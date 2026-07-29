@@ -209,6 +209,33 @@ A skill that creates, registers, or dispatches to agents is an **orchestrator**.
 handbook costs a delegation tier and buries the orchestration in a context that returns only a
 summary. Orchestrators appear in the chart, visible, without being in the chain.
 
+### The evaluators, and why they are not just companion skills
+
+`code-evaluator` and `text-eval` come from claude-enforcer, where they are force-installed companion
+skills carrying catalogs. Here they are what makes **tier-4 verification defensible** — most work needing
+review has no exit code, and a second opinion with no criteria is still just an opinion.
+
+They exist at **two tiers**, because ICs carry `disallowedTools: Agent` and so can never dispatch to an
+evaluator. If review only existed as an employee, the employees who most need it could not reach it.
+
+| Layer | Used by | Tier |
+|---|---|---|
+| the catalog, as a skill | any IC, grepped directly | 3 — mechanical |
+| the evaluator employee that owns it | a lead, which can delegate | 4 — judgment, but catalogued |
+
+**Catalogs install on absence alone, never gated on a declared department** — claude-enforcer's
+`DEC-2026-06-12-install-on-absence`, where an all-coding project got no text evaluator and the audit
+defended the omission. **Present catalogs are maintained unconditionally**, checkbox or not: a growing
+catalog that never reaches installed copies only helps new projects.
+
+**The catalogs are not duplicated into this repo.** They are designed to grow, and two growing copies is
+the two-canonical-texts failure this project refuses everywhere else. If claude-enforcer is on the machine,
+its catalogs seed the project's copy once; otherwise a minimal seed is written and marked as such. After
+that the catalog belongs to the project and to the employee who owns it.
+
+Full treatment: `references/evaluators.md`. **Not to be confused with `evals`** — those are per-employee
+measurement sets (`references/evals.md`). Similar names, unrelated jobs.
+
 ### What is measured and what is not
 
 `references/platform.md` splits platform behavior into **MEASURED** — with evidence paths and the

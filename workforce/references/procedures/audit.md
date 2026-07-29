@@ -71,12 +71,25 @@ A `failed` backup is never silently upgraded to "good enough". The report names 
 
 ## Step 0.3 — Companion skills
 
-Two grouped multi-selects in one call (one question slot): **Core** — `org (recommended)`,
-`operating-principles (recommended)`; **Helpers** — `personnel-ledger (recommended)`, `evals`.
+Two grouped multi-selects in one call (one question slot):
+
+- **Core** — `org (recommended)`, `operating-principles (recommended)`, `personnel-ledger (recommended)`
+- **Evaluators** — `code-evaluator (recommended)`, `text-eval (recommended)`
+  (`references/evaluators.md`)
 
 **Only absent companions render.** A checked box installs; an unchecked box does nothing. **The gate
-never uninstalls** — removal is always a separate, deliberate act. All four present → a one-line
-notice, not a question.
+never uninstalls** — removal is always a separate, deliberate act. All present → a one-line notice, not
+a question.
+
+**Evaluator catalogs install on ABSENCE ALONE — never gated on a declared department.** This is
+claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got no text evaluator because
+nothing declared a creative lane, and the audit *defended* the non-build. That defense was rejected.
+Absence of the catalog is the trigger; nothing else.
+
+**Present catalogs receive unconditional maintenance regardless of any checkbox.** The version comparison
+and forcible append (`evaluators.md` § Forcible propagation) are maintenance of something already
+installed, not a new install, so they run whether or not anything was checked. A growing catalog that does
+not reach installed copies only ever helps new projects.
 
 ## Step 0.4 — Payroll picker
 
@@ -227,6 +240,15 @@ is a better audit than one that converts seventeen.
 
 Assign tiers, `reports-to`, spawn budgets, and exactly one Records Owner per retained playbook. Ties
 break toward the employee owning the fewest records — an owner is a serialization point.
+
+**Evaluator wiring** (`references/evaluators.md`). Per department whose work a catalog covers: propose an
+evaluator employee, make it the catalog's Records Owner, and grant it the catalog via `skills:`. Then wire
+the two verification paths — a **catalog grep** into each producing employee's `## Verification` (tier 3),
+and the **evaluator as reviewer** into that department's Lead handbook (tier 4, because ICs cannot
+delegate).
+
+**Do not staff an evaluator where there is no work for it.** The catalog still installs, so any employee
+can self-check; an employee nothing dispatches to is a pass-through hop.
 
 ## Step 5 — Ratify, then author
 

@@ -204,4 +204,5 @@ design), `references/scopes.md` (personal vs project install, and what each can 
 `references/org-doctrine.md` (the three-document hierarchy),
 `references/procedure-for-procedures.md` (how every handbook is authored),
 `references/delegation-budget.md` (depth, fan-out, spawn caps),
-`references/staging.md` (lint, probe, canary).
+`references/staging.md` (lint, probe, canary),
+`references/evaluators.md` (code and text quality review — what makes tier-4 verification real).

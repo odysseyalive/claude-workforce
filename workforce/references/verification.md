@@ -23,9 +23,18 @@ own opinion.** Ranked, best first:
 |---|---|---|
 | 1 | A **command with an exit code** — `npm test`, `tsc --noEmit`, a linter, a build | Binary, reproducible, no judgment |
 | 2 | A **deterministic test suite** — including a `playwright-mcp` scaffolded suite (see below) | Binary, and covers behavior a command cannot reach |
-| 3 | A **file/string assertion** — a file must exist, a string must appear, a count must match | Mechanical, though it proves less |
-| 4 | A **second agent in a fresh context** judging against stated criteria | Independent, but still a judgment |
+| 3 | A **file/string assertion**, including **a grep against an evaluator catalog** | Mechanical, though it proves less |
+| 4 | A **second agent in a fresh context** judging **against a catalog** | Independent, and catalogued rather than tasteful |
 | — | *"Review the output for quality"* | **Not a check.** Reject it at authoring time |
+
+**Tiers 3 and 4 both depend on catalogs, and that is what makes them worth trusting.** A catalog converts
+a judgment into a checklist: "does this read as machine-written?" is taste, while "does this cluster three
+or more of these tells?" is close to mechanical. Without one, tier 4 collapses into the rejected row —
+a second opinion with no criteria is still just an opinion.
+
+For prose and code quality, the catalogs are `code-evaluator` and `text-eval`
+(`references/evaluators.md`). An IC greps the catalog itself (tier 3); its Lead dispatches the evaluator
+employee for independent review (tier 4), because ICs cannot delegate.
 
 **A handbook may not report PASS on an unrun check.** The section states the command, the expected
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with

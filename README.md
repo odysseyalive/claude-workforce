@@ -110,6 +110,8 @@ That split is a deliberate reading of two sources that disagree. Boris Cherny's 
 
 Every handbook must name a check that proves its own work — an exit code, a test suite, a file assertion. *"Review the output for quality"* is rejected at authoring time. An employee that cannot verify itself either stops early or reports success it did not earn, and because only the top-level summary comes back, a false pass from deep in the chain is invisible.
 
+**For work no command can check, that means a catalog.** Every project gets two evaluators — one for code quality, one for text authenticity — each carrying a catalog of tells and taxonomies. A catalog is what turns a judgment into a checklist: *"does this read as machine-written?"* is taste, while *"does this cluster three or more of these tells?"* is close to mechanical. Individual contributors grep the catalog themselves; their lead dispatches the evaluator for independent review. Without the catalog, quality review is just a second opinion with no criteria.
+
 ## Nobody Is Hired Until a Stranger Can Follow the Handbook
 
 ![A stranger in a doorway reading a single page under morning light, the workshop's regular occupants absent, tools laid out and waiting](assets/images/off-the-street.jpg)
