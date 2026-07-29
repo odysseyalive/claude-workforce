@@ -20,10 +20,47 @@ and how it is structured.
 `skills:` preload, so length multiplies by headcount and fan-out. More importantly: a charter nobody
 can hold in mind has stopped being a decision filter.
 
+## Brand-new project — the interview
+
+Reached from `audit.md` § Step 1a CHARTER-FIRST: a new directory with nothing to read. There is no
+evidence to draft from, so the charter comes from an interview — and it becomes the evidence everything
+downstream uses.
+
+**One `AskUserQuestion` call, several objects** — question slot 5, which org ratification would otherwise
+have used. It is not an extra slot.
+
+Ask only what shapes the project and the org:
+
+1. **What is this project, and what problem does it solve?** The identity line and the fundamental
+   strategy. Always asked; nothing downstream works without it.
+2. **What kinds of work will it involve?** Multi-select — building and testing, content and copy, design,
+   research, data, operations, something else. **This is the department proposal**, taken from the user
+   rather than guessed.
+3. **What will it explicitly NOT do?** Scope boundaries stated up front are worth more than any later
+   inference, and they become the first guardrails.
+4. **What must never happen without your review?** Deploys, publishing, migrations, deletions. Becomes a
+   guardrail on whichever employee ends up owning that work.
+
+**Never invent a purpose.** If the user cannot say what the project is yet, stop and say so: a charter is
+the fixed point everything else is measured against, and a fabricated one measures nothing. Suggest
+returning once there is something to describe.
+
+Then:
+
+- Write the charter into `operating-principles/SKILL.md`, verbatim from the user's own wording.
+- **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and every
+  employee reads it. Keep it short: it is injected into every spawn.
+- Hand the answers to `org-design.md`. Answer 2 is the department proposal; answers 3 and 4 are
+  guardrails. Roles get **provisional verification** where no check exists yet.
+
+**Suppressed in headless, non-interactive, and `--quick`** — which then write nothing and propose nothing.
+A charter is never authored without a human.
+
 ## Procedure
 
 1. **Draft.** The CEO drafts from `CLAUDE.md`, the README, and the actual shape of the project. Where
-   the project's purpose cannot be established from evidence, **ask** — never invent a strategy.
+   the project's purpose cannot be established from evidence, **ask** — never invent a strategy. With
+   nothing at all to read, use § Brand-new project above.
 2. **Ratify.** The user approves before anything is written. **This is not a panel decision.**
    Carpenter is explicit that the Strategic Objective is the leader's job, not a committee's, and an
    org whose charter was written by its own agents has no external reference point.

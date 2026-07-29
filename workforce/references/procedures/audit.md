@@ -56,6 +56,19 @@ skill) requires a verified snapshot. Without one, every conversion downgrades to
 reported. This diverges from claude-enforcer, which proceeds on a warning; the blast radius here is
 replacing a working file, so the floor is higher.
 
+**Declined, failed, and empty are three different states.** Conflating them is how a run either blocks
+for no reason or proceeds without the protection it thinks it has:
+
+| State | Meaning | Consequence |
+|---|---|---|
+| `declined` | the user said no | proceed; conversions downgrade to non-destructive |
+| `no-content` | nothing to archive — no `CLAUDE.md`, no `.claude/`; `zip` reports "Nothing to do" | **proceed normally.** Nothing exists to protect, and only creation follows |
+| `failed` | content existed and the snapshot could not be written or verified | **treat as declined, and say why.** Never proceed as though a snapshot exists |
+
+A `failed` backup is never silently upgraded to "good enough". The report names the state, not just a
+✗ — "backup failed (disk full); conversions restricted to non-destructive" is actionable, and a bare
+✗ is not.
+
 ## Step 0.3 — Companion skills
 
 Two grouped multi-selects in one call (one question slot): **Core** — `org (recommended)`,
@@ -115,8 +128,38 @@ project's file.
 
 | Condition | Mode |
 |---|---|
-| no skills, or none surviving the refusal list | **GREENFIELD** |
+| **no project evidence at all** — no `CLAUDE.md`, no source, no build/test tooling | **CHARTER-FIRST** |
+| project evidence exists, no skills | **GREENFIELD** |
 | skills exist | **BROWNFIELD** = greenfield **plus** conversion |
+
+### CHARTER-FIRST — a brand-new project
+
+A new directory, Claude Code opened, `audit` run. There is nothing to read.
+
+**Do not design an org from nothing, and do not report "nothing to do".** That is the same failure as
+reporting "nothing to convert" — one level deeper. An empty project is not a project without work; it
+is a project whose work has not been written down yet.
+
+**An empty project needs its charter before it needs a company.** So:
+
+1. **Say what was found and what was not.** "No `CLAUDE.md`, no source, no build tooling — this looks
+   like a brand-new project."
+2. **Run `charter`** (`charter.md` § Brand-new project). Its interview establishes what the project is
+   going to be. This consumes question slot 5, which org ratification would otherwise have used.
+3. **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and
+   everything downstream reads it.
+4. **Design the org from the charter.** A stated intent *is* evidence: "a Next.js marketing site with a
+   blog" implies engineering and content before a single file exists.
+5. **Hire the minimum, with provisional verification** where the real check does not exist yet
+   (`org-design.md` § Provisional verification). Never a fabricated check, never a silent pass.
+6. Then Steps 4, 5 (authoring only — ratification already happened at step 2 above), 6, 7 as normal.
+   Step 3 is skipped; there are no skills.
+
+**A backup on an empty project may legitimately fail** — with no `CLAUDE.md` and no `.claude/` there is
+nothing to archive, and `zip` reports "Nothing to do". Treat that as **absent, not broken**: report it
+as `no-content`, and proceed. Charter-first only *creates* files; it replaces nothing, so there is
+nothing a snapshot would protect. This is distinct from a backup that failed while content existed —
+see § Step 0.2.
 
 **Brownfield is never conversion alone.** A project with three skills and twelve directories of code
 has far more work than three skills describe; designing the company from the skills alone staffs a

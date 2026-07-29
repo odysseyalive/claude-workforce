@@ -64,6 +64,14 @@ finding with the journal row that would resume it.
 **Unowned playbooks.** A retained playbook with no Records Owner. Unowned shared data is what
 `records-ownership.md` exists to prevent.
 
+**Still-provisional employees.** Any employee hired charter-first whose verification names a command that
+does not exist yet (`org-design.md` § Provisional verification). Promote it the moment the command
+appears; report it every review until then.
+
+This is a standing finding, not a note. An employee on a provisional check has **never proven anything** —
+it reports `UNVERIFIED` rather than `PASS`, which is honest, but an org that stays provisional for months
+is an org running entirely on trust. That should be visible at every review rather than quietly aging.
+
 ---
 
 ## What a review never does

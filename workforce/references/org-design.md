@@ -15,11 +15,12 @@ case.
 
 ---
 
-## Two modes, one destination
+## Three modes, one destination
 
 | Mode | Trigger | Primary evidence |
 |---|---|---|
-| **Greenfield** | no skills, or none that survive the refusal list | the project itself — layout, `CLAUDE.md`, README, build tooling, git history |
+| **Charter-first** | nothing to read — no `CLAUDE.md`, no source, no tooling | **the user's stated intent**, established by `charter`'s interview |
+| **Greenfield** | project evidence exists, no skills | the project itself — layout, `CLAUDE.md`, README, build tooling, git history |
 | **Brownfield** | skills exist | those skills, **plus** all the greenfield evidence |
 
 Brownfield is greenfield **plus** conversion, never instead of it. A project with three skills and
@@ -51,6 +52,36 @@ the org chart.
 **No git, no tests, no CLAUDE.md?** Then evidence is thin and the roster must be correspondingly
 small. Design for what you can see — an org proposed from guesswork is worse than a small one proposed
 from facts.
+
+**Nothing at all to read?** That is charter-first (`audit.md` § Step 1a), and the evidence becomes the
+user's **stated intent**. A charter is real evidence: *"a Next.js marketing site with a blog"* implies
+engineering and content before a single file exists. What it cannot supply is a verification command —
+see below.
+
+---
+
+## Provisional verification — pre-code roles
+
+The rule that a role without a nameable check is not hired is right, and on a brand-new project it would
+drop **every** role: no build tooling exists yet, so no check exists yet. Applied literally there, a good
+rule refuses to staff a legitimately new project.
+
+So a role may be hired with a **provisional** verification, under three conditions:
+
+1. **It names the check that will exist**, concretely — "`npm test`, once the project is scaffolded" —
+   never "tests will be added".
+2. **It is marked provisional in the handbook and in the `EMP` file.** The handbook says so inside its
+   own `## Verification` section, so the cold reader knows before it starts.
+3. **Until the named command exists, the employee reports `UNVERIFIED`, never `PASS`.** This is the whole
+   point: a provisional check is an admission, not a loophole. An employee that cannot yet prove its work
+   says so on every work order.
+
+`review` promotes a provisional check to real as soon as the named command exists, and **reports every
+still-provisional employee** as a standing finding. An org that stays provisional for months is an org
+whose employees have never proven anything, and that should be visible rather than quietly forgotten.
+
+**Provisional applies to charter-first only.** On a project that already has tooling, a role whose check
+cannot be named is still not hired — the check exists, so name it.
 
 ---
 
