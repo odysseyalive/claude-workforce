@@ -263,7 +263,11 @@ Issues and pull requests are welcome. I can't promise a response time.
 
 ## Acknowledgments
 
+Special thanks to Joe Loudermilk, who helped me understand why giving an LLM a second opinion opens doors. That conversation planted the seed for everything the agent system became.
+
 Special thanks to Wouter Dieters, who helped me make the connection between organizational theory and agency. An agent with a role, a scope it won't leave, a check to pass, and someone it answers to behaves differently from one without.
+
+Thanks also to [Autonomee](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together the greatest minds in the business.
 
 ## License
 
