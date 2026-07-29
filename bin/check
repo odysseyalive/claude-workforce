@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""
+Conformance check for claude-workforce.
+
+This is the project's OWN verification — the runnable check its handbooks
+demand of every employee. Run it before every commit:
+
+    python3 bin/check          # or: bin/check
+
+Exit 0 = conformant. Exit 1 = at least one FAIL.
+
+Every check here exists because its failure mode is SILENT: the repo looks
+fine and something is wrong. Most were discovered by hand during the build
+and are recorded here so they cannot recur unnoticed.
+"""
+
+import os
+import re
+import sys
+import glob
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
+
+FAILS = []
+WARNS = []
+PASSES = 0
+
+
+def check(name, ok, detail=""):
+    global PASSES
+    if ok:
+        PASSES += 1
+    else:
+        FAILS.append((name, detail))
+
+
+def warn(name, detail=""):
+    WARNS.append((name, detail))
+
+
+def read(p):
+    with open(p, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def manifest_paths():
+    """Shipped files, with their flags stripped."""
+    out = []
+    for line in read("manifest.txt").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        for pre in ("keep ", "hook "):
+            if s.startswith(pre):
+                s = s[len(pre):].strip()
+        out.append(s)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Manifest is the single authoritative shipped-file list
+# ─────────────────────────────────────────────────────────────────────────────
+declared = manifest_paths()
+missing = [p for p in declared if not os.path.exists(p)]
+check("manifest: every declared file exists", not missing, f"missing: {missing}")
+
+on_disk = {
+    p for p in glob.glob("workforce/**/*", recursive=True)
+    if os.path.isfile(p) and not os.path.basename(p).startswith(".")
+}
+undeclared = sorted(on_disk - set(declared))
+check(
+    "manifest: no shipped file is undeclared",
+    not undeclared,
+    f"on disk but not in manifest (installers would never fetch these): {undeclared}",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Constants are stated once (forward mobility)
+#
+# A platform change must be a small declared sweep, not a hunt. platform.md is
+# the source of truth; the installers cannot read markdown at install time; the
+# user-facing docs describe the product to a human; scopes.md documents the
+# exception list.
+# ─────────────────────────────────────────────────────────────────────────────
+CONST_EXEMPT = {
+    "workforce/references/platform.md",
+    "workforce/references/scopes.md",
+    "install",
+    "install.ps1",
+    "README.md",
+    "COMMANDS.md",
+}
+CONST_RX = re.compile(r"\bthree tiers\b|\bthree-tier\b|\b20 concurrent\b|\b200 subagents?\b", re.I)
+offenders = []
+for p in declared + ["README.md", "COMMANDS.md", "install", "install.ps1"]:
+    if p in CONST_EXEMPT or not p.endswith((".md", ".sh", ".ps1")) and p not in ("install", "install.ps1"):
+        continue
+    if p in CONST_EXEMPT:
+        continue
+    if CONST_RX.search(read(p)):
+        offenders.append(p)
+check(
+    "constants: stated once, outside the declared exceptions",
+    not offenders,
+    f"restated in: {offenders} — see platform.md § Derived constants",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Cross-references resolve
+# ─────────────────────────────────────────────────────────────────────────────
+broken = []
+for p in glob.glob("workforce/**/*.md", recursive=True) + ["README.md", "COMMANDS.md"]:
+    body = read(p)
+    for m in re.findall(r"`(references/[\w./-]+\.md)`", body):
+        if not os.path.exists("workforce/" + m):
+            broken.append((p, m))
+check("references: every `references/…` link resolves", not broken, f"broken: {broken}")
+
+img_broken = [
+    src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", read("README.md"))
+    if not src.startswith("http") and not os.path.exists(src)
+]
+check("README: every image resolves", not img_broken, f"missing: {img_broken}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Project state never lives in the skill directory
+#
+# The invariant that lets ONE personal install serve many projects. Break it and
+# a single config is shared across unrelated orgs.
+# ─────────────────────────────────────────────────────────────────────────────
+STATE_RX = re.compile(
+    r"\.claude/skills/workforce/[\w./-]*(?:org-config\.md|org-chart|personnel/|work/|evals/|ablations/)"
+)
+leaks = [p for p in declared if p.endswith(".md") and STATE_RX.search(read(p))]
+check("scopes: no project state written into the skill directory", not leaks, f"leaks: {leaks}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. SKILL.md structure and marker pairing
+# ─────────────────────────────────────────────────────────────────────────────
+skill = read("workforce/SKILL.md")
+check("SKILL.md: frontmatter present", skill.startswith("---\n"))
+fm = skill.split("\n---\n")[0]
+for key in ("name:", "description:", "when_to_use:", "allowed-tools:"):
+    check(f"SKILL.md: frontmatter has {key}", key in fm)
+check(
+    "SKILL.md: ENFORCEMENT ANNOTATION blocks are paired",
+    skill.count("<!-- ENFORCEMENT ANNOTATION") == skill.count("<!-- END ENFORCEMENT ANNOTATION -->"),
+    f"{skill.count('<!-- ENFORCEMENT ANNOTATION')} open vs "
+    f"{skill.count('<!-- END ENFORCEMENT ANNOTATION -->')} close",
+)
+# Count only STANDALONE markers — one on its own line. Prose that documents the
+# marker syntax (`<!-- origin: user | immutable: true -->` inside backticks) is a
+# mention, not a marker, and counting it produced 8 false failures on this
+# check's first run.
+OPEN_RX = re.compile(r"^<!--\s*origin:.*-->\s*$", re.M)
+CLOSE_RX = re.compile(r"^<!--\s*/origin\s*-->\s*$", re.M)
+for p in declared:
+    if not p.endswith(".md"):
+        continue
+    body = read(p)
+    o, c = len(OPEN_RX.findall(body)), len(CLOSE_RX.findall(body))
+    check(f"origin blocks paired in {os.path.basename(p)}", o == c, f"{o} open vs {c} close")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Shipped agents are leaf helpers
+#
+# They run as panel members. If one could delegate it would consume a tier from
+# the org that hired it — measured as exactly the budget the chain of command needs.
+# ─────────────────────────────────────────────────────────────────────────────
+for p in glob.glob("workforce/agents/*/AGENT.md"):
+    body = read(p)
+    name = os.path.basename(os.path.dirname(p))
+    check(f"agent {name}: carries disallowedTools: Agent", "disallowedTools: Agent" in body)
+    check(f"agent {name}: frontmatter has name:", re.search(r"^name:\s*\S+", body.split("\n---\n")[0], re.M) is not None)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Handbook templates carry the load-bearing frontmatter
+# ─────────────────────────────────────────────────────────────────────────────
+tpl = read("workforce/references/handbook-templates.md")
+check("templates: IC carries disallowedTools: Agent (the measured tier ceiling)", "disallowedTools: Agent" in tpl)
+check("templates: delegating tiers carry background: false", "background: false" in tpl)
+check("templates: no memory: field offered", not re.search(r"^\s*memory:\s*\w", tpl, re.M))
+check("templates: MCP granted at server level", "mcp__playwright-mcp__*" in tpl)
+
+pfp = read("workforce/references/procedure-for-procedures.md")
+required = re.findall(r"\| `## (\w[\w ]*)` \|", pfp)
+absent = [s for s in required if f"## {s}" not in tpl]
+check("templates: every section the authoring spec requires is present", not absent, f"absent: {absent}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Hooks fail open and are executable
+# ─────────────────────────────────────────────────────────────────────────────
+for p in glob.glob("workforce/hooks/*.sh"):
+    body = read(p)
+    n = os.path.basename(p)
+    check(f"hook {n}: exits 0 (fails open)", "exit 0" in body)
+    check(f"hook {n}: executable bit set", os.access(p, os.X_OK))
+    check(f"hook {n}: declared with the hook flag", f"hook {p}" in read("manifest.txt"))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Honesty rules — never claim enforcement the runtime will not deliver
+# ─────────────────────────────────────────────────────────────────────────────
+# The SANCTIONED honesty clause contains the word "enforced" by design —
+# "enforced by prose plus permissions.deny. Prose is advisory…" — so a naive
+# scan flags the very sentence written to prevent overclaiming. It did, on this
+# check's first run. Strip the canonical clause, then scan what remains.
+SANCTIONED = "Chain of command is enforced by prose plus permissions.deny"
+OVERCLAIM = re.compile(
+    r"chain of command is (?:enforced|guaranteed|prevented|sandboxed)"
+    r"|(?:enforces|guarantees|prevents) (?:the )?chain of command",
+    re.I,
+)
+overclaims = []
+for p in declared + ["README.md", "COMMANDS.md"]:
+    if not p.endswith(".md"):
+        continue
+    body = read(p).replace(SANCTIONED, "")
+    if OVERCLAIM.search(body):
+        overclaims.append(p)
+check(
+    "honesty: chain of command never described as enforced",
+    not overclaims,
+    f"overclaimed in: {overclaims} — it is detection, not prevention (enforcement.md)",
+)
+
+enf = read("workforce/references/enforcement.md")
+check("honesty: enforcement.md states the cannot-enforce cases", "CANNOT. Detection only." in enf)
+
+plat = read("workforce/references/platform.md")
+check("platform: MEASURED-ON stamp present", "MEASURED-ON:" in plat)
+check("platform: TIER-LIMIT constant present", "TIER-LIMIT:" in plat)
+check("platform: MEASURED and DOCUMENTED are separated", "## DOCUMENTED" in plat and "## MEASURED" in plat)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. README copy-button discipline — one command per fenced block
+# ─────────────────────────────────────────────────────────────────────────────
+multi = [
+    b.strip()[:50]
+    for lang, b in re.findall(r"```(\w*)\n(.*?)```", read("README.md"), re.S)
+    if lang in ("", "bash", "powershell")
+    and len([x for x in b.strip().split("\n") if x.strip()]) > 1
+]
+check("README: one copyable command per fenced block", not multi, f"stacked: {multi}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Warnings — worth knowing, not worth failing
+# ─────────────────────────────────────────────────────────────────────────────
+for p in declared:
+    if p.endswith(".md"):
+        n = len(read(p).splitlines())
+        if n > 260:
+            warn(f"{os.path.basename(p)} is {n} lines", "long reference; candidate for a split or ablation")
+
+if not os.path.exists("CLAUDE.md"):
+    warn("no CLAUDE.md at the repo root", "a fresh session here has no orientation")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Report
+# ─────────────────────────────────────────────────────────────────────────────
+print(f"claude-workforce conformance — {len(declared)} shipped files\n")
+if FAILS:
+    print(f"FAIL ({len(FAILS)}):")
+    for name, detail in FAILS:
+        print(f"  ✗ {name}")
+        if detail:
+            print(f"      {detail}")
+    print()
+if WARNS:
+    print(f"warnings ({len(WARNS)}):")
+    for name, detail in WARNS:
+        print(f"  · {name}" + (f" — {detail}" if detail else ""))
+    print()
+print(f"{PASSES} passed, {len(FAILS)} failed, {len(WARNS)} warnings")
+sys.exit(1 if FAILS else 0)

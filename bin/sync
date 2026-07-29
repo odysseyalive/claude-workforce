@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""
+Mirror the source distribution into the runtime copy, exactly as the installers do.
+
+    python3 bin/sync            # or: bin/sync
+
+claude-workforce has a dual tree:
+
+    workforce/                     the SOURCE distribution — what ships
+    .claude/skills/workforce/      the RUNTIME copy — what a session here loads
+
+Edit source, run this, restart Claude Code. Never edit the runtime copy: it is
+overwritten every sync, and source-first is a directive inherited from
+claude-enforcer, where reverse-order edits repeatedly landed in the runtime and
+were lost.
+
+This reads manifest.txt, so it fails the same way an installer would if the
+manifest and the tree disagree — which is the point. `bin/check` asserts that
+agreement separately.
+"""
+
+import os
+import shutil
+import stat
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
+
+DEST_ROOT = ".claude/skills/workforce"
+PREFIX = "workforce/"
+
+if not os.path.isfile("manifest.txt"):
+    sys.exit("no manifest.txt — run from the repo root")
+
+if os.path.isdir(DEST_ROOT):
+    shutil.rmtree(DEST_ROOT)
+
+copied = hooks = 0
+missing = []
+
+for line in open("manifest.txt", encoding="utf-8"):
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+
+    flag = ""
+    if s.startswith("keep "):
+        flag, s = "keep", s[5:].strip()
+    elif s.startswith("hook "):
+        flag, s = "hook", s[5:].strip()
+
+    if not s.startswith(PREFIX):
+        missing.append(f"{s} (path does not start with {PREFIX!r})")
+        continue
+    if not os.path.isfile(s):
+        missing.append(f"{s} (declared, not on disk)")
+        continue
+
+    dest = os.path.join(DEST_ROOT, s[len(PREFIX):])
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copy2(s, dest)
+
+    if flag == "hook":
+        os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        hooks += 1
+
+    copied += 1
+
+print(f"synced {copied} files to {DEST_ROOT} ({hooks} hooks marked executable)")
+
+if missing:
+    print("\nmanifest problems:")
+    for m in missing:
+        print(f"  ✗ {m}")
+    sys.exit(1)
+
+print("\nRestart Claude Code to load the synced copy — a freshly written skill is not")
+print("discoverable in the session that wrote it (references/platform.md fact 3b).")
