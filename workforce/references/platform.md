@@ -65,44 +65,79 @@ design decision, which is why the design does not wait on it.
 delegating tiers as defensive practice, and its absence is *reported*. It is **never** a blocking
 check. See fact 2b for what actually is.
 
-### Fact 2b — `disallowedTools: Agent` is the only reliable tier ceiling ✅
+### Fact 2b — entry depth does not cap an IC ✅ MEASURED
 
-Depth alone does not cap an IC. At depth 3 the harness withholds `Agent` — but an IC is only at depth
-3 when it was reached through CEO → Lead. Invoke `@agent-eng-lead` **directly** and that Lead sits at
-depth 1, putting its ICs at depth 2, where `Agent` is granted.
+Depth alone does not cap an IC. At the depth limit the harness withholds `Agent` — but an IC only sits
+at the limit when reached through CEO → Lead. Invoke a Lead **directly** and it sits at depth 1, putting
+its ICs at depth 2, where `Agent` **is** granted.
 
-**Every IC handbook therefore carries `disallowedTools: Agent`.** It is the single frontmatter line
-that holds the org's shape invariant regardless of entry point, and it is a **blocking** lint check.
+**Measured 2026-07-29**, and by accident: the tier canary was spawned from main, so its Lead was depth 1
+and its IC depth 2. The IC reported `IC_HAS_AGENT_TOOL: yes | TOOLS: Read, Write, Agent`. The canary
+recorded FAIL — but **the canary's expectation was wrong, not the host.** This is exactly the entry-depth
+case, and observing it confirms the fact. Evidence: `.claude/workforce/canary.md`.
 
-### Fact 3 — Agent definitions are NOT live-reloaded ✅
+Two things follow, and the second is uncomfortable.
 
-Evidence: writing `.claude/agents/wf-canary-lead.md` and immediately spawning it returned
-`Agent type 'wf-canary-lead' not found` (2026-07-29).
+### Fact 2c — `disallowedTools: Agent` as the tier ceiling ⚠️ NOT YET MEASURED
 
-### Fact 3b — Nor are freshly installed SKILLS, despite documented live change detection ❌
+Because entry depth cannot be relied on, every IC handbook carries `disallowedTools: Agent`, and the
+lint check that asserts it is **blocking**.
 
-Evidence: installing all 58 manifest files to `.claude/skills/workforce/` and immediately invoking the
-skill returned `Unknown skill: workforce` — **three times**, on 2026-07-29, harness 2.1.220.
+**That mechanism has not been measured.** An earlier draft of this file called it "the only
+measured-reliable way to withhold delegation" — it was not measured at all. The background rule *was*
+measured and falsified (fact 2); `disallowedTools` was assumed to work because the documentation says so,
+which is the precise substitution this file exists to prevent. It went unnoticed because it was written
+in the same edit that recorded a real measurement, and inherited its credibility.
 
-The documentation states that project skill directories are watched and need no restart. That did not
-hold here. One hypothesis was tested and **falsified**: the project was not a git repo, and project
-skills are documented as loading by walking up to a repo root — but `git init` did not make the skill
-discoverable either.
+**Until measured, it is a DOCUMENTED fact**, and the ordinary rule applies: it may not be the basis of a
+gate that refuses a user's work. The blocking lint check therefore asserts *presence of the line* — a
+property of the text, which is verifiable — and never claims the runtime honors it.
 
-**Mechanism unknown, and deliberately not guessed at.** Candidates not distinguished: a
-session-start skill listing that is not re-read, a watcher that does not pick up newly *created*
-directories (as opposed to edits within known ones), or something specific to this sandbox. What is
-established is the observable behavior.
+**The measurement:** `.claude/agents/wf-ceiling-probe.md` lists `Agent` in **both** `tools:` and
+`disallowedTools:`, so a missing `Agent` proves the harness withheld it rather than it never having been
+requested. Spawn it, record the result, and promote or correct this row. Pending because a newly written
+agent is not immediately discoverable (fact 3).
 
-**Design consequences:**
-- The restart notice is **not only about agents**. A fresh install cannot be exercised in the session
-  that performed it, so both installers and `audit`'s closing report say restart — which is now
-  doubly justified rather than a precaution.
-- **`update` cannot be verified in the session that runs it.** `update.md`'s "run `verify` and report
-  what changed" happens against the *old* loaded copy. The report must say so rather than implying it
-  validated the new one.
-- A smoke test of this project's own skill requires a fresh session. There is no way around it from
-  inside one.
+### Fact 3 — Agents and skills register on a DELAY, not on restart ✅ CORRECTED
+
+**This row was wrong twice before being measured properly. Read the correction, not the conclusion.**
+
+What is established, harness 2.1.220:
+
+| Observation | |
+|---|---|
+| A just-written agent is **not immediately** discoverable | `wf-reload-probe` written 22:41:32Z; spawn attempted at **22:42, 22:44, and 22:46** → `not found` all three times |
+| A just-installed skill is **not immediately** invocable | 58 files installed, invoked three times → `Unknown skill: workforce` |
+| **Both register later in the same session, with no restart** | at 22:42 the available-agents list included `wf-canary-ic` and `wf-canary-lead`, both written at **18:34** — and the skill listing included `workforce` |
+
+**So a restart is not required. The earlier claim that it was is retracted.**
+
+**Bound on the interval: longer than 4.5 minutes, shorter than a session.** Three attempts across that
+window all failed, while agents written hours earlier had registered. The upper bound is loose because
+the canary agents' registration was noticed rather than timed.
+
+**The trigger is undetermined and deliberately not guessed at.** Candidates not distinguished: a
+long-interval watcher, a re-scan on compaction or another harness event, or the availability notice itself
+being the registration. One hypothesis *was* tested and falsified — the project was not a git repo, and
+project skills are documented as loading by walking up to a repo root, but `git init` did not make the
+skill discoverable.
+
+**Next measurement, if it is worth narrowing:** write a fixture and attempt it on a fixed schedule, so the
+first success is timed rather than noticed. `wf-reload-probe` and `wf-ceiling-probe` are left in
+`.claude/agents/` for exactly that.
+
+**Design consequences — restart is the RELIABLE path, not the only one:**
+
+- `audit`'s closing report and both installers say: *newly hired employees are not immediately
+  dispatchable. They register later in this session, or immediately after a restart — restart if you want
+  them now.* Saying "restart required" would be false; saying nothing would leave a user confused by a
+  chart full of employees that cannot yet be reached.
+- `org index` marks affected rows `PENDING-RESTART`. The label is imprecise but the behavior is right:
+  do not dispatch to an employee the harness has not yet loaded.
+- **`update` may not have loaded the copy it just installed.** Report it as unconfirmed rather than
+  claiming either outcome.
+- A fixture written for measurement must be written **well before** it is needed. This is why
+  `wf-ceiling-probe` (fact 2c) is pending: it cannot be spawned in the turn that created it.
 
 **Consequences:**
 - `audit`'s closing report MUST tell the user to **restart Claude Code before the new org is usable**.

@@ -89,15 +89,49 @@ before proceeding.
 Registration required, **once per run, not per employee**. The frontmatter properties Phase B cannot
 reach depend on *tier*, not on the individual handbook — so test them once.
 
-1. Register two throwaway agents: a delegating-tier canary and a terminal-tier canary.
-2. Spawn the delegating one. Its whole instruction: report whether it has the `Agent` tool; if so,
-   spawn the terminal canary and report what *it* returned; write findings to
-   `.claude/workforce/work/<run-id>/canary.md`; return PASS/FAIL.
-3. Assert the delegating tier receives `Agent` and the terminal tier does not.
-4. Delete both canaries. Record the result and cite it in the org chart header.
+> **The first version of this spec was wrong, and it produced a false FAIL on 2026-07-29.** It asserted
+> "the delegating tier receives `Agent` and the terminal tier does not." Spawned from main, the Lead sits
+> at depth 1 and its IC at depth **2** — not the ceiling — so the IC correctly *had* `Agent` and the
+> canary reported failure against a healthy host. The expectation was wrong, not the platform. A canary
+> that fails for a reason that is not true is worse than no canary, because it blocks real work.
 
-**A canary FAIL aborts the run before any registration.** No handbooks are registered against a host
-whose delegation semantics do not match the design's assumptions.
+**Two independent assertions, because they measure different things:**
+
+### C1 — the depth limit
+
+Register three throwaway agents chained A → B → C, and spawn A **from the main conversation** so the
+chain reaches true depth. Each reports whether it has `Agent`, and A returns the collected result.
+
+Assert: the deepest link **lacks** `Agent`, and every link above it has it. That measures
+`TIER-LIMIT` (`platform.md` § header) on this host.
+
+**Do not test depth with a two-agent chain.** That is the mistake above: two links from main reach depth
+2, which is not the ceiling on a host whose limit is 3.
+
+### C2 — the tier ceiling mechanism (the one that matters)
+
+Register one throwaway agent listing `Agent` in **both** `tools:` and `disallowedTools:`. Spawn it at any
+depth. Assert it **lacks** `Agent`.
+
+Listing it in both is the whole design: a missing `Agent` then proves the harness **withheld** it, rather
+than it never having been requested. Without that, absence is uninformative.
+
+**C2 is the load-bearing assertion.** Every IC handbook's tier ceiling rests on `disallowedTools`, not on
+depth — because entry depth is not controllable (`platform.md` fact 2b). C1 tells you the org's maximum
+shape; C2 tells you whether the shape holds when someone invokes a Lead directly.
+
+### Both
+
+- Delete the fixtures afterward. Record both results and cite them in the org chart header.
+- **A canary FAIL aborts the run before any registration** — no handbooks land against a host whose
+  delegation semantics differ from the design's. But confirm the *expectation* first: on the one occasion
+  this has fired, the spec was at fault.
+- **Fixtures cannot be spawned in the turn that creates them** (`platform.md` fact 3). Write them early,
+  or run the canary against fixtures registered by a previous session.
+
+**Instruct every canary to report only what it observes.** The phrasing matters:
+*"report only what you actually observe; never infer from documentation, from your own frontmatter, or
+from what you expect."* A canary that reasons from the docs measures the docs.
 
 **Instruct every canary to report only what it observes.** The phrasing matters:
 *"report only what you actually observe; never infer from documentation or from what you expect."*

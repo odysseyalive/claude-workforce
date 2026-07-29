@@ -247,9 +247,10 @@ Begin with step 1 now.
     Write-Host ''
     Write-Host "Installation complete ($scope scope)."
     Write-Host ''
-    Write-Host 'IMPORTANT: restart Claude Code before running the audit.'
-    Write-Host 'Claude Code discovers agent definitions at startup and does NOT reload'
-    Write-Host 'them mid-session. Employees the audit hires are unreachable until you restart.'
+    Write-Host 'NOTE: restart Claude Code before running the audit.'
+    Write-Host 'Newly written agent definitions are not IMMEDIATELY discoverable. They'
+    Write-Host 'register later in a session on their own, but the delay is undetermined —'
+    Write-Host 'restarting is the reliable way to reach new employees now.'
     Write-Host ''
     if ($scope -eq 'user') {
         Write-Host 'This install serves every project on this machine. Each project gets its'

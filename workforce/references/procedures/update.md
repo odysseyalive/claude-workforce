@@ -77,19 +77,21 @@ At personal scope, one update reaches every project on the machine.
    after. If it is not, that is a bug in the manifest or the installer, not an acceptable outcome.
 6. **Run `verify`** and report what changed — with the caveat in the next section attached.
 
-## The new copy is not loaded in this session
+## The new copy may not be loaded yet
 
-**A freshly written skill is not discoverable in the session that wrote it** (`platform.md` fact 3b) —
-measured, and contrary to the documented live change detection.
+**A freshly installed skill is not *immediately* discoverable** (`platform.md` fact 3). It registers
+later in the same session — no restart strictly required — but the interval and trigger are undetermined.
 
-So everything after step 3 runs against the **previously loaded** copy of this spec, not the one just
-installed. Say so explicitly rather than implying otherwise:
+So the checks after step 4 may have run against the **previously loaded** copy. Report that as unknown
+rather than claiming either outcome:
 
-> Updated to `<version>`. The new copy is on disk but not loaded in this session — restart Claude Code
-> to run it. The checks above were performed by the previously loaded version.
+> Updated to `<version>` at `<path>`. Whether this session has loaded it is unconfirmed — a freshly
+> installed skill registers on a delay. Restart Claude Code to be certain you are running it. The checks
+> above may have been performed by the previously loaded version.
 
-A report that reads as though it validated the new release, when it could not have, is exactly the
-"reads as success" failure this project exists to avoid.
+Claiming it validated the new release would be the "reads as success" failure. Claiming a restart is
+*required* would be equally wrong — an earlier draft of this section said exactly that, before the
+behavior was measured properly.
 
 ## What to check after updating
 
