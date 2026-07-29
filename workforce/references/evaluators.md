@@ -67,23 +67,35 @@ nobody manages and nothing dispatches to is a pass-through hop.
 
 ---
 
-## Seeding the catalog — and why it is not duplicated here
+## Seeding the catalog
 
-**claude-workforce does not ship copies of claude-enforcer's catalogs.** Those catalogs are designed to
-grow, and two growing copies of a corpus is the two-canonical-texts failure this project refuses
-everywhere else — the same reason an immutable block is referenced and never copied.
+The catalogs originate in claude-enforcer, which this project supersedes. That makes seeding a
+**one-time migration import**, not an ongoing dependency: workforce must never require a superseded
+project to be installed in order to function.
 
 Seeding, in order:
 
-1. **claude-enforcer present on this machine?** Import its shipped catalogs as the seed, recording the
-   source path and its version anchor. One canonical origin, imported once.
-2. **Otherwise**, write the minimal seed this project ships — the structure, the severity tiers, the
-   clustering rule, and a starter set of entries — and mark it `seed-only` so its thinness is visible
-   rather than mistaken for a complete corpus.
+1. **claude-enforcer present on this machine?** Import its shipped catalogs once, recording the source
+   path and its version anchor in the project's copy. This is the migration path, and it is the best
+   available seed because those catalogs are the real accumulated corpus.
+2. **Otherwise**, write the seed this project ships: the structure, the severity tiers, the clustering
+   rule, the `[hard]` rows, and a starter set of entries. Mark it `seed-only` so its thinness is
+   visible rather than mistaken for a complete corpus.
 
-Either way the catalog then lives **in the project**, at
-`${CLAUDE_PROJECT_DIR}/.claude/skills/<evaluator>/`, as its owner's playbook. Growth after that is the
-project's own, and the evaluator employee is the one who grows it.
+**After the import, the dependency ends.** The catalog lives in the project at
+`${CLAUDE_PROJECT_DIR}/.claude/skills/<evaluator>/` as its owner's playbook, and it grows from the
+project's own work. Nothing re-reads claude-enforcer afterward, and a project seeded from the shipped
+minimal set is fully functional rather than degraded.
+
+**Why the catalogs are not duplicated into this repo wholesale.** They are designed to grow, and two
+growing copies of one corpus is the two-canonical-texts failure this project refuses everywhere else,
+for the same reason an immutable block is referenced and never copied. Carrying the shipped seed plus
+the migration import keeps one canonical origin per project.
+
+**Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
+carry more of the weight. Growing it is a release task, tracked in `version.md`, and the honest signal
+is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
+corpus.
 
 ---
 

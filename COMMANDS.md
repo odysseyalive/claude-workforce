@@ -198,7 +198,7 @@ assistant beneath it. Research is a department peer reached by a lead.
 Each handbook carries its own `model:` and `effort:`, resolved as department override → tier default.
 The main loop only dispatches, so the session model does not affect the work.
 
-That removes a problem claude-enforcer has to solve: its `/route` must sometimes ask you to switch
+That removes a problem claude-enforcer had to solve: its `/route` must sometimes ask you to switch
 models, because the dispatched skill runs in the main loop. **`/org` never asks**, and the dispatch
 contract says so explicitly so nobody ports the question back in.
 
@@ -229,9 +229,11 @@ defended the omission. **Present catalogs are maintained unconditionally**, chec
 catalog that never reaches installed copies only helps new projects.
 
 **The catalogs are not duplicated into this repo.** They are designed to grow, and two growing copies is
-the two-canonical-texts failure this project refuses everywhere else. If claude-enforcer is on the machine,
-its catalogs seed the project's copy once; otherwise a minimal seed is written and marked as such. After
-that the catalog belongs to the project and to the employee who owns it.
+the two-canonical-texts failure this project refuses everywhere else. If claude-enforcer is on the
+machine, its catalogs seed the project's copy **once**, as a migration import; otherwise the shipped
+minimal seed is written and marked `seed-only`. After that the catalog belongs to the project and to the
+employee who owns it, and nothing re-reads the superseded project. A project seeded from the shipped set
+is fully functional rather than degraded.
 
 Full treatment: `references/evaluators.md`. **Not to be confused with `evals`** — those are per-employee
 measurement sets (`references/evals.md`). Similar names, unrelated jobs.

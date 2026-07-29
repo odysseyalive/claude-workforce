@@ -118,11 +118,27 @@ for p in glob.glob("workforce/**/*.md", recursive=True) + ["README.md", "COMMAND
             broken.append((p, m))
 check("references: every `references/…` link resolves", not broken, f"broken: {broken}")
 
+readme = read("README.md")
 img_broken = [
-    src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", read("README.md"))
+    src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)
     if not src.startswith("http") and not os.path.exists(src)
 ]
 check("README: every image resolves", not img_broken, f"missing: {img_broken}")
+
+# In-document anchors are not paths. Resolve them against the heading slugs
+# instead — treating them as files was a false positive on this check's own terms.
+slugs = {
+    re.sub(r"[^a-z0-9]+", "-", h.lower()).strip("-")
+    for h in re.findall(r"^#{2,3} (.+)$", readme, re.M)
+}
+bad_anchors = [a for a in re.findall(r"\]\(#([^)]+)\)", readme) if a not in slugs]
+check("README: every in-document anchor resolves", not bad_anchors, f"broken: {bad_anchors}")
+
+link_broken = [
+    tgt.split("#")[0] for _, tgt in re.findall(r"\[([^\]]+)\]\(([^)]+)\)", readme)
+    if not tgt.startswith(("http", "#")) and not os.path.exists(tgt.split("#")[0])
+]
+check("README: every relative link resolves", not link_broken, f"missing: {link_broken}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Project state never lives in the skill directory
