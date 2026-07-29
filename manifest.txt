@@ -1,0 +1,121 @@
+# Claude Workforce install manifest
+#
+# The single authoritative list of every file the installers ship.
+# Consumed by BOTH installers: `install` (bash, Linux/macOS) and
+# `install.ps1` (PowerShell, Windows). Add every new shipped file here;
+# there are no per-installer fetch loops to keep in sync.
+#
+# Format: [flag] <path relative to repo root>
+#   (no flag)  fetch unconditionally, overwriting any existing copy
+#   keep       fetch only if absent on the host (user-editable file; never clobber)
+#   hook       fetch unconditionally; mark executable on unix systems
+#
+# Host destination: .claude/skills/workforce/<path minus leading "workforce/">
+
+workforce/SKILL.md
+
+# ── References ────────────────────────────────────────────────────────────────
+workforce/references/principles.md
+workforce/references/platform.md
+workforce/references/scopes.md
+workforce/references/org-design.md
+workforce/references/org-doctrine.md
+workforce/references/procedure-for-procedures.md
+workforce/references/handbook-templates.md
+workforce/references/org-chart-format.md
+workforce/references/conversion-taxonomy.md
+workforce/references/records-ownership.md
+workforce/references/personnel-templates.md
+workforce/references/delegation-budget.md
+workforce/references/verification.md
+workforce/references/staging.md
+workforce/references/ablation.md
+workforce/references/evals.md
+workforce/references/enforcement.md
+workforce/references/personas.md
+workforce/references/templates.md
+workforce/references/version.md
+
+# org-config.template.md is the SHIPPED TEMPLATE for the per-project config
+# (tier -> model/effort, department roster, per-project markers).
+#
+# It is fetched UNCONDITIONALLY and is never edited by the user. `/workforce audit`
+# instantiates it once into ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md
+# and never clobbers that copy afterwards.
+#
+# Why a template rather than claude-enforcer's `keep`-flagged in-skill file: the
+# skill may be installed at USER scope (~/.claude/skills/workforce/), where a single
+# in-skill config would be shared by every project on the machine — department
+# rosters and tier->model tables silently colliding across unrelated orgs. `keep`
+# protects a file from re-download; it cannot protect it from being in the wrong
+# scope. Project state lives in the project. See references/scopes.md.
+workforce/references/org-config.template.md
+
+# ── Procedures ────────────────────────────────────────────────────────────────
+workforce/references/procedures/audit.md
+workforce/references/procedures/org.md
+workforce/references/procedures/handbook.md
+workforce/references/procedures/charter.md
+workforce/references/procedures/principles.md
+
+# HR lifecycle
+workforce/references/procedures/hire.md
+workforce/references/procedures/promote.md
+workforce/references/procedures/transfer.md
+workforce/references/procedures/retire.md
+
+# The HR loop
+workforce/references/procedures/review.md
+workforce/references/procedures/amend.md
+workforce/references/procedures/defect.md
+workforce/references/procedures/ledger.md
+workforce/references/procedures/roster.md
+
+# Payroll, budget, measurement
+workforce/references/procedures/model-map.md
+workforce/references/procedures/budget.md
+workforce/references/procedures/evals.md
+workforce/references/procedures/ablate.md
+
+# Recovery
+workforce/references/procedures/backup.md
+workforce/references/procedures/restore.md
+workforce/references/procedures/rollback.md
+workforce/references/procedures/disband.md
+
+# Maintenance
+workforce/references/procedures/vendor.md
+workforce/references/procedures/reconcile.md
+workforce/references/procedures/checksums.md
+workforce/references/procedures/verify.md
+workforce/references/procedures/intent-router.md
+workforce/references/procedures/update.md
+workforce/references/procedures/version.md
+
+# ── Agents ────────────────────────────────────────────────────────────────────
+workforce/agents/intent-router/AGENT.md
+workforce/agents/handbook-cold-reader/AGENT.md
+workforce/agents/headcount-skeptic/AGENT.md
+workforce/agents/conversion-auditor/AGENT.md
+
+# ── Hooks ─────────────────────────────────────────────────────────────────────
+# claude-workforce does NOT distribute hooks; the host generates its own.
+# Exactly four files are excepted, and they are load-bearing enforcement:
+#
+#   protect-directives.{sh,ps1}  guards immutable user-directive blocks
+#   unique-employee.{sh,ps1}     guards employee name collisions
+#
+# The unique-employee pair earns its exception on a hard platform fact: agent
+# identity comes ONLY from the `name:` frontmatter field, and subfolders do NOT
+# namespace. Two handbooks at .claude/agents/eng/reviewer.md and
+# .claude/agents/docs/reviewer.md collide SILENTLY — one simply wins, chosen by
+# filesystem read order. Without a mechanical guard every fresh install can lose
+# an employee with no error.
+#
+# All four stay dormant until wired host-locally; run
+#   /workforce dev hooks --execute
+# to wire the OS-appropriate variant into .claude/settings.local.json.
+hook workforce/hooks/protect-directives.sh
+hook workforce/hooks/unique-employee.sh
+workforce/hooks/protect-directives.ps1
+workforce/hooks/unique-employee.ps1

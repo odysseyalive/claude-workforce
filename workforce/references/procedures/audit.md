@@ -1,0 +1,245 @@
+# audit — survey the project and build its company
+
+**The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
+executes its own recommendations.
+
+```
+/workforce audit            full run — the Step 0 disclaimer IS the consent
+/workforce audit --review   full scan and plan, ZERO writes
+/workforce audit --quick    frontmatter, chart drift, and budget only
+```
+
+**Autonomy model, inherited from claude-enforcer's ratified design:** the disclaimer is the consent;
+there is no DEFER tier; **agent panels supply judgment, never user questions**; failures land as ✗ in
+the Execution Summary with the step they failed at, never as "run this command yourself."
+
+---
+
+## The question budget — five, and it is a ceiling
+
+| # | Step | Question |
+|---|---|---|
+| 1 | 0 | Disclaimer — accept and proceed / cancel |
+| 2 | 0.2 | Backup offer |
+| 3 | 0.3 | Companion skills — absent only, check to install |
+| 4 | 0.4 | Payroll picker — tier × department model and effort |
+| 5 | 5-setup | Org ratification — the proposed roster, first audit only |
+
+Everything else is a panel. **Suppressed entirely** in headless, non-interactive, and `--quick` runs:
+those render nothing, write no markers, and install nothing that was not already authorized.
+
+---
+
+## Step 0 — Disclaimer
+
+A real `AskUserQuestion` widget, never prose. Must state plainly:
+
+- Designed for the current model generation; handbooks it writes remain usable on earlier models.
+- **This audit CONVERTS skills into agent employees. It writes `.claude/agents/`, demotes converted
+  skills to stubs, and edits your project's `.claude/` directory.**
+- Back up `CLAUDE.md` and `.claude/` first. You will be offered a snapshot next; taking it enables a
+  clean uninstall via `/workforce disband` or `restore`.
+- Accepting runs the audit and applies its recommendations automatically.
+
+Cancel → stop, write nothing. Accept → write the `audit-disclaimer` marker.
+
+Headless: with no acceptance on record, **refuse**. Interactive runs always re-ask.
+
+## Step 0.2 — Backup
+
+Offer a snapshot (`backup.md`). It runs **first** in the execution phase so it captures pre-audit
+state.
+
+**Declining does not stop the audit, but it restricts it:** conversion's destructive step (demoting a
+skill) requires a verified snapshot. Without one, every conversion downgrades to
+**register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and
+reported. This diverges from claude-enforcer, which proceeds on a warning; the blast radius here is
+replacing a working file, so the floor is higher.
+
+## Step 0.3 — Companion skills
+
+Two grouped multi-selects in one call (one question slot): **Core** — `org (recommended)`,
+`operating-principles (recommended)`; **Helpers** — `personnel-ledger (recommended)`, `evals`.
+
+**Only absent companions render.** A checked box installs; an unchecked box does nothing. **The gate
+never uninstalls** — removal is always a separate, deliberate act. All four present → a one-line
+notice, not a question.
+
+## Step 0.4 — Payroll picker
+
+Two `AskUserQuestion` calls, eight objects, **fixed regardless of headcount**
+(`references/org-config.template.md`):
+
+- **Call 1 — models:** CEO tier / Lead tier / IC tier / **creative-alternate**. One shared option
+  pool; the copy must announce that "Other" accepts any model ID typed by hand.
+- **Call 2 — effort and overrides:** CEO / Lead / IC effort, and which departments run on the
+  alternate model (pre-checked from the Step 2 panel's creative classification).
+
+**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
+anything else arrives by being typed.
+
+**Every object renders every run**, current values pre-selected — one click when nothing changed. A
+marker may change a default; it may never drop a question.
+
+**The picker prints a receipt** (§ Step 6). Assertions alone have failed to hold this gate twice in
+claude-enforcer; a skipped question and an answered one must never look the same.
+
+## Step 0.5 — VCS preflight
+
+Report whether the project is version-controlled and whether the tree is dirty. **No VCS and no
+backup → conversion refuses** (Step 0.2).
+
+---
+
+## Step 1 — Survey the project
+
+**Survey the project, not just its skills.** The org is derived from the work the project involves;
+existing skills are additional evidence, never the only evidence (`references/org-design.md`).
+
+Gather, in order: `CLAUDE.md` · repository shape (directories, package manifests, config, test layout)
+· build and test tooling · git history where present · README and docs · then
+`.claude/skills/*/SKILL.md`, `.claude/agents/**/*.md`, any existing chart and personnel ledger.
+
+Per skill, where skills exist: workflow length, actors implied, inbound cross-references, immutable
+blocks, declared modes, existing agents.
+
+**Report what was absent as well as what was found.** No tests, no git, no `CLAUDE.md` means evidence
+is thin and the roster must be correspondingly small. An org proposed from guesswork is worse than a
+small one proposed from facts.
+
+**Report CLAUDE.md size against a budget.** It is injected into every subagent with no opt-out, so its
+length is multiplied by fan-out — the highest-leverage cost lever in the system, and it is not this
+project's file.
+
+## Step 1a — Mode fork
+
+| Condition | Mode |
+|---|---|
+| no skills, or none surviving the refusal list | **GREENFIELD** |
+| skills exist | **BROWNFIELD** = greenfield **plus** conversion |
+
+**Brownfield is never conversion alone.** A project with three skills and twelve directories of code
+has far more work than three skills describe; designing the company from the skills alone staffs a
+fraction of the project.
+
+**GREENFIELD NEVER REPORTS "NOTHING TO CONVERT" AND STOPS.** That is the failure claude-enforcer names
+by name. A fresh project is the audience that needs the most help, not the least. Greenfield proceeds
+through Steps 2, 4, 5, 6, 7 — skipping only Step 3, which has nothing to classify.
+
+**The setup questions fire in every mode, greenfield included.** claude-enforcer's
+`INC-2026-06-07-bootstrap-onboarding-skip` records exactly this being skipped on fresh projects — the
+audience that most needed it — because a blanket "skip the per-skill steps" swallowed the setup
+questions with them. A fresh project is where the payroll picker and the companion gate matter *most*:
+nothing is configured yet. **No mode exempts a sanctioned question.**
+
+## Step 1b — Agent registry census (before anything is staged)
+
+## Step 1c — Agent registry census (before anything is staged)
+
+Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
+kind, raw link text, resolved target, owning skill, and whether it dangles.
+
+**`Write` to a symlinked path writes through to the target.** Registering an employee whose name
+collides with a symlinked registration would silently overwrite a file inside a skill directory. So:
+never write through a symlink; collisions resolve by renaming (`<dept>-<role>`); an unresolvable
+collision **aborts the run**; dangling links and unregistered agent files are **reported, never
+repaired** — registering an agent makes it model-invocable, a behavior change nobody asked for.
+
+## Step 2 — Design the org (panel) — both modes
+
+Full method: `references/org-design.md`.
+
+A three-agent panel — domain reader, `headcount-skeptic`, premortem analyst — proposes departments
+from **all** the Step 1 evidence. **Disagreement resolves to fewer departments.** Capped per
+`delegation-budget.md`.
+
+A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
+being wrong** — not by a distinct directory. Two to four is the normal answer.
+
+Then, per department, propose the smallest roster that covers its work. Each role carries: what it
+owns, **the verification command it will use**, and the evidence justifying it.
+
+**Drop any role whose verification cannot be named.** A role with a runnable check is an employee; a
+role without one is a job title, and it will report success it did not earn. Say so and leave it
+unhired.
+
+**Hire the smallest company that can do the work.** A single coherent job needs no CEO — a CEO with one
+report is a wasted hop. Growth is cheap: `hire` adds one employee in one command, on evidence that is
+concrete rather than speculative.
+
+The panel also classifies each department as creative or not, feeding Step 0.4's pre-checks.
+
+## Step 3 — Dispositions (panel) — BROWNFIELD ONLY
+
+Skipped entirely in greenfield: there is nothing to classify, and that is not a finding.
+
+Assign every existing skill exactly one disposition per `references/conversion-taxonomy.md`. **Test for
+ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from outside.
+
+**Report dispositions with reasons. A conversion count is not a success metric.** An audit that
+converts two skills, correctly leaves fifteen alone, and hires three employees the skills never covered
+is a better audit than one that converts seventeen.
+
+## Step 4 — Chain of command and Records Owners
+
+Assign tiers, `reports-to`, spawn budgets, and exactly one Records Owner per retained playbook. Ties
+break toward the employee owning the fewest records — an owner is a serialization point.
+
+## Step 5 — Ratify, then author
+
+**Step 5-setup — org ratification (question slot 5, first audit only).** One `AskUserQuestion` call
+carrying several objects — the same one-call/one-slot pattern the payroll picker uses, so this adds no
+question slot beyond the one already reserved.
+
+The **roster object always renders**: departments, employees, what each owns, and **the evidence cited
+for each**. A company is never created without the user seeing it first, and a roster whose reasoning
+cannot be checked is a roster that cannot be corrected.
+
+Additional objects render only where the evidence could not settle something that changes the roster —
+what work to hand off first, what must never happen without review, what a model should not do here at
+all (`references/org-design.md` § the greenfield questions). Ask nothing the evidence already answered.
+
+**Suppressed in headless, non-interactive, and `--quick`** — which then propose nothing and create
+nobody.
+
+**Then author.** Per employee, through `handbook.md`, under the transaction order in `hire.md`
+§ Transaction Order. Greenfield authors the whole ratified roster as a batch (`hire.md` § Initial
+roster); brownfield authors conversions and new hires together. Every handbook is cold-read before its
+task completes; a probe failure is fixed in the same run, never deferred.
+
+## Step 6 — Execute
+
+Order: **backup → conversions → handbooks → charter and principles → payroll rewrite → `org index` →
+`org embed`.**
+
+**Pre-execution assertion:** every payroll question object demonstrably rendered this run. If one did
+not, fail **by name** — never a generic picker error.
+
+**The Execution Summary opens with the Payroll Receipt:**
+
+```
+Payroll
+| Tier / Dept        | Model            | Effort | Source                 |
+| CEO                | <id>             | high   | asked this run         |
+| Lead               | <id>             | medium | unchanged, pre-selected|
+| IC / engineering   | <id>             | medium | tier default           |
+| IC / content       | <id>             | medium | department override    |
+```
+
+Then per-task ✓ / ✗ with the step any failure reached.
+
+## Step 7 — Close
+
+Report the org, the fan-out budget, the canary result, and — **always** —
+
+> Restart Claude Code before dispatching. Agent definitions are not reloaded mid-session, so the
+> employees this audit hired are registered but not yet reachable.
+
+Without that line the audit ends by reporting a company nobody can talk to.
+
+---
+
+## `--quick`
+
+Frontmatter validity, chart-vs-disk drift, budget arithmetic, restated-constant scan. No questions,
+no conversions, no panels. Mechanical findings are fixed; anything requiring judgment is reported.
