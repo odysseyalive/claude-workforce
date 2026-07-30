@@ -57,8 +57,41 @@ its model here by hand.
 |---|---|
 | Departments on alternate | |
 
-**Resolution order for any one employee: department override → tier default.** A blank cell disables
-the override; a blank tier model means the employee inherits the session model.
+## Employee overrides (rare — one employee whose work differs from its department's)
+
+Pins one employee's model and effort regardless of which department it sits in. This is the escape hatch
+for generative work the department budget forced into a non-creative department
+(`references/procedures/audit.md` Step 2): rather than widening the org to give image work its own
+department, pin the image employee.
+
+| Employee | Model | Effort |
+|---|---|---|
+
+**`audit` never writes a row here.** It writes back only the values you chose in its setup questions, and
+this is not one of them — a per-employee axis in the picker would scale questions with headcount, which the
+fixed-object budget exists to prevent (`references/audit-setup.md` § The question budget). The audit
+*proposes* rows in its report; you add them.
+
+**An override PINS across departments.** `transfer` normally repins an employee's model as a side effect of
+moving it; an employee listed here keeps its model through the move (`procedures/transfer.md`).
+
+**Prefer moving the employee to pinning it.** A pin is a standing exception that no longer tracks the org —
+if a whole department's worth of work needs one, the department was drawn wrong.
+
+<!-- /origin -->
+
+---
+
+## Resolution
+
+**Resolution order for any one employee: employee override → department override → tier default.**
+Stated once, here; every procedure reads it from this file rather than restating it.
+
+A blank cell disables that level; a blank tier model means the employee inherits the session model. The
+payroll receipt names which level supplied each resolved value, so a pin and a tier default can never look
+the same (`procedures/model-map.md` § The receipt).
+
+<!-- origin: user | modifiable: true | user-editable mapping -->
 
 ## Departments
 

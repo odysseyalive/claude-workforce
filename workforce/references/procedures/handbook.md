@@ -30,7 +30,8 @@ creates two canonical texts that will diverge.
   collisions are silent (`personas.md`).
 - **Persona:** a stance, not a title. Unique across the org, paraphrase included.
 - **Tier:** from the org chart. Determines which template applies.
-- **`model` / `effort`:** from `org-config.md` — department override → tier default. Never invented.
+- **`model` / `effort`:** from `org-config.md`, resolved per
+  `references/org-config.template.md` § Resolution. Never invented.
 - **IC → `disallowedTools: Agent`.** Mandatory, blocking (`platform.md` fact 2b).
 - **Delegating → `background: false`.** Set it; report if absent; never block on it (fact 2).
 - **`tools`:** only what the procedure actually uses. `Grep`, `Glob`, and `WebFetch` are **not**

@@ -31,8 +31,9 @@ resilience and gains nothing measurable.
 
 ## Procedure
 
-1. Build the map: every employee's name, persona, triggers, scope paths, owned records, and
-   escalation target.
+1. Build the map: every employee's name, persona, triggers, scope paths, owned records, escalation
+   target, and any **employee override** row pinning its model
+   (`references/org-config.template.md` § Employee overrides).
 2. Detect conflicts from the table above. **Mechanical detections** — names, orphans, cycles, unowned
    records — are certain. **Judgment detections** — trigger shadowing, mutation risk — go to a panel,
    and panel disagreement resolves to **no finding**.
@@ -49,6 +50,10 @@ resilience and gains nothing measurable.
 - **Touch an immutable block.** A remedy whose edit span intersects one downgrades to FLAG-ONLY.
 - **Act for performance.** Speed, token savings, deduplication, and "cleaner" are not rationales. If
   the only argument is efficiency, **drop it silently** — it is not a finding.
+- **Edit `org-config.md`.** That file is the user's. An **orphaned employee override** — a pin naming an
+  employee that no longer exists — is a real mechanical finding and reports as one, but its remedy is
+  **FLAG-ONLY**: print the row and the missing name, and let the user delete it. A stale pin is otherwise
+  invisible, because it resolves nothing and therefore never appears in a payroll receipt.
 
 ## Trigger shadowing, specifically
 

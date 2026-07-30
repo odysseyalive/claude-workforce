@@ -31,8 +31,13 @@ ladder that could fail.
 
 ## Resolution
 
-**department override → tier default.** A blank tier cell means the employee inherits the session
-model; a blank alternate disables the override.
+**Specified in `references/org-config.template.md` § Resolution, not here** — three levels, employee
+override first. A blank cell disables that level; a blank tier cell means the employee inherits the session
+model; a blank alternate disables the department override.
+
+**The employee level is not a picker question.** Its rows are hand-written in the project's `org-config.md`;
+this command reads them and never writes them. Asking per employee would scale questions with headcount,
+which is exactly what the fixed-object budget prevents.
 
 ## Payroll Rewrite
 
@@ -48,11 +53,17 @@ dual key — it changes what an employee runs on, not what it does.
 Print the resolved table with the **source of every value**:
 
 ```
-| Tier / Dept      | Model | Effort | Source                  |
-| CEO              | <id>  | high   | asked this run          |
-| Lead             | <id>  | medium | unchanged, pre-selected |
-| IC / content     | <id>  | medium | department override     |
+| Tier / Dept / Employee | Model | Effort | Source                  |
+| CEO                    | <id>  | high   | asked this run          |
+| Lead                   | <id>  | medium | unchanged, pre-selected |
+| IC / content           | <id>  | medium | department override     |
+| IC / eng / <employee>  | <id>  | medium | employee override (pinned) |
 ```
+
+**Every level that resolved a value appears by name.** `employee override (pinned)` and `tier default` must
+never render alike: a pin is a standing exception, and one left behind after the org moved is invisible
+otherwise. An override naming an employee that no longer exists is a `reconcile` finding, not a silent
+no-op.
 
 **A pre-execution assertion requires every object to have demonstrably rendered this run**, and fails
 **by name** when one did not — never a generic picker error.

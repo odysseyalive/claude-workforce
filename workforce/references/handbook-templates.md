@@ -9,8 +9,9 @@ Three templates. Fill every `<angle bracket>`; leave no placeholder in a written
   alone does not cap an IC reached through a directly-invoked Lead.
 - `background: false` on delegating tiers — defensive, **not** the mechanism that grants delegation.
   Its absence is reported, never blocking.
-- `model:` and `effort:` come from `org-config.md` (department override → tier default). Never
-  invented, never hardcoded here.
+- `model:` and `effort:` come from `org-config.md`, resolved per
+  `references/org-config.template.md` § Resolution. Never invented, never hardcoded here, and never
+  restated as an order — the levels change, and a handbook author copying a stale one pins the wrong model.
 - No `memory:`. Ever.
 
 ---

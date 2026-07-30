@@ -187,8 +187,8 @@ The panel also classifies each department as creative or not, feeding the payrol
 picker can only offer departments that exist.** Its multi-select is built from this panel's output, so
 design, image, voice, and translation work reach the alternate model *only* if some department the panel
 proposed owns them. Fold that work into `engineering` and there is nothing for the user to check: they are
-asked about `content`, the image employee resolves `department override → tier default`, and it silently
-runs on the coding model. Nothing errors, and no question was skipped — the option was never constructible.
+asked about `content`, the image employee falls through to its tier default, and it silently runs on the
+coding model. Nothing errors, and no question was skipped — the option was never constructible.
 
 So, in order:
 
@@ -199,9 +199,11 @@ So, in order:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
    A roster that quietly routes image work to the coding model has made a payroll decision the receipt
    never shows.
-3. **Never widen the department count to dodge this.** Report the collision and let the user move the
-   employee (`transfer.md`, where the model change is a documented consequence) or set the model by hand
-   in their own `org-config.md`.
+3. **Never widen the department count to dodge this.** Report the collision with both remedies named:
+   move the employee (`transfer.md`, where the model change is a documented consequence), or add an
+   **employee override** row (`references/org-config.template.md` § Employee overrides), which pins one
+   employee's model without redrawing the org. **Propose the row; never write it** — that file's
+   per-employee rows are the user's, and `audit` writes back only its own setup answers.
 
 ## Step 3 — Dispositions (panel) — BROWNFIELD ONLY
 
