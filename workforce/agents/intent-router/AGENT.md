@@ -21,7 +21,7 @@ Read the ask, name the command that owns it, and pass the ask through **verbatim
 
 ## Procedure
 
-1. Read `SKILL.md` § Commands and `references/procedures/intent-router.md`.
+1. Read `SKILL.md` § Quick Commands and `references/procedures/intent-router.md`.
 2. Classify. The distinctions that carry real consequence:
 
    | Ask | Command |

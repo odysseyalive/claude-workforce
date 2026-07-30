@@ -108,7 +108,7 @@ A stub pointing at the employee that replaced it is a placeholder: it occupies a
 procedure, and it exists only to tell a reader where the real thing went. That is residue, and residue
 across dozens of skills is what makes a half-migrated tree unreadable.
 
-**The safety property is unaffected.** The transaction ordering (`SKILL.md` § the T1–T8 invariant)
+**The safety property is unaffected.** The transaction ordering (`SKILL.md` § Sacred-Directive Enforcement Gates)
 registers the employee and *verifies the registration* before anything touches the skill — so
 capability is reachable by the new path before the old one is removed. The stub was a courtesy pointer
 for someone typing the old command, never the safety mechanism.

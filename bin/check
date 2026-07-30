@@ -210,6 +210,60 @@ check(
     f"broken: {broken}",
 )
 
+# Section anchors. `REF_RX` above resolves the PATH half of a citation and never
+# the `§ Section` half, so every heading in the project could be renamed with the
+# check green. Four separate doctrine audits flagged this independently as the
+# largest unguarded class of cross-reference; it found 16 broken anchors on first
+# run, six of them citing a `§ Header` section in platform.md that did not exist.
+#
+# Generators strict, readers liberal: a citation resolves if ANY heading in the
+# target starts with ANY word-prefix of the cited text. Prose reliably trails a
+# citation ("§ Phase A against the staged file"), and demanding an exact match
+# would report the prose as the defect.
+CITE_RX = re.compile(r"`?([\w./-]+\.md)`?\s*§\s*(`[^`\n]+`|[^.,;()*|\n]+(?:\n[^.,;()*|\n#\-]+)?)")
+# Files this project WRITES INTO A PROJECT rather than ships. They cannot be
+# resolved here and are not defects.
+GENERATED_TARGETS = ("operating-principles/", "org/", "personnel-ledger/")
+
+
+def _norm_heading(s):
+    """Normalise, and strip a leading article.
+
+    Without the article strip, the shortest prefix of "the three outcomes" is
+    "the" — which matches ANY heading beginning with "the". Renaming a heading
+    three files cited went undetected for exactly that reason, found by mutating
+    this check rather than by reading it.
+    """
+    s = re.sub(r"\s+", " ", s.replace("`", "").lstrip("#")).strip().lower()
+    return re.sub(r"^(?:the|a|an)\s+", "", s)
+
+
+_by_name = {}
+for _p in glob.glob("workforce/**/*.md", recursive=True):
+    _by_name[os.path.basename(_p)] = _p
+    _by_name[_p.replace("workforce/", "")] = _p
+
+_anchor_broken = []
+for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
+    for _m in CITE_RX.finditer(read(_src)):
+        _raw, _sec = _m.group(1), _norm_heading(_m.group(2))
+        if not _sec or _raw.startswith(GENERATED_TARGETS):
+            continue
+        _tgt = _by_name.get(_raw) or _by_name.get(os.path.basename(_raw))
+        if not _tgt:
+            continue  # the PATH half is check 3's job, not this one
+        _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
+        _w = _sec.split()
+        if not any(any(h.startswith(" ".join(_w[:n])) for h in _heads)
+                   for n in range(len(_w), 0, -1)):
+            _anchor_broken.append(f"{_src.replace('workforce/', '')} → {_raw} § {_sec[:48]}")
+check(
+    "references: every `file § Section` anchor resolves to a real heading",
+    not _anchor_broken,
+    f"broken anchors: {_anchor_broken} — renaming a heading silently dangles every "
+    "citation of it; only the path half was ever validated",
+)
+
 readme = read("README.md")
 img_broken = [
     src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)

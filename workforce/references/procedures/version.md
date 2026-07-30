@@ -23,7 +23,7 @@ running a different copy than you think."
 **Whether another copy exists**, and its version. Version skew between a personal install and a
 vendored one is invisible until something behaves unexpectedly.
 
-**Platform freshness** — `platform.md` § `MEASURED-ON` against the running harness. Mismatch means
+**Platform freshness** — `platform.md` § Header (`MEASURED-ON`) against the running harness. Mismatch means
 every measured fact is **stale**: still usable as a working assumption, but barred from being the
 basis of a blocking check until re-measured.
 

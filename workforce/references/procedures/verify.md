@@ -61,7 +61,7 @@ Three rules, each from a finding that was true and useless without it:
 |---|---|
 | Which copy of the skill is **active**, by path | personal shadows project silently (skills resolve personal > project) |
 | Whether a shadowed copy also exists | a project pinned to an older version, overridden with no warning |
-| Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § `TIER-LIMIT` | the org's shape contract broken by a host setting |
+| Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § Header (`TIER-LIMIT`) | the org's shape contract broken by a host setting |
 | `Agent` present in `permissions.allow` | every hop prompts; the org is unusable |
 | No project state inside the skill directory | a personal install sharing one config across unrelated projects |
 | Every wired hook `command` resolves to a file that exists | **dead wiring** — non-blocking at runtime, silently drops whatever the hook enforced (`discovery.md` § Dead wiring) |
@@ -70,7 +70,7 @@ Three rules, each from a finding that was true and useless without it:
 
 ## Platform freshness
 
-Compare `platform.md` § `MEASURED-ON` against the running `claude --version`, and report which
+Compare `platform.md` § Header (`MEASURED-ON`) against the running `claude --version`, and report which
 measurement level is in force — shipped baseline or a project-local `platform-local.md`, **by path**.
 
 Mismatch → every MEASURED fact is **STALE**: still usable as a working assumption, but barred from

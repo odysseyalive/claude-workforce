@@ -6,7 +6,7 @@ Classifies a freeform ask into a command. Runs when the first token is not a kno
 
 ## Procedure
 
-1. **Match against the known command set** (`SKILL.md` § Commands). An exact match is not freeform —
+1. **Match against the known command set** (`SKILL.md` § Quick Commands). An exact match is not freeform —
    dispatch it directly.
 1b. **Match against the roster.** If the first token is not a command but *is* an employee name in the
    org chart, this is a **direct work dispatch**: hand the rest of the line to that employee verbatim
