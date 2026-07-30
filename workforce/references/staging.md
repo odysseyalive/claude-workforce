@@ -18,6 +18,41 @@ session is not discoverable this session.
 Together these bound everything below. Any design claiming to fully validate a staged agent in
 isolation is wrong.
 
+### The same constraint applies to workforce's own panel agents — and it was missed
+
+The shipped panel definitions live at `workforce/agents/<role>/AGENT.md`, **inside the skill
+directory**. By the rule stated above they are not discoverable and cannot be spawned by name. Nothing
+registered them and no procedure named them, so every panel this project describes was unrunnable as
+written.
+
+The sharpest way to see the error: `procedures/audit.md` censuses `AGENT.md` files under
+`.claude/skills/**` as *the unregistered surface* in a user's project. Workforce shipped its own agents
+in exactly that shape.
+
+**Resolution: a shipped `AGENT.md` is a prompt template, not a registered agent.** A procedure that
+convenes a panel `Read`s the definition and passes its body as the task prompt.
+
+| | |
+|---|---|
+| **costs** | one `Read` per panel member |
+| **avoids** | registration, fact 3's reload delay, name collisions in the user's agent list, and any footprint left behind |
+| **keeps** | the definition as the single source of the role's objective, boundaries, and output contract |
+
+Three consequences worth stating, because each is a place this could silently rot:
+
+- **The `name:` field is documentation, not an address.** Nothing resolves it. It stays for the persona
+  uniqueness check (`personas.md`) and for reports.
+- **`disallowedTools:` and `tools:` in a shipped definition are not enforced by the harness** — they
+  describe the grant the caller should apply. Claiming otherwise would be exactly the overclaim
+  `enforcement.md` exists to prevent.
+- **The four-part contract matters more, not less.** A registered agent gets its system prompt from the
+  file; a template gets it from whatever the caller pasted. If the caller reads only part of the
+  definition, the agent drifts and nothing reports it. Read the whole file.
+
+**The alternative — installing them into `.claude/agents/`** — was rejected: it puts six `wf-*` entries
+in the user's agent list that they did not ask for, on a product whose entire premise is that the user's
+agent roster is theirs.
+
 ---
 
 ## Phase A — static lint

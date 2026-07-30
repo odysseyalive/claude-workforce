@@ -69,7 +69,10 @@ Full census in `plan/baseline-2026-07-30.md`. The load-bearing figures:
 | `MODEL-LANE-GATE` blocks | **12** | predecessor lane machinery |
 | `LANE-AGENT-EMBED` / `CODE-EVAL-EMBED` | **1 / 1** | same family, small tail |
 | `.directives.sha` sidecars | **36** | orphaned the moment their generator is deleted |
-| datasets (persistent state files) | **70**, 1.91 MB | 47 tracked, 21 ignored, 2 untracked |
+| datasets (persistent state files) | **44**, 1.80 MB | *corrected from 70 — see B-17* |
+| files accounted for / **unclassified** | 537 / **0** | every file categorised; residual must stay 0 |
+| policy files (ignore rules) | **1** | `.gitignore` — never moved |
+| hook registrations (entries) | **61** | 60 file-pointing, 1 inline, **40 unique scripts** |
 | ignore-rule source files | **3** | `.gitignore`, `.claude/.gitignore`, `opportunity-scout/.gitignore` |
 | credential-shaped files | **3** | OAuth token caches inside the skill tree |
 | host-local sentinels / caches | **9** | disposable, must never be restored stale |
@@ -255,6 +258,28 @@ The rule existed — `legacy-markers.md` said inline wording is extracted first 
 **Fixed:** `SCAFFOLDING` now requires an embedded-text scan carrying `EMBEDDED:` or `EMBEDDED: none (scanned)`; the gate counts two populations (`N of N spans` **and** `M of M embedded`); attribution lines stay with their blocks; and extraction is no longer gated on classification, because *"Never output credentials"* reads as a bare `RULE` and is also a user directive.
 
 **Method note for Part H:** anything derived from a proxy gets re-derived from the shipping artifact before it is trusted. The proxies here produced confident, specific, wrong numbers — which is worse than no numbers.
+
+### B-17. Loose ends closed, 2026-07-30 — including one blocker
+
+Self-audit of this plan for further proxies and unresolved conflicts. Five findings, all fixed.
+
+**BLOCKER — the panels were unrunnable as written.** Six shipped agents live at `workforce/agents/<role>/AGENT.md`, *inside the skill directory*. Claude Code discovers agents only in `.claude/agents/` and `~/.claude/agents/`; nothing registered them and no procedure named them. The tell: `audit.md` censuses that exact shape as **the unregistered surface** in a user's project, and workforce shipped six of its own that way.
+
+**Resolved:** a shipped `AGENT.md` is a **prompt template, not a registered agent** — a procedure `Read`s the definition and passes its body as the task prompt. Costs one `Read`; avoids registration, fact 3's reload delay, name collisions, and any footprint in the user's agent list. Two consequences stated so they cannot rot: `name:` is documentation rather than an address, and `tools:` / `disallowedTools:` in a template **are not enforced by the harness** — they describe the grant a caller should apply. Installing them into `.claude/agents/` was rejected: six `wf-*` entries the user never asked for, on a product whose premise is that their roster is theirs.
+
+**The dataset census was a matcher; now it enumerates.** It scanned for files it recognised as state — so a dataset with an unusual name in an unusual place was invisible, and that number is the one guarding against data loss. Now every file gets a category (**policy / instruction / code / state / sidecar**) and the residual is reported by name. Run against the target it immediately surfaced two blind spots: **36 integrity sidecars** and **15 root-level `reference.md` files**, both silently counted as data.
+
+**Corrected: datasets are 44, not 70.** The old figure was inflated by more than half. Part F is updated; the Part A row now carries the correction.
+
+**`.gitignore` is now its own category — policy.** It was landing in the residual, and it is the *only* declaration of whether a dataset is disposable. Never moved, counted separately.
+
+**Hook counting was measuring the wrong quantity.** A JSON parse finds **61 registrations**; 40 was the count of *unique scripts*, because 20 scripts are wired to more than one event. A before/after on the unique count passes while 21 registrations vanish. One entry is an **inline command with no file** — invisible to a file-resolution census. All four numbers are now reported.
+
+**Data-skill naming had no scheme.** One skill per dataset can add dozens of names to a namespace where duplicates resolve by filesystem order with no reported loser. Scheme is `records-<dataset>` — derived from the data, never the source skill — checked against the full union, and **a collision is reported rather than auto-varied**.
+
+**`bin/baseline` stays unshipped.** `enforcement.md` records that this project ships zero executables, measured and deliberate. The census discipline is ported into `audit.md` § Step 3b instead, so the audit produces those numbers itself.
+
+**Confirmed unchanged:** cross-skill duplication re-derived against the corrected 81-block population — still **0**.
 
 ### B-13. Department cap — superseded by B-14
 
@@ -479,9 +504,12 @@ Fill the *after* column from `bin/baseline` post-run. A mismatch is a finding, n
 | `MODEL-LANE-GATE` | 12 | **0** | |
 | `LANE-AGENT-EMBED` / `CODE-EVAL-EMBED` | 1 / 1 | **0 / 0** | |
 | `.directives.sha` sidecars | 36 | **0** per-skill, **1** at `.claude/workforce/` | a surviving per-skill sidecar is an orphan |
-| datasets | 70 | **70** | **any loss is a stop-everything failure** |
-| dataset bytes | 1,911,522 | **≥ 1,911,522** | a decrease means data was lost |
+| datasets | 44 | **44** | **any loss is a stop-everything failure** |
+| dataset bytes | 1,803,389 | **≥ 1,803,389** | a decrease means data was lost |
+| policy files | 1 | **1**, unmoved | an ignore rule that moved is a disclosure risk |
 | ignore-rule source files | 3 | **3**, unchanged | data did not move, so rules must not have |
+| **unclassified files** | 0 | **0** | a nonzero residual means the census categories are incomplete |
+| hook registrations (entries) | 61 | **61** | the unique-script count alone would pass while registrations vanish |
 | credential-shaped files | 3 | **3**, unmoved, **absent from every backup archive** | |
 | hooks registered | 40 | **40** | |
 | hooks dead wiring | 0 | **0** | relocation broke a registration |

@@ -426,7 +426,15 @@ check(
 # the first write, and a model-ID exemption the check forbade — so each of these
 # pins a rule to the text that implements it.
 # ─────────────────────────────────────────────────────────────────────────────
-ds = read("workforce/references/data-skills.md")
+ds   = read("workforce/references/data-skills.md")
+lm   = read("workforce/references/legacy-markers.md")
+ct   = read("workforce/references/conversion-taxonomy.md")
+cd_  = read("workforce/references/conversion-department.md")
+pa_  = read("workforce/agents/provenance-analyst/AGENT.md")
+cc_  = read("workforce/agents/content-classifier/AGENT.md")
+disc = read("workforce/references/discovery.md")
+stg  = read("workforce/references/staging.md")
+aud  = read("workforce/references/procedures/audit.md")
 REQUIRED_DS_SECTIONS = [
     "## Schema", "## Invariants", "## Degradation",
     "## Owner", "## Git policy", "## Seed", "## Maintainers",
@@ -448,7 +456,6 @@ check(
 
 # Constants stated once, applied to the marker table. Two files listing the same
 # regexes is how a sweep starts matching different things in different steps.
-lm = read("workforce/references/legacy-markers.md")
 check("legacy-markers: the marker table exists", "ENFORCEMENT ANNOTATION" in lm and "ROUTE-EMBED" in lm)
 marker_restaters = [
     p for p in declared
@@ -482,7 +489,6 @@ check(
     f"stub template present in: {stub_templates} — converted skills are deleted, never stubbed",
 )
 
-ct = read("workforce/references/conversion-taxonomy.md")
 check(
     "no-residue: conversion-taxonomy states that a converted skill is deleted",
     "never replaced by a stub" in ct,
@@ -493,8 +499,6 @@ check(
 # reads as preservation and is abdication: the conversion silently never happens
 # for it. The department is the mechanism that replaced that default; these
 # assertions stop it drifting back.
-cd_ = read("workforce/references/conversion-department.md")
-pa_ = read("workforce/agents/provenance-analyst/AGENT.md")
 check(
     "conversion: no default-to-frozen for unclassified content",
     "no default-to-frozen" in ct,
@@ -531,7 +535,6 @@ check(
 # text — 66,670 chars — none of it inside an immutable span. A gate counting only
 # spans reports 100% coverage while the sweep deletes all of it. The rule existed
 # in prose and was unwired; these assertions wire it.
-cc_ = read("workforce/agents/content-classifier/AGENT.md")
 check(
     "extraction: SCAFFOLDING is scanned for embedded user text before it is deletable",
     "EMBEDDED:" in cc_,
@@ -546,6 +549,50 @@ check(
     "extraction: preservation is not gated on the classification",
     "Extraction does not wait on your classification" in cc_,
     "a bare rule can be a user directive; only the destination depends on the class",
+)
+
+# A shipped AGENT.md cannot be spawned by name — it lives inside the skill
+# directory, and agents resolve only from .claude/agents/ and ~/.claude/agents/.
+# Every panel this project described was unrunnable as written until this was
+# stated. The same file censuses that shape as "unregistered" in a user's project.
+check(
+    "panels: shipped AGENT.md is a prompt template, not a registered agent",
+    "prompt template" in stg,
+    "staging.md must state how shipped panel definitions are actually invoked, or "
+    "every panel in this project is unrunnable as written",
+)
+check(
+    "panels: the definition's tool fields are not claimed as enforced",
+    "not enforced by the harness" in stg,
+    "a template's tools:/disallowedTools: describe the grant a caller should apply; "
+    "claiming the harness applies them is the overclaim enforcement.md forbids",
+)
+
+# Data skills can add dozens of names at once to a namespace where duplicates
+# resolve by filesystem order with no reported loser.
+check(
+    "data-skills: a naming scheme and a union collision check are specified",
+    "records-" in ds and "union" in ds,
+    "one skill per dataset means many new names; a collision resolves silently",
+)
+check(
+    "data-skills: a name collision is reported, never auto-varied",
+    "does not invent a variant" in ds,
+    "silently becoming records-x-2 produces two plausible names for one dataset",
+)
+
+# The census must enumerate and classify, not match what it recognises. Its
+# false negatives are the expensive kind: it is the number guarding data loss.
+check(
+    "census: classification is by exclusion with a reported residual",
+    "UNCLASSIFIED" in aud and "residual must be zero" in aud.lower(),
+    "a matcher finds what it already knows to look for; the residual is what makes it honest",
+)
+check(
+    "census: hook registrations are counted as entries, not unique scripts",
+    "not unique scripts" in disc or "registrations, not unique" in disc,
+    "61 entries resolved to 40 unique scripts on a real project; a unique-count "
+    "comparison passes while 21 registrations vanish",
 )
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
@@ -592,7 +639,6 @@ check(
 
 # Discovery tiers cap what may be acted on. A HEURISTIC finding that recommends a
 # deletion is indistinguishable in a report from a certain one.
-disc = read("workforce/references/discovery.md")
 for tier in ("MECHANICAL", "HEURISTIC", "JUDGMENT"):
     check(f"discovery: {tier} tier defined", tier in disc)
 check(
