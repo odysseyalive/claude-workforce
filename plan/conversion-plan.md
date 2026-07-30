@@ -301,6 +301,36 @@ Fixed: pairing is verified before extraction and before the sweep, and **an unpa
 
 **Checked and clean:** immutable-marker regex handles both spacing variants in use (53 + 5 = 58); no registered hook command points outside a `hooks/` directory; `say/say.sh` is correctly categorised as code rather than escaping the census.
 
+### B-19. The written-and-unwired pattern, addressed structurally
+
+Five defects of one shape. Not "a rule wasn't enforced" — something more specific:
+
+> **The rule's home is never the rule's enforcement point, and nothing connects them.**
+
+`legacy-markers.md` is the right home for *"extract embedded wording first."* The enforcement point is the classifier's procedure. Two files, no link, no failure if the link is missing. Writing the doctrine *feels* like completing the work — because as doctrine it **is** complete, which is exactly why re-reading never finds the gap.
+
+**The distinction that was missing.** Every normative claim is one of three kinds, and each has exactly one place it can be enforced (`references/invariants.md`):
+
+| Kind | Enforced by |
+|---|---|
+| **structural** — a property of shipped files | a `bin/check` assertion |
+| **procedural** — a property of a *run* | **a counted line in the run report** |
+| **advisory** — guidance for a reader | nothing, stated explicitly |
+
+We had been treating all three as if `bin/check` could reach them. It cannot reach the procedural ones, and their absence looks exactly like their presence. The backup-ordering defect is the clean case: no static check could ever have caught it, and it would have been obvious the instant a run printed *"backup taken · 0 writes preceded it."*
+
+**Shipped:**
+
+1. **`references/invariants.md`** — the ten run-time invariants, each with the line it must print. The set is **closed**: adding one means adding a row *and* a report line in the same change, and `bin/check` fails if the table and its declared count disagree.
+2. **A Run Invariants block opens the closing report** — every row present including the zeroes, because a missing row is indistinguishable from a gate that never ran. A row that cannot be computed prints `NOT UPHELD` and blocks any destructive step.
+3. **`procedure-for-procedures.md` rule 8b** — a rule lands with its enforcement in the same change, and **a new assertion is proven by breaking it.** An assertion never observed failing might be testing nothing.
+4. **`wf-doctrine-auditor`** — an adversarial second reader asking one question of every claim: *what makes this true?* It refuses proximity as enforcement (a prose check once sat three lines above the row it governed and failed anyway eleven days later), and reports `UNCHECKED` distinctly from `UNENFORCED`.
+5. **`bin/baseline` moved into the edit loop** in `CLAUDE.md`, not kept as an end-of-project step.
+
+**What I would bet on, of those five: the last one.** All five defects were found by *running* the system against a real tree — the census, the replay set, the pairing check, each within minutes. None was found by re-reading, across several careful passes by the person who wrote them. Authoring discipline has a ceiling; execution against reality does not.
+
+**Stated limitation:** the author of these defects designed the mechanism meant to catch them, which is a real blind spot no amount of care removes. `wf-doctrine-auditor` exists precisely because it does not share that author's confidence, and it should be run against `invariants.md` itself before that file is trusted.
+
 ### B-13. Department cap — superseded by B-14
 
 *The stop-and-ask below was reverted on 2026-07-30. Retained because the reasoning error is worth being able to read back: a rule was imported from the wrong domain, and the arithmetic of the question surface is what caught it.*

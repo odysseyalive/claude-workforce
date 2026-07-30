@@ -626,6 +626,68 @@ check(
     "orphan opener" in lm and "excluded from both extraction and the sweep" in lm,
     "an unpaired file must be excluded, not worked around",
 )
+
+# ── The written-and-unwired pattern ──────────────────────────────────────────
+# Five recorded defects of one shape: doctrine correct, nothing making it true.
+# A procedural claim cannot be caught statically, so its ONLY enforcement is a
+# counted line in the run report — and these assertions guard that mechanism.
+inv = read("workforce/references/invariants.md")
+pfp = read("workforce/references/procedure-for-procedures.md")
+
+check(
+    "invariants: normative claims are classified into three enforceable kinds",
+    all(k in inv for k in ("Structural", "Procedural", "Advisory")),
+    "a claim filed under the wrong kind is how a rule ends up written and unwired",
+)
+check(
+    "invariants: an invariant that cannot print its evidence is not enforced",
+    "not enforced — it is intended" in inv,
+    "invariants.md must state the rule that makes the printed line mandatory",
+)
+check(
+    "invariants: zero counts are printed, never omitted",
+    "including when the count is zero" in inv,
+    "a missing row is indistinguishable from a gate that never ran",
+)
+# The set is closed on purpose: an open list grows by accretion and nobody
+# notices a row that was never added.
+inv_rows = len(re.findall(r"^\|\s*\d+\s*\|", inv, re.M))
+check(
+    "invariants: the enumerated set matches the count it declares",
+    inv_rows == 10,
+    f"invariants.md declares ten and the table holds {inv_rows} — adding one means "
+    "adding a row AND a report line in the same change",
+)
+check(
+    "invariants: the run report prints the block before findings",
+    "Run Invariants" in aud,
+    "audit.md Step 7 must print the block, or the invariants are intentions",
+)
+check(
+    "authoring: a rule lands with its enforcement in the same change",
+    "same change" in pfp and "intention" in pfp,
+    "procedure-for-procedures.md must carry the rule that closes the "
+    "written-and-unwired pattern",
+)
+check(
+    "authoring: a new assertion is proven by breaking it",
+    "Prove the enforcement by breaking it" in pfp,
+    "an assertion never observed failing might be testing nothing",
+)
+# The author of a rule cannot see this class of defect — writing correct doctrine
+# feels like completing the work. The second reader is the only mechanism that
+# does not depend on the author noticing.
+da = read("workforce/agents/doctrine-auditor/AGENT.md")
+check(
+    "doctrine-auditor: exists and asks what makes a claim true",
+    "What makes this true?" in da,
+    "the adversarial second reader is the only check independent of the author",
+)
+check(
+    "doctrine-auditor: proximity is not accepted as enforcement",
+    "NEVER accept proximity as enforcement" in da,
+    "a prose check sat three lines above the row it governed and failed anyway",
+)
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
 # numbers are the reason it may not decide, and they survive rewording.

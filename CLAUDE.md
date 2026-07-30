@@ -24,8 +24,17 @@ landed in the runtime copy and vanished.
 ## The loop
 
 ```
-edit workforce/…  →  python3 bin/check  →  python3 bin/sync  →  restart Claude Code
+edit workforce/…  →  python3 bin/check  →  python3 bin/baseline ~/lab/odyssey-alive  →  python3 bin/sync
 ```
+
+**`bin/baseline` is in the loop, not at the end of the project.** Every defect of the
+written-and-unwired kind this project has recorded — five, and counting — was found by *running*
+something against a real tree. None was found by re-reading the documents, across several careful
+passes. Reading has a ceiling here and measurement does not: the census, the replay set, and the pairing
+check each surfaced a real defect within minutes of first running.
+
+So a substantive change is not done when `bin/check` passes. It is done when the census still adds up
+against a real project. That costs seconds and is the only step with a track record.
 
 **`bin/check` is this project's own verification** — the runnable check its handbooks demand of every
 employee. Run it before every commit. It asserts manifest completeness both ways, resolves every
@@ -59,6 +68,16 @@ or summarized. Mechanics implementing a directive live in `references/`, never i
 
 **Prefer deleting to accumulating.** Guidance written for a past model's weakness is paid for on every
 spawn, forever. `ablate` exists for this.
+
+**A rule lands with its enforcement, in the same change.** This is the project's dominant failure mode —
+five recorded defects, all one shape: doctrine written correctly, and nothing making it true. Classify
+first (`references/invariants.md`): **structural** → a `bin/check` assertion; **procedural** → a counted
+line in the run report; **advisory** → say so explicitly. Then **prove the enforcement by breaking it**;
+an assertion never observed failing might be testing nothing.
+
+The tell to watch for in yourself: writing correct doctrine *feels* like completing the work. It is
+complete as doctrine, which is exactly why re-reading never finds the gap. `wf-doctrine-auditor` is the
+second reader that does not share the author's confidence.
 
 ## Naming hazards
 
