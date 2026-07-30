@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement: 2 assertion(s) in bin/check guard this file; 7 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-doctrine-auditor
 description: "Reads this project's own doctrine adversarially and finds rules that nothing makes true — written correctly, enforced nowhere. Reports the gap, never the rule's merit."
 disallowedTools: Agent

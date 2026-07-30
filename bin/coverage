@@ -48,10 +48,25 @@ VAR_TO_FILE = {
     "plat": "workforce/references/platform.md",
     "_plat": "workforce/references/platform.md",
     "skill": "workforce/SKILL.md",
+    "_hire": "workforce/references/procedures/hire.md",
     "pa_": "workforce/agents/provenance-analyst/AGENT.md",
     "cc_": "workforce/agents/content-classifier/AGENT.md",
     "da": "workforce/agents/doctrine-auditor/AGENT.md",
 }
+
+# Assertions whose condition iterates `declared` or a glob rather than naming a
+# file variable. They guard EVERY shipped file, and VAR_TO_FILE structurally
+# cannot see them — so a file reported at 0 below is covered by these.
+GENERIC = [
+    "manifest: every declared file exists",
+    "manifest: no shipped file is undeclared",
+    "constants: stated once, outside the declared exceptions",
+    "references: every references/… link resolves, backticked or bare",
+    "scopes: no project state written into the skill directory",
+    "doctrine: no shipped file revokes a rule while keeping its guarded text",
+    "immutable: every shipped user directive matches its stamp",
+    "coverage: every Enforcement header matches the assertions that exist",
+]
 
 # A normative claim: a sentence carrying an imperative token. Deliberately the
 # same crude definition the audits used, so the numbers are comparable.
@@ -116,9 +131,9 @@ def main():
             if a == 0:
                 continue
             body = open(p, encoding="utf-8").read()
-            line = (f"<!-- Enforcement: {a} assertion(s) in bin/check guard this file; "
-                    f"{c} normative claims total. Coverage is a floor, not a certificate — "
-                    f"run bin/coverage. -->")
+            line = (f"<!-- Enforcement: {a} assertion(s) in bin/check name this file; "
+                    f"{c} normative claims total. {len(GENERIC)} generic assertions guard it "
+                    f"too. Coverage is a floor, not a certificate — run bin/coverage. -->")
             body = re.sub(r"<!-- Enforcement: \d+ assertion.*?-->\n", "", body, flags=re.S)
             lines = body.split("\n")
             at = 1 if lines and lines[0].startswith("# ") else 0
@@ -133,7 +148,16 @@ def main():
     unguarded = [r for r in rows if r[2] == 0]
     print("# Enforcement coverage\n")
     print(f"{len(rows)} shipped markdown files · {tot_c} normative claims · "
-          f"{tot_a} assertions · **{len(unguarded)} files with no assertion at all**\n")
+          f"{tot_a} file-specific assertions · {len(unguarded)} files with no "
+          f"file-specific assertion\n")
+    print(f"**Plus {len(GENERIC)} generic assertions that guard EVERY shipped file** — "
+          f"{', '.join(GENERIC)}. A file reported at zero below is covered by those; it "
+          f"has no assertion naming *it*.\n")
+    print("> Two independent audits found the earlier version of this line misleading: it "
+          "printed \"files with no assertion at all\", which was false. The generic loops "
+          "iterate `declared` and `glob`, so `VAR_TO_FILE` — which attributes only named "
+          "variables — could never see them. A coverage tool that undercounts its own "
+          "floor is the defect it exists to report.\n")
     print("| file | claims | assertions |")
     print("|---|---|---|")
     for p, c, a in rows:

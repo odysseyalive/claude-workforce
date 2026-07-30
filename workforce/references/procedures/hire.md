@@ -1,5 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -25,7 +26,7 @@ The greenfield path, and the primary one. `audit` arrives here with the evidence
 6. **Failure is per-employee.** One unauthorable role marks itself ✗ and the rest of the roster
    proceeds. The org chart is written from what actually landed.
 7. Charter and principles from the same evidence (`charter.md`, `principles.md`), then `org index`,
-   `org embed`, and the restart notice.
+   `org embed`, and the delayed-registration notice.
 
 **The batch is still the smallest company that can do the work.** If authoring reveals two roles whose
 handbooks are nearly identical, that is one employee — merge them and report it. Discovering the
@@ -89,11 +90,16 @@ harmless overstatement, and it has crept back into this project's files once alr
 
 ### Preconditions — all four, before any transaction
 
-1. The backup state is `taken` or `no-content` — **not "verification passed"**. `audit-setup.md`
-   § Step 0.2 defines three states, and a `failed` backup with content present **proceeds degraded**
-   (register the employee, leave the skill, two live paths) rather than stopping the run. Requiring
-   `taken` refused a run its own upstream had authorised — the identical deadlock this section already
-   documents and fixed for precondition 3, left standing on precondition 1.
+1. **The backup state is known** — `taken`, `no-content`, or `failed` (`audit-setup.md` § Step 0.2).
+   `taken` and `no-content` proceed normally. **`failed` with content present proceeds DEGRADED**:
+   register the employee, leave the skill, two live paths. **Only an unknown or untaken state stops the
+   run.**
+
+   Two earlier forms were wrong in the same direction. The first required "verification passed"; the
+   second accepted `taken`/`no-content` and left the closing "any failure → stop" in place, so `failed`
+   was outside the accepted set and the degraded path audit-setup defines was **unreachable through
+   this list**. Precondition 3 below has the correct shape — name the full set, say which value
+   degrades, and close with *only X stops* — and this one now copies it.
 2. The registry census reported **zero unresolved name collisions**.
 3. **The tier canary did not FAIL** — `PASS`, `PASS (on record)`, or `UNAVAILABLE`
    (`staging.md` § The three outcomes). `UNAVAILABLE` proceeds DEGRADED: register, and mark every
@@ -101,7 +107,11 @@ harmless overstatement, and it has crept back into this project's files once alr
 4. The journal holds **no rows left at WRITE-INTENT** from a prior run. An unfinished run is rolled
    back, never converted over.
 
-Any failure → stop the whole run. Convert nothing.
+Any precondition **not** in its stated accepted set → stop the whole run. Convert nothing.
+
+Read that against each precondition's own set rather than as a blanket rule: preconditions 1 and 3 both
+name a value that **proceeds degraded**, and a blanket "any failure stops" silently deleted both of
+those paths.
 
 **Precondition 3 read "returned PASS this run" and deadlocked the first run of every fresh install:**
 a first run has no registered fixtures, so the canary cannot run, and "cannot run" was indistinguishable
@@ -117,6 +127,7 @@ T3  probation             →  lint + cold-read probe (staging.md A and B)
 T4  journal WRITE-INTENT
 T5  register              →  .claude/agents/<name>.md          ← employee live; TWO paths live
 T6  verify registration   →  regular file, parses, hash matches
+T6b journal WRITE-INTENT (T7)   ← rollback cannot tell "after T6" from "after T7" without it
 T7  retire the skill      →  copy SKILL.md to .orig, then MARK for the sweep  ← still two paths
 T8  journal COMMITTED
 ```
@@ -124,6 +135,13 @@ T8  journal COMMITTED
 **The invariant:** at every observable instant the capability is reachable by **exactly one or exactly
 two paths — never zero.** A crash before T5 leaves the original untouched. A crash between T5 and T7
 leaves both live: degraded, and safe.
+
+**The mark IS the COMMITTED T7 journal row.** It is not an annotation in the skill, not a sidecar, and
+not run-local state — `audit.md` § Step 6b enumerates the sweep's input set from those rows, and
+`disband` reverses from the same place. An audit found the mark's representation specified nowhere in
+the distribution while five files used it; the journal was the only candidate any consumer read, so it
+is now the definition rather than the inference. The exemplar's `action` for a T7 row is `mark`, never
+`replace` — nothing is written into the skill.
 
 **T7 marks; it does not delete.** The unlink happens in a single sweep after the whole org verifies
 (`conversion-taxonomy.md` § Nothing is left behind). Skills reference one another, so deleting as the
@@ -172,7 +190,7 @@ backup: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UN
 | seq | skill | step | path | action | prior-sha | status |
 |-----|-------|------|------|--------|-----------|--------|
 | 001 | copy-truth | T5 | .claude/agents/content-copy-truth.md | create | (absent) | COMMITTED |
-| 002 | copy-truth | T7 | .claude/skills/copy-truth/SKILL.md | replace | a3f1… | COMMITTED |
+| 002 | copy-truth | T7 | .claude/skills/copy-truth/SKILL.md | mark | a3f1… | COMMITTED |
 | 003 | analytics  | T5 | .claude/agents/data-analytics.md | create | (absent) | WRITE-INTENT |
 ```
 

@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement: 2 assertion(s) in bin/check guard this file; 8 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-content-classifier
 description: "Classifies a block of skill content by what it DOES — rule, reference, scaffolding, or directive-statement — so conversion can move it without first resolving who wrote it."
 disallowedTools: Agent

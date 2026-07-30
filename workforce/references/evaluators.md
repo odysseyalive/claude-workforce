@@ -78,7 +78,9 @@ Seeding, in order:
 1. **claude-enforcer present on this machine?** Import its shipped catalogs once, recording the source
    path and its version anchor in the project's copy. This is the migration path, and it is the best
    available seed because those catalogs are the real accumulated corpus.
-2. **Otherwise**, write the seed this project ships: the structure, the severity tiers, the clustering
+2. **Otherwise**, write a minimal seed from the structure below — **this project ships no seed file**, and
+an earlier form of this sentence promised one. On any machine without the predecessor installed, that
+branch had no artifact to copy. Author it here from: the structure, the severity tiers, the clustering
    rule, the `[hard]` rows, and a starter set of entries. Mark it `seed-only` so its thinness is
    visible rather than mistaken for a complete corpus.
 
@@ -155,7 +157,7 @@ An evaluator with no ownership is not a degraded employee. It is an employee who
 maintains — the ordinary case for any inherited reference library.
 
 **Import, then never re-import.** After seeding from claude-enforcer, the project's catalog is its own. A
-later `sync` appends *new* shipped entries; it does not overwrite the project's additions or re-flatten
+later **`audit`** appends *new* shipped entries; it does not overwrite the project's additions or re-flatten
 its edits.
 
 ---

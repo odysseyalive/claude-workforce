@@ -899,6 +899,7 @@ try:
         "plat": "workforce/references/platform.md",
         "_plat": "workforce/references/platform.md",
         "skill": "workforce/SKILL.md",
+        "_hire": "workforce/references/procedures/hire.md",
         "pa_": "workforce/agents/provenance-analyst/AGENT.md",
         "cc_": "workforce/agents/content-classifier/AGENT.md",
         "da": "workforce/agents/doctrine-auditor/AGENT.md",
@@ -927,6 +928,67 @@ check(
     not _hdr_stale,
     f"{_hdr_stale} — regenerate with `bin/coverage --stamp`. A label that drifts "
     "from its mechanism is the defect the labelling pass exists to remove",
+)
+
+# The T-order is this project's most safety-critical constant and is restated in
+# TWO shipped files. An audit inverted each independently — putting retirement
+# before registration, so capability is reachable by ZERO paths at the crash
+# window the whole design exists to prevent — and both passed. CONST_RX covers
+# tier counts and model IDs; it never reached the ordering.
+_hire = read("workforce/references/procedures/hire.md")
+_T_SEQ = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"]
+
+
+def _t_positions(hay):
+    return [hay.find(f"{t} ") for t in _T_SEQ]
+
+
+_hire_block = ""
+_m = re.search(r"```\n(T1 .*?T8[^\n]*)\n```", _hire, re.S)
+if _m:
+    _hire_block = _m.group(1)
+_hire_pos = _t_positions(_hire_block)
+check(
+    "T-order: hire.md sequences T1 through T8 monotonically",
+    _hire_block and all(0 <= a < b for a, b in zip(_hire_pos, _hire_pos[1:])),
+    "the T-order block is missing or out of order — retirement before registration "
+    "leaves capability reachable by ZERO paths",
+)
+
+# Both files must agree. Two restatements with nothing comparing them is the
+# constants-stated-once rule failing on the constant that matters most.
+_gate = ""
+_m = re.search(r"2\. ORDER IS THE INVARIANT[^\n]*", skill)
+if _m:
+    _gate = _m.group(0)
+_gate_pos = _t_positions(_gate)
+check(
+    "T-order: SKILL.md's gate states the same sequence as hire.md",
+    _gate and all(0 <= a < b for a, b in zip(_gate_pos, _gate_pos[1:])),
+    "SKILL.md's Atomic-or-Absent gate restates the T-order; an audit scrambled it "
+    "independently of hire.md and nothing noticed",
+)
+
+# Two rules whose violation is silent, out-of-plan data loss.
+check(
+    "T-order: T5 refuses a symlink",
+    "T5 refuses a symlink" in _hire and "T5 SYMLINK REFUSAL" in skill,
+    "writing through a symlink destroys a file the plan never named",
+)
+check(
+    "T-order: the sweep mark has a defined representation",
+    "The mark IS the COMMITTED T7 journal row" in _hire,
+    "five files used the mark while nothing defined it; the sweep's input set was "
+    "specified nowhere",
+)
+
+# The Constitution Gate shipped fully templated and no procedure wrote it —
+# the same orphan defect the department had.
+check(
+    "templates: a procedure actually writes the Constitution Gate",
+    "WORKFORCE-CONSTITUTION" in aud,
+    "templates.md specifies the gate in full; charter refreshes it and disband "
+    "removes it, both presupposing something created it",
 )
 
 # ── This project holds itself to what it asks of others ──────────────────────

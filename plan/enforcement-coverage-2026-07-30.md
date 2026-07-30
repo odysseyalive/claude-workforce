@@ -1,19 +1,23 @@
 # Enforcement coverage
 
-65 shipped markdown files · 438 normative claims · 48 assertions · **50 files with no assertion at all**
+65 shipped markdown files · 441 normative claims · 52 file-specific assertions · 49 files with no file-specific assertion
+
+**Plus 8 generic assertions that guard EVERY shipped file** — manifest: every declared file exists, manifest: no shipped file is undeclared, constants: stated once, outside the declared exceptions, references: every references/… link resolves, backticked or bare, scopes: no project state written into the skill directory, doctrine: no shipped file revokes a rule while keeping its guarded text, immutable: every shipped user directive matches its stamp, coverage: every Enforcement header matches the assertions that exist. A file reported at zero below is covered by those; it has no assertion naming *it*.
+
+> Two independent audits found the earlier version of this line misleading: it printed "files with no assertion at all", which was false. The generic loops iterate `declared` and `glob`, so `VAR_TO_FILE` — which attributes only named variables — could never see them. A coverage tool that undercounts its own floor is the defect it exists to report.
 
 | file | claims | assertions |
 |---|---|---|
-| `SKILL.md` | 41 | 2 |
-| `references/procedures/audit.md` | 35 | 4 |
+| `SKILL.md` | 41 | 3 |
+| `references/procedures/audit.md` | 36 | 5 |
 | `references/conversion-taxonomy.md` | 25 | 6 |
 | `references/platform.md` | 20 | 4 |
+| `references/procedures/hire.md` | 12 | 2 |
+| `references/procedures/verify.md` | 12 | 0  ← **none** |
 | `references/templates.md` | 12 | 0  ← **none** |
 | `references/verification.md` | 12 | 0  ← **none** |
 | `references/data-skills.md` | 11 | 3 |
 | `references/evaluators.md` | 11 | 0  ← **none** |
-| `references/procedures/hire.md` | 11 | 0  ← **none** |
-| `references/procedures/verify.md` | 11 | 0  ← **none** |
 | `references/legacy-markers.md` | 10 | 4 |
 | `references/audit-setup.md` | 9 | 0  ← **none** |
 | `references/discovery.md` | 9 | 4 |
@@ -75,6 +79,7 @@
 **`SKILL.md`**
 - SKILL.md: ENFORCEMENT ANNOTATION blocks are paired
 - SKILL.md: frontmatter present
+- T-order: T5 refuses a symlink
 
 **`agents/content-classifier/AGENT.md`**
 - extraction: SCAFFOLDING is scanned for embedded user text before it is deletable
@@ -144,6 +149,11 @@
 - conversion: the disposition arithmetic is required to balance
 - invariants: computed and gated before the sweep, not only printed at close
 - invariants: the run report is instructed to print the block, imperatively
+- templates: a procedure actually writes the Constitution Gate
+
+**`references/procedures/hire.md`**
+- T-order: T5 refuses a symlink
+- T-order: the sweep mark has a defined representation
 
 **`references/staging.md`**
 - fixtures: a fixture is swept once its fact is measured
