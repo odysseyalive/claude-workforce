@@ -237,7 +237,7 @@ Most of the machinery came over unchanged:
 | The awareness ledger | Personnel records, retargeted from incidents to people |
 | `/route` and its dispatch contract | `/org`, minus the lane preflight, since employees are model-pinned |
 | Backup and restore: rotation, pinned baseline, atomic create, host-generated restore kit | The same, plus a symlink-flattening defect found and fixed |
-| The Lane→Model picker | The tier×department payroll picker, plus the receipt the enforcer needed and never had |
+| The Lane→Model picker | The tier×department model budget, plus the receipt the enforcer needed and never had |
 | `code-evaluator` and `text-eval` | The two evaluators, with their catalogs |
 
 Some of it arrived as hard-won lessons rather than as code. A checksum generator once wrote rows its own parser couldn't read, so the hook reported clean about blocks it never examined. An evaluator never installed because nothing had declared a creative lane. A setup question got dropped twice by executor omission; both times an assertion was added, and neither time did anything print the resolved values back, so the skip stayed invisible. Each of those is cited by its record ID in the reference that fixes it, so the incident travels with the rule.

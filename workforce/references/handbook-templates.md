@@ -5,6 +5,10 @@
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
 
 **Frontmatter facts that are load-bearing** (`platform.md`):
+- **No `tools:` field.** Omitting it gives every employee the full default grant —
+  `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus ~150 deferred behind
+  `ToolSearch` including all configured MCP servers (fact 4). Listing even one tool costs you every
+  tool you did not list (fact 4b). The only subtraction mechanism is `disallowedTools:`.
 - `disallowedTools: Agent` on every IC — **the only measured-reliable tier ceiling**, because depth
   alone does not cap an IC reached through a directly-invoked Lead.
 - `background: false` on delegating tiers — defensive, **not** the mechanism that grants delegation.
@@ -25,7 +29,6 @@ description: "Chief executive for <project>. Use for cross-department work, stra
 model: <CEO tier model from org-config.md>
 effort: <CEO tier effort>
 background: false
-tools: Read, Grep, Glob, Write, Agent, SendMessage, TaskCreate, TaskUpdate, TaskList
 skills: [operating-principles]
 color: purple
 ---
@@ -106,7 +109,7 @@ numbered script for a coordinator is the over-specification failure.
 
 | Item | Lead value |
 |---|---|
-| Frontmatter | identical shape; `model`/`effort` from the **Lead tier** row; `background: false`; `tools` unchanged (it delegates, so it keeps `Agent` and `SendMessage`); distinct `color` |
+| Frontmatter | identical shape; `model`/`effort` from the **Lead tier** row; `background: false`; no `tools:` (default grant, which includes `Agent`); distinct `color` |
 | `ORG-RECORD` | `tier: 2`, `department: <dept>`, `reports-to: ceo`, `direct-reports: <its ICs>` |
 | Sections | **every section the CEO template shows, in the same order, minus none** — `Role`, `Scope`, `Chain of Command`, `Verification`, `Guardrails`, `Exit criteria`, `Escalation`, `Probe`, `Reporting` |
 | `## Escalation` | the escalation sentinel **verbatim**, byte-identical to the CEO and IC templates. It is not optional and not paraphrasable |
@@ -137,7 +140,6 @@ model: <IC tier model, or the department override>
 effort: <IC tier effort>
 background: true
 disallowedTools: Agent
-tools: Read, Edit, Write, Bash
 skills: [operating-principles<, owned-playbook>]
 maxTurns: 40
 ---
@@ -203,10 +205,12 @@ Include one improvement observation when you have one (see the improvement quota
 
 ## Web-facing IC
 
-Identical, with the server granted at server level so tool renames between releases cannot break it:
+Identical frontmatter — no `tools:` field. The default grant already delivers every configured MCP
+server's tools in the deferred namespace, loadable via `ToolSearch` (fact 4). The handbook's
+`## Procedure` includes loading the server's tools as its first step:
 
-```yaml
-tools: Read, Edit, Write, Bash, mcp__playwright-mcp__*
+```markdown
+1. Load your browser tools: call `ToolSearch` for `mcp__playwright-mcp__*`.
 ```
 
 Its `## Verification` should be a scaffolded deterministic suite rather than a judgment

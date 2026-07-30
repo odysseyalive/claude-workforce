@@ -36,7 +36,7 @@ invented.
    | each imperative step | a `## Procedure` step, or an explicit statement of who else now owns it |
    | each constraint or "do not" | a `## Guardrails` line containing a literal NEVER / MUST NOT / STOP |
    | each check or test | part of `## Verification`, naming a runnable check |
-   | each tool the workflow uses | an entry in `tools:` |
+   | each tool the workflow uses | available in the default grant, loaded via `ToolSearch` in the procedure, or listed in an explicit `tools:` if present |
    | each routing point to another skill | preserved, or explicitly re-homed |
    | each immutable directive block | **referenced, never copied**, with a `directives-sha` |
 

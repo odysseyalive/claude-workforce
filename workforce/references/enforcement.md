@@ -8,7 +8,7 @@ The single most important table in this project:
 |---|---|---|
 | Employee cannot delegate | `disallowedTools: Agent` | **PREVENTS** — measured (`platform.md` fact 2b) |
 | Org cannot exceed the tier limit | harness depth limit | **PREVENTS** — measured (fact 1) |
-| Employee cannot reach an MCP server its grant does not name | `tools:` | **PREVENTS** — measured (fact 13). Granting `ToolSearch` does not open a side door |
+| Employee cannot reach an MCP server its explicit `tools:` grant does not name | `tools:` | **PREVENTS** when `tools:` is set — measured (fact 13). Does not apply when `tools:` is omitted: the default grant includes `ToolSearch` and all configured servers (deferred) |
 | Employee cannot read/write certain paths | `permissions.deny` | **PREVENTS** |
 | Employee cannot run certain commands | `permissions.deny` | **PREVENTS** |
 | Employee A may not spawn employee B | — | **CANNOT. Detection only.** |

@@ -4,9 +4,9 @@
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
 
-Everything `audit` does before Step 1: backup, companion skills, payroll, VCS, the canary fixtures,
-and the ownership preflight. **These are gates, not steps** — each one's outcome changes what the rest
-of the run is allowed to do.
+Everything `audit` does before Step 1: backup, companion skills, model and effort setup, VCS, the
+canary fixtures, and the ownership preflight. **These are gates, not steps** — each one's outcome
+changes what the rest of the run is allowed to do.
 
 **Two of them write, and the backup precedes both.** Step 0.6 writes canary fixtures and Step 0.2 takes the
 backup; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
@@ -16,14 +16,17 @@ backup; the ordering rule is stated in Step 0.2 and is not a matter of convenien
 ## The question budget — one slot, and it is a ceiling
 
 Running `/workforce audit` is the consent. The backup is taken automatically. Companions install on
-absence. The org is designed from evidence and built. **The only question is the payroll picker** — which
-model and effort level to run at each tier, and which departments use the creative alternate.
+absence. The org is designed from evidence and built. **The only questions are the model budget, the
+effort budget, and the advisor budget** — which model and effort level to run at each tier, which
+departments use the creative alternate, and which model advises the main session.
 
 | # | Step | What happens | Calls |
 |---|---|---|---|
 | — | 0 | Backup taken automatically | 0 |
 | — | 0.3 | Absent companions installed automatically | 0 |
-| 1 | 0.4 | Payroll picker — tier × department model and effort | **2** (models; effort and overrides) |
+| 1 | 0.4a | Model budget — tier × model + creative alternate | **1** |
+| 2 | 0.4b | Effort budget — tier × effort + department overrides | **1** |
+| 3 | 0.4c | Advisor budget — session advisor model or none | **1** |
 | — | 5 | Org designed from evidence, built, and reported | 0 |
 
 Everything else is a panel or an automatic gate. **Suppressed entirely** in headless, non-interactive,
@@ -38,7 +41,7 @@ authorized.
 command name is unambiguous, and the backup taken next protects what a question would have protected.
 
 Write the `audit-disclaimer` marker on entry. Headless: the marker must already exist from a prior
-interactive run — refuse without it, because the payroll picker cannot render headless.
+interactive run — refuse without it, because the budget questions cannot render headless.
 
 ## Step 0.2 — Backup
 
@@ -84,21 +87,23 @@ and forcible append (`evaluators.md` § Forcible propagation) are maintenance of
 installed, not a new install, so they run whether or not anything was checked. A growing catalog that does
 not reach installed copies only ever helps new projects.
 
-**Remove `advisorModel` from the project's settings if present.** A workforce-staffed project already
-has a company of agents; an advisor running on top of every spawn compounds overhead. Check both
-`.claude/settings.json` and `.claude/settings.local.json` — remove the key from whichever file carries
-it and report what was removed. This is automatic and asks no question: the audit is about to hire the
-agents that make the advisor redundant.
+**Read the current `advisorModel` from the project's settings** (both `.claude/settings.json` and
+`.claude/settings.local.json`). Its value pre-selects the advisor budget (Step 0.4c). The budget
+decides what happens — not this gate.
 
-## Step 0.4 — Payroll picker
+## Step 0.4 — Model budget, effort budget, advisor budget
 
-Two `AskUserQuestion` calls, eight objects, **fixed regardless of headcount**
+Three `AskUserQuestion` calls, nine objects, **fixed regardless of headcount**
 (`references/org-config.template.md`):
 
-- **Call 1 — models:** CEO tier / Lead tier / IC tier / **creative-alternate**. One shared option
-  pool; the copy must announce that "Other" accepts any model ID typed by hand.
-- **Call 2 — effort and overrides:** CEO / Lead / IC effort, and which departments run on the
-  alternate model (pre-checked from the Step 2 panel's creative classification).
+- **Step 0.4a — Model budget:** CEO tier / Lead tier / IC tier / **creative-alternate**. One shared
+  option pool; the copy must announce that "Other" accepts any model ID typed by hand.
+- **Step 0.4b — Effort budget:** CEO / Lead / IC effort, and which departments run on the alternate
+  model (pre-checked from the Step 2 panel's creative classification).
+- **Step 0.4c — Advisor budget:** which model advises the main session, or **none**. Pre-selected
+  from the current `advisorModel` in project settings (read in Step 0.3). Choosing "None" removes
+  the setting; choosing a model writes it. The advisor runs only in the main session — it does not
+  compound with spawned employees.
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
 anything else arrives by being typed.
@@ -106,8 +111,8 @@ anything else arrives by being typed.
 **Every object renders every run**, current values pre-selected — one click when nothing changed. A
 marker may change a default; it may never drop a question.
 
-**The picker prints a receipt** (`procedures/audit.md` Step 6). Assertions alone have failed to hold this
-gate twice in claude-enforcer; a skipped question and an answered one must never look the same.
+**The budgets print a receipt** (`procedures/audit.md` Step 6). Assertions alone have failed to hold
+this gate twice in claude-enforcer; a skipped question and an answered one must never look the same.
 
 ## Step 0.5 — VCS preflight
 
@@ -151,7 +156,7 @@ clause 7): the disposition is degraded and reported, or it is declined upward.
 
 **Report all four states even when the count is zero.** "0 foreign-owned, 0 collisions" is what tells the
 reader the gate ran; silence reads the same as a gate that never fired, which is the failure mode the
-payroll receipt exists to prevent one gate over.
+budget receipt exists to prevent one gate over.
 
 ### Read the succession marker here, and name the lever
 

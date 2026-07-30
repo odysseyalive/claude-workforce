@@ -48,7 +48,7 @@ personnel/
 ## Frontmatter of Record
 | Key | Value | Verified by | When |
 |---|---|---|---|
-| model / effort | | payroll | |
+| model / effort | | model budget | |
 | disallowedTools | | lint | |
 | background | | canary | |
 

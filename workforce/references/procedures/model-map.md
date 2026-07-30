@@ -1,27 +1,27 @@
-# model-map — payroll: which model each employee runs on
+# model-map — which model each employee runs on
 
 Low risk; executes immediately. `/workforce model-map`
 
-The picker, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without the
-rest of the audit.
+The budgets, standalone — the same three calls `references/audit-setup.md` § Step 0.4 runs, without
+the rest of the audit.
 Spec: `references/org-config.template.md`.
 
 ---
 
-## The picker
+## The budgets
 
-**Two `AskUserQuestion` calls, eight objects, fixed regardless of headcount.**
+**Three `AskUserQuestion` calls, nine objects, fixed regardless of headcount.**
 
-- **Call 1 — models:** CEO tier · Lead tier · IC tier · **creative / alternate**.
-- **Call 2 — effort and overrides:** CEO · Lead · IC effort, and which departments run on the
-  alternate model.
+- **Model budget:** CEO tier · Lead tier · IC tier · **creative / alternate**.
+- **Effort budget:** CEO · Lead · IC effort, and which departments run on the alternate model.
+- **Advisor budget:** which model advises the main session, or none.
 
 The alternate is labelled as the **creative** model — the one running departments doing generative
 work (content, design, image, voice, translation). Its department multi-select pre-checks whatever the
 department panel classified as creative, so the override lands without the user having to remember
 which department is which.
 
-**All eight objects render on every interactive run**, current values pre-selected. Answering costs
+**All nine objects render on every interactive run**, current values pre-selected. Answering costs
 one click when nothing changed. **A marker may change a default; it may never drop a question.**
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose; the
@@ -35,17 +35,20 @@ ladder that could fail.
 override first. A blank cell disables that level; a blank tier cell means the employee inherits the session
 model; a blank alternate disables the department override.
 
-**The employee level is not a picker question.** Its rows are hand-written in the project's `org-config.md`;
+**The employee level is not a budget question.** Its rows are hand-written in the project's `org-config.md`;
 this command reads them and never writes them. Asking per employee would scale questions with headcount,
 which is exactly what the fixed-object budget prevents.
 
-## Payroll Rewrite
+## Model Rewrite
 
 A changed cell queues one task **per affected handbook**, rewriting **only** the `model:` and
 `effort:` frontmatter lines, verified by re-reading the file. It runs **before** `org index`, so the
 chart reflects the rewritten values rather than the previous ones.
 
-Nothing else in a handbook is touched. A payroll change is not an amendment and does not go through
+A changed advisor model writes or removes `advisorModel` in the project's `.claude/settings.json`
+(or `.claude/settings.local.json`, whichever carried it). "None" removes the key entirely.
+
+Nothing else in a handbook is touched. A model change is not an amendment and does not go through
 dual key — it changes what an employee runs on, not what it does.
 
 ## The receipt
@@ -66,7 +69,7 @@ otherwise. An override naming an employee that no longer exists is a `reconcile`
 no-op.
 
 **A pre-execution assertion requires every object to have demonstrably rendered this run**, and fails
-**by name** when one did not — never a generic picker error.
+**by name** when one did not — never a generic error.
 
 Both exist because assertions alone failed to hold this gate twice in claude-enforcer: a question
 object was dropped by executor omission, and nothing printed the resolved values back, so a skipped

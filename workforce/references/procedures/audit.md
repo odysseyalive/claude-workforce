@@ -11,19 +11,20 @@ executes its own recommendations.
 
 **Autonomy model, inherited from claude-enforcer's ratified design:** running the command is the
 consent; the backup is taken automatically; companions install on absence; the org is designed from
-evidence and built. **The only question is the payroll picker** — which model and effort to run at each
-tier. Everything else is resolved by agent panels. Failures land as ✗ in the Execution Summary with the
-step they failed at, never as "run this command yourself."
+evidence and built. **The only questions are the model budget, effort budget, and advisor budget** —
+which model and effort to run at each tier, and whether to advise the main session. Everything else is
+resolved by agent panels. Failures land as ✗ in the Execution Summary with the step they failed at,
+never as "run this command yourself."
 
 ---
 
 ## Steps 0 through 0.6 — the setup gates
 
 **Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
-the payroll picker (the one question), VCS preflight, and the canary fixtures.
+the model/effort/advisor budgets (the three questions), VCS preflight, and the canary fixtures.
 
 Run them in order and carry their outcomes forward, because three of them change what the rest of this
-file may do: the backup state gates conversion's destructive step, the payroll answers are what Step 6's
+file may do: the backup state gates conversion's destructive step, the budget answers are what Step 6's
 receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
 
 **Nothing below writes anything until those gates have run.**
@@ -82,7 +83,7 @@ is a project whose work has not been written down yet.
 1. **Say what was found and what was not.** "No `CLAUDE.md`, no source, no build tooling — this looks
    like a brand-new project."
 2. **Run `charter`** (`charter.md` § Brand-new project). Its interview establishes what the project is
-   going to be. This is the one additional question a charter-first audit asks beyond the payroll picker.
+   going to be. This is the one additional question a charter-first audit asks beyond the budgets.
 3. **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and
    everything downstream reads it.
 4. **Design the org from the charter.** A stated intent *is* evidence: "a Next.js marketing site with a
@@ -106,11 +107,11 @@ fraction of the project.
 by name. A fresh project is the audience that needs the most help, not the least. Greenfield proceeds
 through Steps 2, 4, 5, 6, 7 — skipping only Step 3, which has nothing to classify.
 
-**The payroll picker fires in every mode, greenfield included.** claude-enforcer's
+**The budget questions fire in every mode, greenfield included.** claude-enforcer's
 `INC-2026-06-07-bootstrap-onboarding-skip` records exactly this being skipped on fresh projects — the
 audience that most needed it — because a blanket "skip the per-skill steps" swallowed the setup
-with them. A fresh project is where the payroll picker matters *most*: nothing is configured yet.
-**No mode exempts the payroll picker.**
+with them. A fresh project is where the budgets matter *most*: nothing is configured yet.
+**No mode exempts the model, effort, or advisor budgets.**
 
 ## Step 1b — Registry census: agents and hooks (before anything is staged)
 
@@ -187,11 +188,11 @@ unhired.
 report is a wasted hop. Growth is cheap: `hire` adds one employee in one command, on evidence that is
 concrete rather than speculative.
 
-The panel also classifies each department as creative or not, feeding the payroll picker's pre-checks
-(`references/audit-setup.md` § Step 0.4).
+The panel also classifies each department as creative or not, feeding the effort budget's pre-checks
+(`references/audit-setup.md` § Step 0.4b).
 
 **`creative` is a property of a DEPARTMENT, but generative work is a property of an EMPLOYEE — and the
-picker can only offer departments that exist.** Its multi-select is built from this panel's output, so
+effort budget can only offer departments that exist.** Its multi-select is built from this panel's output, so
 design, image, voice, and translation work reach the alternate model *only* if some department the panel
 proposed owns them. Fold that work into `engineering` and there is nothing for the user to check: they are
 asked about `content`, the image employee falls through to its tier default, and it silently runs on the
@@ -204,7 +205,7 @@ So, in order:
    already broader than "content", and it is the list to check the roster against.
 2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
-   A roster that quietly routes image work to the coding model has made a payroll decision the receipt
+   A roster that quietly routes image work to the coding model has made a model decision the receipt
    never shows.
 3. **Never widen the department count to dodge this.** Report the collision with both remedies named:
    move the employee (`transfer.md`, where the model change is a documented consequence), or add an
@@ -316,17 +317,17 @@ completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
-Order: **conversions → handbooks → charter and principles → payroll rewrite → `org index` → `org embed`.**
+Order: **conversions → handbooks → charter and principles → model rewrite → `org index` → `org embed`.**
 
 **The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
 first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.
 Assert it succeeded (or that its state is `declined` / `no-content`) before the first conversion; never
 run it again.
 
-**Pre-execution assertion:** every payroll question object demonstrably rendered this run. If one did
-not, fail **by name** — never a generic picker error.
+**Pre-execution assertion:** every budget question demonstrably rendered this run. If one did
+not, fail **by name** — never a generic error.
 
-**The Execution Summary opens with the Payroll Receipt:**
+**The Execution Summary opens with the Budget Receipt:**
 
 ```
 Payroll

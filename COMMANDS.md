@@ -45,8 +45,8 @@ Hands work to the employee who owns it — the lowest node that can do the job.
 /workforce roster
 ```
 
-Leads with the payroll receipt — every tier and department, its model and effort, and **where that
-value came from**. A setup question that was skipped and one that was answered must never look the
+Leads with the budget receipt — every tier and department, its model and effort, and **where that
+value came from**. A budget question that was skipped and one that was answered must never look the
 same.
 
 ---
@@ -103,7 +103,7 @@ inventing a latency it did not achieve.
 |---|---|---|
 | `/workforce evals [employee]` | low | Create or run an employee's measurement set |
 | `/workforce ablate <employee>` | high | Delete lines, add back only what earns its place |
-| `/workforce model-map` | low | The payroll picker, standalone |
+| `/workforce model-map` | low | The model, effort, and advisor budgets, standalone |
 
 ```
 /workforce ablate <employee> --execute

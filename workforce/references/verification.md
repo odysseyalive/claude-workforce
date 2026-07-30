@@ -95,20 +95,22 @@ own browser in its own process, so a suite run of any size never touches these g
 suite over a fan-out of fetches** — that is the deterministic path anyway, and it is also the one with
 no budget.
 
-**Granting it.** A web-facing employee's handbook carries the server in its `tools:` frontmatter:
+**Reaching it.** A web-facing employee uses the default grant (no `tools:` field), which delivers
+every configured MCP server's tools in the deferred namespace, loadable via `ToolSearch` (fact 4).
+The handbook's `## Procedure` loads the server as its first step:
 
-```yaml
-tools: Read, Edit, Write, Bash, mcp__playwright-mcp__*
+```markdown
+1. Load your browser tools: call `ToolSearch` for `mcp__playwright-mcp__*`.
 ```
 
-Server-level patterns (`mcp__<server>`, `mcp__<server>__*`) resolve to the server's whole tool set, and
-the names arrive directly callable — **measured**, `platform.md` fact 13. That is the forward-mobility
-rule applied to tool grants: the employee gets the server without enumerating tools that will be renamed
-between releases.
+Server-level patterns (`mcp__<server>`, `mcp__<server>__*`) resolve to the server's whole tool set —
+**measured**, `platform.md` fact 13. That is the forward-mobility rule: the employee gets the server
+without enumerating tools that will be renamed between releases.
 
-**Never add `ToolSearch` alongside an MCP grant.** The same measurement found that it *defers* tools
-that were loaded without it, buying a load step for nothing. It does not widen reach either — a fixture
-holding `ToolSearch` could not load a tool from a server its grant never named. The grant is the ceiling.
+**Only use an explicit `tools:` grant for MCP when the handbook must be restricted below the
+default.** When you do, never pair an MCP grant with `ToolSearch` — it *defers* tools that were
+loaded without it, buying a load step for nothing (fact 13). And an explicit `tools:` is a ceiling:
+a fixture holding `ToolSearch` could not load a tool from a server its grant never named.
 
 ### When the server is absent
 
@@ -119,10 +121,10 @@ vendor. Read this section before granting it anywhere.
 **`procedures/handbook.md` Step 2a is the gate that enforces this** — a local, read-only presence check
 that is forbidden from probing servers to answer it. Every
 fixture behind fact 13 ran against a server that exists; what an employee sees when the named server is
-*absent* is untested, and the expected failure is the worst kind — the pattern resolves to nothing, the
-employee holds `Read, Edit, Write, Bash` and no way to notice what it is missing, and the handbook's
+*absent* is untested, and the expected failure is the worst kind — `ToolSearch` returns nothing for
+the server pattern, the employee has no way to notice what it is missing, and the handbook's
 `## Verification` cannot run. Cold, silent, in a fresh context. Confirm the server is present at hire
-time; if it is not, do not write the grant.
+time; if it is not, do not write the dependency into the procedure.
 
 **Then take the higher tier instead, because it was always ranked higher.** Look again at the tier
 table at the top of this file: *a command with an exit code* is tier 1 and the MCP suite is tier 2. A
@@ -176,5 +178,6 @@ Two different things, both mandatory, easy to conflate:
 4. Forbid PASS on an unrun check, in the handbook's own words.
 5. If the work is web-facing and the check is a judgment call, stop — a deterministic suite was
    probably available.
-6. Confirm every tool the check needs is in `tools:`, remembering that `Grep`/`Glob`/`WebFetch` are
-   **not** granted by default.
+6. Confirm every tool the check needs is in the default grant or loaded via `ToolSearch` in the
+   procedure. `Grep`/`Glob`/`WebFetch` are **not** in the default grant and cannot be assumed (fact 4).
+   If an explicit `tools:` field is present, confirm the check's tools are listed there.

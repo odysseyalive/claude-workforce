@@ -53,7 +53,7 @@ resilience and gains nothing measurable.
 - **Edit `org-config.md`.** That file is the user's. An **orphaned employee override** — a pin naming an
   employee that no longer exists — is a real mechanical finding and reports as one, but its remedy is
   **FLAG-ONLY**: print the row and the missing name, and let the user delete it. A stale pin is otherwise
-  invisible, because it resolves nothing and therefore never appears in a payroll receipt.
+  invisible, because it resolves nothing and therefore never appears in a budget receipt.
 
 ## Trigger shadowing, specifically
 

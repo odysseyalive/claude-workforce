@@ -34,19 +34,22 @@ creates two canonical texts that will diverge.
   `references/org-config.template.md` § Resolution. Never invented.
 - **IC → `disallowedTools: Agent`.** Mandatory, blocking (`platform.md` fact 2b).
 - **Delegating → `background: false`.** Set it; report if absent; never block on it (fact 2).
-- **`tools`:** only what the procedure actually uses. `Grep`, `Glob`, and `WebFetch` are **not**
-  granted to subagents — a step depending on them fails cold (fact 4). Grant MCP servers at server
-  level (`mcp__server__*`) — measured to resolve, and rename-proof (fact 13). **Never pair an MCP grant
-  with `ToolSearch`:** it defers tools that were loaded without it and widens nothing (fact 13).
-  **Any MCP grant must clear Step 2a first.**
+- **No `tools:` field by default.** Omitting it gives the employee the full default grant —
+  `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus all configured MCP
+  servers deferred behind `ToolSearch` (fact 4). Listing even one tool costs every tool not listed
+  (fact 4b), so the only subtraction mechanism is `disallowedTools:`. An employee that needs a
+  specific MCP server loads it via `ToolSearch` as the first procedure step.
+  **Only add an explicit `tools:` when a handbook must be restricted below the default** — and when
+  you do, list everything the procedure needs, remembering that `Grep`, `Glob`, and `WebFetch` are
+  not in the default grant and cannot be assumed (fact 4). **Any MCP dependency must clear Step 2a.**
 - **No `memory:`.** Ever.
 
 ## Step 2a — MCP server preflight (blocking, and it may not touch the network)
 
-**Runs once per handbook that names an MCP server. No grant is written until it returns PRESENT.**
-A grant naming a server this host has not configured leaves the employee holding
-`Read, Edit, Write, Bash`, unable to run its own `## Verification`, with nothing in its context saying
-why — cold and silent, in a fresh context (`references/verification.md` § When the server is absent).
+**Runs once per handbook whose procedure depends on an MCP server.** Without the default grant's
+`tools:` field, a missing server fails differently than before — the `ToolSearch` call returns nothing
+rather than a grant resolving to an empty set — but it is equally cold and silent
+(`references/verification.md` § When the server is absent).
 
 **The check is local. Observe, do not probe.**
 

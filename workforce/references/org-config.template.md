@@ -13,10 +13,10 @@ writes back only the values you chose in its setup questions.
 ---
 
 <!-- origin: user | modifiable: true | user-editable mapping -->
-## Model statics — the pool the payroll picker proposes from
+## Model statics — the pool the model budget proposes from
 
 **These are the only IDs `audit` and `model-map` may propose.** Anything else reaches a config by the
-user typing it into the picker's "Other" field. Refreshed on every release (`version.md` step 2) — they
+user typing it into the budget's "Other" field. Refreshed on every release (`version.md` step 2) — they
 go stale between releases, and there is no discovery ladder.
 
 | Model ID | Context | Notes |
@@ -57,6 +57,14 @@ its model here by hand.
 |---|---|
 | Departments on alternate | |
 
+## Session advisor
+
+The advisor model runs alongside the main session only — it does not reach spawned employees.
+Choosing "None" in the advisor budget removes the setting entirely.
+
+| Advisor model | |
+|---|---|
+
 ## Employee overrides (rare — one employee whose work differs from its department's)
 
 Pins one employee's model and effort regardless of which department it sits in. This is the escape hatch
@@ -67,9 +75,9 @@ department, pin the image employee.
 | Employee | Model | Effort |
 |---|---|---|
 
-**`audit` never writes a row here.** It writes back only the values you chose in the payroll picker, and
-this is not one of them — a per-employee axis in the picker would scale questions with headcount. The
-audit *proposes* rows in its report; you add them.
+**`audit` never writes a row here.** It writes back only the values you chose in the model and effort
+budgets, and this is not one of them — a per-employee question would scale with
+headcount. The audit *proposes* rows in its report; you add them.
 
 **An override PINS across departments.** `transfer` normally repins an employee's model as a side effect of
 moving it; an employee listed here keeps its model through the move (`procedures/transfer.md`).
@@ -87,7 +95,7 @@ if a whole department's worth of work needs one, the department was drawn wrong.
 Stated once, here; every procedure reads it from this file rather than restating it.
 
 A blank cell disables that level; a blank tier model means the employee inherits the session model. The
-payroll receipt names which level supplied each resolved value, so a pin and a tier default can never look
+setup receipt names which level supplied each resolved value, so a pin and a tier default can never look
 the same (`procedures/model-map.md` § The receipt).
 
 <!-- origin: user | modifiable: true | user-editable mapping -->
@@ -118,20 +126,20 @@ Managed by `audit`. Hand-edit any of them; delete one to reset.
 ```
 <!-- audit-disclaimer: unset -->
 <!-- org-setup: unset -->
-<!-- payroll-setup: unset -->
+<!-- budget-setup: unset -->
 <!-- succession: none -->
 ```
 
 | Marker | States | Meaning |
 |---|---|---|
-| `audit-disclaimer` | `unset` \| `accepted` | Set automatically on every interactive audit. Consumed only by headless runs: with no acceptance on record a headless audit refuses, because the payroll picker cannot render headless |
+| `audit-disclaimer` | `unset` \| `accepted` | Set automatically on every interactive audit. Consumed only by headless runs: with no acceptance on record a headless audit refuses, because the budget questions cannot render headless |
 | `org-setup` | `unset` \| `configured` \| `declined` | Whether this project uses a workforce org at all. `declined` silences audit entirely |
-| `payroll-setup` | `unset` \| `configured` | Whether the payroll picker has been answered once. **Never a suppression switch** — the picker renders on every interactive audit; this only decides which values arrive pre-selected |
+| `budget-setup` | `unset` \| `configured` | Whether the model/effort/advisor budgets have been answered once. **Never a suppression switch** — the budget questions render on every interactive audit; this only decides which values arrive pre-selected |
 | `succession` | `none` \| `declared` | **`none` (default): coexistence.** Workforce lands beside the existing skill library and converts only the narrow cases — RETAIN rules 3 and 7 refuse hand-authored and foreign-generated skills. **`declared`: workforce is taking the library over.** Those two rules stand down and most one-actor workflows become eligible. Orchestrators, pure reference, `disable-model-invocation` skills, and unparseable skills still refuse (`references/conversion-taxonomy.md` § SUCCESSION) |
 
-**The picker is never skipped.** Every full interactive audit renders every payroll object, with
-current values pre-selected — answering costs one click when nothing changed. A marker may change a
-default; it may never drop the question. The audit prints a **Payroll Receipt** showing each resolved
+**The budget questions are never skipped.** Every full interactive audit renders every budget question,
+with current values pre-selected — answering costs one click when nothing changed. A marker may change
+a default; it may never drop a question. The audit prints a **Budget Receipt** showing each resolved
 value and where it came from (`asked this run` / `unchanged, pre-selected` / `config default`), so a
 skipped question and an answered one can never look the same.
 

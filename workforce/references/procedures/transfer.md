@@ -17,9 +17,9 @@ High risk; display by default. `/workforce transfer <employee> <department> --ex
 
 **The model change is the one most often missed.** A transfer can silently repin an employee to a
 different model, changing cost and output character with no visible edit to its handbook. Report it
-explicitly in the plan, and run the payroll rewrite as part of the transfer.
+explicitly in the plan, and run the model rewrite as part of the transfer.
 
-**A pin makes the transfer a no-op for payroll, and that is also worth reporting.** Moving a pinned employee
+**A pin makes the transfer a no-op for the model rewrite, and that is also worth reporting.** Moving a pinned employee
 into a creative department does *not* give it the creative model — the pin wins. Say so in the plan: a user
 who transfers an employee expecting the model to follow, and finds an old pin silently holding it, has hit
 the failure this level was added to prevent, pointed the other way. If the pin is now redundant, propose
@@ -31,7 +31,7 @@ deleting the row rather than leaving two mechanisms describing one decision.
    answer, not an exception.
 2. Update the employee's `ORG-RECORD`.
 3. Update both managers' `ORG-CHAIN` blocks.
-4. Re-resolve `model` / `effort` and apply the payroll rewrite if they changed.
+4. Re-resolve `model` / `effort` and apply the model rewrite if they changed.
 5. Re-home playbooks that belong to the old department.
 6. Update peer handbooks naming it as an escalation target.
 7. `ORG` record, `EMP` update, `org index`, `org embed`.
