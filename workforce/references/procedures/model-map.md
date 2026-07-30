@@ -10,12 +10,12 @@ Spec: `references/org-config.template.md`.
 
 ## The budgets
 
-**Three `AskUserQuestion` calls, nine objects, fixed regardless of headcount.**
+**Three `AskUserQuestion` calls, seven objects, fixed regardless of headcount.**
 
-- **Model budget:** CEO tier · Lead tier · IC tier · **creative / alternate**. Each question offers
-  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
-  "Other" for a hand-typed model ID.
-- **Effort budget:** CEO · Lead · IC effort, and which departments run on the alternate model.
+- **Model budget:** Lead tier · IC tier · **creative / alternate**. Each question offers the four
+  statics from `org-config.template.md` § Model statics, in the order listed there, plus "Other" for
+  a hand-typed model ID. **No CEO question** — the CEO is the main session.
+- **Effort budget:** Lead · IC effort, and which departments run on the alternate model.
 - **Advisor budget:** same four options in the same order. "Other" is where the user types
   "No Advisor" to decline one.
 
@@ -24,7 +24,7 @@ work (content, design, image, voice, translation). Its department multi-select p
 department panel classified as creative, so the override lands without the user having to remember
 which department is which.
 
-**All nine objects render on every interactive run**, current values pre-selected. Answering costs
+**All seven objects render on every interactive run**, current values pre-selected. Answering costs
 one click when nothing changed. **A marker may change a default; it may never drop a question.**
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
@@ -57,11 +57,11 @@ dual key — it changes what an employee runs on, not what it does.
 Print the resolved table with the **source of every value**:
 
 ```
-| Tier / Dept / Employee | Model | Effort | Source                  |
-| CEO                    | <id>  | high   | asked this run          |
-| Lead                   | <id>  | medium | unchanged, pre-selected |
-| IC / content           | <id>  | medium | department override     |
+| Tier / Dept / Employee | Model | Effort | Source                    |
+| Lead                   | <id>  | medium | asked this run            |
+| IC / content           | <id>  | medium | department override       |
 | IC / eng / <employee>  | <id>  | medium | employee override (pinned) |
+| Advisor                | <id>  |        | asked this run            |
 ```
 
 **Every level that resolved a value appears by name.** `employee override (pinned)` and `tier default` must

@@ -35,9 +35,11 @@ Use the full official model ID. Never an alias, never a date suffix on the IDs a
 
 | Tier | Model | Effort |
 |---|---|---|
-| CEO (1) | `claude-opus-5` | high |
 | Lead (2) | `claude-opus-5` | medium |
 | IC (3) | `claude-sonnet-5` | medium |
+
+**No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
+Claude Code session, not a budget setting.
 
 A blank model cell means the employee inherits the session model. IC effort defaults to `medium`
 deliberately — `high` across a wide wave is expensive and rarely changes an IC's mechanical output

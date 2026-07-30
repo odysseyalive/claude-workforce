@@ -93,14 +93,15 @@ decides what happens — not this gate.
 
 ## Step 0.4 — Model budget, effort budget, advisor budget
 
-Three `AskUserQuestion` calls, nine objects, **fixed regardless of headcount**
+Three `AskUserQuestion` calls, seven objects, **fixed regardless of headcount**
 (`references/org-config.template.md`):
 
-- **Step 0.4a — Model budget:** CEO tier / Lead tier / IC tier / **creative-alternate**. Each
-  question offers the four statics from `org-config.template.md` § Model statics, in the order listed
-  there, plus "Other" for a hand-typed model ID.
-- **Step 0.4b — Effort budget:** CEO / Lead / IC effort, and which departments run on the alternate
-  model (pre-checked from the Step 2 panel's creative classification).
+- **Step 0.4a — Model budget:** Lead tier / IC tier / **creative-alternate**. Each question offers
+  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
+  "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and runs on
+  whatever model the user chose for their Claude Code session.
+- **Step 0.4b — Effort budget:** Lead / IC effort, and which departments run on the alternate model
+  (pre-checked from the Step 2 panel's creative classification).
 - **Step 0.4c — Advisor budget:** same four options in the same order. "Other" is where the user
   types **"No Advisor"** to decline one. Pre-selected from the current `advisorModel` in project
   settings (read in Step 0.3). Choosing a model writes `advisorModel`; choosing "No Advisor" removes

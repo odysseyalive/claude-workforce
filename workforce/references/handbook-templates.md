@@ -20,14 +20,21 @@ Three templates. Fill every `<angle bracket>`; leave no placeholder in a written
 
 ---
 
-## CEO
+## CEO — the main session, not a spawned agent
+
+**The human and Claude in the main conversation are the CEO.** This keeps thinking transparent —
+you see the reasoning, not just a summary from a spawn. There is no CEO row in the budget; the
+main session runs on whatever model the user chose for their Claude Code session.
+
+The template below exists for the rare case a project wants an explicit CEO agent. Its model and
+effort are hand-set, not budget-configured.
 
 ```yaml
 ---
 name: ceo
 description: "Chief executive for <project>. Use for cross-department work, strategic direction, or asks no single department owns."
-model: <CEO tier model from org-config.md>
-effort: <CEO tier effort>
+model: <hand-set, not from budget>
+effort: <hand-set>
 background: false
 skills: [operating-principles]
 color: purple
