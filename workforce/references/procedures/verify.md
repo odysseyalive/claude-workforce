@@ -64,6 +64,7 @@ Three rules, each from a finding that was true and useless without it:
 | Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § `TIER-LIMIT` | the org's shape contract broken by a host setting |
 | `Agent` present in `permissions.allow` | every hop prompts; the org is unusable |
 | No project state inside the skill directory | a personal install sharing one config across unrelated projects |
+| Every wired hook `command` resolves, and none resolves into a demoted skill | a hook firing against a stub — clean report, no effect |
 
 ## Platform freshness
 
@@ -155,6 +156,31 @@ links.
 **That last one is the regression test for an inherited defect** — a `zip` without `-y` silently
 stores symlinked agent registrations as file contents, producing a snapshot that looks correct and
 restores wrong.
+
+## The user's own files
+
+Two files the org depends on and does not own. **Both are proposals, always: print the exact edit and
+never apply it.** Stated once here rather than at each caller — a check that edits `CLAUDE.md` or
+`.gitignore` has changed the user's project in order to fix its own report.
+
+**`.gitignore`, where the project is version-controlled.** `.claude-backups/` is a new directory at the
+project root holding zips of the whole `.claude/` tree, settings included; unignored, the next
+`git add -A` commits one. Report it with the literal line to add — and `.claude/workforce/` as a second
+line only where `.claude/` is itself tracked, since otherwise it is already covered and a redundant rule
+is noise. Under no VCS there is nothing to check, and already-ignored is a one-line notice rather than a
+finding.
+
+**`CLAUDE.md`, for content the conversion made false.** Distinct from the size proposal at `audit.md`
+Step 1, and the two never merge into one list:
+
+| Class | Test | Computed at |
+|---|---|---|
+| `DERIVABLE` | the model could read it off the codebase — directory listings, dependency names, restated build commands | survey time, before anything changes |
+| `STALE` | this run made it false — it describes a skill now demoted, a hook now firing at a stub, or work an employee now owns | after execution, from COMMITTED rows |
+
+**`STALE` is computed from the journal, never from the plan** — the same rule `org index` follows for the
+chart. A conversion that failed with ✗ left its skill intact, so every line describing that skill is
+still true, and flagging it would send the user to delete accurate documentation.
 
 ---
 

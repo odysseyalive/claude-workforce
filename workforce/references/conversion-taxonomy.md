@@ -45,6 +45,9 @@ report a total as though higher were better.
 | **ADOPT** | already a registered agent | censused into the chart, **zero bytes changed** |
 | **RETAIN** | on the refusal list below | untouched |
 
+**SUPERSEDED is an annotation, not a seventh row** (§ SUPERSEDED). Every skill still gets exactly one
+disposition; redundancy rides on top of whichever one it got.
+
 Judgment calls go to an agent panel; disagreement resolves to the more conservative disposition.
 
 **One ordering rule that is not obvious:** test for ORCHESTRATOR *before* CHARTER. A dispatcher looks
@@ -85,3 +88,35 @@ No panel. Do not convert.
 4. **Pure reference** — data, profiles, lookup tables. Already an employee's grounding library.
 5. **Body is entirely machine-generated managed blocks** — nothing of the author's to convert.
 6. **Quarantined** — frontmatter does not parse. Never convert what you cannot read.
+
+---
+
+## SUPERSEDED — redundancy is reported, never resolved
+
+The six dispositions classify a skill by **what it is**. Not one of them asks whether the org that was
+just designed already covers its work, so an inherited artifact that a new employee makes redundant
+lands as ADOPT — *zero bytes changed* — and nothing says the duplication out loud.
+
+**SUPERSEDED is that missing sentence, and it is a finding rather than a verb.** It annotates a
+disposition already assigned; it never overrides one, and it removes nothing.
+
+Annotate an existing skill or registered agent SUPERSEDED when either holds, and print the evidence:
+
+| Trigger | Evidence to print |
+|---|---|
+| its declared job falls entirely inside one new employee's `## Scope` | that employee, and the scope lines that swallow it |
+| its persona collides with one the new org draws — paraphrase included (`personas.md`) | both persona texts, and both paths |
+
+**The persona case is the one that stops a run.** Phase A blocks on a persona already present in the
+union glob (`staging.md` Phase A), and the file it collides with may be one workforce never wrote. So
+**the org redraws its own persona and reports the collision.** Never resolve a collision by editing or
+deleting the other side: an inherited agent belongs to the user, and a blocked draft is workforce's own
+problem to fix.
+
+**Treatment is the user's, and the report names it by command.** Where the redundant artifact is a
+workforce employee, that is `retire` — *for a job that no longer exists*, which is precisely this case.
+Where it is anything else there is **no command**, and the finding ends at the report. Proposing the
+removal of a skill the user wrote is not this project's call.
+
+**A SUPERSEDED count is no more a success metric than a conversion count.** Zero of them on a mature
+project means the org was designed to complement what was already there, which is the better outcome.

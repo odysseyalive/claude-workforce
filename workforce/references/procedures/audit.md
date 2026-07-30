@@ -119,6 +119,10 @@ claude-enforcer; a skipped question and an answered one must never look the same
 Report whether the project is version-controlled and whether the tree is dirty. **No VCS and no
 backup → conversion refuses** (Step 0.2).
 
+**Then run the ignore check here**, because Step 6 is about to create the directory it covers. The rule
+is `verify.md` § The user's own files, which also states why nothing is edited; this step only runs it
+early enough to matter.
+
 ## Step 0.6 — Write the canary fixtures (earliest possible step)
 
 Registration requires a tier-canary result (`hire.md` § Preconditions), and a fixture **cannot be
@@ -161,6 +165,10 @@ the codebase." **Report the derivable content specifically**: directory listings
 framework identification, file inventories, restated build commands that `package.json` already holds.
 Quote the lines and total what removing them would save per spawn. Never edit it — it is the user's
 file, and this is a proposal.
+
+This is the `DERIVABLE` class only, and it is everything survey time can honestly see. The `STALE`
+class — lines this run is about to make false — cannot exist yet and belongs to Step 7
+(`verify.md` § The user's own files).
 
 ## Step 1a — Mode fork
 
@@ -213,7 +221,7 @@ audience that most needed it — because a blanket "skip the per-skill steps" sw
 questions with them. A fresh project is where the payroll picker and the companion gate matter *most*:
 nothing is configured yet. **No mode exempts a sanctioned question.**
 
-## Step 1b — Agent registry census (before anything is staged)
+## Step 1b — Registry census: agents and hooks (before anything is staged)
 
 Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
 kind, raw link text, resolved target, owning skill, and whether it dangles.
@@ -234,6 +242,18 @@ collides with a symlinked registration would silently overwrite a file inside a 
 never write through a symlink; collisions resolve by renaming (`<dept>-<role>`); an unresolvable
 collision **aborts the run**; dangling links and unregistered agent files are **reported, never
 repaired** — registering an agent makes it model-invocable, a behavior change nobody asked for.
+
+**Census the wired hooks in the same pass, from both settings scopes** (`scopes.md`). Per `hooks` entry:
+the event, the matcher, the raw `command`, the path it resolves to, and whether that path lands **inside
+a skill directory**. Step 3 joins its dispositions against that mapping.
+
+A hook is wired to a path, never to a skill, so demoting a skill leaves its hooks firing unchanged
+against a stub. That is claude-enforcer's `protect-directives` defect inverted: there the hook read a
+sidecar no procedure wrote (`enforcement.md` § Hooks), here the hook keeps running while the skill
+behind it has been hollowed out. Both report clean while doing nothing.
+
+**Report, never rewire.** Workforce ships no hooks and does not manage a host's. A hook it did not write
+is outside what `disband` may excise, which makes it outside what `audit` may touch.
 
 ## Step 2 — Design the org (panel) — both modes
 
@@ -269,6 +289,14 @@ ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from ou
 **Report dispositions with reasons. A conversion count is not a success metric.** An audit that
 converts two skills, correctly leaves fifteen alone, and hires three employees the skills never covered
 is a better audit than one that converts seventeen.
+
+**Then annotate what the new org made redundant** (`conversion-taxonomy.md` § SUPERSEDED) — a finding,
+never a removal, and where a persona collides the org redraws its own rather than touching the other
+side.
+
+**And join the Step 1b hook census against the dispositions.** A hook whose command resolves into a
+skill being demoted fires against a stub the moment T7 lands: name the event, the hook path, and the
+skill. Reported, not rewired.
 
 ## Step 4 — Chain of command and Records Owners
 
@@ -365,8 +393,18 @@ Then the org, the fan-out budget, and the canary result **by state, with its con
 | `PASS (on record)` | `tier ceiling: verified — platform-local.md matches the running harness` |
 | `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
 
-A run that verified the host and a run that verified nothing must never print the same line. Then —
-**always** —
+A run that verified the host and a run that verified nothing must never print the same line.
+
+**Then propose the `CLAUDE.md` lines this run made false** — the `STALE` class, per `verify.md` § The
+user's own files. Quote each line, name the COMMITTED journal row that invalidated it, and print the
+replacement text. Never edit the file.
+
+An audit that demotes a skill and leaves the project's own documentation pointing at it has moved the
+work and left the map — and that map is injected into every employee it just hired. Under `--review`,
+where nothing was committed, the same lines are reported as what *would* go stale: part of the plan, not
+a finding about the tree as it stands.
+
+Then — **always** —
 
 > The employees this audit hired are registered but **not immediately dispatchable**. They register
 > later in this session, or immediately after a restart — restart Claude Code if you want them now.
