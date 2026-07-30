@@ -96,17 +96,19 @@ decides what happens — not this gate.
 Three `AskUserQuestion` calls, nine objects, **fixed regardless of headcount**
 (`references/org-config.template.md`):
 
-- **Step 0.4a — Model budget:** CEO tier / Lead tier / IC tier / **creative-alternate**. One shared
-  option pool; the copy must announce that "Other" accepts any model ID typed by hand.
+- **Step 0.4a — Model budget:** CEO tier / Lead tier / IC tier / **creative-alternate**. Each
+  question offers the four statics from `org-config.template.md` § Model statics, in the order listed
+  there, plus "Other" for a hand-typed model ID.
 - **Step 0.4b — Effort budget:** CEO / Lead / IC effort, and which departments run on the alternate
   model (pre-checked from the Step 2 panel's creative classification).
-- **Step 0.4c — Advisor budget:** which model advises the main session, or **none**. Pre-selected
-  from the current `advisorModel` in project settings (read in Step 0.3). Choosing "None" removes
-  the setting; choosing a model writes it. The advisor runs only in the main session — it does not
-  compound with spawned employees.
+- **Step 0.4c — Advisor budget:** same four options in the same order. "Other" is where the user
+  types **"No Advisor"** to decline one. Pre-selected from the current `advisorModel` in project
+  settings (read in Step 0.3). Choosing a model writes `advisorModel`; choosing "No Advisor" removes
+  the setting. The advisor runs only in the main session — it does not compound with spawned
+  employees.
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
-anything else arrives by being typed.
+anything else arrives via "Other."
 
 **Every object renders every run**, current values pre-selected — one click when nothing changed. A
 marker may change a default; it may never drop a question.

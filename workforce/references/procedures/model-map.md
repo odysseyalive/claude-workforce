@@ -12,9 +12,12 @@ Spec: `references/org-config.template.md`.
 
 **Three `AskUserQuestion` calls, nine objects, fixed regardless of headcount.**
 
-- **Model budget:** CEO tier · Lead tier · IC tier · **creative / alternate**.
+- **Model budget:** CEO tier · Lead tier · IC tier · **creative / alternate**. Each question offers
+  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
+  "Other" for a hand-typed model ID.
 - **Effort budget:** CEO · Lead · IC effort, and which departments run on the alternate model.
-- **Advisor budget:** which model advises the main session, or none.
+- **Advisor budget:** same four options in the same order. "Other" is where the user types
+  "No Advisor" to decline one.
 
 The alternate is labelled as the **creative** model — the one running departments doing generative
 work (content, design, image, voice, translation). Its department multi-select pre-checks whatever the
@@ -24,10 +27,8 @@ which department is which.
 **All nine objects render on every interactive run**, current values pre-selected. Answering costs
 one click when nothing changed. **A marker may change a default; it may never drop a question.**
 
-**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose; the
-question copy must announce that "Other" accepts any ID typed by hand. That is the only path to a
-model the statics have not been updated to name — and it is why manual entry replaced a discovery
-ladder that could fail.
+**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
+anything else arrives via "Other."
 
 ## Resolution
 

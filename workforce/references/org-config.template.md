@@ -19,13 +19,15 @@ writes back only the values you chose in its setup questions.
 user typing it into the budget's "Other" field. Refreshed on every release (`version.md` step 2) — they
 go stale between releases, and there is no discovery ladder.
 
-| Model ID | Context | Notes |
-|---|---|---|
-| `claude-fable-5` | 1M | most capable; priced above the Opus tier |
-| `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
-| `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
-| `claude-sonnet-5` | 1M | near-Opus on coding and agentic work, lower cost |
-| `claude-haiku-4-5` | 200K | fastest and cheapest; mechanical work only |
+| # | Model ID | Context | Notes |
+|---|---|---|---|
+| 1 | `claude-fable-5` | 1M | most capable; priced above the Opus tier |
+| 2 | `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
+| 3 | `claude-opus-4-8` | 1M | |
+| 4 | `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
+
+**Presented in this order, every time.** The "Other" field accepts any model ID typed by hand.
+For the advisor budget, "Other" is where the user types "No Advisor" to decline one.
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 
