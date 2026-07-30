@@ -33,6 +33,24 @@ Everything else is a panel or an automatic gate. **Suppressed entirely** in head
 and `--quick` runs: those render nothing, write no markers, and install nothing that was not already
 authorized.
 
+**Three questions is the whole surface, and it is a design constraint rather than a current count.**
+Discoveries, repairs, classifications, and deferrals are handled by the run — not escalated. Two places
+where a question is the obvious move and is refused:
+
+- **Content whose ownership is unclear** goes to the Conversion Department
+  (`conversion-department.md`), which resolves it on evidence and files a `DEC` for what it cannot.
+  A record the user can overturn in one edit beats forty questions they must answer.
+- **Department evidence exceeding the cap** resolves toward the evidence and reports the conflict
+  loudly (`procedures/audit.md` § Step 2). `transfer` restructures later if the user disagrees.
+
+The only sanctioned addition is **charter-first** (`procedures/charter.md`): a bare directory has no
+evidence to read, so the charter comes from the user. That is a fourth question on an empty project and
+nowhere else.
+
+**Adding a question is a design change, not a convenience.** The failure it prevents is real: a run that
+stops forty times is a run nobody finishes, and the work it was stopping for gets skipped by hand
+instead.
+
 ---
 
 ## Step 0 — Consent

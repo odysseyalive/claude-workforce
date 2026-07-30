@@ -176,29 +176,28 @@ from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
 A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
 being wrong** — not by a distinct directory. Two to four is the normal answer.
 
-### When the evidence exceeds the cap — stop and ask
+### When the evidence exceeds the cap — the evidence wins, loudly
 
 A real project can present five or six domains that each pass the three-pronged test. The cap then forces
 a merge the evidence does not support, and whether the cap or the evidence is wrong is **unsettled** —
 deliberately, rather than resolved by widening a cap on one project's showing.
 
-So when the panel finds more warranted departments than the cap allows, the audit **stops and asks the
-user.** Not silently merging, and not letting the panel override.
+**Resolve toward the evidence and report the conflict.** This is the rule two paragraphs above, applied
+one level up: *a department that meets the three-pronged evidence test stands regardless of the
+skeptic's vote.* A cap is a prior about the normal case; evidence is an observation about this one, and
+an observation that survives the three-pronged test outranks a prior.
 
-The panel's job is to make the question answerable, which means the ask arrives with the work already
-done: every candidate domain named, the evidence for each, **what merging any given pair would cost**,
-and a recommended split. A question that hands the user a raw list has moved the work rather than
-finishing it.
+The report carries what would otherwise have been the question: every candidate domain, the evidence for
+each, **what merging any given pair would have cost**, and the fact that the cap was exceeded. Recorded
+in the chart, so a reader a month later can see it was a decision rather than an oversight.
 
-**The panel recommends; the user ratifies.** Identical to the hand-written intake protocol
-(`conversion-taxonomy.md`), and for the same reason: the machine does the analysis, the human owns the
-call. A department structure is something the user works inside every day.
+**No question fires.** An earlier draft stopped and asked here, reasoning from the rule that a panel
+recommends and never ratifies. That rule governs **editing the user's own text** — where the machine has
+no standing — and importing it into a structural decision the audit is already authorized to make was a
+category error. `transfer` restructures later at no cost if the user disagrees.
 
-**This is not the org's chain of command.** CEO → Lead → IC is the runtime hierarchy for doing work; this
-is the audit's own decision procedure, and it terminates at the user rather than inside the org.
-
-Record the outcome in the chart either way — a cap honored and a cap exceeded are both decisions worth
-being able to read back later.
+**A cap honored and a cap exceeded are both recorded**, because an unmarked cap-honoring merge is
+indistinguishable from a project that only ever had four domains.
 
 **Disagreement resolves to fewer ROLES, not fewer departments.** A department that meets the
 three-pronged evidence test stands regardless of the skeptic's vote — the evidence warranted it and a

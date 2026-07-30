@@ -201,23 +201,30 @@ between managed spans.
 > **In an unmarked file, unmarked text has the STRONGEST claim to user origin.** It is not "legacy
 > machinery nobody claimed." The usual reading inverts here.
 
-1. **Until classification is ratified, conversion may only APPEND.** Annotations, frontmatter keys,
-   new blocks. Not one unmarked line is rewritten, reordered, or reflowed.
-2. **Propose the full inventory** — every block quoted verbatim, labelled **SACRED** (will receive
-   `origin: user | immutable: true`), **MACHINERY** (becomes `origin: workforce | modifiable: true`),
-   or **UNSURE**.
-3. **UNSURE goes to a panel that recommends and never ratifies.** A split panel leaves the block UNSURE.
-4. **The default for every UNSURE or unratified block is SACRED.** A wrongly-frozen block is recovered
-   by editing its markers; a wrongly-reworded user sentence is not recoverable at all. The asymmetry
-   decides the default, not the panel's confidence.
+1. **Conversion never rewrites an unmarked line.** Annotations, frontmatter keys, and new blocks are
+   appended; existing text is not reordered, reflowed, or normalized. This holds at every stage, not
+   just before a decision.
+2. **Classify by function first, and move the work immediately** (`conversion-department.md`). A rule
+   reaches the handbook, reference data reaches the data skill, scaffolding is marker-matched and
+   deleted. **Three of four destinations do not depend on who wrote the block**, so no conversion waits
+   on an authorship question.
+3. **Resolve authorship only for directive-shaped blocks**, on the evidence ladder — marker match,
+   cross-skill duplication, sidecar coverage, voice, introduction pattern. The verdict names the rung
+   that decided it and what that rung found.
+4. **`NO-EVIDENCE` is an outcome, and it is handled rather than deferred.** The block's text is
+   extracted verbatim regardless (extraction is additive and cheap), the derived rule is already in the
+   handbook, no `directives-sha` cites it — citing would claim an attribution nobody established — and
+   a `DEC` records the rungs tried. The next run reads the record instead of re-deciding.
 5. **Markers are additive.** Wrapping verbatim text adds lines around it and changes nothing inside —
-   attribution lines, spacing, and nonstandard formatting inside a SACRED block stay byte-exact. A
-   wrapper never normalizes.
-6. **Checksums are generated only after ratification**, so the integrity baseline records consented
-   state rather than the converter's guess. Stamping a guess makes the guess look verified, which is
-   worse than leaving it unstamped.
+   attribution lines, spacing, and nonstandard formatting stay byte-exact. A wrapper never normalizes.
+6. **Checksums are generated only after attribution is established.** Stamping an unresolved block
+   makes a guess look verified, which is worse than leaving it unstamped.
 
-The user ratifies in batches. Nothing becomes MACHINERY without an explicit ratification.
+**There is no batch ratification, and no default-to-frozen.** An earlier draft of this section froze
+every unresolved block as SACRED and reported it as a decision. That conflates *this is the user's
+sacred text* with *nobody determined what this is*, and freezing the second dressed as the first means
+the conversion silently never happens for those blocks — residue with a respectable label. The
+department exists to do that work instead.
 
 ---
 
