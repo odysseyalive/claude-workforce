@@ -7,6 +7,8 @@ executes immediately.
 
 Every check below exists because its failure mode is **silent** — the system reports fine and is not.
 
+### Detection vs treatment
+
 **This is the canonical DETECTION surface — one place to look first.** `/doctor` earned that shape by
 deletion: three separate changelog entries *remove* scattered startup warnings and send the user here
 instead. The division of labour, stated so it stops blurring:

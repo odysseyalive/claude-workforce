@@ -7,7 +7,7 @@ threatens completion.
 
 ---
 
-**`verify` detects these; `reconcile` resolves them** (`verify.md` § the detection/treatment split).
+**`verify` detects these; `reconcile` resolves them** (`verify.md` § Detection vs treatment).
 The conflict vocabulary below is this file's to define — `verify` reports it and never redefines it.
 
 ## The bar
