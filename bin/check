@@ -22,6 +22,29 @@ import glob
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
+# `bin/check --stamp` regenerates workforce/.immutable.sha and exits. Deliberately
+# a separate invocation: a check that re-stamps what it is checking cannot detect
+# drift. checksums.md's rule — flag, never repair — applies to this project's own
+# blocks too, so the stamp is a human act.
+if "--stamp" in sys.argv:
+    import hashlib as _hl
+    _rx = re.compile(
+        r"<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S)
+    _rows = []
+    for _f in sorted(glob.glob("workforce/**/*.md", recursive=True)):
+        with open(_f, encoding="utf-8") as _fh:
+            for _m in _rx.finditer(_fh.read()):
+                _b = "\n".join(l.rstrip() for l in _m.group(1).strip().splitlines())
+                _rows.append((_f, _hl.sha256(_b.encode()).hexdigest(), _b.splitlines()[0][:60]))
+    with open("workforce/.immutable.sha", "w", encoding="utf-8") as _fh:
+        _fh.write(
+            "# sha256 of every shipped `origin: user | immutable: true` block.\n"
+            "# Normalisation: strip markers, rstrip each line, strip leading/trailing blanks.\n"
+            "# Regenerate with `bin/check --stamp` ONLY after an intended change.\n"
+            + "".join(f"{h}  {p}  {t}\n" for p, h, t in _rows))
+    print(f"stamped {len(_rows)} immutable blocks")
+    sys.exit(0)
+
 FAILS = []
 WARNS = []
 PASSES = 0
@@ -53,6 +76,31 @@ def read(p):
         return ""
     with open(p, encoding="utf-8", errors="replace") as f:
         return f.read()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CANCEL-BY-PROSE: the systemic defeat of every substring assertion in this file.
+#
+# A doctrine audit demonstrated it across five separate guarded rules: keep the
+# guarded substring, wrap it in a sentence that revokes it, and the check passes.
+#     "Historically the extraction gate precedes every deletion; it is now
+#      advisory and the sweep proceeds regardless."
+# The guard for this was written once, for one block, and never generalised —
+# which is the written-and-unwired pattern applied to the pattern's own fix.
+#
+# These phrases have no legitimate use in shipped doctrine. Historical narration
+# belongs in measurements/ and plan/, which are not shipped.
+CANCEL_RX = re.compile(
+    r"(?:Historically[^.]{0,120}(?:no longer|is now advisory)"
+    r"|is no longer expected"
+    r"|it is now advisory"
+    r"|was the old rule"
+    r"|the old rule said"
+    r"|the sweep proceeds regardless"
+    r"|need not sum"
+    r"|whichever is convenient)",
+    re.I,
+)
 
 
 def manifest_paths():
@@ -457,6 +505,53 @@ check(
 # Constants stated once, applied to the marker table. Two files listing the same
 # regexes is how a sweep starts matching different things in different steps.
 check("legacy-markers: the marker table exists", "ENFORCEMENT ANNOTATION" in lm and "ROUTE-EMBED" in lm)
+
+# The table is the single artifact both bin/baseline and the sweep match against,
+# and it was guarded by two incidental substrings. An audit relaxed the
+# foreign-origin regex to drop its `(?!user\b)` guard — making the PROTECTED class
+# match as foreign origin — reclassified the ledger row, and deleted the sidecar
+# row, all at 290/0.
+# Middle column is not always a bare backticked regex — two rows describe a path
+# or a directory shape in prose ("`.directives.sha` at a skill root"). Parse the
+# CELLS, not an assumed shape; a parser that silently matched 7 of 9 rows would
+# have left the two prose rows unguarded, which is the class this check exists for.
+_marker_rows = [
+    tuple(c.strip() for c in _l.strip().strip("|").split("|"))
+    for _l in lm.splitlines()
+    if _l.startswith("| ") and _l.count("|") == 4 and "---" not in _l
+    and not _l.startswith("| Marker |")
+]
+check(
+    "legacy-markers: the table carries every marker family",
+    len(_marker_rows) >= 9,
+    f"only {len(_marker_rows)} parseable marker rows — the table is the single "
+    "source the sweep matches against",
+)
+check(
+    "legacy-markers: the user-immutable row stays classed protected",
+    any("immutable" in _rx and "protected" in _c.lower() for _n, _rx, _c in _marker_rows),
+    "flipping that row's class tells the sweep that user directives are deletable machinery",
+)
+check(
+    "legacy-markers: the foreign-origin regex still excludes user and workforce",
+    any("(?!user" in _rx and "(?!workforce" in _rx for _n, _rx, _c in _marker_rows),
+    "without both negative lookaheads the protected class matches as foreign origin",
+)
+check(
+    "legacy-markers: the sidecar row keeps its skill-root qualifier",
+    any(".directives.sha" in _rx and "skill root" in _rx for _n, _rx, _c in _marker_rows),
+    "without it the table classifies THIS project's own sidecar as predecessor "
+    "scaffolding, and the sweep deletes the file `checksums` reads",
+)
+
+# The disposition arithmetic is the named backstop for a misordered ORCHESTRATOR
+# test, and the file calls it "checkable" while nothing checked it.
+check(
+    "conversion: the disposition arithmetic is required to balance",
+    "MUST sum to the skill total" in ct and "make it balance" in aud,
+    "the 2026-07-29 dry run produced 48 dispositions against 45 skills; the sum is "
+    "what catches a state pasted in as a row",
+)
 marker_restaters = [
     p for p in declared
     if p.endswith(".md")
@@ -741,11 +836,80 @@ check(
     "a prose check sat three lines above the row it governed and failed anyway",
 )
 
+# Cancel-by-prose, applied to every shipped file at once rather than one rule.
+_cancelled = sorted(
+    p for p in declared if p.endswith(".md") and CANCEL_RX.search(read(p))
+)
+check(
+    "doctrine: no shipped file revokes a rule while keeping its guarded text",
+    not _cancelled,
+    f"cancelling prose in: {_cancelled} — a substring assertion is satisfied by a "
+    "sentence that withdraws the rule it guards; put history in measurements/",
+)
+
+# Ordering assertions must be POSITION-AWARE. The one ordering guard this project
+# had was a pair of substring tests, and an audit relocated the entire compute-
+# and-gate block to sit AFTER the deletions — reproducing the exact defect the
+# assertion existed to prevent, with the assertion green.
+def _pos(hay, needle):
+    i = hay.find(needle)
+    return i if i >= 0 else 10 ** 9
+
+
+_sweep = _pos(aud, "## Step 6b — The sweep")
+_gate = _pos(aud, "Compute the ten Run Invariants FIRST")
+_close = _pos(aud, "## Step 7 — Close")
+check(
+    "ordering: the invariant gate is positioned before the sweep it guards",
+    _gate < _sweep + len("## Step 6b — The sweep") + 4000 and _gate > _sweep,
+    "the gate must sit inside Step 6b, ahead of the removal table — a substring "
+    "test cannot see that the block was moved",
+)
+check(
+    "ordering: the sweep is sequenced before close",
+    _sweep < _close,
+    "Step 6b must precede Step 7; an audit moved the sweep after close and every "
+    "substring assertion still passed",
+)
+
 # ── This project holds itself to what it asks of others ──────────────────────
 # A fixture is retained by an OPEN fact. Once its fact is MEASURED the evidence
 # lives in measurements/, which is what makes the fixture disposable — and a
 # registered agent doing nothing is the residue this project refuses to leave in
 # someone else's roster. Found by running our own census against ourselves.
+# We ship `checksums` to stamp exactly this class of block in a USER's project
+# and ran nothing on our own. An audit replaced the ORCHESTRATOR user directive
+# in conversion-taxonomy.md with an inversion of its meaning — markers left
+# paired — and the check passed at 290/0.
+import hashlib
+
+_IMM_RX = re.compile(
+    r"<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S
+)
+_stamped = {}
+for _line in read("workforce/.immutable.sha").splitlines():
+    if _line.startswith("#") or not _line.strip():
+        continue
+    _h, _rest = _line.split("  ", 1)
+    _stamped.setdefault(_rest.split("  ")[0], []).append(_h)
+
+_live = {}
+for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)):
+    for _m in _IMM_RX.finditer(read(_p)):
+        _body = "\n".join(l.rstrip() for l in _m.group(1).strip().splitlines())
+        _live.setdefault(_p, []).append(hashlib.sha256(_body.encode()).hexdigest())
+
+_drift = []
+for _p in sorted(set(_live) | set(_stamped)):
+    if _live.get(_p, []) != _stamped.get(_p, []):
+        _drift.append(f"{_p}: {len(_live.get(_p, []))} live vs {len(_stamped.get(_p, []))} stamped")
+check(
+    "immutable: every shipped user directive matches its stamp",
+    not _drift,
+    f"MISMATCH: {_drift} — a sacred block was reworded, added, or removed. Flag, "
+    "never repair: regenerate with bin/check --stamp only after the change is intended",
+)
+
 check(
     "fixtures: a fixture is swept once its fact is measured",
     "swept" in stg and "MEASURED is residue" in stg,

@@ -48,7 +48,15 @@ danger of being inundated with a massive conglomeration of rarely used procedure
 hires for every surprise drowns in headcount nobody remembers.
 
 **Check the budget before hiring.** A new employee changes worst-case fan-out. If it would breach the
-concurrency cap, the answer is a structural change, not one more employee (`delegation-budget.md`).
+concurrency cap, **report the overage and convene the redesign panel — do not refuse the hire.**
+
+That cap is `platform.md` fact 8, which is DOCUMENTED and unmeasured, and an unverified fact may not
+become a blocking check. An earlier form of this line read "the answer is a structural change, not one
+more employee", which refuses on the unmeasured cap — the exact substitution `delegation-budget.md`
+was rewritten to remove. The demotion landed there and was never swept into this file.
+
+The run prints **`INV-REGISTER`** — registrations verified before any retirement
+(`references/invariants.md`).
 
 ## Step 2 — Place it
 
@@ -68,8 +76,10 @@ Through the transaction order below.
 
 `EMP-<name>.md`, an `ORG` record for the structural change, then `org index` and `org embed`.
 
-End with the restart notice — a newly hired employee is registered and unreachable until Claude Code
-restarts.
+End with the delayed-registration notice (`platform.md` § the sanctioned wording) — a newly hired
+employee is registered and **not yet dispatchable**, becoming so within the session rather than on a
+restart. **Never write "restart required":** it is retracted, it is a measured falsehood rather than a
+harmless overstatement, and it has crept back into this project's files once already.
 
 ---
 
@@ -79,7 +89,11 @@ restarts.
 
 ### Preconditions — all four, before any transaction
 
-1. A backup exists and passed integrity verification.
+1. The backup state is `taken` or `no-content` — **not "verification passed"**. `audit-setup.md`
+   § Step 0.2 defines three states, and a `failed` backup with content present **proceeds degraded**
+   (register the employee, leave the skill, two live paths) rather than stopping the run. Requiring
+   `taken` refused a run its own upstream had authorised — the identical deadlock this section already
+   documents and fixed for precondition 3, left standing on precondition 1.
 2. The registry census reported **zero unresolved name collisions**.
 3. **The tier canary did not FAIL** — `PASS`, `PASS (on record)`, or `UNAVAILABLE`
    (`staging.md` § The three outcomes). `UNAVAILABLE` proceeds DEGRADED: register, and mark every
@@ -126,8 +140,6 @@ preserves instead is the only content the deletion could destroy — every
 
 - **T5 refuses a symlink.** If `.claude/agents/<name>.md` exists and is a symlink, stop the entire run
   — writing through it destroys a file the plan never named.
-The run prints **`INV-REGISTER`** — registrations verified before any retirement (`references/invariants.md`).
-
 - **T7 never runs without T6 passing.** Retiring a working skill is authorized only by a *verified*
   live replacement. Unknown result counts as failure: "Refusing to retire `<skill>` — its replacement
   is unverified. The skill is left intact."
@@ -146,7 +158,12 @@ The run prints **`INV-REGISTER`** — registrations verified before any retireme
 
 ### The journal
 
-`.claude/workforce/.conversion-journal.md`, append-only, written **before** each mutation:
+`.claude/workforce/.conversion-journal.md`, append-only, written **before each mutation that leaves the
+staging area** — T5 and T7. T1–T3 write only into `.claude/workforce/staging/` and
+`.claude/workforce/directives/`, both of which `rollback` removes wholesale rather than replaying.
+
+An earlier form said "before each mutation" while the first row landed at T4, which was false on its own
+face: T1 and T2 both write. The rule is now what the exemplar below actually shows.
 
 ```markdown
 # Conversion Journal — run <id>

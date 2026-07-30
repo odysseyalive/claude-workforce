@@ -140,7 +140,9 @@ did not prove** — it honors no frontmatter), grounding library, key holders. T
 
 ## Step 8 — Say it is not live yet
 
-**Agents are not live-reloaded.** A handbook written now is unreachable until Claude Code restarts.
+**Agents register on a delay, not on a restart** (`platform.md` fact 3). A handbook written now is real
+on disk and not yet dispatchable; it becomes so within the session. Never write "restart required" —
+that claim is retracted and has crept back into this project's files once already.
 End the report with it:
 
 > `<name>` is registered but not yet loaded in this session. It loads later in this session, or

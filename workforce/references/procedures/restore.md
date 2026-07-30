@@ -82,7 +82,9 @@ did not confirm.
 Confirm `CLAUDE.md` and `.claude/` are present and parse. Then run `verify`: the restored org may
 disagree with the current harness version, and the chart may be from a different measurement era.
 
-**End with the restart notice.** Restored agent definitions are not loaded in this session.
+**End with the delayed-registration notice** (`platform.md` § the sanctioned wording). Restored agent
+definitions are not dispatchable the instant they land; they register on a delay. Never "restart
+required".
 
 ---
 
