@@ -18,10 +18,17 @@ never as "run this command yourself."
 
 ---
 
-## Steps 0 through 0.6 — the setup gates
+## Steps 0 through 0.7 — the setup gates
 
 **Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
-the model/effort/advisor budgets (the three questions), VCS preflight, and the canary fixtures.
+the model/effort/advisor budgets (the three questions), VCS preflight, the canary fixtures, and the
+**ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
+name collisions.
+
+**Step 0.7 was absent from this list while Steps 3 and 3a consumed its output.** A run following this
+file literally never executed it, so the succession branch had no input and the disposition arithmetic
+had no annotation table to separate out. Any gate added to `audit-setup.md` must be added here too; the
+entry point is the only thing that sequences them.
 
 Run them in order and carry their outcomes forward, because three of them change what the rest of this
 file may do: the backup state gates conversion's destructive step, the budget answers are what Step 6's
@@ -116,7 +123,9 @@ with them. A fresh project is where the budgets matter *most*: nothing is config
 ## Step 1b — Registry census: agents and hooks (before anything is staged)
 
 Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
-kind, raw link text, resolved target, owning skill, and whether it dangles.
+kind, raw link text, resolved target, owning skill, and whether it dangles. **Under `--review`, compute
+it and print it; write nothing** — `--review` writes nothing anywhere, and this step and Step 3b were
+the two that contradicted that.
 
 **Census BOTH agent locations, not just this project's.** Agents resolve from `.claude/agents/` *and*
 `~/.claude/agents/`, identity comes solely from `name:`, and a collision resolves silently by
@@ -217,8 +226,13 @@ unhired.
 report is a wasted hop. Growth is cheap: `hire` adds one employee in one command, on evidence that is
 concrete rather than speculative.
 
-The panel also classifies each department as creative or not, feeding the effort budget's pre-checks
-(`references/audit-setup.md` § Step 0.4b).
+The panel also classifies each department as creative or not. **Step 0.4b has already rendered by now**,
+so its department multi-select cannot have been pre-checked from this panel — the producer runs after
+the consumer. The pre-check is seeded from `org-config.md` where a prior run recorded it, and on a first
+run it is simply empty (`references/audit-setup.md` § Step 0.4b).
+
+**Do not describe the 0.4b pre-check as built from this panel's output.** It was, and the ordering made
+it false: departments were classified after the question that was supposed to reflect the classification.
 
 **`creative` is a property of a DEPARTMENT, but generative work is a property of an EMPLOYEE — and the
 effort budget can only offer departments that exist.** Its multi-select is built from this panel's output, so
@@ -251,8 +265,13 @@ ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from ou
 
 **Branch on the succession marker Step 0.7 read** (`conversion-taxonomy.md` § SUCCESSION). Under
 `none` this is the coexistence pass and rules 3 and 7 refuse as written. Under `declared` those two stand
-down and most one-actor workflows become eligible — but ORCHESTRATOR, rule 4, rule 1, and rule 6 still
-refuse, so **succession is never "convert everything"** and a report implying it is wrong.
+down and most one-actor workflows become eligible — but **five refusals survive, not four**:
+ORCHESTRATOR, rule 4, rule 1, rule 6, **and rule 2** (`conversion-taxonomy.md` § What still refuses).
+So **succession is never "convert everything"** and a report implying it is wrong.
+
+Rule 2 was missing from this list and from `org-config.template.md` while the taxonomy called the list
+"the point" of its section — a run reading either restatement would have converted a skill whose
+imperative content sits only inside an immutable span.
 
 **Under `declared`, count the batch before executing it.** Dozens of conversions each carrying a cold probe
 approaches the session spawn cap (`delegation-budget.md` § The session cap). Print the eligible count, and
@@ -362,7 +381,7 @@ dataset is a finding, not a tolerable state.
 ### Connections
 
 Enumerate the MCP servers and connectors the host **actually has configured**, and write the list into
-`org-config.md`.
+`org-config.md` — **or, under `--review`, print it and write nothing.**
 
 - **Grant only what is present.** A grant naming an absent server fails *silently* — tool search returns
   nothing, the employee reports no capability, and the run looks clean. Refuse the grant instead, and
@@ -464,7 +483,7 @@ not, fail **by name** — never a generic error.
 **The Execution Summary opens with the Budget Receipt:**
 
 ```
-Payroll
+Budget Receipt
 | Tier / Dept        | Model            | Effort | Source                 |
 | CEO                | <id>             | high   | asked this run         |
 | Lead               | <id>             | medium | unchanged, pre-selected|
@@ -491,9 +510,20 @@ two-paths-live state** — which is degraded but correct, and reversible by `dis
 
 1. **`verify` passed for the whole org this run.** Not per skill — the whole org. A sweep is authorized
    by a working replacement, and "working" is an org-level property.
-2. **Extraction is complete.** `N of N` immutable blocks extracted and read back byte-exact
-   (`conversion-taxonomy.md` § What succession removes). **A single short extraction blocks the entire
-   sweep**, not just that skill's removal.
+2. **Extraction is complete — BOTH populations.** `N of N` immutable spans **and** `M of M` embedded
+   user quotes, each extracted and read back byte-exact (`conversion-taxonomy.md` § What succession
+   removes). **A single short extraction in either population blocks the entire sweep**, not just that
+   skill's removal.
+
+   **A short count is not a `NOT UPHELD` row and the invariants gate will not catch it.** `INV-EMBEDDED`
+   printing `40 of 96` is a *computed* count — the run measured successfully and the answer was bad.
+   That is why this is a named precondition and not left to the invariants block: without it, a run
+   prints an honest number directly above the deletion that number was measuring, and proceeds.
+
+2b. **Unpaired files are excluded.** `INV-MARKERS` names the files whose markers do not balance
+   (`legacy-markers.md` § Pairing is verified). **The sweep may not touch them**, and re-deriving what to
+   remove from marker matches at this step would silently re-include them — an orphan opener runs a span
+   to the next closer and takes the content between two blocks with it.
 3. **The backup exists and verified.**
 4. **Every marked skill has its `.orig` recorded and hashed** in the journal.
 
