@@ -39,6 +39,18 @@ MARKERS = {
     "lane_agent_embed": re.compile(r"<!--\s*LANE-AGENT-EMBED START"),
 }
 
+# Paired markers: a sweep removes opener-to-closer, so pairing must be VERIFIED
+# rather than assumed. Measured on a real project: one skill carried 3 openers
+# and 4 closers, so the orphan closer would have survived the sweep as residue.
+PAIRS = {
+    "enforcement_annotation": (r"<!--\s*ENFORCEMENT ANNOTATION", r"END ENFORCEMENT ANNOTATION"),
+    "route_embed": (r"<!--\s*ROUTE-EMBED START", r"ROUTE-EMBED END"),
+    "code_eval_embed": (r"<!--\s*CODE-EVAL-EMBED START", r"CODE-EVAL-EMBED END"),
+    "model_lane_gate": (r"<!--\s*MODEL-LANE-GATE START", r"MODEL-LANE-GATE END"),
+    "lane_agent_embed": (r"<!--\s*LANE-AGENT-EMBED START", r"LANE-AGENT-EMBED END"),
+    "origin_span": (r"<!--\s*origin:", r"<!--\s*/origin\s*-->"),
+}
+
 # Directory names that hold persistent state rather than instructions. The list
 # is deliberately broad: on the survey target, state was found under five
 # different conventions, and a census keyed to `data/` alone missed three of them.
@@ -99,6 +111,7 @@ def census(root):
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
+    unpaired = []
 
     names = sorted(os.listdir(skills_dir)) if os.path.isdir(skills_dir) else []
     for name in names:
@@ -133,6 +146,19 @@ def census(root):
             if n:
                 rec["markers"][key] = n
                 marker_totals[key] += n
+
+        # PAIRING. A marker sweep deletes opener-to-closer, so an unpaired marker
+        # either survives as residue (orphan closer) or swallows everything up to
+        # the NEXT closer (orphan opener). Counting openers alone cannot see it.
+        for key, (o_rx, c_rx) in PAIRS.items():
+            o = len(re.findall(o_rx, body))
+            c = len(re.findall(c_rx, body))
+            if o != c:
+                unpaired.append({
+                    "skill": name, "marker": key, "openers": o, "closers": c,
+                    "risk": "orphan closer survives the sweep as residue" if c > o
+                            else "orphan opener — the sweep may swallow to the next closer",
+                })
         for owner in MARKERS["origin_foreign"].findall(body):
             foreign_owners[owner] += 1
 
@@ -337,6 +363,7 @@ def census(root):
         "skill_count": len(skills),
         "skills": skills,
         "quarantined": quarantined,
+        "unpaired_markers": unpaired,
         "skills_with_no_origin_marker": no_marker,
         "marker_totals": dict(marker_totals),
         "foreign_origin_owners": dict(foreign_owners),
@@ -390,6 +417,7 @@ def report(c):
     p(f"|---|---|")
     p(f"| skills | {c['skill_count']} |")
     p(f"| quarantined (unparseable) | {len(c['quarantined'])} |")
+    p(f"| **UNPAIRED markers (sweep hazard)** | **{len(c['unpaired_markers'])}** |")
     p(f"| skills with no `origin:` marker | {len(c['skills_with_no_origin_marker'])} |")
     for k, v in sorted(c["marker_totals"].items()):
         p(f"| marker `{k}` | {v} |")
@@ -434,6 +462,12 @@ def report(c):
         p("")
         for k, v in sorted(c["ignore_rule_sources"].items()):
             p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c["unpaired_markers"]:
+        p("## Unpaired markers — a sweep hazard")
+        p("")
+        for u in c["unpaired_markers"]:
+            p(f"- `{u['skill']}` {u['marker']}: {u['openers']} openers / {u['closers']} closers — {u['risk']}")
         p("")
     if c["hooks_dead_wiring"]:
         p("## Dead wiring (registered, file absent)")

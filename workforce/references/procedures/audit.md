@@ -283,6 +283,37 @@ inherits the dataset it guards, with its registration rewritten **in the same tr
 Rewriting a registration is the one exception to "report, never rewire" — and it is not a rewire, it is
 carrying an existing wire to where its script now lives.
 
+### Step 3a — Convene the Conversion Department
+
+Dispositions above decide what each *skill* becomes. This decides what each **block inside it** becomes,
+and it is the step that makes conversion possible on a library with unmarked content.
+
+**Full method: `references/conversion-department.md`.** Three roles, run as a pipeline — never as a
+voting panel, which measured worse upstream.
+
+| Order | Role | Definition |
+|---|---|---|
+| 1 | function, per block | `workforce/agents/content-classifier/AGENT.md` |
+| 2 | ownership, directive-shaped blocks only | `workforce/agents/provenance-analyst/AGENT.md` |
+| 3 | fidelity, after a handbook exists | `workforce/agents/conversion-auditor/AGENT.md` |
+
+**Each is invoked by reading its definition and passing the body as the task prompt** — a shipped
+`AGENT.md` is a prompt template, not a registered agent, and cannot be spawned by name
+(`references/staging.md` § The same constraint applies). **Read the whole file**: the four-part contract
+is what keeps the role from drifting, and a caller that pastes half of it gets a drifting agent with
+nothing reporting the drift.
+
+Order matters and is not a preference. Function first, because three of four destinations do not depend
+on authorship — so the work moves before the harder question is asked, and most blocks never reach it.
+
+**Gate before any of it: marker pairing.** A file whose markers do not balance is excluded from
+extraction and from the sweep until a human resolves it (`legacy-markers.md` § Pairing is verified).
+Measured on the first real target: 5 unpaired findings across 3 skills.
+
+Report from this step: blocks by destination, `EMBEDDED:` totals from every `SCAFFOLDING`
+classification, and the provenance outcome counts — `USER` / `GENERATOR` / `IMMATERIAL` / `UNRESOLVED`,
+separately.
+
 ## Step 3b — Datasets and connections
 
 Two censuses that decide what the org can actually reach. Both run before Step 4 assigns owners, because
