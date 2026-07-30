@@ -29,7 +29,8 @@ os.chdir(ROOT)
 if "--stamp" in sys.argv:
     import hashlib as _hl
     _rx = re.compile(
-        r"<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S)
+        r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+        re.S | re.M)
     _rows = []
     for _f in sorted(glob.glob("workforce/**/*.md", recursive=True)):
         with open(_f, encoding="utf-8") as _fh:
@@ -98,7 +99,12 @@ CANCEL_RX = re.compile(
     r"|the old rule said"
     r"|the sweep proceeds regardless"
     r"|need not sum"
-    r"|whichever is convenient)",
+    r"|whichever is convenient"
+    r"|[Tt]hat is retracted"
+    r"|is withdrawn"
+    r"|An earlier draft said"
+    r"|reserved for findings the audit cannot"
+    r"|treat the labels above as approximate)",
     re.I,
 )
 
@@ -220,7 +226,10 @@ check(
 # target starts with ANY word-prefix of the cited text. Prose reliably trails a
 # citation ("§ Phase A against the staged file"), and demanding an exact match
 # would report the prose as the defect.
-CITE_RX = re.compile(r"`?([\w./-]+\.md)`?\s*§\s*(`[^`\n]+`|[^.,;()*|\n]+(?:\n[^.,;()*|\n#\-]+)?)")
+CITE_RX = re.compile(
+    r"`?([\w./-]+\.md)`?\s*§\s*"
+    r"(`[^`\n]+`|(?:[^.,;()*|\n]|\.(?=\S))+(?:\n(?:[^.,;()*|\n#\-]|\.(?=\S))+)?)"
+)
 # Files this project WRITES INTO A PROJECT rather than ships. They cannot be
 # resolved here and are not defects.
 GENERATED_TARGETS = ("operating-principles/", "org/", "personnel-ledger/")
@@ -235,7 +244,8 @@ def _norm_heading(s):
     this check rather than by reading it.
     """
     s = re.sub(r"\s+", " ", s.replace("`", "").lstrip("#")).strip().lower()
-    return re.sub(r"^(?:the|a|an)\s+", "", s)
+    s = re.sub(r"^(?:the|a|an)\s+", "", s)
+    return re.sub(r"'s\b", "", s)
 
 
 _by_name = {}
@@ -254,8 +264,28 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
             continue  # the PATH half is check 3's job, not this one
         _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
         _w = _sec.split()
-        if not any(any(h.startswith(" ".join(_w[:n])) for h in _heads)
-                   for n in range(len(_w), 0, -1)):
+        # Longest prefix first; the first length matching EXACTLY ONE heading
+        # resolves. A prefix matching several has not resolved anything — the
+        # bare word "phase" matched Phase A, B and C, so renaming or deleting
+        # Phase B or C left every citation of them green.
+        _hit = False
+        for _n in range(len(_w), 0, -1):
+            _pre = " ".join(_w[:_n])
+            _ms = [h for h in _heads if h.startswith(_pre)]
+            # An EXACT heading — the prefix is the whole heading, or ends at its
+            # separator — resolves even when it is also a prefix of siblings.
+            # "Step 0.4" is a real heading AND a prefix of 0.4a/b/c; without this
+            # the ambiguity rule rejects a citation that is perfectly well formed.
+            if any(h == _pre or h[len(_pre):len(_pre) + 2] in (" —", " -", ": ")
+                   for h in _ms):
+                _hit = True
+                break
+            if len(_ms) == 1:
+                _hit = True
+                break
+            if len(_ms) > 1:
+                break
+        if not _hit:
             _anchor_broken.append(f"{_src.replace('workforce/', '')} → {_raw} § {_sec[:48]}")
 check(
     "references: every `file § Section` anchor resolves to a real heading",
@@ -621,6 +651,12 @@ check(
 # Detection by marker, never by name. A named-skill delete list silently misses a
 # renamed or forked install and reports success anyway.
 check(
+    "legacy-markers: the marker table declares itself a floor, not the population",
+    "floor, never the population" in lm and "generic detector" in lm,
+    "a census keyed only to named families reports a clean sweep over every "
+    "generator it has not met; four unlisted families were found on the first target",
+)
+check(
     "legacy-markers: detection is by marker, not by name",
     "never by name" in lm,
     "legacy-markers.md must state that detection keys on markers, not skill names",
@@ -932,7 +968,7 @@ check(
 # and is GENERATED (`bin/coverage --stamp`), because a hand-maintained label
 # drifts from the assertion it describes, which is the defect being labelled.
 _HDR_RX = re.compile(
-    r"<!-- Enforcement: (\d+) assertion\(s\) in bin/check guard this file; (\d+) normative"
+    r"<!-- Enforcement: (\d+) assertion\(s\) in bin/check name this file; (\d+) normative"
 )
 _hdr_stale = []
 try:
@@ -1057,7 +1093,8 @@ check(
 import hashlib
 
 _IMM_RX = re.compile(
-    r"<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+    re.S | re.M,
 )
 _stamped = {}
 for _line in read("workforce/.immutable.sha").splitlines():
@@ -1175,6 +1212,21 @@ check(
     "discovery: the directive-touch hard floor is stated",
     "FLAG-ONLY" in disc and "immutable: true" in disc,
     "discovery.md must downgrade any finding whose edit span intersects an immutable block",
+)
+# The census must generalise past the shapes it was written from. A matcher keyed
+# to one project's conventions reports a clean sweep over everything it had no
+# name for — and every convention in this project was learned from ONE project.
+check(
+    "discovery: the census generalises past the conventions it was learned from",
+    "never the population" in disc and "classify by exclusion, never by recognition" in disc.lower(),
+    "discovery.md must state that its named shapes are examples, and that "
+    "classification is by exclusion so unknowns surface as findings",
+)
+check(
+    "discovery: an unrecognised shape is a finding, not a silent skip",
+    "has not proven the project is simple" in disc,
+    "a census reporting zero unknowns on an unfamiliar project has only proven it "
+    "looked for what it already knew",
 )
 check(
     "discovery: quarantine is counted, not silent",

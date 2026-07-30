@@ -218,7 +218,9 @@ is retained by an *open* fact, never by having once been useful.
 Fixtures persist **across** runs; that is what makes the canary reachable at all.
 
 1. **Write them as early in the run as possible** — before the survey, which is the long part. The
-   registration delay is longer than 4.5 minutes and shorter than a session (`platform.md` fact 3), so
+   registration delay is **shorter** than 4.5 minutes of wall-clock and gated on at least one turn
+   boundary (`platform.md` § Fact 3 — an earlier form of this sentence stated 4.5 minutes as a *lower*
+   bound, the figure that fact explicitly falsifies, and cited it as the authority), so
    the survey and the org-design panels are what buys the time.
 2. **Run the canary late** — immediately before the first registration, not immediately after writing
    the fixtures.
@@ -233,7 +235,7 @@ Fixtures persist **across** runs; that is what makes the canary reachable at all
 from what you expect."* A canary that reasons from the docs measures the docs.
 
 **A canary written this session cannot run this session** (`platform.md` fact 3 — registration is
-delayed, longer than 4.5 minutes and shorter than a session). It runs against fixtures registered by a
+delayed by at least a turn boundary). It runs against fixtures registered by a
 *previous* session, or against built-in agent types driven through the Agent tool's own parameters —
 which is how the 2026-07-29 depth and background measurements were taken. **Write the fixtures early**
 so a later step in the same run can reach them; see § Fixture lifecycle.

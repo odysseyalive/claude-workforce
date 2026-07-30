@@ -1,6 +1,6 @@
 # Enforcement coverage
 
-65 shipped markdown files · 441 normative claims · 52 file-specific assertions · 49 files with no file-specific assertion
+65 shipped markdown files · 445 normative claims · 55 file-specific assertions · 49 files with no file-specific assertion
 
 **Plus 8 generic assertions that guard EVERY shipped file** — manifest: every declared file exists, manifest: no shipped file is undeclared, constants: stated once, outside the declared exceptions, references: every references/… link resolves, backticked or bare, scopes: no project state written into the skill directory, doctrine: no shipped file revokes a rule while keeping its guarded text, immutable: every shipped user directive matches its stamp, coverage: every Enforcement header matches the assertions that exist. A file reported at zero below is covered by those; it has no assertion naming *it*.
 
@@ -12,15 +12,15 @@
 | `references/procedures/audit.md` | 36 | 5 |
 | `references/conversion-taxonomy.md` | 25 | 6 |
 | `references/platform.md` | 20 | 4 |
+| `references/discovery.md` | 12 | 6 |
 | `references/procedures/hire.md` | 12 | 2 |
 | `references/procedures/verify.md` | 12 | 0  ← **none** |
 | `references/templates.md` | 12 | 0  ← **none** |
 | `references/verification.md` | 12 | 0  ← **none** |
 | `references/data-skills.md` | 11 | 3 |
 | `references/evaluators.md` | 11 | 0  ← **none** |
-| `references/legacy-markers.md` | 10 | 4 |
+| `references/legacy-markers.md` | 11 | 5 |
 | `references/audit-setup.md` | 9 | 0  ← **none** |
-| `references/discovery.md` | 9 | 4 |
 | `references/procedure-for-procedures.md` | 9 | 2 |
 | `references/staging.md` | 9 | 3 |
 | `agents/content-classifier/AGENT.md` | 8 | 2 |
@@ -116,7 +116,9 @@
 **`references/discovery.md`**
 - <computed>
 - census: hook registrations are counted as entries, not unique scripts
+- discovery: an unrecognised shape is a finding, not a silent skip
 - discovery: quarantine is counted, not silent
+- discovery: the census generalises past the conventions it was learned from
 - discovery: the directive-touch hard floor is stated
 
 **`references/enforcement.md`**
@@ -131,6 +133,7 @@
 **`references/legacy-markers.md`**
 - extraction: the gate counts embedded quotes as well as immutable spans
 - legacy-markers: detection is by marker, not by name
+- legacy-markers: the marker table declares itself a floor, not the population
 - legacy-markers: the marker table exists
 - markers: pairing is verified before extraction and before the sweep
 

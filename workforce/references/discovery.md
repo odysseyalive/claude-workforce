@@ -1,6 +1,6 @@
 # Discovery — how much a finding is trusted, and what may be done about it
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the tier caps the action. A finding may never be acted on above its tier. -->
 
 `conversion-taxonomy.md` classifies **what a skill is**. This file classifies **how much a finding
@@ -136,6 +136,36 @@ Without this list an audit over-reports on any mature project, because a well-de
 deliberate overlap everywhere. Reporting design as defect trains the user to ignore the report.
 
 ---
+
+## Fluency: every convention here is an example, never the population
+
+**The shapes below were learned from real projects. They are not the shapes.** A census keyed to what
+one project happened to do finds what that project happened to do, and reports a clean sweep over
+everything it had no name for.
+
+| Learned from one project | The rule that generalises |
+|---|---|
+| state under `data/`, `ledger/`, `scans/`, `corpora/` | **enumerate every file and classify by exclusion**; the residual is the finding |
+| markers named `ROUTE-EMBED`, `MODEL-LANE-GATE` | **any `<!-- NAME START/END -->` pair is a marker family**; the named ones are examples |
+| generators named `skill-builder` | **any `origin:` value that is neither `user` nor `workforce`** |
+| ignore rules in three specific files | **wherever `git check-ignore -v` says they are**, asked per file |
+| hooks under `hooks/`, registered by path | **every `command` string in settings**, whatever shape it takes |
+| records as `INC`/`DEC`/`PAT`/`FLW` | **whatever record types the artifact actually contains**, enumerated from the filesystem |
+
+**Three rules make a census fluent rather than fitted:**
+
+1. **Classify by exclusion, never by recognition.** Ask what a file *is not* — not instruction, not
+   code, not policy, not state — and report the remainder by name. Recognition finds the known;
+   exclusion finds the unknown and says so.
+2. **Ask the system, do not assume it.** `git check-ignore` knows the ignore rules; the settings JSON
+   knows the hooks; the filesystem knows the records. Every hardcoded path in a census is a project it
+   will be wrong about.
+3. **An unrecognised thing is a finding, never a silent skip.** A marker family, a record type, a state
+   directory, or a naming convention this project has not seen before is reported so the table can grow
+   — which is how the next project's shapes get learned.
+
+**A census that reports zero unknowns on an unfamiliar project has not proven the project is simple.**
+It has proven the census only looked for what it already knew.
 
 ## Greenfield discovers from intent
 

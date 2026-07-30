@@ -58,7 +58,11 @@ instead.
 **Running `/workforce audit` is the consent.** No disclaimer question, no confirmation widget. The
 command name is unambiguous, and the backup taken next protects what a question would have protected.
 
-Write the `audit-disclaimer` marker on entry. Headless: the marker must already exist from a prior
+**Write the `audit-disclaimer` marker AFTER the backup**, not on entry. The marker lives in
+`org-config.md`, inside the tree Step 0.2 archives — so writing it first makes `INV-BACKUP`'s counted
+quantity 1 rather than 0, which is `NOT UPHELD`, which aborts the sweep on every run. It also puts this
+run's own marker inside an archive claiming to be pre-audit state, the exact defect Step 0.2 exists to
+close. Headless: the marker must already exist from a prior
 interactive run — refuse without it, because the budget questions cannot render headless.
 
 ## Step 0.2 — Backup
@@ -103,7 +107,11 @@ claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got
 nothing declared a creative lane, and the audit *defended* the non-build. That defense was rejected.
 Absence of the catalog is the trigger; nothing else.
 
-**Present catalogs receive unconditional maintenance regardless of any checkbox.** The version comparison
+**Present catalogs receive unconditional maintenance regardless of any checkbox — but the append
+itself waits for Step 0.7.** The version comparison runs here; the *write* runs after the
+`catalog-unappendable` state is known, because a catalog whose content sits inside an immutable span
+may not be appended at all (`evaluators.md` § When the catalog cannot be appended). Appending at this
+step would write into an immutable span before the gate that forbids it had run. The version comparison
 and forcible append (`evaluators.md` § Forcible propagation) are maintenance of something already
 installed, not a new install, so they run whether or not anything was checked. A growing catalog that does
 not reach installed copies only ever helps new projects.
@@ -117,13 +125,25 @@ decides what happens — not this gate.
 Three `AskUserQuestion` calls, seven objects, **fixed regardless of headcount**
 (`references/org-config.template.md`):
 
-- **Step 0.4a — Model budget:** Lead tier / IC tier / **creative-alternate**. Each question offers
-  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
-  "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and runs on
-  whatever model the user chose for their Claude Code session.
-- **Step 0.4b — Effort budget:** Lead / IC effort, and which departments run on the alternate model
-  (pre-checked from the Step 2 panel's creative classification).
-- **Step 0.4c — Advisor budget:** same four options in the same order. "Other" is where the user
+### Step 0.4a — Model budget
+
+Lead tier / IC tier / **creative-alternate**. Each question offers the four statics from
+`org-config.template.md` § Model statics, in the order listed there, plus "Other" for a hand-typed
+model ID. **No CEO question** — the CEO is the main session and runs on whatever model the user chose
+for their Claude Code session.
+
+### Step 0.4b — Effort budget
+
+Lead / IC effort, and which departments run on the alternate model.
+
+**The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
+and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a
+first run it is simply empty. An earlier form of this line claimed the panel's output as its source,
+and the ordering made that false (`procedures/audit.md` § Step 2).
+
+### Step 0.4c — Advisor budget
+
+Same four options in the same order. "Other" is where the user
   types **"No Advisor"** to decline one. Pre-selected from the current `advisorModel` in project
   settings (read in Step 0.3). Choosing a model writes `advisorModel`; choosing "No Advisor" removes
   the setting. The advisor runs only in the main session — it does not compound with spawned
