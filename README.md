@@ -1,6 +1,12 @@
 # Claude Workforce
 
+> **This repo might not change, but model capabilities do.** Re-run `/workforce audit` after any major change to Claude Code or the available models. Platform facts are measured on a specific harness version, and they expire. [How that works →](#platform-facts-expire)
+
+> **NEW:** Meet `/org`. Describe a task in plain language and it hands the work to whoever owns it, at the lowest level that can do the job. [See routing →](#talking-to-the-company)
+
 > **SUPERSEDES:** claude-enforcer. This project grew out of it and takes over from it. If you run the enforcer today, `/workforce audit` is the migration path. [What carried over →](#succeeding-claude-enforcer)
+
+> **PAIRS WELL WITH:** playwright-mcp. Web-facing work is the hardest kind to write a real check for. `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with **no model in the loop**. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
 
 Most people build one very good assistant. The leverage is in building a company.
 
@@ -84,8 +90,6 @@ It also works on an empty project. With no skills, no tests and no git, it desig
 
 A role whose verification can't be named is never hired. It gets reported unstaffed, with the reason. **A role with a runnable check is an employee; a role without one is a job title.**
 
-> **This repo might not change, but model capabilities do.** Re-run `/workforce audit` after any major change to Claude Code or the available models. Platform facts are measured on a specific harness version, and they expire. [How that works →](#platform-facts-expire)
-
 ## Talking to the Company
 
 Describe the task. `/org` finds the owner.
@@ -137,8 +141,6 @@ An employee that can't verify itself either stops early or claims a success it d
 Some work has no command that can check it, and there the check is a catalog. Every project gets two evaluators, one for code quality and one for text authenticity, each carrying a catalog of tells and taxonomies. A catalog turns a judgment into a checklist. *"Does this read as machine-written?"* is taste, while *"does this cluster three or more of these tells?"* is close to mechanical.
 
 Individual contributors grep the catalog themselves. Their lead dispatches the evaluator for independent review, because ICs can't delegate.
-
-> **PAIRS WELL WITH:** playwright-mcp. Web-facing work is the hardest kind to write a real check for. `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with **no model in the loop**. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
 
 ## Nobody Is Hired Until a Stranger Can Follow the Handbook
 
@@ -280,6 +282,8 @@ Issues and pull requests are welcome. I can't promise a response time.
 Special thanks to Joe Loudermilk, who helped me understand why giving an LLM a second opinion opens doors. That conversation started everything the agent system became.
 
 Special thanks to Wouter Dieters, who helped me connect organizational theory to agency. An agent behaves differently once it has a role, a scope it won't leave, a check to pass, and someone it answers to.
+
+Thanks to Jeff Polack, who pointed out that this should support a personal install. That turned out to reshape the whole design: once the skill had to serve every project from one copy, no project-specific content could live inside it, and updating became a clean replacement instead of a merge.
 
 Thanks also to [Autonomee](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together some of the sharpest minds in the business.
 
