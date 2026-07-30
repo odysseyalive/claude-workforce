@@ -38,8 +38,8 @@ report a total as though higher were better.
 
 | Disposition | The skill is… | Result |
 |---|---|---|
-| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md demoted to a stub (`templates.md`) |
-| **SPLIT** | a workflow *and* reference data | workflow becomes a handbook; reference sections stay |
+| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md **deleted** (§ Nothing is left behind) |
+| **SPLIT** | a workflow *and* persistent data | four ways — § SPLIT decomposes four ways |
 | **CHARTER** | several distinct actors in one file | becomes a department: one Lead + N ICs |
 | **ORCHESTRATOR** | machinery that creates, registers, or drives agents | **stays a skill.** May gain employees it dispatches to; never becomes one |
 | **ADOPT** | already a registered agent | censused into the chart, **zero bytes changed** |
@@ -51,8 +51,7 @@ disposition; redundancy rides on top of whichever one it got.
 **So are the ownership-preflight states, and this has already gone wrong once.** `foreign-owned`,
 `multi-origin`, `collision`, and `catalog-unappendable` (`audit-setup.md` § Step 0.7) describe *what was
 detected about a file*. A disposition describes *what happens to it*. A skill can carry a state and a
-disposition at once — `route` is `foreign-owned` **and** `ORCHESTRATOR` — so mixing them into one table
-double-counts every skill that has both.
+disposition at once, so mixing them into one table double-counts every skill that has both.
 
 Two mechanical consequences, both checkable:
 
@@ -60,15 +59,68 @@ Two mechanical consequences, both checkable:
   A sum that overshoots is the tell that a state was pasted in as a row.
 - **Preflight states render in their own table** and are never added to that sum.
 
-On the 2026-07-29 run this failed exactly as described: `5 + 26 + 10 + 4 + 3 + 0 = 48` against 46 skills,
-with `code-evaluator` and `route` each appearing under both `RETAIN — rule 7` and `ORCHESTRATOR`. Their
-disposition is `ORCHESTRATOR`; `foreign-owned` is the annotation. **Test for ORCHESTRATOR first** (below)
-and the ambiguity does not arise — the arithmetic is what catches it when the ordering is missed.
+On the 2026-07-29 dry run this failed exactly as described: `5 + 26 + 10 + 4 + 3 + 0 = 48` against a
+45-skill population, because two skills each appeared under both `RETAIN — rule 7` and `ORCHESTRATOR`.
+The disposition was `ORCHESTRATOR`; `foreign-owned` was the annotation. **Test for ORCHESTRATOR first**
+(below) and the ambiguity does not arise — the arithmetic is what catches it when the ordering is missed.
+
+*(Historical note, so the example is not mistaken for current guidance: both skills in that run were
+predecessor-system artifacts and are now removed under succession. The lesson stands — a preflight state
+is not a disposition, and the sum is what proves it — but neither skill is a live ORCHESTRATOR case.
+The population figure is corrected too: the original entry said 46, which was a miscount from a shell
+`ls` that emitted a header line. **No count in this project is hand-derived**; `bin/baseline` produces
+them.)*
 
 Judgment calls go to an agent panel; disagreement resolves to the more conservative disposition.
 
 **One ordering rule that is not obvious:** test for ORCHESTRATOR *before* CHARTER. A dispatcher looks
 like several actors from the outside, and misreading one as a department destroys the dispatch layer.
+
+---
+
+## SPLIT decomposes four ways
+
+"Workflow becomes a handbook; reference sections stay" describes almost nothing that happens to a real
+skill. A mature skill carrying data decomposes into four destinations, and naming only one of them is
+how the other three get handled by accident:
+
+| Destination | What goes there |
+|---|---|
+| **Handbook** | the procedure, the judgment, the refusals, the output contract |
+| **Data skill** | the schema, invariants, degradation contract, git policy, owner (`data-skills.md`) |
+| **Stays exactly where it is** | the maintaining scripts and the registered hooks — **untouched, path unchanged** |
+| **Deleted** | the `SKILL.md`, once the handbook is live and verified |
+
+The third row is the one that is easy to miss and expensive to get wrong. A skill's `scripts/` and
+`hooks/` are working implementations that typically cost incidents to get right, and their
+registrations are paths in settings that a conversion cannot see from the skill directory. They do not
+move. `data-skills.md` § The data never moves states why, and the same reasoning covers the code that
+maintains it.
+
+---
+
+## Nothing is left behind
+
+**A converted skill is deleted. It is never replaced by a stub.**
+
+A stub pointing at the employee that replaced it is a placeholder: it occupies a name, it states no
+procedure, and it exists only to tell a reader where the real thing went. That is residue, and residue
+across dozens of skills is what makes a half-migrated tree unreadable.
+
+**The safety property is unaffected.** The transaction ordering (`SKILL.md` § the T1–T8 invariant)
+registers the employee and *verifies the registration* before anything touches the skill — so
+capability is reachable by the new path before the old one is removed. The stub was a courtesy pointer
+for someone typing the old command, never the safety mechanism.
+
+**What replaces the command surface** is the org's own entry point: a plain-language ask reaches the
+CEO and is dispatched, and `/workforce <employee> <args>` names the worker explicitly
+(`procedures/intent-router.md`). One entry point for a whole org scales past the point where
+remembering dozens of individual commands stops working.
+
+**Deletion happens once, at the end of a verified run** — never per skill mid-run. Skills reference
+each other; deleting as you go leaves dangling references at every intermediate step, and a run that
+dies freezes it there. Marking for deletion is part of each transaction; the sweep is a single step
+after the whole org verifies.
 
 ---
 
@@ -86,12 +138,21 @@ the orchestration inside an isolated context that returns only a summary (fact 7
 It appears in the chart as an `ORCHESTRATOR` row — visible, never a silent absence — and never
 receives a `## Chain of Command` block, because it is not in the chain.
 
-Real cases: `route` (catalog dispatcher), and `workforce` / `org` themselves.
+Real cases: `workforce` / `org` themselves.
 
-**Exception: `skill-builder` is the superseded generator, not an orchestrator.** Under `succession:
-declared`, it is removed entirely — not retained, not converted, not demoted to a stub. Workforce
-replaces it, and leaving both in place creates two systems managing the same artifacts. Report its
-removal in the closing summary.
+**ORCHESTRATOR may legitimately have zero instances**, and a zero is not a bug in the report. Under
+succession, a predecessor's own dispatcher is removed with the rest of that system — a catalog
+dispatcher and an org chart are two answers to one question, and keeping both is the same duplication
+that retires the superseded generator. What remains is whatever the *user* built to create and run
+agents, which the immutable directive above protects. On a project where they built none, the count is
+zero and the org chart is doing the dispatching.
+
+**Exception: the superseded generator is not an orchestrator.** Under `succession: declared`, it is
+removed entirely — not retained, not converted, not stubbed. Workforce replaces it, and leaving both in
+place creates two systems managing the same artifacts. Report its removal in the closing summary.
+
+**Identify it by marker, never by name** (`legacy-markers.md`). A generator that was renamed, forked, or
+partially installed is the same system; a name list finds none of those and reports success anyway.
 
 ---
 
@@ -111,8 +172,8 @@ No panel. Do not convert.
 6. **Quarantined** — frontmatter does not parse. Never convert what you cannot read.
 7. **Owned by another generator** — the imperative content sits inside an `origin:` marker whose value
    is neither `user` nor `workforce`. Rule 5 usually reaches the same answer by inference, and that is
-   not good enough here: converting would demote a `SKILL.md` its owner rewrites on the next run, so
-   the stub and the regenerated skill become **two live copies of one job** — the exact two-canonical-
+   not good enough here: converting would remove a `SKILL.md` its owner rewrites on the next run, so
+   the handbook and the regenerated skill become **two live copies of one job** — the exact two-canonical-
    texts failure conversion exists to avoid. Report the owner by name so the reason is legible.
 
    **Two live cases, and the second is the common one.** `playwright-mcp`'s `suite_scaffold`
@@ -128,6 +189,35 @@ No panel. Do not convert.
    for different reasons, so the outcome is RETAIN either way — **but it arrives by the conservative
    tie-break, not because a rule fired.** Say which it was in the report. A disposition defended as a rule
    that fired, when no rule fired, is the class of claim `verify` exists to catch.
+
+---
+
+## Hand-written intake — classify before touching, default to sacred
+
+Fires whenever a conversion target holds text outside every `<!-- origin: … -->` marker. On a
+people-authored library that is most of the file; on a generator-managed one it is the ragged prose
+between managed spans.
+
+> **In an unmarked file, unmarked text has the STRONGEST claim to user origin.** It is not "legacy
+> machinery nobody claimed." The usual reading inverts here.
+
+1. **Until classification is ratified, conversion may only APPEND.** Annotations, frontmatter keys,
+   new blocks. Not one unmarked line is rewritten, reordered, or reflowed.
+2. **Propose the full inventory** — every block quoted verbatim, labelled **SACRED** (will receive
+   `origin: user | immutable: true`), **MACHINERY** (becomes `origin: workforce | modifiable: true`),
+   or **UNSURE**.
+3. **UNSURE goes to a panel that recommends and never ratifies.** A split panel leaves the block UNSURE.
+4. **The default for every UNSURE or unratified block is SACRED.** A wrongly-frozen block is recovered
+   by editing its markers; a wrongly-reworded user sentence is not recoverable at all. The asymmetry
+   decides the default, not the panel's confidence.
+5. **Markers are additive.** Wrapping verbatim text adds lines around it and changes nothing inside —
+   attribution lines, spacing, and nonstandard formatting inside a SACRED block stay byte-exact. A
+   wrapper never normalizes.
+6. **Checksums are generated only after ratification**, so the integrity baseline records consented
+   state rather than the converter's guess. Stamping a guess makes the guess look verified, which is
+   worse than leaving it unstamped.
+
+The user ratifies in batches. Nothing becomes MACHINERY without an explicit ratification.
 
 ---
 
@@ -166,6 +256,35 @@ Succession is not "convert everything". Four refusals and one disposition surviv
 
 **So the end state of a full succession is orchestrators plus reference data**, which is the shape the takeover
 is aiming at rather than an accident of it.
+
+### What succession removes — the half that was missing
+
+Standing down two refusals only decides what may be *converted*. It says nothing about the predecessor's
+**emissions**, and leaving those in place is the outcome succession exists to avoid: a tree carrying two
+systems' scaffolding, where nothing indicates which is live.
+
+So succession also removes what the predecessor produced — **detected by marker, dispositioned by
+category, never by authorship** (`legacy-markers.md`):
+
+| Category | Under succession |
+|---|---|
+| the generator itself | removed |
+| **scaffolding** it emitted — embeds, annotations, gates, sidecars, sentinels | removed |
+| **working machinery** it wrote — hooks guarding data, maintaining scripts | **survives**, re-owned, registration rewritten in the same transaction |
+| **user content inside its files** | **extracted verbatim first.** Gate below |
+| **data** it maintained — a ledger, an index | migrated, enumerated from the filesystem and never from that artifact's own index |
+| anything generated-looking that matches no marker | quarantined to the report, untouched |
+
+**The extraction gate is blocking, and it precedes every deletion in the run.** Before the first file is
+removed, every `origin: user | immutable: true` span in the tree is extracted verbatim and byte-exact
+with its source `file:line`, and the extracted count is asserted against the census: **N of N, or the
+run does not proceed to any deletion.** Those spans are the user's own words, they routinely sit inside
+files the predecessor owns, and they are the only content in a managed tree that no regeneration can
+reconstruct.
+
+Ordering matters here for a reason this project has already paid for once: a rule that was correct and
+implemented in the wrong order (a backup that ran after the first write) produced an archive of a tree
+the run had already modified. Extraction has the same shape and the same failure mode.
 
 ### What succession does not do
 

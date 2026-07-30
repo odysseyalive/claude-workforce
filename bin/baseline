@@ -1,0 +1,381 @@
+#!/usr/bin/env python3
+"""
+Baseline capture for a conversion target.
+
+    python3 bin/baseline <project-dir> [--json]
+
+Prints a reproducible census of a project's .claude/ tree. Run it BEFORE the
+first `/workforce audit` and again AFTER, and diff the two: every number in
+plan/conversion-plan.md's before/after table comes from here, so the comparison
+is mechanical rather than hand-counted.
+
+Why a script and not a checklist: the first hand count of this project's
+awareness-ledger reported 20 records because it trusted a stale index, and a
+hand `find | head -100` undercounted the same directory a second time. A census
+that can be re-run is the only kind that can be compared.
+
+Exit code is always 0 — this is a measurement, not a gate.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from collections import Counter
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Markers that identify predecessor-system output. Detection is BY MARKER, never
+# by skill name: a renamed, forked, or partial install of the same generator must
+# still be found. Names appear only in the report, as examples of what matched.
+# ─────────────────────────────────────────────────────────────────────────────
+MARKERS = {
+    "origin_user_immutable": re.compile(r"<!--\s*origin:\s*user\b[^>]*immutable:\s*true"),
+    "origin_foreign": re.compile(r"<!--\s*origin:\s*(?!user\b)(?!workforce\b)([\w.-]+)"),
+    "enforcement_annotation": re.compile(r"<!--\s*ENFORCEMENT ANNOTATION"),
+    "route_embed": re.compile(r"<!--\s*ROUTE-EMBED START"),
+    "code_eval_embed": re.compile(r"<!--\s*CODE-EVAL-EMBED START"),
+    "model_lane_gate": re.compile(r"<!--\s*MODEL-LANE-GATE START"),
+    "lane_agent_embed": re.compile(r"<!--\s*LANE-AGENT-EMBED START"),
+}
+
+# Directory names that hold persistent state rather than instructions. The list
+# is deliberately broad: on the survey target, state was found under five
+# different conventions, and a census keyed to `data/` alone missed three of them.
+STATE_DIRS = {"data", "ledger", "scans", "corpora", "clients", "records", "state", "cache"}
+STATE_EXT = {".json", ".jsonl", ".csv", ".tsv", ".db", ".sqlite", ".sqlite3", ".yaml", ".yml", ".org"}
+
+# Files whose names mark them as machine-maintained working state even though
+# they are markdown and sit beside instructions.
+STATE_NAME_RX = re.compile(
+    r"(index|state|cache|history|ledger|registry|-log|seen|manifest)\.md$", re.I
+)
+
+# Two distinct categories, deliberately not merged. A credential must never be
+# archived or committed; a host-local sentinel is merely disposable. Conflating
+# them would either over-warn on `task-cache.json` or under-warn on a real token.
+CRED_RX = re.compile(r"(token|secret|credential|auth|-key|\.env)", re.I)
+HOST_LOCAL_RX = re.compile(r"^\.(.*(cache|acked|nudge|-ts|mode|active|pending|reviewed|advised))", re.I)
+
+
+def sh(args, cwd):
+    try:
+        r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=60)
+        return r.returncode, r.stdout, r.stderr
+    except Exception as e:  # a census must not die on the thing it measures
+        return 1, "", str(e)
+
+
+def git_status(root, relpath):
+    """Return one of: tracked, ignored, untracked, unknown."""
+    code, _, _ = sh(["git", "ls-files", "--error-unmatch", relpath], root)
+    if code == 0:
+        return "tracked"
+    code, _, _ = sh(["git", "check-ignore", "-q", relpath], root)
+    if code == 0:
+        return "ignored"
+    return "untracked"
+
+
+def read(p):
+    try:
+        with open(p, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def census(root):
+    root = os.path.abspath(root)
+    claude = os.path.join(root, ".claude")
+    skills_dir = os.path.join(claude, "skills")
+    out = {"project": root, "exists": os.path.isdir(claude)}
+    if not out["exists"]:
+        return out
+
+    # ── Skills ───────────────────────────────────────────────────────────────
+    skills = {}
+    marker_totals = Counter()
+    foreign_owners = Counter()
+    no_marker = []
+    quarantined = []
+
+    names = sorted(os.listdir(skills_dir)) if os.path.isdir(skills_dir) else []
+    for name in names:
+        sdir = os.path.join(skills_dir, name)
+        if not os.path.isdir(sdir):
+            continue
+        smd = os.path.join(sdir, "SKILL.md")
+        body = read(smd)
+        rec = {
+            "has_skill_md": os.path.isfile(smd),
+            "lines": body.count("\n") + 1 if body else 0,
+            "bytes": len(body.encode("utf-8")),
+            "subdirs": sorted(
+                d for d in os.listdir(sdir) if os.path.isdir(os.path.join(sdir, d))
+            ),
+            "markers": {},
+        }
+
+        # Frontmatter parses? A skill that cannot be read is QUARANTINED: excluded
+        # from downstream work, but counted in every total so the accounting never
+        # silently shrinks.
+        if rec["has_skill_md"]:
+            if not body.startswith("---\n") or "\n---\n" not in body:
+                rec["quarantined"] = "frontmatter missing or unterminated"
+                quarantined.append(name)
+        else:
+            rec["quarantined"] = "no SKILL.md"
+            quarantined.append(name)
+
+        for key, rx in MARKERS.items():
+            n = len(rx.findall(body))
+            if n:
+                rec["markers"][key] = n
+                marker_totals[key] += n
+        for owner in MARKERS["origin_foreign"].findall(body):
+            foreign_owners[owner] += 1
+
+        if "origin:" not in body and rec["has_skill_md"]:
+            no_marker.append(name)
+
+        # /route named in prose, outside the generated embed
+        rec["names_route"] = bool(re.search(r"/route\b", body))
+
+        # sidecars and dotfiles at the skill root
+        rec["root_dotfiles"] = sorted(
+            f for f in os.listdir(sdir)
+            if f.startswith(".") and os.path.isfile(os.path.join(sdir, f))
+        )
+        skills[name] = rec
+
+    # ── State / data inventory ───────────────────────────────────────────────
+    # Walk the whole skills tree; classify anything that is persistent state
+    # rather than instruction, and record its git disposition. The git status is
+    # the load-bearing column: it is the ONLY place a project declares whether a
+    # dataset is disposable, and it lives in files no SKILL.md mentions.
+    datasets = []
+    for dirpath, dirnames, filenames in os.walk(skills_dir):
+        rel_from_skills = os.path.relpath(dirpath, skills_dir)
+        parts = rel_from_skills.split(os.sep)
+        skill = parts[0] if parts and parts[0] != "." else None
+        in_state_dir = any(p in STATE_DIRS for p in parts)
+        for fn in filenames:
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root)
+            ext = os.path.splitext(fn)[1].lower()
+            is_state = (
+                in_state_dir
+                or ext in STATE_EXT
+                or STATE_NAME_RX.search(fn)
+                or (fn.startswith(".") and CRED_RX.search(fn))
+                or (fn.startswith(".") and HOST_LOCAL_RX.search(fn))
+            )
+            if not is_state:
+                continue
+            # SKILL.md and reference prose are not state even inside a state dir
+            if fn == "SKILL.md":
+                continue
+            try:
+                size = os.path.getsize(full)
+            except OSError:
+                size = -1
+            datasets.append({
+                "skill": skill,
+                "path": rel,
+                "bytes": size,
+                "git": git_status(root, rel),
+                "credential_shaped": bool(CRED_RX.search(fn)),
+                "host_local_sentinel": bool(fn.startswith(".") and HOST_LOCAL_RX.search(fn)),
+                "location": "state-dir" if in_state_dir else "skill-root-or-references",
+            })
+
+    # ── Hooks: registered vs on disk, both directions ────────────────────────
+    # Dead wiring (registered, file absent) silently drops whatever the hook
+    # enforced. Orphans (on disk, unregistered) are dead weight. Neither is
+    # visible from a skill directory alone, so both are censused here.
+    settings_paths = [
+        os.path.join(claude, "settings.json"),
+        os.path.join(claude, "settings.local.json"),
+    ]
+    registered = set()
+    for sp in settings_paths:
+        txt = read(sp)
+        for m in re.finditer(r"(?:\$CLAUDE_PROJECT_DIR/)?\.?claude/(skills/[\w./-]+\.(?:sh|py|js|ts))", txt):
+            registered.add(m.group(1))
+        for m in re.finditer(r"(skills/[\w./-]+/hooks/[\w.-]+\.(?:sh|py|js|ts))", txt):
+            registered.add(m.group(1))
+    on_disk_hooks = set()
+    for dirpath, _, filenames in os.walk(skills_dir):
+        if os.path.basename(dirpath) != "hooks":
+            continue
+        for fn in filenames:
+            rel = os.path.relpath(os.path.join(dirpath, fn), claude)
+            on_disk_hooks.add(rel.replace(os.sep, "/"))
+    dead_wiring = sorted(r for r in registered if r not in on_disk_hooks)
+    orphan_hooks = sorted(on_disk_hooks - registered)
+
+    # ── Agent definitions, both shapes, both locations ───────────────────────
+    # Identity comes only from `name:`, and .claude/agents/ is scanned
+    # recursively, so a collision anywhere in the union is a collision.
+    agents = {"registered": [], "in_skills": []}
+    agents_dir = os.path.join(claude, "agents")
+    for dirpath, _, filenames in os.walk(agents_dir):
+        for fn in filenames:
+            if fn.endswith(".md"):
+                agents["registered"].append(
+                    os.path.relpath(os.path.join(dirpath, fn), root)
+                )
+    for dirpath, _, filenames in os.walk(skills_dir):
+        for fn in filenames:
+            if fn == "AGENT.md" or (
+                os.path.basename(dirpath) == "agents" and fn.endswith(".md")
+            ):
+                agents["in_skills"].append(
+                    os.path.relpath(os.path.join(dirpath, fn), root)
+                )
+    agents["registered"].sort()
+    agents["in_skills"].sort()
+
+    # ── Predecessor ledger (record files vs whatever its index claims) ───────
+    ledger = {}
+    led_root = os.path.join(skills_dir, "awareness-ledger", "ledger")
+    if os.path.isdir(led_root):
+        for t in ("incidents", "decisions", "patterns", "flows"):
+            d = os.path.join(led_root, t)
+            ledger[t] = len(
+                [f for f in os.listdir(d) if f.endswith(".md")]
+            ) if os.path.isdir(d) else 0
+        idx = read(os.path.join(led_root, "index.md"))
+        claimed = re.findall(
+            r"\|\s*(Incidents|Decisions|Patterns|Flows)\s*\|\s*(\d+)", idx
+        )
+        ledger["index_claims"] = {k.lower(): int(v) for k, v in claimed}
+        ledger["actual_total"] = sum(
+            v for k, v in ledger.items() if isinstance(v, int)
+        )
+
+    # ── Where ignore rules for skill state actually live ─────────────────────
+    ignore_sources = Counter()
+    for ds in datasets:
+        if ds["git"] != "ignored":
+            continue
+        code, sout, _ = sh(["git", "check-ignore", "-v", ds["path"]], root)
+        if code == 0 and sout.strip():
+            ignore_sources[sout.split(":")[0]] += 1
+
+    out.update({
+        "skill_count": len(skills),
+        "skills": skills,
+        "quarantined": quarantined,
+        "skills_with_no_origin_marker": no_marker,
+        "marker_totals": dict(marker_totals),
+        "foreign_origin_owners": dict(foreign_owners),
+        "skills_naming_route_in_prose": sorted(
+            n for n, r in skills.items() if r.get("names_route")
+        ),
+        "directives_sha_sidecars": sorted(
+            n for n, r in skills.items()
+            if ".directives.sha" in r.get("root_dotfiles", [])
+        ),
+        "datasets": sorted(datasets, key=lambda d: d["path"]),
+        "dataset_bytes_total": sum(max(0, d["bytes"]) for d in datasets),
+        "credential_shaped_files": [d["path"] for d in datasets if d["credential_shaped"]],
+        "host_local_sentinels": [d["path"] for d in datasets if d.get("host_local_sentinel")],
+        "hooks_registered": sorted(registered),
+        "hooks_on_disk": sorted(on_disk_hooks),
+        "hooks_dead_wiring": dead_wiring,
+        "hooks_orphaned": orphan_hooks,
+        "agents": agents,
+        "predecessor_ledger": ledger,
+        "ignore_rule_sources": dict(ignore_sources),
+    })
+    return out
+
+
+def human(n):
+    for unit in ("B", "KB", "MB"):
+        if n < 1024 or unit == "MB":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n/1:.0f}{unit}"
+        n /= 1024
+    return f"{n}B"
+
+
+def report(c):
+    if not c.get("exists"):
+        print(f"no .claude/ directory at {c['project']}")
+        return
+    p = print
+    p(f"# Baseline — {c['project']}")
+    p("")
+    p("## Counts")
+    p("")
+    p(f"| metric | value |")
+    p(f"|---|---|")
+    p(f"| skills | {c['skill_count']} |")
+    p(f"| quarantined (unparseable) | {len(c['quarantined'])} |")
+    p(f"| skills with no `origin:` marker | {len(c['skills_with_no_origin_marker'])} |")
+    for k, v in sorted(c["marker_totals"].items()):
+        p(f"| marker `{k}` | {v} |")
+    p(f"| `.directives.sha` sidecars | {len(c['directives_sha_sidecars'])} |")
+    p(f"| skills naming `/route` in prose | {len(c['skills_naming_route_in_prose'])} |")
+    p(f"| datasets (persistent state files) | {len(c['datasets'])} |")
+    p(f"| dataset bytes | {c['dataset_bytes_total']} |")
+    p(f"| credential-shaped files | {len(c['credential_shaped_files'])} |")
+    p(f"| host-local sentinels / caches | {len(c['host_local_sentinels'])} |")
+    p(f"| hooks registered | {len(c['hooks_registered'])} |")
+    p(f"| hooks on disk | {len(c['hooks_on_disk'])} |")
+    p(f"| hooks DEAD WIRING (registered, file absent) | {len(c['hooks_dead_wiring'])} |")
+    p(f"| hooks orphaned (on disk, unregistered) | {len(c['hooks_orphaned'])} |")
+    p(f"| agents registered in `.claude/agents/` | {len(c['agents']['registered'])} |")
+    p(f"| agent definitions inside skills | {len(c['agents']['in_skills'])} |")
+    if c["predecessor_ledger"]:
+        pl = c["predecessor_ledger"]
+        p(f"| predecessor ledger records (actual) | {pl.get('actual_total')} |")
+        p(f"| predecessor ledger records (index claims) | {sum(pl.get('index_claims', {}).values())} |")
+    p("")
+    if c["foreign_origin_owners"]:
+        p("## Foreign `origin:` owners (detection is by marker, never by name)")
+        p("")
+        for k, v in sorted(c["foreign_origin_owners"].items(), key=lambda x: -x[1]):
+            p(f"- `{k}` — {v} region(s)")
+        p("")
+    p("## Datasets by git disposition")
+    p("")
+    by = Counter(d["git"] for d in c["datasets"])
+    for k, v in sorted(by.items()):
+        p(f"- {k}: {v}")
+    p("")
+    if c["ignore_rule_sources"]:
+        p("Ignore rules for that state are spread across:")
+        p("")
+        for k, v in sorted(c["ignore_rule_sources"].items()):
+            p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c["hooks_dead_wiring"]:
+        p("## Dead wiring (registered, file absent)")
+        p("")
+        for h in c["hooks_dead_wiring"]:
+            p(f"- `{h}`")
+        p("")
+    if c["credential_shaped_files"]:
+        p("## Credential-shaped files inside the skill tree")
+        p("")
+        for f in c["credential_shaped_files"]:
+            p(f"- `{f}`")
+        p("")
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    target = args[0] if args else os.path.expanduser("~/lab/odyssey-alive")
+    c = census(target)
+    if "--json" in sys.argv:
+        print(json.dumps(c, indent=2, sort_keys=True))
+    else:
+        report(c)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

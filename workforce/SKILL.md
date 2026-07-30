@@ -30,9 +30,29 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, Tas
 <!-- origin: user | immutable: true -->
 ## Directives
 
-*No user directives recorded yet. Directives captured here are **sacred**: quoted verbatim, never
-reworded, paraphrased, summarized, or reordered. Each carries a dated attribution line naming its
-source. Mechanics implementing a directive live in `references/`, never inside this block.*
+*Directives captured here are **sacred**: quoted verbatim, never reworded, paraphrased, summarized, or
+reordered. Each carries a dated attribution line naming its source. Mechanics implementing a directive
+live in `references/`, never inside this block.*
+
+> **"The main directive in this process is to keep the integrity and functionality of the existing
+> systems we are replacing. They should work better and more efficient in the new format (this
+> project) than they did before."**
+
+*— Added 2026-07-30, source: user directive ratifying the conversion plan. Governs every conversion:
+preservation is the floor, not the goal. A conversion that keeps a system working but slower, or more
+awkward to invoke, or harder to maintain, has failed even with no data lost.*
+
+> **"I don't want to leave any of the old system still there that doesn't need to be there. it will be
+> confusing."**
+
+*— Added 2026-07-30, source: user directive. Residue is a defect in its own right, independent of
+whether it is harmful. Converted skills are deleted rather than stubbed, and a predecessor system's
+emissions are removed with it.*
+
+*One further user directive — on skills that build and run agents — is recorded at
+`references/conversion-taxonomy.md`, beside the mechanics it governs. It is **not** restated here: a
+sacred block copied to a second location is two canonical texts, which is the failure this project
+refuses everywhere else. Directives live once, wherever they were first captured.*
 <!-- /origin -->
 
 ---
@@ -72,11 +92,13 @@ CHECKPOINT — Chain-of-Command Gate (fires whenever a handbook is authored or a
      make-before-break. Full transaction spec: references/procedures/hire.md § Transaction Order. -->
 CHECKPOINT — Atomic-or-Absent Conversion Gate (fires at every T-step of every per-skill conversion):
 1. PRECONDITIONS — all four, checked before ANY transaction begins. Any failure → STOP the entire run and convert nothing: (a) the pre-conversion backup exists and passed integrity verification; (b) the agent-registry census wrote `.agents-symlink-manifest.txt` and reported ZERO unresolved name collisions; (c) the tier canary did NOT return FAIL — PASS, PASS (on record), or UNAVAILABLE all satisfy this, and UNAVAILABLE proceeds DEGRADED rather than stopping (references/staging.md § The three outcomes); (d) the conversion journal is writable and holds no rows left at WRITE-INTENT from a prior run — an unfinished prior run must be rolled back, never converted over.
-2. ORDER IS THE INVARIANT, never reordered for convenience: T1 stage handbook → T2 stage stub → T3 probation → T4 journal WRITE-INTENT → T5 register `.claude/agents/<name>.md` → T6 verify registration → T7 swap SKILL.md → T8 journal COMMITTED. The employee goes live BEFORE the skill is demoted. At every instant the capability is reachable by exactly one or exactly two paths, NEVER zero.
+2. ORDER IS THE INVARIANT, never reordered for convenience: T1 stage handbook → T2 extract immutable directives → T3 probation → T4 journal WRITE-INTENT → T5 register `.claude/agents/<name>.md` → T6 verify registration → T7 copy `.orig` and MARK the skill for the sweep → T8 journal COMMITTED. The employee goes live BEFORE the skill is retired. At every instant the capability is reachable by exactly one or exactly two paths, NEVER zero.
+2b. T2 EXTRACTION IS BLOCKING PER SKILL. Every `<!-- origin: user | immutable: true -->` span in the source is written verbatim and byte-exact to `.claude/workforce/directives/<skill>.md` with its source `file:line`, read back, and compared. IF the extracted count is short by even one block → mark the skill ✗ and do NOT proceed to T5. The sweep may never remove a file whose extraction did not pass. These spans are the user's own words and no regeneration reconstructs them.
+2c. DELETION IS A SINGLE SWEEP AFTER THE WHOLE ORG VERIFIES — never per skill mid-run. T7 marks; it does not unlink. Skills reference one another, so deleting as the batch proceeds leaves dangling references at every intermediate step and a crash freezes the tree there. NOTHING IS STUBBED: a placeholder pointing at its replacement is residue, forbidden by the user directive above.
 3. T5 SYMLINK REFUSAL. Before writing `.claude/agents/<name>.md`, test whether the path exists and is a symlink. IF it is a symlink → STOP the entire run. Report: "Registration path <path> is a symlink to <target>. Writing it would overwrite <target> inside its skill directory." Writing through a symlink is a destructive act on a file the plan never named.
 4. T6 REGISTRATION VERIFY. Re-read the path: it MUST be a regular file, MUST parse as valid frontmatter, and its sha MUST equal the staged handbook's. Any mismatch → roll this transaction back from the journal, mark the skill ✗, do NOT proceed to T7.
-5. NEVER T7 WITHOUT T6 PASS. Demoting a working skill is authorized ONLY by a verified live replacement. IF T6 did not pass, was skipped, or its result is unknown → STOP. Report: "Refusing to demote <skill> — its replacement employee is unverified. The skill is left intact."
-6. T7 IS COPY-THEN-WRITE. Copy the live SKILL.md to `<staging>/<name>/SKILL.md.orig` and record its sha in the journal BEFORE replacing it. Write via temp → verify → rename. `.orig` is retained after the run and is the single-file undo.
+5. NEVER T7 WITHOUT T6 PASS. Retiring a working skill is authorized ONLY by a verified live replacement. IF T6 did not pass, was skipped, or its result is unknown → STOP. Report: "Refusing to retire <skill> — its replacement employee is unverified. The skill is left intact."
+6. T7 IS COPY-THEN-MARK. Copy the live SKILL.md to `<staging>/<name>/SKILL.md.orig` and record its sha in the journal BEFORE marking it. `.orig` is retained after the run and is the single-file undo.
 7. FAILURE CONTAINMENT. A failed transaction marks that skill ✗ and CONTINUES to the next — it never aborts the batch and never leaves a half-transaction. Every ✗ appears in the Execution Summary with the T-step it failed at.
 8. THE ORG CHART IS WRITTEN LAST AND ONLY FROM COMMITTED ROWS — never from the plan, never from intent. IF the chart would name an employee whose journal row is not COMMITTED → STOP and report the discrepancy rather than writing an aspirational chart.
 <!-- END ENFORCEMENT ANNOTATION -->

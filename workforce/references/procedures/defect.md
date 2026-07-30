@@ -16,6 +16,16 @@ Automatically and unconditionally, on any of:
 | `AMBIGUOUS:` returned by a probe | `staging.md` Phase B |
 | "the handbook doesn't say", "I assumed", "it wasn't clear whether" | any employee output |
 | a clarifying question asked of a human mid-task | any |
+| a data skill's stated contract did not hold | any read or write against it |
+
+**The data-skill row is against the skill, not the employee.** A dataset found in a state its
+`## Degradation` section does not describe, a schema that does not match what is on disk, or an
+invariant that turned out to be violable — each is the *document* being wrong about the data, which is
+the same class of defect as a handbook being wrong about a job.
+
+The distinction from a change request matters: **a change request is data that is out of date; a `DEF`
+is a description that was never right.** Stale data is ordinary maintenance and carries no attribution
+(`records-ownership.md`). A schema that never matched is a defect and gets one.
 
 **Capture is automatic here, and that is a deliberate divergence** from claude-enforcer's
 awareness-ledger, whose sacred rule is that capture is always user-confirmed. These are the org's own

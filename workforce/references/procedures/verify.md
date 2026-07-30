@@ -64,7 +64,9 @@ Three rules, each from a finding that was true and useless without it:
 | Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § `TIER-LIMIT` | the org's shape contract broken by a host setting |
 | `Agent` present in `permissions.allow` | every hop prompts; the org is unusable |
 | No project state inside the skill directory | a personal install sharing one config across unrelated projects |
-| Every wired hook `command` resolves, and none resolves into a demoted skill | a hook firing against a stub — clean report, no effect |
+| Every wired hook `command` resolves to a file that exists | **dead wiring** — non-blocking at runtime, silently drops whatever the hook enforced (`discovery.md` § Dead wiring) |
+| Every hook on disk is registered | an orphan — reported, never deleted |
+| Every `directives-sha` stamp resolves to a block that exists at the path it names | a stamp pointing into a swept skill — `checksums` reports `MISMATCH` one command after the run reported success |
 
 ## Platform freshness
 
@@ -146,9 +148,15 @@ States: `OK` · `MISMATCH` · `PARTIAL` (some blocks unreadable) · `UNREADABLE`
 
 Under `succession: declared` (`references/conversion-taxonomy.md` § SUCCESSION), rule 7 stood down on the
 premise that the previous generator would never rewrite `SKILL.md` again. **Verify that premise instead of
-trusting it.** For every stub whose pre-conversion source carried a foreign `origin:` marker, compare the
-live file against the `.orig` recorded at T7: a stub that has been overwritten means the generator ran after
-succession was declared, and the two-canonical-texts failure rule 7 was written to prevent is now live.
+trusting it.** A swept skill's path should stay empty; a foreign generator that ran after succession was
+declared **recreates the file it owned**. So for every swept skill whose `.orig` carried a foreign
+`origin:` marker, test whether its path exists again. A resurrected file means the generator is still
+running, and the two-canonical-texts failure rule 7 was written to prevent is now live — the employee and
+the regenerated skill both claiming one job.
+
+This check is *cheaper* after the move to deletion than it was against stubs: presence at a path that
+should be empty is unambiguous, where a stub required diffing against its recorded hash to tell an
+overwrite from the original.
 
 Report it as `SUCCESSION-VIOLATED: <skill> (owner: <generator>)` with both paths. **Detection only** — the
 remedy is the user's, because it is a question about which system they actually want running, and neither
@@ -188,7 +196,7 @@ Step 1, and the two never merge into one list:
 | Class | Test | Computed at |
 |---|---|---|
 | `DERIVABLE` | the model could read it off the codebase — directory listings, dependency names, restated build commands | survey time, before anything changes |
-| `STALE` | this run made it false — it describes a skill now demoted, a hook now firing at a stub, or work an employee now owns | after execution, from COMMITTED rows |
+| `STALE` | this run made it false — it describes a skill now swept, a hook now dead-wired, or work an employee now owns | after execution, from COMMITTED rows |
 
 **`STALE` is computed from the journal, never from the plan** — the same rule `org index` follows for the
 chart. A conversion that failed with ✗ left its skill intact, so every line describing that skill is

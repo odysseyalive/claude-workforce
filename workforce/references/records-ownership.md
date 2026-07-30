@@ -9,6 +9,12 @@ libraries stay **skills** — they are data many employees read, not one actor's
 But shared data with no owner rots. So every retained playbook gets **exactly one Records Owner**:
 the employee that receives all update tasks for it.
 
+**Two kinds of playbook, one ownership rule.** A *reference* playbook is read — a lookup table, a
+voice profile. A *data skill* is read **and written** — a run pointer, an append-only history, a
+routing index a human also edits (`data-skills.md`). Ownership works identically for both; the
+difference is that everything below about races, staleness, and second keys is theoretical for the
+first kind and operational for the second.
+
 This is Carpenter's dual-key rule reaching its natural target — *"the creator of the procedure and
 the relevant department manager must be intimately involved with the revision, and each must give
 final approval"* — applied to the artifacts an org shares rather than to any one job.
@@ -27,6 +33,36 @@ final approval"* — applied to the artifacts an org shares rather than to any o
 **Why one owner rather than "whoever is working on it."** Two employees editing a shared index in
 parallel produce a mutation race that no one observes: each runs in an isolated context, neither sees
 the other's write, and the last writer wins silently. A single owner makes the sequence explicit.
+
+### The skill is the mechanism; this table is the policy
+
+A data skill **cannot enforce any of the above**. Nothing inside it prevents a second employee from
+invoking it and writing. What prevents the mutation race is the one-owner rule here, expressed in the
+org chart and reconciled by `verify`.
+
+Never write a data skill whose prose implies a lock. It is a filing cabinet with a label on it, not a
+door with a key — and this project does not claim enforcement the runtime will not deliver
+(`enforcement.md`).
+
+---
+
+## Writing, staleness, and the four degraded states
+
+For a data skill, ownership carries obligations a reference playbook does not have.
+
+**The owner owns the degradation contract.** Every dataset answers four states — absent, empty, stale,
+corrupt — and names the safe direction for each (`data-skills.md` § Degradation). The invariant is
+universal and not negotiable per dataset:
+
+> **Degraded state may cause more work. It may never authorize a write.**
+
+**The owner owns the git policy, including where the ignore rule lives.** That rule is the only place
+a project declares whether a dataset is disposable, and it habitually lives in a file no skill
+mentions. An owner that cannot name its dataset's ignore rule by path does not know whether it is
+holding something recoverable.
+
+**A reader that finds the data stale files a change request. It does not refresh the data itself.**
+Refresh is a write, and writes belong to the owner.
 
 ---
 
@@ -64,7 +100,9 @@ ordinary maintenance and carries no attribution.
 
 ## Assigning ownership
 
-At conversion, each retained playbook goes to the employee whose scope most uses it.
+At conversion, each retained playbook goes to the employee whose scope most uses it. On a greenfield
+project the same rule runs forward: the employee whose procedure names the dataset owns it, and a
+dataset no procedure names is not created (`data-skills.md` § Every data skill is reachable).
 
 **Ties break toward the employee with the fewest owned records** — load balancing beats affinity. An
 owner is a serialization point, and concentrating several playbooks on one employee makes that

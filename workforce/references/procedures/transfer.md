@@ -12,7 +12,7 @@ High risk; display by default. `/workforce transfer <employee> <department> --ex
 | old manager's `ORG-CHAIN` | loses the report |
 | new manager's `ORG-CHAIN` | gains it — **check that Lead's parallel cap first** |
 | `model` / `effort` | **may change**: the department override resolves before the tier default, so moving into a creative department can change which model the employee runs on — **unless the employee carries an employee override, which pins it across the move** (`references/org-config.template.md` § Employee overrides) |
-| owned playbooks | move with the employee, unless the playbook belongs to the old department's domain — then re-home it (`records-ownership.md`) |
+| owned playbooks and data skills | move with the employee, unless the artifact belongs to the old department's domain — then re-home it (`records-ownership.md`). Ownership is recorded in three places and all three move together: the employee's `ORG-RECORD`, the chart, and the `ORG-OWNER` block in the artifact itself |
 | escalation targets in peer handbooks | any handbook naming this employee as an escalation path now points across a department boundary |
 
 **The model change is the one most often missed.** A transfer can silently repin an employee to a

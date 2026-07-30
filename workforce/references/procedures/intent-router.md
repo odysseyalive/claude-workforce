@@ -8,6 +8,9 @@ Classifies a freeform ask into a command. Runs when the first token is not a kno
 
 1. **Match against the known command set** (`SKILL.md` § Commands). An exact match is not freeform —
    dispatch it directly.
+1b. **Match against the roster.** If the first token is not a command but *is* an employee name in the
+   org chart, this is a **direct work dispatch**: hand the rest of the line to that employee verbatim
+   and stop. See § Naming an employee directly.
 2. **Classify the intent.** The distinctions that actually matter:
 
    | Intent | Command |
@@ -40,6 +43,36 @@ needs work.
 **Destructive commands are never auto-dispatched.** `retire`, `restore`, `disband`, and `rollback`
 render their display mode first, whatever the ask sounded like.
 
+## Naming an employee directly
+
+`/workforce <employee> <args>` dispatches straight to that employee, arguments passed through
+untouched. An employee named `triage-lead` invoked as `<employee> today --no-triage` receives `today
+--no-triage` intact.
+
+*(Employee names appear here only as `<employee>`, never spelled out after `/workforce`. `bin/check`
+asserts that every literal `/workforce <word>` is a real command, and a concrete example would read as a
+phantom one. The check is correct to be strict and must not be relaxed to accommodate an example.)*
+
+**This is what replaces a converted skill's slash command.** Conversion deletes the skill and leaves no
+stub (`conversion-taxonomy.md` § Nothing is left behind), so the org's own entry point has to carry the
+invocation the user is used to typing.
+
+Three rules make it safe:
+
+- **Commands win ties.** A command name and an employee name that collide resolve to the command.
+  `personas.md` should have prevented the collision at authoring time; if one exists anyway, report it
+  as a finding rather than silently preferring either.
+- **Arguments are never interpreted here.** Flags, modes, and dates go through verbatim. The router
+  does not know what `--no-triage` means and must not learn — that is the employee's handbook's job.
+- **An unknown first token is not an employee.** It falls through to intent classification below. Never
+  guess at a near-miss name; a typo that resolves to the wrong employee dispatches real work to the
+  wrong worker.
+
+**Naming the employee is a convenience, not a requirement.** A plain-language ask reaches the CEO and is
+dispatched from there. The explicit form exists for when the user already knows who should do the work —
+which, as an org grows past the point where anyone can hold its whole surface in mind, is worth having
+without requiring it.
+
 ## The distinction from `/org`
 
 `/workforce` manages **the company** — hiring, handbooks, records, structure. `/org` dispatches
@@ -50,3 +83,8 @@ render their display mode first, whatever the ask sounded like.
 When an ask arrives here that is plainly work rather than company management, say so and point at
 `/org` rather than doing the work — the whole value of the org is that the work runs inside an
 employee with its own guardrails and its own verification.
+
+**The direct-dispatch form above is the deliberate exception**, and it is narrow: it fires only when the
+first token is an exact employee name. It exists because a converted skill's users typed a command for
+years, and telling them the capability still exists but is no longer nameable would be a regression the
+conversion caused.

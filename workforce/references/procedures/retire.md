@@ -58,6 +58,36 @@ Set the `EMP` file status to `retired` with the date and reason. **Records are n
 performance history and amendment log are institutional memory, and the next hire for a similar role
 should be able to read why the last one ended.
 
+---
+
+## Retiring a dataset
+
+`/workforce retire <data-skill> --execute` retires a **dataset whose last reader is gone** — the same
+principle as retiring a job that no longer exists, applied to a filing cabinet nothing opens.
+
+**Two preconditions, both asserted:**
+
+1. **No handbook names it.** A data skill must be reachable from at least one handbook
+   (`data-skills.md`); one that is not is a `verify` finding already. Retirement is how that finding
+   gets resolved deliberately rather than by neglect.
+2. **The user confirms explicitly**, with the dataset's size, git disposition, and last-modified time
+   displayed. A dataset that has not been written in months may be dormant rather than dead.
+
+**What is removed and what is not:**
+
+| Removed | Kept |
+|---|---|
+| the data skill — schema, procedures, ownership | **the data files themselves** |
+| the `ORG-OWNER` block and chart row | the ignore rule governing them |
+| | the scripts and hooks that maintained them |
+
+**Retiring a data skill never deletes data.** The skill is the description; the data is the thing. A
+command that removes a description is not authorized to remove what it described, and the two decisions
+are not the same decision — one is org maintenance, the other is destroying records.
+
+If the user wants the data gone too, that is a separate, explicit act they perform themselves. Report
+the paths and stop there.
+
 File an `ORG` record for the structural change.
 
 ## Step 6 — Verify

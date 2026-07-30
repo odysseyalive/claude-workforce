@@ -161,3 +161,36 @@ Same steps, plus:
 - **Recompute the `contract-stamp`.** A changed stamp means the eval baseline is stale; queue a
   `review`.
 - **Never reword hand-authored text.** Append only.
+
+---
+
+## Authoring a data skill
+
+`/workforce handbook <data-skill> [--execute]` writes the artifact that holds an employee's records
+rather than its job. Spec: `references/data-skills.md`. Sections and their order come from there and are
+not restated here.
+
+The steps differ from a handbook's in four ways, and each difference is the point:
+
+**1. The source material is the data itself, not a description of it.** Read the actual files. A schema
+written from what a previous document *claimed* the data looked like inherits that document's errors —
+and on a conversion the previous document is exactly what is being replaced because it drifted.
+
+**2. There is no probe, because there is no procedure to follow.** A handbook is proven by a stranger
+executing it; a data skill is proven by **round-tripping an instance**: read a real file, validate it
+against the declared schema, and confirm the `## Seed` produces something the same validation accepts.
+A schema that cannot accept the data it describes is the defect this replaces the probe with.
+
+**3. Ownership is assigned at authoring time, never left for later.** Exactly one Records Owner, its
+Lead as second key, and the `ORG-OWNER` block written into the skill in the same pass
+(`records-ownership.md`). An unowned data skill is a `verify` finding, and authoring one without an
+owner creates the finding deliberately.
+
+**4. Nothing about the data changes.** Authoring is descriptive. Files are not moved, reformatted,
+seeded, cleaned, or migrated — not even when the schema turns out to describe them imperfectly. A
+mismatch is a finding to report, and the user decides whether the schema or the data is wrong.
+
+**On conversion, the immutable blocks come first.** If the source skill carried
+`origin: user | immutable: true` spans, they are extracted before anything else
+(`templates.md` § The extracted-directives file) and the data skill references them where they now live.
+Authoring never inlines a copy — that is two canonical texts of a sacred block.
