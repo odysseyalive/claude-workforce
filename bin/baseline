@@ -42,12 +42,16 @@ MARKERS = {
 # Paired markers: a sweep removes opener-to-closer, so pairing must be VERIFIED
 # rather than assumed. Measured on a real project: one skill carried 3 openers
 # and 4 closers, so the orphan closer would have survived the sweep as residue.
+# Both halves are written as FULL comment forms, so line-anchoring below applies
+# to each identically. Writing a closer as bare text (`END ENFORCEMENT ANNOTATION`)
+# silently produced 0 closers once anchoring was added, turning every paired file
+# into a false orphan-opener — the anchor was right and the pattern was wrong.
 PAIRS = {
-    "enforcement_annotation": (r"<!--\s*ENFORCEMENT ANNOTATION", r"END ENFORCEMENT ANNOTATION"),
-    "route_embed": (r"<!--\s*ROUTE-EMBED START", r"ROUTE-EMBED END"),
-    "code_eval_embed": (r"<!--\s*CODE-EVAL-EMBED START", r"CODE-EVAL-EMBED END"),
-    "model_lane_gate": (r"<!--\s*MODEL-LANE-GATE START", r"MODEL-LANE-GATE END"),
-    "lane_agent_embed": (r"<!--\s*LANE-AGENT-EMBED START", r"LANE-AGENT-EMBED END"),
+    "enforcement_annotation": (r"<!--\s*ENFORCEMENT ANNOTATION", r"<!--\s*END ENFORCEMENT ANNOTATION"),
+    "route_embed": (r"<!--\s*ROUTE-EMBED START", r"<!--\s*ROUTE-EMBED END"),
+    "code_eval_embed": (r"<!--\s*CODE-EVAL-EMBED START", r"<!--\s*CODE-EVAL-EMBED END"),
+    "model_lane_gate": (r"<!--\s*MODEL-LANE-GATE START", r"<!--\s*MODEL-LANE-GATE END"),
+    "lane_agent_embed": (r"<!--\s*LANE-AGENT-EMBED START", r"<!--\s*LANE-AGENT-EMBED END"),
     "origin_span": (r"<!--\s*origin:", r"<!--\s*/origin\s*-->"),
 }
 
@@ -150,9 +154,17 @@ def census(root):
         # PAIRING. A marker sweep deletes opener-to-closer, so an unpaired marker
         # either survives as residue (orphan closer) or swallows everything up to
         # the NEXT closer (orphan opener). Counting openers alone cannot see it.
+        #
+        # ONLY LINE-ANCHORED MARKERS COUNT. A marker quoted inside a sentence —
+        # documentation describing the format — is not a span opener. Counting it
+        # produced a false "unpaired" on this project's own SKILL.md, which under
+        # the exclusion rule would have silently skipped a legitimate file. A
+        # false positive on an exclusion gate is expensive: it looks like caution
+        # and behaves like a dropped file.
+        anchored = lambda rx: re.compile(r"^[ \t]*" + rx, re.M)
         for key, (o_rx, c_rx) in PAIRS.items():
-            o = len(re.findall(o_rx, body))
-            c = len(re.findall(c_rx, body))
+            o = len(anchored(o_rx).findall(body))
+            c = len(anchored(c_rx).findall(body))
             if o != c:
                 unpaired.append({
                     "skill": name, "marker": key, "openers": o, "closers": c,
