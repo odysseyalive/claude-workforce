@@ -90,6 +90,20 @@ It also works on an empty project. With no skills, no tests and no git, it desig
 
 A role whose verification can't be named is never hired. It gets reported unstaffed, with the reason. **A role with a runnable check is an employee; a role without one is a job title.**
 
+### What the audit asks you
+
+Five questions, in order. Everything else is resolved by agent panels without involving you.
+
+**1. Disclaimer.** The audit converts skills, writes agent definitions, and edits your `.claude/` directory. This is the consent. Cancel stops the run cold and writes nothing.
+
+**2. Backup.** Whether to archive your `CLAUDE.md` and `.claude/` directory before the audit touches anything. Taking it enables `disband` and `restore` later. Declining doesn't stop the audit, but it restricts conversions to non-destructive: the employee gets registered and the original skill stays, so you end up with two paths instead of one.
+
+**3. Companion skills.** A checklist of skills the audit needs installed to do its job: `org` for routing, `operating-principles` for the decision filter, `personnel-ledger` for records, and the two evaluator catalogs for code and text quality review. Only absent ones appear. A checked box installs; unchecked does nothing; the gate never uninstalls.
+
+**4. Payroll.** Two screens. The first asks which model to run at each tier — CEO, Lead, IC — plus which model to use for creative work. The second asks the effort level for each tier and which departments count as creative. Current values are pre-selected, so when nothing changed you're confirming with one click. The closing report prints a receipt showing every resolved value and where it came from, so a skipped question and an answered one can never look the same.
+
+**5. Org ratification.** The proposed roster: departments, employees, what each one owns, and the evidence cited for every role. This is always rendered, because a company is never created without you seeing it first. Where the evidence couldn't settle something that changes the roster — what work to hand off first, what must never happen without your review, whether there's work a model shouldn't do at all — those questions appear alongside it. Suppressed entirely in `--review` and `--quick` runs.
+
 ## Talking to the Company
 
 Describe the task. `/org` finds the owner.
