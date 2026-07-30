@@ -40,6 +40,17 @@ def warn(name, detail=""):
 
 
 def read(p):
+    """Read a file, or return "" if it is not there.
+
+    A DIAGNOSTIC MUST NOT DIE ON THE INPUT IT EXISTS TO DIAGNOSE. Any missing
+    declared file — a typo, a deleted path, a manifest flag prefix — used to raise
+    FileNotFoundError from whichever later check read it first, killing the run
+    before the report printed. The dedicated existence check would already have
+    recorded the FAIL; the traceback threw it away and reported nothing else
+    either. Missing files are reported by check 1 and read as empty everywhere.
+    """
+    if not os.path.isfile(p):
+        return ""
     with open(p, encoding="utf-8", errors="replace") as f:
         return f.read()
 
