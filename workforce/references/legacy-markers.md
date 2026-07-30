@@ -36,6 +36,29 @@ The regexes match **openers only**. A pattern matching both an opener and its cl
 double-counts every block; the first hand census of a real project reported twice the true count for
 exactly this reason.
 
+### Pairing is verified before any sweep, never assumed
+
+Counting openers tells you how many blocks there are. It does not tell you whether each one *ends*
+where the sweep will think it ends — and a sweep removes opener-to-closer.
+
+**Both failure directions are real, and one of them destroys content:**
+
+| Imbalance | What the sweep does |
+|---|---|
+| **orphan closer** (closers > openers) | the stray comment survives — residue, which the no-residue directive forbids |
+| **orphan opener** (openers > closers) | the span runs to the **next** closer, **swallowing unrelated content between two blocks** |
+
+Measured on the first real target: **5 unpaired findings across 3 skills** — one orphan closer, and two
+orphan `origin:` openers. The second kind is the one that matters, because `origin: user | immutable:
+true` is the protected class and a mis-paired span extracts or deletes the wrong text.
+
+**So the extraction gate verifies pairing first.** For every marker family in every file: openers ==
+closers, or the file is reported and **excluded from both extraction and the sweep** until a human
+resolves it. An unpaired file is not a hazard the run works around — it is a file the run does not
+touch.
+
+Report as a count alongside the others: `N files · M unpaired`.
+
 ---
 
 ## Disposition by category, never by authorship

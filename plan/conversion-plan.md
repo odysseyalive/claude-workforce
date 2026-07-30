@@ -61,6 +61,7 @@ Full census in `plan/baseline-2026-07-30.md`. The load-bearing figures:
 |---|---|---|
 | skills | **45** | the conversion population |
 | quarantined (unparseable) | **0** | nothing is unreadable today; any nonzero after the run is a regression |
+| **unpaired markers** | **5** across 3 skills | **sweep hazard** — those files are excluded from extraction and the sweep until resolved (B-18) |
 | skills with no `origin:` marker | **4** | hand-written; strongest claim to user origin (Part C-7) |
 | `origin: user \| immutable: true` blocks | **58** | **the irreplaceable content.** Gate D-2 exists for these |
 | `origin: skill-builder` regions | **60** | predecessor-owned spans, across 31 skills |
@@ -280,6 +281,25 @@ Self-audit of this plan for further proxies and unresolved conflicts. Five findi
 **`bin/baseline` stays unshipped.** `enforcement.md` records that this project ships zero executables, measured and deliberate. The census discipline is ported into `audit.md` § Step 3b instead, so the audit produces those numbers itself.
 
 **Confirmed unchanged:** cross-skill duplication re-derived against the corrected 81-block population — still **0**.
+
+### B-18. Second sweep, 2026-07-30 — one more blocker, one more hazard
+
+**BLOCKER — nothing convened the department.** It shipped fully specified, with three roles, an evidence ladder, and its own eval — and **no procedure referenced it.** The invocation *mechanism* was fixed in B-17 while the *caller* was never written, so the machinery was correct and unreachable.
+
+This is the same defect `verify` already asserts against data skills — *"must be named as a dependency by at least one handbook"* — turned on our own output and not caught, because the assertion only pointed outward. Fixed: `audit.md` § Step 3a convenes it, names each definition by path, and states that each is read as a prompt template rather than spawned. `bin/check` now fails if it is orphaned again.
+
+**HAZARD — marker pairing was assumed, never verified.** Counting openers says how many blocks exist; it says nothing about where each one *ends*, and a sweep removes opener-to-closer. Both failure directions are real and one destroys content:
+
+| Imbalance | Consequence |
+|---|---|
+| orphan closer | the stray survives — residue |
+| **orphan opener** | **the span runs to the next closer, swallowing unrelated content between two blocks** |
+
+Measured on the target: **5 unpaired findings across 3 skills** — one orphan closer (`frontend-design`, enforcement annotations) and **two orphan `origin:` openers** (`focus`, `frontend-design`). The second kind is the dangerous one, because `origin: user | immutable: true` is the protected class and a mis-paired span extracts or deletes the wrong text. The extraction gate could not have seen it: it counts openers.
+
+Fixed: pairing is verified before extraction and before the sweep, and **an unpaired file is excluded from both** until a human resolves it — not worked around.
+
+**Checked and clean:** immutable-marker regex handles both spacing variants in use (53 + 5 = 58); no registered hook command points outside a `hooks/` directory; `say/say.sh` is correctly categorised as code rather than escaping the census.
 
 ### B-13. Department cap — superseded by B-14
 
@@ -509,6 +529,7 @@ Fill the *after* column from `bin/baseline` post-run. A mismatch is a finding, n
 | policy files | 1 | **1**, unmoved | an ignore rule that moved is a disclosure risk |
 | ignore-rule source files | 3 | **3**, unchanged | data did not move, so rules must not have |
 | **unclassified files** | 0 | **0** | a nonzero residual means the census categories are incomplete |
+| unpaired markers | 5 | **0**, or the same 5 named as skipped | silently dropping to 0 means a sweep ran on a file it should have excluded |
 | hook registrations (entries) | 61 | **61** | the unique-script count alone would pass while registrations vanish |
 | credential-shaped files | 3 | **3**, unmoved, **absent from every backup archive** | |
 | hooks registered | 40 | **40** | |
