@@ -110,6 +110,33 @@ cannot be the one that skips the check.
 
 **Never place the kit inside the archive.** It lives beside them.
 
+### Refreshing a kit another generator wrote
+
+`.claude-backups/` is shared. On a project migrating from claude-enforcer the kit already exists, its prose
+says it was created by `/skill-builder backup`, and its guided-path line says to use **`/skill-builder
+restore`**. Appending the `claude-workforce-pre-` tier to that file and changing nothing else — which is what
+happened on 2026-07-29 — leaves the kit telling the user to restore a workforce archive with a command that
+does not know about it.
+
+So, when a kit is already present:
+
+- **Add this project's tier, and never reword another generator's tier descriptions.** Same
+  two-canonical-texts discipline as everywhere else: its owner may rewrite that file.
+- **The guided-path line must name a command per tier**, because one name cannot be right for archives two
+  systems wrote — `/workforce restore` for `claude-workforce-pre-*`, whatever the existing kit already
+  names for its own tiers.
+- **Never delete or replace the existing guided-path line.** It is correct for its own archives; it was only
+  ever wrong as a blanket instruction.
+
+**The hand-restore instructions stay generator-agnostic, and that is the part that matters.** `unzip -o`
+works on every tier regardless of which system wrote it, which is the entire reason the kit exists — it is
+the path used when the skill is gone. A guided command is a convenience; the `unzip` line is the guarantee.
+
+**State that a restore MERGES.** The kit's own instructions overwrite what the archive holds and leave
+everything else in place, so a user restoring a pre-audit archive still has the employees the audit
+registered. `procedures/restore.md` calls this its most commonly misread behavior; the kit is where it is
+misread, so the kit has to say it.
+
 ## Step 5 — Rotate, only after verification
 
 Keep the newest 3 of the matching prefix. The baseline and pre-restore tiers are invisible to rotation
