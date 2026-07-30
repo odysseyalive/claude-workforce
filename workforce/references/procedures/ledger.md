@@ -67,7 +67,7 @@ them silently while reporting success.
 **IDs are preserved unchanged.** Records cross-reference each other by ID; renaming breaks every link at
 once, and the links are most of the value.
 
-Report migrated-count against filesystem-count. `N of N`, never a bare "migrated."
+Report migrated-count against filesystem-count as **`INV-LEDGER`**. `N of N`, never a bare "migrated."
 
 ## The index
 

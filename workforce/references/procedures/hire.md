@@ -126,6 +126,8 @@ preserves instead is the only content the deletion could destroy — every
 
 - **T5 refuses a symlink.** If `.claude/agents/<name>.md` exists and is a symlink, stop the entire run
   — writing through it destroys a file the plan never named.
+The run prints **`INV-REGISTER`** — registrations verified before any retirement (`references/invariants.md`).
+
 - **T7 never runs without T6 passing.** Retiring a working skill is authorized only by a *verified*
   live replacement. Unknown result counts as failure: "Refusing to retire `<skill>` — its replacement
   is unverified. The skill is left intact."

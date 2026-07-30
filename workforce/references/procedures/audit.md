@@ -346,7 +346,7 @@ incomplete.** Run against the first real target, the residual surfaced two blind
 integrity sidecars, and reference prose living at the skill root rather than under `references/`. Both
 had been silently counted as data, inflating the dataset total by more than half.
 
-Report `N files accounted · M unclassified`. Coverage as a count, never a bare "clean."
+Report `N files accounted · M unclassified` as **`INV-CENSUS`**. Coverage as a count, never a bare "clean."
 
 For each dataset, record what the skill will need: schema, current git disposition, **the file its
 ignore rule lives in**, and every script or hook that reads or writes it. The ignore rule matters most
@@ -481,7 +481,12 @@ T-step tells the user something broke; it does not tell them what to type.
 Every conversion marked its skill at T7; nothing has been unlinked. This step does it, once, after the
 whole org has verified.
 
-**Four preconditions, all asserted, any failure aborts the sweep and leaves the tree in its
+**Compute the ten Run Invariants FIRST** (`references/invariants.md`). Every row, including the zeroes.
+**Any row that computes to `NOT UPHELD` aborts the sweep** — that is the whole reason they are computed
+here rather than at close, where they are merely printed. `INV-VERIFY` (the org verified),
+`INV-CENSUS` (residual zero), and `INV-HOOKS` (no dead wiring) are computed at this point and gate here.
+
+**Then four preconditions, all asserted, any failure aborts the sweep and leaves the tree in its
 two-paths-live state** — which is degraded but correct, and reversible by `disband`:
 
 1. **`verify` passed for the whole org this run.** Not per skill — the whole org. A sweep is authorized
@@ -509,7 +514,7 @@ prevent.
 
 - **Rewrite dangling references.** Any surviving skill that named a removed command gets that reference
   stripped. A gate telling a reader to invoke something deleted is worse than no gate.
-- **Re-run the hook census.** Dead wiring must be **zero**; a nonzero count means a relocation in Step 6
+- **Re-run the hook census** and print **`INV-HOOKS`**. Dead wiring must be **zero**; a nonzero count means a relocation in Step 6
   did not rewrite its registration.
 - **Report as counts**: skills swept, scaffolding blocks removed by marker class, blocks extracted
   against blocks censused, quarantined items. **Never a bare "clean"** — a sweep that cannot state its

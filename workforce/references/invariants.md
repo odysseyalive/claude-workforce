@@ -32,41 +32,62 @@ missing line is silence, and silence is indistinguishable from a gate that never
 Ten, and the list is closed: adding a procedural invariant means adding a row here and a line to the
 report, in the same change.
 
-| # | Invariant | Line the run prints |
-|---|---|---|
-| 1 | backup precedes the first write of the run | `backup: taken · 0 writes preceded it` |
-| 2 | immutable spans extracted before any deletion | `directives: N of N extracted` |
-| 3 | embedded user quotes extracted from scaffolding | `embedded: M of M extracted · K blocks scanned` |
-| 4 | marker pairing verified; unpaired files excluded | `markers: N files paired · M excluded unpaired` |
-| 5 | registration verified before a skill is retired | `T6: N of N verified before T7` |
-| 6 | the org verifies before the sweep | `verify: PASS · sweep authorised` |
-| 7 | every budget question rendered | `budget: 3 of 3 rendered` |
-| 8 | the file census leaves no residual | `census: N accounted · M unclassified` |
-| 9 | no dead wiring after hook relocation | `hooks: N registrations · M dead` |
-| 10 | ledger migration matches the filesystem | `ledger: N of N migrated (filesystem count)` |
+| # | Invariant | Token the run prints | Owed by |
+|---|---|---|---|
+| 1 | backup precedes the first write of the run | `INV-BACKUP` | references/audit-setup.md |
+| 2 | immutable spans extracted before any deletion | `INV-DIRECTIVES` | references/conversion-taxonomy.md |
+| 3 | embedded user quotes extracted from scaffolding | `INV-EMBEDDED` | references/legacy-markers.md |
+| 4 | marker pairing verified; unpaired files excluded | `INV-MARKERS` | references/legacy-markers.md |
+| 5 | registration verified before a skill is retired | `INV-REGISTER` | references/procedures/hire.md |
+| 6 | the org verifies before the sweep | `INV-VERIFY` | references/procedures/audit.md |
+| 7 | every budget question rendered | `INV-BUDGET` | references/audit-setup.md |
+| 8 | the file census leaves no residual | `INV-CENSUS` | references/procedures/audit.md |
+| 9 | no dead wiring after hook relocation | `INV-HOOKS` | references/procedures/audit.md |
+| 10 | ledger migration matches the filesystem | `INV-LEDGER` | references/procedures/ledger.md |
 
-Their *content* lives where it is specified — this file names the obligation, never restates the rule.
-Rows 2–4 are `legacy-markers.md`; 5–6 are `hire.md` and `conversion-taxonomy.md`; 1 and 7 are
-`audit-setup.md`; 8–9 are `procedures/audit.md`; 10 is `procedures/ledger.md`.
+**The token is the link, and it is what makes the pairing checkable.** Each `INV-*` token appears in
+exactly two places: this table, and the procedure that owes the count. `bin/check` resolves every row's
+token into its named owner and fails if the owner does not carry it — so a row cannot be added,
+reworded, or repointed without the procedure changing in the same edit.
+
+An earlier form of this table carried the literal line text and named its owners in a prose sentence.
+Both were unenforceable: an audit replaced all ten line texts with the word "garbage" and the check
+passed, because it counted rows without reading them. The owner names were written bare
+(`legacy-markers.md`), so the project's own cross-reference check — which resolves only paths beginning
+`references/` — validated none of them.
+
+Their *content* lives where it is specified. This file names the obligation and never restates the rule.
 
 ---
 
-## Where the lines go
+## When they are computed, and why that is not when they are printed
 
-A **Run Invariants** block in the closing report, before the findings. It answers a different question
-from the rest of the report: not *what did this run do*, but *what did it uphold*.
+**Compute and gate BEFORE the sweep. Print at close.** These are two moments and collapsing them makes
+the gate unfireable.
+
+| | |
+|---|---|
+| **computed and gated** | as a precondition of the destructive step (`references/procedures/audit.md` § Step 6b) |
+| **printed** | in the closing report, before the findings (§ Step 7) |
+
+**This was wrong in the first version of this file, in the exact shape the project keeps recording.**
+The block was specified to print at close, the only deletion happens before close, and the sentence
+*"a run with any NOT UPHELD row does not proceed to a destructive step"* therefore described a gate that
+fires strictly after the thing it was meant to stop. Seven of the ten rows had no pre-sweep gate at all.
+Correct rule, contradicting implementation — the same defect as a backup ordered after the first write.
 
 ```
 Run Invariants
-  backup      taken · 0 writes preceded it
-  directives  58 of 58 extracted
-  embedded    95 of 95 extracted · 96 blocks scanned
-  markers     42 files paired · 3 excluded unpaired
-  …
+  INV-BACKUP      taken · 0 writes preceded it
+  INV-DIRECTIVES  58 of 58 extracted
+  INV-EMBEDDED    95 of 95 extracted · 96 blocks scanned
+  INV-MARKERS     42 files paired · 3 excluded unpaired
+  …ten rows, always all ten…
 ```
 
 **A row that cannot be computed prints `NOT UPHELD` with the reason** — never omitted, never inferred
-from the absence of a complaint. A run with any `NOT UPHELD` row does not proceed to a destructive step.
+from the absence of a complaint. **Any `NOT UPHELD` row blocks the sweep**, which is enforceable only
+because the computation now precedes it.
 
 ---
 
