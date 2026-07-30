@@ -21,7 +21,6 @@ agreement separately.
 
 import os
 import shutil
-import stat
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,19 +35,13 @@ if not os.path.isfile("manifest.txt"):
 if os.path.isdir(DEST_ROOT):
     shutil.rmtree(DEST_ROOT)
 
-copied = hooks = 0
+copied = 0
 missing = []
 
 for line in open("manifest.txt", encoding="utf-8"):
     s = line.strip()
     if not s or s.startswith("#"):
         continue
-
-    flag = ""
-    if s.startswith("keep "):
-        flag, s = "keep", s[5:].strip()
-    elif s.startswith("hook "):
-        flag, s = "hook", s[5:].strip()
 
     if not s.startswith(PREFIX):
         missing.append(f"{s} (path does not start with {PREFIX!r})")
@@ -60,14 +53,9 @@ for line in open("manifest.txt", encoding="utf-8"):
     dest = os.path.join(DEST_ROOT, s[len(PREFIX):])
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     shutil.copy2(s, dest)
-
-    if flag == "hook":
-        os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        hooks += 1
-
     copied += 1
 
-print(f"synced {copied} files to {DEST_ROOT} ({hooks} hooks marked executable)")
+print(f"synced {copied} files to {DEST_ROOT}")
 
 if missing:
     print("\nmanifest problems:")

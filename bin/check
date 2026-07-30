@@ -45,15 +45,17 @@ def read(p):
 
 
 def manifest_paths():
-    """Shipped files, with their flags stripped."""
+    """Shipped files.
+
+    The `keep ` / `hook ` flag prefixes are gone: they existed only for the four
+    hook files removed in b5ddbba, and no line used them afterward. A reappearing
+    prefix is caught by the check below rather than silently parsed.
+    """
     out = []
     for line in read("manifest.txt").splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        for pre in ("keep ", "hook "):
-            if s.startswith(pre):
-                s = s[len(pre):].strip()
         out.append(s)
     return out
 
@@ -64,6 +66,14 @@ def manifest_paths():
 declared = manifest_paths()
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
+
+flagged = [p for p in declared if p.split(" ")[0] in ("keep", "hook")]
+check(
+    "manifest: no flag prefixes",
+    not flagged,
+    f"flag-prefixed lines: {flagged} — `keep `/`hook ` handling was removed with the "
+    "hooks; re-adding a flag means re-adding its handling to bin/check and bin/sync",
+)
 
 on_disk = {
     p for p in glob.glob("workforce/**/*", recursive=True)
@@ -92,15 +102,19 @@ CONST_EXEMPT = {
     "README.md",
     "COMMANDS.md",
 }
-CONST_RX = re.compile(r"\bthree tiers\b|\bthree-tier\b|\b20 concurrent\b|\b200 subagents?\b", re.I)
-offenders = []
-for p in declared + ["README.md", "COMMANDS.md", "install", "install.ps1"]:
-    if p in CONST_EXEMPT or not p.endswith((".md", ".sh", ".ps1")) and p not in ("install", "install.ps1"):
-        continue
-    if p in CONST_EXEMPT:
-        continue
-    if CONST_RX.search(read(p)):
-        offenders.append(p)
+CONST_RX = re.compile(
+    r"\bthree tiers\b|\bthree-tier\b|\b20 concurrent\b|\b200 subagents?\b"
+    # Model IDs are constants too — platform.md § Derived constants says so
+    # explicitly ("and to model IDs, which live in org-config.md, never in
+    # prose"). The rule was written; the check never covered it, leaving the one
+    # class of constant most likely to churn unguarded.
+    r"|\bclaude-(?:opus|sonnet|haiku|fable)-[\w.\[\]-]*\d",
+    re.I,
+)
+offenders = [
+    p for p in declared
+    if p.endswith(".md") and p not in CONST_EXEMPT and CONST_RX.search(read(p))
+]
 check(
     "constants: stated once, outside the declared exceptions",
     not offenders,
@@ -109,14 +123,25 @@ check(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Cross-references resolve
+#
+# Backticks are NOT required. The original pattern demanded them, so nine bare
+# `references/…md` mentions went unvalidated — SEVEN of them in SKILL.md, the
+# file whose grounding paths matter most. A path is a path whether or not it is
+# quoted.
 # ─────────────────────────────────────────────────────────────────────────────
+REF_RX = re.compile(r"(?<![\w/])references/[\w./-]+\.md")
 broken = []
-for p in glob.glob("workforce/**/*.md", recursive=True) + ["README.md", "COMMANDS.md"]:
-    body = read(p)
-    for m in re.findall(r"`(references/[\w./-]+\.md)`", body):
+for p in glob.glob("workforce/**/*.md", recursive=True) + [
+    "README.md", "COMMANDS.md", "CLAUDE.md",
+]:
+    for m in REF_RX.findall(read(p)):
         if not os.path.exists("workforce/" + m):
             broken.append((p, m))
-check("references: every `references/…` link resolves", not broken, f"broken: {broken}")
+check(
+    "references: every references/… link resolves, backticked or bare",
+    not broken,
+    f"broken: {broken}",
+)
 
 readme = read("README.md")
 img_broken = [
@@ -206,14 +231,77 @@ absent = [s for s in required if f"## {s}" not in tpl]
 check("templates: every section the authoring spec requires is present", not absent, f"absent: {absent}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. Hooks fail open and are executable
+# 8. Every `fact N` citation resolves to a fact platform.md actually defines
+#
+# A citation to platform.md fact "3b" appeared in CLAUDE.md twice and in bin/sync
+# once. No such fact has ever existed. It survived because nothing resolved fact
+# numbers — the same blind spot that let `/workforce dev hooks` ship in seven
+# files (see 8b), one class of reference later. A citation to a fact that does not
+# exist reads as grounding and is its opposite: it sends a reader looking for
+# evidence that was never written.
+#
+# Note the phrasing of the comment above: it names the bad number without writing
+# it in citation form, because this file scans itself.
 # ─────────────────────────────────────────────────────────────────────────────
-for p in glob.glob("workforce/hooks/*.sh"):
-    body = read(p)
+plat_body = read("workforce/references/platform.md")
+defined_facts = set(re.findall(r"^### Fact ([0-9]+[a-z]?)\b", plat_body, re.M))
+defined_facts |= set(re.findall(r"^\| ([0-9]+[a-z]?) \|", plat_body, re.M))
+
+CITE_RX = re.compile(r"\bfacts?\s+([0-9]+[a-z]?(?:\s*(?:,|and|/)\s*[0-9]+[a-z]?)*)", re.I)
+dangling = {}
+for p_ in declared + ["README.md", "COMMANDS.md", "CLAUDE.md", "bin/check", "bin/sync"]:
+    if not os.path.exists(p_):
+        continue
+    for group in CITE_RX.findall(read(p_)):
+        for n in re.findall(r"[0-9]+[a-z]?", group):
+            if n not in defined_facts:
+                dangling.setdefault(f"fact {n}", set()).add(p_)
+check(
+    "facts: every `fact N` citation resolves to a fact platform.md defines",
+    not dangling,
+    "dangling: " + "; ".join(f"{k} (in {', '.join(sorted(v))})" for k, v in dangling.items())
+    + f" — defined: {sorted(defined_facts)}",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8a. No duplicated heading or restated paragraph inside one file
+#
+# Both shipped. staging.md carried the same "instruct every canary" paragraph
+# twice; audit.md had an EMPTY `## Step 1b` heading directly above the real
+# `## Step 1c` with identical title text. Neither is catchable by eye in a
+# 300-line reference, and a duplicated instruction is how two versions of one
+# rule start drifting apart.
+#
+# The template files are exempt by design: each holds several complete handbook
+# templates, so `## Role` / `## Verification` recurring per template is correct.
+# ─────────────────────────────────────────────────────────────────────────────
+DUP_EXEMPT = {
+    "workforce/references/handbook-templates.md",
+    "workforce/references/personnel-templates.md",
+    "workforce/references/templates.md",
+    "workforce/references/org-config.template.md",
+}
+for p in declared:
+    if not p.endswith(".md") or p in DUP_EXEMPT:
+        continue
     n = os.path.basename(p)
-    check(f"hook {n}: exits 0 (fails open)", "exit 0" in body)
-    check(f"hook {n}: executable bit set", os.access(p, os.X_OK))
-    check(f"hook {n}: declared with the hook flag", f"hook {p}" in read("manifest.txt"))
+    lines = [l.rstrip() for l in read(p).splitlines()]
+
+    heads = [l for l in lines if l.startswith("#")]
+    dup_h = sorted({h for h in heads if heads.count(h) > 1})
+    # Same title under different numbering — `## Step 1b — X` vs `## Step 1c — X`.
+    titles = [re.sub(r"^#+\s*(?:Step\s+[\w.]+\s*[—-]\s*)?", "", h) for h in heads]
+    dup_t = sorted({t for t in titles if titles.count(t) > 1 and t not in ("", "Both")})
+    check(f"no duplicate heading in {n}", not (dup_h or dup_t), f"repeated: {dup_h or dup_t}")
+
+    # Markers (`<!-- … -->`) repeat by design — six enforcement annotations open
+    # with the same line. Their pairing is check 5's job, not this one's.
+    prose = [
+        l for l in lines
+        if len(l) > 55 and not l.lstrip().startswith(("|", "#", "```", "<!--"))
+    ]
+    dup_p = sorted({l for l in prose if prose.count(l) > 1})
+    check(f"no restated paragraph in {n}", not dup_p, f"repeated verbatim: {[l[:70] for l in dup_p]}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8b. Every /workforce command referenced anywhere actually exists
@@ -223,10 +311,13 @@ for p in glob.glob("workforce/hooks/*.sh"):
 # through nine commits because nothing checked command references — only
 # `references/…` links were validated.
 # ─────────────────────────────────────────────────────────────────────────────
+# `dev` is a prefix, not a command; the referring regex strips it when resolving
+# `/workforce dev <cmd>`. `audit` is the default command, documented in prose
+# rather than in the description's Commands list. `hooks` is deliberately absent —
+# it is the phantom this check exists to catch.
 KNOWN_COMMANDS = set(
     re.findall(r"[\w-]+", re.search(r"Commands: ([^\"]+)", skill).group(1))
-) | {"dev", "audit", "hooks"} - {"hooks"}
-# `dev` is a prefix, not a command; strip it when resolving `/workforce dev <cmd>`.
+) | {"dev", "audit"}
 referenced = {}
 for p_ in declared + ["README.md", "COMMANDS.md", "CLAUDE.md", "install", "install.ps1", "manifest.txt"]:
     if not os.path.exists(p_):
@@ -287,6 +378,20 @@ plat = read("workforce/references/platform.md")
 check("platform: MEASURED-ON stamp present", "MEASURED-ON:" in plat)
 check("platform: TIER-LIMIT constant present", "TIER-LIMIT:" in plat)
 check("platform: MEASURED and DOCUMENTED are separated", "## DOCUMENTED" in plat and "## MEASURED" in plat)
+
+# Every MEASURED fact must cite evidence a clone can actually open. platform.md
+# promises "MEASURED facts carry their evidence path" — and cited `.claude/`,
+# which is gitignored, so no reader could check one.
+ev_broken = sorted({
+    m for m in re.findall(r"`(measurements/[\w./-]+\.md)`", plat)
+    if not os.path.exists(m)
+})
+check("platform: every cited evidence file exists", not ev_broken, f"missing: {ev_broken}")
+check(
+    "platform: evidence is not cited from gitignored project state",
+    ".claude/workforce/canary" not in plat,
+    "cites .claude/workforce/ — gitignored, so a clone cannot verify the measurement",
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. README copy-button discipline — one command per fenced block
