@@ -89,7 +89,7 @@ came out of the same run.
 | Path | |
 |---|---|
 | `workforce/SKILL.md` | command surface, immutable directives, six enforcement gates |
-| `workforce/references/` | 22 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
+| `workforce/references/` | 23 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
 | `workforce/references/procedures/` | 29 command procedures |
 | `workforce/agents/` | four shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
 | — | this project ships **no executables**; see `references/enforcement.md` § Hooks |

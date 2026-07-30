@@ -154,7 +154,7 @@ High-risk commands default to **display mode** and require `--execute`: `hire`, 
 `disband`, `rollback`. Low-risk and read-only commands run immediately: `roster`, `budget`,
 `org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`.
 
-`audit` is the exception: its Step 0 disclaimer IS the consent, and it then auto-executes its
+`audit` is the exception: its Step 0 disclaimer IS the consent (`references/audit-setup.md`), and it then auto-executes its
 recommended work. `audit --review` is the zero-write escape, and it closes by naming the one command
 that would apply exactly what it displayed — report first, apply on a separate gesture.
 

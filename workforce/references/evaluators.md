@@ -128,8 +128,8 @@ its edits.
 
 ## Wiring into the org
 
-**`audit`** — the catalogs render in the Step 0.3 companion gate when absent, checkbox to install
-(`route`/`operating-principles` precedent). Present catalogs receive unconditional maintenance: the
+**`audit`** — the catalogs render in the companion gate when absent, checkbox to install
+(`references/audit-setup.md` § Step 0.3; `route`/`operating-principles` precedent). Present catalogs receive unconditional maintenance: the
 version comparison and forcible append run whether or not anything was checked, because that is
 maintenance of something already installed rather than a new install.
 

@@ -132,7 +132,8 @@ needing them will be concrete rather than speculative.
 Where the project cannot answer a question that changes the roster, **ask**. Do not invent a
 department, and do not guess at a purpose.
 
-This is the audit's fifth sanctioned question slot (`audit.md`) — **one `AskUserQuestion` call
+This is the audit's fifth sanctioned question slot (`references/audit-setup.md` § The question budget) —
+**one `AskUserQuestion` call
 carrying several objects**, the same one-call/one-slot pattern the payroll picker uses. It does not
 add a question slot; it fills the one already reserved for org ratification.
 

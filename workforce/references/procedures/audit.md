@@ -15,127 +15,17 @@ the Execution Summary with the step they failed at, never as "run this command y
 
 ---
 
-## The question budget — five slots, six calls, and it is a ceiling
+## Steps 0 through 0.6 — the setup gates
 
-**Slots, not calls.** The payroll picker is two `AskUserQuestion` calls occupying one slot, so a full
-first audit makes six calls against five slots. Stating it as "five" without that line has read as a
-call budget, and a reviewer counting calls finds a violation that is not one.
+**Specified in `references/audit-setup.md`, not here.** Consent, snapshot, companion skills, the payroll
+picker, VCS preflight, and the canary fixtures — plus the question budget that four of the five slots are
+spent against.
 
-| # | Step | Question | Calls |
-|---|---|---|---|
-| 1 | 0 | Disclaimer — accept and proceed / cancel | 1 |
-| 2 | 0.2 | Backup offer | 1 |
-| 3 | 0.3 | Companion skills — absent only, check to install | 1 (two grouped multi-selects) |
-| 4 | 0.4 | Payroll picker — tier × department model and effort | **2** (models; effort and overrides) |
-| 5 | 5-setup | Org ratification — the proposed roster, first audit only | 1 |
+Run them in order and carry their outcomes forward, because three of them change what the rest of this
+file may do: the backup state gates conversion's destructive step, the payroll answers are what Step 6's
+receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
 
-Everything else is a panel. **Suppressed entirely** in headless, non-interactive, and `--quick` runs:
-those render nothing, write no markers, and install nothing that was not already authorized.
-
----
-
-## Step 0 — Disclaimer
-
-A real `AskUserQuestion` widget, never prose. Must state plainly:
-
-- Designed for the current model generation; handbooks it writes remain usable on earlier models.
-- **This audit CONVERTS skills into agent employees. It writes `.claude/agents/`, demotes converted
-  skills to stubs, and edits your project's `.claude/` directory.**
-- Back up `CLAUDE.md` and `.claude/` first. You will be offered a snapshot next; taking it enables a
-  clean uninstall via `/workforce disband` or `restore`.
-- Accepting runs the audit and applies its recommendations automatically.
-
-Cancel → stop, write nothing. Accept → write the `audit-disclaimer` marker.
-
-Headless: with no acceptance on record, **refuse**. Interactive runs always re-ask.
-
-## Step 0.2 — Backup
-
-Offer a snapshot (`backup.md`). It runs **first** in the execution phase so it captures pre-audit
-state.
-
-**Declining does not stop the audit, but it restricts it:** conversion's destructive step (demoting a
-skill) requires a verified snapshot. Without one, every conversion downgrades to
-**register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and
-reported. This diverges from claude-enforcer, which proceeds on a warning; the blast radius here is
-replacing a working file, so the floor is higher.
-
-**Declined, failed, and empty are three different states.** Conflating them is how a run either blocks
-for no reason or proceeds without the protection it thinks it has:
-
-| State | Meaning | Consequence |
-|---|---|---|
-| `declined` | the user said no | proceed; conversions downgrade to non-destructive |
-| `no-content` | nothing to archive — no `CLAUDE.md`, no `.claude/`; `zip` reports "Nothing to do" | **proceed normally.** Nothing exists to protect, and only creation follows |
-| `failed` | content existed and the snapshot could not be written or verified | **treat as declined, and say why.** Never proceed as though a snapshot exists |
-
-A `failed` backup is never silently upgraded to "good enough". The report names the state, not just a
-✗ — "backup failed (disk full); conversions restricted to non-destructive" is actionable, and a bare
-✗ is not.
-
-## Step 0.3 — Companion skills
-
-Two grouped multi-selects in one call (one question slot):
-
-- **Core** — `org (recommended)`, `operating-principles (recommended)`, `personnel-ledger (recommended)`
-- **Evaluators** — `code-evaluator (recommended)`, `text-eval (recommended)`
-  (`references/evaluators.md`)
-
-**Only absent companions render.** A checked box installs; an unchecked box does nothing. **The gate
-never uninstalls** — removal is always a separate, deliberate act. All present → a one-line notice, not
-a question.
-
-**Evaluator catalogs install on ABSENCE ALONE — never gated on a declared department.** This is
-claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got no text evaluator because
-nothing declared a creative lane, and the audit *defended* the non-build. That defense was rejected.
-Absence of the catalog is the trigger; nothing else.
-
-**Present catalogs receive unconditional maintenance regardless of any checkbox.** The version comparison
-and forcible append (`evaluators.md` § Forcible propagation) are maintenance of something already
-installed, not a new install, so they run whether or not anything was checked. A growing catalog that does
-not reach installed copies only ever helps new projects.
-
-## Step 0.4 — Payroll picker
-
-Two `AskUserQuestion` calls, eight objects, **fixed regardless of headcount**
-(`references/org-config.template.md`):
-
-- **Call 1 — models:** CEO tier / Lead tier / IC tier / **creative-alternate**. One shared option
-  pool; the copy must announce that "Other" accepts any model ID typed by hand.
-- **Call 2 — effort and overrides:** CEO / Lead / IC effort, and which departments run on the
-  alternate model (pre-checked from the Step 2 panel's creative classification).
-
-**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
-anything else arrives by being typed.
-
-**Every object renders every run**, current values pre-selected — one click when nothing changed. A
-marker may change a default; it may never drop a question.
-
-**The picker prints a receipt** (§ Step 6). Assertions alone have failed to hold this gate twice in
-claude-enforcer; a skipped question and an answered one must never look the same.
-
-## Step 0.5 — VCS preflight
-
-Report whether the project is version-controlled and whether the tree is dirty. **No VCS and no
-backup → conversion refuses** (Step 0.2).
-
-**Then run the ignore check here**, because Step 6 is about to create the directory it covers. The rule
-is `verify.md` § The user's own files, which also states why nothing is edited; this step only runs it
-early enough to matter.
-
-## Step 0.6 — Write the canary fixtures (earliest possible step)
-
-Registration requires a tier-canary result (`hire.md` § Preconditions), and a fixture **cannot be
-spawned in the turn that creates it** (`platform.md` fact 3). So the fixtures are written here, before
-the survey — the survey and the Step 2 panels are what buys the registration delay.
-
-- Skip if `platform-local.md` exists and its `MEASURED-ON` matches the running harness: the host is
-  already measured, Step 4b returns `PASS (on record)`, and nothing needs spawning.
-- Skip if fixtures from a previous run are already registered and discoverable. Reuse them.
-- Otherwise write them per `staging.md` § Fixture lifecycle, and **report that they were written this
-  run** — that single fact is what makes an UNAVAILABLE at Step 4b legible rather than mysterious.
-
-**This step writes files and spawns nothing.** It is not a question and consumes no question slot.
+**Nothing below writes anything until those gates have run.**
 
 ---
 
@@ -205,7 +95,7 @@ is a project whose work has not been written down yet.
 nothing to archive, and `zip` reports "Nothing to do". Treat that as **absent, not broken**: report it
 as `no-content`, and proceed. Charter-first only *creates* files; it replaces nothing, so there is
 nothing a snapshot would protect. This is distinct from a backup that failed while content existed —
-see § Step 0.2.
+see `references/audit-setup.md` § Step 0.2.
 
 **Brownfield is never conversion alone.** A project with three skills and twelve directories of code
 has far more work than three skills describe; designing the company from the skills alone staffs a
@@ -277,7 +167,8 @@ unhired.
 report is a wasted hop. Growth is cheap: `hire` adds one employee in one command, on evidence that is
 concrete rather than speculative.
 
-The panel also classifies each department as creative or not, feeding Step 0.4's pre-checks.
+The panel also classifies each department as creative or not, feeding the payroll picker's pre-checks
+(`references/audit-setup.md` § Step 0.4).
 
 ## Step 3 — Dispositions (panel) — BROWNFIELD ONLY
 
@@ -327,7 +218,7 @@ Resolve to exactly one of the four outcomes in `staging.md` § The three outcome
 | `FAIL` | **abort before any registration.** Confirm the expectation first — on the one occasion this has fired, the spec was at fault |
 
 **`UNAVAILABLE` is the expected result on a first audit** and is not a defect: the fixtures written at
-Step 0.6 have not registered yet. It is also the expected result headless. Never report it as FAIL, and
+`references/audit-setup.md` § Step 0.6 have not registered yet. It is also the expected result headless. Never report it as FAIL, and
 never abort on it — a gate that refuses a fresh install because it cannot measure a host it has a
 shipped baseline for is a gate that fails for a reason that is not true.
 

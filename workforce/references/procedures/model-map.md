@@ -2,7 +2,8 @@
 
 Low risk; executes immediately. `/workforce model-map`
 
-The picker, standalone — the same two calls `audit` § Step 0.4 runs, without the rest of the audit.
+The picker, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without the
+rest of the audit.
 Spec: `references/org-config.template.md`.
 
 ---
