@@ -79,6 +79,18 @@ material into its grounding library. Never resolved by shipping a longer handboo
 **8. Do not restate constants.** Tier limits, caps, and model IDs live in exactly one place each
 (`platform.md`, `org-config.md`). A handbook that hardcodes one is a `verify` finding.
 
+**8b. A rule lands with its enforcement, in the same change.** Classify it first
+(`references/invariants.md`): **structural** → a `bin/check` assertion; **procedural** → a counted line
+in the run report; **advisory** → say so explicitly, so nobody later assumes a mechanism exists.
+
+A rule written without one of those three is not a rule, it is an intention. This project has recorded
+five defects of exactly that shape, and in every case the doctrine was correct while nothing made it
+true. Writing the doctrine feels like finishing the work; that feeling is the failure mode.
+
+**Prove the enforcement by breaking it.** A new assertion is run once against a deliberately broken
+input to confirm it fails, then against the real one to confirm it passes. An assertion never observed
+failing is an assertion that might be testing nothing.
+
 **9. Never add `memory:`.** An employee's records live in a data skill at a path its handbook names
 (`data-skills.md`), so there is nothing for `memory:` to carry. Grounding libraries and data skills are
 the mechanism.

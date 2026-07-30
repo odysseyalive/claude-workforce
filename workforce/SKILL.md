@@ -49,6 +49,14 @@ awkward to invoke, or harder to maintain, has failed even with no data lost.*
 whether it is harmful. Converted skills are deleted rather than stubbed, and a predecessor system's
 emissions are removed with it.*
 
+> **"Resolve all issues with pizazz."**
+
+*— Added 2026-07-30, source: user directive, on making it a standing instruction after two uses.
+Sets the standard for how a finding is closed: the cheap resolution is not a resolution. Mechanics at
+`references/invariants.md`; the operational reading is — fix the class rather than the instance, land
+the enforcement with the rule rather than after it, prove the fix by making it fail, and never close a
+finding by recording it. A flag is not a fix; a default is not a decision.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. It is **not** restated here: a
 sacred block copied to a second location is two canonical texts, which is the failure this project

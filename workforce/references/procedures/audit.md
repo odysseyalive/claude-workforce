@@ -517,7 +517,15 @@ prevent.
 
 ## Step 7 — Close
 
-**Open with the provenance header** (`verify.md` § Provenance header — specified there, not restated
+**Print the Run Invariants block first** (`references/invariants.md`). Ten rows, every one present
+including the zeroes, before any finding. It answers a different question from the rest of the report —
+not what this run *did*, but what it *upheld* — and a row that cannot be computed prints `NOT UPHELD`
+with the reason rather than being omitted.
+
+A missing row is indistinguishable from a gate that never ran, which is precisely how five rules in this
+project came to be written and unwired.
+
+**Then the provenance header** (`verify.md` § Provenance header — specified there, not restated
 here). A closing report that starts with findings makes the reader supply the host context, and they
 cannot: whether the platform facts are stale, which scope is active, and whether the canary ran change
 what every line below them means.
