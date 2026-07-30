@@ -99,7 +99,8 @@ did not prove** — it honors no frontmatter), grounding library, key holders. T
 **Agents are not live-reloaded.** A handbook written now is unreachable until Claude Code restarts.
 End the report with it:
 
-> `<name>` is registered but not loaded in this session. Restart Claude Code before dispatching to it.
+> `<name>` is registered but not yet loaded in this session. It loads later in this session, or
+> immediately after a restart — restart Claude Code if you want to dispatch to it now.
 
 Omitting this line ends the run by reporting a healthy employee that cannot be reached.
 

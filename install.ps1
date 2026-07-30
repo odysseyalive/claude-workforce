@@ -233,7 +233,8 @@ Begin with step 1 now.
     Write-Host ''
     Write-Host "Installation complete ($scope scope)."
     Write-Host ''
-    Write-Host 'NOTE: restart Claude Code before running the audit.'
+    Write-Host 'NOTE: the skill is not immediately invocable. It registers later in this session,'
+    Write-Host '      or immediately after a restart -- restart Claude Code if you want it now.'
     Write-Host 'Newly written agent definitions are not IMMEDIATELY discoverable. They'
     Write-Host 'register later in a session on their own, but the delay is undetermined —'
     Write-Host 'restarting is the reliable way to reach new employees now.'

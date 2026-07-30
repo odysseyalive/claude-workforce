@@ -27,7 +27,7 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | Check | Blocking? |
 |---|---|
 | Frontmatter keys ⊆ the documented set | **BLOCK** — an invented key is *silently ignored*, which is exactly how a setting appears applied without taking effect |
-| Every IC carries `disallowedTools: Agent` | **BLOCK** — the only measured-reliable tier ceiling (`platform.md` fact 2b) |
+| Every IC carries `disallowedTools: Agent` | **BLOCK** — the measured tier ceiling (`platform.md` fact 2c); depth cannot substitute for it (fact 2b) |
 | Delegating tiers carry `background: false` | **report only** — defensive, not the mechanism (fact 2). A block here fails for a reason that is not true |
 | No `Agent(` allowlist anywhere in `tools:`/`disallowedTools:` | **BLOCK** — ignored at runtime, so its presence means someone believes in a guarantee that does not exist |
 | Every path in the body resolves on disk | **BLOCK** — the top cold-start failure |
@@ -133,13 +133,11 @@ shape; C2 tells you whether the shape holds when someone invokes a Lead directly
 *"report only what you actually observe; never infer from documentation, from your own frontmatter, or
 from what you expect."* A canary that reasons from the docs measures the docs.
 
-**Instruct every canary to report only what it observes.** The phrasing matters:
-*"report only what you actually observe; never infer from documentation or from what you expect."*
-A canary that reasons from the docs measures the docs.
-
-**Because agents are not live-reloaded, a canary written this session cannot run this session.**
-It runs against agents registered by a previous session, or against built-in agent types driven
-through the Agent tool's own parameters — which is how the 2026-07-29 measurement was taken.
+**A canary written this session cannot run this session** (`platform.md` fact 3 — registration is
+delayed, longer than 4.5 minutes and shorter than a session). It runs against fixtures registered by a
+*previous* session, or against built-in agent types driven through the Agent tool's own parameters —
+which is how the 2026-07-29 depth and background measurements were taken. **Write the fixtures early**
+so a later step in the same run can reach them; see § Fixture lifecycle.
 
 ---
 

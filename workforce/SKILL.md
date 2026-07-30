@@ -40,15 +40,15 @@ source. Mechanics implementing a directive live in `references/`, never inside t
 ## Sacred-Directive Enforcement Gates
 
 <!-- ENFORCEMENT ANNOTATION — Opus 5+ literal-execution gate | authored 2026-07-29 -->
-<!-- Source: MEASURED platform behavior, references/platform.md facts 1, 2, 2b. The documented
+<!-- Source: MEASURED platform behavior, references/platform.md facts 1, 2, 2b, 2c. The documented
      "background subagents do not receive the Agent tool" rule was tested on 2026-07-29 and did
-     NOT hold; see .claude/workforce/canary-background.md. This gate is written against what was
+     NOT hold; see measurements/2026-07-29-background.md. This gate is written against what was
      measured, not against what the documentation says. -->
 CHECKPOINT — Tier-Ceiling Gate (fires whenever a handbook is authored, amended, staged, registered, or read during `review`):
 1. Resolve the employee's TIER from the org chart. CEO and Lead are DELEGATING tiers; IC is TERMINAL.
    IF the org chart has no row for this employee → STOP. Report: "Employee <name> has no org-chart row; tier is undetermined and delegation safety cannot be evaluated."
 2. Resolve DELEGATION INTENT from the handbook BODY, not the chart alone: any instruction to spawn, dispatch, hand off, assign, or consult another employee by name is delegation intent. Intent and tier MUST agree.
-3. **BLOCKING — every IC handbook MUST carry the literal line `disallowedTools: Agent`.** This is the only mechanism MEASURED to reliably withhold delegation. Depth alone is NOT sufficient: at depth 3 the harness withholds `Agent`, but an IC reached via a directly-invoked Lead sits at depth 2 and would receive it. IF the line is absent from an IC handbook → STOP. Do not register. Report: "IC <name> lacks `disallowedTools: Agent`. Its tier ceiling depends on entry depth and is not guaranteed. Add the line and re-run."
+3. **BLOCKING — every IC handbook MUST carry the literal line `disallowedTools: Agent`.** `disallowedTools` overriding `tools:` is MEASURED (references/platform.md fact 2c), and depth alone is NOT sufficient: at depth 3 the harness withholds `Agent`, but an IC reached via a directly-invoked Lead sits at depth 2 and would receive it (fact 2b). **What this check verifies is presence of the line — a property of the text.** The runtime behavior is established once per host by the canary, NEVER inferred per handbook from the presence of a string. IF the line is absent from an IC handbook → STOP. Do not register. Report: "IC <name> lacks `disallowedTools: Agent`. Its tier ceiling depends on entry depth and is not guaranteed. Add the line and re-run."
 4. **ADVISORY, NEVER BLOCKING — `background: false` on delegating tiers.** Set it, and report when it is missing, because it is defensive on hosts where the documented background filter does apply. But on the host measured 2026-07-29 a background agent DID receive `Agent`, so this line is NOT what grants delegation. NEVER refuse to register a handbook over it. A gate that blocks here fails for a reason that is not true.
 5. IF tier is TERMINAL (IC) AND delegation intent is present → STOP. Report: "IC <name> instructs delegation but is a terminal tier. Either promote it to Lead (org-chart change, ORG record) or remove the delegation instruction."
 6. IF a change proposes expressing the tier ceiling through `tools:`, `permissionMode:`, `maxTurns:`, or by restoring `background:` to a blocking check → STOP and report the mechanism conflict. `disallowedTools: Agent` is the ceiling.
@@ -141,9 +141,11 @@ employee — converting the dispatcher into an agent creates a dispatch loop.
 
 Maintainer mode is active when `${CLAUDE_PROJECT_DIR}/workforce/SKILL.md` exists (the source
 distribution). In maintainer mode, **edit the source distribution FIRST, then mirror to the runtime
-copy.** Never edit runtime first and sync back: the runtime holds intentional runtime-only content
-that must not propagate to source. End-of-session check: `git status --short -- workforce/` empty
-when changes were expected is a FAIL.
+copy.** Never edit runtime first and sync back: **`bin/sync` deletes the runtime tree and rebuilds it
+from the manifest**, so a runtime-first edit is not merged — it is destroyed. This is a directive
+inherited from claude-enforcer, where reverse-order edits repeatedly landed in the runtime copy and
+vanished. End-of-session check: `git status --short -- workforce/` empty when changes were expected is
+a FAIL.
 
 ## Display vs. Execute
 

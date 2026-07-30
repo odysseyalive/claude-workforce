@@ -30,7 +30,7 @@ upgrade, and § Derived constants for why no other file restates these numbers.
 
 ### Fact 1 — Delegation bottoms out three layers below main ✅
 
-Evidence: `.claude/workforce/canary-depth.md` (2026-07-29).
+Evidence: `measurements/2026-07-29-depth.md` (2026-07-29).
 
 | Depth | Reached by | Has the `Agent` tool? |
 |---|---|---|
@@ -49,7 +49,7 @@ assistant beneath it.
 
 ### Fact 2 — Background subagents DO receive the `Agent` tool ❌ (documentation says otherwise)
 
-Evidence: `.claude/workforce/canary-background.md` (2026-07-29).
+Evidence: `measurements/2026-07-29-background.md` (2026-07-29).
 
 The documentation states that background subagents receive a restricted built-in tool set that
 **excludes** `Agent`. Measured result on this host: a `general-purpose` agent spawned with
@@ -74,29 +74,33 @@ its ICs at depth 2, where `Agent` **is** granted.
 **Measured 2026-07-29**, and by accident: the tier canary was spawned from main, so its Lead was depth 1
 and its IC depth 2. The IC reported `IC_HAS_AGENT_TOOL: yes | TOOLS: Read, Write, Agent`. The canary
 recorded FAIL — but **the canary's expectation was wrong, not the host.** This is exactly the entry-depth
-case, and observing it confirms the fact. Evidence: `.claude/workforce/canary.md`.
+case, and observing it confirms the fact. Evidence: `measurements/2026-07-29-tier-canary.md`.
 
-Two things follow, and the second is uncomfortable.
+**Two things follow.** First, the tier ceiling cannot rest on depth — see fact 2c for what it rests on
+instead. Second, a canary FAIL is not self-evidently a host problem: confirm the expectation before
+believing it. That rule is now `staging.md` § Phase C's, and it came from this run.
 
-### Fact 2c — `disallowedTools: Agent` as the tier ceiling ⚠️ NOT YET MEASURED
+### Fact 2c — `disallowedTools` overrides `tools:` ✅ MEASURED
 
 Because entry depth cannot be relied on, every IC handbook carries `disallowedTools: Agent`, and the
 lint check that asserts it is **blocking**.
 
-**That mechanism has not been measured.** An earlier draft of this file called it "the only
-measured-reliable way to withhold delegation" — it was not measured at all. The background rule *was*
-measured and falsified (fact 2); `disallowedTools` was assumed to work because the documentation says so,
-which is the precise substitution this file exists to prevent. It went unnoticed because it was written
-in the same edit that recorded a real measurement, and inherited its credibility.
+**Measured 2026-07-29.** Evidence: `measurements/2026-07-29-ceiling.md`. A fixture listing `Agent` in
+**both** `tools:` and `disallowedTools:` returned `HAS_AGENT: no | TOOLS: Read, Write`. Listing it in
+both is the whole design: a missing `Agent` proves the harness **withheld** it rather than it never
+having been requested. The control — an identical `tools:` line with no `disallowedTools:` — was granted
+`Agent`. One line of difference, opposite outcomes.
 
-**Until measured, it is a DOCUMENTED fact**, and the ordinary rule applies: it may not be the basis of a
-gate that refuses a user's work. The blocking lint check therefore asserts *presence of the line* — a
-property of the text, which is verifiable — and never claims the runtime honors it.
+**Read the history, not just the conclusion.** This row said "⚠️ NOT YET MEASURED" for a reason worth
+keeping. An earlier draft called it "the only measured-reliable way to withhold delegation" when it had
+not been measured at all: the background rule *was* measured and falsified (fact 2), and `disallowedTools`
+was assumed to work because the documentation says so — the precise substitution this file exists to
+prevent. It went unnoticed because it was written in the same edit that recorded a real measurement, and
+**inherited its credibility.** The lesson survives the promotion: proximity to evidence is not evidence.
 
-**The measurement:** `.claude/agents/wf-ceiling-probe.md` lists `Agent` in **both** `tools:` and
-`disallowedTools:`, so a missing `Agent` proves the harness withheld it rather than it never having been
-requested. Spawn it, record the result, and promote or correct this row. Pending because a newly written
-agent is not immediately discoverable (fact 3).
+**What the blocking lint check asserts is still only *presence of the line*** — a property of the text,
+which is what a static check can verify. The runtime behavior is now measured, but it is measured **once
+per host by the canary**, never inferred per handbook from the presence of a string.
 
 ### Fact 3 — Agents and skills register on a DELAY, not on restart ✅ CORRECTED
 
@@ -123,29 +127,28 @@ project skills are documented as loading by walking up to a repo root, but `git 
 skill discoverable.
 
 **Next measurement, if it is worth narrowing:** write a fixture and attempt it on a fixed schedule, so the
-first success is timed rather than noticed. `wf-reload-probe` and `wf-ceiling-probe` are left in
-`.claude/agents/` for exactly that.
+first success is timed rather than noticed. `wf-reload-probe` is left in `.claude/agents/` for exactly
+that.
 
-**Design consequences — restart is the RELIABLE path, not the only one:**
+**Design consequences — restart is the RELIABLE path, not the only one.** This list is the whole set;
+an earlier revision of this file carried a second, contradictory one that survived the retraction of
+"restart required" and stated it again as a MUST. There is one list.
 
 - `audit`'s closing report and both installers say: *newly hired employees are not immediately
   dispatchable. They register later in this session, or immediately after a restart — restart if you want
   them now.* Saying "restart required" would be false; saying nothing would leave a user confused by a
   chart full of employees that cannot yet be reached.
-- `org index` marks affected rows `PENDING-RESTART`. The label is imprecise but the behavior is right:
-  do not dispatch to an employee the harness has not yet loaded.
+- `org index` marks affected rows `PENDING-RESTART`, and reports them as *registered, not yet loaded —
+  restart to load now*. The one-word label is imprecise; the sentence beside it is not.
+- **`verify` MUST detect the "registered on disk but not loaded this session" state** and report it as
+  such, rather than reporting a healthy org.
 - **`update` may not have loaded the copy it just installed.** Report it as unconfirmed rather than
   claiming either outcome.
-- A fixture written for measurement must be written **well before** it is needed. This is why
-  `wf-ceiling-probe` (fact 2c) is pending: it cannot be spawned in the turn that created it.
-
-**Consequences:**
-- `audit`'s closing report MUST tell the user to **restart Claude Code before the new org is usable**.
-  Without that line the audit ends by reporting a healthy org that cannot be dispatched to.
-- `verify` MUST detect the "registered on disk but not loaded this session" state and report it as
-  such, rather than reporting a healthy org.
-- The tier canary cannot run in the session that writes it. It runs against agents registered by a
-  *previous* session, or against built-in agent types via the Agent tool's own parameters.
+- **A fixture written for measurement must be written well before it is needed**, and it runs against
+  agents registered by a *previous* session, or against built-in agent types driven through the Agent
+  tool's own parameters. Fact 2c is the worked example: `wf-ceiling-probe` was written in one session
+  and could only be spawned in a later one, which is exactly why it sat unmeasured while the gate that
+  depended on it shipped.
 
 ### Fact 4 — Observed tool grants diverge from the documented lists, in both directions ✅
 
@@ -159,11 +162,24 @@ the foreground and background agents, loadable on demand via `ToolSearch`. This 
 what one would assume: an employee running cold can reach an MCP server, but **cannot** rely on
 built-in `Grep`/`Glob`/`WebFetch`.
 
+**Both observations above are of the DEFAULT grant** — agents that declared no `tools:` field.
+
+### Fact 4b — an explicit `tools:` list is exact, not a filter ✅ MEASURED
+
+Evidence: `measurements/2026-07-29-ceiling.md` (2026-07-29), observed while measuring fact 2c.
+
+A fixture declaring `tools: Read, Write, Agent` reported `Read, Write` and **nothing else**: no
+`ToolSearch`, no deferred namespace, not one `mcp__*` name visible even by name.
+
+**So `tools:` replaces the default grant; it does not narrow it.** Naming any tool costs you every tool
+you did not name, `ToolSearch` and every MCP server included.
+
 **Consequences:** never encode a documented tool-filter list as an invariant. **Handbooks must not
 assume `Grep` or `Glob` are available** — ground file-finding steps in `Bash` or an explicit `Read`
 of a known path. A handbook whose procedure depends on an ungranted tool fails cold, in a fresh
-context, with no one watching. Conversely, an MCP server is dependable grounding for a handbook, and
-is the preferred mechanism for verification steps (`verification.md`).
+context, with no one watching. And an MCP tool a handbook depends on **must be named in `tools:`** —
+an employee with an explicit grant cannot reach a server through `ToolSearch`, so "MCP is dependable
+grounding" (`verification.md`) holds only for servers the handbook actually lists.
 
 ---
 
@@ -261,7 +277,10 @@ hesitate to run is an update path that does not mitigate anything.
 
 1. **Measure first.** Write a canary that reports what it *observes*, never what it expects. Instruct
    it explicitly: "report only what you actually observe; never infer from documentation."
-2. Record the evidence file path and the harness version alongside the fact.
+2. Record the evidence file path and the harness version alongside the fact. **Evidence goes in the
+   repository's `measurements/` directory, never only in `.claude/workforce/`** — the latter is
+   `.gitignore`d project state, so citing it alone leaves a clone unable to check a single measurement
+   the system rests on. Raw canary output may stay host-local; the file that ships the citation must not.
 3. Move a row from DOCUMENTED to MEASURED only when a canary covered it **on the host in question**.
 4. When a measurement contradicts documentation, **the measurement wins** — and the contradiction is
    written down here, not quietly reconciled. Fact 2 exists in this shape on purpose.

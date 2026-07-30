@@ -134,7 +134,7 @@ nothing to happen?"
   tier ceiling:     disallowedTools: Agent  [present]
   owns records:     code-evaluator
   triggers:         test, coverage, regression
-  loadable now:     yes | NO — registered but not loaded this session (restart required)
+  loadable now:     yes | NO — registered, not yet loaded (restart to load now)
   release:          probe PASS 2026-07-29 · evals 7/7 · stamp current
   would receive:    "<sample ask>" → yes, as lowest competent node
 ```

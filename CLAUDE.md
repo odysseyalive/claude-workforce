@@ -32,9 +32,11 @@ cross-reference, catches restated constants, verifies marker pairing, confirms n
 into the skill directory, and enforces the honesty rules. Its first run found nine failures, all of
 them bugs in the check itself; that is the normal outcome and worth reading the diff for.
 
-**A restart is required after sync.** Neither agent definitions nor freshly installed skills are
-discoverable in the session that writes them (`references/platform.md` fact 3b — measured, and contrary
-to the documented live change detection).
+**A restart is the reliable way to load a sync, not the only one.** Neither agent definitions nor
+freshly installed skills are *immediately* discoverable in the session that writes them, but both
+register on a delay — longer than 4.5 minutes, shorter than a session (`references/platform.md` fact 3).
+Restart if you want the synced copy now. **Do not write "restart required"**: it is retracted, and it
+has crept back into this file, `audit.md`, `bin/sync`, and both installers once already.
 
 ## Non-negotiables
 
@@ -66,22 +68,31 @@ Unrelated jobs, similar names. Do not conflate them in a procedure or a report.
 
 ## Open, as of 2026-07-29
 
-- **`/workforce audit` has never run.** Nothing here has been executed end to end.
-- **The live-reload finding needs re-measuring.** The skill and both canary agents did eventually
-  register in a session that wrote them, which contradicts `platform.md` facts 3 and 3b and the caveat
-  in `update.md`. Three entries may be wrong in the file whose job is being the authority on measured
-  behavior — fix before trusting.
-- **`wf-canary-*.md`** are throwaway fixtures in `.claude/agents/`. Run them to test frontmatter
-  `background: true`, record the result, delete them.
+- **`/workforce audit` has never run.** Nothing here has been executed end to end. This is the one
+  remaining item that matters; everything below it is bounded.
+- **`background: true` in *frontmatter* is still unmeasured.** Fact 2 measured the Agent tool's
+  `run_in_background` *parameter*, which may not be the same thing. `wf-canary-*.md` in
+  `.claude/agents/` are the fixtures for it. The design never blocks on `background:`, so this is a
+  loose end rather than a risk — but do not delete the fixtures until it is closed.
+- **Fact 3's interval is bounded but not timed.** Registration happens later in the same session,
+  somewhere between 4.5 minutes and a session. `wf-reload-probe` is retained to narrow it on a fixed
+  schedule if that is ever worth doing.
+
+**Closed 2026-07-29.** Fact 2c (`disallowedTools` overrides `tools:`) is measured — `wf-ceiling-probe`
+returned `HAS_AGENT: no` against an identical `tools:` line that was granted `Agent`; evidence in
+`measurements/`. The live-reload re-measurement is done, the retracted "restart required" claim is swept
+out of all seven files that carried it, and fact 4b (an explicit `tools:` list is exact, not a filter)
+came out of the same run.
 
 ## Layout
 
 | Path | |
 |---|---|
 | `workforce/SKILL.md` | command surface, immutable directives, six enforcement gates |
-| `workforce/references/` | 21 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
+| `workforce/references/` | 22 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
 | `workforce/references/procedures/` | 29 command procedures |
 | `workforce/agents/` | four shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
 | — | this project ships **no executables**; see `references/enforcement.md` § Hooks |
 | `manifest.txt` | the authoritative shipped-file list, consumed by both installers |
+| `measurements/` | evidence behind every MEASURED fact in `platform.md`; tracked, deliberately **not** shipped |
 | `bin/check`, `bin/sync` | conformance and mirror |

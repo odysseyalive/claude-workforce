@@ -19,7 +19,7 @@ Employees (9)
 | Employee | T | Dept | Reports to | Model | Owns | Released | Loadable |
 | ceo      | 1 | exec | —          | <id>  | —    | probe ✓  | yes      |
 | eng-lead | 2 | eng  | ceo        | <id>  | —    | probe ✓  | yes      |
-| eng-test | 3 | eng  | eng-lead   | <id>  | code-evaluator | probe ✓ | NO — restart required |
+| eng-test | 3 | eng  | eng-lead   | <id>  | code-evaluator | probe ✓ | NO — restart to load |
 
 Orchestrators (2)
 | /skill-builder | dispatches to eng-implementer | creates and registers agents |

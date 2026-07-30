@@ -190,8 +190,6 @@ nothing is configured yet. **No mode exempts a sanctioned question.**
 
 ## Step 1b — Agent registry census (before anything is staged)
 
-## Step 1c — Agent registry census (before anything is staged)
-
 Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
 kind, raw link text, resolved target, owning skill, and whether it dangles.
 
@@ -297,10 +295,12 @@ Then per-task ✓ / ✗ with the step any failure reached.
 
 Report the org, the fan-out budget, the canary result, and — **always** —
 
-> Restart Claude Code before dispatching. Agent definitions are not reloaded mid-session, so the
-> employees this audit hired are registered but not yet reachable.
+> The employees this audit hired are registered but **not immediately dispatchable**. They register
+> later in this session, or immediately after a restart — restart Claude Code if you want them now.
 
-Without that line the audit ends by reporting a company nobody can talk to.
+Without that line the audit ends by reporting a company nobody can talk to. **Do not write "restart
+required"** — it is false (`platform.md` fact 3), and this line is where the retracted version kept
+coming back.
 
 ---
 
