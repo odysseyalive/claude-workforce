@@ -1,5 +1,6 @@
 # Procedure for Procedures — how every handbook is authored
 
+<!-- Enforcement: 2 assertion(s) in bin/check guard this file; 9 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — normative. `handbook`, `hire`, `amend`, and `verify` all assert against
      this file. It governs its own format. -->
 

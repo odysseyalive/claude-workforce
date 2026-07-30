@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""
+Enforcement coverage: which shipped claims have a mechanism, and which do not.
+
+    python3 bin/coverage            # the map
+    python3 bin/coverage --stamp    # write the per-file Enforcement headers
+
+A doctrine audit of four files found 96 of 201 normative claims unenforced, and
+noted the real problem underneath: *nothing marks which is which*. Every claim is
+written in the same imperative bold, so a reader cannot tell an enforced rule from
+an unenforced one without re-running the audit.
+
+This is that labelling, generated rather than hand-written — a hand-maintained
+label drifts from the assertion it describes, which is the exact defect being
+labelled.
+
+WHAT IT CANNOT DO. It reports whether a file is *guarded*, not whether a specific
+sentence is. `bin/check` asserts on substrings, not on claim identifiers, so
+"4 assertions guard this file" never means "these 4 claims are safe and the rest
+are not". Coverage here is a floor and a trend, never a certificate.
+
+Exit code is always 0 — a measurement, not a gate.
+"""
+
+import glob
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
+
+# check() name → the file-variables its CONDITION reads. Restricted to the
+# condition expression: an earlier form scanned the whole call and attributed
+# assertions by their failure-message text, which credited files that were only
+# mentioned in prose.
+VAR_TO_FILE = {
+    "lm": "workforce/references/legacy-markers.md",
+    "ct": "workforce/references/conversion-taxonomy.md",
+    "aud": "workforce/references/procedures/audit.md",
+    "inv": "workforce/references/invariants.md",
+    "cd_": "workforce/references/conversion-department.md",
+    "disc": "workforce/references/discovery.md",
+    "stg": "workforce/references/staging.md",
+    "ds": "workforce/references/data-skills.md",
+    "pfp": "workforce/references/procedure-for-procedures.md",
+    "enf": "workforce/references/enforcement.md",
+    "plat": "workforce/references/platform.md",
+    "_plat": "workforce/references/platform.md",
+    "skill": "workforce/SKILL.md",
+    "pa_": "workforce/agents/provenance-analyst/AGENT.md",
+    "cc_": "workforce/agents/content-classifier/AGENT.md",
+    "da": "workforce/agents/doctrine-auditor/AGENT.md",
+}
+
+# A normative claim: a sentence carrying an imperative token. Deliberately the
+# same crude definition the audits used, so the numbers are comparable.
+NORM_RX = re.compile(r"\b(MUST NOT|MUST|NEVER|ALWAYS|may never|must never|never|always)\b")
+
+
+def guarded():
+    """file → sorted assertion names whose CONDITION reads that file.
+
+    PARSED, not regexed. `bin/check` is valid Python, and a regex over check()
+    calls found 9 of 299 because the calls take four different shapes. Guessing
+    at a file's structure when the file can be parsed is how a measurement comes
+    back confidently wrong — which is the defect this whole tool reports on.
+    """
+    import ast
+
+    src = open("bin/check", encoding="utf-8").read()
+    tree = ast.parse(src)
+    out = {}
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "check"):
+            continue
+        if not node.args:
+            continue
+        name = node.args[0]
+        name = name.value if isinstance(name, ast.Constant) else "<computed>"
+        cond = node.args[1] if len(node.args) > 1 else None
+        if cond is None:
+            continue
+        names_read = {
+            n.id for n in ast.walk(cond) if isinstance(n, ast.Name)
+        }
+        for var, path in VAR_TO_FILE.items():
+            if var in names_read:
+                out.setdefault(path, set()).add(name)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def claims(path):
+    body = open(path, encoding="utf-8").read()
+    body = re.sub(r"```.*?```", "", body, flags=re.S)
+    units = re.split(r"(?<=[.!?])\s+|\n\|", body)
+    return sum(1 for u in units if NORM_RX.search(u))
+
+
+def main():
+    g = guarded()
+    shipped = [
+        l.strip() for l in open("manifest.txt", encoding="utf-8")
+        if l.strip() and not l.startswith("#") and l.strip().endswith(".md")
+    ]
+    rows = []
+    for p in shipped:
+        if not os.path.isfile(p):
+            continue
+        rows.append((p, claims(p), len(g.get(p, []))))
+    rows.sort(key=lambda r: (-r[1], r[0]))
+
+    if "--stamp" in sys.argv:
+        n = 0
+        for p, c, a in rows:
+            if a == 0:
+                continue
+            body = open(p, encoding="utf-8").read()
+            line = (f"<!-- Enforcement: {a} assertion(s) in bin/check guard this file; "
+                    f"{c} normative claims total. Coverage is a floor, not a certificate — "
+                    f"run bin/coverage. -->")
+            body = re.sub(r"<!-- Enforcement: \d+ assertion.*?-->\n", "", body, flags=re.S)
+            lines = body.split("\n")
+            at = 1 if lines and lines[0].startswith("# ") else 0
+            lines.insert(at + 1, line)
+            open(p, "w", encoding="utf-8").write("\n".join(lines))
+            n += 1
+        print(f"stamped {n} files")
+        return 0
+
+    tot_c = sum(r[1] for r in rows)
+    tot_a = sum(r[2] for r in rows)
+    unguarded = [r for r in rows if r[2] == 0]
+    print("# Enforcement coverage\n")
+    print(f"{len(rows)} shipped markdown files · {tot_c} normative claims · "
+          f"{tot_a} assertions · **{len(unguarded)} files with no assertion at all**\n")
+    print("| file | claims | assertions |")
+    print("|---|---|---|")
+    for p, c, a in rows:
+        mark = "" if a else "  ← **none**"
+        print(f"| `{p.replace('workforce/', '')}` | {c} | {a}{mark} |")
+    print("\n## Assertions by file\n")
+    for p in sorted(g):
+        print(f"**`{p.replace('workforce/', '')}`**")
+        for n in g[p]:
+            print(f"- {n}")
+        print()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

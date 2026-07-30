@@ -1,5 +1,6 @@
 # audit — survey the project and build its company
 
+<!-- Enforcement: 4 assertion(s) in bin/check guard this file; 35 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 

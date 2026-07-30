@@ -1,5 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
+<!-- Enforcement: 1 assertion(s) in bin/check guard this file; 8 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:

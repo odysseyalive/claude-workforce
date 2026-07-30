@@ -872,6 +872,63 @@ check(
     "substring assertion still passed",
 )
 
+# The labelling pass. A doctrine audit found 96 of 201 claims unenforced and named
+# the deeper problem: nothing marked which was which, so every claim read as
+# equally binding. The per-file header carries the ratio at the point of use —
+# and is GENERATED (`bin/coverage --stamp`), because a hand-maintained label
+# drifts from the assertion it describes, which is the defect being labelled.
+_HDR_RX = re.compile(
+    r"<!-- Enforcement: (\d+) assertion\(s\) in bin/check guard this file; (\d+) normative"
+)
+_hdr_stale = []
+try:
+    import ast as _ast
+
+    _tree = _ast.parse(read("bin/check"))
+    _VARMAP = {
+        "lm": "workforce/references/legacy-markers.md",
+        "ct": "workforce/references/conversion-taxonomy.md",
+        "aud": "workforce/references/procedures/audit.md",
+        "inv": "workforce/references/invariants.md",
+        "cd_": "workforce/references/conversion-department.md",
+        "disc": "workforce/references/discovery.md",
+        "stg": "workforce/references/staging.md",
+        "ds": "workforce/references/data-skills.md",
+        "pfp": "workforce/references/procedure-for-procedures.md",
+        "enf": "workforce/references/enforcement.md",
+        "plat": "workforce/references/platform.md",
+        "_plat": "workforce/references/platform.md",
+        "skill": "workforce/SKILL.md",
+        "pa_": "workforce/agents/provenance-analyst/AGENT.md",
+        "cc_": "workforce/agents/content-classifier/AGENT.md",
+        "da": "workforce/agents/doctrine-auditor/AGENT.md",
+    }
+    _live = {}
+    for _n in _ast.walk(_tree):
+        if isinstance(_n, _ast.Call) and getattr(_n.func, "id", "") == "check" and len(_n.args) > 1:
+            _nm = _n.args[0].value if isinstance(_n.args[0], _ast.Constant) else "<computed>"
+            _reads = {x.id for x in _ast.walk(_n.args[1]) if isinstance(x, _ast.Name)}
+            for _v, _p in _VARMAP.items():
+                if _v in _reads:
+                    _live.setdefault(_p, set()).add(_nm)
+    for _p in declared:
+        if not _p.endswith(".md"):
+            continue
+        _m = _HDR_RX.search(read(_p))
+        if not _m:
+            continue
+        if int(_m.group(1)) != len(_live.get(_p, ())):
+            _hdr_stale.append(f"{_p}: header says {_m.group(1)}, actual {len(_live.get(_p, ()))}")
+except Exception as _e:  # a diagnostic must not die on the input it diagnoses
+    _hdr_stale.append(f"could not parse bin/check: {_e}")
+
+check(
+    "coverage: every Enforcement header matches the assertions that exist",
+    not _hdr_stale,
+    f"{_hdr_stale} — regenerate with `bin/coverage --stamp`. A label that drifts "
+    "from its mechanism is the defect the labelling pass exists to remove",
+)
+
 # ── This project holds itself to what it asks of others ──────────────────────
 # A fixture is retained by an OPEN fact. Once its fact is MEASURED the evidence
 # lives in measurements/, which is what makes the fixture disposable — and a

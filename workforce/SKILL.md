@@ -1,4 +1,5 @@
 ---
+<!-- Enforcement: 2 assertion(s) in bin/check guard this file; 41 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
