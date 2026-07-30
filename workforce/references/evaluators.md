@@ -139,6 +139,21 @@ on the *other* side.
 An installed catalog this project did write, with its own anchor and its own machine-owned region, still
 receives the unconditional append. Nothing above weakens that case.
 
+**Ownership does not survive unappendability, but the employee does.** `records-ownership.md` defines a
+Records Owner as the employee that *drafts every amendment* to a playbook. A catalog that cannot be written
+cannot receive one, so naming an owner for it asserts a capability the doctrine withholds — the same
+overclaim `enforcement.md` opens by refusing. So:
+
+- **Still hire the evaluator.** Reading the catalog and performing tier-4 review are unaffected by the
+  file's writability, and that review is the entire reason the employee exists.
+- **Record `Records Owner: none (read-only: <reason>)`** on the catalog's chart row, with the reason —
+  `immutable` or `owned by <generator>` — stated rather than implied.
+- **Route change requests to the user**, not to an owner who cannot act on them. Growing the catalog is
+  then the user's call, which is correct: it is their file, or another generator's.
+
+An evaluator with no ownership is not a degraded employee. It is an employee whose playbook someone else
+maintains — the ordinary case for any inherited reference library.
+
 **Import, then never re-import.** After seeding from claude-enforcer, the project's catalog is its own. A
 later `sync` appends *new* shipped entries; it does not overwrite the project's additions or re-flatten
 its edits.

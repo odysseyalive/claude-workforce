@@ -213,6 +213,19 @@ the two verification paths — a **catalog grep** into each producing employee's
 and the **evaluator as reviewer** into that department's Lead handbook (tier 4, because ICs cannot
 delegate).
 
+**The catalog is not converted, and the evaluator is not a conversion.** The catalog stays a skill — shared
+data many employees read (`records-ownership.md`) — and the evaluator is a *new hire* beside it. Both exist
+because they serve different tiers: an IC reads the catalog directly (it cannot dispatch to anything), a
+Lead dispatches to the evaluator. Reporting this as "the catalog was left alone" without naming the hire
+undercounts what the run produced.
+
+**Where the catalog is `catalog-unappendable`, hire the evaluator but do NOT assert ownership of it**
+(`evaluators.md` § When the catalog cannot be appended). A Records Owner "drafts every amendment", and a
+catalog that is immutable or owned by another generator cannot receive one — naming an owner there claims a
+capability the doctrine withholds. Mark it `Records Owner: none (read-only: <reason>)` and route change
+requests to the user. **The employee is still worth hiring**: reading and reviewing are unaffected, and
+review is the whole value.
+
 **Do not staff an evaluator where there is no work for it.** The catalog still installs, so any employee
 can self-check; an employee nothing dispatches to is a pass-through hop.
 
