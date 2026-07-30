@@ -1,7 +1,8 @@
 # CLAUDE.md — maintaining claude-workforce
 
-Guidance for working **on** this project. (Unlike claude-enforcer, this file is committed: the audit
-reads `CLAUDE.md` as primary evidence, so a clone without one would go charter-first on its own repo.)
+Guidance for working **on** this project. (Unlike claude-enforcer, this file is committed: anyone
+working on the repo needs the orientation, and for a repo-only session — remote execution, a
+collaborator's checkout — the clone is the only copy there is.)
 
 ## What this is
 
@@ -88,10 +89,10 @@ came out of the same run.
 
 | Path | |
 |---|---|
-| `workforce/SKILL.md` | command surface, immutable directives, six enforcement gates |
-| `workforce/references/` | 23 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
-| `workforce/references/procedures/` | 29 command procedures |
-| `workforce/agents/` | four shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
+| `workforce/SKILL.md` | command surface, immutable directives, the enforcement gates |
+| `workforce/references/` | cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
+| `workforce/references/procedures/` | one procedure per command |
+| `workforce/agents/` | the shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
 | — | this project ships **no executables**; see `references/enforcement.md` § Hooks |
 | `manifest.txt` | the authoritative shipped-file list, consumed by both installers |
 | `measurements/` | evidence behind every MEASURED fact in `platform.md`; tracked, deliberately **not** shipped |
