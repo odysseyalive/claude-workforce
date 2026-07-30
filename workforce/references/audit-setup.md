@@ -4,13 +4,13 @@
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
 
-Everything `audit` does before Step 1: consent, snapshot, companion skills, payroll, VCS, the canary
+Everything `audit` does before Step 1: consent, backup, companion skills, payroll, VCS, the canary
 fixtures, and the ownership preflight. **These are gates, not steps** — each one's outcome changes what the
 rest of the run is allowed to do, and four of the five sanctioned question slots are spent here. The fifth
 is org ratification, in `procedures/audit.md` Step 5.
 
 **Two of them write, and the backup precedes both.** Step 0.6 writes canary fixtures and Step 0.2 takes the
-snapshot; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
+backup; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
 
 ---
 
@@ -40,7 +40,7 @@ A real `AskUserQuestion` widget, never prose. Must state plainly:
 - Designed for the current model generation; handbooks it writes remain usable on earlier models.
 - **This audit CONVERTS skills into agent employees. It writes `.claude/agents/`, demotes converted
   skills to stubs, and edits your project's `.claude/` directory.**
-- Back up `CLAUDE.md` and `.claude/` first. You will be offered a snapshot next; taking it enables a
+- Back up `CLAUDE.md` and `.claude/` first. You will be offered a backup next; taking it enables a
   clean uninstall via `/workforce disband` or `restore`.
 - Accepting runs the audit and applies its recommendations automatically.
 
@@ -50,19 +50,19 @@ Headless: with no acceptance on record, **refuse**. Interactive runs always re-a
 
 ## Step 0.2 — Backup
 
-Offer a snapshot (`procedures/backup.md`). **On acceptance it runs here, immediately — before any other
+Offer a backup (`procedures/backup.md`). **On acceptance it runs here, immediately — before any other
 gate writes anything.**
 
 **The rule is "before the first write of the run", not "first in the execution phase".** An earlier
 revision said the latter, and it was wrong: Step 0.6 writes canary fixtures into `.claude/agents/`, and
-the execution phase is Step 6. A snapshot taken there captures a tree workforce has already modified, so
+the execution phase is Step 6. A backup taken there captures a tree workforce has already modified, so
 `restore` would put this run's fixtures back as though the user had written them — the archive claims to
 be pre-audit state and is not. Whatever the first writing gate becomes, the backup precedes it.
 
 A declined or failed backup does not reorder anything; it changes what later steps may do (below).
 
 **Declining does not stop the audit, but it restricts it:** conversion's destructive step (demoting a
-skill) requires a verified snapshot. Without one, every conversion downgrades to
+skill) requires a verified backup. Without one, every conversion downgrades to
 **register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and
 reported. This diverges from claude-enforcer, which proceeds on a warning; the blast radius here is
 replacing a working file, so the floor is higher.
@@ -74,7 +74,7 @@ for no reason or proceeds without the protection it thinks it has:
 |---|---|---|
 | `declined` | the user said no | proceed; conversions downgrade to non-destructive |
 | `no-content` | nothing to archive — no `CLAUDE.md`, no `.claude/`; `zip` reports "Nothing to do" | **proceed normally.** Nothing exists to protect, and only creation follows |
-| `failed` | content existed and the snapshot could not be written or verified | **treat as declined, and say why.** Never proceed as though a snapshot exists |
+| `failed` | content existed and the backup could not be written or verified | **treat as declined, and say why.** Never proceed as though a backup exists |
 
 A `failed` backup is never silently upgraded to "good enough". The report names the state, not just a
 ✗ — "backup failed (disk full); conversions restricted to non-destructive" is actionable, and a bare
@@ -147,7 +147,7 @@ here, before the survey — the survey and the Step 2 panels are what buys the r
 ## Step 0.7 — Ownership and collision preflight (detect, then degrade — stated)
 
 **Runs after the backup** (§ Step 0.2), because everything it finds changes what the run may write and
-the snapshot must predate all of it. Reads the tree; writes nothing; asks nothing.
+the backup must predate all of it. Reads the tree; writes nothing; asks nothing.
 
 Four conditions, each with a **named state** the closing report reproduces. This gate never repairs, never
 rewrites another generator's file, and never edits the project's `CLAUDE.md` — a detected condition

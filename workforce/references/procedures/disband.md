@@ -6,7 +6,7 @@
 
 Returns the project to its pre-workforce shape: skills restored, employees removed, settings cleaned.
 **Distinct from `restore`** — disband reverses *this project's conversion* using the journal, while
-restore overwrites everything from a snapshot.
+restore overwrites everything from a backup.
 
 ---
 
@@ -14,16 +14,16 @@ restore overwrites everything from a snapshot.
 
 | | `disband` | `restore` |
 |---|---|---|
-| Source of truth | the conversion journal | a snapshot |
+| Source of truth | the conversion journal | a backup |
 | Effect on work done since | **preserved** | **overwritten** |
-| Employee handbooks | removed | whatever the snapshot held |
+| Employee handbooks | removed | whatever the backup held |
 | Use when | you want the tooling gone, keeping the project's progress | you want the project as it was on a date |
 
 Disband is almost always the right one. Restore is for "undo everything since."
 
 ## Procedure
 
-**1. Pre-disband snapshot.** Hard precondition — disband is its own kind of destructive.
+**1. Pre-disband backup.** Hard precondition — disband is its own kind of destructive.
 
 **2. Restore every demoted skill.** For each `COMMITTED` T7 row in the journal, restore `SKILL.md`
 from its `.orig`, verifying against the recorded `prior-sha`. A mismatch means the file changed since

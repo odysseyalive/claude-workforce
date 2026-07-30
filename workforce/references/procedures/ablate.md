@@ -15,7 +15,7 @@ may simply not have come up. The eval set is what turns "seems fine" into a numb
 
 ## Procedure
 
-1. **Snapshot**, and copy the handbook to `ablations/<employee>.baseline.md`.
+1. **Backup**, and copy the handbook to `ablations/<employee>.baseline.md`.
 2. **Skeletonize** to `Role`, `Scope`, `Exit criteria`, `Verification`. Everything else becomes an
    ordered candidate list.
 3. **Baseline run** of the eval set against the skeleton, in fresh contexts.
@@ -53,7 +53,7 @@ coarser, and claiming line-level precision it does not have would be worse than 
 
 ## `--org`
 
-**Display-only, always**, and requires a verified baseline snapshot before it will print. Skeletonizes
+**Display-only, always**, and requires a verified baseline backup before it will print. Skeletonizes
 every handbook and re-measures the company.
 
 Its headline number: **what share of the org's total instruction volume is `LOAD-BEARING`.** Well

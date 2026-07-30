@@ -1,8 +1,8 @@
-# restore — overwrite the project from a snapshot
+# restore — overwrite the project from a backup
 
 **Destructive.** Display by default; requires `--execute` **and** an explicit confirmation.
 
-`/workforce restore [snapshot] --execute`
+`/workforce restore [backup] --execute`
 
 **Never auto-fired.** No audit, hire, or amendment invokes this. Restoring is always a separate,
 deliberate act — it overwrites rather than deletes, which makes it strip's mirror image and just as
@@ -12,12 +12,12 @@ irreversible in practice.
 
 ## Step 1 — Enumerate
 
-List every snapshot by tier and embedded date, newest first, marking the baseline. Report each one's
+List every backup by tier and embedded date, newest first, marking the baseline. Report each one's
 integrity state.
 
 ## Step 2 — Verify the source BEFORE trusting it
 
-The archive must list non-empty and contain `CLAUDE.md` and/or `.claude/`. **A snapshot that fails
+The archive must list non-empty and contain `CLAUDE.md` and/or `.claude/`. **A backup that fails
 this is refused, not repaired** — restoring from a damaged archive is how a bad state becomes the only
 state.
 
@@ -26,12 +26,12 @@ state.
 Name explicitly:
 
 - files that will be **overwritten**
-- files that exist now and are **absent from the snapshot** — these survive the extract, which means
-  the result is a *merge*, not the snapshot as it was. Say so plainly; this is the most commonly
+- files that exist now and are **absent from the backup** — these survive the extract, which means
+  the result is a *merge*, not the tree the backup captured. Say so plainly; this is the most commonly
   misunderstood property of a restore.
 - whether the org will differ afterwards, and how
 
-## Step 4 — Pre-restore snapshot — always
+## Step 4 — Pre-restore backup — always
 
 Take `claude-prerestore-<ts>.zip` first. It is restore's own undo, and it is a **hard precondition**:
 if it cannot be written and verified, refuse. Without VCS it is the only way back.
@@ -51,7 +51,7 @@ fi
 ## Step 6 — Symlink replay and verification — never skipped
 
 `unzip` restores stored links correctly. **`Expand-Archive` cannot represent links at all**, and any
-snapshot predating the `-y` fix stored them as file contents. In both cases the extracted tree *looks*
+backup predating the `-y` fix stored them as file contents. In both cases the extracted tree *looks*
 right while every agent registration has been forked from its source.
 
 Replay `.claude/.symlink-manifest.txt`:
@@ -72,7 +72,7 @@ echo "Symlinks: $OK intact, $FIXED relinked from manifest, $SKIPPED skipped"
 Report as a **first-class line**. A restore that cannot prove registration fidelity has not finished
 reporting.
 
-**No manifest in the snapshot** (it predates this): say so explicitly — *"snapshot predates the
+**No manifest in the backup** (it predates this): say so explicitly — *"backup predates the
 symlink manifest; agent registrations could not be verified. Check `.claude/agents/` for regular files
 that should be symlinks."* Do not repair what you cannot verify, and never imply a clean restore you
 did not confirm.

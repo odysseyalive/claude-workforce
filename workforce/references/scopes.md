@@ -25,7 +25,7 @@ project on the machine.
 | the four shipped panel agents | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
 | | `.claude/workforce/work/**`, `evals/**`, `ablations/**`, the conversion journal |
 | | `.claude/skills/operating-principles/` — this project's Strategic Objective + General Operating Principles |
-| | `.claude-backups/` — snapshots and the restore kit |
+| | `.claude-backups/` — backups and the restore kit |
 
 **Why `org-config.md` is a template, not a `keep`-flagged file in the skill.** claude-enforcer keeps
 its user-editable `model-lanes.md` inside the skill directory and protects it with the manifest's

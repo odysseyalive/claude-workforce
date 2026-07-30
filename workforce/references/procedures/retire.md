@@ -35,9 +35,9 @@ break toward the employee owning the fewest records.
 An unowned playbook is a `verify` finding, so retiring without re-homing trades one problem for
 another.
 
-## Step 3 — Snapshot
+## Step 3 — Backup
 
-A verified pre-retirement snapshot is a **hard precondition**. Without VCS it is the only way back.
+A verified pre-retirement backup is a **hard precondition**. Without VCS it is the only way back.
 
 ## Step 4 — Disconnect, then delete
 

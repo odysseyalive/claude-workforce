@@ -228,7 +228,7 @@ Most of the machinery came over unchanged:
 
 Some of it arrived as hard-won lessons rather than as code. A checksum generator once wrote rows its own parser couldn't read, so the hook reported clean about blocks it never examined. An evaluator never installed because nothing had declared a creative lane. A setup question got dropped twice by executor omission; both times an assertion was added, and neither time did anything print the resolved values back, so the skip stayed invisible. Each of those is cited by its record ID in the reference that fixes it, so the incident travels with the rule.
 
-**If you run claude-enforcer today**, install this and run `/workforce audit`. It reads your existing skills, converts the ones that encode one actor's job, and leaves the rest alone. Skills that create or dispatch agents stay skills, which is why `skill-builder` and `/route` are classified as orchestrators and left in place. Nothing is deleted without a snapshot, and `disband` reverses the whole thing.
+**If you run claude-enforcer today**, install this and run `/workforce audit`. It reads your existing skills, converts the ones that encode one actor's job, and leaves the rest alone. Skills that create or dispatch agents stay skills, which is why `skill-builder` and `/route` are classified as orchestrators and left in place. Nothing is deleted without a backup, and `disband` reverses the whole thing.
 
 Where a new employee's job overlaps an agent or a skill you already had, the audit says so and leaves both in place. It reports the overlap, names the command that would resolve it, and stops there. Deciding that something you wrote is no longer needed is yours to make, not the audit's.
 
@@ -246,9 +246,9 @@ Two ways out, and they do different things. Most of the time you want the first.
 
 Disband replays the journal the audit wrote. It restores demoted skills from their `.orig` copies, deletes the employee handbooks, and takes the machine-owned block out of your settings.
 
-Work you did after the audit survives, because disband replays that journal rather than overwriting from a snapshot. It also preserves `.claude/workforce/`, moving it to `.claude/workforce.disbanded-<date>/`. Those personnel records explain why every handbook said what it said. A hand-edited handbook or a skill you changed since conversion gets reported and left alone.
+Work you did after the audit survives, because disband replays that journal rather than overwriting from a backup. It also preserves `.claude/workforce/`, moving it to `.claude/workforce.disbanded-<date>/`. Those personnel records explain why every handbook said what it said. A hand-edited handbook or a skill you changed since conversion gets reported and left alone.
 
-**Restore from a snapshot.**
+**Restore from a backup.**
 
 ```
 /workforce restore baseline --execute
@@ -256,11 +256,11 @@ Work you did after the audit survives, because disband replays that journal rath
 
 If you took a backup during your first audit, the baseline holds your original `CLAUDE.md` and `.claude/` from before workforce touched anything. Restoring overwrites the live tree, so anything you did since is gone.
 
-It takes a safety snapshot first, shows you the blast radius before writing, and replays the symlink manifest afterward so agent registrations come back as links. If the skill is already gone and you can't run the command, the restore kit inside `.claude-backups/` works on its own. Run `restore.sh`, or `restore.ps1` on Windows.
+It takes a safety backup first, shows you the blast radius before writing, and replays the symlink manifest afterward so agent registrations come back as links. If the skill is already gone and you can't run the command, the restore kit inside `.claude-backups/` works on its own. Run `restore.sh`, or `restore.ps1` on Windows.
 
 **By hand**, if you never took a backup. Delete the skill directory, which is `~/.claude/skills/workforce/` for a personal install or `.claude/skills/workforce/` for a vendored one. Then delete the `.claude/agents/` entries the audit created, delete `.claude/workforce/` if you don't want the records, and remove the block between the `WORKFORCE-DENY` markers in your settings file. Your other skills and your `CLAUDE.md` stay untouched, apart from the small constitution block, which sits between its own markers too.
 
-Snapshots and the restore kit sit outside all of that, in `.claude-backups/` at the project root. Delete it last, once you're sure you don't want a way back. The audit proposes a `.gitignore` line for it on the first run, because it holds a zip of your entire `.claude/` directory and it is the kind of thing a `git add -A` sweeps up.
+Backups and the restore kit sit outside all of that, in `.claude-backups/` at the project root. Delete it last, once you're sure you don't want a way back. The audit proposes a `.gitignore` line for it on the first run, because it holds a zip of your entire `.claude/` directory and it is the kind of thing a `git add -A` sweeps up.
 
 `backup`, `restore`, `rollback`, and `disband` are documented in full in [COMMANDS.md § Recovery](COMMANDS.md).
 

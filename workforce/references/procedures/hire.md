@@ -80,7 +80,7 @@ restarts.
 
 ### Preconditions — all four, before any transaction
 
-1. A snapshot exists and passed integrity verification.
+1. A backup exists and passed integrity verification.
 2. The registry census reported **zero unresolved name collisions**.
 3. **The tier canary did not FAIL** — `PASS`, `PASS (on record)`, or `UNAVAILABLE`
    (`staging.md` § The three outcomes). `UNAVAILABLE` proceeds DEGRADED: register, and mark every
@@ -136,7 +136,7 @@ leaves both live: degraded, and safe.
 
 ```markdown
 # Conversion Journal — run <id>
-snapshot: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UNAVAILABLE
+backup: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UNAVAILABLE
 
 | seq | skill | step | path | action | prior-sha | status |
 |-----|-------|------|------|--------|-----------|--------|
@@ -155,7 +155,7 @@ backward.
 `apps-odyssey-alive` is a realistic target and is not a git repository. Three mechanisms substitute,
 and all three are required because each covers a different failure:
 
-1. **The snapshot** — bulk recovery. A hard precondition: cannot be written and verified → conversion
+1. **The backup** — bulk recovery. A hard precondition: cannot be written and verified → conversion
    refuses.
 2. **The journal plus `prior-sha`** — surgical, per-file, without unpacking an archive.
 3. **The `.orig` files** — the fastest single-file undo, retained after the run.

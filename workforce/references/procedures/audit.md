@@ -17,7 +17,7 @@ the Execution Summary with the step they failed at, never as "run this command y
 
 ## Steps 0 through 0.6 — the setup gates
 
-**Specified in `references/audit-setup.md`, not here.** Consent, snapshot, companion skills, the payroll
+**Specified in `references/audit-setup.md`, not here.** Consent, backup, companion skills, the payroll
 picker, VCS preflight, and the canary fixtures — plus the question budget that four of the five slots are
 spent against.
 
@@ -94,7 +94,7 @@ is a project whose work has not been written down yet.
 **A backup on an empty project may legitimately fail** — with no `CLAUDE.md` and no `.claude/` there is
 nothing to archive, and `zip` reports "Nothing to do". Treat that as **absent, not broken**: report it
 as `no-content`, and proceed. Charter-first only *creates* files; it replaces nothing, so there is
-nothing a snapshot would protect. This is distinct from a backup that failed while content existed —
+nothing a backup would protect. This is distinct from a backup that failed while content existed —
 see `references/audit-setup.md` § Step 0.2.
 
 **Brownfield is never conversion alone.** A project with three skills and twelve directories of code

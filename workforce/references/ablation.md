@@ -27,7 +27,7 @@ turns "seems fine" into a number.
 
 ## Procedure
 
-1. **Snapshot.** Force a backup and copy the handbook to `ablations/<employee>.baseline.md`.
+1. **Backup.** Force a backup and copy the handbook to `ablations/<employee>.baseline.md`.
 2. **Skeletonize.** Reduce to the irreducible four — `Role`, `Scope`, `Exit criteria`,
    `Verification`. Everything else becomes an ordered candidate list: each numbered step, each
    guardrail, each example, each reporting line.
@@ -90,7 +90,7 @@ be worse than the coarseness.
 
 Boris's six-month reset at org scale: skeletonize every handbook and re-measure the whole company.
 
-**Display-only, always.** It requires a verified baseline snapshot before it will even print, and its
+**Display-only, always.** It requires a verified baseline backup before it will even print, and its
 output is a proposal, never an executable task list. Deleting a company is a human decision.
 
 Its real value is the summary line: how much of the org's total instruction volume is `LOAD-BEARING`.

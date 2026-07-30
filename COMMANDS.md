@@ -127,10 +127,10 @@ scaffolding written for a model that no longer needs it.
 
 | Command | Risk | Does |
 |---|---|---|
-| `/workforce backup` | low | Snapshot `CLAUDE.md` and `.claude/` |
+| `/workforce backup` | low | Back up `CLAUDE.md` and `.claude/` |
 | `/workforce rollback` | **destructive** | Undo an interrupted conversion from the journal |
 | `/workforce disband` | **destructive** | De-convert the project, keep its history |
-| `/workforce restore [snapshot]` | **destructive** | Overwrite everything from a snapshot |
+| `/workforce restore [backup]` | **destructive** | Overwrite everything from a backup |
 
 **Disband and restore are different operations.** Disband reverses *this project's conversion* using
 the journal and preserves work done since. Restore overwrites everything from a point in time.

@@ -109,7 +109,7 @@ plus two the fixing surfaced:
 |---|---|
 | payroll picker had no model IDs to propose | statics now shipped in `org-config.template.md` |
 | …and `bin/check` forbade putting them there | the template is the sanctioned home per `platform.md` § Derived constants; it is now in `CONST_EXEMPT`, which is why the cells were empty |
-| the backup ran *after* the first writing gate | Step 0.6 writes fixtures, so a Step-6 snapshot archived a tree this run had modified. The rule is now "before the first write of the run" |
+| the backup ran *after* the first writing gate | Step 0.6 writes fixtures, so a Step-6 backup archived a tree this run had modified. The rule is now "before the first write of the run" |
 | concurrency cap was a *blocking* check on unmeasured fact 8 | `delegation-budget.md` now reports and convenes the panel; promotion waits on measurement |
 | forcible catalog append vs immutable blocks | `evaluators.md` § When the catalog cannot be appended — skipped and reported, never forced |
 | RETAIN rule 7 assumed single-origin files | multi-origin sandwiches land on RETAIN by conservative tie-break, and the report must say which |

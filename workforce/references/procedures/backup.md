@@ -1,10 +1,10 @@
-# backup — snapshot before anything destructive
+# backup — archive the project before anything destructive
 
 Low risk (writes only into `.claude-backups/`); executes immediately.
 
 `/workforce backup`
 
-Snapshots `CLAUDE.md` and `.claude/` into `.claude-backups/` at the project root — a **sibling** of
+Backups `CLAUDE.md` and `.claude/` into `.claude-backups/` at the project root — a **sibling** of
 `.claude/`, never nested, so an archive cannot swallow its own output.
 
 ---
@@ -17,7 +17,7 @@ No rotation glob can ever match another tier's files.
 |---|---|---|
 | `claude-baseline-<date>.zip` | first ever, pre-workforce original | **never rotated** |
 | `claude-workforce-pre-<ts>.zip` | before every conversion or amendment run | keep last 3 |
-| `claude-backup-<date>.zip` | ordinary snapshot | keep last 3 |
+| `claude-backup-<date>.zip` | ordinary backup | keep last 3 |
 | `claude-prerestore-<ts>.zip` | restore's own undo | never rotated |
 
 **The `workforce-pre-` tier earns its place:** after a month of amendments the baseline is far too old
@@ -29,7 +29,7 @@ uninstalling the product are different operations needing different artifacts.
 ## Step 1 — Symlink census (before archiving)
 
 `.claude/agents/` is commonly a farm of **symlinks** into skill directories. An archive storing them
-as file contents produces a snapshot that looks correct and restores wrong: every registration is
+as file contents produces a backup that looks correct and restores wrong: every registration is
 forked from its source, so later edits to the original never reach the registered copy.
 
 Write `.claude/.symlink-manifest.txt` — inside `.claude/`, so the archive carries it:
@@ -92,7 +92,7 @@ fi
 ```
 
 **Report it as a first-class line** — "N of N symlinks stored as links" — never as silence. A mismatch
-is a **warning, not a failure**: the manifest makes the snapshot recoverable either way, and blocking
+is a **warning, not a failure**: the manifest makes the backup recoverable either way, and blocking
 a backup would be worse than a lossy one.
 
 Only on success, rename into place.
@@ -113,4 +113,4 @@ cannot be the one that skips the check.
 ## Step 5 — Rotate, only after verification
 
 Keep the newest 3 of the matching prefix. The baseline and pre-restore tiers are invisible to rotation
-by construction. Rotating before verifying could evict a good snapshot in favour of a bad one.
+by construction. Rotating before verifying could evict a good backup in favour of a bad one.

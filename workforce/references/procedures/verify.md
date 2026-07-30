@@ -149,12 +149,12 @@ effort-weighted cost. Flag any department over its width cap.
 
 ## Recovery readiness
 
-A baseline snapshot exists and verifies; the journal has no rows stranded at `WRITE-INTENT`; `.orig`
+A baseline backup exists and verifies; the journal has no rows stranded at `WRITE-INTENT`; `.orig`
 files exist for every demoted skill; the symlink manifest is present and its entries still resolve as
 links.
 
 **That last one is the regression test for an inherited defect** — a `zip` without `-y` silently
-stores symlinked agent registrations as file contents, producing a snapshot that looks correct and
+stores symlinked agent registrations as file contents, producing a backup that looks correct and
 restores wrong.
 
 ## The user's own files
