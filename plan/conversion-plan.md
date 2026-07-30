@@ -210,6 +210,34 @@ Job → employee. Filing cabinet → skill. A surviving skill may contain schema
 
 **Measured, not assumed:** cross-skill duplication resolves 15 paragraphs (4 spanning 10+ skills) against 1,048 unique ones; git commit breadth separates generator writes (33–44 files) from an authored directive (11) — directional, overlapping, and therefore never decisive alone.
 
+### B-15. The abstention is split four ways, not flagged once
+
+**Decision.** `NO-EVIDENCE` is replaced by four outcomes — `USER`, `GENERATOR`, `IMMATERIAL`, `UNRESOLVED` — and the analyst reports the **full evidence vector** rather than collapsing to a verdict.
+
+**Four defects in the single flag, all measured:**
+
+1. **One bucket, several states.** "Nothing fired" and "something defers to this and I cannot tell" have different consequences. On the survey target the single bucket held **40 blocks**; the split resolves 19 and identifies 21 as immaterial. **Zero genuinely open.**
+2. **It discarded gathered evidence.** Stop-at-first-decisive skipped rungs that are `grep` — saving nothing measurable while throwing away signals that would have composed. The ladder now runs every rung on every block.
+3. **Weak signals could not compose.** The vector is now reported; the conversion applies policy. Measurement separated from treatment, the same doctrine `verify.md` already holds.
+4. **It gated two decisions when it should gate one.** *Preserve the text?* is unconditional — a preserved copy of boilerplate is clutter, a deleted directive is unrecoverable. Only *does a `directives-sha` cite it as binding?* needs evidence. The old flag stalled both.
+
+**New rung 5 — downstream authority.** Something elsewhere cites the block *as a source or a reason*: a checkpoint naming it, a log entry giving it as why. It measures **function rather than history**, which is what the system actually needs. Not vocabulary overlap — two files sharing terminology are about the same subject, which is evidence of nothing. A generator does not cite its own boilerplate as a source directive.
+
+**`IMMATERIAL` is not default-to-SACRED in new clothes:**
+
+| | default-to-SACRED (rejected) | `IMMATERIAL` |
+|---|---|---|
+| what it says | could not tell, so froze it | checked three ways; nothing turns on the answer |
+| evidence | none | three specific negatives, reported |
+| reversible | by hand, if noticed | automatically — any later citation overturns it |
+| conversion happens | **no** | **yes** — the rule is already in the handbook |
+
+**A hypothesis the data killed:** recoverability-as-stakes. I expected cross-skill duplication to proxy for "cheap to misclassify." **0 of 125** directive-shaped blocks are duplicated. Recorded so it is not re-proposed.
+
+**Population measured:** 512 unmarked prose paragraphs across 41 skills → **125 directive-shaped** reaching the analyst → 85 resolved by voice, 19 by authority, 21 immaterial.
+
+**Caveat carried into Part H:** those splits come from regex proxies, not the agent that will run the ladder. The 21 `IMMATERIAL` blocks are what a human should spot-check first — which doubles as the human-labelled ground truth the replay check needs.
+
 ### B-13. Department cap — superseded by B-14
 
 *The stop-and-ask below was reverted on 2026-07-30. Retained because the reasoning error is worth being able to read back: a rule was imported from the wrong domain, and the arithmetic of the question surface is what caught it.*

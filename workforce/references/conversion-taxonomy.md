@@ -208,13 +208,17 @@ between managed spans.
    reaches the handbook, reference data reaches the data skill, scaffolding is marker-matched and
    deleted. **Three of four destinations do not depend on who wrote the block**, so no conversion waits
    on an authorship question.
-3. **Resolve authorship only for directive-shaped blocks**, on the evidence ladder — marker match,
-   cross-skill duplication, sidecar coverage, voice, introduction pattern. The verdict names the rung
-   that decided it and what that rung found.
-4. **`NO-EVIDENCE` is an outcome, and it is handled rather than deferred.** The block's text is
-   extracted verbatim regardless (extraction is additive and cheap), the derived rule is already in the
-   handbook, no `directives-sha` cites it — citing would claim an attribution nobody established — and
-   a `DEC` records the rungs tried. The next run reads the record instead of re-deciding.
+3. **Resolve authorship only for directive-shaped blocks**, and only to decide one thing: whether a
+   `directives-sha` cites the block as binding. **Preservation is never gated on it** — the text is
+   extracted verbatim either way, because a preserved copy of boilerplate is clutter and a deleted
+   directive is unrecoverable. Every rung runs on every block and the full evidence vector is reported
+   (`conversion-department.md`).
+4. **Four outcomes, and the unresolved one is now rare.** `USER` and `GENERATOR` where evidence
+   decides; **`IMMATERIAL`** where nothing cites the block and the verdict changes no action;
+   **`UNRESOLVED`** only where something *does* defer to the block and the evidence still cannot
+   settle it. A `DEC` is filed for `UNRESOLVED` alone — filing one per immaterial block would rebuild
+   the useless bucket in the ledger instead of the report. Each carries the evidence that would
+   overturn it.
 5. **Markers are additive.** Wrapping verbatim text adds lines around it and changes nothing inside —
    attribution lines, spacing, and nonstandard formatting stay byte-exact. A wrapper never normalizes.
 6. **Checksums are generated only after attribution is established.** Stamping an unresolved block

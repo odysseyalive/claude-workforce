@@ -117,46 +117,87 @@ that gets expensive without a stated budget.
 
 ---
 
+## Two decisions, not one
+
+The ladder answers a narrower question than it first appears to, and separating them is what makes the
+hard cases tractable:
+
+| Decision | Gated on evidence? | Cost of being wrong |
+|---|---|---|
+| **Preserve the block's text verbatim** | **no** — unconditional | one archived paragraph |
+| **A `directives-sha` cites it as binding** | **yes** | claims an authority nobody established |
+
+An earlier design gated both on one verdict, so a block the ladder could not attribute stalled its own
+preservation. Extraction is additive and cheap; the asymmetry runs one way; preservation never waits.
+
 ## The evidence ladder
 
-`provenance-analyst` runs these in order, and **stops at the first that decides**. Each rung names what
-it looked at, so a conclusion can be re-checked without re-deriving it.
+`provenance-analyst` runs **every rung on every block** and reports the full vector. It does not stop
+early — rungs 1, 2 and 5 are `grep`, so stopping saves nothing measurable and discards evidence that
+would have composed.
 
 1. **Marker match** — byte-identical to a known generator template (`legacy-markers.md`). Decisive.
-2. **Cross-skill duplication** — the same paragraph in two or more skills. Generated boilerplate
-   repeats; authored prose does not. Decisive above three skills, strong at two.
-3. **Sidecar coverage** — the predecessor's own checksum sidecar covered this block, meaning that
-   system treated it as a directive. Strong.
-4. **Voice markers** — quoted speech, first person, a dated attribution line, a name, a bug report's
-   phrasing. Strong when present; absence proves nothing.
-5. **Introduction pattern** — git commit breadth and message. **Weak, and never decisive alone.** It
-   was measured at 33–44 files for generator writes against 11 for an authored directive: separation
-   exists, overlap is plausible, and a rule built on it would misclassify a batched authoring session.
+2. **Cross-skill duplication** — the same paragraph in two or more skills. Decisive above three, strong
+   at two. *Measured caveat: on the first survey target, **0 of 125** directive-shaped blocks were
+   duplicated. Cheap and decisive when it fires; it rarely fires on this class of content.*
+3. **Sidecar coverage** — the predecessor's own checksum sidecar covered this block. Strong → USER.
+4. **Voice** — quoted speech, first person, a dated attribution, a name, bug-report phrasing. Strong
+   when present; absence proves nothing. *Measured: resolves 85 of 125.*
+5. **Downstream authority** — something elsewhere **cites this block as a source or a reason**. Moderate
+   → USER. *Measured: splits the remaining 40 into 19 with authority and 21 inert.*
+6. **Introduction pattern** — git commit breadth. **Weak, corroborates only.** Measured at 33–44 files
+   for generator writes against 11 for an authored directive: directional, plausibly overlapping.
 
-**`NO-EVIDENCE` is a real outcome and is not a tie.** It means the ladder was exhausted and names each
-rung that was tried and what it found. A tie means two rungs disagreed, which is a finding about the
-ladder.
+**Rung 5 measures function, not history — which is what the system actually cares about.** It is also
+the rung that must not degrade into vocabulary matching: two files sharing terminology are about the
+same subject, which is evidence of nothing. What counts is a citation of *authority* — a checkpoint
+naming the block as its source directive, a log entry giving it as the reason for a change. A generator
+does not cite its own boilerplate as a source; when it emits machinery implementing a block, it is
+treating that block as something real that came from elsewhere.
 
 ---
 
-## What happens to the true remainder
+## Four outcomes, and why `IMMATERIAL` is the important one
 
-Some blocks survive the ladder. They are **handled, not deferred**:
+| Outcome | Meaning |
+|---|---|
+| `USER` | rungs 3, 4, or 5 fired; nothing decisive contradicts |
+| `GENERATOR` | rung 1, or rung 2 at ≥3 skills; no USER rung fired |
+| `IMMATERIAL` | rungs 1–5 all silent — **the verdict changes no action** |
+| `UNRESOLVED` | rungs conflict in a way that matters, or the block **has downstream authority but no attribution** |
 
-1. **The function conversion already happened.** The rule is in the handbook and the employee can do
-   the work. This is the part that matters and it is never blocked.
-2. **The text is extracted verbatim anyway.** Extraction is additive and cheap; a preserved copy of a
-   generated block is harmless, a missing copy of a user directive is not. The asymmetry runs one way,
-   so the safe action is unconditional.
-3. **The handbook does not cite it as a directive** — citing implies an attribution the department
-   could not establish, and a `directives-sha` against unattributed text claims verification nobody
-   performed.
-4. **A `DEC` record is written** naming the block, the rungs tried, and what each found. The next run
-   reads the record instead of re-litigating, and the user can overturn it in one edit.
+**A single `NO-EVIDENCE` bucket was hiding a clean split.** It collapsed "nothing fired" together with
+"something depends on this and I cannot tell" — states with completely different consequences. Measured
+on the first survey target, the old design returned 40 blocks in one undifferentiated bucket; the split
+resolves 19 of them and correctly identifies the other 21 as immaterial.
 
-**The report separates the two counts** — resolved by evidence, and preserved without attribution. The
-second number is the department's own quality metric. A large one is a finding about the ladder, not
-about the project.
+**`IMMATERIAL` is a positive finding built from three negative measurements** — no voice, not
+duplicated, nothing defers to it — which together say the question does not change what anyone does.
+It is not the frozen-by-default rule this department replaced:
+
+| | default-to-SACRED | `IMMATERIAL` |
+|---|---|---|
+| what it says | I could not tell, so I froze it | I checked three ways; nothing turns on the answer |
+| evidence | none | three specific negatives, reported |
+| reversible | by hand, if noticed | automatically — any later citation overturns it |
+| conversion happens | **no** | **yes**, the rule is already in the handbook |
+
+Every `IMMATERIAL` and `UNRESOLVED` carries an `OVERTURNED-BY` line naming the evidence that would
+change it. An outcome with no path back is a dead end wearing a label.
+
+## What happens to each
+
+1. **The function conversion already happened** in every case. The rule is in the handbook and the
+   employee can work. This is never blocked by anything on this page.
+2. **The text is extracted verbatim** in every case.
+3. **A `directives-sha` cites it only on `USER`.** Citing an unattributed block claims verification
+   nobody performed.
+4. **A `DEC` is written for `UNRESOLVED` only** — naming the block, every rung, and what would settle
+   it. `IMMATERIAL` needs no record: it is not an open question, and filing one for each would rebuild
+   the useless bucket in the ledger instead of the report.
+
+**`UNRESOLVED` is the department's quality metric**, and it should now be small and specific. A large
+count means the ladder needs a rung — not that the project was messy.
 
 ---
 
