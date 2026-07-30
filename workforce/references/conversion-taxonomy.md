@@ -127,6 +127,55 @@ No panel. Do not convert.
 
 ---
 
+## SUCCESSION — when workforce is taking the library over
+
+Everything above assumes **coexistence**: workforce lands beside a skill library that someone else keeps
+maintaining, so it converts the narrow cases and leaves the rest. That is the safe default and it stays the
+default.
+
+It is not always the intent. `README.md` states that this project **supersedes claude-enforcer** and that
+`/workforce audit` *is* the migration path off it. Under coexistence rules that promise cannot be kept: on a
+project whose library that generator produced, rule 7 refuses nearly every skill and the migration converts
+nothing. The rules and the promise contradicted each other, and the rules won silently.
+
+**Succession is the declared-intent mode that resolves it.** It is off unless
+`org-config.md` carries `<!-- succession: declared -->` (`org-config.template.md` § Per-project markers).
+
+### What stands down, and why
+
+| Rule | Under succession | Why |
+|---|---|---|
+| **3** — hand-authored, no machine-owned region | **stands down** | The rule protects *authorship*, and succession is the author saying "take it over". It is not limited to another generator's output: a hand-written skill is as much part of the library as a generated one |
+| **7** — owned by another generator | **stands down** | Its whole reason is that the owner rewrites `SKILL.md` on the next run, producing two live copies. A retired owner never runs again, so the risk it names does not exist |
+
+### What still refuses — and this list is the point
+
+Succession is not "convert everything". Four refusals and one disposition survive it:
+
+| Still refuses | Why it survives declared intent |
+|---|---|
+| **ORCHESTRATOR** | The user's own immutable directive in this file makes it first-class. Machinery that creates and runs agents stays a skill. **Succession never overrides it** |
+| **Rule 4** — pure reference, data, lookup tables | Already an employee's grounding library. Nothing to convert; converting a table produces an employee with no job |
+| **Rule 1** — `disable-model-invocation: true` | A per-skill opt-out the user wrote by hand. A project-level "take over" is the broader signal; the narrower one wins. Report it and let the user clear it per skill |
+| **Rule 6** — quarantined, frontmatter unparseable | Never convert what you cannot read. Safety, not policy |
+| **Rule 2** — imperative content *only* inside an immutable span | Mechanical, not protective: immutable spans are never copied or moved, so there is nothing outside the block to convert. A skill with content on *both* sides still converts — the handbook references the block and stamps a `directives-sha` |
+
+**So the end state of a full succession is orchestrators plus reference data**, which is the shape the takeover
+is aiming at rather than an accident of it.
+
+### What succession does not do
+
+It does not uninstall the previous generator, delete a file, touch an immutable span, or convert an
+orchestrator. It changes which skills are *eligible*; every conversion still runs the same
+atomic-or-absent transaction, still requires a verified backup for its destructive step, and is still
+reversed by `disband`.
+
+**Blast radius is the thing to watch.** Coexistence converts a handful; succession can convert dozens in one
+run, each with a cold probe. That approaches the session spawn cap
+(`delegation-budget.md` § The session cap), so report the eligible count *before* executing and split
+across sessions where it will not fit. A succession that dies half-way through the batch is why the
+per-skill transaction exists, but it is not a plan.
+
 ## SUPERSEDED — redundancy is reported, never resolved
 
 The six dispositions classify a skill by **what it is**. Not one of them asks whether the org that was

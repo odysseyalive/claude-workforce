@@ -165,6 +165,29 @@ clause 7): the disposition is degraded and reported, or it is declined upward.
 reader the gate ran; silence reads the same as a gate that never fired, which is the failure mode the
 payroll receipt exists to prevent one gate over.
 
+### Read the succession marker here, and name the lever
+
+This gate is also where `<!-- succession: -->` is read (`org-config.template.md` § Per-project markers), and
+its value changes what Step 3 may convert. Print it as its own line, always: `succession: none
+(coexistence)` or `succession: declared`.
+
+**Under `none`, count what the mode refused and say the lever exists.** A run that leaves the library intact
+because rules 3 and 7 fired looks identical to a run that found nothing to convert — and the user has no way
+to tell which happened, or that a choice was ever available:
+
+> `succession: none (coexistence)` — 31 skills eligible for conversion **only** under succession
+> (26 multi-origin, 5 foreign-owned to `skill-builder`). Set `<!-- succession: declared -->` in
+> `.claude/workforce/org-config.md` to convert them; see `conversion-taxonomy.md` § SUCCESSION for what
+> still refuses either way.
+
+**This line is not optional and it is not a nudge.** `README.md` advertises `audit` as the migration path off
+a superseded generator, so a user arriving that way has already been told takeover is the point. Refusing
+every skill *and* not mentioning the mode that would convert them is how the promise and the behavior drifted
+apart without either side reporting it.
+
+**Never set the marker for the user.** Naming the count is reporting; writing `declared` on their behalf
+would authorize demoting dozens of working skills from an inference about intent.
+
 **A high foreign-owned count is not a defect in the project or in this gate.** A mature project managed by
 another generator is the ordinary brownfield case: conversion yield near zero is the *correct* result there,
 and the audit's value comes from the org it designs for work no skill covers (`org-design.md`). Never report

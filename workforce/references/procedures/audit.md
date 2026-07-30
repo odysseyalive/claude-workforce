@@ -212,6 +212,16 @@ Skipped entirely in greenfield: there is nothing to classify, and that is not a 
 Assign every existing skill exactly one disposition per `references/conversion-taxonomy.md`. **Test for
 ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from outside.
 
+**Branch on the succession marker Step 0.7 read** (`conversion-taxonomy.md` § SUCCESSION). Under
+`none` this is the coexistence pass and rules 3 and 7 refuse as written. Under `declared` those two stand
+down and most one-actor workflows become eligible — but ORCHESTRATOR, rule 4, rule 1, and rule 6 still
+refuse, so **succession is never "convert everything"** and a report implying it is wrong.
+
+**Under `declared`, count the batch before executing it.** Dozens of conversions each carrying a cold probe
+approaches the session spawn cap (`delegation-budget.md` § The session cap). Print the eligible count, and
+where it will not fit in one session, say so and split — a batch that dies half-way is contained by the
+per-skill transaction, but being contained is not the same as being planned.
+
 **Report dispositions with reasons. A conversion count is not a success metric.** An audit that
 converts two skills, correctly leaves fifteen alone, and hires three employees the skills never covered
 is a better audit than one that converts seventeen.
@@ -287,6 +297,12 @@ question slot beyond the one already reserved.
 The **roster object always renders**: departments, employees, what each owns, and **the evidence cited
 for each**. A company is never created without the user seeing it first, and a roster whose reasoning
 cannot be checked is a roster that cannot be corrected.
+
+**Under `succession: declared`, a demotion object renders too — naming every skill by name.** Setting the
+marker declares an intent; it does not ratify a specific list, and the list is the part carrying the blast
+radius. Show which skills become stubs, which still refuse and under which rule, and that `disband` reverses
+it. The marker says *take the library over*; this object is where the user sees what that turned out to mean.
+It rides in the same call, so it costs no additional question slot.
 
 Additional objects render only where the evidence could not settle something that changes the roster —
 what work to hand off first, what must never happen without review, what a model should not do here at

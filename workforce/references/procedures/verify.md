@@ -142,6 +142,18 @@ coverage is indistinguishable from one that is working.
 States: `OK` · `MISMATCH` · `PARTIAL` (some blocks unreadable) · `UNREADABLE` (sidecar unparseable).
 `PARTIAL` and `UNREADABLE` are findings, not silence.
 
+### A retired generator that came back
+
+Under `succession: declared` (`references/conversion-taxonomy.md` § SUCCESSION), rule 7 stood down on the
+premise that the previous generator would never rewrite `SKILL.md` again. **Verify that premise instead of
+trusting it.** For every stub whose pre-conversion source carried a foreign `origin:` marker, compare the
+live file against the `.orig` recorded at T7: a stub that has been overwritten means the generator ran after
+succession was declared, and the two-canonical-texts failure rule 7 was written to prevent is now live.
+
+Report it as `SUCCESSION-VIOLATED: <skill> (owner: <generator>)` with both paths. **Detection only** — the
+remedy is the user's, because it is a question about which system they actually want running, and neither
+answer is workforce's to pick.
+
 ## Budget
 
 Recompute worst-case fan-out from the current roster against the measured caps. Report the projected

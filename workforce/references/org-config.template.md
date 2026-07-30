@@ -120,6 +120,7 @@ Managed by `audit`. Hand-edit any of them; delete one to be re-asked fresh.
 <!-- audit-disclaimer: unset -->
 <!-- org-setup: unset -->
 <!-- payroll-setup: unset -->
+<!-- succession: none -->
 <!-- companions: org=unset, operating-principles=unset, personnel-ledger=unset, evals=unset -->
 ```
 
@@ -128,6 +129,7 @@ Managed by `audit`. Hand-edit any of them; delete one to be re-asked fresh.
 | `audit-disclaimer` | `unset` \| `accepted` | Consumed only by headless runs: with no acceptance on record a headless audit refuses. Interactive audits always re-ask regardless |
 | `org-setup` | `unset` \| `configured` \| `declined` | Whether this project uses a workforce org at all. `declined` silences audit entirely |
 | `payroll-setup` | `unset` \| `configured` | Whether the tier×department picker has been answered once. **Never a suppression switch** — the picker renders on every interactive audit; this only decides which values arrive pre-selected |
+| `succession` | `none` \| `declared` | **`none` (default): coexistence.** Workforce lands beside the existing skill library and converts only the narrow cases — RETAIN rules 3 and 7 refuse hand-authored and foreign-generated skills. **`declared`: workforce is taking the library over.** Those two rules stand down and most one-actor workflows become eligible. Orchestrators, pure reference, `disable-model-invocation` skills, and unparseable skills still refuse (`references/conversion-taxonomy.md` § SUCCESSION) |
 | `companions` | per key `on` \| `off` \| `unset` | A checked box means install. `off` means "do not auto-install while absent" — **never** "remove". Uninstalling is always a deliberate, separate act |
 
 **The picker is never skipped.** Every full interactive audit renders every question object, with
