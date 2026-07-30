@@ -28,6 +28,26 @@ Mismatch → every MEASURED fact is **STALE**: still usable as a working assumpt
 being the basis of a blocking check until re-measured. **Warning, not a block** — refusing to run
 because the harness moved is worse than proceeding with a stated caveat.
 
+### Deferred tier canary — the follow-up `audit` promises
+
+An audit whose canary came back `UNAVAILABLE` registered its employees with the tier ceiling unverified
+and told the user to re-run `verify` once the fixtures load (`audit.md` Step 7). **This is where that
+promise is kept.**
+
+- IF fixtures from a previous run exist and are now discoverable → **run `staging.md` § Phase C** and
+  report the result.
+- IF they exist and are still not discoverable → report `canary: UNAVAILABLE` with the fixture paths, and
+  say plainly that the ceiling is still unverified. Never report a clean org.
+- IF `platform-local.md` already matches the running harness → `PASS (on record)`; nothing to spawn.
+- On `FAIL` → a finding of the first rank: employees are live on a host whose delegation semantics differ
+  from the design's. Report it against the org, not against any one handbook.
+
+**This is the one place `verify` spawns anything, and it still writes nothing.** Spawning a canary is
+observation; it does not touch the org. On `PASS`, print the exact `platform-local.md` row to record and
+name `/workforce amend` as what clears the `Tier ceiling: unverified this run` marks — **`verify` reports
+the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
+report that no command fulfilled.
+
 ## Org integrity
 
 **Three-way reconciliation** between the chart, `.claude/agents/**`, and the `EMP` files. Any two

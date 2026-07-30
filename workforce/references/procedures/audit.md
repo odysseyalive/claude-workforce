@@ -115,6 +115,20 @@ claude-enforcer; a skipped question and an answered one must never look the same
 Report whether the project is version-controlled and whether the tree is dirty. **No VCS and no
 backup → conversion refuses** (Step 0.2).
 
+## Step 0.6 — Write the canary fixtures (earliest possible step)
+
+Registration requires a tier-canary result (`hire.md` § Preconditions), and a fixture **cannot be
+spawned in the turn that creates it** (`platform.md` fact 3). So the fixtures are written here, before
+the survey — the survey and the Step 2 panels are what buys the registration delay.
+
+- Skip if `platform-local.md` exists and its `MEASURED-ON` matches the running harness: the host is
+  already measured, Step 4b returns `PASS (on record)`, and nothing needs spawning.
+- Skip if fixtures from a previous run are already registered and discoverable. Reuse them.
+- Otherwise write them per `staging.md` § Fixture lifecycle, and **report that they were written this
+  run** — that single fact is what makes an UNAVAILABLE at Step 4b legible rather than mysterious.
+
+**This step writes files and spawns nothing.** It is not a question and consumes no question slot.
+
 ---
 
 ## Step 1 — Survey the project
@@ -248,6 +262,27 @@ delegate).
 **Do not staff an evaluator where there is no work for it.** The catalog still installs, so any employee
 can self-check; an employee nothing dispatches to is a pass-through hop.
 
+## Step 4b — Tier canary (the last step before anything is registered)
+
+Run `staging.md` § Phase C now — after the org is designed, before a single handbook is authored or
+registered. **This is the step that produces the `canary:` value every registration precondition
+requires** (`hire.md` § Preconditions, and SKILL.md's Tier-Ceiling and Atomic-or-Absent gates).
+
+Resolve to exactly one of the four outcomes in `staging.md` § The three outcomes:
+
+| Result | What Step 5 does |
+|---|---|
+| `PASS` / `PASS (on record)` | author and register normally |
+| `UNAVAILABLE` | **proceed, DEGRADED.** Register, mark every handbook `Tier ceiling: unverified this run`, and carry the state into Step 7 |
+| `FAIL` | **abort before any registration.** Confirm the expectation first — on the one occasion this has fired, the spec was at fault |
+
+**`UNAVAILABLE` is the expected result on a first audit** and is not a defect: the fixtures written at
+Step 0.6 have not registered yet. It is also the expected result headless. Never report it as FAIL, and
+never abort on it — a gate that refuses a fresh install because it cannot measure a host it has a
+shipped baseline for is a gate that fails for a reason that is not true.
+
+Record the result and cite it in the org chart header either way.
+
 ## Step 5 — Ratify, then author
 
 **Step 5-setup — org ratification (question slot 5, first audit only).** One `AskUserQuestion` call
@@ -293,7 +328,16 @@ Then per-task ✓ / ✗ with the step any failure reached.
 
 ## Step 7 — Close
 
-Report the org, the fan-out budget, the canary result, and — **always** —
+Report the org, the fan-out budget, and the canary result **by state, with its consequence**:
+
+| Canary | Line to print |
+|---|---|
+| `PASS` | `tier ceiling: verified this run (canary PASS)` |
+| `PASS (on record)` | `tier ceiling: verified — platform-local.md matches the running harness` |
+| `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
+
+A run that verified the host and a run that verified nothing must never print the same line. Then —
+**always** —
 
 > The employees this audit hired are registered but **not immediately dispatchable**. They register
 > later in this session, or immediately after a restart — restart Claude Code if you want them now.

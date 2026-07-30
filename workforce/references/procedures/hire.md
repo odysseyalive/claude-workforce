@@ -82,11 +82,18 @@ restarts.
 
 1. A snapshot exists and passed integrity verification.
 2. The registry census reported **zero unresolved name collisions**.
-3. The tier canary returned PASS this run.
+3. **The tier canary did not FAIL** — `PASS`, `PASS (on record)`, or `UNAVAILABLE`
+   (`staging.md` § The three outcomes). `UNAVAILABLE` proceeds DEGRADED: register, and mark every
+   handbook `Tier ceiling: unverified this run`. Only `FAIL` stops the run.
 4. The journal holds **no rows left at WRITE-INTENT** from a prior run. An unfinished run is rolled
    back, never converted over.
 
 Any failure → stop the whole run. Convert nothing.
+
+**Precondition 3 read "returned PASS this run" and deadlocked the first run of every fresh install:**
+a first run has no registered fixtures, so the canary cannot run, and "cannot run" was indistinguishable
+from FAIL. `UNAVAILABLE` is the canary's version of STALE — proceed on the shipped baseline with the
+caveat stated, never refuse a user's work over a measurement that was unobtainable.
 
 ### The order
 
@@ -126,7 +133,7 @@ leaves both live: degraded, and safe.
 
 ```markdown
 # Conversion Journal — run <id>
-snapshot: <path>        symlink-manifest: <path>        canary: PASS
+snapshot: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UNAVAILABLE
 
 | seq | skill | step | path | action | prior-sha | status |
 |-----|-------|------|------|--------|-----------|--------|

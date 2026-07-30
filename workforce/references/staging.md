@@ -122,12 +122,61 @@ shape; C2 tells you whether the shape holds when someone invokes a Lead directly
 
 ### Both
 
-- Delete the fixtures afterward. Record both results and cite them in the org chart header.
-- **A canary FAIL aborts the run before any registration** — no handbooks land against a host whose
-  delegation semantics differ from the design's. But confirm the *expectation* first: on the one occasion
-  this has fired, the spec was at fault.
-- **Fixtures cannot be spawned in the turn that creates them** (`platform.md` fact 3). Write them early,
-  or run the canary against fixtures registered by a previous session.
+- Record both results and cite them in the org chart header.
+- **Confirm the expectation before believing a FAIL.** On the one occasion this has fired, the spec was
+  at fault, not the host.
+
+---
+
+## The three outcomes — and UNAVAILABLE is not FAIL
+
+**This distinction is the whole reason the canary is runnable at all.** Written with two outcomes, the
+gate deadlocked: registration required `canary: PASS`, a first run has no registered fixtures, and
+"could not run" collapsed into FAIL — so no handbook could ever land on a fresh install.
+
+| Outcome | Meaning | Consequence |
+|---|---|---|
+| `PASS` | ran this run; assertions held | proceed normally |
+| `PASS (on record)` | `platform-local.md` exists and its `MEASURED-ON` matches the running harness | proceed normally, **no spawn** — the host was already measured |
+| `UNAVAILABLE` | could not run: fixtures were written this run and have not registered yet (`platform.md` fact 3), or the run is headless | **proceed, DEGRADED and stated.** Never abort |
+| `FAIL` | ran; an assertion did not hold | **abort before any registration** — no handbooks land against a host whose delegation semantics differ from the design's |
+
+**Why UNAVAILABLE proceeds.** The tier ceiling is a property of the *host*, and the shipped
+`platform.md` already carries the maintainer's measurement of it. When the canary cannot run, that
+baseline is the best information available — which is exactly the case `platform.md` § Staleness already
+settles: *"A stale fact is still the best information available, and refusing to run because the harness
+moved would be worse than proceeding with a stated caveat. But a stale fact may not be the basis of a
+gate that refuses a user's work."*
+
+**UNAVAILABLE is the canary's version of STALE.** The doctrine was already written; the gate simply did
+not obey it.
+
+**What DEGRADED costs, and it must be stated every time:**
+
+- Every handbook registered this run is marked `Tier ceiling: unverified this run (canary UNAVAILABLE)`.
+- The closing report names the state and why — *"fixtures written this run; they register later in this
+  session or after a restart. Re-run `/workforce verify` once they load to confirm the ceiling."*
+- `UNAVAILABLE` and `PASS` must never look the same in a report. A run that verified nothing and a run
+  that verified the host are different runs.
+
+**Never upgrade UNAVAILABLE to PASS by inference.** Not from the presence of `disallowedTools:` in the
+text, not from the shipped platform.md, not from a previous project's result. A static grep never
+substitutes for the canary — and the canary never substitutes for the grep.
+
+## Fixture lifecycle
+
+Fixtures persist **across** runs; that is what makes the canary reachable at all.
+
+1. **Write them as early in the run as possible** — before the survey, which is the long part. The
+   registration delay is longer than 4.5 minutes and shorter than a session (`platform.md` fact 3), so
+   the survey and the org-design panels are what buys the time.
+2. **Run the canary late** — immediately before the first registration, not immediately after writing
+   the fixtures.
+3. **Do not delete them at the end of a run in which they never registered.** Deleting an
+   unregistered fixture guarantees the next run is UNAVAILABLE too, forever. Retain them; the next run
+   finds them registered and returns a real PASS or FAIL.
+4. **Delete them only after a run that actually used them**, and only once the result is recorded in
+   `platform-local.md`. A recorded measurement outlives its fixture; an unrecorded one does not.
 
 **Instruct every canary to report only what it observes.** The phrasing matters:
 *"report only what you actually observe; never infer from documentation, from your own frontmatter, or
