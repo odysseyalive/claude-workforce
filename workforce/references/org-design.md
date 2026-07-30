@@ -122,8 +122,11 @@ handbooks are where defects hide.
 | genuinely cross-cutting work | CEO + Leads + ICs |
 
 The `headcount-skeptic` panel member exists to argue this side, and **panel disagreement resolves to
-fewer employees**. Growth is cheap later: `hire` adds one employee in one command, and the evidence for
-needing them will be concrete rather than speculative.
+fewer roles per department, not fewer departments**. A department that meets the evidence test — distinct
+output, distinct notion of done, distinct way of being wrong — stands regardless of the skeptic's vote.
+The skeptic cuts roles whose verification cannot be named; it does not override evidence for a
+department's existence. Growth within a department is cheap later: `hire` adds one employee in one
+command, and the evidence for needing them will be concrete rather than speculative.
 
 ---
 
@@ -166,7 +169,8 @@ create nobody. A company is never created without a human seeing the roster.
 
 1. Gather evidence (above), and report what was found *and what was absent*.
 2. Panel proposes departments — domain reader, `headcount-skeptic`, premortem analyst. Disagreement
-   resolves to **fewer**.
+   resolves to **fewer roles per department, not fewer departments** — a department the evidence
+   warrants is never cut by a panel vote.
 3. Per department, propose the smallest roster that covers its work, each role with: what it owns, the
    verification command it will use, and the evidence justifying it.
 4. **Drop any role whose verification cannot be named.** An employee that cannot prove its work is an

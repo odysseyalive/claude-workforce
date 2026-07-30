@@ -163,11 +163,17 @@ is outside what `disband` may excise, which makes it outside what `audit` may to
 Full method: `references/org-design.md`.
 
 A three-agent panel — domain reader, `headcount-skeptic`, premortem analyst — proposes departments
-from **all** the Step 1 evidence. **Disagreement resolves to fewer departments.** Capped per
-`delegation-budget.md`.
+from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
 
 A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
 being wrong** — not by a distinct directory. Two to four is the normal answer.
+
+**Disagreement resolves to fewer ROLES, not fewer departments.** A department that meets the
+three-pronged evidence test stands regardless of the skeptic's vote — the evidence warranted it and a
+panel member's preference does not override evidence. The skeptic's value is in cutting roles whose
+verification cannot be named and in arguing headcount within departments, not in overriding the
+evidence for a department's existence. A panel that argues away a department the project clearly needs
+produces a recommended option that undersells the project to a new user who trusts it.
 
 Then, per department, propose the smallest roster that covers its work. Each role carries: what it
 owns, **the verification command it will use**, and the evidence justifying it.
@@ -297,6 +303,11 @@ question slot beyond the one already reserved.
 The **roster object always renders**: departments, employees, what each owns, and **the evidence cited
 for each**. A company is never created without the user seeing it first, and a roster whose reasoning
 cannot be checked is a roster that cannot be corrected.
+
+**The recommended option is the full evidence-backed roster — every department the evidence warrants,
+with the minimum viable headcount per department.** Trimmed alternatives may appear as other options,
+but the default a new user picks by trusting "(Recommended)" must cover all the work the project
+involves. An audit that recommends a fraction of the project teaches its first user to distrust it.
 
 **Under `succession: declared`, a demotion object renders too — naming every skill by name.** Setting the
 marker declares an intent; it does not ratify a specific list, and the list is the part carrying the blast
