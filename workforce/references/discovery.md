@@ -72,6 +72,7 @@ from both ends and reports the difference.
 | Census | Forward | Reverse | The gap each finds |
 |---|---|---|---|
 | **hooks** | registered in settings → does the file exist? | on disk → is it registered? | **dead wiring** / **orphans** |
+| **files** | every file → which category? | every category → which files? | **UNCLASSIFIED residual** |
 | **records** | data skill → does its data exist? | dataset on disk → does it have an owner? | broken pointer / unowned data |
 | **agents** | chart → is it registered? | registered → is it in the chart? | phantom employee / unmanaged agent |
 | **skills** | manifest → present? | present → declared? | missing file / undeclared file |
@@ -92,6 +93,25 @@ ordinary cleanup.
 **Orphans** — on disk, unregistered — are reported and **never deleted**. An unregistered script may
 be mid-installation, may be called directly by another script, or may be the user's. Reporting it is
 the whole job.
+
+### Count registrations, not unique scripts
+
+Four numbers, because collapsing them loses the one that changes:
+
+```
+hook registrations (entries)      61
+  …of those, file-pointing        60
+  …inline commands, no file        1
+unique hook scripts referenced    40
+```
+
+**A script wired to several events is several registrations.** Measured on a real project: 61 entries
+resolved to 40 unique scripts, because 20 scripts were wired to more than one event or matcher. A
+before/after comparison on the unique count passes unchanged while 21 registrations disappear.
+
+**Inline commands are registrations with no file.** They cannot dead-wire, so a file-resolution census
+skips them entirely — and then reports a hook total that is quietly short. Count them separately rather
+than not at all.
 
 ---
 

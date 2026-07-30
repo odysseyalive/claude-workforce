@@ -104,6 +104,29 @@ sweep aimed at a deleted generator from taking a safety mechanism with it.
 
 ---
 
+## Naming, and the collision that resolves silently
+
+One skill per dataset means a project can gain dozens of new skill names at once, in a namespace that
+already holds the user's own and where **a duplicate resolves by filesystem read order with no
+documented precedence** — the loser simply never loads, and nothing reports it.
+
+**The scheme:** `records-<dataset>`, where `<dataset>` is the data's own name rather than its former
+skill's. `records-run-state`, `records-account-index`, `records-holdings`.
+
+Deriving from the dataset rather than the source skill is deliberate. A skill holding three datasets
+would otherwise produce `records-agenda-1..3`, which names the past instead of the contents and
+guarantees a collision the moment another skill's data is also called `agenda`.
+
+Constraints, all mechanical: lowercase and hyphens only, ≤64 characters, no `claude` or `anthropic`,
+and **not a gerund** — the naming convention for skills prefers verb-ing forms for *activities*, and a
+records skill is deliberately not an activity.
+
+**Check the whole union before writing, not just the project's skills.** A name is occupied if it
+appears anywhere in `.claude/skills/`, `~/.claude/skills/`, or as an `AGENT.md` `name:` under
+`.claude/skills/**` — the same union `audit-setup.md` § Step 0.7 censuses. **A collision is reported and
+the run does not invent a variant**: silently becoming `records-holdings-2` produces two plausible names
+for one dataset and no way to tell which the org chart meant.
+
 ## Scope: one dataset, one skill
 
 Scope a data skill to **one coherent dataset with one owner** — never to whichever skill happened to

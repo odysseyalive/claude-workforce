@@ -288,13 +288,34 @@ carrying an existing wire to where its script now lives.
 Two censuses that decide what the org can actually reach. Both run before Step 4 assigns owners, because
 an owner cannot be assigned to a dataset nobody found.
 
-### Datasets
+### Datasets — enumerate, then classify by exclusion
 
-Every persistent-state file in the survey gets a **data skill** and exactly one owner
-(`data-skills.md`). Census breadth is the thing to get right: state hides under at least five
+Every persistent-state file gets a **data skill** and exactly one owner (`data-skills.md`).
+
+**Do not scan for files that look like data.** That was the first design and it failed the way this kind
+of design always fails: it found what it already knew to look for. State hides under at least five
 conventions — a `data/` directory, the skill root, inside `references/`, a purpose-named directory
-(`ledger/`, `scans/`, `corpora/`), and dotfiles. **A census keyed to `data/` alone finds a fraction of
-it.**
+(`ledger/`, `scans/`, `corpora/`), and dotfiles — and a dataset with an unusual name in an unusual place
+is invisible to a matcher. The number produced this way is the one guarding against data loss, so its
+false negatives are the expensive kind.
+
+**Enumerate every file under the skills tree and give each one a category. The residual must be zero.**
+
+| Category | What it is | Disposition |
+|---|---|---|
+| **policy** | `.gitignore`, `.gitattributes` | **never moved.** The only declaration of whether a dataset is disposable |
+| **instruction** | `SKILL.md`, `AGENT.md`, reference prose | converts or is deleted |
+| **code** | `scripts/`, `hooks/`, any executable | **survives, path unchanged** |
+| **state** | everything an org must not lose | gets a data skill and an owner |
+| **sidecar** | predecessor integrity stamps | scaffolding; orphaned when its generator goes |
+| **UNCLASSIFIED** | matched none of the above | **a finding.** Reported by name, never dropped |
+
+**A nonzero residual is not a failure of the project — it is the census telling you its categories are
+incomplete.** Run against the first real target, the residual surfaced two blind spots at once:
+integrity sidecars, and reference prose living at the skill root rather than under `references/`. Both
+had been silently counted as data, inflating the dataset total by more than half.
+
+Report `N files accounted · M unclassified`. Coverage as a count, never a bare "clean."
 
 For each dataset, record what the skill will need: schema, current git disposition, **the file its
 ignore rule lives in**, and every script or hook that reads or writes it. The ignore rule matters most

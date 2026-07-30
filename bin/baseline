@@ -154,16 +154,53 @@ def census(root):
     # rather than instruction, and record its git disposition. The git status is
     # the load-bearing column: it is the ONLY place a project declares whether a
     # dataset is disposable, and it lives in files no SKILL.md mentions.
+    # ENUMERATE, then classify by EXCLUSION. An earlier version matched files it
+    # recognised as state, which means a dataset with an unusual name in an
+    # unusual place was invisible — and the number it produced was the one
+    # guarding against data loss. Now every file is accounted for: instruction,
+    # code, or state. Whatever matches none of those is UNCLASSIFIED, and an
+    # unclassified file is a finding rather than a silent omission.
     datasets = []
+    unclassified = []
+    policy_files = []
+    sidecar_files = []
+    accounted = 0
     for dirpath, dirnames, filenames in os.walk(skills_dir):
         rel_from_skills = os.path.relpath(dirpath, skills_dir)
         parts = rel_from_skills.split(os.sep)
         skill = parts[0] if parts and parts[0] != "." else None
         in_state_dir = any(p in STATE_DIRS for p in parts)
+        in_code_dir = any(p in ("scripts", "hooks") for p in parts)
+        in_ref_dir = "references" in parts
         for fn in filenames:
             full = os.path.join(dirpath, fn)
             rel = os.path.relpath(full, root)
             ext = os.path.splitext(fn)[1].lower()
+            accounted += 1
+
+            # 1. POLICY — the only place a project declares whether a dataset is
+            #    disposable. Load-bearing, tracked, and never moved. Counted
+            #    separately because losing one silently commits private data.
+            if fn in (".gitignore", ".gitattributes"):
+                policy_files.append(rel)
+                continue
+            # 2. Instruction — the skill's own prose. Never state. Includes
+            #    root-level `reference.md`: this project's own survey target puts
+            #    reference prose at the skill root, not under references/.
+            if fn in ("SKILL.md", "AGENT.md", "README.md") or (
+                ext == ".md" and not STATE_NAME_RX.search(fn)
+                and (in_ref_dir or skill is not None)
+            ):
+                continue
+            # 3. Code — executable machinery. Survives conversion, never moved.
+            if in_code_dir or ext in (".sh", ".py", ".js", ".ts", ".ps1", ".mjs"):
+                continue
+            # 4. Predecessor sidecars — integrity stamps the generator wrote.
+            #    Scaffolding, and orphaned the moment its generator is removed.
+            if fn.endswith(".sha"):
+                sidecar_files.append(rel)
+                continue
+            # 3. State — everything the org must not lose.
             is_state = (
                 in_state_dir
                 or ext in STATE_EXT
@@ -172,9 +209,9 @@ def census(root):
                 or (fn.startswith(".") and HOST_LOCAL_RX.search(fn))
             )
             if not is_state:
-                continue
-            # SKILL.md and reference prose are not state even inside a state dir
-            if fn == "SKILL.md":
+                # 4. Residual. Reported by name — never dropped.
+                unclassified.append({"path": rel, "bytes": os.path.getsize(full)
+                                     if os.path.exists(full) else -1})
                 continue
             try:
                 size = os.path.getsize(full)
@@ -194,17 +231,49 @@ def census(root):
     # Dead wiring (registered, file absent) silently drops whatever the hook
     # enforced. Orphans (on disk, unregistered) are dead weight. Neither is
     # visible from a skill directory alone, so both are censused here.
+    #
+    # FOUR numbers, not one. An earlier version reported only unique script
+    # paths and labelled it "registered", which is a different quantity: on a
+    # real project, 61 entries resolved to 40 unique scripts because 20 scripts
+    # were wired to more than one event/matcher. A before/after comparison on
+    # the unique count would pass while 21 registrations were lost.
     settings_paths = [
         os.path.join(claude, "settings.json"),
         os.path.join(claude, "settings.local.json"),
     ]
-    registered = set()
+    hook_entries = []          # every `command` string, however shaped
     for sp in settings_paths:
-        txt = read(sp)
-        for m in re.finditer(r"(?:\$CLAUDE_PROJECT_DIR/)?\.?claude/(skills/[\w./-]+\.(?:sh|py|js|ts))", txt):
+        try:
+            with open(sp, encoding="utf-8") as f:
+                blob = json.load(f)
+        except Exception:
+            blob = None
+        if blob is not None:
+            def _walk(o):
+                if isinstance(o, dict):
+                    for k, v in o.items():
+                        if k == "command" and isinstance(v, str):
+                            hook_entries.append(v)
+                        else:
+                            _walk(v)
+                elif isinstance(o, list):
+                    for v in o:
+                        _walk(v)
+            _walk(blob)
+        else:
+            # Unparseable settings is a FINDING, not a zero. Fall back to regex
+            # so the census degrades loudly rather than reporting no hooks.
+            txt = read(sp)
+            hook_entries += re.findall(r'"command"\s*:\s*"((?:[^"\\]|\\.)*)"', txt)
+
+    registered = set()
+    inline_hooks = []
+    for cmd in hook_entries:
+        m = re.search(r"(skills/[\w./-]+\.(?:sh|py|js|ts))", cmd)
+        if m:
             registered.add(m.group(1))
-        for m in re.finditer(r"(skills/[\w./-]+/hooks/[\w.-]+\.(?:sh|py|js|ts))", txt):
-            registered.add(m.group(1))
+        else:
+            inline_hooks.append(cmd[:80])
     on_disk_hooks = set()
     for dirpath, _, filenames in os.walk(skills_dir):
         if os.path.basename(dirpath) != "hooks":
@@ -280,8 +349,15 @@ def census(root):
         ),
         "datasets": sorted(datasets, key=lambda d: d["path"]),
         "dataset_bytes_total": sum(max(0, d["bytes"]) for d in datasets),
+        "files_accounted": accounted,
+        "policy_files": sorted(policy_files),
+        "predecessor_sidecar_files": sorted(sidecar_files),
+        "unclassified_files": sorted(unclassified, key=lambda d: d["path"]),
         "credential_shaped_files": [d["path"] for d in datasets if d["credential_shaped"]],
         "host_local_sentinels": [d["path"] for d in datasets if d.get("host_local_sentinel")],
+        "hook_entries_total": len(hook_entries),
+        "hook_entries_file_pointing": len(hook_entries) - len(inline_hooks),
+        "hooks_inline_no_file": inline_hooks,
         "hooks_registered": sorted(registered),
         "hooks_on_disk": sorted(on_disk_hooks),
         "hooks_dead_wiring": dead_wiring,
@@ -321,9 +397,16 @@ def report(c):
     p(f"| skills naming `/route` in prose | {len(c['skills_naming_route_in_prose'])} |")
     p(f"| datasets (persistent state files) | {len(c['datasets'])} |")
     p(f"| dataset bytes | {c['dataset_bytes_total']} |")
+    p(f"| files accounted for (instruction+code+state+residual) | {c['files_accounted']} |")
+    p(f"| policy files (ignore rules — never move) | {len(c['policy_files'])} |")
+    p(f"| predecessor sidecars | {len(c['predecessor_sidecar_files'])} |")
+    p(f"| **UNCLASSIFIED (must be 0 or explained)** | **{len(c['unclassified_files'])}** |")
     p(f"| credential-shaped files | {len(c['credential_shaped_files'])} |")
     p(f"| host-local sentinels / caches | {len(c['host_local_sentinels'])} |")
-    p(f"| hooks registered | {len(c['hooks_registered'])} |")
+    p(f"| hook registrations (entries) | {c['hook_entries_total']} |")
+    p(f"| …of those, file-pointing | {c['hook_entries_file_pointing']} |")
+    p(f"| …inline commands, no file | {len(c['hooks_inline_no_file'])} |")
+    p(f"| unique hook scripts referenced | {len(c['hooks_registered'])} |")
     p(f"| hooks on disk | {len(c['hooks_on_disk'])} |")
     p(f"| hooks DEAD WIRING (registered, file absent) | {len(c['hooks_dead_wiring'])} |")
     p(f"| hooks orphaned (on disk, unregistered) | {len(c['hooks_orphaned'])} |")
