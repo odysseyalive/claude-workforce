@@ -1,4 +1,5 @@
 ---
+<!-- Enforcement: 2 assertion(s) in bin/check guard this file; 8 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-provenance-analyst
 description: "Measures the evidence for who a directive-shaped block came from — marker, duplication, sidecar, voice, downstream authority, git — and reports the full vector rather than a verdict. Distinguishes an immaterial question from an unresolved one."
 disallowedTools: Agent

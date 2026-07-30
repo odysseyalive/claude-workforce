@@ -1,5 +1,6 @@
 # The Conversion Department — the judgment a regex cannot make
 
+<!-- Enforcement: 5 assertion(s) in bin/check guard this file; 8 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — UNSURE is not an outcome. This department is how the system exits it. -->
 
 Classifying a mature project's skill content is genuine work, not a lookup. Attempts to shortcut it
