@@ -79,8 +79,15 @@ material into its grounding library. Never resolved by shipping a longer handboo
 **8. Do not restate constants.** Tier limits, caps, and model IDs live in exactly one place each
 (`platform.md`, `org-config.md`). A handbook that hardcodes one is a `verify` finding.
 
-**9. Never add `memory:`.** It is auto-memory, inert when disabled, and not a curated index
-(`platform.md` fact 11). Grounding libraries are the mechanism.
+**9. Never add `memory:`.** An employee's records live in a data skill at a path its handbook names
+(`data-skills.md`), so there is nothing for `memory:` to carry. Grounding libraries and data skills are
+the mechanism.
+
+The older reason — that it is auto-memory and inert when disabled — is `platform.md` fact 11, which is
+**unverified**, and a DOCUMENTED fact may not be the load-bearing argument for a blocking rule. The rule
+stands on the sentence above instead, which does not depend on how `memory:` behaves. Were fact 11
+measured false tomorrow, the rule would not change: data skills hold datasets larger than any injected
+index, they work whatever the host's memory setting is, and they carry a schema and an owner.
 
 ---
 

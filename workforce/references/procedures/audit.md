@@ -152,10 +152,16 @@ repaired** — registering an agent makes it model-invocable, a behavior change 
 the event, the matcher, the raw `command`, the path it resolves to, and whether that path lands **inside
 a skill directory**. Step 3 joins its dispositions against that mapping.
 
-A hook is wired to a path, never to a skill, so demoting a skill leaves its hooks firing unchanged
-against a stub. That is claude-enforcer's `protect-directives` defect inverted: there the hook read a
-sidecar no procedure wrote (`enforcement.md` § Hooks), here the hook keeps running while the skill
-behind it has been hollowed out. Both report clean while doing nothing.
+A hook is wired to a path, never to a skill, so a skill's removal does not unwire its hooks — it turns
+them into **dead wiring**: registered, pointing at nothing, non-blocking, and silently enforcing nothing
+(`discovery.md` § Dead wiring). That is claude-enforcer's `protect-directives` defect inverted: there the
+hook read a sidecar no procedure wrote (`enforcement.md` § Hooks), here the registration outlives its
+script. Both report clean while doing nothing.
+
+**Criticality decides how loudly.** A hook whose silent absence is a correctness or safety failure —
+one that blocks destruction of billable or irreplaceable data — is **load-bearing**, and a load-bearing
+dead-wiring finding outranks every optimization finding in the report. Advisory dead wiring is ordinary
+cleanup. The distinction is what makes the finding actionable instead of a broken-path list.
 
 **Report, never rewire.** Workforce ships no hooks and does not manage a host's. A hook it did not write
 is outside what `disband` may excise, which makes it outside what `audit` may touch.
@@ -169,6 +175,30 @@ from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
 
 A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
 being wrong** — not by a distinct directory. Two to four is the normal answer.
+
+### When the evidence exceeds the cap — stop and ask
+
+A real project can present five or six domains that each pass the three-pronged test. The cap then forces
+a merge the evidence does not support, and whether the cap or the evidence is wrong is **unsettled** —
+deliberately, rather than resolved by widening a cap on one project's showing.
+
+So when the panel finds more warranted departments than the cap allows, the audit **stops and asks the
+user.** Not silently merging, and not letting the panel override.
+
+The panel's job is to make the question answerable, which means the ask arrives with the work already
+done: every candidate domain named, the evidence for each, **what merging any given pair would cost**,
+and a recommended split. A question that hands the user a raw list has moved the work rather than
+finishing it.
+
+**The panel recommends; the user ratifies.** Identical to the hand-written intake protocol
+(`conversion-taxonomy.md`), and for the same reason: the machine does the analysis, the human owns the
+call. A department structure is something the user works inside every day.
+
+**This is not the org's chain of command.** CEO → Lead → IC is the runtime hierarchy for doing work; this
+is the audit's own decision procedure, and it terminates at the user rather than inside the org.
+
+Record the outcome in the chart either way — a cap honored and a cap exceeded are both decisions worth
+being able to read back later.
 
 **Disagreement resolves to fewer ROLES, not fewer departments.** A department that meets the
 three-pronged evidence test stands regardless of the skeptic's vote — the evidence warranted it and a
@@ -244,14 +274,65 @@ what happened on 2026-07-29, and the arithmetic is what exposes it.
 never a removal, and where a persona collides the org redraws its own rather than touching the other
 side.
 
-**And join the Step 1b hook census against the dispositions.** A hook whose command resolves into a
-skill being demoted fires against a stub the moment T7 lands: name the event, the hook path, and the
-skill. Reported, not rewired.
+**And join the Step 1b hook census against the dispositions.** A hook whose command resolves into a skill
+the run will sweep becomes dead wiring the moment the sweep lands. Name the event, the hook path, the
+skill, and its **criticality**.
+
+**A load-bearing hook is a reason to relocate, not to abandon.** Its script is working machinery, not
+scaffolding (`legacy-markers.md` § Disposition by category): it survives, re-owned by the data skill that
+inherits the dataset it guards, with its registration rewritten **in the same transaction as the move**.
+Rewriting a registration is the one exception to "report, never rewire" — and it is not a rewire, it is
+carrying an existing wire to where its script now lives.
+
+## Step 3b — Datasets and connections
+
+Two censuses that decide what the org can actually reach. Both run before Step 4 assigns owners, because
+an owner cannot be assigned to a dataset nobody found.
+
+### Datasets
+
+Every persistent-state file in the survey gets a **data skill** and exactly one owner
+(`data-skills.md`). Census breadth is the thing to get right: state hides under at least five
+conventions — a `data/` directory, the skill root, inside `references/`, a purpose-named directory
+(`ledger/`, `scans/`, `corpora/`), and dotfiles. **A census keyed to `data/` alone finds a fraction of
+it.**
+
+For each dataset, record what the skill will need: schema, current git disposition, **the file its
+ignore rule lives in**, and every script or hook that reads or writes it. The ignore rule matters most
+and is easiest to miss — it is the only declaration of whether a dataset is disposable, it is routinely
+spread across several files, and none of them is the skill.
+
+**The data does not move** (`data-skills.md` § The data never moves). This census describes; it never
+relocates.
+
+Report, for both modes: datasets found, datasets with an owner, datasets **without** one. An unowned
+dataset is a finding, not a tolerable state.
+
+### Connections
+
+Enumerate the MCP servers and connectors the host **actually has configured**, and write the list into
+`org-config.md`.
+
+- **Grant only what is present.** A grant naming an absent server fails *silently* — tool search returns
+  nothing, the employee reports no capability, and the run looks clean. Refuse the grant instead, and
+  report it.
+- **Report what an employee wanted and could not have.** "This employee needs a calendar connection you
+  have not configured" is a correct and useful output. A grant that resolves to nothing is not.
+- **Never fabricate a connection or claim an untested one works.** The audit may scaffold the *shape* — a
+  named environment key, a documented setup step — and say what the user must supply.
+
+**Passive by default.** The census reads configuration; it does not call anything. A survey step must
+not send outbound traffic to a mail, billing, or calendar account as a side effect of being run.
+
+**An active probe is available on explicit opt-in** — one call per server — because *configured but
+broken* is a real state that reading configuration cannot detect. Opt-in, never inferred, and never
+during a `--quick` run.
 
 ## Step 4 — Chain of command and Records Owners
 
-Assign tiers, `reports-to`, spawn budgets, and exactly one Records Owner per retained playbook. Ties
-break toward the employee owning the fewest records — an owner is a serialization point.
+Assign tiers, `reports-to`, spawn budgets, and exactly one Records Owner per retained playbook and per
+data skill. Ties break toward the employee owning the fewest records — an owner is a serialization
+point.
 
 **Evaluator wiring** (`references/evaluators.md`). Per department whose work a catalog covers: propose an
 evaluator employee, make it the catalog's Records Owner, and grant it the catalog via `skills:`. Then wire
@@ -306,9 +387,10 @@ what was built and why, and `--review` is the path for seeing it before anything
 headcount per department.** An audit that builds a fraction of the project teaches its first user to
 distrust it.
 
-**Under `succession: declared`, the closing report names every demoted skill.** Setting the marker
-declares an intent; the report is where the user sees what that turned out to mean — which skills
-became stubs, which still refused and under which rule, and that `disband` reverses it.
+**Under `succession: declared`, the closing report names every swept skill.** Setting the marker declares
+an intent; the report is where the user sees what that turned out to mean — which skills were removed,
+which still refused and under which rule, how many immutable blocks were extracted against how many
+censused, and that `disband` reverses it.
 
 **Then author.** Per employee, through `handbook.md`, under the transaction order in `hire.md`
 § Transaction Order. Greenfield authors the whole roster as a batch (`hire.md` § Initial roster);
@@ -317,7 +399,8 @@ completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
-Order: **conversions → handbooks → charter and principles → model rewrite → `org index` → `org embed`.**
+Order: **conversions → handbooks → data skills → charter and principles → model rewrite → `org index` →
+`org embed` → `verify` → the sweep.**
 
 **The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
 first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.
@@ -341,6 +424,45 @@ Payroll
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+## Step 6b — The sweep (the only step that deletes)
+
+Every conversion marked its skill at T7; nothing has been unlinked. This step does it, once, after the
+whole org has verified.
+
+**Four preconditions, all asserted, any failure aborts the sweep and leaves the tree in its
+two-paths-live state** — which is degraded but correct, and reversible by `disband`:
+
+1. **`verify` passed for the whole org this run.** Not per skill — the whole org. A sweep is authorized
+   by a working replacement, and "working" is an org-level property.
+2. **Extraction is complete.** `N of N` immutable blocks extracted and read back byte-exact
+   (`conversion-taxonomy.md` § What succession removes). **A single short extraction blocks the entire
+   sweep**, not just that skill's removal.
+3. **The backup exists and verified.**
+4. **Every marked skill has its `.orig` recorded and hashed** in the journal.
+
+Then, in order:
+
+| | Removed | Kept |
+|---|---|---|
+| marked skills | `SKILL.md` and any span the run moved | `references/`, `scripts/`, `hooks/`, and every dataset — **untouched, paths unchanged** |
+| predecessor scaffolding | marker-matched embeds, annotations, gates, sidecars, sentinels | anything matching no marker → **quarantined to the report** |
+| the superseded generator | itself | the working machinery it wrote |
+
+**A skill directory that still holds datasets, scripts, or hooks is not removed** — only its `SKILL.md`
+is. The directory continues to exist as the data skill's home. Removing a directory because its
+instruction file left would take the data with it, which is the one outcome the whole design is built to
+prevent.
+
+### After the sweep
+
+- **Rewrite dangling references.** Any surviving skill that named a removed command gets that reference
+  stripped. A gate telling a reader to invoke something deleted is worse than no gate.
+- **Re-run the hook census.** Dead wiring must be **zero**; a nonzero count means a relocation in Step 6
+  did not rewrite its registration.
+- **Report as counts**: skills swept, scaffolding blocks removed by marker class, blocks extracted
+  against blocks censused, quarantined items. **Never a bare "clean"** — a sweep that cannot state its
+  coverage is not evidence that anything was swept.
 
 ## Step 7 — Close
 

@@ -98,12 +98,12 @@ caveat stated, never refuse a user's work over a measurement that was unobtainab
 
 ```
 T1  stage handbook        →  .claude/workforce/staging/agents/<name>.md
-T2  stage the skill stub  →  .claude/workforce/staging/skills/<name>/SKILL.md
+T2  extract directives    →  .claude/workforce/directives/<skill>.md   ← verbatim, byte-exact
 T3  probation             →  lint + cold-read probe (staging.md A and B)
 T4  journal WRITE-INTENT
 T5  register              →  .claude/agents/<name>.md          ← employee live; TWO paths live
 T6  verify registration   →  regular file, parses, hash matches
-T7  swap the skill        →  copy SKILL.md to .orig, then write the stub  ← ONE path live
+T7  retire the skill      →  copy SKILL.md to .orig, then MARK for the sweep  ← still two paths
 T8  journal COMMITTED
 ```
 
@@ -111,18 +111,31 @@ T8  journal COMMITTED
 two paths — never zero.** A crash before T5 leaves the original untouched. A crash between T5 and T7
 leaves both live: degraded, and safe.
 
+**T7 marks; it does not delete.** The unlink happens in a single sweep after the whole org verifies
+(`conversion-taxonomy.md` § Nothing is left behind). Skills reference one another, so deleting as the
+batch proceeds leaves dangling references at every intermediate step and a crash freezes the tree
+there. Marking keeps both paths live until the run as a whole is known good.
+
+**T2 replaces the former stub-staging step.** Nothing is stubbed: a placeholder pointing at its
+replacement is residue, and the user directive at `SKILL.md` § Directives forbids leaving it. What T2
+preserves instead is the only content the deletion could destroy — every
+`<!-- origin: user | immutable: true -->` span in the source, extracted verbatim with its source
+`file:line`.
+
 ### The rules that make it hold
 
 - **T5 refuses a symlink.** If `.claude/agents/<name>.md` exists and is a symlink, stop the entire run
   — writing through it destroys a file the plan never named.
-- **T7 never runs without T6 passing.** Demoting a working skill is authorized only by a *verified*
-  live replacement. Unknown result counts as failure: "Refusing to demote `<skill>` — its replacement
+- **T7 never runs without T6 passing.** Retiring a working skill is authorized only by a *verified*
+  live replacement. Unknown result counts as failure: "Refusing to retire `<skill>` — its replacement
   is unverified. The skill is left intact."
-- **T7 is copy-then-write.** `.orig` is written and hashed into the journal first, and retained after
+- **T7 is copy-then-mark.** `.orig` is written and hashed into the journal first, and retained after
   the run as the single-file undo.
-- **The stub's contents are canonical** (`references/templates.md` § The demoted-skill stub). It carries
-  every immutable block through byte-identically, holds none of the moved workflow text, and is read back
-  and re-hashed before T8. A stub that fails read-back leaves its row at `WRITE-INTENT`.
+- **T2 is asserted, not assumed.** The extracted immutable spans are read back and compared byte-exact
+  against the source before T4, and the count is journalled. **A skill whose extraction is short by even
+  one block never reaches T5**, and the sweep may not remove any file whose extraction did not pass.
+  This is the per-skill half of the run-level extraction gate
+  (`conversion-taxonomy.md` § What succession removes).
 - **Order is never rearranged for convenience**, and T7 swaps are never batched ahead of their
   T5/T6 pairs.
 - **A failed transaction marks that skill ✗ and continues.** It never aborts the batch and never

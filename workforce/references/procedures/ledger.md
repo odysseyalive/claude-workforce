@@ -38,9 +38,41 @@ and a confirmation gate drops defects exactly when the user is busy.
 Structural and improvement records stay user-confirmed. The distinction is whether the record is
 evidence about the system or a proposal about its future.
 
+## Two families, one ledger
+
+The five types above are about **the org** — a handbook that failed its employee, an output that missed
+its contract. A predecessor institutional-memory system typically carries a different four, about **the
+project**: `INC` (incident), `DEC` (decision), `PAT` (pattern), `FLW` (flow).
+
+**Both families live here, side by side.** They are not mapped onto each other. Forcing `INC → DEF`
+produces records that read as personnel problems when they were engineering ones, and the distinction
+between *the system misbehaved* and *an employee's document was wrong* is the one this ledger exists to
+keep straight.
+
+| Family | About | Capture |
+|---|---|---|
+| `DEF` `PERF` `AMD` `RFI` `ORG` | the org and its documents | per the table above — defects automatic |
+| `INC` `DEC` `PAT` `FLW` | the project itself | **user-confirmed, never automatic** |
+
+The project family keeps the predecessor's capture rule deliberately. A decision record is a claim about
+why something was chosen, and a system that writes those unprompted manufactures a history nobody
+agreed to.
+
+### Migrating them in
+
+**Enumerate from the filesystem, never from the predecessor's own index.** Those indexes drift — a real
+one under-reported its own contents by three records, and a migration that trusted it would have dropped
+them silently while reporting success.
+
+**IDs are preserved unchanged.** Records cross-reference each other by ID; renaming breaks every link at
+once, and the links are most of the value.
+
+Report migrated-count against filesystem-count. `N of N`, never a bare "migrated."
+
 ## The index
 
-By Department / By Employee / By Status / Statistics, in awareness-ledger's proven shape.
+By Department / By Employee / By Status / Statistics, plus the project family by tag — the shape
+inherited from the predecessor's ledger, which was sound.
 
 **Statistics carries the fix ratio**: `AMD + DEF + PERF` against completed work orders, monthly. It
 should fall over time; a ratio not falling across quarters is an org-health finding rather than a

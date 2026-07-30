@@ -39,6 +39,22 @@ This is the detection half of the chain of command. It is the only half there is
 match `org-config.md` and the employee's tier. Drift here is silent and changes cost or capability
 without changing behavior visibly.
 
+**6. Owned data.** For each data skill this employee owns, check the description against the thing
+described:
+
+- **Schema drift** — does the data on disk still match the declared schema? Drift means one of them
+  moved, and the schema is the one that was supposed to move deliberately.
+- **Degradation coverage** — are absent, empty, stale, and corrupt each still answered, and is each
+  answer still the safe direction?
+- **Git policy** — does the recorded ignore rule still exist, at the path recorded, still covering these
+  files? An ignore rule that moved or was rewritten is how private data reaches a commit.
+- **Maintainers** — does every script and hook listed still exist and still resolve?
+
+Failures here are a `DEF` against the data skill, not a `PERF` against the employee: the document was
+wrong about the data. **The exception is the git-policy check**, which is reported to the user
+immediately regardless of severity — a dataset whose ignore rule silently stopped covering it is a
+disclosure risk, and it does not wait for the next amendment cycle.
+
 **6. Bloat.** Length against the ceiling. Over → a *structural* finding: split the employee or move
 material into its grounding library. **Never resolved by accepting a longer handbook.**
 

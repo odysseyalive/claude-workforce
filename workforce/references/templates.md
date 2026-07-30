@@ -4,7 +4,7 @@
      never shipped as files; these are the literal contents to write. -->
 
 Two skills are created in the project on first audit. Both are **host-generated**: this file holds
-what to write, not files that ship. The Constitution Gate and the demoted-skill stub below are the
+what to write, not files that ship. The Constitution Gate and the extracted-directives file below are the
 same kind of artifact — canonical text written into a file workforce does not own.
 
 **Scope:** `/org` is created alongside `workforce` (same scope — personal or project).
@@ -133,71 +133,61 @@ measuring.
 
 ---
 
-## The demoted-skill stub
+## The extracted-directives file
 
-**What T7 writes over a converted skill's `SKILL.md`** (`procedures/hire.md` § Transaction Order). T7 is
-the one destructive step in a conversion, and this is the only artifact a human or a stale link still
-lands on afterwards.
+**What T2 writes before a conversion may proceed** (`procedures/hire.md` § Transaction Order). A
+converted skill is deleted, never stubbed — so this file is where its immutable spans continue to live,
+and writing it correctly is the precondition for deleting anything.
+
+Path: `.claude/workforce/directives/<skill>.md`.
 
 ```markdown
+# Directives extracted from `<skill>`
+
+Extracted <YYYY-MM-DD> by `/workforce audit`, journal run `<run-id>`.
+Source: `.claude/skills/<skill>/SKILL.md` (sha <pre-conversion sha256>).
+Owner of the work these govern: **`<employee-name>`** (<tier>, <department>).
+
+<N> immutable block(s), verbatim and in original order.
+
 ---
-name: <unchanged>
-description: "Converted to the agent employee <employee-name>. This file is a pointer, not a workflow."
-disable-model-invocation: true
----
 
-# <original title> — converted
-
-This skill's workflow is now the handbook of **`<employee-name>`** (<tier>, <department>).
-
-- **To get the work done:** `/org <the task you came here for>` — it dispatches to the owner.
-- **The handbook:** `.claude/agents/<employee-name>.md`
-- **Grounding library:** `references/` under this directory is retained **unchanged** and is that
-  employee's grounding library. Nothing here was deleted.
-- **The original:** `SKILL.md.orig`, restored by `/workforce disband`.
-
-Converted <YYYY-MM-DD> by `/workforce audit`, journal run `<run-id>`.
+<!-- extracted: <skill>/SKILL.md:<first-line>-<last-line> -->
+<!-- origin: user | immutable: true -->
+… the block, byte-for-byte, including its attribution lines and its own spacing …
+<!-- /origin -->
 ```
 
-### Every immutable block comes through byte-identically
+### Byte-exact, or the conversion does not proceed
 
-**This is the clause the template exists for.** A converted skill may still carry
+**This is the clause the template exists for.** A converted skill may carry
 `<!-- origin: user | immutable: true -->` spans: RETAIN rule 2 refuses conversion only when the skill's
 *imperative content* is inside one (`conversion-taxonomy.md`), so a skill whose directive block sits
-elsewhere converts normally. Its handbook then **references that block in place and stamps a
-`directives-sha` against it.**
+elsewhere converts normally. Its handbook then **references that block and stamps a `directives-sha`
+against it** — and after conversion the block lives here, so that is what the stamp points at.
 
-A stub that dropped the block would leave that stamp pointing at content which no longer exists.
-`checksums` reports `MISMATCH`, names it a directive violation, and refuses to repair it — a sacred-block
-violation committed by workforce itself, surfacing one command after the run reported success. So the
-blocks are appended verbatim below the pointer text, in their original order.
+Deleting a skill without extracting first would leave the stamp pointing at content that no longer
+exists. `checksums` reports `MISMATCH`, names it a directive violation, and refuses to repair it — a
+sacred-block violation committed by workforce itself, surfacing one command after the run reported
+success. Worse than the stale stamp: the text itself would be gone, and nothing but a backup would have
+it.
 
-**No new `verify` check is needed for this**, and none should be added: re-hashing immutable blocks
-against their recorded stamps is already what `procedures/verify.md` § Integrity sidecars does.
+So extraction is **asserted, not assumed**: read back with the same reader that wrote it, compare
+byte-for-byte against the source, and report the carry-through as a count — `N of N blocks extracted` —
+never as a bare "ok" (`procedures/checksums.md` § The inherited lesson). Short by one block, the skill
+is marked ✗, never reaches T5, and is never swept.
+
+**No new `verify` check is needed for the hashing**, and none should be added: re-hashing immutable
+blocks against their recorded stamps is already `procedures/verify.md` § Integrity sidecars. What
+`verify` gains instead is a **reachability** check — every stamp resolves to a block that exists at the
+path it names.
 
 ### The other two rules
 
-**Never a summary of what moved.** Not one line of the workflow's own words. Copying creates two
-canonical texts that diverge, which is the rule the whole conversion path already follows.
+**Never a summary, never a paraphrase.** Not one word of a block is reflowed, re-indented, or
+normalized. Attribution lines and nonstandard spacing inside a block are part of the block. A wrapper
+adds lines around text; it never touches text.
 
-**Read back before T8.** The generator re-reads what it wrote, with its own reader, and confirms four
-things: the frontmatter parses, `name:` is unchanged, no workflow text survived, and every immutable
-block hashes to its pre-conversion value. Report the carry-through as a count — `N of N blocks carried`
-— never as a bare "ok" (`procedures/checksums.md` § The inherited lesson). A T7 that cannot verify its
-own output has not finished, and its journal row stays at `WRITE-INTENT`.
-
-### On `disable-model-invocation`
-
-It states the intent — this is no longer a thing to invoke — and it has a useful second effect: a later
-audit surveying the project reads it as RETAIN rule 1 and leaves the stub alone, which is right, because
-the skill has already been converted.
-
-But **the `description` must carry the weight on its own.** The flag's effect on model invocation is not
-among the measured platform facts, so it is a declaration rather than a mechanism; the description says
-what the file *is* and names its replacement instead of describing a capability. Never rely on the flag
-alone.
-
-One consequence to know rather than discover: a skill carrying that flag **cannot be `skills:`-preloaded**
-(`platform.md` fact 10). That costs nothing here, because a demoted skill is never granted via `skills:` —
-its employee reaches the retained `references/` by explicit `Read`, on the paths its handbook names and
-Phase A verified. Granting a stub as a preload would silently deliver nothing.
+**Extraction is additive to the source until the sweep.** T2 writes the new file; it does not modify or
+remove the original. Both copies exist from T2 until the post-verification sweep, which is what makes a
+crash anywhere in between recoverable.

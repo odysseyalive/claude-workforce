@@ -344,6 +344,11 @@ for p_ in declared + ["README.md", "COMMANDS.md", "CLAUDE.md", "install", "insta
     for m in re.findall(r"/workforce\s+(?:dev\s+)?([a-z][a-z-]*)", read(p_)):
         referenced.setdefault(m, set()).add(p_)
 phantom = {c: sorted(v) for c, v in referenced.items() if c not in KNOWN_COMMANDS}
+# NOTE: `/workforce <employee> <args>` is a real second form (procedures/intent-router.md
+# § Naming an employee directly) and this check cannot distinguish it from a typo'd
+# command, because employee names are per-project and unknowable here. That is the
+# correct trade: a phantom command in shipped docs is a defect, an employee example is
+# a convenience. Docs write `<employee>`; do NOT relax this check to allow a literal one.
 check(
     "commands: every referenced /workforce command exists in the command surface",
     not phantom,
@@ -410,6 +415,103 @@ check(
     "platform: evidence is not cited from gitignored project state",
     ".claude/workforce/canary" not in plat,
     "cites .claude/workforce/ — gitignored, so a clone cannot verify the measurement",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9b. Data skills, legacy markers, and the no-residue rule
+#
+# Every check here guards a decision ratified 2026-07-30 whose failure mode is
+# silent: the doctrine reads correctly while the mechanism contradicts it. That
+# combination has already shipped twice in this project — a backup ordered after
+# the first write, and a model-ID exemption the check forbade — so each of these
+# pins a rule to the text that implements it.
+# ─────────────────────────────────────────────────────────────────────────────
+ds = read("workforce/references/data-skills.md")
+REQUIRED_DS_SECTIONS = [
+    "## Schema", "## Invariants", "## Degradation",
+    "## Owner", "## Git policy", "## Seed", "## Maintainers",
+]
+missing_ds = [s for s in REQUIRED_DS_SECTIONS if s not in ds]
+check(
+    "data-skills: the template specifies all seven required sections",
+    not missing_ds,
+    f"missing from data-skills.md: {missing_ds} — a generated skill is verified against this list",
+)
+
+# The universal invariant is the one line every generated data skill inherits.
+# If it drifts here, it drifts into every dataset an org ever owns.
+check(
+    "data-skills: the universal invariant is stated",
+    "may never authorize a write" in ds,
+    "data-skills.md must state: degraded state may cause more work, never authorize a write",
+)
+
+# Constants stated once, applied to the marker table. Two files listing the same
+# regexes is how a sweep starts matching different things in different steps.
+lm = read("workforce/references/legacy-markers.md")
+check("legacy-markers: the marker table exists", "ENFORCEMENT ANNOTATION" in lm and "ROUTE-EMBED" in lm)
+marker_restaters = [
+    p for p in declared
+    if p.endswith(".md")
+    and p != "workforce/references/legacy-markers.md"
+    and "ROUTE-EMBED START" in read(p)
+]
+check(
+    "legacy-markers: the marker table is stated once",
+    not marker_restaters,
+    f"restated in: {marker_restaters} — see legacy-markers.md § The marker table",
+)
+
+# Detection by marker, never by name. A named-skill delete list silently misses a
+# renamed or forked install and reports success anyway.
+check(
+    "legacy-markers: detection is by marker, not by name",
+    "never by name" in lm,
+    "legacy-markers.md must state that detection keys on markers, not skill names",
+)
+
+# The no-residue directive. A stub template reappearing is the specific
+# regression: it reads as helpful and is exactly what the user forbade.
+stub_templates = [
+    p for p in declared
+    if p.endswith(".md") and "## The demoted-skill stub" in read(p)
+]
+check(
+    "no-residue: no demoted-skill stub template ships",
+    not stub_templates,
+    f"stub template present in: {stub_templates} — converted skills are deleted, never stubbed",
+)
+
+ct = read("workforce/references/conversion-taxonomy.md")
+check(
+    "no-residue: conversion-taxonomy states that a converted skill is deleted",
+    "never replaced by a stub" in ct,
+    "conversion-taxonomy.md § Nothing is left behind must state it",
+)
+
+# The extraction gate. This guards the only content in a managed tree that no
+# regeneration can reconstruct: the user's own immutable spans, which routinely
+# sit inside files a foreign generator owns.
+check(
+    "no-residue: the immutable-extraction gate precedes deletion",
+    "before the first file is removed" in ct or "precedes every deletion" in ct,
+    "conversion-taxonomy.md § What succession removes must state the gate blocks deletion",
+)
+
+# Discovery tiers cap what may be acted on. A HEURISTIC finding that recommends a
+# deletion is indistinguishable in a report from a certain one.
+disc = read("workforce/references/discovery.md")
+for tier in ("MECHANICAL", "HEURISTIC", "JUDGMENT"):
+    check(f"discovery: {tier} tier defined", tier in disc)
+check(
+    "discovery: the directive-touch hard floor is stated",
+    "FLAG-ONLY" in disc and "immutable: true" in disc,
+    "discovery.md must downgrade any finding whose edit span intersects an immutable block",
+)
+check(
+    "discovery: quarantine is counted, not silent",
+    "quarantined" in disc and "audited" in disc,
+    "discovery.md must require reporting N audited · M quarantined",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

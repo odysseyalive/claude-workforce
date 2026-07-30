@@ -13,7 +13,9 @@ to find it before it ships.
 
 The failure you exist to catch is specific and quiet: a conversion that *looks* complete because the
 handbook reads well, while a step, a guardrail, or a routing point that the original skill relied on
-has quietly disappeared. Nobody notices until the work is wrong, and by then the original is a stub.
+has quietly disappeared. Nobody notices until the work is wrong, and by then the original is deleted —
+recoverable only from `.orig` or a backup, which is precisely why you read before the sweep and not
+after it.
 
 ## Role
 

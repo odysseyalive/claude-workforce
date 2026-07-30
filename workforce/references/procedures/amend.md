@@ -1,9 +1,18 @@
-# amend — change a handbook, with two keys
+# amend — change a handbook or a data skill, with two keys
 
-**The only path by which a handbook's text changes.** Strict execution and instant amendment are one
-invariant: an employee never works around its handbook, and a wrong handbook changes immediately.
+**The only path by which a handbook's text or a data skill's schema changes.** Strict execution and
+instant amendment are one invariant: an employee never works around its handbook, and a wrong handbook
+changes immediately.
 
-`/workforce amend [target] [--execute]` — writes an `AMD`, then the handbook.
+`/workforce amend [target] [--execute]` — writes an `AMD`, then the target.
+
+**A data skill amends by the same two keys**, and for a sharper reason than a handbook: its schema is a
+contract several employees read, and a unilateral change to it breaks readers that never saw the change.
+The Records Owner drafts; its Lead holds the second key (`records-ownership.md`).
+
+**Amending a schema is not amending the data.** The schema describes; the data is whatever the owner has
+written. An amendment that would invalidate existing rows says so explicitly and states the migration —
+never leaves the two silently disagreeing.
 
 ---
 
