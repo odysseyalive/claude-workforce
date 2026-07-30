@@ -101,6 +101,33 @@ def read(p):
         return ""
 
 
+# Any `<!-- NAME START -->` / `<!-- NAME END -->` pair is a marker family. The
+# named families above are examples learned from one project; this finds the ones
+# no table lists. A census keyed only to known names reports a clean sweep over
+# every generator it has not met.
+GENERIC_PAIR_RX = re.compile(r"<!--\s*([A-Z][A-Z0-9-]{3,})\s+START\b")
+
+
+def discover_marker_families(skills_dir):
+    """Marker families present in the tree but absent from the known table."""
+    known = {k.upper().replace("_", "-") for k in PAIRS}
+    found = Counter()
+    for dirpath, _d, filenames in os.walk(skills_dir):
+        for fn in filenames:
+            if not fn.endswith(".md"):
+                continue
+            try:
+                body = open(os.path.join(dirpath, fn), encoding="utf-8", errors="replace").read()
+            except Exception:
+                continue
+            for name in GENERIC_PAIR_RX.findall(body):
+                if name.replace("-", "").lower() not in {
+                    k.replace("_", "").replace("-", "").lower() for k in known
+                }:
+                    found[name] += 1
+    return dict(found)
+
+
 def census(root):
     root = os.path.abspath(root)
     claude = os.path.join(root, ".claude")
@@ -376,6 +403,7 @@ def census(root):
         "skills": skills,
         "quarantined": quarantined,
         "unpaired_markers": unpaired,
+        "unknown_marker_families": discover_marker_families(skills_dir),
         "skills_with_no_origin_marker": no_marker,
         "marker_totals": dict(marker_totals),
         "foreign_origin_owners": dict(foreign_owners),
@@ -430,6 +458,7 @@ def report(c):
     p(f"| skills | {c['skill_count']} |")
     p(f"| quarantined (unparseable) | {len(c['quarantined'])} |")
     p(f"| **UNPAIRED markers (sweep hazard)** | **{len(c['unpaired_markers'])}** |")
+    p(f"| **UNKNOWN marker families (not in the table)** | **{len(c['unknown_marker_families'])}** |")
     p(f"| skills with no `origin:` marker | {len(c['skills_with_no_origin_marker'])} |")
     for k, v in sorted(c["marker_totals"].items()):
         p(f"| marker `{k}` | {v} |")
@@ -474,6 +503,12 @@ def report(c):
         p("")
         for k, v in sorted(c["ignore_rule_sources"].items()):
             p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c.get("unknown_marker_families"):
+        p("## Unknown marker families — the table is incomplete")
+        p("")
+        for k, v in sorted(c["unknown_marker_families"].items(), key=lambda x: -x[1]):
+            p(f"- `{k}` — {v} occurrence(s). Not in `legacy-markers.md`; classify before any sweep.")
         p("")
     if c["unpaired_markers"]:
         p("## Unpaired markers — a sweep hazard")

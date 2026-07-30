@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —
@@ -32,6 +32,16 @@ Stated once. `bin/check` fails on restatement elsewhere.
 | lane-agent embed | `<!--\s*LANE-AGENT-EMBED START` | scaffolding |
 | checksum sidecar | `.directives.sha` at a skill root | scaffolding |
 | predecessor ledger | a `ledger/{incidents,decisions,patterns,flows}/` tree | **data — migrate** |
+
+**This table is a floor, never the population.** Any `<!-- NAME START -->` / `<!-- NAME END -->` pair
+is a marker family, and a census keyed only to the named ones reports a clean sweep over every
+generator it has not met. Run the generic detector alongside the table and **report families it finds
+that this table lacks** — they are a finding about this file, and the table grows from them.
+
+Measured on the first survey target, whose markers this project had been reading all day: the generic
+detector found **four families the table omitted** — `ROUTE-DISPATCH-CHECKPOINT` (7 blocks),
+`CREATIVE-SCRUB-EMBED` (2), `CODE-EVAL-ENFORCE` (2), `MODEL-SWITCH-GATE` (1). Twelve blocks a
+name-keyed sweep leaves behind as residue, or mis-pairs.
 
 The regexes match **openers only**. A pattern matching both an opener and its closing comment
 double-counts every block; the first hand census of a real project reported twice the true count for
