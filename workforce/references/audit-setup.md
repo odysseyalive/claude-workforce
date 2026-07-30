@@ -66,6 +66,9 @@ interactive run — refuse without it, because the budget questions cannot rende
 **Take the backup automatically** (`procedures/backup.md`), immediately — before any other gate writes
 anything. No question, no offer to decline.
 
+The run prints **`INV-BACKUP`** — taken, and the number of writes that preceded it, which must be zero
+(`references/invariants.md`).
+
 **The rule is "before the first write of the run", not "first in the execution phase".** An earlier
 revision said the latter, and it was wrong: Step 0.6 writes canary fixtures into `.claude/agents/`, and
 the execution phase is Step 6. A backup taken there captures a tree workforce has already modified, so
@@ -131,6 +134,8 @@ anything else arrives via "Other."
 
 **Every object renders every run**, current values pre-selected — one click when nothing changed. A
 marker may change a default; it may never drop a question.
+
+The run prints **`INV-BUDGET`** — questions rendered against questions owed (`references/invariants.md`).
 
 **The budgets print a receipt** (`procedures/audit.md` Step 6). Assertions alone have failed to hold
 this gate twice in claude-enforcer; a skipped question and an answered one must never look the same.

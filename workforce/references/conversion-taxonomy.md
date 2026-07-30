@@ -293,6 +293,8 @@ run does not proceed to any deletion.** Those spans are the user's own words, th
 files the predecessor owns, and they are the only content in a managed tree that no regeneration can
 reconstruct.
 
+The run prints **`INV-DIRECTIVES`** — spans extracted against spans censused (`references/invariants.md`).
+
 **The gate covers two populations, and counting only the first is how it fails.** Generators quote the
 directive they implement into the machinery they emit, so user text lives inside blocks that marker-
 matching classifies as disposable. Measured on a real project: 95 of 96 generated checkpoints embedded

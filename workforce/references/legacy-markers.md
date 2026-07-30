@@ -57,7 +57,7 @@ closers, or the file is reported and **excluded from both extraction and the swe
 resolves it. An unpaired file is not a hazard the run works around — it is a file the run does not
 touch.
 
-Report as a count alongside the others: `N files · M unpaired`.
+The run prints **`INV-MARKERS`** — files paired, and files excluded unpaired (`references/invariants.md`).
 
 ---
 
@@ -118,6 +118,8 @@ So the extraction assertion covers **two populations, counted separately**:
 |---|---|---|
 | immutable spans | `origin: user \| immutable: true` markers | `N of N spans` |
 | **embedded quotes** | scanned inside every block classified `SCAFFOLDING` | **`M of M embedded`** |
+
+The run prints **`INV-EMBEDDED`** — quotes extracted, against blocks scanned (`references/invariants.md`).
 
 **Both must reach N of N before any deletion.** A run reporting only the first has not measured the
 population it is about to destroy. Every `SCAFFOLDING` classification carries `EMBEDDED: <spans>` or

@@ -651,18 +651,70 @@ check(
 )
 # The set is closed on purpose: an open list grows by accretion and nobody
 # notices a row that was never added.
-inv_rows = len(re.findall(r"^\|\s*\d+\s*\|", inv, re.M))
+inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*\|", inv, re.M)
 check(
     "invariants: the enumerated set matches the count it declares",
-    inv_rows == 10,
-    f"invariants.md declares ten and the table holds {inv_rows} — adding one means "
-    "adding a row AND a report line in the same change",
+    len(inv_rows) == 10,
+    f"invariants.md declares ten and the table holds {len(inv_rows)} parseable rows — "
+    "adding one means adding a row AND wiring its token, in the same change",
+)
+
+# READ THE ROWS, do not merely count them. A doctrine audit replaced all ten line
+# texts with the word "garbage" and the check passed, because it asserted the row
+# COUNT and never the row CONTENT. Each token must resolve into the procedure
+# that owes the count — which is what makes the pairing real rather than declared.
+_unwired = []
+for _n, _tok, _owner in inv_rows:
+    _owner_path = "workforce/" + _owner if _owner.startswith("references/") else _owner
+    _body = read(_owner_path)
+    if not _body:
+        _unwired.append(f"row {_n}: owner {_owner} unreadable")
+    elif _tok not in _body:
+        _unwired.append(f"row {_n}: {_tok} absent from {_owner}")
+check(
+    "invariants: every row's token is wired into the procedure that owes it",
+    not _unwired,
+    f"{_unwired} — a row nothing prints is an intention with a table entry",
+)
+
+# The instruction must REQUIRE the block, not merely mention it. An audit passed
+# this assertion with prose reading "Historically some runs printed a Run
+# Invariants block; that is no longer expected."
+check(
+    "invariants: the run report is instructed to print the block, imperatively",
+    "Print the Run Invariants block first" in aud,
+    "a substring test for the block's name is satisfied by prose that cancels it",
+)
+
+# Compute-and-gate BEFORE the sweep; print at close. Collapsing the two makes the
+# NOT UPHELD gate unfireable — it was specified to print at Step 7 while the only
+# deletion happens at Step 6b, so the gate fired strictly after the thing it was
+# meant to stop. Same shape as a backup ordered after the first write.
+check(
+    "invariants: computed and gated before the sweep, not only printed at close",
+    "Compute the ten Run Invariants FIRST" in aud and "aborts the sweep" in aud,
+    "a gate evaluated after the destructive step is not a gate",
 )
 check(
-    "invariants: the run report prints the block before findings",
-    "Run Invariants" in aud,
-    "audit.md Step 7 must print the block, or the invariants are intentions",
+    "invariants: NOT UPHELD blocks the sweep",
+    "NOT UPHELD" in inv and "blocks the sweep" in inv,
+    "without this the run's only distinction between measured-zero and "
+    "could-not-compute disappears silently",
 )
+
+# The classification table's ENFORCEMENT COLUMN is its operative content — the
+# three labels alone were held, so an audit rewrote the structural enforcer to
+# "a careful reader" and the check passed.
+for _kind, _mech in (("Structural", "`bin/check` assertion"),
+                     ("Procedural", "counted line in the run report"),
+                     ("Advisory", "nothing")):
+    _row = next((l for l in inv.splitlines()
+                 if l.startswith("|") and f"**{_kind}**" in l), "")
+    check(
+        f"invariants: the {_kind.lower()} row names its actual enforcement mechanism",
+        _mech in _row,
+        f"the {_kind} row's enforcer column must name {_mech!r}; only the label was guarded",
+    )
 check(
     "authoring: a rule lands with its enforcement in the same change",
     "same change" in pfp and "intention" in pfp,
