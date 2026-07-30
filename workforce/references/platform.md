@@ -171,7 +171,7 @@ is the preferred mechanism for verification steps (`verification.md`).
 
 | # | Claim | Why it matters here | Status |
 |---|---|---|---|
-| 5 | Agents resolve only from `.claude/agents/` and `~/.claude/agents/`; identity comes solely from the `name:` field, and **subfolders do not namespace** | Two handbooks named `reviewer` in different subfolders collide **silently** — one simply wins by filesystem read order. This is why `unique-employee` is in the shipped-hook exception set | unverified |
+| 5 | Agents resolve only from `.claude/agents/` and `~/.claude/agents/`; identity comes solely from the `name:` field, and **subfolders do not namespace** | Two handbooks named `reviewer` in different subfolders collide **silently** — one simply wins by filesystem read order. Guarded by a blocking Phase A lint check and by `verify`, not by a hook (`enforcement.md` § Hooks) | unverified |
 | 6 | Every non-fork subagent receives a fresh isolated context **plus the full CLAUDE.md plus git status**, with no per-agent opt-out | CLAUDE.md cost is multiplied by fan-out; audit runs a CLAUDE.md size budget check | partly corroborated — isolation is evident; the injection cost is not measured |
 | 7 | Only the **top-level** subagent's summary returns to main | Drives the mandatory `## Reporting` convention: every employee writes `OUTPUT.md` and returns verdict + path + ≤3 lines | unverified |
 | 8 | Caps: 200 subagents/session (**cannot be disabled**), 20 concurrent | Drives department-width caps and the `/org` budget preflight | unverified |

@@ -72,10 +72,10 @@ cannot refuse. Everything available is mitigation, and it should be described as
 1. **Structural width caps** (the table above) — the only real lever.
 2. **Budget preflight at the `/org` door** — projected spawn count against remaining budget; over
    budget, dispatch one tier lower or split the work order.
-3. **A host-generated counter** — `SubagentStart` increments `.claude/workforce/.spawn-count` and
-   advises at 75% and 95% of the cap. Host-generated, never shipped (the no-distribute rule), so a
-   fresh install has no mechanical counter until `hooks --execute` runs. The `/org` preflight is the
-   always-present backstop.
+3. **A host-generated counter**, optional. A `SubagentStart` hook can increment
+   `.claude/workforce/.spawn-count` and advise near the cap. This project ships no hooks
+   (`enforcement.md` § Hooks), so a host that wants the counter writes it. The `/org` preflight is the
+   always-present backstop and does not depend on one.
 4. **Split large conversions across sessions** — documented, not automated.
 
 ---

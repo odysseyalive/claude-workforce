@@ -82,6 +82,6 @@ Unrelated jobs, similar names. Do not conflate them in a procedure or a report.
 | `workforce/references/` | 21 cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
 | `workforce/references/procedures/` | 29 command procedures |
 | `workforce/agents/` | four shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
-| `workforce/hooks/` | the four-file no-distribute exception set; ships dormant |
+| — | this project ships **no executables**; see `references/enforcement.md` § Hooks |
 | `manifest.txt` | the authoritative shipped-file list, consumed by both installers |
 | `bin/check`, `bin/sync` | conformance and mirror |

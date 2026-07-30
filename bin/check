@@ -216,6 +216,45 @@ for p in glob.glob("workforce/hooks/*.sh"):
     check(f"hook {n}: declared with the hook flag", f"hook {p}" in read("manifest.txt"))
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 8b. Every /workforce command referenced anywhere actually exists
+#
+# `/workforce dev hooks --execute` was documented in SEVEN files, including one the
+# installer printed for the user to run, and the command never existed. It shipped
+# through nine commits because nothing checked command references — only
+# `references/…` links were validated.
+# ─────────────────────────────────────────────────────────────────────────────
+KNOWN_COMMANDS = set(
+    re.findall(r"[\w-]+", re.search(r"Commands: ([^\"]+)", skill).group(1))
+) | {"dev", "audit", "hooks"} - {"hooks"}
+# `dev` is a prefix, not a command; strip it when resolving `/workforce dev <cmd>`.
+referenced = {}
+for p_ in declared + ["README.md", "COMMANDS.md", "CLAUDE.md", "install", "install.ps1", "manifest.txt"]:
+    if not os.path.exists(p_):
+        continue
+    for m in re.findall(r"/workforce\s+(?:dev\s+)?([a-z][a-z-]*)", read(p_)):
+        referenced.setdefault(m, set()).add(p_)
+phantom = {c: sorted(v) for c, v in referenced.items() if c not in KNOWN_COMMANDS}
+check(
+    "commands: every referenced /workforce command exists in the command surface",
+    not phantom,
+    "phantom commands: " + "; ".join(f"{c} (in {', '.join(v)})" for c, v in phantom.items()),
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8c. This project ships no executables
+#
+# The four inherited hook files were removed once measurement showed they had never
+# fired, could not be wired, and duplicated verify. Re-adding one is a decision that
+# should be deliberate, so it fails here rather than passing quietly.
+# ─────────────────────────────────────────────────────────────────────────────
+executables = [p_ for p_ in declared if p_.endswith((".sh", ".ps1", ".py")) or os.access(p_, os.X_OK)]
+check(
+    "shipped files: no executables in the distribution",
+    not executables,
+    f"executable or script files in the manifest: {executables} — see enforcement.md § Hooks",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 9. Honesty rules — never claim enforcement the runtime will not deliver
 # ─────────────────────────────────────────────────────────────────────────────
 # The SANCTIONED honesty clause contains the word "enforced" by design —

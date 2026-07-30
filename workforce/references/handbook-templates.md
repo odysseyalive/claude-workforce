@@ -221,4 +221,4 @@ skeptic finds different things than one that thinks like a librarian.
 
 **Personas must be unique across every agent location.** Name collisions are silent — one file simply
 wins by filesystem read order (`platform.md` fact 5) — so uniqueness is checked at authoring time and
-backstopped by the `unique-employee` hook. See `personas.md`.
+and blocked by Phase A lint before registration. See `personas.md`.

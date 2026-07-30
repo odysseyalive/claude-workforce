@@ -50,6 +50,7 @@ Report the target, the section, and both hashes. Resolution is a human or `amend
 
 ## Where it runs
 
-`verify` calls this. `audit` refreshes stamps after any authorized change. The
-`protect-directives` hook consumes the sidecar when wired host-locally — and consumes it with the
-same liberal reader, so a strict-generator/strict-reader mismatch cannot recur.
+`verify` calls this, and `audit` refreshes stamps after any authorized change. **The sidecar path is
+`${CLAUDE_PROJECT_DIR}/.claude/workforce/.directives.sha`** — named here because an inherited hook
+once read a sidecar that no procedure wrote, and reported `NO-COVERAGE` forever. A generator with no
+named destination is not a generator.

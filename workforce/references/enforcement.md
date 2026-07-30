@@ -13,7 +13,7 @@ The single most important table in this project:
 | Employee A may not spawn employee B | — | **CANNOT. Detection only.** |
 | Employee follows its handbook | — | **CANNOT. Detection only.** |
 | Total spawns stay under the session cap | — | **CANNOT. Advisory only.** |
-| Two employees cannot share a name | `unique-employee` hook | **DETECTS** at author time; the platform itself is silent |
+| Two employees cannot share a name | Phase A lint + `verify` | **DETECTS** at author time and at review; the platform itself is silent |
 
 **Anything in a "cannot" row must never be described as enforced, guaranteed, prevented, or
 sandboxed.** That is a gate, not a style preference (Chain-of-Command Gate, `SKILL.md`).
@@ -49,30 +49,46 @@ nothing wrong.
 
 ---
 
-## Hooks
+## Hooks — this project ships none
 
-Host-generated, **never shipped**, except four files.
+**claude-workforce ships zero executables.** Not as an oversight: measured, then removed.
 
-The exception set is `protect-directives.{sh,ps1}` and `unique-employee.{sh,ps1}`. They guard things
-whose failure is **silent**: rewording an immutable directive block, and a name collision that
-discards an employee with no error. Without them a fresh install loses load-bearing enforcement and
-nothing says so.
+Four hook files were inherited from claude-enforcer (`protect-directives` and `unique-employee`, each
+in bash and PowerShell). They were deleted once three things became clear together:
 
-All four stay **dormant** until wired host-locally by `/workforce dev hooks --execute`. Shipping a
-file is not wiring it, and wiring is a deliberate host act.
+1. **They had never fired.** They shipped dormant, and the command documented to wire them
+   (a `dev hooks --execute` subcommand) did not exist. Seven files referenced it, including one the
+   installer printed to the user.
+2. **They duplicated `verify`.** Name uniqueness across every agent location and immutable-block
+   re-hashing are both `verify` checks already, with the same `OK / MISMATCH / PARTIAL / UNREADABLE`
+   states.
+3. **One depended on an artifact nothing wrote.** `protect-directives` read a `.directives.sha`
+   sidecar that no procedure generated, so even wired it would have reported `NO-COVERAGE` forever.
 
-Useful events: `SubagentStart` / `SubagentStop` (matchers take the agent type name; plugin-scoped
-names contain a colon and are regex-evaluated, so anchor them), `PreToolUse` / `PostToolUse`,
-`SessionStart`.
+The inherited argument for shipping them was claude-enforcer's: *without them every fresh install
+silently loses load-bearing enforcement.* **That argument fails on its own terms here.** A dormant
+hook gives a fresh install no enforcement either, so shipping one moves the gap somewhere harder to
+see rather than closing it.
 
-**A hook can observe and it can block a tool call. It cannot deny a spawn against a quota** — which
-is why the session cap is advisory and why the counter hook is described as advisory everywhere it
-appears.
+What covers the ground instead:
 
-**Hooks fail open.** A hook that errors must not wedge the session, so every shipped hook exits 0 on
-any unexpected condition and reports rather than blocking.
+| Guard | Mechanism |
+|---|---|
+| name and persona collisions | Phase A lint (blocking, at authoring time) and `verify` |
+| immutable-block drift | `verify`'s integrity check, and the FLAG-NEVER-TOUCH rule in `amend` |
+| repo-level conformance | `bin/check` in the source distribution |
 
----
+**What is genuinely lost:** edit-time detection between audits. A collision introduced by hand-editing
+`.claude/agents/` goes unnoticed until the next `verify`. That is a real gap, narrow, and stated rather
+than papered over.
+
+**If a host wants hooks**, it generates its own. That was always the rule for every hook except the
+four exceptions, and now there are no exceptions. Useful events: `SubagentStart` / `SubagentStop`
+(matchers take the agent type name), `PreToolUse` / `PostToolUse`, `SessionStart`.
+
+**A hook can observe and it can block a tool call. It cannot deny a spawn against a quota**, which is
+why the session cap is advisory everywhere it appears. **And a hook must fail open** — one that errors
+must not wedge the session.
 
 ## `permissions.deny` and the machine-owned region
 

@@ -1,6 +1,6 @@
 ---
 name: wf-intent-router
-description: "Classifies a freeform /workforce ask into a command. Never guesses into a destructive one."
+description: "Classifies a freeform `/workforce <text>` invocation into a command. Never guesses into a destructive one."
 disallowedTools: Agent
 tools: Read
 effort: low

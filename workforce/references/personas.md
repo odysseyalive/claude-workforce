@@ -1,6 +1,6 @@
 # Personas and Names
 
-<!-- Enforcement: HIGH — name collisions are SILENT. The `unique-employee` hook is the backstop. -->
+<!-- Enforcement: HIGH — name collisions are SILENT. Phase A lint is the blocking backstop. -->
 
 ## Names: collisions are silent, and that is the whole problem
 
@@ -21,9 +21,14 @@ exist — while the org chart lists both and every report says the org is health
    the platform namespaces them, but because *we* must.
 2. **A uniqueness check at authoring time**, globbing every agent location — `.claude/agents/**/*.md`
    and `~/.claude/agents/**/*.md` — dereferencing symlinks and deduping by resolved target.
-3. **The `unique-employee` hook** as the mechanical backstop. This is why it earns a place in the
-   four-file shipped-hook exception set: without it, every fresh install can silently lose an
-   employee.
+3. **A blocking Phase A lint check** (`staging.md`), so a collision stops registration instead of
+   being reported after the fact.
+
+**What is not a mitigation: a shipped hook.** Four were inherited from claude-enforcer and removed,
+because they had never fired, could not be wired, and duplicated `verify` (`enforcement.md` § Hooks).
+The residual gap is real and narrow: a collision introduced by hand-editing `.claude/agents/` between
+audits goes unnoticed until the next `verify`. A host that wants edit-time detection writes its own
+hook.
 
 **Name rules:** lowercase and hyphens only; no colons (reserved for plugin scoping — a file with one
 is not loaded); stable once hired. Renaming an employee is a `transfer`, not an edit — the name is

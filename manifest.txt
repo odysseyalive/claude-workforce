@@ -10,6 +10,14 @@
 #   keep       fetch only if absent on the host (user-editable file; never clobber)
 #   hook       fetch unconditionally; mark executable on unix systems
 #
+# NOTE: `keep` and `hook` currently have no users. This project ships no
+# executables and no user-editable in-skill files: project state lives in the
+# project (references/scopes.md), and the four hook files were removed once
+# measurement showed they had never fired, could not be wired, and duplicated
+# checks `verify` already performs. Both flags are retained because the grammar
+# is shared with claude-enforcer's installers; neither is a dead branch to
+# "clean up" without checking that shared grammar first.
+#
 # Host destination: .claude/skills/workforce/<path minus leading "workforce/">
 
 workforce/SKILL.md
@@ -98,25 +106,3 @@ workforce/agents/intent-router/AGENT.md
 workforce/agents/handbook-cold-reader/AGENT.md
 workforce/agents/headcount-skeptic/AGENT.md
 workforce/agents/conversion-auditor/AGENT.md
-
-# ── Hooks ─────────────────────────────────────────────────────────────────────
-# claude-workforce does NOT distribute hooks; the host generates its own.
-# Exactly four files are excepted, and they are load-bearing enforcement:
-#
-#   protect-directives.{sh,ps1}  guards immutable user-directive blocks
-#   unique-employee.{sh,ps1}     guards employee name collisions
-#
-# The unique-employee pair earns its exception on a hard platform fact: agent
-# identity comes ONLY from the `name:` frontmatter field, and subfolders do NOT
-# namespace. Two handbooks at .claude/agents/eng/reviewer.md and
-# .claude/agents/docs/reviewer.md collide SILENTLY — one simply wins, chosen by
-# filesystem read order. Without a mechanical guard every fresh install can lose
-# an employee with no error.
-#
-# All four stay dormant until wired host-locally; run
-#   /workforce dev hooks --execute
-# to wire the OS-appropriate variant into .claude/settings.local.json.
-hook workforce/hooks/protect-directives.sh
-hook workforce/hooks/unique-employee.sh
-workforce/hooks/protect-directives.ps1
-workforce/hooks/unique-employee.ps1

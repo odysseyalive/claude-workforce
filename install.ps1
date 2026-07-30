@@ -120,7 +120,6 @@ Begin with step 1 now.
     Write-Host 'Downloading workforce...'
     $manifest = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/manifest.txt").Content -split "`n"
 
-    $hookCount = 0
     foreach ($rawLine in $manifest) {
         $line = $rawLine.Trim()
         if (-not $line -or $line.StartsWith('#')) { continue }
@@ -143,19 +142,6 @@ Begin with step 1 now.
         }
 
         Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/$path" -OutFile $dest
-        if ($flag -eq 'hook') { $hookCount++ }
-    }
-
-    if ($hookCount -gt 0) {
-        Write-Host ''
-        Write-Host 'Note: the shipped enforcement hooks come in two variants: bash'
-        Write-Host '(protect-directives.sh, unique-employee.sh) and PowerShell companions'
-        Write-Host 'for Windows (protect-directives.ps1, unique-employee.ps1). They stay'
-        Write-Host 'dormant until wired. To wire the OS-appropriate variant, run inside'
-        Write-Host 'a Claude Code session:'
-        Write-Host ''
-        Write-Host '    /workforce dev hooks --execute'
-        Write-Host ''
     }
 
     # Configure the delegation contract and the permissions the org needs.

@@ -22,7 +22,7 @@ project on the machine.
 | `workforce/` — SKILL.md, references, procedures | `.claude/agents/*.md` — the employees |
 | the generated `/org` receptionist | `.claude/workforce/org-config.md` — tier→model, departments, markers |
 | `org-config.template.md` — the shipped template | `.claude/workforce/org-chart.md` |
-| the four shipped agents, the four hook files | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
+| the four shipped panel agents | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
 | | `.claude/workforce/work/**`, `evals/**`, `ablations/**`, the conversion journal |
 | | `.claude/skills/operating-principles/` — this project's Strategic Objective + General Operating Principles |
 | | `.claude-backups/` — snapshots and the restore kit |
