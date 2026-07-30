@@ -287,6 +287,8 @@ Special thanks to Joe Loudermilk, who helped me understand why giving an LLM a s
 
 Special thanks to Wouter Dieters, who helped me connect organizational theory to agency. An agent behaves differently once it has a role, a scope it won't leave, a check to pass, and someone it answers to.
 
+Thanks to Sjoerd Tiemensma, who convinced me to toss CLAUDE.md in favor of more agency. That nudge cleared the path for agents to own their own context instead of inheriting a shared script.
+
 Thanks to Jeff Polack, who pointed out that this should support a personal install. That turned out to reshape the whole design: once the skill had to serve every project from one copy, no project-specific content could live inside it, and updating became a clean replacement instead of a merge.
 
 Thanks also to [Autonomee](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together some of the sharpest minds in the business.
