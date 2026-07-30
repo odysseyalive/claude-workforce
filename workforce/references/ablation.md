@@ -59,6 +59,10 @@ the right move is usually to **write an eval case that tests it** rather than to
 Excluded mechanically, never offered:
 
 - Anything inside `<!-- origin: user | immutable: true -->` — flagged, never dropped.
+- **Anything inside a marker some other tool owns** — any `origin:` value that is neither `user` nor
+  `workforce` (`procedures/amend.md` Step 2, fourth row). Not because the lines are sacred, but because
+  dropping them accomplishes nothing: the owning generator rewrites that span on its next run and the
+  ablation shows up as churn in somebody else's file. Flagged and reported, never dropped.
 - The mandatory structural sections (`procedure-for-procedures.md`).
 - The escalation sentinel.
 - **`disallowedTools: Agent` on any IC** — the measured tier ceiling (`platform.md` fact 2b).

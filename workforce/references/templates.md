@@ -112,6 +112,25 @@ uncovered case, and a question is a defect.
 with no opt-out, so its length is multiplied by fan-out. `audit` reports its size against a budget and
 flags content that belongs in a handbook or in the principles instead.
 
+### Insert between the markers. Never rewrite the file.
+
+**`CLAUDE.md` is the user's document and workforce is a guest in ten lines of it.** The write is an
+insert, and every byte outside the marker pair survives it — order, wording, comments, trailing
+whitespace, the lot. This is the same discipline `disband` already applies in reverse ("between its
+markers only"), stated on the write side so the two cannot drift.
+
+| Situation | What happens |
+|---|---|
+| no `CLAUDE.md` at all | create one, from the survey's own answers (`procedures/audit.md` Step 1) |
+| exists, no markers | **append** the block at the end. Nothing above it is read, reordered, or "tidied" |
+| exists, markers present | replace **only** what lies between them |
+| exists, and the user has edited *inside* the markers | replace it, and **report that an edit was overwritten** — a managed region silently reclaimed is how a user learns not to trust the tool |
+
+**Everything else workforce has to say about a `CLAUDE.md` is a proposal, printed and not applied**
+(`procedures/verify.md` § The user's own files). Two size-and-staleness lists exist; neither is ever
+written. A run that edits the user's document to improve its own report has changed the thing it was
+measuring.
+
 ---
 
 ## The demoted-skill stub

@@ -67,23 +67,43 @@ spawn, forever. `ablate` exists for this.
 
 Unrelated jobs, similar names. Do not conflate them in a procedure or a report.
 
+Two more, both from the `playwright-mcp` seam:
+
+- **`audit`** — `/workforce audit` surveys a project and staffs it. `playwright-mcp`'s `suite_audit`
+  adjudicates e2e test failures. A handbook that says "run the audit" has named neither.
+- **`test-suite`** — the skill name `suite_scaffold` writes into `.claude/skills/`. It is already taken
+  by a hand-authored skill in at least one project on this machine (`nsayka-wawa`), where scaffolding
+  would collide with it. Check before scaffolding; a skill-name collision resolves silently.
+
 ## Open, as of 2026-07-29
 
 - **`/workforce audit` has never run.** Nothing here has been executed end to end. This is the one
   remaining item that matters; everything below it is bounded.
+- **A grant naming an MCP server the host has not configured is untested.** Fact 13 measured the grant
+  grammar against a server that exists; the absent-server case is the one that matters for anyone else
+  running this project, and the expected failure is silent. `verification.md` § When the server is
+  absent states the rule (check first, never grant blind, prefer the tier-1 command) — but no procedure
+  step *verifies* the server is configured, so today it rests on an author reading that section.
 - **`background: true` in *frontmatter* is still unmeasured.** Fact 2 measured the Agent tool's
   `run_in_background` *parameter*, which may not be the same thing. `wf-canary-*.md` in
   `.claude/agents/` are the fixtures for it. The design never blocks on `background:`, so this is a
   loose end rather than a risk — but do not delete the fixtures until it is closed.
-- **Fact 3's interval is bounded but not timed.** Registration happens later in the same session,
-  somewhere between 4.5 minutes and a session. `wf-reload-probe` is retained to narrow it on a fixed
-  schedule if that is ever worth doing.
+- **Fact 3's trigger is not wall-clock.** The old ">4.5 minutes" lower bound was falsified on
+  2026-07-29: four fixtures were listed 3m06s after being written, across a user-turn boundary. A turn
+  boundary is now the leading candidate; `wf-reload-probe` is retained to separate it from elapsed time.
+  Nothing in the design waits on the trigger, so this stays a loose end.
 
 **Closed 2026-07-29.** Fact 2c (`disallowedTools` overrides `tools:`) is measured — `wf-ceiling-probe`
 returned `HAS_AGENT: no` against an identical `tools:` line that was granted `Agent`; evidence in
 `measurements/`. The live-reload re-measurement is done, the retracted "restart required" claim is swept
 out of all seven files that carried it, and fact 4b (an explicit `tools:` list is exact, not a filter)
 came out of the same run.
+
+**Also closed 2026-07-29.** Fact 13 is measured (`measurements/2026-07-29-mcp-grant.md`): both
+server-level MCP grant forms resolve and arrive **loaded**, so the shipped web-facing grant works. The
+run also falsified a recommendation written earlier the same day — adding `ToolSearch` to an MCP grant
+*defers* tools that were loaded without it — and confirmed that `tools:` is a real ceiling for MCP
+reach, which `enforcement.md` now carries as a measured *prevents*.
 
 ## Layout
 

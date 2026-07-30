@@ -116,15 +116,32 @@ What is established, harness 2.1.220:
 
 **So a restart is not required. The earlier claim that it was is retracted.**
 
-**Bound on the interval: longer than 4.5 minutes, shorter than a session.** Three attempts across that
-window all failed, while agents written hours earlier had registered. The upper bound is loose because
-the canary agents' registration was noticed rather than timed.
+**The 4.5-minute lower bound was wall-clock, and a later observation falsifies it as one.** On
+2026-07-29 at 19:17:16 four fixtures (`wf-mcp-*-probe`) were written; by **19:20:22 — 3m06s later —
+all four appeared in the harness's available-agent-types listing**, with their `tools:` lines. Shorter
+than 4.5 minutes, so elapsed time alone does not govern.
 
-**The trigger is undetermined and deliberately not guessed at.** Candidates not distinguished: a
-long-interval watcher, a re-scan on compaction or another harness event, or the availability notice itself
-being the registration. One hypothesis *was* tested and falsified — the project was not a git repo, and
-project skills are documented as loading by walking up to a repo root, but `git init` did not make the
-skill discoverable.
+**And spawnability followed, in the same session, with no restart.** All four fixtures were spawned
+later that session and returned their measurements (`measurements/2026-07-29-mcp-grant.md`). So the
+observation is not merely that a new definition gets *listed* — it becomes **usable**, on a delay,
+without a restart. This is the direct evidence the retracted "restart required" claim never had.
+
+**Scope it honestly: this measures ADDING a definition, not editing one.** All four fixtures were new
+files. Whether an *edit* to an already-registered agent is picked up in-session — and on what delay — is
+unmeasured. `wf-reload-probe` is the fixture to settle it with: change its returned string and spawn it.
+
+**So the trigger is still undetermined — but one candidate is now ahead.** What the two runs differ in
+is not duration: the 3m06s run crossed a **user-turn boundary** (the availability notice arrived as a
+system reminder opening a new turn), while the three failed attempts did not. A turn boundary, or the
+notice itself, is the leading hypothesis. Confounds, named rather than waved off: a `bin/sync` also ran
+between the write and the listing in the later run, and the two runs were in different sessions. Other
+candidates not distinguished: a long-interval watcher, or a re-scan on compaction. One hypothesis *was*
+tested and falsified — the project was not a git repo, and project skills are documented as loading by
+walking up to a repo root, but `git init` did not make the skill discoverable.
+
+**Working bound, then: shorter than 4.5 minutes of wall-clock, at least one turn boundary, shorter than
+a session.** Treat "restart is the reliable path" as unchanged — the trigger being probably-a-turn-boundary
+is not something a procedure can wait on.
 
 **Next measurement, if it is worth narrowing:** write a fixture and attempt it on a fixed schedule, so the
 first success is timed rather than noticed. `wf-reload-probe` is left in `.claude/agents/` for exactly
@@ -181,6 +198,32 @@ context, with no one watching. And an MCP tool a handbook depends on **must be n
 an employee with an explicit grant cannot reach a server through `ToolSearch`, so "MCP is dependable
 grounding" (`verification.md`) holds only for servers the handbook actually lists.
 
+### Fact 13 — server-level MCP grants resolve, and `ToolSearch` makes them *worse* ✅ MEASURED
+
+Evidence: `measurements/2026-07-29-mcp-grant.md` (2026-07-29). Four fixtures, one grant each.
+
+| `tools:` grant | Tools delivered | Loaded or deferred | Call succeeded |
+|---|---|---|---|
+| `mcp__<server>__*` | all 32 | **loaded** | yes |
+| `mcp__<server>` | all 32 — identical | **loaded** | yes |
+| `mcp__<server>__<tool>` | exactly 1 | loaded | yes |
+| `mcp__<server>__*` **+ `ToolSearch`** | all 32 | **deferred — a load step was required** | yes, after loading |
+
+**Both server-level forms resolve, and the names arrive directly callable.** So the web-facing grant
+is sound: grant MCP servers at server level, and tool renames between releases cannot break a handbook.
+
+**The unplanned finding: `ToolSearch` is not a free hedge.** Adding it to an MCP grant *defers* tools
+that were loaded without it — a load step bought for nothing. Never grant it alongside an MCP server
+"just in case the pattern does not resolve." Same session, same server, one line of difference.
+
+**And `tools:` is a real ceiling for MCP, measured.** The fixture holding `ToolSearch` searched for a
+tool on a server its grant never named; the schema was **withheld**. Granting `ToolSearch` opens no side
+door — this is a *prevents*, and `enforcement.md` carries it as one.
+
+**Still untested: a grant naming a server the host has not configured.** Every fixture ran against a
+server that exists. That gap is the one that matters for anyone else running this project
+(`verification.md` § When the server is absent).
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
@@ -195,6 +238,11 @@ grounding" (`verification.md`) holds only for servers the handbook actually list
 | 10 | The agent `skills:` field preloads a skill's **full content** at startup; skills with `disable-model-invocation: true` cannot be preloaded | The only deterministic way to get the General Operating Principles into every isolated context | unverified |
 | 11 | `memory:` is auto-memory and is inert when `autoMemoryEnabled` is off | It is **not** a curated index. Handbooks omit it by default — do not "improve" the design by adding it | unverified |
 | 12 | `model:` and `effort:` are per-agent frontmatter; `model:` defaults to `inherit`; resolution order is `CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session model | Every employee is model-pinned, which is why `/org` never needs a lane check or a model-switch prompt | partly corroborated — pinning is the documented default path; not canaried |
+**Do not mistake the agent listing for a measurement.** The harness's available-agent-types listing
+prints each definition's `tools:` line — the grant it *requested*. Fact 2c's run is the proof that this
+is not the resolved grant: the listing showed `Read, Write, Agent` for a fixture whose real grant
+withheld `Agent`. A grant is measured only by a spawned agent reporting its own tool list and the
+outcome of a real call. This applies to every `tools:` claim in this file.
 
 ---
 

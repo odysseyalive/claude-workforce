@@ -20,9 +20,18 @@ handbook without a recorded cause are how orgs drift.
 | `<!-- origin: workforce \| modifiable: true -->` | rewritten |
 | unmarked hand-authored | **appended to only**; requires a human KEY 1 |
 | `<!-- origin: user \| immutable: true -->` | **REFUSED.** Never reworded, reordered, summarized, or moved |
+| **any other `origin:` value** — a marker some *other* tool owns | **REFUSED, and reported.** Machine-owned, but not ours |
 
 An amendment whose edit span intersects an immutable block downgrades to FLAG-ONLY regardless of what
 else it would have done.
+
+**The fourth row is not a technicality.** `modifiable: true` is a statement about who may rewrite the
+block, not an invitation to whoever reads it — a foreign marker means another generator will rewrite
+that span on its own schedule, so an amendment there is overwritten without warning and the two tools
+fight over one file forever. The live case: `playwright-mcp`'s `suite_scaffold` writes
+`.claude/skills/test-suite/` with `<!-- origin: playwright-mcp suite_scaffold | modifiable: true -->`,
+and `suite_scaffold --force` rewrites the whole span. Match on the **full marker text**, never on
+`modifiable: true` alone.
 
 ## Step 3 — Determine blast radius
 

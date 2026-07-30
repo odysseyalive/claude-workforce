@@ -88,6 +88,13 @@ No panel. Do not convert.
 4. **Pure reference** — data, profiles, lookup tables. Already an employee's grounding library.
 5. **Body is entirely machine-generated managed blocks** — nothing of the author's to convert.
 6. **Quarantined** — frontmatter does not parse. Never convert what you cannot read.
+7. **Owned by another generator** — the imperative content sits inside an `origin:` marker whose value
+   is neither `user` nor `workforce`. Rule 5 usually reaches the same answer by inference, and that is
+   not good enough here: converting would demote a `SKILL.md` its owner rewrites on the next run, so
+   the stub and the regenerated skill become **two live copies of one job** — the exact two-canonical-
+   texts failure conversion exists to avoid. The live case is `playwright-mcp`'s `suite_scaffold`
+   (`.claude/skills/test-suite/`, marker `origin: playwright-mcp suite_scaffold`), whose `--force` mode
+   rewrites the file wholesale. Report the owner by name so the reason is legible.
 
 ---
 

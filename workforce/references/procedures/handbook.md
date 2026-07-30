@@ -35,8 +35,48 @@ creates two canonical texts that will diverge.
 - **Delegating → `background: false`.** Set it; report if absent; never block on it (fact 2).
 - **`tools`:** only what the procedure actually uses. `Grep`, `Glob`, and `WebFetch` are **not**
   granted to subagents — a step depending on them fails cold (fact 4). Grant MCP servers at server
-  level (`mcp__server__*`) so tool renames between releases cannot break the handbook.
+  level (`mcp__server__*`) — measured to resolve, and rename-proof (fact 13). **Never pair an MCP grant
+  with `ToolSearch`:** it defers tools that were loaded without it and widens nothing (fact 13).
+  **Any MCP grant must clear Step 2a first.**
 - **No `memory:`.** Ever.
+
+## Step 2a — MCP server preflight (blocking, and it may not touch the network)
+
+**Runs once per handbook that names an MCP server. No grant is written until it returns PRESENT.**
+A grant naming a server this host has not configured leaves the employee holding
+`Read, Edit, Write, Bash`, unable to run its own `## Verification`, with nothing in its context saying
+why — cold and silent, in a fresh context (`references/verification.md` § When the server is absent).
+
+**The check is local. Observe, do not probe.**
+
+1. **Read the tool namespace you are already in.** The authoring context is a default-grant context, so
+   every configured server's tools appear in it, deferred (fact 4). `mcp__<server>__*` present → PRESENT.
+2. **Where the namespace is hidden** — an authoring agent carrying an explicit `tools:` list sees none of
+   it (fact 4b) — fall back to the host's own config: the `mcpServers` keys in `~/.claude.json`, a
+   project-root `.mcp.json`, or `.claude/settings*.json`. Name found → PRESENT.
+3. **Anything else, including a config shape you do not recognise → ABSENT.** Fail safe. An unrecognised
+   format is not a licence to assume.
+
+**Never run a server-listing or health command to satisfy this gate** — `claude mcp list` and its kin
+health-check **every** registered server, so a preflight about one server reaches endpoints belonging to
+all of them: remote APIs, authenticated services, things the user has half-decommissioned. That is a side
+effect this project has no business causing in someone else's project, once per handbook, forever. The
+question is *"is this name configured here"*, and that is answerable by reading.
+
+**On ABSENT, do not write the grant.** Take the tier-1 command instead, state the substitution in
+`## Verification`, and report the gap. Never write the grant and hope.
+
+**Two limits, both stated in the handbook rather than papered over:**
+
+- **PRESENT means configured *here, now* — not usable.** A server can be registered and unauthenticated,
+  or registered twice under two transports where only one works, and the difference is invisible without
+  making a call. So `## Verification` needs a FAIL path for a granted tool that errors: report it as a
+  tooling limit and STOP, exactly as for a guard refusal (`verification.md` § The guards an employee will
+  meet). Never a product defect, never a silent downgrade.
+- **PRESENT is about this machine.** A collaborator's clone, a remote session, or a cloud runner has its
+  own config, and the handbook travels to all of them. Where a project genuinely depends on a server, the
+  dependency belongs in a project-root `.mcp.json` so it travels with the repo — *documented, not
+  measured here*; treat it as the recommended distribution path, not a guarantee.
 
 ## Step 3 — Write it
 

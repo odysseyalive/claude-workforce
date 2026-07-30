@@ -22,6 +22,18 @@ superseded, the new run gets a new file and platform.md's row cites both.
 | `2026-07-29-background.md` | 2 | background subagents **do** receive `Agent` — documentation falsified |
 | `2026-07-29-tier-canary.md` | 2b | entry depth does not cap an IC (a canary FAIL whose expectation was wrong) |
 | `2026-07-29-ceiling.md` | 2c | `disallowedTools` withholds a tool that `tools:` requests |
+| `2026-07-29-mcp-grant.md` | 13 | server-level MCP grants resolve **loaded**; adding `ToolSearch` defers them and widens nothing |
+
+**The trap these files exist to avoid.** The harness's available-agent-types listing prints each
+definition's `tools:` line — the grant it *requested*, not the grant it got. `2026-07-29-ceiling.md`
+is the proof: the listing showed `Read, Write, Agent` for a fixture whose real grant withheld `Agent`.
+Only a spawned fixture reporting its own tool list, plus the outcome of a real call, measures anything.
+
+**Fixtures are retained after a recorded run** (`staging.md` § Fixture lifecycle permits deleting them;
+it does not require it). They are the instrument for re-measurement, which is a standing obligation
+below. `wf-mcp-{wildcard,bare,exact,search}-probe` re-measure the grant grammar against **any** server —
+swap the name in `tools:` and in each fixture's step 2; the harness resolves the pattern, so the result
+is vendor-neutral.
 
 ## Re-measuring
 

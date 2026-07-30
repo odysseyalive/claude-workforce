@@ -61,6 +61,39 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
   returns citation data; for an employee, it is the only fetch that exists.
 - **`suite_audit` and `suite_methodology`** give a Lead a real basis for reviewing an IC's test work
   rather than eyeballing it.
+- **`suite_audit` needs neither `Bash` nor the browser.** It runs `npx playwright test` inside the
+  server and returns per-failure dossiers plus the TEST-DEFECT / PRODUCT-BUG rubric, so an employee can
+  run its own suite on an MCP grant alone.
+
+### The guards an employee will meet, and the false defect they cause
+
+`playwright-mcp` refuses some outbound requests by design (its `src/exfil.ts` is the authority; do not
+restate its numbers here, they are its constants to change). Three refusals reach an employee, all
+surfacing the same way — a `blocked` result carrying the word *refused*:
+
+| Refusal | Trigger |
+|---|---|
+| velocity | more than a couple dozen **distinct** URLs on one registrable domain inside a rolling ten-minute window |
+| link-spelling | many short varying path segments on one domain — the shape of data encoded into URLs |
+| credential | the URL carries the value of a known secret in its path, query, or fragment |
+
+**The velocity ledger is process-global, and every employee in the session shares one server.** So the
+budget is *org-wide*, not per-employee: a department fanned out across one live site can exhaust it
+between them, and the employee that trips it did nothing wrong. Its handbook must say so —
+
+> A `blocked` / *refused by the exfiltration guard* result is a **tooling limit, not a finding.**
+> Report it as a tooling limit and STOP. Never file it as a defect, never retry around it, and never
+> record the check as FAIL against the product.
+
+Raising the limit is environment-only (`PLAYWRIGHT_MCP_FETCH_LIMIT`) and needs a server restart, so it
+is **a human's act, never an employee's** — the guard is deliberately unreachable from tool arguments
+precisely so an injected page cannot talk a model into lifting it.
+
+**Two exemptions keep ordinary work clear of all this.** Loopback and private-range targets are exempt
+outright, so localhost dev-server verification is never throttled; and `suite_audit` drives Playwright's
+own browser in its own process, so a suite run of any size never touches these guards. **Prefer a
+suite over a fan-out of fetches** — that is the deterministic path anyway, and it is also the one with
+no budget.
 
 **Granting it.** A web-facing employee's handbook carries the server in its `tools:` frontmatter:
 
@@ -68,14 +101,54 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
 tools: Read, Edit, Write, Bash, mcp__playwright-mcp__*
 ```
 
-Server-level patterns (`mcp__<server>`, `mcp__<server>__*`) are accepted, so an employee gets the
-whole server without enumerating tools that will change between releases — the forward-mobility rule
-applied to tool grants.
+Server-level patterns (`mcp__<server>`, `mcp__<server>__*`) resolve to the server's whole tool set, and
+the names arrive directly callable — **measured**, `platform.md` fact 13. That is the forward-mobility
+rule applied to tool grants: the employee gets the server without enumerating tools that will be renamed
+between releases.
 
-**Hiring note.** `hire` proposes a playwright-mcp grant whenever the role's scope touches a browser,
-and `handbook` refuses to release a web-facing handbook whose `## Verification` is a judgment call
-when a deterministic suite was available. Read `suite_methodology` before authoring test-suite work —
-it is the server's own guidance and it supersedes anything guessed here.
+**Never add `ToolSearch` alongside an MCP grant.** The same measurement found that it *defers* tools
+that were loaded without it, buying a load step for nothing. It does not widen reach either — a fixture
+holding `ToolSearch` could not load a tool from a server its grant never named. The grant is the ceiling.
+
+### When the server is absent
+
+**Most projects that install workforce will not have `playwright-mcp`.** It is one person's local
+server, and this file names it because it is what got measured — not because the design needs that
+vendor. Read this section before granting it anywhere.
+
+**`procedures/handbook.md` Step 2a is the gate that enforces this** — a local, read-only presence check
+that is forbidden from probing servers to answer it. Every
+fixture behind fact 13 ran against a server that exists; what an employee sees when the named server is
+*absent* is untested, and the expected failure is the worst kind — the pattern resolves to nothing, the
+employee holds `Read, Edit, Write, Bash` and no way to notice what it is missing, and the handbook's
+`## Verification` cannot run. Cold, silent, in a fresh context. Confirm the server is present at hire
+time; if it is not, do not write the grant.
+
+**Then take the higher tier instead, because it was always ranked higher.** Look again at the tier
+table at the top of this file: *a command with an exit code* is tier 1 and the MCP suite is tier 2. A
+project with its own `npm run test:e2e`, `npx playwright test`, or `pytest` needs no MCP server at all —
+`Bash` plus that command is a **better** check than anything this section describes.
+
+| The project has | The check |
+|---|---|
+| its own e2e command | **tier 1** — that command, via `Bash`. No MCP server involved |
+| a browser-automation MCP server configured (any vendor) | tier 2 — a deterministic suite through it |
+| neither | say so in the handbook, take the best available tier, and **report the gap** — never dress a judgment call as a check |
+
+So the requirement is *a deterministic browser check*, and `playwright-mcp` is the reference
+implementation of one. Where another server fills the same role, the grammar for granting it is measured
+and vendor-neutral (fact 13); the specific tool names in this file are not portable and the pattern is.
+
+**Hiring note.** `handbook` refuses to release a web-facing handbook whose `## Verification` is a
+judgment call when a deterministic suite was available (`procedures/handbook.md` Step 2 owns the tool
+grant, including the MCP rule). Read `suite_methodology` before authoring test-suite work — it is the
+server's own guidance and it supersedes anything guessed here.
+
+**The session capture is a human's act, and no gate covers it yet.** `session_login` needs
+`headed: true` — a real window, a person at the keyboard — so an employee can never establish its own
+authenticated session. On an authed target, a suite-based `## Verification` has an unstated
+precondition: state it in the handbook with a FAIL path, and never let an uncaptured session degrade
+into eyeballing the page.
 
 ---
 
