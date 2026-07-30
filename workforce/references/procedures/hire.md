@@ -77,7 +77,7 @@ Through the transaction order below.
 
 `EMP-<name>.md`, an `ORG` record for the structural change, then `org index` and `org embed`.
 
-End with the delayed-registration notice (`platform.md` § the sanctioned wording) — a newly hired
+End with the delayed-registration notice (`platform.md` § Fact 3) — a newly hired
 employee is registered and **not yet dispatchable**, becoming so within the session rather than on a
 restart. **Never write "restart required":** it is retracted, it is a measured falsehood rather than a
 harmless overstatement, and it has crept back into this project's files once already.

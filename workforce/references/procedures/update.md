@@ -95,8 +95,7 @@ behavior was measured properly.
 
 ## What to check after updating
 
-**Platform freshness.** A release may carry re-measured facts. `verify` compares `platform.md`
-§ `MEASURED-ON` against the running harness and reports which measurement level is in force — the
+**Platform freshness.** A release may carry re-measured facts. `verify` compares `platform.md` § Header (`MEASURED-ON`) against the running harness and reports which measurement level is in force — the
 shipped baseline, or a project-local `platform-local.md` that survives updates by design.
 
 **Gate changes.** A release that changes an enforcement gate may make a previously-conforming handbook

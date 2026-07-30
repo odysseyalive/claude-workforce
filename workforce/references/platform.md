@@ -3,6 +3,12 @@
 <!-- Enforcement: 4 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — read before designing any delegation, tier, or handbook frontmatter. -->
 
+## Header — the constants, stated once
+
+Six files cite this section by name (`§ header`, `§ TIER-LIMIT`, `§ MEASURED-ON`) and it had **no
+heading**, so none of those citations resolved to anything. Section anchors were unvalidated
+project-wide until the check below was written; this was the largest cluster it found.
+
 ```
 MEASURED-ON:  Claude Code 2.1.220
 MEASURED-AT:  2026-07-29
