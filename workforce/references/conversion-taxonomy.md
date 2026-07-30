@@ -293,6 +293,13 @@ run does not proceed to any deletion.** Those spans are the user's own words, th
 files the predecessor owns, and they are the only content in a managed tree that no regeneration can
 reconstruct.
 
+**The gate covers two populations, and counting only the first is how it fails.** Generators quote the
+directive they implement into the machinery they emit, so user text lives inside blocks that marker-
+matching classifies as disposable. Measured on a real project: 95 of 96 generated checkpoints embedded
+quoted user text, 66,670 characters, none of it inside an immutable span — a gate counting spans alone
+reports 100% coverage while the sweep deletes all of it. **Both `N of N spans` and `M of M embedded
+quotes` must pass** (`legacy-markers.md` § Embedded user text).
+
 Ordering matters here for a reason this project has already paid for once: a rule that was correct and
 implemented in the wrong order (a backup that ran after the first write) produced an archive of a tree
 the run had already modified. Extraction has the same shape and the same failure mode.

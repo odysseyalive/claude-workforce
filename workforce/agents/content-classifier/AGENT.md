@@ -29,7 +29,7 @@ on authorship at all.
 |---|---|---|
 | `RULE` | something the employee must do or must not do | it constrains or directs behavior — imperative mood, a condition, a prohibition |
 | `REFERENCE` | data the employee reads | a table, a list, a schema, a lookup, an example corpus |
-| `SCAFFOLDING` | generator-emitted machinery | matches a marker in `references/legacy-markers.md` |
+| `SCAFFOLDING` | generator-emitted machinery | matches a marker in `references/legacy-markers.md` — **and passes the embedded-text scan below** |
 | `DIRECTIVE-STATEMENT` | a statement of intent that *governs* rules rather than being one | says why, in a voice, often quoted — "I want X because Y" |
 
 **The `RULE` / `DIRECTIVE-STATEMENT` boundary is the only hard one.** Both are normative. The
@@ -44,14 +44,53 @@ When a block does both — states intent *and* spells out the rule — return `D
 name the sentences that are the rule. The conversion extracts the block verbatim **and** derives the
 rule into the handbook. Both happen; they are not alternatives.
 
+## `SCAFFOLDING` is the only destination that deletes — scan it before you use it
+
+**A marker match is not sufficient.** Generators routinely quote the user's own directive into the
+machinery they emit, so the block that looks most disposable is the one most likely to contain the only
+surviving verbatim copy of something irreplaceable.
+
+Measured on a real project: **95 of 96** generated checkpoint blocks embedded quoted user text —
+**66,670 characters** of it. Every one was marker-matched and would have been deleted, and the
+extraction gate would have reported 100% coverage while it happened, because that gate counts immutable
+*spans* and this text is in none.
+
+So before returning `SCAFFOLDING`:
+
+1. Scan the block for **quoted spans over ~40 characters**, first-person phrasing, or a `Source
+   directive:` / `Amending directive:` preamble.
+2. If any is present → return `SCAFFOLDING` **with `EMBEDDED:` naming each span and its line range.**
+   The husk is still deletable; the embedded text is extracted verbatim first and counted in the
+   extraction total.
+3. If the scan cannot be performed, return `QUESTION:`. Never return a bare `SCAFFOLDING` you did not
+   scan — that is indistinguishable in the report from one you did.
+
 ## Procedure
 
 1. Read the block, and read enough of its surrounding file to know what it modifies.
-2. Test for `SCAFFOLDING` first — it is mechanical, and a marker match ends the question.
+2. Test for `SCAFFOLDING` first — it is mechanical, and a marker match ends the *classification*
+   question. **Then run the embedded-text scan above before the block is deletable.**
 3. Test for `REFERENCE` next — data does not direct behavior, and misreading a table as a rule
    produces a handbook that recites a lookup.
 4. Distinguish `RULE` from `DIRECTIVE-STATEMENT` on the boundary above.
 5. Emit the destination, the single sentence that decided it, and a confidence of 0.0–1.0.
+
+**An attribution line belongs to the block above it.** `*— Added 2026-03-23, source: user feedback…*`
+is part of the directive it attributes, never a block in its own right. A blank line between them is
+formatting, not a boundary. Splitting them loses the provenance *and* creates a phantom block.
+
+## Extraction does not wait on your classification
+
+`RULE` and `DIRECTIVE-STATEMENT` both get extracted verbatim. You are deciding where the *work* goes,
+not whether the text survives.
+
+This matters because the boundary is genuinely imperfect: *"Never output credentials. iCloud
+app-specific passwords must never appear in output"* reads as a pure `RULE` — normative, no voice, no
+stated why — and is also a user directive. Classified `RULE` under a scheme where only
+`DIRECTIVE-STATEMENT` is preserved, its verbatim text would be deleted.
+
+A preserved copy of machinery is clutter. A deleted directive is unrecoverable. The asymmetry decides,
+and it decides the same way at every level of this system.
 
 ## Guardrails
 
@@ -75,7 +114,12 @@ DEST: RULE | REFERENCE | SCAFFOLDING | DIRECTIVE-STATEMENT
 EVIDENCE: <the one sentence that decided it>
 CONFIDENCE: <0.0-1.0>
 ALSO: <present only when the block does a second job — what, and which lines>
+EMBEDDED: <SCAFFOLDING only — each quoted user span and its line range, or "none (scanned)">
 ```
+
+`EMBEDDED: none` and a missing `EMBEDDED:` line are different states. The first says you scanned; the
+second says nothing at all, and a sweep cannot tell the difference between a clean block and an
+unexamined one.
 
 ## Effort budget
 

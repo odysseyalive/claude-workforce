@@ -526,6 +526,27 @@ check(
     "Do not stop early" in pa_ or "NEVER stop the ladder early" in pa_,
     "partial evidence discarded to save a grep is a false negative dressed as a measurement",
 )
+
+# MEASURED 2026-07-30: 95 of 96 generated checkpoint blocks embedded quoted user
+# text — 66,670 chars — none of it inside an immutable span. A gate counting only
+# spans reports 100% coverage while the sweep deletes all of it. The rule existed
+# in prose and was unwired; these assertions wire it.
+cc_ = read("workforce/agents/content-classifier/AGENT.md")
+check(
+    "extraction: SCAFFOLDING is scanned for embedded user text before it is deletable",
+    "EMBEDDED:" in cc_,
+    "a marker match is not sufficient — generators quote the directive they implement",
+)
+check(
+    "extraction: the gate counts embedded quotes as well as immutable spans",
+    "M of M" in lm or "embedded quotes" in ct,
+    "counting spans alone passes at 100% while user text inside generated blocks is destroyed",
+)
+check(
+    "extraction: preservation is not gated on the classification",
+    "Extraction does not wait on your classification" in cc_,
+    "a bare rule can be a user directive; only the destination depends on the class",
+)
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
 # numbers are the reason it may not decide, and they survive rewording.

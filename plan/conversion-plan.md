@@ -234,9 +234,27 @@ Job → employee. Filing cabinet → skill. A surviving skill may contain schema
 
 **A hypothesis the data killed:** recoverability-as-stakes. I expected cross-skill duplication to proxy for "cheap to misclassify." **0 of 125** directive-shaped blocks are duplicated. Recorded so it is not re-proposed.
 
-**Population measured:** 512 unmarked prose paragraphs across 41 skills → **125 directive-shaped** reaching the analyst → 85 resolved by voice, 19 by authority, 21 immaterial.
+### B-16. The proxy was wrong — replayed against the handbook, 2026-07-30
 
-**Caveat carried into Part H:** those splits come from regex proxies, not the agent that will run the ladder. The 21 `IMMATERIAL` blocks are what a human should spot-check first — which doubles as the human-labelled ground truth the replay check needs.
+**The 19/21 split above is withdrawn.** It came from regex proxies rather than from the artifact that ships. Replaying 24 real blocks through `wf-content-classifier`'s handbook corrected it. Evidence: `measurements/2026-07-30-classifier-replay.md`. Fixture: `plan/replay-set-2026-07-30.md`.
+
+**The proxy counted normative language as directive-shaped** — but normative language is what a `RULE` looks like. All 10 sampled "hard" cases classified `RULE` or `REFERENCE` and never reach the ladder at all.
+
+| Destination | Blocks |
+|---|---|
+| `REFERENCE` → data skill | 201 |
+| `DIRECTIVE-STATEMENT` → provenance ladder | **81**, all voiced |
+| `RULE` → handbook | 16 |
+
+All 81 reaching provenance carry the voice markers that put them there, so rung 4 resolves them and **the hard set is near-empty on this project**. `IMMATERIAL` / `UNRESOLVED` stays as correct design — another project will differ — but its figures were measuring `RULE`s.
+
+**And the replay found a defect that would have shipped.** `ENFORCEMENT ANNOTATION` blocks are `SCAFFOLDING` by marker match, and `SCAFFOLDING` is the one destination that deletes. **95 of 96 of them embed quoted user directive text — 66,670 characters.** The extraction gate counts `origin: user | immutable: true` *spans*; that text is in no span, so the gate would have reported **N of N at 100% while the sweep destroyed all of it.**
+
+The rule existed — `legacy-markers.md` said inline wording is extracted first — as one sentence of prose that nothing enforced and the classifier never mentioned. **Written and unwired**, which is the third time this project has recorded that exact shape.
+
+**Fixed:** `SCAFFOLDING` now requires an embedded-text scan carrying `EMBEDDED:` or `EMBEDDED: none (scanned)`; the gate counts two populations (`N of N spans` **and** `M of M embedded`); attribution lines stay with their blocks; and extraction is no longer gated on classification, because *"Never output credentials"* reads as a bare `RULE` and is also a user directive.
+
+**Method note for Part H:** anything derived from a proxy gets re-derived from the shipping artifact before it is trusted. The proxies here produced confident, specific, wrong numbers — which is worse than no numbers.
 
 ### B-13. Department cap — superseded by B-14
 

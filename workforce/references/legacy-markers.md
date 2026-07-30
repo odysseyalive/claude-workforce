@@ -75,10 +75,30 @@ Two protections, and both are required because they cover different moments:
 
 The gate is one-time and covers the sweep. The floor is permanent and covers everything else.
 
-**Inline user wording inside an old generated block** — quoted phrases predating origin markers, a
-sentence in the user's voice inside machinery — is **extracted into proper immutable markers first**,
-and only then is the husk upgraded or removed. Recognizing the husk is not permission to discard what
-is embedded in it.
+### Embedded user text is a counted gate, not a caution
+
+**Inline user wording inside a generated block** — a quoted phrase, a `Source directive:` preamble, a
+sentence in the user's voice inside machinery — is **extracted verbatim first**, and only then is the
+husk removed. Recognizing the husk is not permission to discard what is embedded in it.
+
+**This is the failure the extraction gate does not catch on its own.** The gate counts
+`origin: user | immutable: true` *spans*. Text quoted inside a generated block is in no such span, so
+the gate reports N of N at 100% while the sweep deletes it.
+
+Measured on a real project: **95 of 96** generated checkpoint blocks embedded quoted user text —
+**66,670 characters**. Generators quote the directive they implement, which makes the most disposable-
+looking block the likeliest holder of the only surviving verbatim copy.
+
+So the extraction assertion covers **two populations, counted separately**:
+
+| Population | Source | Counted as |
+|---|---|---|
+| immutable spans | `origin: user \| immutable: true` markers | `N of N spans` |
+| **embedded quotes** | scanned inside every block classified `SCAFFOLDING` | **`M of M embedded`** |
+
+**Both must reach N of N before any deletion.** A run reporting only the first has not measured the
+population it is about to destroy. Every `SCAFFOLDING` classification carries `EMBEDDED: <spans>` or
+`EMBEDDED: none (scanned)` — a missing line is an unexamined block, not a clean one.
 
 ---
 
