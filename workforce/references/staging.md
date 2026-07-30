@@ -200,6 +200,20 @@ substitutes for the canary — and the canary never substitutes for the grep.
 
 ## Fixture lifecycle
 
+**A fixture whose fact is MEASURED is residue, and is swept.** The evidence lives in `measurements/`;
+that is what makes the fixture disposable. Keeping it after the measurement closes leaves a registered
+agent in the user's roster doing nothing, which is precisely what this project refuses to leave behind
+in someone else's project.
+
+The rule this project applied to itself on 2026-07-30, having failed it: eight probe fixtures were
+registered, five of them for facts closed the previous day (2c and 13, both with evidence on file).
+They were swept; `wf-canary-ic`, `wf-canary-lead`, and `wf-reload-probe` were retained because their
+facts are still open.
+
+**The tell that a fixture has outlived its purpose is in `platform.md`, not in the fixture.** A fixture
+is retained by an *open* fact, never by having once been useful.
+
+
 Fixtures persist **across** runs; that is what makes the canary reachable at all.
 
 1. **Write them as early in the run as possible** — before the survey, which is the long part. The
