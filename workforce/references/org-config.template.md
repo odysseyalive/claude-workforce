@@ -43,8 +43,15 @@ deliberately — `high` across a wide wave is expensive and rarely changes an IC
 
 ## Creative / alternate model
 
-Departments doing generative work — content, design, image, voice, translation — run on this model
-instead of their tier default.
+Departments doing generative work — **content, design, image, voice, translation** — run on this model
+instead of their tier default. That list is the one to check a roster against; it is deliberately wider
+than "content", which is the kind most projects notice first.
+
+**The override is per department, not per employee.** A department doing both code and image work runs
+entirely on one model, so generative work homed under `engineering` reaches the tier default rather than
+this one. `audit` reports that per employee rather than resolving it silently
+(`references/procedures/audit.md` Step 2); the fixes are to move the employee (`transfer.md`) or to pin
+its model here by hand.
 
 | Alternate model | `claude-opus-4-6` |
 |---|---|

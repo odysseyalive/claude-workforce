@@ -183,6 +183,26 @@ concrete rather than speculative.
 The panel also classifies each department as creative or not, feeding the payroll picker's pre-checks
 (`references/audit-setup.md` § Step 0.4).
 
+**`creative` is a property of a DEPARTMENT, but generative work is a property of an EMPLOYEE — and the
+picker can only offer departments that exist.** Its multi-select is built from this panel's output, so
+design, image, voice, and translation work reach the alternate model *only* if some department the panel
+proposed owns them. Fold that work into `engineering` and there is nothing for the user to check: they are
+asked about `content`, the image employee resolves `department override → tier default`, and it silently
+runs on the coding model. Nothing errors, and no question was skipped — the option was never constructible.
+
+So, in order:
+
+1. **Home generative work in a department classified creative** wherever the department budget allows. The
+   generative kinds are enumerated in `references/org-config.template.md` § Creative — that list is
+   already broader than "content", and it is the list to check the roster against.
+2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
+   name the employee, the department it landed in, and **the model it will therefore actually run on.**
+   A roster that quietly routes image work to the coding model has made a payroll decision the receipt
+   never shows.
+3. **Never widen the department count to dodge this.** Report the collision and let the user move the
+   employee (`transfer.md`, where the model change is a documented consequence) or set the model by hand
+   in their own `org-config.md`.
+
 ## Step 3 — Dispositions (panel) — BROWNFIELD ONLY
 
 Skipped entirely in greenfield: there is nothing to classify, and that is not a finding.
