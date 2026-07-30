@@ -489,6 +489,46 @@ check(
     "conversion-taxonomy.md § Nothing is left behind must state it",
 )
 
+# UNSURE must not be a resting state. Defaulting an unclassified block to frozen
+# reads as preservation and is abdication: the conversion silently never happens
+# for it. The department is the mechanism that replaced that default; these
+# assertions stop it drifting back.
+cd_ = read("workforce/references/conversion-department.md")
+check(
+    "conversion: no default-to-frozen for unclassified content",
+    "no default-to-frozen" in ct,
+    "conversion-taxonomy.md must state that unresolved blocks are worked, not frozen",
+)
+check(
+    "conversion-department: NO-EVIDENCE is an outcome, not a tie-break",
+    "NO-EVIDENCE" in cd_ and "not a tie" in cd_,
+    "the ladder must distinguish an honest abstention from a conflict",
+)
+check(
+    "conversion-department: the evidence ladder is ordered and rung 5 is non-decisive",
+    "Never decisive alone" in cd_ or "never decisive alone" in cd_.lower(),
+    "git commit breadth measured weak (33-44 files vs 11); it may corroborate, never decide",
+)
+# Anthropic's multi-agent findings: a single call with a rubric beat multiple
+# judges. The panel is the obvious "improvement" and it measured worse upstream.
+check(
+    "conversion-department: records that a voting panel was rejected on evidence",
+    "Do not add a voting panel" in cd_,
+    "the pipeline-not-panel choice must carry its source, or it reads as a preference",
+)
+# Every shipped agent needs the four-part contract; missing any one is the
+# documented cause of subagent drift.
+for _a in glob.glob("workforce/agents/*/AGENT.md"):
+    _b = read(_a)
+    _missing = [s for s in ("## Guardrails", "## Reporting") if s not in _b]
+    _has_objective = "## Objective" in _b or "## Role" in _b
+    _has_scope = "## Scope" in _b or "## Effort budget" in _b
+    check(
+        f"agent contract: {os.path.basename(os.path.dirname(_a))} states objective, boundaries, output",
+        not _missing and _has_objective and _has_scope,
+        f"missing: {_missing or ''} objective={_has_objective} boundaries={_has_scope}",
+    )
+
 # The extraction gate. This guards the only content in a managed tree that no
 # regeneration can reconstruct: the user's own immutable spans, which routinely
 # sit inside files a foreign generator owns.

@@ -190,7 +190,29 @@ Job → employee. Filing cabinet → skill. A surviving skill may contain schema
 
 **Never:** fabricate a connection, or grant a server name that is not configured. The failure mode of a blind grant is silent (`ToolSearch` returns nothing, the employee reports no capability, the run looks fine).
 
-### B-13. Department cap: the panel makes the question answerable; the user answers it
+### B-14. The question surface is three, and content classification is a department
+
+**Decision.** The audit asks **three questions** — model budget, effort budget, advisor budget. Consent is the act of running the command; the backup is unconditional. Charter-first adds a fourth on a bare directory and nowhere else. **Everything else — discoveries, repairs, classifications, deferrals — is handled by the run.**
+
+**Two question surfaces added earlier in this plan were withdrawn:**
+
+- **Hand-written intake ratification** (was C-7). Its default-to-SACRED resolved unclassifiable blocks by freezing them, which conflates *this is the user's sacred text* with *nobody determined what this is*. Freezing the second dressed as the first means the conversion silently never happens for those blocks — residue with a respectable label. **Replaced by the Conversion Department** (`references/conversion-department.md`).
+- **Department-cap conflict** (was B-13, below). Reverted to resolving toward the evidence with a loud report. Stopping to ask imported the panel-never-ratifies rule from the domain it belongs to — editing the user's own text — into a structural decision the audit is already authorized to make.
+
+**The Conversion Department** is workforce's own machinery: a three-role pipeline — `content-classifier` (function), `provenance-analyst` (ownership, on a five-rung evidence ladder), `conversion-auditor` (fidelity). Function is resolved first and the work moves immediately, because **three of four destinations do not depend on who wrote a block.** Ownership is resolved only for directive-shaped blocks, and `NO-EVIDENCE` is a real outcome: the text is extracted verbatim anyway, the rule is already in the handbook, no `directives-sha` cites it, and a `DEC` records what was tried.
+
+**Research that shaped it** (`https://www.anthropic.com/engineering/multi-agent-research-system`):
+
+- A **panel was rejected on evidence.** Multiple judges measured *worse* than a single call with a rubric. Each role is one call emitting a verdict, an evidence sentence, and a confidence — never a vote to tally.
+- The **four-part subagent contract** (objective, output format, tool guidance, task boundaries) is now asserted by `bin/check` across every shipped agent; missing any one is the documented cause of drift.
+- **Effort budgets are in the handbooks**, because agents judge their own effort badly — early upstream versions spawned fifty subagents for simple queries.
+- **Judge bias is stated rather than papered over**: same-family judging is unavoidable here, so the mitigations are a differently-pinned auditor, human-labelled ground truth, and mechanical rungs at the top of the ladder.
+
+**Measured, not assumed:** cross-skill duplication resolves 15 paragraphs (4 spanning 10+ skills) against 1,048 unique ones; git commit breadth separates generator writes (33–44 files) from an authored directive (11) — directional, overlapping, and therefore never decisive alone.
+
+### B-13. Department cap — superseded by B-14
+
+*The stop-and-ask below was reverted on 2026-07-30. Retained because the reasoning error is worth being able to read back: a rule was imported from the wrong domain, and the arithmetic of the question surface is what caught it.*
 
 **Decision.** When the evidence supports more departments than `org-design.md`'s cap allows, the audit **stops and asks the user** — but only after the panel has done the work that makes the question answerable: every candidate domain named with its evidence, the cost of merging any two stated, and a recommended split on the table.
 
