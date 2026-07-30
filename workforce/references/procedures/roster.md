@@ -33,8 +33,9 @@ Health    fix ratio 0.31 ↓ · improvements 14/mo (4 deletions) · 1 two-live p
 and one that was answered must never look the same, which is the failure this receipt exists to make
 impossible.
 
-**`Loadable` is not decoration.** Agents are not live-reloaded, so a freshly hired employee is real on
-disk and unreachable until restart. Any `NO` here means the roster is describing a company you cannot
+**`Loadable` is not decoration.** Agents register on a **delay, not on a restart**
+(`platform.md` fact 3), so a freshly hired employee is real on disk and not yet dispatchable — it
+becomes dispatchable within the session. Any `NO` here means the roster is describing a company you cannot
 currently talk to, and the footer says so in words.
 
 **`Released`** distinguishes probe-passed from amended-but-unprobed. An amended handbook is unreleased

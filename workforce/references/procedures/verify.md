@@ -125,9 +125,17 @@ dispatched to.
 
 ## Constants
 
-**Grep for restated constants** — tier counts, caps, model IDs — outside their single source. Sanctioned
-duplication points: `platform.md` (the source), the two installers (they cannot read markdown at
-install time), and `scopes.md` (which documents the exception).
+**Grep for restated constants** — tier counts, caps, model IDs — outside their single source.
+
+**The sanctioned duplication points are `bin/check`'s `CONST_EXEMPT`, and there are seven:**
+`platform.md` (the source), `scopes.md` (documents the exception), **`org-config.template.md`** (the
+sanctioned home for model IDs, per `platform.md` § Derived constants), the two installers (they cannot
+read markdown at install time), and the two user-facing docs (`README.md`, `COMMANDS.md`).
+
+An earlier form of this section named four and omitted `org-config.template.md`. A `verify` following it
+would have reported the shipped model-budget statics as a constants violation — **re-opening the exact
+seam closed 2026-07-29**, where the budget had no model IDs to propose *because a check forbade putting
+them in the only legal place for them*. Read the list from the check; never restate it from memory.
 
 This check is not pedantry. It is what makes a platform change a one-line edit instead of a hunt, and
 it caught five restatements in this project's own files during its first day.

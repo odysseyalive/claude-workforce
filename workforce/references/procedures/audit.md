@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 4 assertion(s) in bin/check guard this file; 35 normative claims total. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 36 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -470,8 +470,14 @@ completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
-Order: **conversions → handbooks → data skills → charter and principles → model rewrite → `org index` →
-`org embed` → `verify` → the sweep.**
+Order: **conversions → handbooks → data skills → charter and principles → the Constitution Gate →
+model rewrite → `org index` → `org embed` → `verify` → the sweep.**
+
+**The Constitution Gate write is a named step because it had none.** `references/templates.md` specifies
+it in full — the marker pair, the ten lines, the insert-never-rewrite rule — and *no procedure wrote
+it*. `charter` refreshes it and `disband` removes it, both presupposing something created it. Write it
+here, between `<!-- WORKFORCE-CONSTITUTION START/END -->`, as an insert that leaves every byte outside
+the markers untouched. **Under `--review`, print it and write nothing.**
 
 **The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
 first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.

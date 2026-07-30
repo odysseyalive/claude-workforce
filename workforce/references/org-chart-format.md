@@ -96,7 +96,9 @@ what it could not parse is the "reads as success" failure.
 | `contract-stamp` ≠ recomputed hash | `CONTRACT-DRIFT` — queues a `review`; the eval baseline is stale |
 | Registered on disk but not loaded this session | `PENDING-RESTART` — see below |
 
-**`PENDING-RESTART` exists because agents are not live-reloaded** (`platform.md` fact 3). A handbook
+**`PENDING-RESTART` names a delay, not a restart requirement** (`platform.md` fact 3 — both agents and
+skills register later in the same session, with no restart). The state name is inherited and kept for
+compatibility; the claim that a restart is *needed* is retracted. A handbook
 written this session is real on disk and not yet dispatchable — it registers on a delay
 (`platform.md` fact 3), not on a restart. Without this row the
 chart reports a healthy org that cannot be dispatched to — and the user has no way to tell the
