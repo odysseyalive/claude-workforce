@@ -7,7 +7,51 @@ executes immediately.
 
 Every check below exists because its failure mode is **silent** — the system reports fine and is not.
 
+**This is the canonical DETECTION surface — one place to look first.** `/doctor` earned that shape by
+deletion: three separate changelog entries *remove* scattered startup warnings and send the user here
+instead. The division of labour, stated so it stops blurring:
+
+| | Owns |
+|---|---|
+| `verify` | **detecting** every silent-failure class below, across the whole org, changing nothing |
+| `reconcile` | resolving cross-employee conflicts it detects — collisions, races, orphans |
+| `checksums` | the integrity-stamp mechanism whose states it reports |
+| `review` | per-employee performance, where the subject is the document |
+| `audit --quick` | a subset of these checks, run inline; **not its own copy of the rules** |
+
+**Detection is defined here; treatment is defined by the specialist.** A row below that names a state
+(`MISMATCH`, `PARTIAL`, `GHOST`, `CONTRACT-DRIFT`) is reporting a vocabulary the specialist owns — it
+never redefines one. Five surfaces each carrying their own copy of the same rule is five copies that
+drift apart.
+
 ---
+
+## Provenance header — printed first, by every diagnostic
+
+`claude doctor` opens with what is *running* before it reports a single result: version, commit,
+platform, install path, install method, update channel, and the outcome and date of the last update
+attempt. Every check below it is interpretable because the host is already on the page. A workforce
+report that opens with findings makes the reader supply the context themselves, and they cannot.
+
+**Specified here once. `verify`, `audit` Step 7, and `review` all print it and none restate it.**
+
+```
+workforce   <skill version>          scope: personal | project (<path>)
+harness     claude <version>         facts: CURRENT | STALE (measured on <version>)
+facts from  shipped baseline | project-local (<path>)
+canary      PASS | PASS (on record) | UNAVAILABLE | FAIL
+org         <n> employees / <n> departments      chart: <path>
+```
+
+Three rules, each from a finding that was true and useless without it:
+
+- **A value with no source is half a finding.** Name where each line came from, by path — the way the
+  Payroll Receipt already distinguishes `asked this run` from `unchanged, pre-selected` from
+  `tier default`. `/doctor` prints `Search: OK (bundled)`, not `Search: OK`.
+- **State the clean case explicitly.** `/doctor` ends "No installation issues found." Silence is not a
+  result, and a reader cannot tell a passing check from a check that never ran.
+- **Never print the same line for a verified and an unverified run.** This is why `canary` is on the
+  header rather than buried: `UNAVAILABLE` and `PASS` mean opposite things about everything below.
 
 ## Install and scope
 
@@ -114,8 +158,22 @@ restores wrong.
 
 ## Output
 
-Grouped by section, each finding naming the file and what would go wrong. Ends with a one-line
-verdict and, when the org is unreachable this session, the restart notice.
+Opens with the provenance header (§ above). Then grouped by section, each finding naming the file and
+what would go wrong. Ends with a one-line verdict and, when the org is unreachable this session, the
+restart notice.
+
+**Every finding carries three things, and a finding missing any of them is incomplete:**
+
+| | Why |
+|---|---|
+| `path:line` | `/doctor` shipped a fix specifically for MCP schema errors "not naming the missing field or showing the source file path" — a finding you cannot navigate to is a finding you cannot act on |
+| the field or rule at fault, by name | not "invalid frontmatter" — *which key* |
+| **the literal text that would fix it** | `/doctor` shows an exec-form example when a hook is missing its `command` field. The gates in SKILL.md already do this well; reports do not |
 
 **`verify` never fixes anything.** It reports; `audit` and `amend` change things. A health check that
 mutates cannot be run safely when you are unsure of the state — which is exactly when it is needed.
+
+**But reporting a fix is not applying one.** Print the exact edit for every mechanically-fixable
+finding, and close with the single command that would apply them — `/doctor` pairs its report with
+"press `f` to have Claude fix reported issues", and the report is worth more when the next step is one
+gesture rather than a research project.

@@ -15,15 +15,19 @@ the Execution Summary with the step they failed at, never as "run this command y
 
 ---
 
-## The question budget — five, and it is a ceiling
+## The question budget — five slots, six calls, and it is a ceiling
 
-| # | Step | Question |
-|---|---|---|
-| 1 | 0 | Disclaimer — accept and proceed / cancel |
-| 2 | 0.2 | Backup offer |
-| 3 | 0.3 | Companion skills — absent only, check to install |
-| 4 | 0.4 | Payroll picker — tier × department model and effort |
-| 5 | 5-setup | Org ratification — the proposed roster, first audit only |
+**Slots, not calls.** The payroll picker is two `AskUserQuestion` calls occupying one slot, so a full
+first audit makes six calls against five slots. Stating it as "five" without that line has read as a
+call budget, and a reviewer counting calls finds a violation that is not one.
+
+| # | Step | Question | Calls |
+|---|---|---|---|
+| 1 | 0 | Disclaimer — accept and proceed / cancel | 1 |
+| 2 | 0.2 | Backup offer | 1 |
+| 3 | 0.3 | Companion skills — absent only, check to install | 1 (two grouped multi-selects) |
+| 4 | 0.4 | Payroll picker — tier × department model and effort | **2** (models; effort and overrides) |
+| 5 | 5-setup | Org ratification — the proposed roster, first audit only | 1 |
 
 Everything else is a panel. **Suppressed entirely** in headless, non-interactive, and `--quick` runs:
 those render nothing, write no markers, and install nothing that was not already authorized.
@@ -147,9 +151,16 @@ blocks, declared modes, existing agents.
 is thin and the roster must be correspondingly small. An org proposed from guesswork is worse than a
 small one proposed from facts.
 
-**Report CLAUDE.md size against a budget.** It is injected into every subagent with no opt-out, so its
-length is multiplied by fan-out — the highest-leverage cost lever in the system, and it is not this
-project's file.
+**Report CLAUDE.md size against a budget — and name what to cut.** It is injected into every subagent
+with no opt-out, so its length is multiplied by fan-out: the highest-leverage cost lever in the system,
+and it is not this project's file.
+
+A line count is a number; a number is not actionable. `/doctor` ships this check in the form worth
+copying — it "proposes trimming checked-in `CLAUDE.md` files by cutting content Claude could derive from
+the codebase." **Report the derivable content specifically**: directory listings, dependency names,
+framework identification, file inventories, restated build commands that `package.json` already holds.
+Quote the lines and total what removing them would save per spawn. Never edit it — it is the user's
+file, and this is a proposal.
 
 ## Step 1a — Mode fork
 
@@ -206,6 +217,17 @@ nothing is configured yet. **No mode exempts a sanctioned question.**
 
 Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
 kind, raw link text, resolved target, owning skill, and whether it dangles.
+
+**Census BOTH agent locations, not just this project's.** Agents resolve from `.claude/agents/` *and*
+`~/.claude/agents/`, identity comes solely from `name:`, and a collision resolves silently by
+filesystem read order (`platform.md` fact 5). A project-scope employee shadowed by a same-named
+personal agent is dispatched to and does the wrong job, with nothing reported.
+
+This is the class of finding `/doctor` covers for its own config — it warns when an MCP server is
+"defined in multiple config scopes with different endpoints", when an entry is "overridden by a
+higher-precedence scope", and on permission rules that are unreachable because something above them
+already matched. **A definition that can never win is not a definition; it is a defect that looks like
+configuration.** Report every cross-scope name collision with both paths and which one wins.
 
 **`Write` to a symlinked path writes through to the target.** Registering an employee whose name
 collides with a symlinked registration would silently overwrite a file inside a skill directory. So:
@@ -324,11 +346,18 @@ Payroll
 | IC / content       | <id>             | medium | department override    |
 ```
 
-Then per-task ✓ / ✗ with the step any failure reached.
+Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
+rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
+T-step tells the user something broke; it does not tell them what to type.
 
 ## Step 7 — Close
 
-Report the org, the fan-out budget, and the canary result **by state, with its consequence**:
+**Open with the provenance header** (`verify.md` § Provenance header — specified there, not restated
+here). A closing report that starts with findings makes the reader supply the host context, and they
+cannot: whether the platform facts are stale, which scope is active, and whether the canary ran change
+what every line below them means.
+
+Then the org, the fan-out budget, and the canary result **by state, with its consequence**:
 
 | Canary | Line to print |
 |---|---|
@@ -352,3 +381,20 @@ coming back.
 
 Frontmatter validity, chart-vs-disk drift, budget arithmetic, restated-constant scan. No questions,
 no conversions, no panels. Mechanical findings are fixed; anything requiring judgment is reported.
+
+Where these overlap `verify`, **`verify.md` is the definition** — `--quick` runs a subset of it and does
+not maintain its own copy of the rules.
+
+## `--review` — report, then offer to apply
+
+`--review` writes nothing. That is the point, and it is also where it ends short: a plan the user agrees
+with still leaves them to re-run the whole audit to get it.
+
+**Close a `--review` run by naming the one command that applies exactly what was just shown**, and state
+plainly what would change. `/doctor` reports and then offers "press `f` to have Claude fix reported
+issues" — diagnosis and remedy in one surface, with the gesture separate from the diagnosis so consent
+stays explicit.
+
+This is the middle setting the command surface was missing. `audit` auto-executes on a disclaimer;
+`--review` writes nothing at all. Between them belongs *show me, then do it* — and it costs no question
+slot, because the offer comes after the work is displayed rather than before it is done.

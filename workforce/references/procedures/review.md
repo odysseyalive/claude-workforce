@@ -7,6 +7,10 @@ and reports org health.
 
 ---
 
+Org-wide silent-failure detection belongs to `verify`; this file owns the per-employee judgment it
+cannot make (`verify.md` § the detection/treatment split). Both print the same provenance header
+(`verify.md` § Provenance header).
+
 ## Per employee
 
 **1. Contract drift.** Recompute the `contract-stamp` over the normalized `## Procedure` +

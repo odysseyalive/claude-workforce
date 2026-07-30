@@ -7,6 +7,9 @@ threatens completion.
 
 ---
 
+**`verify` detects these; `reconcile` resolves them** (`verify.md` § the detection/treatment split).
+The conflict vocabulary below is this file's to define — `verify` reports it and never redefines it.
+
 ## The bar
 
 Two employees whose scopes overlap are usually fine: redundancy is cheap and resilient. Act **only**
