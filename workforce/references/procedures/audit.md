@@ -216,6 +216,12 @@ ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from ou
 converts two skills, correctly leaves fifteen alone, and hires three employees the skills never covered
 is a better audit than one that converts seventeen.
 
+**Print the disposition arithmetic, and make it balance.** Dispositions partition the skills, so the counts
+sum to the skill total — state both and let the reader check. The Step 0.7 preflight states are annotations,
+not dispositions (`conversion-taxonomy.md` § The dispositions), so they render in a separate table and are
+never added to that sum. A sum that overshoots means a state was pasted in as a disposition row; that is
+what happened on 2026-07-29, and the arithmetic is what exposes it.
+
 **Then annotate what the new org made redundant** (`conversion-taxonomy.md` § SUPERSEDED) — a finding,
 never a removal, and where a persona collides the org redraws its own rather than touching the other
 side.

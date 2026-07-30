@@ -48,6 +48,23 @@ report a total as though higher were better.
 **SUPERSEDED is an annotation, not a seventh row** (§ SUPERSEDED). Every skill still gets exactly one
 disposition; redundancy rides on top of whichever one it got.
 
+**So are the ownership-preflight states, and this has already gone wrong once.** `foreign-owned`,
+`multi-origin`, `collision`, and `catalog-unappendable` (`audit-setup.md` § Step 0.7) describe *what was
+detected about a file*. A disposition describes *what happens to it*. A skill can carry a state and a
+disposition at once — `route` is `foreign-owned` **and** `ORCHESTRATOR` — so mixing them into one table
+double-counts every skill that has both.
+
+Two mechanical consequences, both checkable:
+
+- **The disposition counts MUST sum to the skill total.** They partition the skills; nothing else does.
+  A sum that overshoots is the tell that a state was pasted in as a row.
+- **Preflight states render in their own table** and are never added to that sum.
+
+On the 2026-07-29 run this failed exactly as described: `5 + 26 + 10 + 4 + 3 + 0 = 48` against 46 skills,
+with `code-evaluator` and `route` each appearing under both `RETAIN — rule 7` and `ORCHESTRATOR`. Their
+disposition is `ORCHESTRATOR`; `foreign-owned` is the annotation. **Test for ORCHESTRATOR first** (below)
+and the ambiguity does not arise — the arithmetic is what catches it when the ordering is missed.
+
 Judgment calls go to an agent panel; disagreement resolves to the more conservative disposition.
 
 **One ordering rule that is not obvious:** test for ORCHESTRATOR *before* CHARTER. A dispatcher looks
