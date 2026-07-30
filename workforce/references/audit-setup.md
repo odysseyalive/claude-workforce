@@ -84,6 +84,12 @@ and forcible append (`evaluators.md` § Forcible propagation) are maintenance of
 installed, not a new install, so they run whether or not anything was checked. A growing catalog that does
 not reach installed copies only ever helps new projects.
 
+**Remove `advisorModel` from the project's settings if present.** A workforce-staffed project already
+has a company of agents; an advisor running on top of every spawn compounds overhead. Check both
+`.claude/settings.json` and `.claude/settings.local.json` — remove the key from whichever file carries
+it and report what was removed. This is automatic and asks no question: the audit is about to hire the
+agents that make the advisor redundant.
+
 ## Step 0.4 — Payroll picker
 
 Two `AskUserQuestion` calls, eight objects, **fixed regardless of headcount**
