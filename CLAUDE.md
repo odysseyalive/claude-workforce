@@ -77,8 +77,16 @@ Two more, both from the `playwright-mcp` seam:
 
 ## Open, as of 2026-07-29
 
-- **`/workforce audit` has never run.** Nothing here has been executed end to end. This is the one
-  remaining item that matters; everything below it is bounded.
+- **`/workforce audit` has never run.** Nothing here has been executed end to end. The gate-0.4 blocker
+  that made it *unable* to finish is fixed (below), so the next attempt is the first that can get past
+  setup. This remains the one item that matters.
+
+- **The department cap may be narrower than a real project.** `odyssey-alive`'s skills describe five
+  coherent domains — content, engineering, finance/ops, comms, meta-tooling. `org-design.md` calls two to
+  four the normal answer, so the cap forces a merge the evidence does not support. Whether the cap or the
+  guidance is wrong is **unsettled** — deliberately left open rather than resolved by widening a cap on
+  one project's evidence. A project hitting it on the first real target is evidence about the cap, not
+  about the project.
 - **A grant naming an MCP server the host has not configured is untested.** Fact 13 measured the grant
   grammar against a server that exists; the absent-server case is the one that matters for anyone else
   running this project, and the expected failure is silent. `verification.md` § When the server is
@@ -92,6 +100,24 @@ Two more, both from the `playwright-mcp` seam:
   2026-07-29: four fixtures were listed 3m06s after being written, across a user-turn boundary. A turn
   boundary is now the leading candidate; `wf-reload-probe` is retained to separate it from elapsed time.
   Nothing in the design waits on the trigger, so this stays a loose end.
+
+**Closed 2026-07-29 — the pre-run diagnosis against `odyssey-alive`** (45 skills, 31 of them
+skill-builder-owned, 57 in-skill `AGENT.md` files). Six seams found before running anything; five fixed,
+plus two the fixing surfaced:
+
+| | |
+|---|---|
+| payroll picker had no model IDs to propose | statics now shipped in `org-config.template.md` |
+| …and `bin/check` forbade putting them there | the template is the sanctioned home per `platform.md` § Derived constants; it is now in `CONST_EXEMPT`, which is why the cells were empty |
+| the backup ran *after* the first writing gate | Step 0.6 writes fixtures, so a Step-6 snapshot archived a tree this run had modified. The rule is now "before the first write of the run" |
+| concurrency cap was a *blocking* check on unmeasured fact 8 | `delegation-budget.md` now reports and convenes the panel; promotion waits on measurement |
+| forcible catalog append vs immutable blocks | `evaluators.md` § When the catalog cannot be appended — skipped and reported, never forced |
+| RETAIN rule 7 assumed single-origin files | multi-origin sandwiches land on RETAIN by conservative tie-break, and the report must say which |
+| Step 1b censused only the resolving directories | it now censuses `AGENT.md` under `.claude/skills/**` too; a name occupied anywhere in the union is occupied |
+
+The two that were *not* introduced by a missing rule but by a rule that was written and never enforced —
+the model-ID exemption and the backup ordering — are the ones worth re-reading: both had correct doctrine
+and an implementation that contradicted it.
 
 **Closed 2026-07-29.** Fact 2c (`disallowedTools` overrides `tools:`) is measured — `wf-ceiling-probe`
 returned `HAS_AGENT: no` against an identical `tools:` line that was granted `Agent`; evidence in

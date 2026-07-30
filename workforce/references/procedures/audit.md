@@ -121,6 +121,19 @@ kind, raw link text, resolved target, owning skill, and whether it dangles.
 filesystem read order (`platform.md` fact 5). A project-scope employee shadowed by a same-named
 personal agent is dispatched to and does the wrong job, with nothing reported.
 
+**Then census the UNREGISTERED surface too — `AGENT.md` files under `.claude/skills/**`.** Those two
+directories are where agents *resolve*; they are not where the names *live*. A skill-driven project keeps
+its personas beside the skills that own them and registers a handful by symlink, so the resolving
+directories can hold three entries while the real name surface holds dozens — and some of those names are
+already duplicated across skills before this run touches anything. Since subfolders do not namespace
+(fact 5), the duplicates are latent: harmless while unregistered, silently wrong the moment an ADOPT pass
+registers either one.
+
+So the manifest records all three populations, and **a name occupied anywhere in the union is occupied.**
+Never register into one; rename per the collision rule below. A pre-existing duplicate is **reported with
+every path and left alone** — it is the user's, it predates the audit, and repairing it is a behavior
+change nobody asked for.
+
 This is the class of finding `/doctor` covers for its own config — it warns when an MCP server is
 "defined in multiple config scopes with different endpoints", when an entry is "overridden by a
 higher-precedence scope", and on permission rules that are unreachable because something above them
@@ -248,8 +261,12 @@ task completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
-Order: **backup → conversions → handbooks → charter and principles → payroll rewrite → `org index` →
-`org embed`.**
+Order: **conversions → handbooks → charter and principles → payroll rewrite → `org index` → `org embed`.**
+
+**The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
+first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.
+Assert it succeeded (or that its state is `declined` / `no-content`) before the first conversion; never
+run it again.
 
 **Pre-execution assertion:** every payroll question object demonstrably rendered this run. If one did
 not, fail **by name** — never a generic picker error.

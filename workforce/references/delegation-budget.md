@@ -58,9 +58,18 @@ Defaults, chosen to sit under the concurrency cap with retry headroom:
 | Department count | ≤4 by default | a 5th makes 5 + (5×3) = 20 — exactly at the cap, zero headroom |
 | Department width | ≤6 direct reports | the session-cap guard: width is the only real lever |
 
-`audit` **fails the org design** — ✗ in the Execution Summary, plus a redesign panel — when CEO-entry
-worst case exceeds the concurrency cap, or when ten sequential CEO-entry work orders would exceed the
-session cap.
+When CEO-entry worst case exceeds the concurrency cap, or ten sequential CEO-entry work orders would
+exceed the session cap, `audit` **reports the overage and convenes the redesign panel — it does not fail
+the org design.**
+
+**This was a blocking check, and it should not have been.** Both caps are `platform.md` fact 8, which is
+DOCUMENTED and **unmeasured**, and `platform.md` § DOCUMENTED bars an unverified fact from becoming a
+blocking check — the precise substitution that file exists to prevent, reintroduced one file over. A ✗
+here would refuse a user's org shape on a number nobody has measured on their host.
+
+So: report it, name it as resting on an unmeasured fact, and let the panel propose a narrower shape. **If
+fact 8 is ever measured, this may become blocking** — and the promotion belongs in the same edit that moves
+the row, per `platform.md` § Adding a fact.
 
 ---
 

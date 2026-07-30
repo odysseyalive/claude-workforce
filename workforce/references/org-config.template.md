@@ -13,22 +13,40 @@ writes back only the values you chose in its setup questions.
 ---
 
 <!-- origin: user | modifiable: true | user-editable mapping -->
-## Tier → Model / Effort  (EDIT THESE FREELY)
+## Model statics — the pool the payroll picker proposes from
 
-Use the full official model ID. Never an alias.
+**These are the only IDs `audit` and `model-map` may propose.** Anything else reaches a config by the
+user typing it into the picker's "Other" field. Refreshed on every release (`version.md` step 2) — they
+go stale between releases, and there is no discovery ladder.
+
+| Model ID | Context | Notes |
+|---|---|---|
+| `claude-fable-5` | 1M | most capable; priced above the Opus tier |
+| `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
+| `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
+| `claude-sonnet-5` | 1M | near-Opus on coding and agentic work, lower cost |
+| `claude-haiku-4-5` | 200K | fastest and cheapest; mechanical work only |
+
+Use the full official model ID. Never an alias, never a date suffix on the IDs above.
+
+## Tier → Model / Effort  (EDIT THESE FREELY)
 
 | Tier | Model | Effort |
 |---|---|---|
-| CEO (1) | | |
-| Lead (2) | | |
-| IC (3) | | |
+| CEO (1) | `claude-opus-5` | high |
+| Lead (2) | `claude-opus-5` | medium |
+| IC (3) | `claude-sonnet-5` | medium |
+
+A blank model cell means the employee inherits the session model. IC effort defaults to `medium`
+deliberately — `high` across a wide wave is expensive and rarely changes an IC's mechanical output
+(`references/delegation-budget.md`).
 
 ## Creative / alternate model
 
 Departments doing generative work — content, design, image, voice, translation — run on this model
 instead of their tier default.
 
-| Alternate model | |
+| Alternate model | `claude-opus-4-6` |
 |---|---|
 | Departments on alternate | |
 

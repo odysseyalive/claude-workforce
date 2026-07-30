@@ -92,9 +92,21 @@ No panel. Do not convert.
    is neither `user` nor `workforce`. Rule 5 usually reaches the same answer by inference, and that is
    not good enough here: converting would demote a `SKILL.md` its owner rewrites on the next run, so
    the stub and the regenerated skill become **two live copies of one job** — the exact two-canonical-
-   texts failure conversion exists to avoid. The live case is `playwright-mcp`'s `suite_scaffold`
-   (`.claude/skills/test-suite/`, marker `origin: playwright-mcp suite_scaffold`), whose `--force` mode
-   rewrites the file wholesale. Report the owner by name so the reason is legible.
+   texts failure conversion exists to avoid. Report the owner by name so the reason is legible.
+
+   **Two live cases, and the second is the common one.** `playwright-mcp`'s `suite_scaffold`
+   (`.claude/skills/test-suite/`, marker `origin: playwright-mcp suite_scaffold`) rewrites the file
+   wholesale in `--force` mode — one skill, one owner, unambiguous. The larger case is a project whose
+   whole skill library is maintained by a **generator installed and running in that same project**:
+   dozens of skills, every one of them rule 7. Detected at `audit-setup.md` § Step 0.7 as `foreign-owned`.
+
+   **Multi-origin files are the ragged edge, and this rule does not cleanly decide them.** The common
+   shape in a generator-managed project is a sandwich: a `user`/immutable span, one or more
+   foreign-generator spans, and unmarked imperative prose between them. Rule 7 asks where "the imperative
+   content" sits, and the honest answer is *in all three places*. Rules 3 and 7 then point the same way
+   for different reasons, so the outcome is RETAIN either way — **but it arrives by the conservative
+   tie-break, not because a rule fired.** Say which it was in the report. A disposition defended as a rule
+   that fired, when no rule fired, is the class of claim `verify` exists to catch.
 
 ---
 

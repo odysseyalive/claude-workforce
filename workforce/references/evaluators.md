@@ -120,6 +120,25 @@ Mechanics:
 - **Structural fit is verified before the write.** No parseable insertion point → report it with the
   paste-ready text rather than guessing. Atomic-or-absent, as everywhere else.
 
+### When the catalog cannot be appended
+
+"Never skipped, never offered, never a question" is a rule about **maintenance the append can perform** — it
+is not a licence to write into a file this project does not own. Two conditions stop it, both detected at
+`audit-setup.md` § Step 0.7 and both reported as `catalog-unappendable`:
+
+| Condition | Why the append stops |
+|---|---|
+| the catalog's content sits entirely inside `origin: user \| immutable: true` spans | there is no machine-owned region to append into, and **immutable spans are never written** — that rule outranks this one |
+| its version anchor uses another generator's scheme | there is no common ground for the comparison, so "newer than" is undefined and an append would be guesswork |
+
+In both cases: **report the state, print the entries that would have been added, and write nothing.** A
+skipped append on an unappendable catalog is correct behavior, not a failed maintenance pass — and forcing
+one would produce exactly the two-canonical-texts outcome the forcible-propagation rule was written to avoid
+on the *other* side.
+
+An installed catalog this project did write, with its own anchor and its own machine-owned region, still
+receives the unconditional append. Nothing above weakens that case.
+
 **Import, then never re-import.** After seeding from claude-enforcer, the project's catalog is its own. A
 later `sync` appends *new* shipped entries; it does not overwrite the project's additions or re-flatten
 its edits.

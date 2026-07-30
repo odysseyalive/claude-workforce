@@ -4,10 +4,13 @@
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
 
-Everything `audit` does before Step 1: consent, snapshot, companion skills, payroll, VCS, and the canary
-fixtures. **These are gates, not steps** — each one's outcome changes what the rest of the run is allowed
-to do, and four of the five sanctioned question slots are spent here. The fifth is org ratification, in
-`procedures/audit.md` Step 5.
+Everything `audit` does before Step 1: consent, snapshot, companion skills, payroll, VCS, the canary
+fixtures, and the ownership preflight. **These are gates, not steps** — each one's outcome changes what the
+rest of the run is allowed to do, and four of the five sanctioned question slots are spent here. The fifth
+is org ratification, in `procedures/audit.md` Step 5.
+
+**Two of them write, and the backup precedes both.** Step 0.6 writes canary fixtures and Step 0.2 takes the
+snapshot; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
 
 ---
 
@@ -47,8 +50,16 @@ Headless: with no acceptance on record, **refuse**. Interactive runs always re-a
 
 ## Step 0.2 — Backup
 
-Offer a snapshot (`procedures/backup.md`). It runs **first** in the execution phase so it captures
-pre-audit state.
+Offer a snapshot (`procedures/backup.md`). **On acceptance it runs here, immediately — before any other
+gate writes anything.**
+
+**The rule is "before the first write of the run", not "first in the execution phase".** An earlier
+revision said the latter, and it was wrong: Step 0.6 writes canary fixtures into `.claude/agents/`, and
+the execution phase is Step 6. A snapshot taken there captures a tree workforce has already modified, so
+`restore` would put this run's fixtures back as though the user had written them — the archive claims to
+be pre-audit state and is not. Whatever the first writing gate becomes, the backup precedes it.
+
+A declined or failed backup does not reorder anything; it changes what later steps may do (below).
 
 **Declining does not stop the audit, but it restricts it:** conversion's destructive step (demoting a
 skill) requires a verified snapshot. Without one, every conversion downgrades to
@@ -132,3 +143,29 @@ here, before the survey — the survey and the Step 2 panels are what buys the r
   run** — that single fact is what makes an UNAVAILABLE at Step 4b legible rather than mysterious.
 
 **This gate writes files and spawns nothing.** It is not a question and consumes no question slot.
+
+## Step 0.7 — Ownership and collision preflight (detect, then degrade — stated)
+
+**Runs after the backup** (§ Step 0.2), because everything it finds changes what the run may write and
+the snapshot must predate all of it. Reads the tree; writes nothing; asks nothing.
+
+Four conditions, each with a **named state** the closing report reproduces. This gate never repairs, never
+rewrites another generator's file, and never edits the project's `CLAUDE.md` — a detected condition
+downgrades the run and says so. **A workaround is not one of the outcomes** (Failure-Attribution Gate
+clause 7): the disposition is degraded and reported, or it is declined upward.
+
+| Condition | How it is detected | State, and what it costs |
+|---|---|---|
+| **foreign-owned** | a skill's imperative content sits inside an `origin:` marker whose value is neither `user` nor `workforce` | `foreign-owned: <skill> (owner: <name>)`. Conversion refused for that skill — its owner rewrites `SKILL.md`, so a stub would become the second of two live copies (`conversion-taxonomy.md` RETAIN rule 7) |
+| **multi-origin** | one skill carries a `user`/immutable span **and** a foreign-generator span **and** unmarked imperative prose | `multi-origin: <skill>`. No RETAIN rule fires cleanly on these; the panel resolves conservatively, so **report the count and the reason it was conservative** rather than presenting RETAIN as a rule that fired |
+| **name collision** | two `AGENT.md` files anywhere under `.claude/skills/**` declare the same `name:` | `collision: <name> (<n> files)`. Subfolders do not namespace (`platform.md` fact 5), so registering either one resolves silently. Nothing is registered into a colliding name; reported with every path |
+| **catalog unappendable** | a present evaluator catalog has no machine-owned region, or its version anchor uses another generator's scheme | `catalog-unappendable: <catalog> (<reason>)`. The forcible append is **skipped**, not forced — see `evaluators.md` § When the catalog cannot be appended |
+
+**Report all four states even when the count is zero.** "0 foreign-owned, 0 collisions" is what tells the
+reader the gate ran; silence reads the same as a gate that never fired, which is the failure mode the
+payroll receipt exists to prevent one gate over.
+
+**A high foreign-owned count is not a defect in the project or in this gate.** A mature project managed by
+another generator is the ordinary brownfield case: conversion yield near zero is the *correct* result there,
+and the audit's value comes from the org it designs for work no skill covers (`org-design.md`). Never report
+a low conversion count against a high foreign-owned count as a shortfall.
