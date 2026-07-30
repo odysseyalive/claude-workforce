@@ -38,7 +38,7 @@ report a total as though higher were better.
 
 | Disposition | The skill is… | Result |
 |---|---|---|
-| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md demoted to a stub |
+| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md demoted to a stub (`templates.md`) |
 | **SPLIT** | a workflow *and* reference data | workflow becomes a handbook; reference sections stay |
 | **CHARTER** | several distinct actors in one file | becomes a department: one Lead + N ICs |
 | **ORCHESTRATOR** | machinery that creates, registers, or drives agents | **stays a skill.** May gain employees it dispatches to; never becomes one |

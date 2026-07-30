@@ -121,6 +121,9 @@ leaves both live: degraded, and safe.
   is unverified. The skill is left intact."
 - **T7 is copy-then-write.** `.orig` is written and hashed into the journal first, and retained after
   the run as the single-file undo.
+- **The stub's contents are canonical** (`references/templates.md` § The demoted-skill stub). It carries
+  every immutable block through byte-identically, holds none of the moved workflow text, and is read back
+  and re-hashed before T8. A stub that fails read-back leaves its row at `WRITE-INTENT`.
 - **Order is never rearranged for convenience**, and T7 swaps are never batched ahead of their
   T5/T6 pairs.
 - **A failed transaction marks that skill ✗ and continues.** It never aborts the batch and never
