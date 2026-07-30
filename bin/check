@@ -494,20 +494,51 @@ check(
 # for it. The department is the mechanism that replaced that default; these
 # assertions stop it drifting back.
 cd_ = read("workforce/references/conversion-department.md")
+pa_ = read("workforce/agents/provenance-analyst/AGENT.md")
 check(
     "conversion: no default-to-frozen for unclassified content",
     "no default-to-frozen" in ct,
     "conversion-taxonomy.md must state that unresolved blocks are worked, not frozen",
 )
+# A single abstention bucket collapses states with different consequences —
+# "nothing fired" and "something depends on this and I cannot tell" are not the
+# same finding. Measured: the old single bucket held 40 blocks; the split
+# resolves 19 and identifies 21 as immaterial.
 check(
-    "conversion-department: NO-EVIDENCE is an outcome, not a tie-break",
-    "NO-EVIDENCE" in cd_ and "not a tie" in cd_,
-    "the ladder must distinguish an honest abstention from a conflict",
+    "conversion-department: abstention is split, not one bucket",
+    "IMMATERIAL" in cd_ and "UNRESOLVED" in cd_,
+    "the ladder must distinguish an immaterial question from an unresolved one",
 )
 check(
-    "conversion-department: the evidence ladder is ordered and rung 5 is non-decisive",
-    "Never decisive alone" in cd_ or "never decisive alone" in cd_.lower(),
-    "git commit breadth measured weak (33-44 files vs 11); it may corroborate, never decide",
+    "conversion-department: preservation is never gated on attribution",
+    "Preservation is never gated" in ct or "preservation never waits" in cd_,
+    "extraction is additive and cheap; only the directives-sha citation needs evidence",
+)
+check(
+    "conversion-department: every outcome carries a path back",
+    "OVERTURNED-BY" in cd_ or "would overturn it" in cd_,
+    "an outcome with no falsifying evidence named is a dead end wearing a label",
+)
+# Stopping at the first firing rung discards evidence that would have composed,
+# and the rungs it skips are greps — the saving is nothing.
+check(
+    "provenance-analyst: runs every rung, no early exit",
+    "Do not stop early" in pa_ or "NEVER stop the ladder early" in pa_,
+    "partial evidence discarded to save a grep is a false negative dressed as a measurement",
+)
+# The git rung is the one most likely to get quietly promoted, because it feels
+# authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
+# numbers are the reason it may not decide, and they survive rewording.
+check(
+    "conversion-department: the git rung cites the measurement that caps it",
+    "33–44" in cd_ or "33-44" in cd_,
+    "the 33-44-files vs 11 measurement is why commit breadth may corroborate but never decide; "
+    "without it the rung reads as authoritative and gets promoted",
+)
+check(
+    "provenance-analyst: the git rung is capped at corroboration",
+    "never decide" in pa_.lower() or "corroborates only" in pa_.lower(),
+    "a rule built on commit breadth misclassifies a batched authoring session",
 )
 # Anthropic's multi-agent findings: a single call with a rubric beat multiple
 # judges. The panel is the obvious "improvement" and it measured worse upstream.
