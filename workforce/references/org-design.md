@@ -130,38 +130,20 @@ command, and the evidence for needing them will be concrete rather than speculat
 
 ---
 
-## When the evidence runs out — the greenfield questions
+## When the evidence runs out
 
-Where the project cannot answer a question that changes the roster, **ask**. Do not invent a
-department, and do not guess at a purpose.
+Where the project cannot answer a question that changes the roster, **design from what is present**.
+Do not invent a department, and do not guess at a purpose — but do not stop and ask either. The panel
+resolves ambiguity conservatively: if the evidence does not warrant a department, the department is not
+created. The closing report shows what was built and why, and the user adjusts with `hire`, `transfer`,
+or `retire` afterward.
 
-This is the audit's fifth sanctioned question slot (`references/audit-setup.md` § The question budget) —
-**one `AskUserQuestion` call
-carrying several objects**, the same one-call/one-slot pattern the payroll picker uses. It does not
-add a question slot; it fills the one already reserved for org ratification.
-
-Ask only what the evidence could not settle. Typical objects:
-
-1. **The proposed roster — ratify or adjust.** Always rendered. Departments, employees, and what each
-   owns, with the evidence cited for each. This is the one object that always appears, because a
-   company should never be created without the user seeing it first.
-2. **What work do you most want to hand off?** Rendered when the evidence shows several equally
-   plausible starting points. The answer decides which department gets staffed first, not whether it
-   exists.
-3. **What must never happen without your review?** Rendered when the project has destructive
-   operations — deploys, migrations, publishing, deletions. The answer becomes a guardrail, and
-   guardrails derived from a direct answer are far better than guardrails inferred from a directory
-   name.
-4. **Is there work here that a model should not do at all?** Rendered when the project touches
-   something the evidence suggests is sensitive. A scope boundary stated by the user is worth more
-   than any inference.
-
-**Every proposal cites its evidence.** "Engineering, because `package.json` defines `test` and `build`
-and 60% of commits touch `src/`" is ratifiable. "Engineering, because most projects have one" is not,
+**Every department cites its evidence.** "Engineering, because `package.json` defines `test` and `build`
+and 60% of commits touch `src/`" is checkable. "Engineering, because most projects have one" is not,
 and a roster the user cannot check is a roster they cannot correct.
 
-**Suppressed in headless, non-interactive, and `--quick` runs** — which then propose nothing and
-create nobody. A company is never created without a human seeing the roster.
+**`--review` is the preview path.** It shows the full proposed roster with evidence and writes nothing.
+The user who wants to see before committing runs that first.
 
 ---
 
@@ -176,8 +158,7 @@ create nobody. A company is never created without a human seeing the roster.
 4. **Drop any role whose verification cannot be named.** An employee that cannot prove its work is an
    employee that will report success it did not earn. If the project offers no check for that work, say
    so and leave the role unhired rather than hiring one that cannot be held to anything.
-5. Ratify with the user (above).
-6. `hire` authors the batch (`hire.md` § Initial roster).
+5. `hire` authors the batch (`hire.md` § Initial roster).
 7. Charter and principles from the same evidence (`charter.md`, `principles.md`).
 
 **Step 4 is the one most worth keeping.** It is the difference between an org chart and a company: a

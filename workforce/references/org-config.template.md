@@ -67,10 +67,9 @@ department, pin the image employee.
 | Employee | Model | Effort |
 |---|---|---|
 
-**`audit` never writes a row here.** It writes back only the values you chose in its setup questions, and
-this is not one of them — a per-employee axis in the picker would scale questions with headcount, which the
-fixed-object budget exists to prevent (`references/audit-setup.md` § The question budget). The audit
-*proposes* rows in its report; you add them.
+**`audit` never writes a row here.** It writes back only the values you chose in the payroll picker, and
+this is not one of them — a per-employee axis in the picker would scale questions with headcount. The
+audit *proposes* rows in its report; you add them.
 
 **An override PINS across departments.** `transfer` normally repins an employee's model as a side effect of
 moving it; an employee listed here keeps its model through the move (`procedures/transfer.md`).
@@ -114,30 +113,27 @@ downward — raising a cap past the measured platform limits does not raise the 
 
 ## Per-project markers
 
-Managed by `audit`. Hand-edit any of them; delete one to be re-asked fresh.
+Managed by `audit`. Hand-edit any of them; delete one to reset.
 
 ```
 <!-- audit-disclaimer: unset -->
 <!-- org-setup: unset -->
 <!-- payroll-setup: unset -->
 <!-- succession: none -->
-<!-- companions: org=unset, operating-principles=unset, personnel-ledger=unset, evals=unset -->
 ```
 
 | Marker | States | Meaning |
 |---|---|---|
-| `audit-disclaimer` | `unset` \| `accepted` | Consumed only by headless runs: with no acceptance on record a headless audit refuses. Interactive audits always re-ask regardless |
+| `audit-disclaimer` | `unset` \| `accepted` | Set automatically on every interactive audit. Consumed only by headless runs: with no acceptance on record a headless audit refuses, because the payroll picker cannot render headless |
 | `org-setup` | `unset` \| `configured` \| `declined` | Whether this project uses a workforce org at all. `declined` silences audit entirely |
-| `payroll-setup` | `unset` \| `configured` | Whether the tier×department picker has been answered once. **Never a suppression switch** — the picker renders on every interactive audit; this only decides which values arrive pre-selected |
+| `payroll-setup` | `unset` \| `configured` | Whether the payroll picker has been answered once. **Never a suppression switch** — the picker renders on every interactive audit; this only decides which values arrive pre-selected |
 | `succession` | `none` \| `declared` | **`none` (default): coexistence.** Workforce lands beside the existing skill library and converts only the narrow cases — RETAIN rules 3 and 7 refuse hand-authored and foreign-generated skills. **`declared`: workforce is taking the library over.** Those two rules stand down and most one-actor workflows become eligible. Orchestrators, pure reference, `disable-model-invocation` skills, and unparseable skills still refuse (`references/conversion-taxonomy.md` § SUCCESSION) |
-| `companions` | per key `on` \| `off` \| `unset` | A checked box means install. `off` means "do not auto-install while absent" — **never** "remove". Uninstalling is always a deliberate, separate act |
 
-**The picker is never skipped.** Every full interactive audit renders every question object, with
+**The picker is never skipped.** Every full interactive audit renders every payroll object, with
 current values pre-selected — answering costs one click when nothing changed. A marker may change a
-default; it may never drop a question. The audit prints a **Payroll Receipt** showing each resolved
+default; it may never drop the question. The audit prints a **Payroll Receipt** showing each resolved
 value and where it came from (`asked this run` / `unchanged, pre-selected` / `config default`), so a
 skipped question and an answered one can never look the same.
 
 **Suppression:** headless, non-interactive, and `--quick` runs render no questions and write no
-markers. They honor existing markers and install nothing that has not been explicitly authorized —
-no expressed consent, no install, in either mode.
+markers. They honor existing markers and install nothing that has not been explicitly authorized.

@@ -26,8 +26,9 @@ Reached from `audit.md` § Step 1a CHARTER-FIRST: a new directory with nothing t
 evidence to draft from, so the charter comes from an interview — and it becomes the evidence everything
 downstream uses.
 
-**One `AskUserQuestion` call, several objects** — question slot 5, which org ratification would otherwise
-have used. It is not an extra slot.
+**One `AskUserQuestion` call, several objects.** This is the one additional question a charter-first
+audit asks beyond the payroll picker — the project has nothing to read, so the charter comes from the
+user.
 
 Ask only what shapes the project and the org:
 

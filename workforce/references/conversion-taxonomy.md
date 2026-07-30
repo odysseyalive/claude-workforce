@@ -86,8 +86,12 @@ the orchestration inside an isolated context that returns only a summary (fact 7
 It appears in the chart as an `ORCHESTRATOR` row — visible, never a silent absence — and never
 receives a `## Chain of Command` block, because it is not in the chain.
 
-Real cases: `skill-builder` (creates and registers agents), `route` (catalog dispatcher), and
-`workforce` / `org` themselves.
+Real cases: `route` (catalog dispatcher), and `workforce` / `org` themselves.
+
+**Exception: `skill-builder` is the superseded generator, not an orchestrator.** Under `succession:
+declared`, it is removed entirely — not retained, not converted, not demoted to a stub. Workforce
+replaces it, and leaving both in place creates two systems managing the same artifacts. Report its
+removal in the closing summary.
 
 ---
 
@@ -154,7 +158,7 @@ Succession is not "convert everything". Four refusals and one disposition surviv
 
 | Still refuses | Why it survives declared intent |
 |---|---|
-| **ORCHESTRATOR** | The user's own immutable directive in this file makes it first-class. Machinery that creates and runs agents stays a skill. **Succession never overrides it** |
+| **ORCHESTRATOR** | The user's own immutable directive in this file makes it first-class. Machinery that creates and runs agents stays a skill. **Succession never overrides it.** Exception: `skill-builder` is the superseded generator and is removed entirely under succession (§ ORCHESTRATOR above) |
 | **Rule 4** — pure reference, data, lookup tables | Already an employee's grounding library. Nothing to convert; converting a table produces an employee with no job |
 | **Rule 1** — `disable-model-invocation: true` | A per-skill opt-out the user wrote by hand. A project-level "take over" is the broader signal; the narrower one wins. Report it and let the user clear it per skill |
 | **Rule 6** — quarantined, frontmatter unparseable | Never convert what you cannot read. Safety, not policy |
@@ -165,10 +169,10 @@ is aiming at rather than an accident of it.
 
 ### What succession does not do
 
-It does not uninstall the previous generator, delete a file, touch an immutable span, or convert an
-orchestrator. It changes which skills are *eligible*; every conversion still runs the same
-atomic-or-absent transaction, still requires a verified backup for its destructive step, and is still
-reversed by `disband`.
+It does not delete arbitrary files, touch an immutable span, or convert an orchestrator (other than the
+superseded generator, which is removed entirely). It changes which skills are *eligible*; every
+conversion still runs the same atomic-or-absent transaction, still requires a verified backup for its
+destructive step, and is still reversed by `disband`.
 
 **Blast radius is the thing to watch.** Coexistence converts a handful; succession can convert dozens in one
 run, each with a cold probe. That approaches the session spawn cap

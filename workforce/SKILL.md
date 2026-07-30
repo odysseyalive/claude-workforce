@@ -16,7 +16,7 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, Tas
 
 | Command | Action |
 |---------|--------|
-| `/workforce` | Full audit: disclaimer → survey → convert skills to employees → org chart → auto-execute |
+| `/workforce` | Full audit: survey → design org → convert skills → author handbooks → auto-execute |
 | `/workforce audit --review` | Full scan + would-be Execution Plan, zero writes |
 | `/workforce roster` | Who works here, which tier, which model, what they own |
 | `/workforce budget` | Delegation depth, fan-out, and spawn-cap accounting |
@@ -154,8 +154,8 @@ High-risk commands default to **display mode** and require `--execute`: `hire`, 
 `disband`, `rollback`. Low-risk and read-only commands run immediately: `roster`, `budget`,
 `org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`.
 
-`audit` is the exception: its Step 0 disclaimer IS the consent (`references/audit-setup.md`), and it then auto-executes its
-recommended work. `audit --review` is the zero-write escape, and it closes by naming the one command
+`audit` is the exception: running the command is the consent (`references/audit-setup.md`), and it
+auto-executes. `audit --review` is the zero-write escape, and it closes by naming the one command
 that would apply exactly what it displayed — report first, apply on a separate gesture.
 
 ## Core Principles

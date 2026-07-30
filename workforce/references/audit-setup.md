@@ -4,54 +4,46 @@
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
 
-Everything `audit` does before Step 1: consent, backup, companion skills, payroll, VCS, the canary
-fixtures, and the ownership preflight. **These are gates, not steps** — each one's outcome changes what the
-rest of the run is allowed to do, and four of the five sanctioned question slots are spent here. The fifth
-is org ratification, in `procedures/audit.md` Step 5.
+Everything `audit` does before Step 1: backup, companion skills, payroll, VCS, the canary fixtures,
+and the ownership preflight. **These are gates, not steps** — each one's outcome changes what the rest
+of the run is allowed to do.
 
 **Two of them write, and the backup precedes both.** Step 0.6 writes canary fixtures and Step 0.2 takes the
 backup; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
 
 ---
 
-## The question budget — five slots, six calls, and it is a ceiling
+## The question budget — one slot, and it is a ceiling
 
-**Slots, not calls.** The payroll picker is two `AskUserQuestion` calls occupying one slot, so a full
-first audit makes six calls against five slots. Stating it as "five" without that line has read as a
-call budget, and a reviewer counting calls finds a violation that is not one.
+Running `/workforce audit` is the consent. The backup is taken automatically. Companions install on
+absence. The org is designed from evidence and built. **The only question is the payroll picker** — which
+model and effort level to run at each tier, and which departments use the creative alternate.
 
-| # | Step | Question | Calls |
+| # | Step | What happens | Calls |
 |---|---|---|---|
-| 1 | 0 | Disclaimer — accept and proceed / cancel | 1 |
-| 2 | 0.2 | Backup offer | 1 |
-| 3 | 0.3 | Companion skills — absent only, check to install | 1 (two grouped multi-selects) |
-| 4 | 0.4 | Payroll picker — tier × department model and effort | **2** (models; effort and overrides) |
-| 5 | 5-setup | Org ratification — the proposed roster, first audit only | 1 |
+| — | 0 | Backup taken automatically | 0 |
+| — | 0.3 | Absent companions installed automatically | 0 |
+| 1 | 0.4 | Payroll picker — tier × department model and effort | **2** (models; effort and overrides) |
+| — | 5 | Org designed from evidence, built, and reported | 0 |
 
-Everything else is a panel. **Suppressed entirely** in headless, non-interactive, and `--quick` runs:
-those render nothing, write no markers, and install nothing that was not already authorized.
+Everything else is a panel or an automatic gate. **Suppressed entirely** in headless, non-interactive,
+and `--quick` runs: those render nothing, write no markers, and install nothing that was not already
+authorized.
 
 ---
 
-## Step 0 — Disclaimer
+## Step 0 — Consent
 
-A real `AskUserQuestion` widget, never prose. Must state plainly:
+**Running `/workforce audit` is the consent.** No disclaimer question, no confirmation widget. The
+command name is unambiguous, and the backup taken next protects what a question would have protected.
 
-- Designed for the current model generation; handbooks it writes remain usable on earlier models.
-- **This audit CONVERTS skills into agent employees. It writes `.claude/agents/`, demotes converted
-  skills to stubs, and edits your project's `.claude/` directory.**
-- Back up `CLAUDE.md` and `.claude/` first. You will be offered a backup next; taking it enables a
-  clean uninstall via `/workforce disband` or `restore`.
-- Accepting runs the audit and applies its recommendations automatically.
-
-Cancel → stop, write nothing. Accept → write the `audit-disclaimer` marker.
-
-Headless: with no acceptance on record, **refuse**. Interactive runs always re-ask.
+Write the `audit-disclaimer` marker on entry. Headless: the marker must already exist from a prior
+interactive run — refuse without it, because the payroll picker cannot render headless.
 
 ## Step 0.2 — Backup
 
-Offer a backup (`procedures/backup.md`). **On acceptance it runs here, immediately — before any other
-gate writes anything.**
+**Take the backup automatically** (`procedures/backup.md`), immediately — before any other gate writes
+anything. No question, no offer to decline.
 
 **The rule is "before the first write of the run", not "first in the execution phase".** An earlier
 revision said the latter, and it was wrong: Step 0.6 writes canary fixtures into `.claude/agents/`, and
@@ -59,22 +51,14 @@ the execution phase is Step 6. A backup taken there captures a tree workforce ha
 `restore` would put this run's fixtures back as though the user had written them — the archive claims to
 be pre-audit state and is not. Whatever the first writing gate becomes, the backup precedes it.
 
-A declined or failed backup does not reorder anything; it changes what later steps may do (below).
-
-**Declining does not stop the audit, but it restricts it:** conversion's destructive step (demoting a
-skill) requires a verified backup. Without one, every conversion downgrades to
-**register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and
-reported. This diverges from claude-enforcer, which proceeds on a warning; the blast radius here is
-replacing a working file, so the floor is higher.
-
-**Declined, failed, and empty are three different states.** Conflating them is how a run either blocks
-for no reason or proceeds without the protection it thinks it has:
+**Failed and empty are two different states.** Conflating them is how a run either blocks for no reason
+or proceeds without the protection it thinks it has:
 
 | State | Meaning | Consequence |
 |---|---|---|
-| `declined` | the user said no | proceed; conversions downgrade to non-destructive |
+| `taken` | backup written and verified | proceed normally; full conversion available |
 | `no-content` | nothing to archive — no `CLAUDE.md`, no `.claude/`; `zip` reports "Nothing to do" | **proceed normally.** Nothing exists to protect, and only creation follows |
-| `failed` | content existed and the backup could not be written or verified | **treat as declined, and say why.** Never proceed as though a backup exists |
+| `failed` | content existed and the backup could not be written or verified | proceed; conversions downgrade to **register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and reported |
 
 A `failed` backup is never silently upgraded to "good enough". The report names the state, not just a
 ✗ — "backup failed (disk full); conversions restricted to non-destructive" is actionable, and a bare
@@ -82,15 +66,13 @@ A `failed` backup is never silently upgraded to "good enough". The report names 
 
 ## Step 0.3 — Companion skills
 
-Two grouped multi-selects in one call (one question slot):
+**Install all absent companions automatically.** No question, no checklist.
 
-- **Core** — `org (recommended)`, `operating-principles (recommended)`, `personnel-ledger (recommended)`
-- **Evaluators** — `code-evaluator (recommended)`, `text-eval (recommended)`
-  (`references/evaluators.md`)
+- **Core** — `org`, `operating-principles`, `personnel-ledger`
+- **Evaluators** — `code-evaluator`, `text-eval` (`references/evaluators.md`)
 
-**Only absent companions render.** A checked box installs; an unchecked box does nothing. **The gate
-never uninstalls** — removal is always a separate, deliberate act. All present → a one-line notice, not
-a question.
+All present → a one-line notice. Absent → installed and reported. **The gate never uninstalls** —
+removal is always a separate, deliberate act.
 
 **Evaluator catalogs install on ABSENCE ALONE — never gated on a declared department.** This is
 claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got no text evaluator because
@@ -123,7 +105,7 @@ gate twice in claude-enforcer; a skipped question and an answered one must never
 
 ## Step 0.5 — VCS preflight
 
-Report whether the project is version-controlled and whether the tree is dirty. **No VCS and no
+Report whether the project is version-controlled and whether the tree is dirty. **No VCS and a failed
 backup → conversion refuses** (§ Step 0.2).
 
 **Then run the ignore check here**, because the execution phase is about to create the directory it
@@ -176,9 +158,9 @@ because rules 3 and 7 fired looks identical to a run that found nothing to conve
 to tell which happened, or that a choice was ever available:
 
 > `succession: none (coexistence)` — 31 skills eligible for conversion **only** under succession
-> (26 multi-origin, 5 foreign-owned to `skill-builder`). Set `<!-- succession: declared -->` in
-> `.claude/workforce/org-config.md` to convert them; see `conversion-taxonomy.md` § SUCCESSION for what
-> still refuses either way.
+> (26 multi-origin, 5 foreign-owned to `skill-builder`). `skill-builder` itself will be removed
+> entirely. Set `<!-- succession: declared -->` in `.claude/workforce/org-config.md` to convert them;
+> see `conversion-taxonomy.md` § SUCCESSION for what still refuses either way.
 
 **This line is not optional and it is not a nudge.** `README.md` advertises `audit` as the migration path off
 a superseded generator, so a user arriving that way has already been told takeover is the point. Refusing

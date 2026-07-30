@@ -9,11 +9,10 @@ High-risk; display by default. `/workforce hire [role] [--execute]`
 
 ## Initial roster — staffing a company from nothing
 
-The greenfield path, and the primary one. `audit` arrives here with a **ratified** roster
+The greenfield path, and the primary one. `audit` arrives here with the evidence-backed roster
 (`references/org-design.md`); this authors it as a batch.
 
-1. **Confirm ratification.** The roster was seen and approved by the user. Without that, stop — a
-   company is never created from an unratified proposal.
+1. **Confirm the roster is evidence-backed.** Every department cites the evidence that warranted it.
 2. **Order the batch: Leads before their ICs, CEO first if there is one.** An IC's `ORG-CHAIN`
    escalation target must exist before the IC does, or the first thing it learns is that its manager is
    missing.

@@ -4,22 +4,23 @@
 executes its own recommendations.
 
 ```
-/workforce audit            full run — the Step 0 disclaimer IS the consent
+/workforce audit            full run — running the command IS the consent
 /workforce audit --review   full scan and plan, ZERO writes
 /workforce audit --quick    frontmatter, chart drift, and budget only
 ```
 
-**Autonomy model, inherited from claude-enforcer's ratified design:** the disclaimer is the consent;
-there is no DEFER tier; **agent panels supply judgment, never user questions**; failures land as ✗ in
-the Execution Summary with the step they failed at, never as "run this command yourself."
+**Autonomy model, inherited from claude-enforcer's ratified design:** running the command is the
+consent; the backup is taken automatically; companions install on absence; the org is designed from
+evidence and built. **The only question is the payroll picker** — which model and effort to run at each
+tier. Everything else is resolved by agent panels. Failures land as ✗ in the Execution Summary with the
+step they failed at, never as "run this command yourself."
 
 ---
 
 ## Steps 0 through 0.6 — the setup gates
 
-**Specified in `references/audit-setup.md`, not here.** Consent, backup, companion skills, the payroll
-picker, VCS preflight, and the canary fixtures — plus the question budget that four of the five slots are
-spent against.
+**Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
+the payroll picker (the one question), VCS preflight, and the canary fixtures.
 
 Run them in order and carry their outcomes forward, because three of them change what the rest of this
 file may do: the backup state gates conversion's destructive step, the payroll answers are what Step 6's
@@ -81,7 +82,7 @@ is a project whose work has not been written down yet.
 1. **Say what was found and what was not.** "No `CLAUDE.md`, no source, no build tooling — this looks
    like a brand-new project."
 2. **Run `charter`** (`charter.md` § Brand-new project). Its interview establishes what the project is
-   going to be. This consumes question slot 5, which org ratification would otherwise have used.
+   going to be. This is the one additional question a charter-first audit asks beyond the payroll picker.
 3. **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and
    everything downstream reads it.
 4. **Design the org from the charter.** A stated intent *is* evidence: "a Next.js marketing site with a
@@ -105,11 +106,11 @@ fraction of the project.
 by name. A fresh project is the audience that needs the most help, not the least. Greenfield proceeds
 through Steps 2, 4, 5, 6, 7 — skipping only Step 3, which has nothing to classify.
 
-**The setup questions fire in every mode, greenfield included.** claude-enforcer's
+**The payroll picker fires in every mode, greenfield included.** claude-enforcer's
 `INC-2026-06-07-bootstrap-onboarding-skip` records exactly this being skipped on fresh projects — the
 audience that most needed it — because a blanket "skip the per-skill steps" swallowed the setup
-questions with them. A fresh project is where the payroll picker and the companion gate matter *most*:
-nothing is configured yet. **No mode exempts a sanctioned question.**
+with them. A fresh project is where the payroll picker matters *most*: nothing is configured yet.
+**No mode exempts the payroll picker.**
 
 ## Step 1b — Registry census: agents and hooks (before anything is staged)
 
@@ -296,36 +297,22 @@ Record the result and cite it in the org chart header either way.
 
 ## Step 5 — Ratify, then author
 
-**Step 5-setup — org ratification (question slot 5, first audit only).** One `AskUserQuestion` call
-carrying several objects — the same one-call/one-slot pattern the payroll picker uses, so this adds no
-question slot beyond the one already reserved.
+**No ratification question.** The panel designs the org from evidence, and the audit builds it. The
+closing report (Step 7) shows the full roster with the evidence cited for every role — the user sees
+what was built and why, and `--review` is the path for seeing it before anything is written.
 
-The **roster object always renders**: departments, employees, what each owns, and **the evidence cited
-for each**. A company is never created without the user seeing it first, and a roster whose reasoning
-cannot be checked is a roster that cannot be corrected.
+**The roster covers every department the evidence warrants — every one, with the minimum viable
+headcount per department.** An audit that builds a fraction of the project teaches its first user to
+distrust it.
 
-**The recommended option is the full evidence-backed roster — every department the evidence warrants,
-with the minimum viable headcount per department.** Trimmed alternatives may appear as other options,
-but the default a new user picks by trusting "(Recommended)" must cover all the work the project
-involves. An audit that recommends a fraction of the project teaches its first user to distrust it.
-
-**Under `succession: declared`, a demotion object renders too — naming every skill by name.** Setting the
-marker declares an intent; it does not ratify a specific list, and the list is the part carrying the blast
-radius. Show which skills become stubs, which still refuse and under which rule, and that `disband` reverses
-it. The marker says *take the library over*; this object is where the user sees what that turned out to mean.
-It rides in the same call, so it costs no additional question slot.
-
-Additional objects render only where the evidence could not settle something that changes the roster —
-what work to hand off first, what must never happen without review, what a model should not do here at
-all (`references/org-design.md` § the greenfield questions). Ask nothing the evidence already answered.
-
-**Suppressed in headless, non-interactive, and `--quick`** — which then propose nothing and create
-nobody.
+**Under `succession: declared`, the closing report names every demoted skill.** Setting the marker
+declares an intent; the report is where the user sees what that turned out to mean — which skills
+became stubs, which still refused and under which rule, and that `disband` reverses it.
 
 **Then author.** Per employee, through `handbook.md`, under the transaction order in `hire.md`
-§ Transaction Order. Greenfield authors the whole ratified roster as a batch (`hire.md` § Initial
-roster); brownfield authors conversions and new hires together. Every handbook is cold-read before its
-task completes; a probe failure is fixed in the same run, never deferred.
+§ Transaction Order. Greenfield authors the whole roster as a batch (`hire.md` § Initial roster);
+brownfield authors conversions and new hires together. Every handbook is cold-read before its task
+completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
@@ -409,6 +396,6 @@ plainly what would change. `/doctor` reports and then offers "press `f` to have 
 issues" — diagnosis and remedy in one surface, with the gesture separate from the diagnosis so consent
 stays explicit.
 
-This is the middle setting the command surface was missing. `audit` auto-executes on a disclaimer;
-`--review` writes nothing at all. Between them belongs *show me, then do it* — and it costs no question
-slot, because the offer comes after the work is displayed rather than before it is done.
+This is the middle setting the command surface was missing. `audit` auto-executes; `--review` writes
+nothing at all. Between them belongs *show me, then do it* — and it costs no question, because the
+offer comes after the work is displayed rather than before it is done.
