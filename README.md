@@ -84,7 +84,7 @@ Then, from inside a project:
 /workforce audit
 ```
 
-The audit reads the project, designs the smallest company that can do its work, and staffs it. It asks one question — which models to run at each tier — and resolves everything else automatically with agent panels.
+The audit reads the project, designs the smallest company that can do its work, and staffs it. It asks one question (which models to run at each tier) and resolves everything else automatically with agent panels.
 
 It also works on an empty project. With no skills, no tests and no git, it designs from what it can see and tells you what it couldn't. Thin evidence means a small roster, which is the right answer for a project that hasn't been built yet.
 
@@ -94,15 +94,15 @@ A role whose verification can't be named is never hired. It gets reported unstaf
 
 One question. Everything else is automatic.
 
-**Payroll.** Two screens. The first asks which model to run at each tier — CEO, Lead, IC — plus which model to use for creative work. The second asks the effort level for each tier and which departments count as creative. Current values are pre-selected, so when nothing changed you're confirming with one click. The closing report prints a receipt showing every resolved value and where it came from.
+**Payroll.** Two screens. The first asks which model to run at each tier (CEO, Lead, IC) plus which model to use for creative work. The second asks the effort level for each tier and which departments count as creative. Current values are pre-selected, so when nothing changed you're confirming with one click. The closing report prints a receipt showing every resolved value and where it came from.
 
 Everything else happens without asking:
 
 - **Backup** is taken automatically before anything is written. It enables `disband` and `restore` later.
 - **Companion skills** (`org`, `operating-principles`, `personnel-ledger`, and the two evaluator catalogs) are installed when absent.
-- **The org** is designed from evidence — the project's layout, tooling, build commands, git history, and existing skills — and built. The closing report shows the full roster with the evidence behind every role.
+- **The org** is designed from evidence (the project's layout, tooling, build commands, git history, and existing skills) and built. The closing report shows the full roster with the evidence behind every role.
 
-If you want to preview the plan before it runs, use `audit --review` — it does the full analysis and writes nothing.
+If you want to preview the plan before it runs, use `audit --review`. It does the full analysis and writes nothing.
 
 ## Talking to the Company
 
@@ -244,9 +244,9 @@ Some of it arrived as hard-won lessons rather than as code. A checksum generator
 
 **If you run claude-enforcer today**, install this and run `/workforce audit`. It reads your existing skills, converts the ones that encode one actor's job, and leaves the rest alone. Skills that create or dispatch agents stay skills, which is why `skill-builder` and `/route` are classified as orchestrators and left in place. Nothing is deleted without a backup, and `disband` reverses the whole thing.
 
-**By default that is a coexistence pass, and on a library the enforcer built it converts very little** — skills carrying its `origin:` markers are refused, because a generator that is still running would rewrite them and leave two live copies of one job. That default is deliberately cautious, and on a real migration it is the wrong answer: the audit reports how many skills are eligible only under succession, and you turn it on with `<!-- succession: declared -->` in `.claude/workforce/org-config.md`.
+**By default that is a coexistence pass, and on a library the enforcer built it converts very little.** Skills carrying its `origin:` markers are refused, because a generator that is still running would rewrite them and leave two live copies of one job. That default is deliberately cautious, and on a real migration it is the wrong answer. The audit reports how many skills are eligible only under succession, and you turn it on with `<!-- succession: declared -->` in `.claude/workforce/org-config.md`.
 
-**Succession is still not "convert everything."** Orchestrators stay skills, reference data and lookup tables stay skills, anything marked `disable-model-invocation: true` stays, and anything whose frontmatter will not parse stays. What you end up with is an org plus the indexes and dispatchers it reads — which is the point of the takeover rather than a limitation of it.
+**Succession is still not "convert everything."** Orchestrators stay skills, reference data and lookup tables stay skills, anything marked `disable-model-invocation: true` stays, and anything whose frontmatter will not parse stays. What you end up with is an org plus the indexes and dispatchers it reads. That is the point of the takeover, not a limitation of it.
 
 Where a new employee's job overlaps an agent or a skill you already had, the audit says so and leaves both in place. It reports the overlap, names the command that would resolve it, and stops there. Deciding that something you wrote is no longer needed is yours to make, not the audit's.
 
@@ -307,7 +307,7 @@ Special thanks to Wouter Dieters, who helped me connect organizational theory to
 
 Thanks to Sjoerd Tiemensma, who convinced me to toss CLAUDE.md in favor of more agency. That nudge cleared the path for agents to own their own context instead of inheriting a shared script.
 
-Thanks to Jeff Polack, who pointed out that this should support a personal install. That turned out to reshape the whole design: once the skill had to serve every project from one copy, no project-specific content could live inside it, and updating became a clean replacement instead of a merge.
+Thanks to Jeff Polack, who pointed out that this should support a personal install. That turned out to reshape the whole design. Once the skill had to serve every project from one copy, no project-specific content could live inside it, and updating became a clean replacement instead of a merge.
 
 Thanks also to [Autonomee](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together some of the sharpest minds in the business.
 
