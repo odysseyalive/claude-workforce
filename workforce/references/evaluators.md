@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -67,6 +67,84 @@ that produces no prose — the catalog still installs, so any employee can self-
 nobody manages and nothing dispatches to is a pass-through hop.
 
 ---
+
+## Converting a customized evaluator — what "converts" actually produces
+
+`audit-setup.md` (§ Three states, not two) says a customized companion **converts**, and said nothing
+about what that yields. Found by running it: the state was named, the wrong actions were forbidden, and the right
+one was never specified — this project's signature failure, committed while fixing that class.
+
+**The disposition is SPLIT**, and it falls out of the two-layer design above rather than being a new
+idea. Four destinations:
+
+| Destination | What goes there |
+|---|---|
+| **stays exactly where it is** | the catalog, with **every customization intact** — inversions, retargeted vocabulary, user spans, deliberately-inert inherited directives. It becomes the employee's grounding library, at its existing path |
+| **the employee** | an evaluator IC, hired and made the catalog's Records Owner. Its `## Procedure` reads the catalog; it does not restate it |
+| **the supersession register** | which shipped entries this project has overridden — see below |
+| **deleted** | nothing. A companion catalog is reference data (RETAIN rule 4 applies to its content); the conversion adds an owner, it does not remove a file |
+
+**Never merge the shipped copy into it.** The shipped catalog is a *seed* for projects that have none
+(§ Seeding). Where one already exists, that ship has sailed — the project's copy is canonical and the
+shipped one is only a source of *new* entries, through the append below.
+
+### The supersession register
+
+The append rule says *"check whether the shipped entry is one the project has superseded"*, and until
+there is a register, that check is a fresh judgment made by reading prose on every run — which is the
+kind of check that quietly stops happening.
+
+So conversion writes one, at the catalog's own root, listing every shipped entry this project has
+overridden and the customization that overrode it:
+
+```markdown
+| Shipped entry | Superseded by | Where | Since |
+|---|---|---|---|
+| palette variety across a set | inverted — a system is recognisable when colours repeat | `.claude/skills/image-eval/references/graphic-system.md` | 2026-07-22 |
+| watercolour base style | drawn graphic system | SKILL.md § Directives (amendment) | 2026-07-22 |
+```
+
+**The append reads this register, not the prose.** An entry listed here is reported and skipped; anything
+else lands. **A register that cannot be written — no machine-owned region — makes the whole catalog
+`catalog-unappendable`**, which is the existing state and the correct outcome: report the entries that
+would have been added, and write nothing.
+
+**Conversion never invents a row.** Each one cites the customization that supersedes it, by path. A row
+with no citation is a guess about the user's intent, and the register exists precisely so nobody has to
+guess twice.
+
+**Derive rows from STRUCTURE, never from a prose grep for "supersede".** Tried on the first run: a
+regex over that word returned exactly one row, and it was a fragment of an unrelated sentence about a
+stale model mapping. A scrape is not a citation — it is an invention with a line number attached, which
+is worse than an empty register because it looks sourced.
+
+The structured evidence is the dated amendment the project already writes. `/image` and `/image-eval`
+record their inversions the way this project's own directives rule requires — **superseded by dated
+amendment, never edited** — so a row comes from:
+
+| Source | Row |
+|---|---|
+| an `origin: user` span whose attribution line names what it supersedes | the named entry, that span's path, its date |
+| a `supersedes:` key in a marker's own attributes | same |
+| anything else | **no row.** Report the file as *possibly customized, supersession undetermined* and let the append skip the whole catalog rather than half of it |
+
+**An empty register on a customized catalog is a legitimate, reportable outcome** — it means the
+customizations exist and none of them was recorded as superseding a shipped entry. The safe response is
+`catalog-unappendable`, not an append against a register nobody could build.
+
+**And say what that costs, every run — because the safe outcome is also a permanent one.** A catalog
+left unappendable never receives another shipped entry, which is the sweep-exclusion problem in a
+different file: caution that becomes neglect when nothing surfaces it.
+
+```
+Catalogs   4 customized · 1 register derived (image, 1 row) · 3 unappendable, register empty
+           23 shipped entries withheld — record a supersedes: attribute to unblock
+```
+
+Measured on the first run of this path. `/image` records its inversion structurally — a `supersedes:`
+attribute on a user span — and derived cleanly. **`/image-eval`'s palette inversion is just as real and
+is written only in prose**, so it derived nothing and its whole catalog is withheld. That is the
+correct behavior and an unhelpful outcome, and the counted line is what keeps the second half visible.
 
 ## Seeding the catalog
 
