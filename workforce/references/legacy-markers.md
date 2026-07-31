@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 8 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 9 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —
@@ -30,7 +30,7 @@ Stated once. `bin/check` fails on restatement elsewhere.
 | code-eval embed | `<!--\s*CODE-EVAL-EMBED START` | scaffolding |
 | model-lane gate | `<!--\s*MODEL-LANE-GATE START` | scaffolding |
 | lane-agent embed | `<!--\s*LANE-AGENT-EMBED START` | scaffolding |
-| checksum sidecar | `.directives.sha` at a skill root | scaffolding |
+| integrity sidecar | a dotfile at a skill root whose body is hex digests — **by shape, never by filename**. `.directives.sha` is this project's own and is never swept as a predecessor's | scaffolding |
 | predecessor ledger | a `ledger/{incidents,decisions,patterns,flows}/` tree | **data — migrate** |
 
 **This table is a floor, never the population.** Any `<!-- NAME START -->` / `<!-- NAME END -->` pair
@@ -110,6 +110,37 @@ rewrites on its next run. Same destination as `f1`, reached from below the floor
 
 **Report the unattributable population as its own number.** `0 unattributable` is a measurement;
 folding those files into "hand-authored" is an assertion nobody made deliberately.
+
+### A hand-edited generated block — the marker lies, and the sidecar is the only tell
+
+Every rule here keys on the marker, and a marker says *who emitted the block* — never *who last wrote
+its contents*. **A user editing inside `origin: <generator> | modifiable: true` produces a block the
+whole design treats as disposable machinery and which is, in substance, their work.**
+
+Fixture `f7-edited-generated-blocks`, 2026-07-31. Two skills, identical marker structure. One block is
+as its generator emitted it; the other the user rewrote — *"push the tag before the artifact. We learned
+this the hard way in March."* Nothing in the marker distinguishes them, and under succession both are
+scaffolding.
+
+**The generator's own integrity sidecar is the only evidence**, and it is exactly what sidecars are for:
+a recorded hash of what was emitted. Where the recorded hash and the live block disagree, **the block
+has been edited since generation** — that is the detection.
+
+| State | Reading |
+|---|---|
+| sidecar present, hash **matches** | as emitted. Ordinary scaffolding |
+| sidecar present, hash **differs** | **hand-edited. Treat as user content**: extract verbatim before any removal, and report it |
+| **no sidecar** | undetermined — never "unedited". Report the population and prefer extraction |
+
+**Detect the sidecar by SHAPE, not by one predecessor's filename.** `.directives.sha` is what
+claude-enforcer happens to call it; `f7`'s generator writes `.quarry.sha`, and a detector keyed to the
+first name counted zero — the same fitting failure as the ownership detector, in a different file. A
+dotfile at a skill root whose body is hex digests is an integrity sidecar whoever wrote it.
+
+**This is a detection with a real false-negative rate, and saying so is the point.** A generator that
+ships no sidecar leaves no way to tell an edited block from a fresh one. Where that is the case, the
+honest position is `undetermined` and the safe action is extraction — never a silent classification as
+machinery.
 
 ### An unpaired marker is REPORTED, and repaired only inside a family workforce owns
 

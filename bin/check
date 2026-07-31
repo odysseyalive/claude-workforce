@@ -774,6 +774,21 @@ check(
     "of them. Two in a tree and the second loses its protection",
 )
 check(
+    "legacy-markers: a hand-edited generated block is its own state",
+    "the marker lies, and the sidecar is the only tell" in lm
+    and "hand-edited. Treat as user content" in lm
+    and "SHAPE, not by one predecessor's filename" in lm,
+    "a marker says who EMITTED a block, never who last wrote its contents; a user "
+    "editing inside a modifiable region produces work the design treats as disposable",
+)
+check(
+    "baseline: the census reads the journal and detects sidecars by shape",
+    "INTERRUPTED TRANSACTION" in _bl and "integrity_sidecars" in _bl
+    and "SIDECAR_NAME_RX" in _bl,
+    "precondition 4's entire subject is an interrupted prior run and the census "
+    "never read the journal; and sidecars were matched by one predecessor's filename",
+)
+check(
     "legacy-markers: unattributable is not unowned",
     "The floor: a generator that emits no markers at all" in lm
     and "Unattributable is NOT unowned" in lm

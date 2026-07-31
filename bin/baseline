@@ -70,6 +70,13 @@ STATE_NAME_RX = re.compile(
 # Two distinct categories, deliberately not merged. A credential must never be
 # archived or committed; a host-local sentinel is merely disposable. Conflating
 # them would either over-warn on `task-cache.json` or under-warn on a real token.
+# A generator's integrity sidecar, detected by SHAPE not by filename. Keying on
+# `.directives.sha` — one predecessor's name — made fixture f7's `.quarry.sha`
+# invisible, the same name-fitting failure as the ownership detector. A dotfile at
+# a skill root whose body is hex digests is a sidecar whoever wrote it.
+SIDECAR_NAME_RX = re.compile(r"^\.[\w.-]*\.(sha|sha256|lock|hash)$|^\.[\w-]*(sha|hash|lock)[\w.-]*$", re.I)
+SIDECAR_BODY_RX = re.compile(r"\b[0-9a-f]{32,64}\b")
+
 CRED_RX = re.compile(r"(token|secret|credential|auth|-key|\.env)", re.I)
 HOST_LOCAL_RX = re.compile(r"^\.(.*(cache|acked|nudge|-ts|mode|active|pending|reviewed|advised))", re.I)
 
@@ -151,6 +158,16 @@ def census(root):
     # commits, two package manifests, a settings file) produced output identical
     # to an empty directory. A measurement with no signal on the primary path is
     # not a conservative measurement; it is an absent one.
+    # An interrupted prior run is precondition 4 of every transaction, and the
+    # census never looked. Fixture f9 carries a WRITE-INTENT row and reported clean.
+    jrl = os.path.join(claude, "workforce", ".conversion-journal.md")
+    jbody = read(jrl)
+    out["journal"] = {
+        "path": os.path.relpath(jrl, root) if jbody else None,
+        "rows": jbody.count("\n| 0") if jbody else 0,
+        "write_intent": jbody.count("WRITE-INTENT") if jbody else 0,
+    }
+
     out["greenfield"] = gf = {}
     gf["claude_md_bytes"] = len(read(os.path.join(root, "CLAUDE.md")).encode())
     manifests = ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "mix.exs",
@@ -478,9 +495,12 @@ def census(root):
         "skills_naming_route_in_prose": sorted(
             n for n, r in skills.items() if r.get("names_route")
         ),
-        "directives_sha_sidecars": sorted(
-            n for n, r in skills.items()
-            if ".directives.sha" in r.get("root_dotfiles", [])
+        # By SHAPE, not by one predecessor's filename. `.directives.sha` was the
+        # only name matched, so fixture f7's `.quarry.sha` — same artifact, same
+        # role, different generator — counted zero.
+        "integrity_sidecars": sorted(
+            f"{n}/{f}" for n, r in skills.items() for f in r.get("root_dotfiles", [])
+            if SIDECAR_NAME_RX.match(f)
         ),
         "datasets": sorted(datasets, key=lambda d: d["path"]),
         "dataset_bytes_total": sum(max(0, d["bytes"]) for d in datasets),
@@ -559,7 +579,12 @@ def report(c):
     p(f"| skills with no `origin:` marker | {len(c['skills_with_no_origin_marker'])} |")
     for k, v in sorted(c["marker_totals"].items()):
         p(f"| marker `{k}` | {v} |")
-    p(f"| `.directives.sha` sidecars | {len(c['directives_sha_sidecars'])} |")
+    p(f"| integrity sidecars (any generator) | {len(c['integrity_sidecars'])} |")
+    _j = c.get("journal") or {}
+    if _j.get("write_intent"):
+        p(f"| **INTERRUPTED TRANSACTION (journal WRITE-INTENT rows)** | **{_j['write_intent']}** |")
+    elif _j.get("path"):
+        p(f"| conversion journal | {_j['rows']} rows, 0 at WRITE-INTENT |")
     p(f"| skills naming `/route` in prose | {len(c['skills_naming_route_in_prose'])} |")
     p(f"| datasets (persistent state files) | {len(c['datasets'])} |")
     p(f"| dataset bytes | {c['dataset_bytes_total']} |")
