@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 38 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 39 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -219,9 +219,14 @@ produces a recommended option that undersells the project to a new user who trus
 Then, per department, propose the smallest roster that covers its work. Each role carries: what it
 owns, **the verification command it will use**, and the evidence justifying it.
 
-**Drop any role whose verification cannot be named.** A role with a runnable check is an employee; a
-role without one is a job title, and it will report success it did not earn. Say so and leave it
-unhired.
+**Drop any role whose verification cannot be named — after checking whether it may be provisional.**
+A role with a runnable check is an employee; a role without one is a job title, and it will report
+success it did not earn. But *cannot be named* and *does not exist yet* are different states, asked per
+role (`org-design.md` § Provisional verification): where the project's own evidence names the check that
+will exist, the role is hired provisional and reports `UNVERIFIED`, never `PASS`. Where nothing names
+one, it is not hired. **Print both counts** — real and provisional, with each provisional employee's
+named check and the evidence line it came from — so a project staffed entirely on promises cannot look
+like one staffed on checks.
 
 **Hire the smallest company that can do the work.** A single coherent job needs no CEO — a CEO with one
 report is a wasted hop. Growth is cheap: `hire` adds one employee in one command, on evidence that is

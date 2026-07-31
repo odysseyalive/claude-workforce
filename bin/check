@@ -681,6 +681,58 @@ check(
     "a positive claim is read charitably by whoever matches an ask against it; the "
     "boundary is the cell that cannot be",
 )
+# ── Provisional verification is scoped by the ROLE, not the mode ─────────────
+# "Provisional applies to charter-first only" keyed the escape to the MODE FORK,
+# which asks whether skills exist. Whether a CHECK exists is a different question,
+# asked per kind of work — and a project can be brownfield by that fork while
+# having no build, test, or lint at all.
+#
+# The mock audit measured what that produced on apps-odyssey-alive, and it was not
+# an empty chart: content and design hired (their evaluator catalogs ship with the
+# project, so a catalog grep is a real tier-3 check), engineering dropped, on a
+# project whose stated next action is to build. Plausible, confident, and missing
+# the department the project exists for.
+_od = read("workforce/references/org-design.md")
+# The retracted phrase must SURVIVE, marked as retracted — this project writes down
+# what it reversed rather than deleting it (platform.md § the contradiction is
+# written down). A first draft asserted the phrase was ABSENT and failed against the
+# retraction sentence quoting it, which would have taught the fix to erase its own
+# history. So: it may appear once, and only inside the retraction.
+_pv_hits = _od.count("charter-first only")
+# Contiguous fragment only. The full retraction sentence wraps between "applies to"
+# and "charter-first only", so matching it whole silently never fires — the third
+# time this hard-wrap has broken an assertion in this file.
+_pv_retracted = 'An earlier form read *"provisional applies to' in _od
+check(
+    "org-design: provisional is scoped by the role's check, not by the project mode",
+    "The scope is the ROLE, not the project mode" in _od
+    and "does the check for THIS role's work exist yet" in _od
+    and _pv_hits == 1 and _pv_retracted,
+    f"the mode-scoped rule must appear exactly once and only as a retraction "
+    f"(found {_pv_hits}, retracted={_pv_retracted}). Keying the escape to the mode "
+    "fork drops every role that would build the tooling the rule demands — unevenly, "
+    "which is worse than dropping all of them",
+)
+check(
+    "org-design: an available check is never downgraded to a promise",
+    "Provisional is **refused**" in _od,
+    "without this, provisional widens from an admission into a way to skip naming a "
+    "check that already exists",
+)
+check(
+    "org-design: the named check is quoted from evidence, never invented",
+    "never invented" in _od and "a fabricated command is the" in _od,
+    "principle 5 forbids inventing a procedure step; a fabricated command is the same "
+    "invention with a worse failure, because it will be typed",
+)
+check(
+    "org-design: the real/provisional split is printed, so a lopsided org is visible",
+    "Report the split, always" in _od and "3 provisional" in _od
+    and "Print both counts" in aud,
+    "a run staffed entirely on promises must not look like one staffed on checks; the "
+    "count is what made the lopsided shape visible in the first place",
+)
+
 # ── `--review` writes nothing, including in the gates that write ─────────────
 # Found by PREPARING to run the first mock audit, before a step executed. A prior
 # pass fixed the two steps that contradicted "--review writes nothing" — both in
@@ -1312,6 +1364,7 @@ try:
         "ds": "workforce/references/data-skills.md",
         "vfy": "workforce/references/procedures/verify.md",
         "_asu": "workforce/references/audit-setup.md",
+        "_od": "workforce/references/org-design.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",
         "_pfp2": "workforce/references/procedure-for-procedures.md",

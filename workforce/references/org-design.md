@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -61,11 +61,25 @@ see below.
 
 ---
 
-## Provisional verification — pre-code roles
+## Provisional verification — roles whose check does not exist yet
 
-The rule that a role without a nameable check is not hired is right, and on a brand-new project it would
-drop **every** role: no build tooling exists yet, so no check exists yet. Applied literally there, a good
-rule refuses to staff a legitimately new project.
+The rule that a role without a nameable check is not hired is right, and where the tooling has not been
+built yet it drops every role that would have built it. Applied literally, a good rule refuses to staff
+the work that would produce the checks it demands.
+
+**The scope is the ROLE, not the project mode.** An earlier form read *"provisional applies to
+charter-first only"*, and that was wrong in a way only a run against a real tree showed. The mode fork
+keys on whether skills exist; whether a *check* exists is a different question, asked per kind of work.
+A project can be brownfield by that fork — plenty to read — and still have no build, no test, and no
+lint, because the instruction layer was authored before the code.
+
+**What that produced is worse than an empty org, and this is the reason the scope changed.** Measured on
+`apps-odyssey-alive` (`plan/mock-audit-apps-odyssey-alive-2026-07-31.md`): content and design were
+hired, because their evaluator catalogs ship with the project and a catalog grep is a real tier-3 check.
+Engineering was dropped, because no build or test command exists yet — **on a project whose entire
+stated next action is to build.** The result is not a chart that is obviously empty. It is a confidently
+staffed, plausible-looking org missing the department the project exists for, which is the reads-as-success
+failure this codebase refuses everywhere else.
 
 So a role may be hired with a **provisional** verification, under three conditions:
 
@@ -81,8 +95,30 @@ So a role may be hired with a **provisional** verification, under three conditio
 still-provisional employee** as a standing finding. An org that stays provisional for months is an org
 whose employees have never proven anything, and that should be visible rather than quietly forgotten.
 
-**Provisional applies to charter-first only.** On a project that already has tooling, a role whose check
-cannot be named is still not hired — the check exists, so name it.
+**Provisional is decided per role, by one question: does the check for THIS role's work exist yet?**
+
+| For this role's work, the check… | Then |
+|---|---|
+| **exists** | name it. Provisional is **refused** — an available check is never downgraded to a promise |
+| **does not exist yet, and the project's own evidence names the one that will** | **provisional**, under the three conditions above |
+| **does not exist, and nothing in the evidence names one** | **not hired.** Unchanged, and this is the rule doing its job |
+
+**The named check is quoted from evidence, never invented.** `CLAUDE.md`, a README, a stack convention
+the project states, a sibling project it declares itself a copy of — the command comes from a line
+someone wrote. Principle 5 governs: *never invent a procedure step*, and a fabricated command is the
+same class of invention with a worse failure, because it will be typed. Cite where it came from in the
+`EMP` file.
+
+**Report the split, always.** The closing report names every provisional employee, its named check, and
+the evidence line the check came from — and states the count beside the non-provisional one:
+
+```
+Verification   7 employees · 4 real · 3 provisional (engineering: pnpm verify / pnpm test / pnpm lint — CLAUDE.md §Build)
+```
+
+Printing both halves is what makes a lopsided org visible **as it is built** rather than a month later.
+A run where one department is entirely provisional and another entirely real is not necessarily wrong —
+that is the honest shape of a project mid-scaffold — but it is never allowed to be *invisible*.
 
 ---
 

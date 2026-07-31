@@ -83,9 +83,22 @@ missing the department the project exists for — which is exactly the failure m
 everywhere: reads as success.
 
 **Fix, unchanged from the first review and now with evidence:** scope provisional verification to
-*"the named check does not exist yet,"* not to *mode*. `CLAUDE.md` already names the checks in the
-required form — `pnpm verify`, `pnpm test`, `pnpm lint` — and `org-design.md` already demands
-`UNVERIFIED`-never-`PASS` from a provisional employee.
+*"the named check does not exist yet,"* not to *mode*.
+
+### Re-run after the patch — same tree, same step
+
+| Role's work | Check today | Verdict under the patched rule |
+|---|---|---|
+| Engineering | `package.json`, `scripts/verify.sh`, `tests/` — **all absent** | **provisional, hired.** Evidence names them: `CLAUDE.md:135-138` — `pnpm build`, `pnpm lint`, `pnpm verify` |
+| Content · Design | `text-eval`, `code-evaluator`, `image-eval` catalogs **present** | **real check.** Provisional *refused* — an available check is never downgraded |
+
+The lopsided shape is gone, and the split is printed rather than inferred. **Target untouched: 0 files.**
+
+*The re-run also caught a fabricated command.* The paragraph this replaced cited `pnpm test` among the
+named checks; `CLAUDE.md` names `build`, `lint`, and `verify`, and routes runtime verification through
+`/odyssey-apps test` instead. Nothing in the tree ever said `pnpm test` — I did. The patch's own
+*quoted-from-evidence, never invented* rule is what forced the check that found it, which is the rule
+working on its author within an hour of being written.
 
 ---
 
