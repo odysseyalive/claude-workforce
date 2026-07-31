@@ -74,6 +74,16 @@ CRED_RX = re.compile(r"(token|secret|credential|auth|-key|\.env)", re.I)
 HOST_LOCAL_RX = re.compile(r"^\.(.*(cache|acked|nudge|-ts|mode|active|pending|reviewed|advised))", re.I)
 
 
+def ANCHORED(rx):
+    """A marker is a span opener only when it STARTS a line.
+
+    One definition, used by the totals and by the pairing check. They disagreed
+    until 2026-07-31: pairing anchored, totals did not, so the same file counted
+    one population two ways and the extraction gate blocked on the inflated one.
+    """
+    return re.compile(r"^[ \t]*" + rx.pattern, re.M)
+
+
 def sh(args, cwd):
     try:
         r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=60)
@@ -139,6 +149,7 @@ def census(root):
     # ── Skills ───────────────────────────────────────────────────────────────
     skills = {}
     marker_totals = Counter()
+    mention_totals = Counter()
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
@@ -172,11 +183,25 @@ def census(root):
             rec["quarantined"] = "no SKILL.md"
             quarantined.append(name)
 
+        # ANCHOR THE TOTALS TOO. The pairing block below has line-anchored since it
+        # was written, and documents why: a marker quoted inside a sentence is
+        # documentation about the format, not a span opener. The TOTALS did not
+        # anchor, so one file computed the same population two ways.
+        #
+        # Measured on the first sweep ever run: `origin_user_immutable` counted 68
+        # naive against 37 anchored — 31 mentions, 46% inflation — and the
+        # extraction gate blocked a completable sweep because the census it was
+        # asserting against was counting prose. The mentions are REPORTED rather
+        # than dropped; a number that shrank without explanation is its own defect.
         for key, rx in MARKERS.items():
-            n = len(rx.findall(body))
+            n = len(ANCHORED(rx).findall(body))
+            mentions = len(rx.findall(body)) - n
             if n:
                 rec["markers"][key] = n
                 marker_totals[key] += n
+            if mentions:
+                rec.setdefault("marker_mentions", {})[key] = mentions
+                mention_totals[key] += mentions
 
         # PAIRING. A marker sweep deletes opener-to-closer, so an unpaired marker
         # either survives as residue (orphan closer) or swallows everything up to
@@ -188,7 +213,7 @@ def census(root):
         # the exclusion rule would have silently skipped a legitimate file. A
         # false positive on an exclusion gate is expensive: it looks like caution
         # and behaves like a dropped file.
-        anchored = lambda rx: re.compile(r"^[ \t]*" + rx, re.M)
+        anchored = lambda rx: re.compile(r"^[ \t]*" + rx, re.M)  # str patterns (PAIRS)
         for key, (o_rx, c_rx) in PAIRS.items():
             o = len(anchored(o_rx).findall(body))
             c = len(anchored(c_rx).findall(body))

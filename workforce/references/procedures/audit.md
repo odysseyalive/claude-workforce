@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 39 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 7 assertion(s) in bin/check name this file; 40 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -565,8 +565,24 @@ prevent.
 
 ### After the sweep
 
-- **Rewrite dangling references.** Any surviving skill that named a removed command gets that reference
-  stripped. A gate telling a reader to invoke something deleted is worse than no gate.
+- **Rewrite dangling references — and this is a procedure, not a sentence.** Any surviving skill that
+  named a removed command gets that reference stripped. A gate telling a reader to invoke something
+  deleted is worse than no gate.
+
+  **Measured on the first sweep ever run: removing ONE `SKILL.md` left 16 surviving files naming the
+  removed command.** At that scale "stripped" has to say what it removes, because the choices are not
+  equivalent:
+
+  | The reference sits in | Strip |
+  |---|---|
+  | a machine-owned marker block whose whole purpose was that command | **the whole block**, markers included |
+  | a sentence inside otherwise-live prose | **the clause**, leaving the sentence grammatical — never the paragraph |
+  | an immutable user span | **nothing.** Report it; the user's words are not edited to tidy up after a sweep |
+  | a `references/` file the sweep kept | same rules — kept files are not exempt, and they are where most of the 16 were |
+
+  **Report the count before and after.** A sweep that removed one file and left sixteen dangling
+  pointers has produced exactly the residue the no-residue directive forbids, and the only way that is
+  visible is a number.
 - **Re-run the hook census** and print **`INV-HOOKS`**. Dead wiring must be **zero**; a nonzero count means a relocation in Step 6
   did not rewrite its registration.
 - **Report as counts**: skills swept, scaffolding blocks removed by marker class, blocks extracted

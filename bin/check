@@ -726,6 +726,48 @@ check(
 _stg = read("workforce/references/staging.md")
 _hire2 = read("workforce/references/procedures/hire.md")
 
+# ── A marker MENTIONED is not a marker PRESENT ───────────────────────────────
+# Found by the first sweep ever run. bin/baseline line-anchored its PAIRING check
+# and documented exactly why — "a marker quoted inside a sentence is documentation
+# describing the format, not a span opener" — while its marker TOTALS did not
+# anchor. One file, one population, two answers.
+#
+# Measured on the target: origin_user_immutable counted 68 naive against 37
+# anchored. 31 mentions, 46% inflation — and the extraction gate blocked a sweep
+# that was completable, because the census it asserted against was counting prose.
+# The dangerous direction is the other one: the sweep removes opener-to-closer, so
+# a mention matched as an opener runs a span to the next closer and takes real
+# content with it.
+check(
+    "audit: stripping a dangling reference says WHAT it removes",
+    "this is a procedure, not a sentence" in aud
+    and "left 16 surviving files naming the" in aud
+    and "the user's words are not edited to tidy up after a sweep" in aud,
+    "removing one SKILL.md left sixteen dangling pointers; at that scale a "
+    "one-line 'stripped' is four different edits, one of which touches an "
+    "immutable span",
+)
+check(
+    "hire: a blocked extraction cannot be mistaken for a complete one",
+    "belong to this run" in _hire2 and "unattributed extraction is not evidence" in _hire2,
+    "the extraction gate blocks AFTER writing part of its output, and precondition "
+    "4 cannot see it — a blocked run writes no journal row at all",
+)
+
+_bl = read("bin/baseline")
+check(
+    "baseline: marker totals and pairing use ONE anchoring rule",
+    "def ANCHORED" in _bl and "ANCHORED(rx).findall(body)" in _bl,
+    "pairing anchored and the totals did not, so the same file counted one "
+    "population two ways; the extraction gate then blocked on the inflated count",
+)
+check(
+    "baseline: excluded mentions are reported, not silently dropped",
+    "mention_totals" in _bl and "REPORTED rather" in _bl,
+    "a number that shrank without explanation is its own defect — the mentions are "
+    "a measurement about the tree, not noise to discard",
+)
+
 # ── Running the transaction order for the first time, 2026-07-31 ─────────────
 # It is declared "used by every conversion and every hire", and T2/T7 both take a
 # <skill>. A hire has none. A reader following it literally hunts for a source
@@ -1524,6 +1566,7 @@ try:
         "_od": "workforce/references/org-design.md",
         "_stg": "workforce/references/staging.md",
         "_hire2": "workforce/references/procedures/hire.md",
+        "_bl": "bin/baseline",
         "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",
