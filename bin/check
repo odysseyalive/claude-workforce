@@ -724,6 +724,30 @@ check(
 # outside this project, so a key or flag NAME read today is renamed next release
 # and the check reports success against a rename. Measure the behaviour.
 _stg = read("workforce/references/staging.md")
+_hire2 = read("workforce/references/procedures/hire.md")
+
+# ── Running the transaction order for the first time, 2026-07-31 ─────────────
+# It is declared "used by every conversion and every hire", and T2/T7 both take a
+# <skill>. A hire has none. A reader following it literally hunts for a source
+# that does not exist — and the honest failure mode is that they invent one.
+check(
+    "hire: the transaction order states what T2 and T7 do on a hire",
+    "On a HIRE, T2 and T7 do not apply" in _hire2
+    and "T8 follows T6 directly" in _hire2 and "N/A (hire)" in _hire2,
+    "the order claims to cover every hire while two of its steps require a source "
+    "skill; a journal with nothing between T5 and T8 is otherwise indistinguishable "
+    "from a conversion whose T7 was skipped",
+)
+# `ls` is aliased on real hosts (eza, lsd, colour wrappers) and the replacements
+# print a HEADER. `ls … | head -1` returns a column heading; `ls | wc -l` returns
+# N+1. Twice now: a skill count off by one, and a transaction precondition that
+# reported a valid backup as missing.
+check(
+    "procedure-for-procedures: handbooks enumerate with find, never with ls",
+    "never with `ls`" in _pfp2 and "header line" in _pfp2,
+    "a cold agent told to enumerate with `ls` gets a header row as data on any host "
+    "with the common aliases, and it reads as a real result",
+)
 
 # ── The first probe ever run returned FAIL, and it was right ─────────────────
 # The handbook came straight from handbook-templates.md and passed Phase A. Its
@@ -1499,6 +1523,7 @@ try:
         "_asu": "workforce/references/audit-setup.md",
         "_od": "workforce/references/org-design.md",
         "_stg": "workforce/references/staging.md",
+        "_hire2": "workforce/references/procedures/hire.md",
         "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",

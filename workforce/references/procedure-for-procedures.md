@@ -1,6 +1,6 @@
 # Procedure for Procedures — how every handbook is authored
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — normative. `handbook`, `hire`, `amend`, and `verify` all assert against
      this file. It governs its own format. -->
 
@@ -58,6 +58,13 @@ instruction; `Read .claude/workforce/org-config.md` is.
 **3. Ground in tools that exist.** `Grep`, `Glob`, and `WebFetch` are **not** granted to subagents
 (`platform.md` fact 4). A step depending on them fails cold with nobody watching. Use `Bash`, an
 explicit `Read` of a known path, or an MCP server — MCP tools *do* reach subagents.
+
+**Enumerate with `find`, never with `ls`.** `ls` is commonly aliased — to `eza`, `lsd`, or a
+`--color` wrapper — and the replacements print a **header line**. A step doing `ls … | head -1` then
+returns a column heading where a path was expected, and `ls | wc -l` returns N+1. This project has
+been bitten twice: a skill count off by one in an early census, and a transaction precondition that
+reported a valid backup as missing (2026-07-31). Both read as data. `find` has no alias convention
+and no header.
 
 **3b. Prefer the mechanical form of a step, every time one exists.** A step that names a command with
 an exit code is cheaper, faster, and *more* verifiable than the same step described in prose for a
