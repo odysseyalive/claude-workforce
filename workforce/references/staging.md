@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 8 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -149,6 +149,44 @@ conditions are reachable.
 `disallowedTools:`, `background:`, `permissionMode`, `maxTurns`. The probe runs under a generic agent
 type and honors **none** of the candidate's frontmatter. Any report claiming otherwise is corrected
 before proceeding.
+
+### `UNAVAILABLE` — when the host will not spawn at all
+
+**A fourth outcome, and it exists for the same reason Phase C's does.** § The three outcomes settles
+this argument already: written with only PASS and FAIL, a gate that requires a spawn deadlocks on every
+host that cannot provide one. Phase B was written with three outcomes and none of them covers *"the
+spawn did not happen."*
+
+The gap is not hypothetical. **A host can suppress subagent spawning by ambient instruction** — a
+policy line, an operator preamble, a setting delivered outside this project — and the failure is silent
+in the worst way: the probe simply does not run, nothing errors, and a handbook can be registered
+looking released. **That is a false PASS on the one gate whose entire job is to catch what the author
+cannot see in their own work.**
+
+| Outcome | Meaning | Consequence |
+|---|---|---|
+| `PASS` / `FAIL:` / `AMBIGUOUS:` | the probe ran | as above |
+| **`UNAVAILABLE`** | the probe could not run — spawning is not available in this session | **register DEGRADED and stated.** Never abort, never infer a PASS |
+
+**DETECT IT BEHAVIOURALLY, NEVER BY CONFIG KEY.** Attempt one throwaway spawn at preflight; whether it
+happens is the measurement. **Never grep a settings file, a cache, or a flag name for it.** Ambient
+policy arrives through channels this project does not control and does not version — a key read today
+is renamed next release, and a name list finds none of the renames while reporting success. This is the
+same rule `legacy-markers.md` states for predecessor detection, and the same rule `platform.md` states
+about documentation: measure the behaviour, never the description of it.
+
+**What DEGRADED costs here, stated every time:**
+
+- Every handbook registered this run carries `Release Record: not probed (spawning unavailable)` —
+  never `probe PASS`, and never a blank that reads like one.
+- The closing report names the state and the **remedy**, which is real: the probe is blocked by an
+  instruction whose own condition is *unless the user asks*, so **an explicit line in the project's
+  `CLAUDE.md` requesting cold-reader agents satisfies it.** Name that as the fix rather than reporting
+  a dead end.
+- `UNAVAILABLE` and `PASS` must never look the same in a report, in the chart, or in an `EMP` file.
+
+**This is a detection, not a prevention** (`enforcement.md`). Workforce cannot lift a host constraint
+and must never describe itself as having done so.
 
 ---
 
