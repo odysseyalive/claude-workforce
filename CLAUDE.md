@@ -93,6 +93,14 @@ measurement contradicts documentation, the measurement wins **and the contradict
 prevent. `Agent(type)` allowlists are discarded inside subagent definitions and `permissions.deny` has
 no caller axis. `enforcement.md` opens with the prevents/detects table; `bin/check` fails on overclaims.
 
+**Assertions match contiguous fragments.** Every reference here is hard-wrapped at ~100 columns, so a
+phrase you read as one string is stored with a newline in it — `"boundary of responsibility"` is not a
+substring of a file that renders it across two lines. The `in` form fails loudly; **the `not in` form
+passes vacuously**, reporting success about a condition it never tested. `bin/check` now lints itself
+for this (parses its own AST, derives the var→file map from `read()` assignments, and flags any literal
+present in its target *only across a wrap*). Its first run found a fourth instance nobody had noticed —
+a dead term masked by an `or` since the day it was written.
+
 **Immutable blocks are sacred.** `<!-- origin: user | immutable: true -->` is never reworded, reordered,
 or summarized. Mechanics implementing a directive live in `references/`, never inside the block.
 
