@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -62,6 +62,58 @@ an employee its handbook forbids. Treat the org chart as a contract, not a sandb
 | Skill | Dispatches to | Why it stayed a skill |
 |---|---|---|
 | /skill-builder | eng-implementer | creates and registers agents |
+
+## Mechanicals
+| Command | Covers | Does NOT cover | Owner | Destructive | Proven | Source |
+|---|---|---|---|---|---|---|
+| `pnpm test` | the whole unit suite | e2e, lint, types | eng-test-writer | no | probe 2026-07-29 | package.json |
+| `scripts/check-ledger.sh` | ledger index = filesystem | record *content* | records-ledger | no | negative test | maintainer |
+
+**What the dispatcher reads before it picks a node** (`procedures/org.md` § Canonical Dispatch
+CHECKPOINT clause 2). Rows come from four places, all of them already in the tree: project command
+definitions, data-skill `## Maintainers` rows (`data-skills.md`), employees' `## Verification`
+commands, and skills whose whole surface is deterministic.
+
+**`Covers` is a coverage claim and the dispatcher reads it literally.** Write what the command
+*wholly* answers, never what it participates in — clause 2 fires on total coverage only, so an
+overstated cell is how a partial answer gets returned as a complete one. When in doubt, narrow it: a
+row that under-claims costs one agent hop, and a row that over-claims returns the wrong answer
+cheaply.
+
+**`Does NOT cover` is the cell that makes the claim checkable, and it is mandatory.** A positive
+coverage claim is read charitably by whoever is matching an ask against it — that is how *"runs the
+tests"* comes to look like it covers a type error. A stated boundary cannot be read charitably: the
+dispatcher checks the ask against it and any overlap disqualifies the row outright. **An empty
+boundary cell is not "covers everything"; it is an unfinished row**, and `org index` drops it.
+
+**`Proven` records where the confidence comes from**, and the vocabulary is closed:
+
+| Value | Meaning |
+|---|---|
+| `negative test` | a maintainer row — its script was made to fail (`data-skills.md` § Maintainers) |
+| `probe <date>` | an employee's `## Verification` command, exercised at that employee's release |
+| `unproven` | nothing has ever confirmed this command does what the row claims |
+
+**`unproven` never blocks and never silently passes.** The row still dispatches — a project's own
+`pnpm test` is usually right — but the announcement carries the word, and the result is reported as an
+exit code **whose coverage claim is unconfirmed**, never as a bare PASS. This is `org-design.md`
+§ Provisional verification applied one layer out: an unproven check is an admission, not a loophole.
+
+**Every row needs a command with an exit code.** A row whose check is a judgment is not mechanical and
+does not belong here — it is an employee's job, and listing it would dress a judgment as a check.
+
+**`Destructive: yes` rows are never auto-run.** They render display-first, like every other
+high-risk command.
+
+**Two rows may never claim total coverage of the same work.** That is a defect in *this table*, not a
+decision for the dispatcher: it means `index` built two answers to one question and left the choice to
+whoever reads it next. `index` detects the overlap and reports both rows; the door refuses to guess
+between them (clause 2). Resolve it by narrowing a `Covers` cell or filling a `Does NOT cover` cell —
+never by deleting a row, which discards a real capability to silence a reporting problem.
+
+**Zero rows is valid and common.** A project with no test command, no maintainers, and no deterministic
+skills has an empty table and every ask goes to clause 3. Write the explicit "no mechanicals" notice
+rather than omitting the section — an absent table and an empty one must not look the same.
 
 ## Roster
 | Employee | Tier | Dept | Reports to | Model / Effort | Owns records | Triggers | Status |

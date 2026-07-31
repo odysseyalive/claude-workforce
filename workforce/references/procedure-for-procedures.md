@@ -1,6 +1,6 @@
 # Procedure for Procedures — how every handbook is authored
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — normative. `handbook`, `hire`, `amend`, and `verify` all assert against
      this file. It governs its own format. -->
 
@@ -58,6 +58,37 @@ instruction; `Read .claude/workforce/org-config.md` is.
 **3. Ground in tools that exist.** `Grep`, `Glob`, and `WebFetch` are **not** granted to subagents
 (`platform.md` fact 4). A step depending on them fails cold with nobody watching. Use `Bash`, an
 explicit `Read` of a known path, or an MCP server — MCP tools *do* reach subagents.
+
+**3b. Prefer the mechanical form of a step, every time one exists.** A step that names a command with
+an exit code is cheaper, faster, and *more* verifiable than the same step described in prose for a
+reasoning agent to perform. `Run \`scripts/check-ledger.sh\`; it must exit 0` beats *"confirm the index
+matches the files on disk"* on every axis that matters, and the difference compounds: a handbook runs on
+every work order, forever, so a step written as prose where a command existed is a cost paid an
+unbounded number of times.
+
+This is the same rule `## Verification` already enforces at tier 1 (`references/verification.md`),
+applied to the **procedure** half of a handbook, where nothing enforced it. Where no command exists,
+one may be worth writing — a mechanical invariant gets a maintainer (`references/data-skills.md`
+§ Maintainers) rather than a paragraph.
+
+**Agency is for judgment, and most asks need it.** This rule never argues for mechanizing work that
+is genuinely a judgment call — dressing one as a check is the failure `verification.md` rejects at
+tier 4. It argues only against the narrower and much more common mistake: an agent hand-performing a
+step that a command already answers. **State which it is.** A step that could have been a command and
+is not says why, in the handbook, in one clause.
+
+**Its enforcement is PROCEDURAL, per rule 8b** — no static check can tell a step that *should* be a
+command from one that correctly is not, because that difference is the judgment the rule is about. So
+`handbook` counts instead, and prints the count on every authoring and every amendment:
+
+```
+Mechanical preference   11 procedure steps · 6 name a command · 4 stated why not · 1 UNSTATED
+```
+
+**The last column is the finding.** A step that neither names a command nor says why it does not is
+the one this rule exists to surface, and a run that cannot print the count did not apply the rule
+(`references/invariants.md` § The rule). Zero is printed like any other number: `0 UNSTATED` is a
+measurement, and silence is not.
 
 **4. Every guardrail is literal.** *"Be careful with deletions"* is not a guardrail.
 *"NEVER delete a file you did not create in this run"* is. Guardrails must contain a literal NEVER,

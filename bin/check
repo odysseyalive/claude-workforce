@@ -618,6 +618,222 @@ check(
     "data-skills.md must state: degraded state may cause more work, never authorize a write",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Mechanical-before-agentic, landed 2026-07-31.
+#
+# Every rung of the dispatch CHECKPOINT chose WHICH AGENT; none asked whether one
+# was needed. The ladder ran "which employee" → "hire one", so the cheapest correct
+# answer — run the thing that already does this — was not on it. An org that spawns
+# a reasoning agent to run a command it owns is both more expensive and LESS
+# verifiable, because the exit code outranks the agent's report.
+#
+# The precedence is worth nothing without the total-coverage rule: a partial match
+# dispatched as if complete returns a wrong answer cheaply, which is strictly worse
+# than the agent hop it saved.
+# ─────────────────────────────────────────────────────────────────────────────
+_org = read("workforce/references/procedures/org.md")
+_ocf = read("workforce/references/org-chart-format.md")
+_pfp2 = read("workforce/references/procedure-for-procedures.md")
+
+check(
+    "org: the dispatch CHECKPOINT weighs mechanical before it picks a node",
+    "MECHANICAL BEFORE AGENTIC" in _org and "LOWEST COMPETENT NODE" in _org
+    and _org.index("MECHANICAL BEFORE AGENTIC") < _org.index("LOWEST COMPETENT NODE"),
+    "clause 2 must precede lowest-competent-node — a precedence rule that runs after "
+    "the node is chosen has already lost the thing it was ordering",
+)
+check(
+    "org: mechanical dispatch fires on total coverage only",
+    "TOTAL COVERAGE ONLY" in _org and "partial match" in _org,
+    "without it, a command that partly answers the ask returns a wrong result cheaply "
+    "— worse than the agent hop it saved",
+)
+check(
+    "org: a destructive mechanical is never auto-run",
+    "destructive" in _org.lower() and "display-first" in _org,
+    "clause 2 would otherwise auto-run a deploy because its coverage claim matched",
+)
+check(
+    "org-chart-format: the Mechanicals table exists and states its zero case",
+    "## Mechanicals" in _ocf and "Destructive" in _ocf and "no mechanicals" in _ocf,
+    "clause 2 dispatches from this table; an absent table and an empty one must not "
+    "look the same to a reader",
+)
+
+# ── The three weak points the design shipped with, closed 2026-07-31 ──────────
+# 1. Coverage is matched by reading a prose cell. A positive claim reads
+#    charitably; a stated BOUNDARY does not, and an unclear match resolves to an
+#    agent rather than to a cheap wrong answer.
+# 2. A row had no negative test while maintainers now do. `Proven` inherits one
+#    where it exists and says `unproven` where it does not — which dispatches, but
+#    never as a bare PASS.
+# 3. Two rows claiming the same work was left to a dispatch-time tiebreak. It is a
+#    defect in the TABLE; the door refuses, `index` reports.
+check(
+    "org: an unclear coverage match resolves to an agent, not to a guess",
+    "UNCLEAR IS NOT TOTAL" in _org and "softest joint" in _org,
+    "clause 2a must say what happens when totality is UNCLEAR — without it a literal "
+    "reader treats plausible-but-unconfirmed as total, which is the whole risk",
+)
+check(
+    "org-chart-format: a coverage claim states its boundary, and an empty one is unfinished",
+    "Does NOT cover" in _ocf and "unfinished row" in _ocf,
+    "a positive claim is read charitably by whoever matches an ask against it; the "
+    "boundary is the cell that cannot be",
+)
+check(
+    "org: an unproven mechanical never reports a bare PASS",
+    "unproven" in _org and "NEVER restate it as PASS" in _org
+    and "negative test" in _ocf and "unproven" in _ocf,
+    "`Proven` must inherit a maintainer's negative test or an employee's probe, and an "
+    "unproven row must announce it rather than let an exit code stand in for evidence",
+)
+check(
+    "org: two rows claiming the same work stop the door and are fixed at index",
+    "TABLE DEFECT" in _org and "Do NOT pick the first" in _org
+    and "never by deleting a row" in _ocf,
+    "a dispatch-time tiebreak between two total-coverage claims is a guess dressed as "
+    "a rule; the defect is that index wrote two answers to one question",
+)
+check(
+    "procedure-for-procedures: the mechanical preference reaches the PROCEDURE half",
+    "Prefer the mechanical form of a step" in _pfp2 and "compounds" in _pfp2,
+    "`## Verification` enforces tier 1 already; nothing enforced it for procedure "
+    "steps, which is where the cost is paid on every work order forever",
+)
+# Rule 3b landed with an assertion that the RULE EXISTS and nothing making handbooks
+# follow it — the written-and-unwired shape, committed while fixing it. No static
+# check can separate a step that should be a command from one correctly left prose,
+# so per rule 8b the class is PROCEDURAL and the enforcement is a counted line.
+check(
+    "procedure-for-procedures: rule 3b names its own enforcement class and prints a count",
+    "PROCEDURAL, per rule 8b" in _pfp2 and "UNSTATED" in _pfp2
+    and "Mechanical preference" in read("workforce/references/procedures/handbook.md"),
+    "a preference with no counted line is an intention; handbook.md must print "
+    "steps · naming a command · stating why not · UNSTATED, on every authoring",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Maintainer authoring, landed 2026-07-31. `## Maintainers` was a required section
+# with nothing on the greenfield path that could fill it: authoring was descriptive
+# only, so an org could ship a validated schema, a stated degradation contract, and
+# no validator. Every invariant was then a sentence an employee was trusted to keep.
+#
+# The negative test is the load-bearing half. A validator that has only ever exited
+# 0 is indistinguishable from `exit 0`, which is why these assertions were each
+# broken before being trusted.
+# ─────────────────────────────────────────────────────────────────────────────
+DS_CLASSES = ["`mechanical`", "`contextual`", "`advisory`"]
+check(
+    "data-skills: every invariant carries a class, from one stated vocabulary",
+    all(c in ds for c in DS_CLASSES) and "Every invariant carries a class" in ds,
+    f"data-skills.md must state the class vocabulary {DS_CLASSES} — it is what routes an "
+    "invariant to a script, to a judgment, or to nothing",
+)
+check(
+    "data-skills: a maintainer is released by making it fail",
+    "Negative test" in ds and "released by making it fail" in ds,
+    "the maintainer row must carry a negative-test cell; a validator never observed "
+    "rejecting anything is indistinguishable from `exit 0`",
+)
+check(
+    "data-skills: a maintainer detects and never repairs",
+    "never repairs" in ds and "exits nonzero" in ds,
+    "a maintainer that edits what it validates is a second writer of a single-owner "
+    "dataset; one that exits 0 on unreadable data reports health it did not measure",
+)
+# The narrowing must be VISIBLE. "Authoring is descriptive" was true of everything
+# authoring did until step 5 wrote a script — a rule never tested against the case
+# that breaks it. Silently deleting it would be the revocation this project fails on.
+_hb = read("workforce/references/procedures/handbook.md")
+check(
+    "handbook: the data-skill authoring step writes maintainers, and says what narrowed",
+    "run its negative test" in _hb and "narrowing of earlier wording" in _hb,
+    "handbook.md § Authoring a data skill must add the maintainer step AND state that "
+    "'authoring is descriptive' narrowed to the data rather than quietly disappearing",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A claim that `verify` enforces something is a claim about ANOTHER file.
+#
+# data-skills.md carried two of them — "a data skill that lacks any of these is a
+# `verify` finding" and "`verify` enforces it" — while procedures/verify.md
+# mentioned data skills ZERO times. Correct doctrine, nothing making it true:
+# the shape this project records five times over.
+#
+# The instance is fixed by verify.md § Data-skill conformance. This is the class:
+# every file that says `verify` finds X must name an X that verify.md covers.
+# Nouns are a closed vocabulary so the check fails LOUDLY on an unclassifiable
+# claim rather than passing over a sentence it could not parse.
+# ─────────────────────────────────────────────────────────────────────────────
+vfy = read("workforce/references/procedures/verify.md")
+
+check(
+    "verify: data-skill conformance is carried, not just claimed elsewhere",
+    "## Data-skill conformance" in vfy
+    and "§ Required sections" in vfy
+    and "reachable from a handbook" in vfy,
+    "data-skills.md says `verify` enforces the section list and the no-orphan rule; "
+    "verify.md must carry both, by reference and never by restating the sections",
+)
+
+# The section list is a constant with a single home. verify.md citing it is right;
+# verify.md LISTING it would be the restatement bug, one file further along.
+check(
+    "verify: the required-section list is referenced, never restated",
+    sum(1 for s in REQUIRED_DS_SECTIONS if s in vfy) <= 1,
+    "verify.md restates data-skills.md's section list — cite § Required sections instead",
+)
+
+# Closed vocabulary: the artifact kinds verify.md is allowed to be said to find.
+VERIFY_SUBJECTS = {
+    "data skill": "## Data-skill conformance",
+    "playbook": "Records Owner",
+    "handbook": "## Handbook conformance",
+    "constant": "## Constants",
+    "tier count": "## Constants",
+    "persona": "Personas unique",
+    "name": "Names unique",
+}
+_verify_claim = re.compile(r"`verify`\s+(?:finding|enforces)|is a `verify` finding", re.I)
+
+# SCAN BY PARAGRAPH, NOT BY LINE. Every reference here is hard-wrapped at ~100
+# columns, so a claim and its subject routinely land on different lines — "A
+# restated constant is a\n`verify` finding". A line-scan reported both of this
+# repo's correctly-wired claims as unclassifiable on its first run. The paragraph
+# is the smallest unit that reliably holds a whole sentence.
+#
+# A paragraph carrying two claims is checked against the union of its nouns,
+# which is loose. Preferring that to a sentence splitter is deliberate: the
+# failure mode of loose is a claim that passes, and of a bad splitter is a
+# correct claim that fails, which is how a diagnostic gets switched off.
+_unwired, _unclassifiable = [], []
+for _p in declared:
+    if not _p.endswith(".md") or _p.endswith("procedures/verify.md"):
+        continue
+    _line_no = 1
+    for _para in re.split(r"\n\s*\n", read(_p)):
+        if _verify_claim.search(_para):
+            _subs = [s for s in VERIFY_SUBJECTS if s in _para.lower()]
+            if not _subs:
+                _unclassifiable.append(f"{_p}:{_line_no}")
+            for _s in _subs:
+                if VERIFY_SUBJECTS[_s] not in vfy:
+                    _unwired.append(f"{_p}:{_line_no} claims verify finds '{_s}'")
+        _line_no += _para.count("\n") + 2
+
+check(
+    "verify: every claim that `verify` finds X resolves to a check in verify.md",
+    not _unwired,
+    f"unwired: {_unwired}",
+)
+check(
+    "verify: every `verify` finding claim names a known artifact kind",
+    not _unclassifiable,
+    f"unclassifiable: {_unclassifiable} — add the noun to the sentence, or a row to "
+    "VERIFY_SUBJECTS once verify.md actually covers that kind",
+)
+
 # Constants stated once, applied to the marker table. Two files listing the same
 # regexes is how a sweep starts matching different things in different steps.
 check("legacy-markers: the marker table exists", "ENFORCEMENT ANNOTATION" in lm and "ROUTE-EMBED" in lm)
@@ -869,11 +1085,20 @@ check(
 # The set is closed on purpose: an open list grows by accretion and nobody
 # notices a row that was never added.
 inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*\|", inv, re.M)
+# The count was written here as a literal `10`, which made it a restated constant
+# in the file that polices restated constants: adding row 11 failed this check
+# against a number no reader of invariants.md could see. Read the DECLARATION and
+# compare it to the table — that is the actual invariant. "Closed" was never about
+# a specific number; it is the rule that no row arrives without its report line.
+_INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13}
+_inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
+_inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 check(
     "invariants: the enumerated set matches the count it declares",
-    len(inv_rows) == 10,
-    f"invariants.md declares ten and the table holds {len(inv_rows)} parseable rows — "
-    "adding one means adding a row AND wiring its token, in the same change",
+    _inv_declared is not None and len(inv_rows) == _inv_declared,
+    f"invariants.md declares {_inv_decl.group(1) if _inv_decl else '<no declaration found>'} "
+    f"and the table holds {len(inv_rows)} parseable rows — adding one means adding a row, "
+    "wiring its token, AND updating the declaration, in the same change",
 )
 
 # READ THE ROWS, do not merely count them. A doctrine audit replaced all ten line
@@ -1016,6 +1241,10 @@ try:
         "disc": "workforce/references/discovery.md",
         "stg": "workforce/references/staging.md",
         "ds": "workforce/references/data-skills.md",
+        "vfy": "workforce/references/procedures/verify.md",
+        "_org": "workforce/references/procedures/org.md",
+        "_ocf": "workforce/references/org-chart-format.md",
+        "_pfp2": "workforce/references/procedure-for-procedures.md",
         "pfp": "workforce/references/procedure-for-procedures.md",
         "enf": "workforce/references/enforcement.md",
         "plat": "workforce/references/platform.md",
@@ -1050,6 +1279,22 @@ check(
     not _hdr_stale,
     f"{_hdr_stale} — regenerate with `bin/coverage --stamp`. A label that drifts "
     "from its mechanism is the defect the labelling pass exists to remove",
+)
+
+# `_VARMAP` above and `VAR_TO_FILE` in bin/coverage are the SAME constant, restated
+# in two files — the thing this project fails a run over everywhere else. They stay
+# separate because a diagnostic must not import the tool it diagnoses, so the
+# duplication is deliberate and the drift is what needs catching. Adding `vfy` to
+# one copy and not the other produced exactly that: coverage stamped a header that
+# check then called stale, and neither tool was wrong about its own map.
+_cov_src = read("bin/coverage")
+_cov_map = re.search(r"VAR_TO_FILE\s*=\s*\{(.*?)\n\}", _cov_src, re.S)
+_cov_pairs = set(re.findall(r'"([^"]+)":\s*"([^"]+)"', _cov_map.group(1))) if _cov_map else set()
+check(
+    "coverage: bin/check and bin/coverage agree on the variable→file map",
+    _cov_pairs == set(_VARMAP.items()),
+    f"only in check: {sorted(set(_VARMAP.items()) - _cov_pairs)}; "
+    f"only in coverage: {sorted(_cov_pairs - set(_VARMAP.items()))}",
 )
 
 # The T-order is this project's most safety-critical constant and is restated in

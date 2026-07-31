@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 36 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 38 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -378,6 +378,17 @@ relocates.
 
 Report, for both modes: datasets found, datasets with an owner, datasets **without** one. An unowned
 dataset is a finding, not a tolerable state.
+
+**Maintainers, in the same pass.** Every script this census found under `code` that reads or writes a
+dataset is an **existing maintainer** — re-owned, never rewritten (`legacy-markers.md` § Disposition by
+category). Run its negative test once, because that is the only way to learn what an inherited validator
+actually rejects rather than what its skill claimed; where the two differ, the finding is a `DEF`
+against the data skill, never a `PERF` against anyone.
+
+Then classify each dataset's invariants (`data-skills.md` § Invariants). A `mechanical` invariant with
+no existing maintainer is a **candidate**: report it with the script that would be written, and author
+it only under `--execute`. Report the candidate count **before** executing — a converted project can
+present dozens, and each is new executable code in a tree the user owns.
 
 ### Connections
 

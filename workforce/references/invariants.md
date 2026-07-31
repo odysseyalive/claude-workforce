@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -30,8 +30,13 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Ten, and the list is closed: adding a procedural invariant means adding a row here and a line to the
+Eleven, and the list is closed: adding a procedural invariant means adding a row here and a line to the
 report, in the same change.
+
+*(It was ten until 2026-07-31. "Closed" means **no row is added without its report line**, never that
+the set is finished — a list that cannot grow stops describing the runs it governs, and the rule that
+matters is the pairing, not the count. Row 11 was added with its line, its owner, and its `bin/check`
+assertion in one change.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -45,6 +50,7 @@ report, in the same change.
 | 8 | the file census leaves no residual | `INV-CENSUS` | references/procedures/audit.md |
 | 9 | no dead wiring after hook relocation | `INV-HOOKS` | references/procedures/audit.md |
 | 10 | ledger migration matches the filesystem | `INV-LEDGER` | references/procedures/ledger.md |
+| 11 | every mechanical invariant has a maintainer, and every maintainer passed its negative test | `INV-MAINTAINERS` | references/data-skills.md |
 
 **The token is the link, and it is what makes the pairing checkable.** Each `INV-*` token appears in
 exactly two places: this table, and the procedure that owes the count. `bin/check` resolves every row's
@@ -83,7 +89,8 @@ Run Invariants
   INV-DIRECTIVES  58 of 58 extracted
   INV-EMBEDDED    95 of 95 extracted · 96 blocks scanned
   INV-MARKERS     42 files paired · 3 excluded unpaired
-  …ten rows, always all ten…
+  INV-MAINTAINERS 4 mechanical · 4 maintainers · 4 negative tests passed · 6 contextual
+  …eleven rows, always all eleven…
 ```
 
 **A row that cannot be computed prints `NOT UPHELD` with the reason** — never omitted, never inferred

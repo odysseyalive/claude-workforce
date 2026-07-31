@@ -1,6 +1,6 @@
 # Data Skills — the artifact that holds an employee's records
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every dataset an org touches has exactly one data skill and one owner. -->
 
 A **data skill** holds a dataset: its schema, its invariants, the scripts that maintain it, and the
@@ -68,6 +68,23 @@ skipping a check or creating a record.
 Append dataset-specific invariants beneath it. Append-only tables say so. Point-in-time series that
 must never be backfilled say so.
 
+**Every invariant carries a class**, and the class decides where it is enforced. The vocabulary is
+stated here and referenced everywhere else:
+
+| Class | Test | Enforced by |
+|---|---|---|
+| `mechanical` | decidable by reading this dataset alone | a maintainer script (§ Maintainers) |
+| `contextual` | needs knowledge from outside the dataset | the owner's `## Verification`, as a stated judgment |
+| `advisory` | guidance for whoever reads the data | nothing, and the row says so |
+
+Worked: *"the index count equals the number of record files"* is mechanical. *"this decision record
+still reflects the architecture"* is contextual — no script decides it. *"append-only; rows are never
+backfilled"* is mechanical **only against a stored prior state**, so it is mechanical *with* a digest
+and contextual without one; say which, because the difference is the whole check.
+
+A dataset whose invariants are all contextual is a legitimate outcome with an honestly empty
+`## Maintainers`. **Never reclassify an invariant to justify writing a script for it.**
+
 ### `## Degradation`
 
 Behavior when the data is **absent**, **empty**, **stale**, or **corrupt** — four states, each
@@ -102,6 +119,52 @@ whether it is load-bearing.
 **Load-bearing means its silent absence is a correctness failure**, not a convenience loss. A hook
 that blocks deletion of billable time entries is load-bearing. That column is what stops a cleanup
 sweep aimed at a deleted generator from taking a safety mechanism with it.
+
+### The row shape, and the cell that does the work
+
+Every maintainer is one row of four cells. Three are bookkeeping. The fourth is the reason to trust it.
+
+| Script | Implements | Load-bearing | Negative test |
+|---|---|---|---|
+| `scripts/check-ledger.sh` | index count = file count | yes | hide one record → exits 2, names the file |
+
+> **A maintainer is released by making it fail, never by watching it pass.**
+
+A validator that has only ever exited 0 is indistinguishable from `exit 0`, and nothing about running
+it tells the two apart. This project has paid for that distinction twice — nine of `bin/check`'s first
+assertions were bugs in the check itself, found only by breaking them.
+
+So the negative test is **run at authoring time and its result recorded in the row.** A row whose
+negative test was never run is authored, not released — the same line `## Probe` draws for a handbook,
+for the same reason: the authoring context knows what the script meant to do.
+
+**A maintainer reports; it never repairs.** One that edits the data it validates has become a second
+writer of a dataset with exactly one Records Owner, which is the mutation race the org chart exists to
+prevent. `references/enforcement.md`'s prevents/detects distinction applies unchanged: this is
+detection.
+
+**The universal invariant binds the maintainer itself.** A maintainer that cannot read its dataset
+**exits nonzero.** Absent, empty, unreadable, and malformed are the four states `## Degradation`
+already answers — not "nothing to check." A validator exiting 0 on an unreadable file reports health it
+did not measure. `## Seed` is the one legitimate empty case, and the maintainer accepts exactly that.
+
+**Where a new one goes:** an existing maintainer never moves (§ The data never moves, and the same
+reasoning covers the code that maintains it). A new one follows the project's own script convention
+where it has one; where it has none, `.claude/workforce/maintainers/<this-skill-name>/`
+(`references/scopes.md` — project state lives in the project).
+
+**No hook registration, ever.** A maintainer is invoked from its owner's `## Verification` and nowhere
+else. Wiring one to a tool-use matcher would claim prevention the design does not deliver
+(`references/enforcement.md` § Hooks).
+
+**The prose is not deleted when the script is written.** `## Invariants` states the rule; the maintainer
+decides it. That is the relation `references/invariants.md` has with `bin/check` in this project's own
+repo, and collapsing it would leave the rule legible only as code.
+
+The run prints **`INV-MAINTAINERS`** — mechanical invariants against maintainers written against
+negative tests passed (`references/invariants.md`). All four counts, always, including zeros: a dataset
+with no mechanical invariants prints `0 mechanical · 0 maintainers`, which is a measurement. Silence is
+not.
 
 ---
 
