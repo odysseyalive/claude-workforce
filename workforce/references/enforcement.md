@@ -1,6 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement: 1 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
@@ -50,6 +50,32 @@ That last attribution rule matters: blaming the callee produces no fix, because 
 nothing wrong.
 
 ---
+
+## The host can withdraw a capability this design depends on
+
+**Every guarantee here is conditional on capabilities workforce does not own**, and the sharpest case is
+subagent spawning: the cold-read probe, the tier canary, and every panel are spawns. A host can suppress
+spawning by **ambient instruction** — a policy line, an operator preamble, a setting delivered through a
+channel this project neither controls nor versions.
+
+**The failure is silent, and it lands on the one gate that exists to catch what an author cannot see in
+their own work.** Nothing errors. The probe simply does not run, and a handbook can register looking
+released. An org whose verification could not run is not a verified org, and it must never report as one.
+
+Three rules, and they are the whole of it:
+
+1. **Measure the capability, never read the setting.** Attempt one throwaway spawn. Whether it happens
+   is the answer. **Never grep a config file, cache, or flag name** — the channel is unversioned and a
+   renamed key reads as absent, which reports success. Same rule as `legacy-markers.md` for predecessor
+   detection and `platform.md` for documented behaviour.
+2. **Degrade loudly, per artifact.** `Release Record: not probed (spawning unavailable)` on every
+   handbook, in the chart, and in the `EMP` file. **A blank field reads as a pass.**
+3. **Name the remedy.** These constraints are typically conditioned on *unless the user asks* — so an
+   explicit line in the project's `CLAUDE.md` requesting cold-reader agents satisfies the condition.
+   That is a real fix and it belongs in the report, not a shrug.
+
+**Workforce cannot lift a host constraint and must never describe itself as having done so.** This row
+belongs in the DETECTS column with everything else here.
 
 ## Hooks — this project ships none
 

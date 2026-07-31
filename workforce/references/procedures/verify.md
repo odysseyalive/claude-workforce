@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -64,6 +64,8 @@ Three rules, each from a finding that was true and useless without it:
 | Whether a shadowed copy also exists | a project pinned to an older version, overridden with no warning |
 | Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § Header (`TIER-LIMIT`) | the org's shape contract broken by a host setting |
 | `Agent` present in `permissions.allow` | every hop prompts; the org is unusable |
+| `Agent` present in `permissions.deny` | no hop resolves; the whole chain of command is inert while the chart says otherwise |
+| **A throwaway spawn actually happens** | **ambient policy suppressing subagent spawning.** Measured by attempting one, NEVER by reading a settings key or flag name (`references/staging.md` § UNAVAILABLE) — the channel is outside this project and unversioned, so a name check reports success against a renamed key |
 | No project state inside the skill directory | a personal install sharing one config across unrelated projects |
 | Every wired hook `command` resolves to a file that exists | **dead wiring** — non-blocking at runtime, silently drops whatever the hook enforced (`discovery.md` § Dead wiring) |
 | Every hook on disk is registered | an orphan — reported, never deleted |

@@ -712,6 +712,46 @@ check(
     "a positive claim is read charitably by whoever matches an ask against it; the "
     "boundary is the cell that cannot be",
 )
+# ── A host can withdraw the capability every gate here depends on ────────────
+# Found 2026-07-31 by tracing why cold readers were never spawned this session:
+# an ambient instruction, delivered outside this project, suppressing subagent
+# spawning. Phase C had argued the UNAVAILABLE case at length; Phase B — the
+# release gate — had only PASS/FAIL/AMBIGUOUS, so "the spawn did not happen" had
+# nowhere to land. Written literally the gate deadlocks; run loosely it registers
+# unprobed handbooks that look released.
+#
+# The detection rule is the load-bearing part. The channel is unversioned and
+# outside this project, so a key or flag NAME read today is renamed next release
+# and the check reports success against a rename. Measure the behaviour.
+_stg = read("workforce/references/staging.md")
+check(
+    "staging: Phase B has an UNAVAILABLE outcome for a host that will not spawn",
+    "UNAVAILABLE` — when the host will not spawn" in _stg
+    and "not probed (spawning unavailable)" in _stg,
+    "Phase C settled this argument for the canary; the release gate never got it, "
+    "so a suppressed spawn had no outcome and could register as though probed",
+)
+check(
+    "staging: spawn suppression is measured, never read from a config key",
+    "NEVER BY CONFIG KEY" in _stg and "a name list finds none of the renames" in _stg,
+    "the channel is outside this project and unversioned — a flag name read today "
+    "is renamed next release, and the check then reports success",
+)
+check(
+    "enforcement: a withdrawn host capability degrades loudly and names its remedy",
+    "The host can withdraw a capability this design depends on" in enf
+    and "A blank field reads as a pass" in enf and "unless the user asks" in enf,
+    "an org whose verification could not run is not verified; the remedy is real "
+    "(the constraint is conditioned on the user asking) and belongs in the report",
+)
+_vfy2 = read("workforce/references/procedures/verify.md")
+check(
+    "verify: scope checks cover deny as well as allow, and prove a spawn happens",
+    "`permissions.deny`" in _vfy2 and "A throwaway spawn actually happens" in _vfy2,
+    "allow was checked and deny was not; and neither established that spawning "
+    "works at all, which every gate in this design assumes",
+)
+
 # ── Phase A blocked the handbook its own templates produce ───────────────────
 # Found by RUNNING Phase A against a handbook authored straight from
 # handbook-templates.md. Three blocking checks failed it, and all three were the
@@ -723,7 +763,6 @@ check(
 # One shape: a blocking check specified from the failure it prevents and never run
 # against a passing case. bin/check could assert the checks EXISTED; only executing
 # one against a real artifact showed what it did to a correct one.
-_stg = read("workforce/references/staging.md")
 check(
     "staging: Phase A distinguishes read paths from write paths",
     "Every path the handbook **reads** resolves" in _stg
@@ -1434,6 +1473,7 @@ try:
         "_asu": "workforce/references/audit-setup.md",
         "_od": "workforce/references/org-design.md",
         "_stg": "workforce/references/staging.md",
+        "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",
         "_pfp2": "workforce/references/procedure-for-procedures.md",
