@@ -113,17 +113,58 @@ the repair.)*
 
 ---
 
-## Open — the honest weak points
+## The three weak points, closed 2026-07-31
 
-1. **`Covers` is judged at the door, by a model reading a prose cell.** Guarded (narrow claims,
-   never infer from a filename, total-coverage-only) but not eliminated. This is the softest joint in
-   the design and the place a wrong dispatch would come from.
+Shipped open, closed in the next change. Four more assertions, each proven by breaking it.
 
-2. **A Mechanicals row has no negative test, and maintainers now do.** The asymmetry is real. Proving
-   a `Covers` claim would mean running the command at index time and recording its output shape —
-   defensible, and expensive on every `org index`. **Not built. Worth deciding deliberately rather
-   than by omission.**
+### 1. Coverage was judged by reading one prose cell → state the boundary, and bias to agency
 
-3. **Precedence between two mechanicals is unspecified.** Clause 11 says a mechanical and an employee
-   are never "tied," but two commands both claiming total coverage have no tiebreak. Rare, and
-   currently falls to clause 11's stop condition — ask. That is probably right, and it is untested.
+Two fixes, because the problem had two halves.
+
+**A positive claim is read charitably; a boundary is not.** *"Runs the tests"* comes to look like it
+covers a type error, because whoever matches an ask against a coverage claim is trying to make it fit.
+So every row now states **`Does NOT cover`**, and the dispatcher checks that cell *first* — any overlap
+disqualifies the row outright. There is no charitable reading of an explicit exclusion. **An empty
+boundary cell is an unfinished row, not a claim to cover everything**, and `index` drops it.
+
+**Unclear was not covered by "total coverage only."** A literal reader could treat
+plausible-but-unconfirmed as total, which is exactly the reading the rule was written against. Clause
+2a now says it: **if totality is unclear, it is not total** — resolve to an agent and report that the
+table was read and did not decide. The costs are asymmetric and that is the whole argument: being
+wrong toward agency costs one hop, being wrong toward mechanical returns a wrong answer cheaply.
+
+### 2. A row had no negative test while maintainers now do → `Proven`, inherited not asserted
+
+Running every command at index time was the expensive answer, and it is not needed, because the
+evidence mostly **already exists somewhere else**. `Proven` inherits it, on a closed vocabulary:
+`negative test` (a maintainer, made to fail), `probe <date>` (an employee's `## Verification`,
+exercised at release), or `unproven`.
+
+**`unproven` dispatches and never reports a bare PASS.** The announcement carries the word; the result
+is an exit code *whose coverage claim is unconfirmed*. That is `org-design.md` § Provisional
+verification applied one layer out — an unproven check is an admission, not a loophole. Most project
+commands arrive `unproven` and that is a normal state, not a defect.
+
+Clause 2 also now reports **the command, its exit code, and its output**. A result that does not answer
+the ask becomes visible in the same response rather than inferred later, which is the cheap mitigation
+that survives whatever the coverage claim got wrong.
+
+### 3. Two rows claiming the same work → a table defect, never a dispatch-time tiebreak
+
+The instinct is to pick the narrower or the more proven. Both are guesses dressed as rules. Two rows
+wholly covering one ask means **`index` wrote two answers to one question**, so the door STOPs, reports
+both rows verbatim, and names `/workforce org index` as where it is fixed. `index` detects the overlap
+when it builds the table and reports it there too — and **never auto-resolves by narrowing a cell or
+deleting a row.** Which row is wrong is a question about the project, not about the table; deleting one
+discards a real capability to silence a reporting problem.
+
+---
+
+## Still open, deliberately
+
+**Nothing about `Covers` is verified against the command's actual behavior.** The boundary cell,
+the conservative unclear-rule, `Proven`, and output reporting are four independent mitigations of one
+unverified claim — they make a wrong claim survivable and visible, not impossible. The measurement that
+would close it (run each command at index time, record its output shape) remains unbuilt because it
+costs a full command sweep on every `org index`. **This is a stated limit, not an oversight**, and it is
+the thing to revisit first if a mechanical dispatch ever returns a wrong answer.

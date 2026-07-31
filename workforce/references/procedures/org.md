@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -37,6 +37,23 @@ with a dispatcher pointed at it, which is worse than the absence it records. Rep
 where it says nothing, write the narrow claim. `pnpm verify` is not evidence that a command verifies
 anything, and a coverage claim assembled from a filename is how clause 2's total-coverage rule gets
 satisfied by a guess.
+
+**Fill `Does NOT cover` from the same evidence, and drop the row if you cannot.** The boundary is what
+makes the claim checkable at the door (`org-chart-format.md` § Mechanicals), and a row without one is
+unfinished rather than unlimited. Where the project's own docs name sibling commands — a separate
+`lint`, `typecheck`, or e2e target — those siblings *are* the boundary, already written down.
+
+**Resolve `Proven` by inheritance, never by assertion.** A maintainer row carries its negative test
+(`data-skills.md` § Maintainers); an employee's `## Verification` command carries the date of that
+employee's release probe. Anything else is `unproven`, which is a normal state and not a defect — most
+project commands arrive that way. **Never write `unproven` where evidence exists, and never write
+evidence that was not run.**
+
+**Detect overlapping coverage before writing the table.** Two rows whose `Covers` claims both wholly
+contain the same work make the table ambiguous, and the door is forbidden to resolve it (clause 2d).
+Report both rows with the overlap named. **Never auto-resolve by narrowing a cell** — which of the two
+is wrong is a question about the project, not about the table, and guessing produces a confident row
+nobody checked.
 
 **2. Detect `/org`.** Missing → bootstrap from `references/templates.md`. Present → leave hand-written
 content alone; only the marked CHECKPOINT block is auto-managed (step 5).
@@ -89,7 +106,12 @@ Byte-canonical. Lives in `/org`'s SKILL.md between
 <!-- ENFORCEMENT ANNOTATION — Opus 5+ literal-execution gate -->
 CHECKPOINT — Dispatch Required:
 1. ANNOUNCE-AND-INVOKE IS ONE ACT. The same response that prints `→ Dispatching to @agent-<name> (T<n>, <dept>) — <why this is the lowest competent node>` MUST also issue the `Agent` call — or, for a mechanical dispatch, MUST run the command itself (clause 2). The announcement is a label on the dispatch, never a substitute for it.
-2. MECHANICAL BEFORE AGENTIC. Read the chart's `## Mechanicals` table BEFORE choosing any node. IF an entry's declared coverage is the WHOLE ask → announce `→ Running <command> (mechanical — <what makes an agent unnecessary>)`, run it in the same response, and report its exit code as the result. NEVER spawn an employee to run a command that already exists. **TOTAL COVERAGE ONLY:** a partial match is NOT a mechanical dispatch — it becomes a named step inside the work order of whatever node clause 3 selects, never a reason to skip that node. Three refusals, each of which sends the ask to clause 3 instead: (a) the entry writes, deletes, deploys, or is otherwise destructive → render display-first, never auto-run; (b) the entry's declared check is not a command with an exit code → it is not mechanical, and calling it so would dress a judgment as a check; (c) the entry is absent from disk → treat as stale per clause 8 and do not run a command that is not there. A mechanical dispatch is still a dispatch: it announces, it reports, and its exit code IS its verification — tier 1 (`references/verification.md`), which outranks the employee it replaced.
+2. MECHANICAL BEFORE AGENTIC. Read the chart's `## Mechanicals` table BEFORE choosing any node. Match the ask against BOTH cells: it must fall wholly inside `Covers` AND touch nothing in `Does NOT cover`. Any overlap with the boundary disqualifies the row — check the boundary first, because a positive coverage claim reads charitably and a stated boundary does not. On a match → announce `→ Running <command> (mechanical — <what makes an agent unnecessary>) [Proven: <value>]`, run it in the same response, and report **the command, its exit code, AND its output**, so a result that does not answer the ask is visible here rather than inferred later. NEVER spawn an employee to run a command that already exists.
+2a. TOTAL COVERAGE ONLY, AND UNCLEAR IS NOT TOTAL. A partial match is NOT a mechanical dispatch — it becomes a named step inside the work order of whatever node clause 3 selects, never a reason to skip that node. **IF totality is unclear, it is not total**: resolve to clause 3 and say that the table was read and did not decide. Coverage is judged here by reading a prose cell, which is the softest joint in this ladder, and the conservative alternative is one agent hop — against a wrong answer returned cheaply, which is what the other error produces.
+2b. FOUR REFUSALS, each sending the ask to clause 3: (a) the entry writes, deletes, deploys, or is otherwise destructive → render display-first, never auto-run; (b) its declared check is not a command with an exit code → it is not mechanical, and calling it so would dress a judgment as a check; (c) it is absent from disk → treat as stale per clause 8 and never run a command that is not there; (d) its `Does NOT cover` cell is empty → an unfinished row, never a claim to cover everything.
+2c. `Proven: unproven` DISPATCHES BUT NEVER REPORTS A BARE PASS. Print the word in the announcement, and report the result as an exit code **whose coverage claim is unconfirmed**. NEVER restate it as PASS, and never let the exit code stand in for evidence the command checks what the row says it checks (`org-design.md` § Provisional verification — an unproven check is an admission, not a loophole).
+2d. TWO ROWS CLAIMING THE SAME WORK IS A TABLE DEFECT, NEVER A DISPATCH DECISION. IF two entries both match wholly → STOP. Report both rows verbatim and ask. Do NOT pick the first, the narrower, or the more proven — every one of those is a guess dressed as a rule, and the defect is that `index` wrote two answers to one question. Say so, and name `/workforce org index` as where it gets fixed.
+2e. A mechanical dispatch IS a dispatch: it announces, it reports, and its exit code is its verification — tier 1 (`references/verification.md`), which outranks the employee it replaced.
 3. LOWEST COMPETENT NODE. One IC's scope covers it → that IC. Two or more ICs in one department, or intra-department sequencing → that Lead. Two or more departments, no owner, or strategic/ambiguous work → the CEO. TIES RESOLVE DOWNWARD — cheaper, fewer hops. The CEO is never a mandatory funnel.
 4. NO MODEL ASK. Every employee is model-pinned by its own frontmatter, so the active session model does not affect the work. NEVER ask the user to run `/model`, and never port a lane preflight from a dispatcher that does main-loop work.
 5. BUDGET PREFLIGHT. Compute projected spawns for this order. If it would exceed the remaining session budget, dispatch one tier lower or split the order, and say which you did.

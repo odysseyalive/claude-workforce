@@ -659,6 +659,42 @@ check(
     "clause 2 dispatches from this table; an absent table and an empty one must not "
     "look the same to a reader",
 )
+
+# ── The three weak points the design shipped with, closed 2026-07-31 ──────────
+# 1. Coverage is matched by reading a prose cell. A positive claim reads
+#    charitably; a stated BOUNDARY does not, and an unclear match resolves to an
+#    agent rather than to a cheap wrong answer.
+# 2. A row had no negative test while maintainers now do. `Proven` inherits one
+#    where it exists and says `unproven` where it does not — which dispatches, but
+#    never as a bare PASS.
+# 3. Two rows claiming the same work was left to a dispatch-time tiebreak. It is a
+#    defect in the TABLE; the door refuses, `index` reports.
+check(
+    "org: an unclear coverage match resolves to an agent, not to a guess",
+    "UNCLEAR IS NOT TOTAL" in _org and "softest joint" in _org,
+    "clause 2a must say what happens when totality is UNCLEAR — without it a literal "
+    "reader treats plausible-but-unconfirmed as total, which is the whole risk",
+)
+check(
+    "org-chart-format: a coverage claim states its boundary, and an empty one is unfinished",
+    "Does NOT cover" in _ocf and "unfinished row" in _ocf,
+    "a positive claim is read charitably by whoever matches an ask against it; the "
+    "boundary is the cell that cannot be",
+)
+check(
+    "org: an unproven mechanical never reports a bare PASS",
+    "unproven" in _org and "NEVER restate it as PASS" in _org
+    and "negative test" in _ocf and "unproven" in _ocf,
+    "`Proven` must inherit a maintainer's negative test or an employee's probe, and an "
+    "unproven row must announce it rather than let an exit code stand in for evidence",
+)
+check(
+    "org: two rows claiming the same work stop the door and are fixed at index",
+    "TABLE DEFECT" in _org and "Do NOT pick the first" in _org
+    and "never by deleting a row" in _ocf,
+    "a dispatch-time tiebreak between two total-coverage claims is a guess dressed as "
+    "a rule; the defect is that index wrote two answers to one question",
+)
 check(
     "procedure-for-procedures: the mechanical preference reaches the PROCEDURE half",
     "Prefer the mechanical form of a step" in _pfp2 and "compounds" in _pfp2,
