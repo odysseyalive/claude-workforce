@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -106,6 +106,15 @@ harmless overstatement, and it has crept back into this project's files once alr
    handbook `Tier ceiling: unverified this run`. Only `FAIL` stops the run.
 4. The journal holds **no rows left at WRITE-INTENT** from a prior run. An unfinished run is rolled
    back, never converted over.
+5. **`.claude/workforce/directives/` is empty, or its contents belong to this run.** The extraction gate
+   can block *after* writing part of its output — that is what a short count means — and precondition 4
+   cannot see it, because a blocked extraction never reached T4 and wrote no journal row at all.
+
+   Found on 2026-07-31: an extraction blocked at 49 of 60, left 49 files on disk, and a second run
+   wrote alongside them. Nothing distinguished the two populations afterward, and a later run reading
+   that directory would count a partial extraction as a complete one — **against the gate whose entire
+   job is asserting the count.** Clear it, or stamp each file with the run that wrote it. An
+   unattributed extraction is not evidence.
 
 Any precondition **not** in its stated accepted set → stop the whole run. Convert nothing.
 
