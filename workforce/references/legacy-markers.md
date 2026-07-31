@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 7 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —
@@ -46,6 +46,36 @@ name-keyed sweep leaves behind as residue, or mis-pairs.
 The regexes match **openers only**. A pattern matching both an opener and its closing comment
 double-counts every block; the first hand census of a real project reported twice the true count for
 exactly this reason.
+
+### Ownership must not require the word `origin:`
+
+**The foreign-owner regex keys on the literal `origin:`, so a generator using any other attribute name
+is invisible as an owner** — while its blocks are still found by the generic family detector. Two
+detectors, one tree, disagreeing, and nothing reconciles them.
+
+Measured on fixture `f1-foreign-generator`, 2026-07-31: a generator whose blocks read
+`<!-- forge: v2 | managed: true -->` inside `FORGE-GUARD` markers. The generic detector found both
+families. The owner census found **zero owners**, and the report said *"skills with no `origin:`
+marker: 2"* — which reads as *hand-authored and unmanaged*, about the two most heavily managed files
+in the tree.
+
+**The consequence is not cosmetic.** RETAIN rule 7 needs an owner and never fires; rule 3 fires
+instead, so coexistence reaches RETAIN **by the wrong rule** — and under succession rule 3 stands
+down while rule 7 was never available, leaving those skills eligible for conversion.
+
+**So ownership is inferred from the marker FAMILY, not from one keyword.** Any
+`<!-- NAME START -->` / `<!-- NAME END -->` family is an ownership claim by whatever emitted it; the
+family name is the owner of record until something better is found, and an `origin:`-style attribute
+refines it rather than being required for it.
+
+**Report the reconciliation every run**, because the disagreement is the signal:
+
+```
+Owners   1 by origin: attribute (skill-builder) · 1 by marker family (FORGE) · 0 unattributed families
+```
+
+**A family with no owner and an owner with no family are both findings.** Silence about either is how
+a tree with two generators reports as a tree with one.
 
 ### An unpaired marker is REPORTED, and repaired only inside a family workforce owns
 
