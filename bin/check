@@ -681,6 +681,31 @@ check(
     "a positive claim is read charitably by whoever matches an ask against it; the "
     "boundary is the cell that cannot be",
 )
+# ── `--review` writes nothing, including in the gates that write ─────────────
+# Found by PREPARING to run the first mock audit, before a step executed. A prior
+# pass fixed the two steps that contradicted "--review writes nothing" — both in
+# audit.md — while the writing gates live in audit-setup.md. Step 0.6 registers
+# agent fixtures in the user's .claude/agents/, so a run advertised as zero-write
+# would have written into the tree it was previewing.
+#
+# The same shape audit.md already records about Step 0.7: a sweep scoped to one
+# file, over a procedure sequenced across two.
+_asu = read("workforce/references/audit-setup.md")
+_WRITING_GATES = ["## Step 0.2 — Backup", "## Step 0.6 — Write the canary fixtures"]
+_silent_gates = []
+for _g in _WRITING_GATES:
+    _i = _asu.find(_g)
+    _nxt = _asu.find("\n## ", _i + 1) if _i >= 0 else -1
+    _body = _asu[_i:_nxt if _nxt > 0 else len(_asu)] if _i >= 0 else ""
+    if not _body or "--review" not in _body:
+        _silent_gates.append(_g)
+check(
+    "audit-setup: every writing gate declares its `--review` behavior",
+    not _silent_gates and "Every writing gate declares its `--review` behavior" in _asu,
+    f"silent under --review: {_silent_gates} — a mode whose whole promise is that it "
+    "writes nothing cannot have gates that write and never mention it",
+)
+
 # ── Coverage derivation, landed 2026-07-31 ───────────────────────────────────
 # The first design proved a coverage claim by PLANTING a defect and requiring the
 # command to catch it — carrying "released by making it fail" over from maintainers,
@@ -1286,6 +1311,7 @@ try:
         "stg": "workforce/references/staging.md",
         "ds": "workforce/references/data-skills.md",
         "vfy": "workforce/references/procedures/verify.md",
+        "_asu": "workforce/references/audit-setup.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",
         "_pfp2": "workforce/references/procedure-for-procedures.md",

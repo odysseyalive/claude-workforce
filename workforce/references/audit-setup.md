@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 1 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -66,10 +66,28 @@ run's own marker inside an archive claiming to be pre-audit state, the exact def
 close. Headless: the marker must already exist from a prior
 interactive run — refuse without it, because the budget questions cannot render headless.
 
+## Every writing gate declares its `--review` behavior
+
+`--review` writes nothing **anywhere** (`procedures/audit.md` § `--review`). Steps 1b and 3b carry that
+carve-out explicitly, and a pass that found them fixed both — **in `audit.md`, while the writing gates
+live here**, so Step 0.2 and Step 0.6 kept writing under a mode whose whole promise is that it does not.
+Step 0.6 writes agent fixtures into the user's `.claude/agents/`, which is the worst version of it: a
+preview that registers files.
+
+**So the rule is stated once, here, and every gate below carries it:** a gate that writes states what
+it does under `--review`, in its own section. This is the same coupling `procedures/audit.md` § Steps 0
+through 0.7 already declares in the other direction — *any gate added to `audit-setup.md` must be added
+there too.* A gate is added to both, and it declares its `--review` behavior, or it is not added.
+
 ## Step 0.2 — Backup
 
 **Take the backup automatically** (`procedures/backup.md`), immediately — before any other gate writes
 anything. No question, no offer to decline.
+
+**Under `--review`: skipped, and reported as `skipped (--review writes nothing)`.** Not "taken" and not
+"failed" — a third state, because a review run has nothing to protect: it makes no change a backup would
+roll back. `INV-BACKUP` still prints, with that state and `0 writes preceded it`, since a missing line
+and an inapplicable gate must not look the same.
 
 The run prints **`INV-BACKUP`** — taken, and the number of writes that preceded it, which must be zero
 (`references/invariants.md`).
@@ -183,6 +201,13 @@ here, before the survey — the survey and the Step 2 panels are what buys the r
   run** — that single fact is what makes an UNAVAILABLE at Step 4b legible rather than mysterious.
 
 **This gate writes files and spawns nothing.** It is not a question and consumes no question slot.
+
+**Under `--review`: writes NOTHING.** No fixtures, ever — this gate registers agent definitions in the
+user's `.claude/agents/`, and doing that during a run advertised as zero-write is the sharpest form of
+the contradiction. Report which of the three applies: fixtures already present and reusable, a matching
+`platform-local.md` on record, or **neither — in which case say that Step 4b would return `UNAVAILABLE`
+on a real run and the tier ceiling would be reported unverified.** A review that quietly implies a
+canary it never wrote would be describing a run nobody could have.
 
 ## Step 0.7 — Ownership and collision preflight (detect, then degrade — stated)
 
