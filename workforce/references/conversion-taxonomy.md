@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 25 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 7 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -246,6 +246,35 @@ nothing. The rules and the promise contradicted each other, and the rules won si
 
 **Succession is the declared-intent mode that resolves it.** It is off unless
 `org-config.md` carries `<!-- succession: declared -->` (`org-config.template.md` § Per-project markers).
+
+### Succession is FROM a named predecessor — never from "the past"
+
+**`succession: declared` was a boolean, and a boolean cannot say whom.** Rules 3 and 7 stand down on
+the premise that *"a retired owner never runs again"* — which is true of the generator being succeeded
+and says nothing about any other generator in the same tree. On a project with two, declaring
+succession retires one and strips the protection from both.
+
+Found by fixture `f2-two-generators`, 2026-07-31: one tree, `skill-builder` and `forge` regions in the
+same files. Declaring succession from `skill-builder` would have made `forge`'s skills eligible —
+converting files a live generator rewrites on its next run, which is the two-canonical-texts failure
+rule 7 exists to prevent, reached *through* the rule that was supposed to prevent it.
+
+**So the marker carries the owner:**
+
+```
+<!-- succession: declared | from: skill-builder -->
+```
+
+| | |
+|---|---|
+| **rules 3 and 7 stand down** | for artifacts owned by the named predecessor, and for unowned hand-authored ones |
+| **every refusal survives** | for artifacts owned by anyone else — including a generator this project has never met |
+| **`from:` names an owner the census found** | never a guess. Unrecognised → **STOP** and report the owners that were detected |
+| **two predecessors** | two declarations, two runs. Never one sweep over both |
+
+**A bare `succession: declared` with more than one owner in the census is an ERROR, not a default.**
+Report every owner found and require the user to name one. Picking the most common is a guess about
+which system they are leaving, made silently, immediately before the only step that deletes.
 
 ### What stands down, and why
 
