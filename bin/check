@@ -773,6 +773,35 @@ check(
     "that the retired owner never runs again — true of one generator, asserted of all "
     "of them. Two in a tree and the second loses its protection",
 )
+# The ledger detector read `skills/awareness-ledger/ledger/` — one predecessor's
+# literal skill name — inside the file whose opening rule is "detection is by
+# marker, never by name", for an artifact legacy-markers.md classes `data —
+# migrate`. A generator naming its store anything else was invisible, and that
+# miss is DATA LOSS rather than a bad count.
+#
+# Fixing it surfaced something worse: the census counted every .md in each bucket,
+# including the README, and reported 24 records against an index correctly claiming
+# 20. This project cited that phantom drift as a live defect for an entire session
+# — in a script written BECAUSE a hand count had trusted a stale index. The index
+# was never stale.
+check(
+    "baseline: the predecessor ledger is found by shape and counts records",
+    "BY SHAPE, never by skill name" in _bl
+    and "COUNT RECORDS, NOT MARKDOWN FILES" in _bl
+    # The name may survive in the comment that documents the retraction — this
+    # project writes down what it reversed. What must be gone is the name used as
+    # a PATH OPERAND, which is the thing that did the detecting.
+    and 'os.path.join(skills_dir, "awareness-ledger"' not in _bl,
+    "keying on one skill name misses any other generator's store, and counting "
+    "files rather than records reports a correct index as drifted",
+)
+check(
+    "personnel-templates: the ledger example records the correction, not the phantom",
+    "Enumerating from the filesystem is still right" in _pt,
+    "the rule was first argued from a drift that did not exist; the rule survives "
+    "and the evidence for it had to be corrected rather than quietly dropped",
+)
+
 check(
     "legacy-markers: a hand-edited generated block is its own state",
     "the marker lies, and the sidecar is the only tell" in lm

@@ -207,7 +207,9 @@ Measured 2026-07-31 with `bin/baseline`, on the tree the first real audit is aim
 
 | Dataset / rule as it exists today | Class | Maintainer |
 |---|---|---|
-| awareness ledger: **24 records on disk, index claims 20** | mechanical | `records-ledger`: enumerate from the filesystem, compare to the index, exit 2 on mismatch. Negative test: hide one record → exits 2. **This defect is live right now** and is precisely what `bin/baseline` was written for after the same drift here |
+| awareness ledger: **24 records on disk, index claims 20** |
+
+> **CORRECTED 2026-07-31:** the ledger's own index was **correct** at 20 records — the census had been counting each bucket's `README.md` as a record and reporting 24. The tool was wrong, not the index. There is no drift. mechanical | `records-ledger`: enumerate from the filesystem, compare to the index, exit 2 on mismatch. Negative test: hide one record → exits 2. **This defect is live right now** and is precisely what `bin/baseline` was written for after the same drift here |
 | `PAT-2026-07-28-county-record-extraction-traps` — nine ways a county site returns plausible-but-wrong data without erroring (`$0` trust transfer above the real sale, truncated owner lists, AV≠market value, an incomplete TLS chain) | mechanical, against a fetched record | a contract validator on the adapter's output. Negative test: each of the nine traps as a fixture |
 | `signEvents` attestation row — what survives an erasure request | **contextual** — an unresolved legal question (`DEC-2026-07-27-erase-document-keep-hash` § Amendment) | none, and the row says why. Recorded as prose, correctly |
 | `moduleAccess` entitlement gating | mechanical | belongs to the Playwright suite (tier 2), not a maintainer — the check already exists and this file never duplicates one |

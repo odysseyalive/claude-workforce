@@ -456,23 +456,53 @@ def census(root):
     agents["registered"].sort()
     agents["in_skills"].sort()
 
-    # ── Predecessor ledger (record files vs whatever its index claims) ───────
+    # ── Predecessor ledger — BY SHAPE, never by skill name ──────────────────
+    # This read `skills/awareness-ledger/ledger/` — one predecessor's literal skill
+    # name — inside the system whose stated rule is "detection is by marker, never
+    # by name", and legacy-markers.md classes this artifact `data — migrate`. A
+    # generator calling its store anything else was invisible, and the miss is DATA
+    # LOSS rather than a bad count.
+    #
+    # The shape: a directory holding >= 2 subdirectories of dated .md records, with
+    # an index beside them. Record-type names are discovered, never enumerated.
     ledger = {}
-    led_root = os.path.join(skills_dir, "awareness-ledger", "ledger")
-    if os.path.isdir(led_root):
-        for t in ("incidents", "decisions", "patterns", "flows"):
-            d = os.path.join(led_root, t)
-            ledger[t] = len(
-                [f for f in os.listdir(d) if f.endswith(".md")]
-            ) if os.path.isdir(d) else 0
-        idx = read(os.path.join(led_root, "index.md"))
-        claimed = re.findall(
-            r"\|\s*(Incidents|Decisions|Patterns|Flows)\s*\|\s*(\d+)", idx
-        )
-        ledger["index_claims"] = {k.lower(): int(v) for k, v in claimed}
-        ledger["actual_total"] = sum(
-            v for k, v in ledger.items() if isinstance(v, int)
-        )
+    REC_RX = re.compile(r"^[A-Z]{2,4}-\d{4}-\d{2}-\d{2}-|^\d{4}-\d{2}-\d{2}")
+    candidates = []
+    for dirpath, subs, files in os.walk(skills_dir):
+        if os.path.basename(dirpath).startswith("."):
+            continue
+        buckets = {}
+        for sub in subs:
+            sd = os.path.join(dirpath, sub)
+            try:
+                mds = [f for f in os.listdir(sd) if f.endswith(".md")]
+            except OSError:
+                continue
+            # COUNT RECORDS, NOT MARKDOWN FILES. The predecessor's buckets each
+            # carry a README.md, and counting every .md reported 24 records against
+            # an index correctly claiming 20 — a drift this project then cited as a
+            # live defect for a whole session. The index was right; the census was
+            # counting its own noise.
+            recs = [f for f in mds if REC_RX.match(f)]
+            if recs:
+                buckets[sub] = len(recs)
+        if len(buckets) >= 2:
+            for sub in subs:  # zero-record buckets are reported, never dropped
+                buckets.setdefault(sub, 0) if os.path.isdir(os.path.join(dirpath, sub)) else None
+            candidates.append((dirpath, buckets))
+    if candidates:
+        led_root, buckets = max(candidates, key=lambda c: sum(c[1].values()))
+        ledger.update(buckets)
+        ledger["root"] = os.path.relpath(led_root, root)
+        ledger["record_types"] = sorted(buckets)
+        idx = ""
+        for cand in ("index.md", "INDEX.md", "README.md"):
+            idx = idx or read(os.path.join(led_root, cand))
+        claimed = re.findall(r"\|\s*([A-Za-z]{3,})\s*\|\s*(\d+)\s*\|", idx)
+        ledger["index_claims"] = {
+            k.lower(): int(v) for k, v in claimed if k.lower() in buckets
+        }
+        ledger["actual_total"] = sum(buckets.values())
 
     # ── Where ignore rules for skill state actually live ─────────────────────
     ignore_sources = Counter()
