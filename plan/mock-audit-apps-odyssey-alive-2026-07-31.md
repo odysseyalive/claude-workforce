@@ -182,7 +182,35 @@ build is not wrong-looking enough to notice.
 | **1 new defect**, found before Step 1 | `--review` wrote into the target via two gates in the other file. Fixed, asserted, proven by breaking |
 | **1 known defect, sharpened** | the pre-scaffold trap produces a *lopsided plausible* org, not an empty one. Still unfixed |
 | **Behaved correctly** | `UNAVAILABLE` ≠ `FAIL` · disposition arithmetic balanced at 17 · symlink census · `wf-` prefix · latent duplicates reported not repaired · ledger read from the filesystem · **Mechanicals zero-row case** |
-| **Untested** | every writing step. `--review` exercises the survey and the plan; the transaction order, the sweep, and the probe gate have still never run |
+| **Untested** | the transaction order (T1–T8) and the sweep |
+
+---
+
+## Phase B — the first cold-read probe this project has ever run
+
+Ran 2026-07-31 against the staged `eng-scaffolder` handbook, in the throwaway. Two runs.
+
+**Run 1 — `FAIL`, and it was right.** The handbook was authored straight from `handbook-templates.md`
+and had passed Phase A. The cold executor returned:
+
+> `NEVER edit files outside src/, convex/, and scripts/` (Guardrails) forbids writing the deliverable
+> that Reporting mandates at `.claude/workforce/work/<run-id>/…/OUTPUT.md` — outside all three.
+
+**The contradiction is in the shipped template**, so every handbook authored from it inherited it. Both
+lines are individually correct; the defect lives only in their relationship — invisible to `bin/check`,
+invisible to Phase A, and invisible to the author across two reviews.
+
+Fixed as instance *and* class: the template's scope guardrail now carves out the reporting directory,
+and **Phase A gained a blocking check** — no guardrail may forbid the path `## Reporting` mandates.
+
+**Run 2 after amendment — `PASS`**, with a 175-line work product citing line numbers, explicitly
+separating the file's `§ B` strip list from delete directives elsewhere rather than guessing scope, and
+stating *"nothing here is invented."*
+
+**It also stamped `Verdict: UNVERIFIED` on its own output**, unprompted — because the handbook's
+`## Verification` says the named command does not exist yet. The provisional-verification rule landed
+earlier the same day was honored by an executor that had never seen this project and was never told
+about the rule. That is the cleanest evidence available that the rule reads correctly cold.
 
 The one item `CLAUDE.md` calls "the one that matters" — *`/workforce audit` has never run* — is now
 partly false. The read-only half has run once, against a real tree, and it cost one defect to do it.

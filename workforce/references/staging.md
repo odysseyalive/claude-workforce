@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement: 8 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 9 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -72,6 +72,7 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | `## Verification` names a runnable check, not a judgment | **BLOCK** |
 | `## Probe` present | **BLOCK** — a handbook that cannot say how to check itself is not releasable |
 | Every guardrail contains a literal NEVER / MUST NOT / STOP | **BLOCK** — the executor override depends on quoting one |
+| **No guardrail forbids the path `## Reporting` mandates** | **BLOCK** — a handbook that cannot write its own deliverable. Found by the first probe ever run; see § A handbook can be internally contradictory and pass every other check |
 | Escalation sentinel present verbatim | **BLOCK** |
 | Name and persona unique across the union glob | **BLOCK** — collisions are silent (`personas.md`) |
 | Tier within the measured limit; no terminal-tier employee has subordinates | **BLOCK** |
@@ -149,6 +150,32 @@ conditions are reachable.
 `disallowedTools:`, `background:`, `permissionMode`, `maxTurns`. The probe runs under a generic agent
 type and honors **none** of the candidate's frontmatter. Any report claiming otherwise is corrected
 before proceeding.
+
+### A handbook can be internally contradictory and pass every other check
+
+**The first probe this project ever ran returned `FAIL`, and it was right.** The handbook was authored
+straight from `handbook-templates.md`, passed Phase A, and carried this pair:
+
+> `## Guardrails` — NEVER edit files outside `src/`, `convex/`, and `scripts/`.
+> `## Reporting` — Write your deliverable to `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`.
+
+**The guardrail forbids the write the Reporting section mandates.** Both lines are individually
+correct, both come from the template, and the contradiction lives only in their relationship — so
+`bin/check` could not see it, Phase A could not see it, and the author had reviewed the file twice.
+
+This is the gate's premise demonstrated rather than argued: *the authoring context knows what the text
+meant to say, which is exactly the knowledge the gate tests for the absence of.* Nothing short of a
+cold executor attempting the work would have surfaced it.
+
+**Two fixes, because one is the instance and one is the class:**
+
+- The template's scope guardrail now carves out the reporting directory explicitly, and says why.
+- **Phase A gained a blocking check** — no guardrail may forbid the path `## Reporting` mandates. It is
+  a static, checkable relationship between two sections, and it belongs in the cheap phase.
+
+**Do not read this as "Phase A can be made sufficient."** The class this found is now caught statically;
+the *next* contradiction will be somewhere else, and only an executor following the text finds it. A
+gate that fires once and gets its lesson folded into a cheaper check is the gate working.
 
 ### `UNAVAILABLE` — when the host will not spawn at all
 

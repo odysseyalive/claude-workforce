@@ -724,6 +724,32 @@ check(
 # outside this project, so a key or flag NAME read today is renamed next release
 # and the check reports success against a rename. Measure the behaviour.
 _stg = read("workforce/references/staging.md")
+
+# ── The first probe ever run returned FAIL, and it was right ─────────────────
+# The handbook came straight from handbook-templates.md and passed Phase A. Its
+# Guardrails forbade editing outside the scope paths; its Reporting section
+# MANDATED a write to .claude/workforce/work/<run-id>/. Both lines correct, both
+# from the template, the contradiction only in their relationship — invisible to
+# bin/check, to Phase A, and to the author across two reviews.
+#
+# Instance: the template carves out the reporting directory. Class: Phase A gained
+# a blocking check, because the relationship is static and belongs in the cheap
+# phase. Neither makes Phase A sufficient; the next contradiction is elsewhere.
+check(
+    "handbook-templates: the scope guardrail carves out the reporting directory",
+    "and your own reporting directory under" in tpl
+    and "forbids the one file every employee must produce" in tpl,
+    "the template's own guardrail forbade the write its own Reporting section "
+    "mandates, so every handbook authored from it inherited a contradiction",
+)
+check(
+    "staging: Phase A blocks a guardrail that forbids the reporting path",
+    "No guardrail forbids the path `## Reporting` mandates" in _stg
+    and "internally contradictory and pass every other check" in _stg,
+    "a static relationship between two sections belongs in the cheap phase; the "
+    "probe found it, and a lesson a probe teaches is folded into the lint",
+)
+
 check(
     "staging: Phase B has an UNAVAILABLE outcome for a host that will not spawn",
     "UNAVAILABLE` — when the host will not spawn" in _stg
