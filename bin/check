@@ -126,6 +126,41 @@ def manifest_paths():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EVERY shipped-file read, in ONE block. Assertions below may appear in any
+# order without a NameError — which happened three times on 2026-07-31, each
+# time because a new assertion was written above the read it depended on.
+# `read()` returns "" for a missing path, so this is cheap and total.
+# ─────────────────────────────────────────────────────────────────────────────
+readme = read("README.md")
+skill = read("workforce/SKILL.md")
+tpl = read("workforce/references/handbook-templates.md")
+pfp = read("workforce/references/procedure-for-procedures.md")
+plat_body = read("workforce/references/platform.md")
+enf = read("workforce/references/enforcement.md")
+plat = read("workforce/references/platform.md")
+disc = read("workforce/references/discovery.md")
+_org = read("workforce/references/procedures/org.md")
+_ocf = read("workforce/references/org-chart-format.md")
+_pfp2 = read("workforce/references/procedure-for-procedures.md")
+_stg = read("workforce/references/staging.md")
+_hire2 = read("workforce/references/procedures/hire.md")
+_pt = read("workforce/references/personnel-templates.md")
+_asu = read("workforce/references/audit-setup.md")
+_ev = read("workforce/references/evaluators.md")
+_bl = read("bin/baseline")
+_vfy2 = read("workforce/references/procedures/verify.md")
+_od = read("workforce/references/org-design.md")
+_hb = read("workforce/references/procedures/handbook.md")
+vfy = read("workforce/references/procedures/verify.md")
+inv = read("workforce/references/invariants.md")
+pfp = read("workforce/references/procedure-for-procedures.md")
+da = read("workforce/agents/doctrine-auditor/AGENT.md")
+_cov_src = read("bin/coverage")
+_hire = read("workforce/references/procedures/hire.md")
+_tpl_cfg = read("workforce/references/org-config.template.md")
+_plat = read("workforce/references/platform.md")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
 # ─────────────────────────────────────────────────────────────────────────────
 declared = manifest_paths()
@@ -325,7 +360,6 @@ check(
     "citation of it; only the path half was ever validated",
 )
 
-readme = read("README.md")
 img_broken = [
     src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)
     if not src.startswith("http") and not os.path.exists(src)
@@ -364,7 +398,6 @@ check("scopes: no project state written into the skill directory", not leaks, f"
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. SKILL.md structure and marker pairing
 # ─────────────────────────────────────────────────────────────────────────────
-skill = read("workforce/SKILL.md")
 check("SKILL.md: frontmatter present", skill.startswith("---\n"))
 fm = skill.split("\n---\n")[0]
 for key in ("name:", "description:", "when_to_use:", "allowed-tools:"):
@@ -403,7 +436,6 @@ for p in glob.glob("workforce/agents/*/AGENT.md"):
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. Handbook templates carry the load-bearing frontmatter
 # ─────────────────────────────────────────────────────────────────────────────
-tpl = read("workforce/references/handbook-templates.md")
 # Both were bare substrings satisfied by the PROSE BULLET stating the rule — the
 # rule serving as its own enforcement. Deleting the actual YAML line from the IC
 # template passed at 314/0. Anchor to a frontmatter line.
@@ -439,7 +471,6 @@ for _fam in ("ORG-RECORD", "ORG-CHAIN"):
 check("templates: no memory: field offered", not re.search(r"^\s*memory:\s*\w", tpl, re.M))
 check("templates: MCP granted at server level", "mcp__playwright-mcp__*" in tpl)
 
-pfp = read("workforce/references/procedure-for-procedures.md")
 required = re.findall(r"\| `## (\w[\w ]*)` \|", pfp)
 absent = [s for s in required if f"## {s}" not in tpl]
 check("templates: every section the authoring spec requires is present", not absent, f"absent: {absent}")
@@ -457,7 +488,6 @@ check("templates: every section the authoring spec requires is present", not abs
 # Note the phrasing of the comment above: it names the bad number without writing
 # it in citation form, because this file scans itself.
 # ─────────────────────────────────────────────────────────────────────────────
-plat_body = read("workforce/references/platform.md")
 defined_facts = set(re.findall(r"^### Fact ([0-9]+[a-z]?)\b", plat_body, re.M))
 defined_facts |= set(re.findall(r"^\| ([0-9]+[a-z]?) \|", plat_body, re.M))
 
@@ -590,10 +620,8 @@ check(
     f"overclaimed in: {overclaims} — it is detection, not prevention (enforcement.md)",
 )
 
-enf = read("workforce/references/enforcement.md")
 check("honesty: enforcement.md states the cannot-enforce cases", "CANNOT. Detection only." in enf)
 
-plat = read("workforce/references/platform.md")
 check("platform: MEASURED-ON stamp present", "MEASURED-ON:" in plat)
 check("platform: TIER-LIMIT constant present", "TIER-LIMIT:" in plat)
 check("platform: MEASURED and DOCUMENTED are separated", "## DOCUMENTED" in plat and "## MEASURED" in plat)
@@ -627,7 +655,6 @@ ct   = read("workforce/references/conversion-taxonomy.md")
 cd_  = read("workforce/references/conversion-department.md")
 pa_  = read("workforce/agents/provenance-analyst/AGENT.md")
 cc_  = read("workforce/agents/content-classifier/AGENT.md")
-disc = read("workforce/references/discovery.md")
 stg  = read("workforce/references/staging.md")
 aud  = read("workforce/references/procedures/audit.md")
 REQUIRED_DS_SECTIONS = [
@@ -662,9 +689,6 @@ check(
 # dispatched as if complete returns a wrong answer cheaply, which is strictly worse
 # than the agent hop it saved.
 # ─────────────────────────────────────────────────────────────────────────────
-_org = read("workforce/references/procedures/org.md")
-_ocf = read("workforce/references/org-chart-format.md")
-_pfp2 = read("workforce/references/procedure-for-procedures.md")
 
 check(
     "org: the dispatch CHECKPOINT weighs mechanical before it picks a node",
@@ -723,8 +747,6 @@ check(
 # The detection rule is the load-bearing part. The channel is unversioned and
 # outside this project, so a key or flag NAME read today is renamed next release
 # and the check reports success against a rename. Measure the behaviour.
-_stg = read("workforce/references/staging.md")
-_hire2 = read("workforce/references/procedures/hire.md")
 
 # ── A marker MENTIONED is not a marker PRESENT ───────────────────────────────
 # Found by the first sweep ever run. bin/baseline line-anchored its PAIRING check
@@ -752,6 +774,23 @@ check(
     "of them. Two in a tree and the second loses its protection",
 )
 check(
+    "legacy-markers: unattributable is not unowned",
+    "The floor: a generator that emits no markers at all" in lm
+    and "Unattributable is NOT unowned" in lm
+    and "absence of evidence of ownership as evidence of absence" in lm,
+    "no marker -> hand-authored -> succession may take it, is how a markerless "
+    "generator's output becomes eligible; rule 3 stands down only on POSITIVE "
+    "attribution, and out-of-band evidence (a manifest, a generated-by line) is read",
+)
+check(
+    "baseline: the census has signal on the greenfield path",
+    "GREENFIELD SIGNAL" in _bl and "_greenfield" in _bl
+    and "Skill-tree metrics are not applicable" in _bl,
+    "org-design.md calls a skill-less project the PRIMARY path and the census "
+    "measured only the skills tree — a 16-file, 4-commit repo produced output "
+    "identical to an empty directory, and no .claude/ printed one line",
+)
+check(
     "legacy-markers: ownership is inferred from the marker family, not the word origin:",
     "must not require the word" in lm
     and "is an ownership claim by whatever emitted it" in lm
@@ -767,8 +806,6 @@ check(
 # companion that existed was customized: image-eval's palette check is INVERTED
 # for that project. The forcible append would drop the shipped rule in beside the
 # inverted one: two contradictory entries, both looking authoritative.
-_pt = read("workforce/references/personnel-templates.md")
-_asu = read("workforce/references/audit-setup.md")
 check(
     "personnel-templates: personnel-ledger is defined, not just named",
     "## `personnel-ledger` — the skill that holds these records" in _pt
@@ -786,7 +823,6 @@ check(
 # "Converts" was a verb with no procedure — named the state, forbade the wrong
 # actions, never said what the right one produces. Found by running it one turn
 # after landing it, which is the shortest this project has ever closed that loop.
-_ev = read("workforce/references/evaluators.md")
 check(
     "evaluators: converting a customized evaluator names its disposition and destinations",
     "what \"converts\" actually produces" in _ev
@@ -836,7 +872,6 @@ check(
     "4 cannot see it — a blocked run writes no journal row at all",
 )
 
-_bl = read("bin/baseline")
 check(
     "baseline: marker totals and pairing use ONE anchoring rule",
     "def ANCHORED" in _bl and "ANCHORED(rx).findall(body)" in _bl,
@@ -918,7 +953,6 @@ check(
     "an org whose verification could not run is not verified; the remedy is real "
     "(the constraint is conditioned on the user asking) and belongs in the report",
 )
-_vfy2 = read("workforce/references/procedures/verify.md")
 check(
     "verify: scope checks cover deny as well as allow, and prove a spawn happens",
     "`permissions.deny`" in _vfy2 and "A throwaway spawn actually happens" in _vfy2,
@@ -969,7 +1003,6 @@ check(
 # project, so a catalog grep is a real tier-3 check), engineering dropped, on a
 # project whose stated next action is to build. Plausible, confident, and missing
 # the department the project exists for.
-_od = read("workforce/references/org-design.md")
 # The retracted phrase must SURVIVE, marked as retracted — this project writes down
 # what it reversed rather than deleting it (platform.md § the contradiction is
 # written down). A first draft asserted the phrase was ABSENT and failed against the
@@ -1142,7 +1175,6 @@ check(
 # The narrowing must be VISIBLE. "Authoring is descriptive" was true of everything
 # authoring did until step 5 wrote a script — a rule never tested against the case
 # that breaks it. Silently deleting it would be the revocation this project fails on.
-_hb = read("workforce/references/procedures/handbook.md")
 check(
     "handbook: the data-skill authoring step writes maintainers, and says what narrowed",
     "run its negative test" in _hb and "narrowing of earlier wording" in _hb,
@@ -1163,7 +1195,6 @@ check(
 # Nouns are a closed vocabulary so the check fails LOUDLY on an unclassifiable
 # claim rather than passing over a sentence it could not parse.
 # ─────────────────────────────────────────────────────────────────────────────
-vfy = read("workforce/references/procedures/verify.md")
 
 check(
     "verify: data-skill conformance is carried, not just claimed elsewhere",
@@ -1465,8 +1496,6 @@ check(
 # Five recorded defects of one shape: doctrine correct, nothing making it true.
 # A procedural claim cannot be caught statically, so its ONLY enforcement is a
 # counted line in the run report — and these assertions guard that mechanism.
-inv = read("workforce/references/invariants.md")
-pfp = read("workforce/references/procedure-for-procedures.md")
 
 check(
     "invariants: normative claims are classified into three enforceable kinds",
@@ -1572,7 +1601,6 @@ check(
 # The author of a rule cannot see this class of defect — writing correct doctrine
 # feels like completing the work. The second reader is the only mechanism that
 # does not depend on the author noticing.
-da = read("workforce/agents/doctrine-auditor/AGENT.md")
 check(
     "doctrine-auditor: exists and asks what makes a claim true",
     "What makes this true?" in da,
@@ -1768,7 +1796,6 @@ check(
 # duplication is deliberate and the drift is what needs catching. Adding `vfy` to
 # one copy and not the other produced exactly that: coverage stamped a header that
 # check then called stale, and neither tool was wrong about its own map.
-_cov_src = read("bin/coverage")
 _cov_map = re.search(r"VAR_TO_FILE\s*=\s*\{(.*?)\n\}", _cov_src, re.S)
 _cov_pairs = set(re.findall(r'"([^"]+)":\s*"([^"]+)"', _cov_map.group(1))) if _cov_map else set()
 check(
@@ -1783,7 +1810,6 @@ check(
 # before registration, so capability is reachable by ZERO paths at the crash
 # window the whole design exists to prevent — and both passed. CONST_RX covers
 # tier counts and model IDs; it never reached the ordering.
-_hire = read("workforce/references/procedures/hire.md")
 _T_SEQ = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"]
 
 
@@ -1870,7 +1896,6 @@ check(
 # The budget can only offer IDs that exist in the statics pool. The pool was
 # emptied once (CLAUDE.md, closed 2026-07-29) with nothing noticing, and a tier
 # default shipped naming an ID outside its own pool.
-_tpl_cfg = read("workforce/references/org-config.template.md")
 _pool = set(re.findall(r"`(claude-[\w.-]+)`", _tpl_cfg.split("## Model statics")[-1][:900]))
 _tier_ids = set(re.findall(r"\|\s*(?:CEO|Lead|IC|creative)[^|]*\|\s*`(claude-[\w.-]+)`", _tpl_cfg))
 check(
@@ -1951,7 +1976,6 @@ check(
     "swept" in stg and "MEASURED is residue" in stg,
     "staging.md must state the fixture lifecycle, or closed probes accumulate",
 )
-_plat = read("workforce/references/platform.md")
 _live_fixtures = {
     os.path.basename(p)[:-3] for p in glob.glob(".claude/agents/wf-*.md")
 }

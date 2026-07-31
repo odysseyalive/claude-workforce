@@ -143,6 +143,49 @@ def census(root):
     claude = os.path.join(root, ".claude")
     skills_dir = os.path.join(claude, "skills")
     out = {"project": root, "exists": os.path.isdir(claude)}
+
+    # ── GREENFIELD SIGNAL ────────────────────────────────────────────────────
+    # org-design.md calls a project with no skills "the ordinary case, not a
+    # degraded one" and the PRIMARY path — and this census measured only the
+    # skills tree, so it returned all zeros for it. Fixture f6 (16 files, 4
+    # commits, two package manifests, a settings file) produced output identical
+    # to an empty directory. A measurement with no signal on the primary path is
+    # not a conservative measurement; it is an absent one.
+    out["greenfield"] = gf = {}
+    gf["claude_md_bytes"] = len(read(os.path.join(root, "CLAUDE.md")).encode())
+    manifests = ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "mix.exs",
+                 "Gemfile", "pom.xml", "build.gradle", "composer.json", "Makefile", "CMakeLists.txt"]
+    gf["manifests"] = sorted(
+        os.path.relpath(os.path.join(d, f), root)
+        for d, _s, fs in os.walk(root) if ".git" not in d and "node_modules" not in d
+        for f in fs if f in manifests
+    )
+    code_ext = {".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".go", ".ex", ".rb", ".java", ".c", ".cpp"}
+    n_code = n_test = 0
+    top = {}
+    for d, subs, fs in os.walk(root):
+        if ".git" in d or "node_modules" in d:
+            continue
+        for f in fs:
+            if os.path.splitext(f)[1] in code_ext:
+                n_code += 1
+                rel = os.path.relpath(os.path.join(d, f), root)
+                top[rel.split(os.sep)[0]] = top.get(rel.split(os.sep)[0], 0) + 1
+                if "test" in f.lower() or "spec" in f.lower() or "/test" in rel.replace(os.sep, "/"):
+                    n_test += 1
+    gf["code_files"] = n_code
+    gf["test_files"] = n_test
+    gf["top_dirs"] = dict(sorted(top.items(), key=lambda kv: -kv[1])[:8])
+    code, so, _ = sh(["git", "rev-list", "--count", "HEAD"], root)
+    gf["git_commits"] = int(so.strip()) if code == 0 and so.strip().isdigit() else 0
+    code, so, _ = sh(["git", "log", "--format=", "--name-only", "-n", "200"], root)
+    churn = {}
+    if code == 0:
+        for line in so.splitlines():
+            if line.strip():
+                churn[line.split("/")[0]] = churn.get(line.split("/")[0], 0) + 1
+    gf["churn_top"] = dict(sorted(churn.items(), key=lambda kv: -kv[1])[:5])
+
     if not out["exists"]:
         return out
 
@@ -469,13 +512,42 @@ def human(n):
     return f"{n}B"
 
 
+def _greenfield(c, p):
+    """The evidence ladder org-design.md ranks. Printed even with no .claude/."""
+    g = c.get("greenfield") or {}
+    if not (g.get("code_files") or g.get("manifests") or g.get("git_commits")):
+        return
+    p("## Project shape — the greenfield evidence ladder")
+    p("")
+    p("A project with no skills is the ordinary case, not a degraded one.")
+    p("")
+    p("| evidence | value |")
+    p("|---|---|")
+    p(f"| build manifests | {', '.join(g['manifests']) or '**none**'} |")
+    p(f"| code files | {g['code_files']} |")
+    _t = g['test_files']
+    p(f"| test files | {_t} — {'supports a tighter handbook' if _t else '**none: roster must be correspondingly small**'} |")
+    p(f"| top directories | {', '.join(f'{k} ({v})' for k, v in g['top_dirs'].items()) or '—'} |")
+    _gc = g['git_commits']
+    p(f"| git history | {_gc} commits{'' if _gc else ' — **no VCS**'} |")
+    p(f"| churn (last 200) | {', '.join(f'{k} ({v})' for k, v in g['churn_top'].items()) or '—'} |")
+    p(f"| CLAUDE.md | {g['claude_md_bytes']} bytes, injected per subagent |")
+    p("")
+
+
 def report(c):
     if not c.get("exists"):
-        print(f"no .claude/ directory at {c['project']}")
+        print(f"# Baseline — {c['project']}")
+        print("")
+        print("**No `.claude/` directory.** Skill-tree metrics are not applicable; the project")
+        print("evidence below is what an audit would design the org from.")
+        print("")
+        _greenfield(c, print)
         return
     p = print
     p(f"# Baseline — {c['project']}")
     p("")
+    _greenfield(c, p)
     p("## Counts")
     p("")
     p(f"| metric | value |")
