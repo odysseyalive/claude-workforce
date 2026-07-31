@@ -24,7 +24,7 @@ landed in the runtime copy and vanished.
 ## The loop
 
 ```
-edit workforce/…  →  python3 bin/check  →  python3 bin/baseline ~/lab/odyssey-alive  →  python3 bin/sync
+edit workforce/…  →  bin/check  →  bin/baseline <real project>  →  MOCK AUDIT --review  →  bin/sync
 ```
 
 **`bin/baseline` is in the loop, not at the end of the project.** Every defect of the
@@ -35,6 +35,36 @@ check each surfaced a real defect within minutes of first running.
 
 So a substantive change is not done when `bin/check` passes. It is done when the census still adds up
 against a real project. That costs seconds and is the only step with a track record.
+
+**A patch that changes a PROCEDURE is validated by running that procedure against a real example, before
+it lands.** This is the fourth step above and it is not optional for procedure changes. `bin/check`
+asserts properties of the text; `bin/baseline` measures a tree. **Neither exercises the procedure**, and
+the defects that survive both are exactly the ones that only appear when someone follows the steps.
+
+The instruments find different things, and 2026-07-31 measured the difference in one session:
+
+| Instrument | Found |
+|---|---|
+| `bin/check` | restated constants, unpaired markers, a vacuous assertion, a duplicated paragraph |
+| `bin/baseline` | 4 unknown marker families, 2 unpaired-marker sweep hazards, a ledger index off by 4 |
+| **the mock audit** | **`--review` wrote into the target** via two gates in the *other* file — and it corrected a known defect's characterization from "produces an empty chart" to "produces a lopsided plausible one," which changed how the fix had to be scoped |
+
+**Manage an anticipated issue through the mock audit rather than by reasoning about it.** The
+provisional-verification fix is the worked example: it was diagnosed by reading (correctly, as far as it
+went), then *re-diagnosed* by running — and the second reading is the one the patch was written against.
+After the patch, the same mock audit was re-run against the same tree to confirm the shape had changed,
+and that re-run caught an invented command (`pnpm test`) in the prior report, which the project's own
+never-invent-a-check rule then forbade.
+
+**Mechanics.** `--review` writes nothing anywhere, including in the gates that write — every writing gate
+declares its `--review` behavior (`references/audit-setup.md`). **Verify the target is untouched
+afterward** rather than trusting the mode: `find <target> -newermt '-1 hours' | wc -l` should be 0. Write
+the run up in `plan/mock-audit-<project>-<date>.md`; that record is the counted evidence the change was
+exercised, and a procedure patch without one has been reasoned about rather than tested.
+
+**The author is not a cold reader.** A mock audit run by whoever wrote the patch finds real defects and
+proves nothing about the absences — the same asymmetry `SKILL.md` § Off-the-Street Release Gate states
+about handbooks. Treat findings as findings and a clean run as untested.
 
 **`bin/check` is this project's own verification** — the runnable check its handbooks demand of every
 employee. Run it before every commit. It asserts manifest completeness both ways, resolves every
@@ -96,9 +126,12 @@ Two more, both from the `playwright-mcp` seam:
 
 ## Open, as of 2026-07-29
 
-- **`/workforce audit` has never run.** Nothing here has been executed end to end. The gate-0.4 blocker
-  that made it *unable* to finish is fixed (below), so the next attempt is the first that can get past
-  setup. This remains the one item that matters.
+- **`/workforce audit` has run read-only, once.** 2026-07-31, `--review` by hand against
+  `~/lab/apps-odyssey-alive` — `plan/mock-audit-apps-odyssey-alive-2026-07-31.md`. It cost one defect to
+  do it (`--review` wrote into the target through Step 0.2 and Step 0.6) and sharpened a second.
+  **Every writing step remains unexecuted**: the transaction order, the sweep, the probe gate, and
+  registration have still never run. That is now the one item that matters, and it is smaller than it
+  was.
 
 - **The department cap may be narrower than a real project.** `odyssey-alive`'s skills describe five
   coherent domains — content, engineering, finance/ops, comms, meta-tooling. `org-design.md` calls two to
