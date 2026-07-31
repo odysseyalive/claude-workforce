@@ -1096,7 +1096,11 @@ check(
 )
 check(
     "extraction: the gate counts embedded quotes as well as immutable spans",
-    "M of M" in lm or "embedded quotes" in ct,
+    # Second term read `"embedded quotes" in ct` and had been dead since it was
+    # written: conversion-taxonomy.md wraps between "embedded" and "quotes", and
+    # the `or` passed on the first term alone. Found by the hard-wrap lint's first
+    # run — the fourth instance that day, and the only one nobody had noticed.
+    "M of M" in lm or "M of M embedded" in ct,
     "counting spans alone passes at 100% while user text inside generated blocks is destroyed",
 )
 check(
@@ -1396,6 +1400,78 @@ try:
             _hdr_stale.append(f"{_p}: header says {_m.group(1)}, actual {len(_live.get(_p, ()))}")
 except Exception as _e:  # a diagnostic must not die on the input it diagnoses
     _hdr_stale.append(f"could not parse bin/check: {_e}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HARD-WRAP LINT — over this file's own assertions.
+#
+# Every reference here is hard-wrapped at ~100 columns, so a phrase an author
+# reads as contiguous is stored with a newline in the middle. Three assertions
+# were broken by this on 2026-07-31 alone, which is the project's own promotion
+# threshold: a rare problem gets a principles entry, a third occurrence gets a
+# mechanism.
+#
+# The `in` form fails loudly and wastes time. **The `not in` form PASSES
+# VACUOUSLY** — assert that a retracted phrase is absent, wrap-break the literal,
+# and the assertion reports success about a condition it never tested. That is
+# the one this exists for, and it is exactly the shape of a draft written today.
+#
+# The var->file map is DERIVED from `x = read("...")` assignments rather than
+# maintained. A hand-kept list here would be one more thing to forget, and this
+# file already carries two copies of one such map for reasons it had to assert
+# its way out of.
+# ─────────────────────────────────────────────────────────────────────────────
+_wrap_bugs = []
+try:
+    import ast as _a2
+
+    _t2 = _a2.parse(read("bin/check"))
+    _readmap = {}
+    for _n in _a2.walk(_t2):
+        if (isinstance(_n, _a2.Assign) and len(_n.targets) == 1
+                and isinstance(_n.targets[0], _a2.Name)
+                and isinstance(_n.value, _a2.Call)
+                and getattr(_n.value.func, "id", "") == "read"
+                and _n.value.args and isinstance(_n.value.args[0], _a2.Constant)):
+            _readmap[_n.targets[0].id] = _n.value.args[0].value
+
+    def _ws(s):
+        return " ".join(s.split())
+
+    for _n in _a2.walk(_t2):
+        if not (isinstance(_n, _a2.Call) and getattr(_n.func, "id", "") == "check"):
+            continue
+        if len(_n.args) < 2:
+            continue
+        for _c in _a2.walk(_n.args[1]):
+            if not (isinstance(_c, _a2.Compare) and len(_c.ops) == 1
+                    and isinstance(_c.ops[0], (_a2.In, _a2.NotIn))
+                    and isinstance(_c.left, _a2.Constant)
+                    and isinstance(_c.left.value, str)
+                    and isinstance(_c.comparators[0], _a2.Name)):
+                continue
+            _lit, _var = _c.left.value, _c.comparators[0].id
+            # Single tokens cannot straddle a wrap; only file-backed vars qualify.
+            if _var not in _readmap or len(_lit.split()) < 2:
+                continue
+            _body = read(_readmap[_var])
+            if not _body or _lit in _body:
+                continue
+            if _ws(_lit) in _ws(_body):
+                _neg = isinstance(_c.ops[0], _a2.NotIn)
+                _wrap_bugs.append(
+                    f"line {_c.lineno}: {'`not in` PASSES VACUOUSLY' if _neg else 'never matches'}"
+                    f" — {_lit[:44]!r} is present in {_readmap[_var]} only across a line wrap"
+                )
+except Exception as _e:  # a diagnostic must not die on the input it diagnoses
+    _wrap_bugs.append(f"could not lint bin/check: {_e}")
+
+check(
+    "assertions: no substring literal is broken by a hard wrap in its target",
+    not _wrap_bugs,
+    f"{_wrap_bugs} — the phrase IS in the file, wrapped. Match a contiguous "
+    "fragment instead. A `not in` broken this way reports success about a "
+    "condition it never tested",
+)
 
 check(
     "coverage: every Enforcement header matches the assertions that exist",
