@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -135,6 +135,26 @@ T8  journal COMMITTED
 **The invariant:** at every observable instant the capability is reachable by **exactly one or exactly
 two paths — never zero.** A crash before T5 leaves the original untouched. A crash between T5 and T7
 leaves both live: degraded, and safe.
+
+### On a HIRE, T2 and T7 do not apply — and this had to be said
+
+This order is declared *"used by every conversion and every hire"*, and **T2 and T7 both take a
+`<skill>`.** A hire has no source skill: nothing to extract directives from, nothing to retire. Found
+by running the order for the first time on 2026-07-31; a reader following it literally would look for a
+source that does not exist, and the honest failure is that they invent one.
+
+| Step | On a conversion | On a hire |
+|---|---|---|
+| **T2** extract directives | blocking, byte-exact | **N/A** — no source. Report `T2 N/A (hire)`, never a silent skip |
+| **T6b / T7** retire the skill | required, copy-then-mark | **N/A** — nothing to retire. **T8 follows T6 directly** |
+
+**The invariant is unaffected and worth restating for this case.** A hire *creates* a path that did not
+exist, so the count runs zero → one. It never passes through the two-path window T7 exists to close, and
+there is nothing a crash could strand: before T5 the employee does not exist, after T6 it does.
+
+**Print the N/A rows rather than omitting them.** A journal showing T5 and T8 with nothing between them
+is indistinguishable from a conversion whose T7 was skipped — which is the one failure this order
+refuses. `T2 N/A (hire)` and `T7 N/A (hire)` cost two lines and remove the ambiguity.
 
 **The mark IS the COMMITTED T7 journal row.** It is not an annotation in the skill, not a sidecar, and
 not run-local state — `audit.md` § Step 6b enumerates the sweep's input set from those rows, and
