@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 7 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -64,43 +64,71 @@ an employee its handbook forbids. Treat the org chart as a contract, not a sandb
 | /skill-builder | eng-implementer | creates and registers agents |
 
 ## Mechanicals
-| Command | Covers | Does NOT cover | Owner | Destructive | Proven | Source |
+| Command | Covers | Does NOT cover | Owner | Destructive | Scope | Source |
 |---|---|---|---|---|---|---|
-| `pnpm test` | the whole unit suite | e2e, lint, types | eng-test-writer | no | probe 2026-07-29 | package.json |
-| `scripts/check-ledger.sh` | ledger index = filesystem | record *content* | records-ledger | no | negative test | maintainer |
+| `pnpm test` | 240 tests over 37 files under `src/` | e2e, lint, types | eng-test-writer | no | derived 2026-07-31 | package.json |
+| `scripts/check-ledger.sh` | ledger index = filesystem | record *content* | records-ledger | no | derived 2026-07-31 | maintainer |
+| `scripts/deploy-preflight.sh` | *(bespoke; no discovery mode)* | — | eng-lead | no | declared | CLAUDE.md |
 
 **What the dispatcher reads before it picks a node** (`procedures/org.md` § Canonical Dispatch
 CHECKPOINT clause 2). Rows come from four places, all of them already in the tree: project command
 definitions, data-skill `## Maintainers` rows (`data-skills.md`), employees' `## Verification`
 commands, and skills whose whole surface is deterministic.
 
-**`Covers` is a coverage claim and the dispatcher reads it literally.** Write what the command
-*wholly* answers, never what it participates in — clause 2 fires on total coverage only, so an
-overstated cell is how a partial answer gets returned as a complete one. When in doubt, narrow it: a
-row that under-claims costs one agent hop, and a row that over-claims returns the wrong answer
-cheaply.
+### `Covers` is DERIVED, never authored
 
-**`Does NOT cover` is the cell that makes the claim checkable, and it is mandatory.** A positive
-coverage claim is read charitably by whoever is matching an ask against it — that is how *"runs the
-tests"* comes to look like it covers a type error. A stated boundary cannot be read charitably: the
-dispatcher checks the ask against it and any overlap disqualifies the row outright. **An empty
-boundary cell is not "covers everything"; it is an unfinished row**, and `org index` drops it.
+> **A `Covers` cell is generated from what the command enumerates about itself. Nothing writes one by
+> hand.**
 
-**`Proven` records where the confidence comes from**, and the vocabulary is closed:
+This is the same relationship this file already declares at the top — *the files are the source of
+truth; the chart is a derived cache* — applied one artifact further in. It exists because a **written**
+coverage claim can over-claim, and an over-claim is the one error that hurts: the dispatcher runs the
+command, gets exit 0, and reports an ask answered that the command never checked. That is a false PASS,
+and `verification.md` is built around the fact that a false PASS from inside a dispatch is invisible.
 
-| Value | Meaning |
-|---|---|
-| `negative test` | a maintainer row — its script was made to fail (`data-skills.md` § Maintainers) |
-| `probe <date>` | an employee's `## Verification` command, exercised at that employee's release |
-| `unproven` | nothing has ever confirmed this command does what the row claims |
+**Nothing authors the cell, so nothing can over-claim it.** The failure is unreachable rather than
+detected, which is worth strictly more than any amount of auditing the cell would have received.
 
-**`unproven` never blocks and never silently passes.** The row still dispatches — a project's own
-`pnpm test` is usually right — but the announcement carries the word, and the result is reported as an
-exit code **whose coverage claim is unconfirmed**, never as a bare PASS. This is `org-design.md`
-§ Provisional verification applied one layer out: an unproven check is an admission, not a loophole.
+Enumeration is what every serious runner already ships, and it executes nothing:
+`playwright test --list`, `jest --listTests`, `pytest --collect-only`, `tsc --listFiles`,
+`eslint --print-config`. **A discovery mode that executes, writes, or deploys is not a discovery mode**
+— never call one to fill this cell.
+
+### `Scope` — the state that decides whether clause 2 may fire
+
+| Value | How the row got its scope | May satisfy total coverage? |
+|---|---|---|
+| `derived <date>` | the command's own enumeration, re-run at that `index` | **yes** |
+| `declared` | the project's docs say so; the command has no discovery mode, or its enumeration is cached and therefore aged | **no — dispatchable as a step only** |
+
+**`declared` costs a hop, never a capability.** The row stays in the table and stays dispatchable — a
+node's work order may name the command as a step. What it may never do is satisfy clause 2's
+total-coverage test on its own authority, because the only thing backing its scope is prose somebody
+wrote.
+
+**A real failure may be recorded as corroboration and changes nothing.** When a command exits nonzero
+over a defect inside its enumerated scope, note it — it confirms the row is live and load-bearing. It
+never establishes scope and **never promotes `declared` to `derived`**; only an enumeration does that.
+
+**`Does NOT cover` is the boundary, and it is mandatory.** Derivation gives it cheaply — it is the
+complement of the enumerated set — and it is what stops an ask being read charitably into a row. The
+dispatcher checks it first: any overlap disqualifies the row outright. **An empty boundary cell is not
+"covers everything"; it is an unfinished row**, and `org index` drops it.
 
 **Every row needs a command with an exit code.** A row whose check is a judgment is not mechanical and
 does not belong here — it is an employee's job, and listing it would dress a judgment as a check.
+
+### What derivation does not establish, and why it is not ours to establish
+
+Enumeration says what the command **will execute**. It does not say whether those executions **assert
+anything** — a vacuous test file enumerates identically to a good one.
+
+> Workforce is answerable for the row accurately describing **what the command does**. Whether the
+> command is a *good check* is the project's own business, exactly as `pnpm test` passing has never
+> meant the code is correct.
+
+Claiming otherwise would be the overclaim `enforcement.md` opens by refusing. This is a boundary of
+responsibility, not a gap to be closed later — do not write a mechanism against it.
 
 **`Destructive: yes` rows are never auto-run.** They render display-first, like every other
 high-risk command.

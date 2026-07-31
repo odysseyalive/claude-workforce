@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 8 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -33,27 +33,41 @@ command, and skills whose entire surface is deterministic.
 not. A row is an instruction to run something; a row for a command that is not there is dead wiring
 with a dispatcher pointed at it, which is worse than the absence it records. Report every drop by name.
 
-**Never infer a `Covers` cell from a command's name.** Read what the project says the command does, and
-where it says nothing, write the narrow claim. `pnpm verify` is not evidence that a command verifies
-anything, and a coverage claim assembled from a filename is how clause 2's total-coverage rule gets
-satisfied by a guess.
+**DERIVE every `Covers` cell by enumerating the command. Never write one** (`org-chart-format.md`
+§ `Covers` is DERIVED, never authored). Per row:
 
-**Fill `Does NOT cover` from the same evidence, and drop the row if you cannot.** The boundary is what
-makes the claim checkable at the door (`org-chart-format.md` § Mechanicals), and a row without one is
-unfinished rather than unlimited. Where the project's own docs name sibling commands — a separate
-`lint`, `typecheck`, or e2e target — those siblings *are* the boundary, already written down.
+1. **Find the command's discovery mode** — `--list`, `--listTests`, `--collect-only`, `--listFiles`,
+   `--print-config`, or whatever its own docs name. **It must execute nothing.** A mode that runs,
+   writes, or deploys is not a discovery mode, and calling one here would make `index` a destructive
+   command.
+2. **Run it and derive `Covers` from the output** — the enumerated set, counted and located, never a
+   paraphrase of what the command is *for*. `Does NOT cover` is the complement, and the project's own
+   sibling commands (a separate `lint`, `typecheck`, or e2e target) name most of it already.
+3. **Set `Scope: derived <today>`.**
+4. **No discovery mode → `Scope: declared`**, scope from the project's docs, and the row is a step-only
+   row. That is a normal outcome, not a defect: it costs a hop and keeps a capability.
 
-**Resolve `Proven` by inheritance, never by assertion.** A maintainer row carries its negative test
-(`data-skills.md` § Maintainers); an employee's `## Verification` command carries the date of that
-employee's release probe. Anything else is `unproven`, which is a normal state and not a defect — most
-project commands arrive that way. **Never write `unproven` where evidence exists, and never write
-evidence that was not run.**
+**Re-derive on EVERY index. Do not cache a scope and do not stamp one.** Enumeration is bounded by the
+command's own discovery phase, always cheaper than running it, and re-deriving is what makes source
+drift a non-category — a new untested module simply does not appear in the enumeration, so no cell ever
+claims it. A cached scope is a claim about a tree that has moved; **where one is genuinely too slow to
+re-run, cache it and mark the row `declared` with the enumeration's age**, so the staleness is in the
+state name rather than hidden behind a hash.
 
-**Detect overlapping coverage before writing the table.** Two rows whose `Covers` claims both wholly
+**Never write `derived` for an enumeration that was not run this index.** That is the one falsehood
+this design cannot absorb: every other state is honest about what it does not know.
+
+**Detect overlapping coverage before writing the table.** Two rows whose derived scopes both wholly
 contain the same work make the table ambiguous, and the door is forbidden to resolve it (clause 2d).
 Report both rows with the overlap named. **Never auto-resolve by narrowing a cell** — which of the two
 is wrong is a question about the project, not about the table, and guessing produces a confident row
 nobody checked.
+
+**Report the coverage line**, always, including zeros:
+
+```
+Coverage   9 rows · 6 derived (re-run this index) · 2 declared (no discovery mode) · 1 declared (cached, 12d)
+```
 
 **2. Detect `/org`.** Missing → bootstrap from `references/templates.md`. Present → leave hand-written
 content alone; only the marked CHECKPOINT block is auto-managed (step 5).
@@ -106,10 +120,10 @@ Byte-canonical. Lives in `/org`'s SKILL.md between
 <!-- ENFORCEMENT ANNOTATION — Opus 5+ literal-execution gate -->
 CHECKPOINT — Dispatch Required:
 1. ANNOUNCE-AND-INVOKE IS ONE ACT. The same response that prints `→ Dispatching to @agent-<name> (T<n>, <dept>) — <why this is the lowest competent node>` MUST also issue the `Agent` call — or, for a mechanical dispatch, MUST run the command itself (clause 2). The announcement is a label on the dispatch, never a substitute for it.
-2. MECHANICAL BEFORE AGENTIC. Read the chart's `## Mechanicals` table BEFORE choosing any node. Match the ask against BOTH cells: it must fall wholly inside `Covers` AND touch nothing in `Does NOT cover`. Any overlap with the boundary disqualifies the row — check the boundary first, because a positive coverage claim reads charitably and a stated boundary does not. On a match → announce `→ Running <command> (mechanical — <what makes an agent unnecessary>) [Proven: <value>]`, run it in the same response, and report **the command, its exit code, AND its output**, so a result that does not answer the ask is visible here rather than inferred later. NEVER spawn an employee to run a command that already exists.
+2. MECHANICAL BEFORE AGENTIC. Read the chart's `## Mechanicals` table BEFORE choosing any node. A row may satisfy total coverage ONLY IF its `Scope` cell reads `derived` — a `declared` row's scope rests on prose somebody wrote, and an authored coverage claim is the one error that produces a false PASS. Then match the ask against BOTH cells: it must fall wholly inside `Covers` AND touch nothing in `Does NOT cover`. Any overlap with the boundary disqualifies the row — check the boundary first, because a coverage claim reads charitably and a stated boundary does not. On a match → announce `→ Running <command> (mechanical — <what makes an agent unnecessary>) [Scope: derived <date>]`, run it in the same response, and report **the command, its exit code, AND its output**, so a result that does not answer the ask is visible here rather than inferred later. NEVER spawn an employee to run a command that already exists.
 2a. TOTAL COVERAGE ONLY, AND UNCLEAR IS NOT TOTAL. A partial match is NOT a mechanical dispatch — it becomes a named step inside the work order of whatever node clause 3 selects, never a reason to skip that node. **IF totality is unclear, it is not total**: resolve to clause 3 and say that the table was read and did not decide. Coverage is judged here by reading a prose cell, which is the softest joint in this ladder, and the conservative alternative is one agent hop — against a wrong answer returned cheaply, which is what the other error produces.
-2b. FOUR REFUSALS, each sending the ask to clause 3: (a) the entry writes, deletes, deploys, or is otherwise destructive → render display-first, never auto-run; (b) its declared check is not a command with an exit code → it is not mechanical, and calling it so would dress a judgment as a check; (c) it is absent from disk → treat as stale per clause 8 and never run a command that is not there; (d) its `Does NOT cover` cell is empty → an unfinished row, never a claim to cover everything.
-2c. `Proven: unproven` DISPATCHES BUT NEVER REPORTS A BARE PASS. Print the word in the announcement, and report the result as an exit code **whose coverage claim is unconfirmed**. NEVER restate it as PASS, and never let the exit code stand in for evidence the command checks what the row says it checks (`org-design.md` § Provisional verification — an unproven check is an admission, not a loophole).
+2b. FIVE REFUSALS, each sending the ask to clause 3: (a) `Scope` is not `derived` → the row is dispatchable as a STEP inside that node's work order, never as the whole answer; (b) the entry writes, deletes, deploys, or is otherwise destructive → render display-first, never auto-run; (c) its scope is not a command with an exit code → it is not mechanical, and calling it so would dress a judgment as a check; (d) it is absent from disk → treat as stale per clause 8 and never run a command that is not there; (e) its `Does NOT cover` cell is empty → an unfinished row, never a claim to cover everything.
+2c. A `declared` ROW COSTS A HOP, NEVER A CAPABILITY. Refusing it here is not discarding it: name it in the work order as a step so the node runs the command instead of reproducing its work by hand (`procedure-for-procedures.md` rule 3b). Report which it was — "the table was read; `<command>` is `declared` and cannot answer this alone" — because a row refused for its state and a row nobody looked at are otherwise identical from outside.
 2d. TWO ROWS CLAIMING THE SAME WORK IS A TABLE DEFECT, NEVER A DISPATCH DECISION. IF two entries both match wholly → STOP. Report both rows verbatim and ask. Do NOT pick the first, the narrower, or the more proven — every one of those is a guess dressed as a rule, and the defect is that `index` wrote two answers to one question. Say so, and name `/workforce org index` as where it gets fixed.
 2e. A mechanical dispatch IS a dispatch: it announces, it reports, and its exit code is its verification — tier 1 (`references/verification.md`), which outranks the employee it replaced.
 3. LOWEST COMPETENT NODE. One IC's scope covers it → that IC. Two or more ICs in one department, or intra-department sequencing → that Lead. Two or more departments, no owner, or strategic/ambiguous work → the CEO. TIES RESOLVE DOWNWARD — cheaper, fewer hops. The CEO is never a mandatory funnel.
