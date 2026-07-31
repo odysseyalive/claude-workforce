@@ -19,8 +19,8 @@ exist — while the org chart lists both and every report says the org is health
 
 1. **Namespaced names by convention:** `<dept>-<role>` — `eng-reviewer`, `docs-reviewer`. Not because
    the platform namespaces them, but because *we* must.
-2. **A uniqueness check at authoring time**, globbing every agent location — `.claude/agents/**/*.md`
-   and `~/.claude/agents/**/*.md` — dereferencing symlinks and deduping by resolved target.
+2. **A uniqueness check at authoring time**, globbing every agent location — `.claude/agents/**/*.md`,
+   `~/.claude/agents/**/*.md`, **and `AGENT.md` files under `.claude/skills/**`** — dereferencing symlinks and deduping by resolved target.
 3. **A blocking Phase A lint check** (`staging.md`), so a collision stops registration instead of
    being reported after the fact.
 

@@ -1081,6 +1081,74 @@ check(
     "removes it, both presupposing something created it",
 )
 
+# The retracted "restart required" claim has returned FIVE times across nine
+# files, caught every time by a human re-reading and never by a mechanism —
+# `grep -n restart bin/check` returned nothing until now. platform.md fact 3
+# measures the opposite: both agents and skills register later in the same
+# session. Prose that PROHIBITS the claim is fine; prose that ASSERTS it is not.
+_RESTART_ASSERT = re.compile(
+    r"(?:not live-reloaded"
+    r"|unreachable until (?:Claude Code )?restart"
+    r"|[Rr]estart Claude Code to reach"
+    r"|restart is required"
+    r"|requires? a restart)",
+)
+_RESTART_OK = re.compile(r"(?:[Nn]ever write|is retracted|retracted|prohibit|would be false)")
+_restart_hits = []
+for _p in declared:
+    if not _p.endswith(".md"):
+        continue
+    for _ln, _line in enumerate(read(_p).splitlines(), 1):
+        if _RESTART_ASSERT.search(_line) and not _RESTART_OK.search(_line):
+            _restart_hits.append(f"{_p}:{_ln}")
+check(
+    "platform: no shipped file asserts that a restart is required",
+    not _restart_hits,
+    f"retracted claim asserted at: {_restart_hits} — platform.md fact 3 measures "
+    "delayed registration, not a restart requirement. It has returned five times; "
+    "state the prohibition or the retraction on the same line, or reword.",
+)
+
+# The budget can only offer IDs that exist in the statics pool. The pool was
+# emptied once (CLAUDE.md, closed 2026-07-29) with nothing noticing, and a tier
+# default shipped naming an ID outside its own pool.
+_tpl_cfg = read("workforce/references/org-config.template.md")
+_pool = set(re.findall(r"`(claude-[\w.-]+)`", _tpl_cfg.split("## Model statics")[-1][:900]))
+_tier_ids = set(re.findall(r"\|\s*(?:CEO|Lead|IC|creative)[^|]*\|\s*`(claude-[\w.-]+)`", _tpl_cfg))
+check(
+    "org-config: the statics pool is non-empty",
+    len(_pool) >= 3,
+    f"only {len(_pool)} model statics — the budget questions have nothing to propose, "
+    "which is the seam closed 2026-07-29 reopening",
+)
+check(
+    "org-config: every tier default is drawn from the statics pool",
+    _tier_ids <= _pool,
+    f"tier defaults outside the pool: {sorted(_tier_ids - _pool)} — a user cannot "
+    "re-select their own default from the four options offered",
+)
+
+# Two shipped agents sharing a name resolve silently by filesystem order. The
+# file that exists to prevent this had zero assertions.
+_agent_names = {}
+for _p in glob.glob("workforce/agents/*/AGENT.md"):
+    _m = re.search(r"^name:\s*(\S+)", read(_p), re.M)
+    if _m:
+        _agent_names.setdefault(_m.group(1), []).append(_p)
+_dupe_names = {k: v for k, v in _agent_names.items() if len(v) > 1}
+check(
+    "personas: no two shipped agents declare the same name",
+    not _dupe_names,
+    f"collision: {_dupe_names} — resolves by filesystem read order, with nothing reported",
+)
+_bad_names = sorted(n for n in _agent_names if not re.fullmatch(r"[a-z0-9-]+", n))
+check(
+    "personas: every shipped agent name is lowercase-and-hyphens, no colons",
+    not _bad_names,
+    f"malformed: {_bad_names} — a colon is reserved for plugin scoping and the file "
+    "is not loaded; the old guard accepted any non-whitespace",
+)
+
 # ── This project holds itself to what it asks of others ──────────────────────
 # A fixture is retained by an OPEN fact. Once its fact is MEASURED the evidence
 # lives in measurements/, which is what makes the fixture disposable — and a

@@ -36,7 +36,7 @@ Use the full official model ID. Never an alias, never a date suffix on the IDs a
 | Tier | Model | Effort |
 |---|---|---|
 | Lead (2) | `claude-opus-5` | medium |
-| IC (3) | `claude-sonnet-5` | medium |
+| IC (3) | `claude-opus-4-8` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
 Claude Code session, not a budget setting.

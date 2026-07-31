@@ -38,9 +38,13 @@ parse is the "reads as success" failure:
 | stamp ≠ recomputed | `CONTRACT-DRIFT` → queue a `review` |
 | on disk, not loadable this session | `PENDING-RESTART` |
 
-`PENDING-RESTART` compares the roster against the agent types actually available. Agents are not
-live-reloaded (`platform.md` fact 3), so a handbook written this session is real and unreachable.
-Without this row the chart reports a healthy org that cannot be dispatched to.
+`PENDING-RESTART` compares the roster against the agent types actually available. Agents register on a
+**delay, not on a restart** (`platform.md` § Fact 3), so a handbook written this session is real on disk
+and not yet dispatchable — it becomes dispatchable within the session. Without this row the chart
+reports a healthy org that cannot yet be dispatched to.
+
+The state name is inherited and kept for compatibility; **that a restart is required is retracted.** This file asserted the retracted version while `org-chart-format.md` spent six lines
+retracting it — the fifth recurrence, and the first with a check behind it.
 
 **5. Reconcile the dispatch CHECKPOINT** in `/org`'s SKILL.md against § Canonical Dispatch CHECKPOINT:
 both markers present and matching → NOOP; present and differing → REFRESH in place; markers absent →
@@ -75,7 +79,7 @@ CHECKPOINT — Dispatch Required:
 5. WORK-ORDER CONTRACT. Every dispatch payload carries exactly four sections — Task, Guardrails, Exit criteria, Verification — plus the artifact path under `.claude/workforce/work/<run-id>/`. Do NOT re-specify procedure steps: the handbook owns the procedure.
 6. BYPASS DETECTION. IF the next tool call after the announcement is Edit / Write / Bash doing the routed work → STOP. Print "Dispatch announced but Agent call skipped. Invoking now." then issue the Agent call.
 7. CHART DISCIPLINE. Never invent an employee name. Dispatch only to roster rows — except the staleness fallback: glob `.claude/agents/**/*.md`; a file on disk whose `name:` matches wins over the chart, with "stale chart — run /workforce org index".
-8. PENDING-RESTART. IF the target is marked PENDING-RESTART, do NOT dispatch. Report: "<name> is registered but not loaded in this session. Restart Claude Code to reach it." Attempting the spawn fails with an unhelpful error.
+8. PENDING-RESTART. IF the target is marked PENDING-RESTART, do NOT dispatch. Report: "<name> is registered but not loaded in this session. It registers later in this session; restart if you want it now." Attempting the spawn fails with an unhelpful error.
 9. NO-MATCH LADDER, in order: (a) staleness check per clause 7; (b) capability gap → hand the user's VERBATIM ask to `/workforce hire`, which owns the hire-vs-extend decision — `/org` never decides it and never invents a department; (c) nothing to hire → do the work in the main thread and note the gap.
 10. STOP CONDITIONS. Two candidates tied, or the best below clear-confidence → report the top candidates and ask which. Do not guess between employees.
 <!-- END ENFORCEMENT ANNOTATION -->

@@ -13,7 +13,7 @@ than no check.
 anywhere else cannot be spawned by name. There is no facility to test an agent definition from an
 arbitrary path.
 
-**And agent definitions are not live-reloaded** (`platform.md` fact 3): a handbook written this
+**And agent definitions register on a delay** (`platform.md` § Fact 3) — not on a restart: a handbook written this
 session is not discoverable this session.
 
 Together these bound everything below. Any design claiming to fully validate a staged agent in

@@ -72,7 +72,7 @@ out wide and none of it needs to delegate further.
 | Role | Job | Output |
 |---|---|---|
 | **content-classifier** | function, per block | one of the four destinations, with the sentence that decided it |
-| **provenance-analyst** | ownership, for directive-shaped blocks only | an attribution with cited evidence, or `NO-EVIDENCE` |
+| **provenance-analyst** | ownership, for directive-shaped blocks only | an attribution with cited evidence, or `IMMATERIAL` / `UNRESOLVED` |
 | **conversion-auditor** | fidelity of the result | `LOST` / `CHANGED` / `INVENTED` / `RE-HOMED` |
 
 `conversion-auditor` already existed and already did its half. The department is what gives the other
@@ -109,7 +109,7 @@ for simple queries. The fix was explicit budgets in the prompt. Ours:
 
 - `content-classifier` — one read per **skill**, not per block; forty blocks is one read and forty objects.
 - `provenance-analyst` — two greps and a `git log` decides most blocks. **Past ~10 tool calls, return
-  `NO-EVIDENCE` with what was tried** — an expensive verdict is not a better verdict, and this cost is
+  `UNRESOLVED` with what was tried** — an expensive verdict is not a better verdict, and this cost is
   paid per block across a whole library.
 
 The cost reality behind those numbers: multi-agent systems run **~15× the tokens of a chat
