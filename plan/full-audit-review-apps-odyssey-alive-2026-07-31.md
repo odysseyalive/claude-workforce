@@ -81,6 +81,8 @@ personal scope empty, so no cross-scope shadowing · hooks: 6 registered, 0 dead
   any sweep; fix before declaring succession here.
 - **4 unknown marker families** (14 blocks) — quarantined, not swept. Residue by the no-residue rule.
 - **Ledger index drift** — 24 records on disk, index claims 20.
+
+> **CORRECTED 2026-07-31:** the ledger's own index was **correct** at 20 records — the census had been counting each bucket's `README.md` as a record and reporting 24. The tool was wrong, not the index. There is no drift.
 - **CLAUDE.md 27KB** injected per subagent; ~430KB per 16-wide wave.
 - `claude-baseline-*.zip` contains `.claude/.symlink-manifest.txt`, which the backup writes — so the
   "pre-workforce original" tier is not quite that.

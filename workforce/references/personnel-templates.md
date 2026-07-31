@@ -1,6 +1,6 @@
 # Personnel Record Templates
 
-<!-- Enforcement: 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the HR ledger's schema. `ledger`, `review`, `amend`, `defect` write these. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/` — project state.
@@ -63,9 +63,11 @@ contract:
 - **A degradation contract.** Four states answered, and the safe direction named for each. The
   predecessor had no answer for *absent*, which is why a fresh install and a corrupted one behaved
   identically.
-- **The index is never the authority.** `INV-LEDGER` enumerates from the filesystem. This is not
-  theoretical: on the first survey target the ledger held **24 records while its own index claimed
-  20**, and every hand count that trusted the index inherited the error.
+- **The index is never the authority.** `INV-LEDGER` enumerates from the filesystem — and the
+  enumeration counts **records**, not files. The example this rule was first written from turned out to
+  prove the opposite point: the census reported 24 records against an index claiming 20, and the ledger's own index was **correct** at 20 records. Each bucket's `README.md` was being counted as a record.
+  **Enumerating from the filesystem is still right; enumerating carelessly is how a correct index gets
+  reported as drifted.**
 - **A maintainer, not a paragraph.** That drift is a `mechanical` invariant, so it gets a script with a
   negative test rather than a sentence asking someone to check.
 

@@ -141,7 +141,9 @@ rule that fired, when no rule fired, is the class `verify` exists to catch.
 **Datasets: 7 · 197,792 bytes · all untracked** (no git). Each would get a `records-*` data skill and one
 owner.
 
-**The live one:** the awareness ledger holds **24 records; its own index claims 20.** The migration rule
+**The live one:** the awareness ledger holds **24 records; its own index claims 20.**
+
+> **CORRECTED 2026-07-31:** the ledger's own index was **correct** at 20 records — the census had been counting each bucket's `README.md` as a record and reporting 24. The tool was wrong, not the index. There is no drift. The migration rule
 already says enumerate from the filesystem and never from the artifact's own index — so the audit reads
 24 and reports the drift. Under the maintainer path landed today this is a `mechanical` invariant and
 gets `check-ledger.sh`, released by making it fail.
