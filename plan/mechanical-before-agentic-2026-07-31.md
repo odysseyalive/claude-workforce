@@ -160,11 +160,17 @@ discards a real capability to silence a reporting problem.
 
 ---
 
-## Still open, deliberately
+## Closed same day — `plan/coverage-proof-2026-07-31.md`
 
-**Nothing about `Covers` is verified against the command's actual behavior.** The boundary cell,
-the conservative unclear-rule, `Proven`, and output reporting are four independent mitigations of one
-unverified claim — they make a wrong claim survivable and visible, not impossible. The measurement that
-would close it (run each command at index time, record its output shape) remains unbuilt because it
-costs a full command sweep on every `org index`. **This is a stated limit, not an oversight**, and it is
-the thing to revisit first if a mechanical dispatch ever returns a wrong answer.
+The open item read: *nothing verifies a `Covers` claim against the command's actual behavior*, with the
+four mitigations above making a wrong claim survivable rather than impossible.
+
+It is closed, and not by verifying the claim — by **removing it**. `Covers` is now DERIVED from the
+command's own enumeration (`playwright test --list`, `jest --listTests`, `pytest --collect-only`), and a
+row whose scope was not derived this `index` reads `declared` and can never satisfy total coverage
+alone. Nothing authors the cell, so nothing can over-claim it: the false-PASS case is unreachable rather
+than mitigated.
+
+`Proven` is gone, replaced by `Scope: derived <date> | declared`. The four mitigations above all survive
+and now guard a much narrower surface, which is the right relationship between a structural fix and the
+guards around it.

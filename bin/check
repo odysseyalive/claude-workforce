@@ -681,12 +681,56 @@ check(
     "a positive claim is read charitably by whoever matches an ask against it; the "
     "boundary is the cell that cannot be",
 )
+# ── Coverage derivation, landed 2026-07-31 ───────────────────────────────────
+# The first design proved a coverage claim by PLANTING a defect and requiring the
+# command to catch it — carrying "released by making it fail" over from maintainers,
+# where it is right. The carry-over was wrong: a planted defect proves ONE POINT
+# inside a claim about a WHOLE SCOPE, so the evidence never matched the shape of the
+# claim. It was expensive, destructive, and weak at once.
+#
+# The fix is not a better audit of the cell. It is deriving the cell, so there is no
+# authored claim left to be wrong — over-claim becomes unreachable rather than
+# detected. Commands enumerate themselves for free and non-destructively, and that
+# also dissolves the source-drift blind spot the stamp was invented to tolerate.
 check(
-    "org: an unproven mechanical never reports a bare PASS",
-    "unproven" in _org and "NEVER restate it as PASS" in _org
-    and "negative test" in _ocf and "unproven" in _ocf,
-    "`Proven` must inherit a maintainer's negative test or an employee's probe, and an "
-    "unproven row must announce it rather than let an exit code stand in for evidence",
+    "org-chart-format: Covers is derived from the command, never authored",
+    "DERIVED, never authored" in _ocf and "Nothing authors the cell" in _ocf,
+    "an authored coverage claim can over-claim, and an over-claim is the one error "
+    "that produces a false PASS at dispatch — deriving it removes the cell that "
+    "could have been wrong",
+)
+check(
+    "org: only a derived scope may satisfy total coverage",
+    "ONLY IF its `Scope` cell reads `derived`" in _org
+    and "`derived <date>`" in _ocf and "step only" in _ocf,
+    "a `declared` row rests on prose somebody wrote; letting it answer an ask alone "
+    "reinstates exactly the authored claim derivation exists to remove",
+)
+check(
+    "org: a declared row costs a hop, never a capability",
+    "COSTS A HOP, NEVER A CAPABILITY" in _org and "as a STEP" in _org,
+    "strictness that discards a working command is not safety — a step-only row is "
+    "still named in the work order, and the refusal is reported rather than silent",
+)
+check(
+    "org: enumeration executes nothing, and is re-run rather than cached",
+    "It must execute nothing" in _org and "Re-derive on EVERY index" in _org
+    and "not a discovery mode" in _ocf,
+    "a discovery mode that runs or writes would make `index` destructive; a cached "
+    "scope is a claim about a tree that has moved, which is the drift the stamp "
+    "design tolerated instead of closing",
+)
+# Written first as a chain of `or`/`and` without parentheses, which Python reads as
+# (A or B or (C and D) or E) — true the moment any one term matched, so it asserted
+# essentially nothing. Caught by breaking it, which is the entire reason for the rule.
+# Substrings are contiguous ones: the prose is hard-wrapped, so "boundary of
+# responsibility" spans a newline and never matches.
+check(
+    "org-chart-format: what derivation cannot establish is a boundary, not a gap",
+    "vacuous test file" in _ocf and "not a gap to be closed later" in _ocf,
+    "enumeration says what a command WILL RUN, never whether it asserts anything — "
+    "that is the project's business, and a mechanism written against it would be the "
+    "overclaim enforcement.md refuses",
 )
 check(
     "org: two rows claiming the same work stop the door and are fixed at index",
