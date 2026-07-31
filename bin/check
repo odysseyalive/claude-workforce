@@ -264,10 +264,38 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
             continue  # the PATH half is check 3's job, not this one
         _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
         _w = _sec.split()
+        # Sentence punctuation is not part of the heading. A citation ending a
+        # sentence — "resolve to one of the four outcomes in staging.md § The
+        # three outcomes:" — carried the colon into the last word, so the full
+        # prefix never matched and resolution fell all the way back to the bare
+        # word "three". That resolved only because ONE heading began with it;
+        # adding a second heading starting "Three" turned a citation that had
+        # been green-by-accident into an ambiguity failure. Strip it, and the
+        # citation matches the heading it always meant.
+        if _w:
+            _w[-1] = _w[-1].rstrip(":;,.!?")
         # Longest prefix first; the first length matching EXACTLY ONE heading
         # resolves. A prefix matching several has not resolved anything — the
         # bare word "phase" matched Phase A, B and C, so renaming or deleting
         # Phase B or C left every citation of them green.
+        # A SHORTENED prefix must land on a heading BOUNDARY. The existing guard
+        # rejected a prefix matching several headings; it accepted one matching
+        # exactly one WRONG heading. Renaming the cited section left
+        # "§ The three outcomes" resolving happily against an unrelated
+        # "Three checks that fail on conformant handbooks" — the rename this check
+        # exists to catch, reported green.
+        #
+        # Shortening is still REQUIRED, because citations legitimately run into
+        # the sentence around them: "`platform.md` § Staleness already settles:".
+        # A blanket two-word floor broke ten real citations to catch one bug.
+        # The discriminator is what the HEADING does after the prefix — it must
+        # end, or continue with punctuation: "Header — …", "Creative / …",
+        # "Resolution". "three checks …" continues with a letter, so it is prose
+        # that merely starts the same way, and is not the cited section.
+        def _boundary(_h, _p):
+            _rest = _h[len(_p):]
+            return _rest == "" or (_rest[:1] == " " and not _rest[1:2].isalnum())
+
         _hit = False
         for _n in range(len(_w), 0, -1):
             _pre = " ".join(_w[:_n])
@@ -280,7 +308,10 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
                    for h in _ms):
                 _hit = True
                 break
-            if len(_ms) == 1:
+            # A UNIQUE match still has to be the right one. At full citation
+            # length uniqueness is enough; once the prefix has been shortened,
+            # the heading must end there or continue with punctuation.
+            if len(_ms) == 1 and (_n == len(_w) or _boundary(_ms[0], _pre)):
                 _hit = True
                 break
             if len(_ms) > 1:
@@ -681,6 +712,39 @@ check(
     "a positive claim is read charitably by whoever matches an ask against it; the "
     "boundary is the cell that cannot be",
 )
+# ── Phase A blocked the handbook its own templates produce ───────────────────
+# Found by RUNNING Phase A against a handbook authored straight from
+# handbook-templates.md. Three blocking checks failed it, and all three were the
+# checks' fault: every template ends with a work/<run-id>/ output path that cannot
+# exist yet; the sentence warning that Grep/Glob are ungranted reads as a use of
+# them; and `model:` frontmatter is the only form the harness accepts while the
+# no-restated-constants rule forbade it.
+#
+# One shape: a blocking check specified from the failure it prevents and never run
+# against a passing case. bin/check could assert the checks EXISTED; only executing
+# one against a real artifact showed what it did to a correct one.
+_stg = read("workforce/references/staging.md")
+check(
+    "staging: Phase A distinguishes read paths from write paths",
+    "Every path the handbook **reads** resolves" in _stg
+    and "is never resolved" in _stg and "placeholder" in _stg,
+    "every shipped template ends with work/<run-id>/<name>/OUTPUT.md — a placeholder "
+    "path naming a file that cannot exist yet. Checked literally it blocks every "
+    "handbook this project ships a template for",
+)
+check(
+    "staging: Phase A distinguishes a tool NAMED from a tool USED",
+    "A tool NAMED is not a tool USED" in _stg and "report, do not block" in _stg,
+    "the sentence warning that Grep/Glob are ungranted is the most valuable line a "
+    "handbook carries; a name-matching check fails the handbook for carrying it",
+)
+check(
+    "staging: resolved frontmatter values are exempt from the restatement rule",
+    "RESOLVED VALUES, not restated constants" in _stg,
+    "the harness reads model:/effort: literally from frontmatter, so the rule as "
+    "written forbade the only form the platform accepts",
+)
+
 # ── Provisional verification is scoped by the ROLE, not the mode ─────────────
 # "Provisional applies to charter-first only" keyed the escape to the MODE FORK,
 # which asks whether skills exist. Whether a CHECK exists is a different question,
@@ -1369,6 +1433,7 @@ try:
         "vfy": "workforce/references/procedures/verify.md",
         "_asu": "workforce/references/audit-setup.md",
         "_od": "workforce/references/org-design.md",
+        "_stg": "workforce/references/staging.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",
         "_pfp2": "workforce/references/procedure-for-procedures.md",
