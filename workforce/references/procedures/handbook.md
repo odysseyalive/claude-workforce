@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -103,6 +103,18 @@ judgment. For web-facing work that usually means a scaffolded deterministic suit
 **`## Probe` must state a self-contained task and the shape of a correct result.** A handbook that
 cannot say how to check itself is not releasable — and this section is what Step 5 runs.
 
+**Count the mechanical preference and print it** (`references/procedure-for-procedures.md` rule 3b).
+Per `## Procedure` step: does it name a command with an exit code, or state why it does not?
+
+```
+Mechanical preference   11 procedure steps · 6 name a command · 4 stated why not · 1 UNSTATED
+```
+
+`UNSTATED` steps are listed by number. They are a **finding, not a block** — the judgment of whether a
+step should be a command belongs to the author and its reviewer, and refusing to release over it would
+turn a preference into a gate on an unmeasurable property. But an unprinted count is the same as a rule
+nobody applied, so the line appears on every authoring and every amendment, zeros included.
+
 ## Step 4 — Lint (Phase A)
 
 Run every blocking check in `references/staging.md` § Phase A against the staged file. Any block →
@@ -189,9 +201,29 @@ Lead as second key, and the `ORG-OWNER` block written into the skill in the same
 (`records-ownership.md`). An unowned data skill is a `verify` finding, and authoring one without an
 owner creates the finding deliberately.
 
-**4. Nothing about the data changes.** Authoring is descriptive. Files are not moved, reformatted,
-seeded, cleaned, or migrated — not even when the schema turns out to describe them imperfectly. A
-mismatch is a finding to report, and the user decides whether the schema or the data is wrong.
+**4. Nothing about the data changes.** Files are not moved, reformatted, seeded, cleaned, or migrated —
+not even when the schema turns out to describe them imperfectly. A mismatch is a finding to report, and
+the user decides whether the schema or the data is wrong.
+
+**This rule is about the DATA, and saying so is a narrowing of earlier wording, not a new licence.** It
+read "authoring is descriptive," which was true of everything authoring did at the time and was
+therefore never tested against a case that wrote anything. Step 5 writes a maintainer: new code that
+*reads* the dataset. Nothing in point 4 weakens — no maintainer moves, seeds, cleans, or migrates data,
+and one that edits what it validates is forbidden outright (`references/data-skills.md` § Maintainers).
+
+**5. Author the maintainers, and break each one.** Every invariant classed `mechanical`
+(`references/data-skills.md` § Invariants) gets a script; every other class does not, and the report
+says which. Per script: write it, run it against the real data, then **run its negative test** — the
+input that must make it exit nonzero — and record that result in its row. A maintainer whose negative
+test has not been run is authored, not released, and its owner's `## Verification` may not cite it yet.
+
+The Records Owner IC writes it. It already has `Bash` and `Write` in the measured default grant
+(`references/platform.md` fact 4), and the resulting check is tier 1 by construction
+(`references/verification.md`) — which is the point of writing one rather than describing it.
+
+**Candidate maintainers are never written silently.** On a conversion a project can present dozens,
+each one new executable code in a tree the user owns. Report the count before executing, as succession
+reports its eligible count before converting a batch.
 
 **On conversion, the immutable blocks come first.** If the source skill carried
 `origin: user | immutable: true` spans, they are extracted before anything else

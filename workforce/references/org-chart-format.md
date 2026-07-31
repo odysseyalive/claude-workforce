@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 1 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -62,6 +62,33 @@ an employee its handbook forbids. Treat the org chart as a contract, not a sandb
 | Skill | Dispatches to | Why it stayed a skill |
 |---|---|---|
 | /skill-builder | eng-implementer | creates and registers agents |
+
+## Mechanicals
+| Command | Covers | Owner | Destructive | Source |
+|---|---|---|---|---|
+| `pnpm test` | the whole test suite | eng-test-writer | no | package.json |
+| `scripts/check-ledger.sh` | ledger index = filesystem | records-ledger | no | maintainer |
+
+**What the dispatcher reads before it picks a node** (`procedures/org.md` § Canonical Dispatch
+CHECKPOINT clause 2). Rows come from four places, all of them already in the tree: project command
+definitions, data-skill `## Maintainers` rows (`data-skills.md`), employees' `## Verification`
+commands, and skills whose whole surface is deterministic.
+
+**`Covers` is a coverage claim and the dispatcher reads it literally.** Write what the command
+*wholly* answers, never what it participates in — clause 2 fires on total coverage only, so an
+overstated cell is how a partial answer gets returned as a complete one. When in doubt, narrow it: a
+row that under-claims costs one agent hop, and a row that over-claims returns the wrong answer
+cheaply.
+
+**Every row needs a command with an exit code.** A row whose check is a judgment is not mechanical and
+does not belong here — it is an employee's job, and listing it would dress a judgment as a check.
+
+**`Destructive: yes` rows are never auto-run.** They render display-first, like every other
+high-risk command.
+
+**Zero rows is valid and common.** A project with no test command, no maintainers, and no deterministic
+skills has an empty table and every ask goes to clause 3. Write the explicit "no mechanicals" notice
+rather than omitting the section — an absent table and an empty one must not look the same.
 
 ## Roster
 | Employee | Tier | Dept | Reports to | Model / Effort | Owns records | Triggers | Status |

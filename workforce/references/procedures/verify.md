@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -123,6 +123,26 @@ assumed; guardrails contain literal NEVER / MUST NOT / STOP; escalation sentinel
 
 **Released-state check:** any handbook amended since its last probe is **UNRELEASED** and must not be
 dispatched to.
+
+## Data-skill conformance
+
+The two checks `references/data-skills.md` says this command owns. Both failures are silent in the same
+way: a data skill is read *for its contract*, so a section that was never written reads as "no
+constraint here" rather than as a gap.
+
+| Check | Catches |
+|---|---|
+| Every section `references/data-skills.md` § Required sections lists is present, in that order | a dataset whose degradation contract, git policy, or maintainer list was never written — a reader finds no rule and infers there is none |
+| Every data skill is named as a dependency by at least one handbook | an orphan (`references/data-skills.md` § Every data skill is reachable from a handbook) — either dead, or never ours to write |
+| Every invariant classed `mechanical` has a maintainer, and every maintainer row records a negative-test result | an invariant demoted to prose, and a validator nobody ever saw reject anything — indistinguishable from `exit 0` |
+
+**Sections are checked for presence, not for contents.** A data skill whose `## Maintainers` list is
+empty is conformant — some datasets have no script, and inventing one to fill the section is worse than
+an honest zero. What is not conformant is the section being **absent**, which is indistinguishable from
+a dataset nobody ever asked the question about.
+
+The section list is not restated here. It lives in `references/data-skills.md` and is read from there,
+for the reason § Constants gives below.
 
 ## Constants
 
