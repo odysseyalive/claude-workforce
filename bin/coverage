@@ -128,8 +128,10 @@ def main():
     if "--stamp" in sys.argv:
         n = 0
         for p, c, a in rows:
-            if a == 0:
-                continue
+            # Zero-assertion files are stamped TOO. Skipping them let the worst-covered
+            # files keep a hand-written "Enforcement: HIGH" label that _HDR_RX cannot
+            # match and therefore never contradicts — a file earning exemption from the
+            # coverage check by having no coverage.
             body = open(p, encoding="utf-8").read()
             line = (f"<!-- Enforcement: {a} assertion(s) in bin/check name this file; "
                     f"{c} normative claims total. {len(GENERIC)} generic assertions guard it "

@@ -1,5 +1,6 @@
 # Records Ownership — shared playbooks and who may change them
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every retained playbook has exactly one owner. -->
 
 Not everything becomes an employee. Shared indexes, lookup tables, voice profiles, and reference

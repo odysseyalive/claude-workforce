@@ -1,5 +1,6 @@
 # Delegation Budget — depth, fan-out, and the caps
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `/workforce budget` reports this; `audit` gates the org design on it. -->
 
 Three caps bound every org. **None of their values are written here** — they live in `platform.md`

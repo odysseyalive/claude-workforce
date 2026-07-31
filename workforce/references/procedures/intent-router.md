@@ -1,5 +1,6 @@
 # intent-router — freeform `/workforce <text>`
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Classifies a freeform ask into a command. Runs when the first token is not a known command.
 
 ---

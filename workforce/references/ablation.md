@@ -1,5 +1,6 @@
 # Ablation — delete, then add back only what earns its place
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `ablate` refuses without an eval set. Amendments go through dual key. -->
 
 > *"Every six months, delete your CLAUDE.md, delete your skills, delete your hooks. See what the

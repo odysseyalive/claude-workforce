@@ -323,7 +323,9 @@ check("README: every relative link resolves", not link_broken, f"missing: {link_
 # a single config is shared across unrelated orgs.
 # ─────────────────────────────────────────────────────────────────────────────
 STATE_RX = re.compile(
-    r"\.claude/skills/workforce/[\w./-]*(?:org-config\.md|org-chart|personnel/|work/|evals/|ablations/)"
+    r"(?:\.claude/skills/workforce/|\$\{CLAUDE_SKILL_DIR\}/)"
+    r"[\w./-]*(?:org-config\.md|org-chart|personnel/|work/|evals/|ablations/|roster\.md"
+    r"|conversion-journal|operating-principles/)"
 )
 leaks = [p for p in declared if p.endswith(".md") and STATE_RX.search(read(p))]
 check("scopes: no project state written into the skill directory", not leaks, f"leaks: {leaks}")
@@ -371,8 +373,38 @@ for p in glob.glob("workforce/agents/*/AGENT.md"):
 # 7. Handbook templates carry the load-bearing frontmatter
 # ─────────────────────────────────────────────────────────────────────────────
 tpl = read("workforce/references/handbook-templates.md")
-check("templates: IC carries disallowedTools: Agent (the measured tier ceiling)", "disallowedTools: Agent" in tpl)
-check("templates: delegating tiers carry background: false", "background: false" in tpl)
+# Both were bare substrings satisfied by the PROSE BULLET stating the rule — the
+# rule serving as its own enforcement. Deleting the actual YAML line from the IC
+# template passed at 314/0. Anchor to a frontmatter line.
+check(
+    "templates: IC frontmatter carries disallowedTools: Agent (the measured tier ceiling)",
+    re.search(r"^disallowedTools:\s*Agent\s*$", tpl, re.M),
+    "must be a frontmatter LINE, not a prose mention (platform.md fact 2c)",
+)
+check(
+    "templates: delegating-tier frontmatter carries background: false",
+    re.search(r"^background:\s*false\s*$", tpl, re.M),
+    "must be a frontmatter LINE, not a prose mention",
+)
+# The `tools:` prohibition is as absolute as the `memory:` one and had no negative
+# assertion, while `memory:` did. An explicit list is EXACT, not a filter (fact 4b):
+# listing one tool costs every tool not listed.
+check(
+    "templates: no tools: field offered",
+    not re.search(r"^tools:\s*\S", tpl, re.M),
+    "omitting tools: gives the full default grant; an explicit list is exact, not a filter",
+)
+# ORG-RECORD and ORG-CHAIN are marker families this project defines and never
+# pair-checked, while asserting pairing as first-class for every other family.
+for _fam in ("ORG-RECORD", "ORG-CHAIN"):
+    _o = len(re.findall(rf"<!--\s*{_fam} START", tpl))
+    _c = len(re.findall(rf"<!--\s*{_fam} END", tpl))
+    check(
+        f"templates: {_fam} markers pair in the shipped templates",
+        _o == _c and _o > 0,
+        f"{_o} openers / {_c} closers — an unpaired opener propagates to every handbook "
+        "and runs a span to the next closer",
+    )
 check("templates: no memory: field offered", not re.search(r"^\s*memory:\s*\w", tpl, re.M))
 check("templates: MCP granted at server level", "mcp__playwright-mcp__*" in tpl)
 

@@ -1,4 +1,5 @@
 ---
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-intent-router
 description: "Classifies a freeform `/workforce <text>` invocation into a command. Never guesses into a destructive one."
 disallowedTools: Agent

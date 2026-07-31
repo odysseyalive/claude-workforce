@@ -1,5 +1,6 @@
 # model-map — which model each employee runs on
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same three calls `references/audit-setup.md` § Step 0.4 runs, without

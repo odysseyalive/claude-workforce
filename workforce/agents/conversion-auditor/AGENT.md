@@ -1,4 +1,5 @@
 ---
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-conversion-auditor
 description: "Verifies that converting a skill into an employee preserved the skill's workflow. Reads both and reports what was lost."
 disallowedTools: Agent

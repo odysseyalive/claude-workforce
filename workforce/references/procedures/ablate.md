@@ -1,5 +1,6 @@
 # ablate — delete, then add back only what earns its place
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 High risk; display by default. `/workforce ablate <employee> [--execute] [--budget N] [--section <name>]`
 
 Method and doctrine: `references/ablation.md`.

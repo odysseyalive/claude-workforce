@@ -1,5 +1,6 @@
 # Evals — the measurement an employee is judged against
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 0 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `ablate` refuses to run without an eval set. `review` runs them. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/evals/<employee>.md` — project state.

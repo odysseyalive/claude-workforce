@@ -1,8 +1,9 @@
 # Principles
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: MEDIUM — the reasoning `SKILL.md`'s Core Principles compress. Read once. -->
 
-`SKILL.md` states nine principles in a paragraph each. This file explains the three that are most
+`SKILL.md` states its principles in a paragraph each. This file explains the three that are most
 often violated by well-intentioned changes, and records what each one is defending against.
 
 ---

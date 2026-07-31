@@ -1,5 +1,6 @@
 # Evaluators — code and text quality review
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -95,7 +96,8 @@ for the same reason an immutable block is referenced and never copied. Carrying 
 the migration import keeps one canonical origin per project.
 
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
-carry more of the weight. Growing it is a release task, tracked in `version.md`, and the honest signal
+carry more of the weight. Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
+was, and that checklist has five items and has never carried one for the seed, and the honest signal
 is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
 corpus.
 

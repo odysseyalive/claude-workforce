@@ -1,5 +1,6 @@
 # promote — IC to Lead
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 High risk; display by default. `/workforce promote <employee> --execute`
 
 A promotion is a **structural change to the org**, not a title change. It alters delegation depth

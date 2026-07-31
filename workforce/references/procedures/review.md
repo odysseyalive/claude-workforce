@@ -1,5 +1,6 @@
 # review — performance review, where the subject is the document
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Assess an employee by assessing its handbook.** Runs its evals, re-reads it cold, checks for drift,
 and reports org health.
 

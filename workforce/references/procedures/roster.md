@@ -1,5 +1,6 @@
 # roster — who works here
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Read-only; executes immediately. `/workforce roster`
 
 Prints the company from `.claude/agents/**` reconciled against the chart — **never from the chart

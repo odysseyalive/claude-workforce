@@ -1,5 +1,6 @@
 # budget — depth, fan-out, and spawn accounting
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Read-only; executes immediately. `/workforce budget`
 
 Arithmetic and caps: `references/delegation-budget.md`. Cap values: `platform.md` — **never restated
@@ -44,7 +45,9 @@ large conversions across sessions, and keeping `CLAUDE.md` small.
 
 ## Gate behavior
 
-`audit` runs this as a gate. It **fails the org design** — ✗ in the Execution Summary plus a redesign
+`audit` runs this as a **report**, not a gate. It **reports the overage and convenes the redesign
+panel — it does not fail the org design**, because both caps are `platform.md` fact 8, DOCUMENTED and
+unmeasured, and an unverified fact may not become a blocking check. An earlier form failed the design — ✗ in the Execution Summary plus a redesign
 panel — when worst-case CEO-entry fan-out exceeds the concurrency cap, or when ten sequential
 CEO-entry work orders would exceed the session cap.
 

@@ -1,5 +1,6 @@
 # charter — the Strategic Objective
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **One page. The document the whole org conforms upward to.**
 
 `/workforce charter` — low risk, executes immediately (it writes into the `operating-principles`

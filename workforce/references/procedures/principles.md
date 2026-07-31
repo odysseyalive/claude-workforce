@@ -1,5 +1,6 @@
 # principles — the General Operating Principles
 
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The constitution: the decision filter for everything no handbook covers.**
 
 `/workforce principles` — low risk, executes immediately.
