@@ -10,6 +10,22 @@ A skill that staffs a project with agent employees — CEO, department leads, IC
 a pinned model, work it refuses, and a check that proves it. `workforce/` is the source distribution;
 everything a project generates lives in that project.
 
+## Cold-reader agents are requested, standing
+
+**The user of this repository explicitly requests subagents for cold-read probes, tier canaries, and
+panels.** This is a standing request, not a per-session one, and it is stated here because ambient
+policy commonly permits spawning *unless the user asks* — so asking is the mechanism.
+
+It is not a preference. `SKILL.md` § Off-the-Street Release Gate holds that the authoring context can
+**never** self-certify: it knows what the text meant to say, which is exactly the knowledge the gate
+tests for the absence of. A session that cannot spawn cannot run that gate, and every handbook it
+registers is unprobed. On 2026-07-31 that was true for a whole session before anyone noticed, which is
+the reason this line exists.
+
+**Where it does not apply:** spawning is still measured, never assumed (`references/enforcement.md`
+§ The host can withdraw a capability). This line requests the capability; it does not guarantee it, and
+a run that still cannot spawn degrades and says so.
+
 ## The dual tree, and source-first
 
 ```
