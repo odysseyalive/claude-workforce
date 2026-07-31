@@ -738,6 +738,43 @@ _hire2 = read("workforce/references/procedures/hire.md")
 # The dangerous direction is the other one: the sweep removes opener-to-closer, so
 # a mention matched as an opener runs a span to the next closer and takes real
 # content with it.
+# ── Companions: present-and-customized was the missing state ─────────────────
+# Step 0.3 was binary — present or absent — and "all present -> a one-line notice"
+# treats a retargeted skill as the shipped one. On the first real target EVERY
+# companion that existed was customized: image-eval's palette check is INVERTED
+# for that project. The forcible append would drop the shipped rule in beside the
+# inverted one: two contradictory entries, both looking authoritative.
+_pt = read("workforce/references/personnel-templates.md")
+_asu = read("workforce/references/audit-setup.md")
+check(
+    "personnel-templates: personnel-ledger is defined, not just named",
+    "## `personnel-ledger` — the skill that holds these records" in _pt
+    and "## Maintainers" in _pt and "index count equals file count" in _pt,
+    "the name appeared in exactly one place in the distribution — Step 0.3's "
+    "install list — so a run had to install a skill it had no description of",
+)
+check(
+    "audit-setup: a customized companion converts, never overwritten or skipped",
+    "Three states, not two" in _asu and "PRESENT, CUSTOMIZED" in _asu
+    and "the customization is the requirement" in _asu,
+    "a retargeted companion encodes what the shipped version does not know; "
+    "treating present as uniform silently discards it",
+)
+check(
+    "audit-setup: the forcible append will not contradict a superseded entry",
+    "superseded entry is reported, never appended" in _asu,
+    "appending a shipped rule into a catalog that inverted it produces two "
+    "contradictory entries in one file, both looking authoritative",
+)
+check(
+    "legacy-markers: an unpaired marker is repaired only in a family we own",
+    ("repaired only inside a family workforce owns" in lm
+     and "scaffolding, not customization" in lm
+     and "A silent exclusion is a file" in lm),
+    "editing another generator's emission is overwritten on its next run; editing "
+    "near a user span is never done at all — and a silent exclusion is permanent residue",
+)
+
 check(
     "audit: stripping a dangling reference says WHAT it removes",
     "this is a procedure, not a sentence" in aud
@@ -937,7 +974,6 @@ check(
 #
 # The same shape audit.md already records about Step 0.7: a sweep scoped to one
 # file, over a procedure sequenced across two.
-_asu = read("workforce/references/audit-setup.md")
 _WRITING_GATES = ["## Step 0.2 — Backup", "## Step 0.6 — Write the canary fixtures"]
 _silent_gates = []
 for _g in _WRITING_GATES:
@@ -1567,6 +1603,7 @@ try:
         "_stg": "workforce/references/staging.md",
         "_hire2": "workforce/references/procedures/hire.md",
         "_bl": "bin/baseline",
+        "_pt": "workforce/references/personnel-templates.md",
         "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
         "_ocf": "workforce/references/org-chart-format.md",

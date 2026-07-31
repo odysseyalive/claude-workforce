@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement: 1 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -118,8 +118,37 @@ A `failed` backup is never silently upgraded to "good enough". The report names 
 - **Core** — `org`, `operating-principles`, `personnel-ledger`
 - **Evaluators** — `code-evaluator`, `text-eval` (`references/evaluators.md`)
 
-All present → a one-line notice. Absent → installed and reported. **The gate never uninstalls** —
-removal is always a separate, deliberate act.
+Absent → installed and reported. **The gate never uninstalls** — removal is always a separate,
+deliberate act.
+
+### Three states, not two — and the third is the common one
+
+*"All present → a one-line notice"* was the whole rule for a present companion, and it treats a
+retargeted skill as if it were the shipped one. On the first real target every companion that existed
+was **customized**: `text-eval` retargeted and carrying user spans, `image-eval` with its palette check
+**inverted for that project** — *"flag drift rather than sameness"* — and two of its inherited
+directives preserved verbatim as deliberately inert.
+
+| State | Detection | Action |
+|---|---|---|
+| **ABSENT** | no directory | install the shipped version, report it |
+| **PRESENT, UNMODIFIED** | every region carries a `workforce` marker, nothing outside them | maintain normally |
+| **PRESENT, CUSTOMIZED** | *any* of: prose outside every managed marker · an `origin: user` span · another generator's marker · a dated superseding amendment | **converts. Never overwritten, never skipped** |
+
+**A customized companion is a conversion input, not an obstacle.** It is the project's own adaptation of
+a generic capability, and it usually encodes something the shipped version does not know — an inverted
+rule, a retargeted vocabulary, a directive that supersedes a default *for this project only*. The
+shipped version is the newcomer; **the customization is the requirement.**
+
+**The forcible append respects this.** `evaluators.md` § Forcible propagation appends new shipped
+entries into a machine-owned region unconditionally, and on a customized catalog that is how a shipped
+rule lands beside the inverted rule that replaced it — two contradictory entries in one catalog, both
+looking authoritative. Before appending, check whether the shipped entry is one the project has
+**superseded**; a superseded entry is reported, never appended. `catalog-unappendable` already covers
+the immutable case (Step 0.7); this covers the larger one.
+
+**Report every customization found, by path and kind.** A companion converted without saying what was
+preserved is indistinguishable from one that was overwritten.
 
 **Evaluator catalogs install on ABSENCE ALONE — never gated on a declared department.** This is
 claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got no text evaluator because

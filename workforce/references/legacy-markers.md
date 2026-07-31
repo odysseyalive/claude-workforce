@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —
@@ -46,6 +46,32 @@ name-keyed sweep leaves behind as residue, or mis-pairs.
 The regexes match **openers only**. A pattern matching both an opener and its closing comment
 double-counts every block; the first hand census of a real project reported twice the true count for
 exactly this reason.
+
+### An unpaired marker is REPORTED, and repaired only inside a family workforce owns
+
+An imbalance is excluded from the sweep (below) — and exclusion is not a resolution. A file excluded
+every run is a file whose scaffolding never gets removed, which is permanent residue under the
+no-residue directive. So the imbalance has to be *fixed*, and the question is by whom.
+
+**Classify the imbalance before touching anything:**
+
+| Where the unpaired marker sits | Disposition |
+|---|---|
+| inside a marker family **workforce writes** | repair it — our emission, our defect |
+| inside **another generator's** emission | **report with both line numbers and the exact repair.** Never edit it: the owner rewrites that file on its next run and the repair vanishes, or worse, conflicts |
+| inside or touching an `origin: user` span | **report only.** A user's words are never edited to balance a comment |
+| unattributable | report, quarantine, touch nothing |
+
+**Measured on the first survey target**, and it is the middle row: `text-eval/SKILL.md` carries a
+`LANE-AGENT-EMBED` block whose `origin: skill-builder` span opens at line 76 and never closes, plus a
+second `END ENFORCEMENT ANNOTATION` at line 96 with no matching opener. Both are **generated
+scaffolding, not customization** — the predecessor emitted them that way. The distinction is the whole
+point: it looks like a defect in the user's skill and is a defect in a generator's output, and treating
+those the same either destroys work or leaves a hazard in place.
+
+**Say what the exclusion costs, every run.** *"`text-eval` excluded from the sweep — 1 orphan closer, 1
+unterminated span, both in `skill-builder` scaffolding"* is actionable. A silent exclusion is a file
+quietly opted out of the run forever.
 
 ### Pairing is verified before any sweep, never assumed
 

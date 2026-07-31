@@ -1,6 +1,6 @@
 # Personnel Record Templates
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the HR ledger's schema. `ledger`, `review`, `amend`, `defect` write these. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/` — project state.
@@ -26,6 +26,48 @@ personnel/
 | **ORG** | structural decision | |
 
 ---
+
+## `personnel-ledger` — the skill that holds these records
+
+**This section exists because the name appeared in exactly one place in the whole distribution — Step
+0.3's companion list — and nothing defined, templated, or created it.** A run following that gate
+literally had to install a skill it had no description of, which is the invention principle 5 forbids.
+Found by running the setup gates, 2026-07-31.
+
+**It is a data skill** (`data-skills.md`), and it takes that file's full contract. The record *formats*
+are below; this is the artifact that holds them.
+
+| Section | For the personnel dataset |
+|---|---|
+| `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`; types `EMP`, `PERF`, `DEF`, `ORG`, each shaped by its template below |
+| `## Invariants` | the universal one, **plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`) |
+| `## Degradation` | absent → the org has no history and `review` says so rather than reporting a clean record; empty → same; stale → the index is rebuilt from the filesystem; corrupt → **stop, never rewrite** |
+| `## Owner` | HR. Exactly one Records Owner; its Lead is the second key |
+| `## Git policy` | tracked by default — an org's history is not disposable — and the rule's file is named by path |
+| `## Seed` | an empty `personnel/` directory and an index stating zero records |
+| `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it |
+
+**Naming.** Data skills workforce *derives* are `records-<dataset>`; this one ships under a fixed name
+because the companion list installs it by that name. Stating the exemption here is the point — two
+naming conventions colliding silently is how a project ends up with `records-personnel` and
+`personnel-ledger` both half-populated.
+
+### What makes this better than the ledger it replaces
+
+Not a rename. The predecessor was a directory of records with no contract, and the difference is the
+contract:
+
+- **One owner.** A predecessor ledger is written by whatever is running; this one has a Records Owner
+  and every amendment is drafted by it (`records-ownership.md`). Unowned shared data is a `verify`
+  finding rather than the normal case.
+- **A degradation contract.** Four states answered, and the safe direction named for each. The
+  predecessor had no answer for *absent*, which is why a fresh install and a corrupted one behaved
+  identically.
+- **The index is never the authority.** `INV-LEDGER` enumerates from the filesystem. This is not
+  theoretical: on the first survey target the ledger held **24 records while its own index claimed
+  20**, and every hand count that trusted the index inherited the error.
+- **A maintainer, not a paragraph.** That drift is a `mechanical` invariant, so it gets a script with a
+  negative test rather than a sentence asking someone to check.
 
 ## EMP
 
