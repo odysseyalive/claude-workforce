@@ -207,7 +207,7 @@ count means the ladder needs a rung — not that the project was messy.
 - **It never edits a block it is classifying.** Classification is an observation. Ownership of the text
   never transfers to the thing deciding what the text is.
 - **It never asks the user.** The audit's question surface is the budget, and this work is precisely
-  what the department exists to absorb (`audit-setup.md` § the question table). A `DEC` the user can
+  what the department exists to absorb (`audit-setup.md` § The question budget). A `DEC` the user can
   overturn beats a question they must answer forty times.
 - **It never resolves by tie-break dressed as a rule.** If the honest answer is that the evidence did
   not decide, the honest output says so and the work still completes.

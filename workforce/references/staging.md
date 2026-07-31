@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -66,8 +66,8 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | Every IC carries `disallowedTools: Agent` | **BLOCK** — the measured tier ceiling (`platform.md` fact 2c); depth cannot substitute for it (fact 2b) |
 | Delegating tiers carry `background: false` | **report only** — defensive, not the mechanism (fact 2). A block here fails for a reason that is not true |
 | No `Agent(` allowlist anywhere in `tools:`/`disallowedTools:` | **BLOCK** — ignored at runtime, so its presence means someone believes in a guarantee that does not exist |
-| Every path in the body resolves on disk | **BLOCK** — the top cold-start failure |
-| Every tool the body uses is in the default grant or loaded via `ToolSearch` in the procedure (or in an explicit `tools:` when present), and `Grep`/`Glob`/`WebFetch` are never assumed | **BLOCK** — fact 4 |
+| Every path the handbook **reads** resolves on disk | **BLOCK** — the top cold-start failure. Read § Three checks that fail on conformant handbooks |
+| Every tool the body **uses** is in the default grant or loaded via `ToolSearch` in the procedure (or in an explicit `tools:` when present), and `Grep`/`Glob`/`WebFetch` are never assumed | **BLOCK** — fact 4. *Uses*, not *mentions* — see below |
 | Sections present and in order per `procedure-for-procedures.md` | **BLOCK** |
 | `## Verification` names a runnable check, not a judgment | **BLOCK** |
 | `## Probe` present | **BLOCK** — a handbook that cannot say how to check itself is not releasable |
@@ -80,6 +80,38 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | `description` does not overlap an existing employee's trigger space | report only |
 
 **Does not prove:** anything about runtime. Every item here is a property of the text.
+
+### Three checks that fail on conformant handbooks
+
+Found on 2026-07-31 by running Phase A against a handbook authored straight from
+`handbook-templates.md`. **All three blocked it, and all three were wrong** — the checks were specified
+from the failure they prevent and never run against a compliant artifact, so each one indicts the
+template it is meant to protect.
+
+**1. READ paths resolve; WRITE paths do not, and must not.** Every template ends with
+`.claude/workforce/work/<run-id>/<name>/OUTPUT.md` — a path with a placeholder segment naming a file
+that **cannot exist yet, because the employee has not run.** Checked literally, the rule blocks every
+handbook this project ships a template for. So: a path the handbook **reads** must resolve; a path it
+**writes** is checked for its *convention* — under `.claude/workforce/work/`, one directory per
+employee — and never for existence. **A path containing a `<placeholder>` segment is never resolved
+against disk**; it is checked for a known placeholder name.
+
+**2. A tool NAMED is not a tool USED.** The most valuable sentence a handbook can carry is the one
+warning that `Grep` and `Glob` are not granted (fact 4) — and a check scanning for tool names flags
+that sentence as a violation, failing the handbook for correctly warning about the thing the check
+exists to prevent. **Classify by grammar: an imperative step that invokes a tool is a use; a sentence
+stating a tool is unavailable is not.** When a naive matcher cannot tell them apart, the safe direction
+is *report, do not block* — a false block on a correct handbook costs more than a missed mention.
+
+**3. `model:` and `effort:` in frontmatter are RESOLVED VALUES, not restated constants.** The harness
+reads the literal string from frontmatter, so every registered handbook necessarily carries one. The
+no-restatement rule governs *prose*, where a constant should be cited rather than copied
+(`org-config.template.md` § Resolution is the single source). **Exempt the frontmatter fields
+explicitly**, or the rule forbids the only form the platform accepts.
+
+The pattern under all three: **a blocking check written from the failure it prevents, never executed
+against a passing case.** `bin/check` asserts the checks are *specified*; only running one against a
+real artifact shows what it does to a correct one.
 
 ---
 
