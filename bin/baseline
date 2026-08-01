@@ -115,6 +115,96 @@ def ANCHORED(rx):
     return re.compile(r"^[ \t]*(?:[#;]|//|--)?[ \t]*" + rx.pattern, re.M)
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ONE MARKER SCAN. Every consumer — totals, mentions, owners, pairing,
+# file-scope headers, family discovery, has-origin — reads this single result.
+#
+# Written after the same defect appeared THREE times in this file: one population
+# computed two ways, disagreeing. Pairing anchored while the totals did not; then
+# the totals gained fence-stripping, a comment-prefix anchor and a whole-skill
+# walk while pairing kept a local lambda; then the owner tally still read SKILL.md
+# and the report printed "33 region(s)" beneath a total of 66. Two of the three
+# were introduced while fixing the first.
+#
+# Assertions caught each one, and a fourth assertion would have been the wrong
+# answer: the file wanted one scan, not more checks that the scans agree.
+# ─────────────────────────────────────────────────────────────────────────────
+SCANNED_EXT = {".md", ".sh", ".ps1", ".py", ".txt"}
+
+
+def scan_markers(sdir, root):
+    """Every marker fact about one skill directory, computed once."""
+    files = []
+    for d, _subs, fns in os.walk(sdir):
+        for fn in fns:
+            if os.path.splitext(fn)[1].lower() in SCANNED_EXT:
+                fp = os.path.join(d, fn)
+                files.append((os.path.relpath(fp, root), read(fp)))
+
+    # SCAN THE WHOLE SKILL, NOT JUST SKILL.md. The extraction gate asserts
+    # extracted spans against CENSUSED spans, so a denominator that read one file
+    # per skill let the sweep delete protected spans living in references/ or
+    # hooks/ — data loss of the protected class, reported as success.
+    defenced = [(fp, defence(body)) for fp, body in files]
+    joined_raw = "\n".join(b for _f, b in files)
+    joined = "\n".join(b for _f, b in defenced)
+
+    out = {
+        "files": files,
+        "totals": {}, "mentions": {},
+        "owners": Counter(), "pairing": [], "file_scope_owners": [],
+        "families": Counter(),
+        "has_origin": bool(ANCHORED(re.compile(r"<!--\s*origin:")).search(joined)),
+    }
+    # ONE anchoring rule and ONE body for every computation below.
+    for key, rx in MARKERS.items():
+        n = len(ANCHORED(rx).findall(joined))
+        if n:
+            out["totals"][key] = n
+        m = len(rx.findall(joined_raw)) - n
+        if m:
+            out["mentions"][key] = m
+    for owner in ANCHORED(MARKERS["origin_foreign"]).findall(joined):
+        out["owners"][owner] += 1
+
+    class _P:  # ANCHORED takes a compiled pattern; PAIRS holds strings
+        def __init__(self, pat):
+            self.pattern = pat
+
+    # PAIRING IS PER FILE. Joining a skill's files to count totals is fine — a
+    # total is a sum. Pairing is not: an opener in SKILL.md would silently pair
+    # with a closer in references/, and a span runs opener-to-closer WITHIN a file.
+    for key, (o_rx, c_rx) in PAIRS.items():
+        per_file = [(fp, len(ANCHORED(_P(o_rx)).findall(b)),
+                         len(ANCHORED(_P(c_rx)).findall(b))) for fp, b in defenced]
+        # A FILE-SCOPE OWNERSHIP HEADER IS NOT AN ORPHAN OPENER. A file opening
+        # with `<!-- origin: <owner> ... -->` in its first lines and never closing
+        # declares the WHOLE FILE machine-owned. Treating those as hazards excluded
+        # 13 well-formed files from the sweep on the real target — residue reached
+        # through the safety check.
+        scope = []
+        for fp, a, b in per_file:
+            if a == 1 and b == 0 and key == "origin_span":
+                head = "\n".join(dict(defenced)[fp].split("\n")[:6])
+                if ANCHORED(_P(o_rx)).search(head):
+                    scope.append(fp)
+        out["file_scope_owners"].extend(scope)
+        bad = [(fp, a, b) for fp, a, b in per_file if a != b and fp not in scope]
+        if bad:
+            out["pairing"].append({
+                "marker": key,
+                "openers": sum(a for _f, a, _b in bad),
+                "closers": sum(b for _f, _a, b in bad),
+                "files": [fp for fp, _a, _b in bad],
+            })
+    # Family discovery reads the SAME files. It walked `.md` only, so a family in
+    # a shell hook was invisible to it while its markers counted in the totals.
+    for name in GENERIC_PAIR_RX.findall(joined):
+        out["families"][name] += 1
+    return out
+
+
 def sh(args, cwd):
     try:
         r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=60)
@@ -149,24 +239,6 @@ def read(p):
 GENERIC_PAIR_RX = re.compile(r"<!--\s*([A-Z][A-Z0-9-]{3,})\s+START\b")
 
 
-def discover_marker_families(skills_dir):
-    """Marker families present in the tree but absent from the known table."""
-    known = {k.upper().replace("_", "-") for k in PAIRS}
-    found = Counter()
-    for dirpath, _d, filenames in os.walk(skills_dir):
-        for fn in filenames:
-            if not fn.endswith(".md"):
-                continue
-            try:
-                body = open(os.path.join(dirpath, fn), encoding="utf-8", errors="replace").read()
-            except Exception:
-                continue
-            for name in GENERIC_PAIR_RX.findall(body):
-                if name.replace("-", "").lower() not in {
-                    k.replace("_", "").replace("-", "").lower() for k in known
-                }:
-                    found[name] += 1
-    return dict(found)
 
 
 def census(root):
@@ -234,6 +306,7 @@ def census(root):
     skills = {}
     marker_totals = Counter()
     mention_totals = Counter()
+    family_totals = Counter()
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
@@ -278,102 +351,30 @@ def census(root):
         # extraction gate blocked a completable sweep because the census it was
         # asserting against was counting prose. The mentions are REPORTED rather
         # than dropped; a number that shrank without explanation is its own defect.
-        # SCAN THE WHOLE SKILL, NOT JUST SKILL.md. The extraction gate asserts
-        # extracted spans against CENSUSED spans, and this counted one file per
-        # skill — so protected `origin: user | immutable: true` spans living in
-        # references/ or hooks/ were invisible to the denominator. The gate would
-        # pass at "2 of 2" while two real spans went unextracted and were then
-        # swept. That is data loss of the protected class, reported as success.
-        # Fixture f12: 4 real user spans in one skill, 1 of them in SKILL.md.
-        marker_files = []
-        for _md, _ms, _mf in os.walk(sdir):
-            for _f in _mf:
-                if os.path.splitext(_f)[1].lower() in (".md", ".sh", ".ps1", ".py", ".txt"):
-                    _fp = os.path.relpath(os.path.join(_md, _f), root)
-                    marker_files.append((_fp, read(os.path.join(_md, _f))))
-        marker_body = [b for _f, b in marker_files]
-        scan = defence("\n".join(marker_body))
-        raw = "\n".join(marker_body)
-        for key, rx in MARKERS.items():
-            n = len(ANCHORED(rx).findall(scan))
-            mentions = len(rx.findall(raw)) - n
-            if n:
-                rec["markers"][key] = n
-                marker_totals[key] += n
-            if mentions:
-                rec.setdefault("marker_mentions", {})[key] = mentions
-                mention_totals[key] += mentions
-
-        # PAIRING. A marker sweep deletes opener-to-closer, so an unpaired marker
-        # either survives as residue (orphan closer) or swallows everything up to
-        # the NEXT closer (orphan opener). Counting openers alone cannot see it.
-        #
-        # ONLY LINE-ANCHORED MARKERS COUNT. A marker quoted inside a sentence —
-        # documentation describing the format — is not a span opener. Counting it
-        # produced a false "unpaired" on this project's own SKILL.md, which under
-        # the exclusion rule would have silently skipped a legitimate file. A
-        # false positive on an exclusion gate is expensive: it looks like caution
-        # and behaves like a dropped file.
-        # ONE anchoring rule and ONE body for both computations. They diverged
-        # twice: first because pairing anchored and the totals did not, then
-        # because the totals gained fence-stripping, a comment-prefix anchor and a
-        # whole-skill scan while pairing kept the old local lambda. An assertion
-        # caught the second within the hour.
-        class _P:  # ANCHORED takes a compiled pattern; PAIRS holds strings
-            def __init__(self, pat): self.pattern = pat
-        # PAIRING IS PER FILE. Joining a skill's files into one body to count
-        # totals is fine — a total is a sum. Pairing is NOT: an opener in SKILL.md
-        # would silently pair with a closer in references/, and the whole point of
-        # this check is that a span runs opener-to-closer WITHIN a file. Introduced
-        # and caught in the same change as the whole-skill scan.
-        for key, (o_rx, c_rx) in PAIRS.items():
-            o = c = 0
-            for _fp, _fb in marker_files:
-                _fs = defence(_fb)
-                o += len(ANCHORED(_P(o_rx)).findall(_fs))
-                c += len(ANCHORED(_P(c_rx)).findall(_fs))
-            per_file = [
-                (fp, len(ANCHORED(_P(o_rx)).findall(defence(fb))),
-                     len(ANCHORED(_P(c_rx)).findall(defence(fb))))
-                for fp, fb in marker_files
-            ]
-            # A FILE-SCOPE OWNERSHIP HEADER IS NOT AN ORPHAN OPENER. A file that
-            # opens with `<!-- origin: <owner> ... -->` in its first lines and
-            # never closes is declaring the WHOLE FILE machine-owned — a different,
-            # legitimate marker form. Measured on the real target: 13 files across
-            # two skills, every one well-formed, which this check would have
-            # excluded from the sweep as hazards. Thirteen files of scaffolding
-            # that then never gets removed is the residue problem, arrived at
-            # through the safety check.
-            def _file_scope(fp, body, a, b):
-                if not (a == 1 and b == 0 and key == "origin_span"):
-                    return False
-                head = "\n".join(defence(body).split("\n")[:6])
-                return bool(ANCHORED(_P(o_rx)).search(head))
-            _bodies = dict(marker_files)
-            file_scope = [fp for fp, a, b in per_file if _file_scope(fp, _bodies[fp], a, b)]
-            for fp in file_scope:
-                file_scope_owners.append({"skill": name, "file": fp})
-            imbalanced = [(fp, a, b) for fp, a, b in per_file
-                          if a != b and fp not in file_scope]
-            if imbalanced:
-                o = sum(a for _f, a, _b in imbalanced)
-                c = sum(b for _f, _a, b in imbalanced)
-                unpaired.append({
-                    "skill": name, "marker": key, "openers": o, "closers": c,
-                    "files": [fp for fp, _a, _b in imbalanced],
-                    "risk": "orphan closer survives the sweep as residue" if c > o
-                            else "orphan opener — the sweep may swallow to the next closer",
-                })
-        # SAME BODY AS THE TOTALS. This read `body` — SKILL.md only — while the
-        # totals read the whole skill, so the report showed "skill-builder — 33
-        # region(s)" directly beneath "marker origin_foreign 66". One population,
-        # two computations, disagreeing in print. Third occurrence of this exact
-        # shape in bin/baseline; the totals/pairing pair were the first two.
-        for owner in ANCHORED(MARKERS["origin_foreign"]).findall(scan):
-            foreign_owners[owner] += 1
-
-        if "origin:" not in body and rec["has_skill_md"]:
+        # ── every marker fact for this skill, from ONE scan ─────────────────
+        mk = scan_markers(sdir, root)
+        for key, n in mk["totals"].items():
+            rec["markers"][key] = n
+            marker_totals[key] += n
+        for key, m in mk["mentions"].items():
+            rec.setdefault("marker_mentions", {})[key] = m
+            mention_totals[key] += m
+        for owner, n in mk["owners"].items():
+            foreign_owners[owner] += n
+        for fam, n in mk["families"].items():
+            family_totals[fam] += n
+        for fp in mk["file_scope_owners"]:
+            file_scope_owners.append({"skill": name, "file": fp})
+        for pr in mk["pairing"]:
+            unpaired.append({
+                "skill": name, "marker": pr["marker"],
+                "openers": pr["openers"], "closers": pr["closers"],
+                "files": pr["files"],
+                "risk": "orphan closer survives the sweep as residue"
+                        if pr["closers"] > pr["openers"]
+                        else "orphan opener — the sweep may swallow to the next closer",
+            })
+        if not mk["has_origin"]:
             no_marker.append(name)
 
         # /route named in prose, outside the generated embed
@@ -636,7 +637,15 @@ def census(root):
         "quarantined": quarantined,
         "unpaired_markers": unpaired,
         "file_scope_owners": file_scope_owners,
-        "unknown_marker_families": discover_marker_families(skills_dir),
+        # From the SAME scan as every other marker fact. The old helper walked
+        # `.md` only, so a family inside a shell hook was invisible to it while
+        # its markers counted in the totals — one population, two computations,
+        # for the fourth time.
+        "unknown_marker_families": {
+            k: v for k, v in family_totals.items()
+            if k.replace("-", "").lower() not in
+               {x.replace("_", "").replace("-", "").lower() for x in PAIRS}
+        },
         "skills_with_no_origin_marker": no_marker,
         "marker_totals": dict(marker_totals),
         "foreign_origin_owners": dict(foreign_owners),
