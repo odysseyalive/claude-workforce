@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 9 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 10 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —
@@ -167,6 +167,23 @@ those the same either destroys work or leaves a hazard in place.
 **Say what the exclusion costs, every run.** *"`text-eval` excluded from the sweep — 1 orphan closer, 1
 unterminated span, both in `skill-builder` scaffolding"* is actionable. A silent exclusion is a file
 quietly opted out of the run forever.
+
+### A file-scope ownership header is not an unterminated span
+
+A file that opens with `<!-- origin: <owner> | modifiable: true -->` in its first lines and never
+closes is declaring **the whole file** machine-owned. It is a different, legitimate marker form, and a
+pairing check reads it as an orphan opener — the imbalance that "may swallow to the next closer".
+
+Measured on the real target, 2026-07-31, the moment the census began reading files other than
+`SKILL.md`: **13 files across two skills**, every one well-formed. Excluding them from the sweep as
+hazards would have left thirteen files of scaffolding permanently unremoved — the residue problem,
+arrived at *through* the safety check.
+
+**The distinction is positional and cheap.** One `origin:` opener, no closer anywhere in the file, and
+the opener inside the first few lines → file-scope ownership. Anything else → a real orphan.
+
+**Report them as their own population.** They are ownership evidence, and on a tree where the census
+finds no `origin:` attribute inside a span they may be the only ownership evidence there is.
 
 ### Pairing is verified before any sweep, never assumed
 
