@@ -28,7 +28,7 @@ evidence to draft from, so the charter comes from an interview — and it become
 downstream uses.
 
 **One `AskUserQuestion` call, several objects.** This is the one additional question a charter-first
-audit asks beyond the model/effort/advisor budgets — the project has nothing to read, so the charter comes from the
+audit asks beyond consent, the backup, and the model and effort budgets — the project has nothing to read, so the charter comes from the
 user.
 
 Ask only what shapes the project and the org:

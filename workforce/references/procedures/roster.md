@@ -9,11 +9,13 @@ alone**, so a stale chart cannot make the roster lie.
 ```
 Company — <project>                     harness: 2.1.220   canary: PASS 2026-07-29
 
-Payroll
-| Tier / Dept      | Model   | Effort | Source                  |
-| Lead             | <id>    | medium | unchanged, pre-selected |
-| IC / engineering | <id>    | medium | tier default            |
-| IC / content     | <id>    | medium | department override     |
+Budget
+| Lane / Tier       | Model   | Effort | Source                  |
+| analytical / Lead | <id>    | medium | unchanged, pre-selected |
+| analytical / IC   | <id>    | medium | unchanged, pre-selected |
+| creative          | <id>    | medium | lane override           |
+| code              | <id>    | medium | blank -> analytical     |
+| advisor           | <id>    | --      | unchanged, pre-selected |
 
 Employees (8)
 | Employee | T | Dept | Reports to | Model | Owns | Released | Loadable |
@@ -28,7 +30,7 @@ Health    fix ratio 0.31 ↓ · improvements 14/mo (4 deletions) · 1 two-live p
 ```
 
 **The Payroll block leads**, and every row names where its value came from — `asked this run` /
-`unchanged, pre-selected` / `tier default` / `department override`. A setup question that was skipped
+`unchanged, pre-selected` / `analytical default` / `lane override` / `blank -> analytical`. A setup question that was skipped
 and one that was answered must never look the same, which is the failure this receipt exists to make
 impossible.
 

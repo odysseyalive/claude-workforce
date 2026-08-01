@@ -2430,19 +2430,84 @@ check(
 # surface", the budget table's numbered rows, and the Step 0.4 subsections —
 # with nothing comparing them. The whole point of the budget is that it is a
 # CEILING, and a ceiling nothing counts is a preference.
-_Q_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5}
+_Q_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 _q_decl = re.search(r"\*\*(\w+) questions is the whole surface", _asu)
 _q_declared = _Q_WORDS.get(_q_decl.group(1).lower()) if _q_decl else None
-_q_rows = re.findall(r"^\|\s*(\d+)\s*\|\s*(0\.4[a-z])\s*\|", _asu, re.M)
-_q_sections = re.findall(r"^###\s+Step\s+(0\.4[a-z])\b", _asu, re.M)
+# Rows carry the step id; a question's own heading declares "(question N of M)".
+# Matching on the step id alone stopped working when two of the four questions
+# became gates at Step 0 and Step 0.2 rather than 0.4x, so the pairing is now
+# row-number ↔ heading-number, which does not care how the steps are numbered.
+_q_rows = re.findall(r"^\|\s*(\d+)\s*\|\s*([\d.a-z]+)\s*\|", _asu, re.M)
+_q_heads = re.findall(r"^##+\s+Step\s+[\d.a-z]+\s+—[^\n]*?\(question (\d+) of (\d+)", _asu, re.M)
+_q_of = {int(m[1]) for m in _q_heads}
 check(
-    "questions: the declared count, the table rows, and the sections all agree",
+    "questions: the declared count, the table rows, and the headings all agree",
     _q_declared is not None
     and len(_q_rows) == _q_declared
-    and [r[1] for r in _q_rows] == _q_sections,
-    f"declared {_q_declared}; table rows {[r[1] for r in _q_rows]}; "
-    f"sections {_q_sections} — a question added to one of the three and not the "
-    "others is a question the budget does not know it is spending",
+    and sorted(int(n) for n, _ in _q_rows) == sorted(int(m[0]) for m in _q_heads)
+    and _q_of == {_q_declared},
+    f"declared {_q_declared}; table rows {[r[0] for r in _q_rows]}; "
+    f"headings {[m[0] for m in _q_heads]} of {_q_of or '{}'} — a question added to "
+    "one of the three and not the others is a question the budget does not know "
+    "it is spending",
+)
+# The two gate questions must stay gates: a declined consent writes nothing, and
+# a declined backup degrades rather than aborts. Both were automatic until
+# 2026-08-01, so both consequences are new surface with nothing else guarding it.
+check(
+    "questions: a declined consent ends the run having written nothing",
+    "declined consent ends the" in _asu,
+    "a consent question whose 'no' still writes is not a consent question",
+)
+check(
+    "questions: a declined backup is a fourth state, degrading like a failure",
+    "`declined`" in _asu and "must not share a line" in _asu,
+    "declined and failed share a consequence and must not share a report line — "
+    "one is a decision, the other is a fault",
+)
+check(
+    "questions: the advisor is an object, not a fourth call",
+    "not a question of its own" in _asu,
+    "a call asking one thing is a stop the user pays for and learns nothing from",
+)
+
+# ── The four lanes ───────────────────────────────────────────────────────────
+# Analytical is the baseline and supplies the tier defaults; creative and code
+# are single-model overrides; advisor is not a lane employees run in.
+for _lane in ("Analytical", "Creative", "Code", "Advisor"):
+    check(f"lanes: {_lane.lower()} is addressed separately in the config",
+          _lane in _ocfg, "org-config.template.md § The four lanes must name it")
+check(
+    "lanes: the tier defaults come from analytical, not a separate tier question",
+    "no separate tier question" in _asu.lower()
+    and "analytical lane supplies" in _asu.lower(),
+    "Lead/IC are pulled from the analytical selection; a second tier question "
+    "would be two sources for one number",
+)
+check(
+    "lanes: image, content, and visual design are a floor, not a default",
+    all(t in _ocfg for t in ("Image generation, content, and visual design",
+                             "floor, not a default")),
+    "a default can be reasoned away by a classifier weighing what a department "
+    "'mostly' does; a floor cannot",
+)
+check(
+    "lanes: the floor is restated where the budget is asked, and agrees",
+    "always creative" in _asu and "floor, not a default" in _asu,
+    "the run reads audit-setup.md, not the template; a floor stated only in the "
+    "config is a floor the gate never sees",
+)
+check(
+    "lanes: assignment is total, with the residual reported by name",
+    "unclassified" in _ocfg and "falls to" in _ocfg,
+    "a department budgeted by a default nobody chose looks identical to one "
+    "budgeted deliberately unless the residual is named",
+)
+check(
+    "lanes: the advisor has no effort object, and the reason is stated",
+    "no effort" in _ocfg and "no effort object" in _asu,
+    "the advisor reaches no spawned employee, so there is no effort level for it "
+    "to control; an effort cell there would be a setting that does nothing",
 )
 check(
     "questions: the sanctioned fourth is named, and bounded to one mode",

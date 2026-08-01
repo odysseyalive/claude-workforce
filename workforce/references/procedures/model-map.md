@@ -1,31 +1,32 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Low risk; executes immediately. `/workforce model-map`
 
-The budgets, standalone — the same three calls `references/audit-setup.md` § Step 0.4 runs, without
-the rest of the audit.
+The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without
+the rest of the audit. It asks neither of the audit's two gate questions: there is nothing to consent
+to and nothing to archive, because this command writes only the config and the frontmatter it names.
 Spec: `references/org-config.template.md`.
 
 ---
 
 ## The budgets
 
-**Three `AskUserQuestion` calls, seven objects, fixed regardless of headcount.**
+**Two `AskUserQuestion` calls, nine objects, fixed regardless of headcount.** The four things managed
+separately are **analytical, creative, code, and advisor** (`org-config.template.md` § The four lanes).
 
-- **Model budget:** Lead tier · IC tier · **creative / alternate**. Each question offers the four
-  statics from `org-config.template.md` § Model statics, in the order listed there, plus "Other" for
-  a hand-typed model ID. **No CEO question** — the CEO is the main session.
-- **Effort budget:** Lead · IC effort, and which departments run on the alternate model.
-- **Advisor budget:** same four options in the same order. "Other" is where the user types
-  "No Advisor" to decline one.
+- **Model budget (5):** analytical Lead · analytical IC · creative · code · advisor. Each object offers
+  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
+  "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session. **No separate
+  tier question** — the analytical lane supplies the Lead and IC defaults. "Other" on the advisor is
+  where the user types "No Advisor" to decline one.
+- **Effort budget (4):** the same lanes minus the advisor, which has no effort because it reaches no
+  spawned employee.
 
-The alternate is labelled as the **creative** model — the one running departments doing generative
-work (content, design, image, voice, translation). Its department multi-select pre-checks whatever the
-department panel classified as creative, so the override lands without the user having to remember
-which department is which.
+Lane membership is derived from the work, never asked (`audit-setup.md` § Which departments are in
+which lane is NOT a question). Image generation, content, and visual design are always creative.
 
-**All seven objects render on every interactive run**, current values pre-selected. Answering costs
+**All nine objects render on every interactive run**, current values pre-selected. Answering costs
 one click when nothing changed. **A marker may change a default; it may never drop a question.**
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
@@ -33,9 +34,9 @@ anything else arrives via "Other."
 
 ## Resolution
 
-**Specified in `references/org-config.template.md` § Resolution, not here** — three levels, employee
-override first. A blank cell disables that level; a blank tier cell means the employee inherits the session
-model; a blank alternate disables the department override.
+**Specified in `references/org-config.template.md` § Resolution, not here** — employee override, then
+lane override, then the analytical tier default. A blank cell disables that level; a blank analytical
+cell means the employee inherits the session model; a blank lane cell falls to analytical.
 
 **The employee level is not a budget question.** Its rows are hand-written in the project's `org-config.md`;
 this command reads them and never writes them. Asking per employee would scale questions with headcount,
@@ -68,7 +69,7 @@ Print the resolved table with the **source of every value**:
 | Advisor                | <id>  |        | asked this run            |
 ```
 
-**Every level that resolved a value appears by name.** `employee override (pinned)` and `tier default` must
+**Every level that resolved a value appears by name.** `employee override (pinned)` and `analytical default` must
 never render alike: a pin is a standing exception, and one left behind after the org moved is invisible
 otherwise. An override naming an employee that no longer exists is a `reconcile` finding, not a silent
 no-op.

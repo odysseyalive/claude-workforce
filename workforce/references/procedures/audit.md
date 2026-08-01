@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 11 assertion(s) in bin/check name this file; 43 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 11 assertion(s) in bin/check name this file; 46 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -10,11 +10,12 @@ executes its own recommendations.
 /workforce audit --quick    frontmatter, chart drift, and budget only
 ```
 
-**Autonomy model, inherited from claude-enforcer's ratified design:** running the command is the
-consent; the backup is taken automatically; companions install on absence; the org is designed from
-evidence and built. **The only questions are the model budget, effort budget, and advisor budget** —
-which model and effort to run at each tier, and whether to advise the main session. Everything else is
-resolved by agent panels. Failures land as ✗ in the Execution Summary with the step they failed at,
+**Autonomy model:** companions install on absence; the org is designed from evidence and built.
+**The only questions are consent, the backup, the model budget, and the effort budget** — whether to
+proceed, whether to archive first, and which model and effort each lane runs at
+(`references/audit-setup.md` § The question budget). The four things the budgets manage separately are
+**analytical, creative, code, and advisor**; the advisor is an object inside the model budget, not a
+call of its own. Everything else is resolved by agent panels. Failures land as ✗ in the Execution Summary with the step they failed at,
 never as "run this command yourself."
 
 ---
@@ -22,7 +23,8 @@ never as "run this command yourself."
 ## Steps 0 through 0.7 — the setup gates
 
 **Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
-the model/effort/advisor budgets (the three questions), VCS preflight, the canary fixtures, and the
+consent and the backup (questions 1 and 2), the model and effort budgets (questions 3 and 4), VCS
+preflight, the canary fixtures, and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
 name collisions.
 
@@ -119,7 +121,7 @@ through Steps 2, 4, 5, 6, 7 — skipping only Step 3, which has nothing to class
 `INC-2026-06-07-bootstrap-onboarding-skip` records exactly this being skipped on fresh projects — the
 audience that most needed it — because a blanket "skip the per-skill steps" swallowed the setup
 with them. A fresh project is where the budgets matter *most*: nothing is configured yet.
-**No mode exempts the model, effort, or advisor budgets.**
+**No mode exempts consent, the backup, or the model and effort budgets.**
 
 ## Step 1b — Registry census: agents and hooks (before anything is staged)
 
@@ -240,18 +242,23 @@ run it is simply empty (`references/audit-setup.md` § Step 0.4b).
 **Do not describe the 0.4b pre-check as built from this panel's output.** It was, and the ordering made
 it false: departments were classified after the question that was supposed to reflect the classification.
 
-**`creative` is a property of a DEPARTMENT, but generative work is a property of an EMPLOYEE — and the
-effort budget can only offer departments that exist.** Its multi-select is built from this panel's output, so
-design, image, voice, and translation work reach the alternate model *only* if some department the panel
-proposed owns them. Fold that work into `engineering` and there is nothing for the user to check: they are
-asked about `content`, the image employee falls through to its tier default, and it silently runs on the
-coding model. Nothing errors, and no question was skipped — the option was never constructible.
+**A lane is a property of a DEPARTMENT, but the kind of work is a property of an EMPLOYEE.** That gap is
+where the old design leaked: lane membership used to be a multi-select built from this panel's output, so
+generative work reached the creative model *only* if some department the panel proposed owned it. Fold image
+work into `engineering` and there was nothing for the user to check — they were asked about `content`, the
+image employee fell through to the tier default, and it silently ran on the coding model. Nothing errored,
+and no question was skipped: the option was never constructible.
+
+**The floor closes that hole and this step enforces it.** Image generation, content, and visual design are
+always creative (`org-config.template.md` § Creative), so an employee doing that work is in the creative
+lane no matter which department it was homed in, and no classifier reading may move it. Lane membership is
+derived here and reported, never asked.
 
 So, in order:
 
-1. **Home generative work in a department classified creative** wherever the department budget allows. The
-   generative kinds are enumerated in `references/org-config.template.md` § Creative — that list is
-   already broader than "content", and it is the list to check the roster against.
+1. **Home generative work in a department in the creative lane** wherever the department budget allows.
+   The floor kinds are in `references/org-config.template.md` § Creative; voice and translation are
+   creative by default and reassignable with a stated reason. That is the list to check the roster against.
 2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
    A roster that quietly routes image work to the coding model has made a model decision the receipt
@@ -537,11 +544,24 @@ not, fail **by name** — never a generic error.
 
 ```
 Budget Receipt
-| Tier / Dept        | Model            | Effort | Source                 |
-| Lead               | <id>             | medium | unchanged, pre-selected|
-| IC / engineering   | <id>             | medium | tier default           |
-| IC / content       | <id>             | medium | department override    |
+| Lane / Tier          | Model  | Effort | Source                   |
+| analytical / Lead    | <id>   | medium | asked this run           |
+| analytical / IC      | <id>   | medium | unchanged, pre-selected  |
+| creative             | <id>   | medium | asked this run           |
+| code                 | <id>   | medium | blank -> analytical      |
+| advisor              | <id>   | --     | unchanged, pre-selected  |
+
+Lane assignment
+| Department   | Lane       | Why                                  |
+| content      | creative   | FLOOR - content is always creative   |
+| engineering  | code       | derived from the work                |
+| ops          | analytical | unclassified - fell to the baseline  |
 ```
+
+**Both blocks, always.** The receipt says what each lane costs; the assignment says which departments
+pay it. A receipt alone cannot show a department that landed in the wrong lane, and the `Why` column is
+what separates a floor from a derivation from a residual — three different things that produce the same
+cell (`references/org-config.template.md` § The four lanes).
 
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a

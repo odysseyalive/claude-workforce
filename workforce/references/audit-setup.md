@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 11 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -16,25 +16,28 @@ backup; the ordering rule is stated in Step 0.2 and is not a matter of convenien
 
 ## The question budget — one slot, and it is a ceiling
 
-Running `/workforce audit` is the consent. The backup is taken automatically. Companions install on
-absence. The org is designed from evidence and built. **The only questions are the model budget, the
-effort budget, and the advisor budget** — which model and effort level to run at each tier, which
-departments use the creative alternate, and which model advises the main session.
+Companions install on absence. The org is designed from evidence and built. **The only questions are
+consent, the backup, the model budget, and the effort budget** — whether to proceed, whether to
+archive first, and which model and effort level each lane runs at.
 
-| # | Step | What happens | Calls |
-|---|---|---|---|
-| — | 0 | Backup taken automatically | 0 |
-| — | 0.3 | Absent companions installed automatically | 0 |
-| 1 | 0.4a | Model budget — tier × model + creative alternate | **1** |
-| 2 | 0.4b | Effort budget — tier × effort + department overrides | **1** |
-| 3 | 0.4c | Advisor budget — session advisor model or none | **1** |
-| — | 5 | Org designed from evidence, built, and reported | 0 |
+| # | Step | What happens | Calls | Objects |
+|---|---|---|---|---|
+| 1 | 0 | Consent — proceed with this audit, or stop | **1** | 1 |
+| 2 | 0.2 | Backup — archive the tree before anything is written | **1** | 1 |
+| — | 0.3 | Absent companions installed automatically | 0 | — |
+| 3 | 0.4a | Model budget — analytical Lead/IC, creative, code, advisor | **1** | 5 |
+| 4 | 0.4b | Effort budget — analytical Lead/IC, creative, code | **1** | 4 |
+| — | 5 | Org designed from evidence, built, and reported | 0 | — |
 
 Everything else is a panel or an automatic gate. **Suppressed entirely** in headless, non-interactive,
 and `--quick` runs: those render nothing, write no markers, and install nothing that was not already
 authorized.
 
-**Three questions is the whole surface, and it is a design constraint rather than a current count.**
+**The advisor is an object inside the model budget, not a question of its own.** It is one of the four
+things managed separately — but it is answered on the same call as the lanes, because a fourth call
+asking one thing is a stop the user pays for and learns nothing from.
+
+**Four questions is the whole surface, and it is a design constraint rather than a current count.**
 Discoveries, repairs, classifications, and deferrals are handled by the run — not escalated. Two places
 where a question is the obvious move and is refused:
 
@@ -45,8 +48,9 @@ where a question is the obvious move and is refused:
   loudly (`procedures/audit.md` § Step 2). `transfer` restructures later if the user disagrees.
 
 The only sanctioned addition is **charter-first** (`procedures/charter.md`): a bare directory has no
-evidence to read, so the charter comes from the user. That is a fourth question on an empty project and
-nowhere else.
+evidence to read, so the charter comes from the user. That is a fifth question on an empty project and
+nowhere else. **The ordinal is not decoration** — it moved from fourth to fifth when consent and the
+backup became questions, and a stale ordinal here is how the ceiling quietly gains a slot.
 
 **Adding a question is a design change, not a convenience.** The failure it prevents is real: a run that
 stops forty times is a run nobody finishes, and the work it was stopping for gets skipped by hand
@@ -54,10 +58,19 @@ instead.
 
 ---
 
-## Step 0 — Consent
+## Step 0 — Consent  (question 1 of 4)
 
-**Running `/workforce audit` is the consent.** No disclaimer question, no confirmation widget. The
-command name is unambiguous, and the backup taken next protects what a question would have protected.
+**Ask before proceeding.** One object: proceed with this audit, or stop. A declined consent ends the
+run having written nothing — not a degraded run, not a partial one.
+
+State what proceeding means in the question itself, because a consent nobody can price is not consent:
+the run backs up (question 2), installs absent companions, designs and builds an org, and converts
+eligible skills. Naming those is what makes "proceed" answerable.
+
+*An earlier design made invocation the consent and asked nothing, on the reasoning that the command
+name is unambiguous and the backup protects what a question would have protected. Superseded 2026-08-01
+by user directive. The prior reasoning is recorded here rather than deleted, because the cost it names
+is real and is now paid deliberately: two of the four questions are gates rather than settings.*
 
 **Write the `audit-disclaimer` marker AFTER the backup**, not on entry. The marker lives in
 `org-config.md`, inside the tree Step 0.2 archives — so writing it first makes `INV-BACKUP`'s counted
@@ -79,10 +92,21 @@ it does under `--review`, in its own section. This is the same coupling `procedu
 through 0.7 already declares in the other direction — *any gate added to `audit-setup.md` must be added
 there too.* A gate is added to both, and it declares its `--review` behavior, or it is not added.
 
-## Step 0.2 — Backup
+## Step 0.2 — Backup  (question 2 of 4)
 
-**Take the backup automatically** (`procedures/backup.md`), immediately — before any other gate writes
-anything. No question, no offer to decline.
+**Ask, then take the backup** (`procedures/backup.md`) — before any other gate writes anything. One
+object: archive the tree first, or proceed without an archive.
+
+**Declining is answered, not refused.** `declined` is a fourth state beside the three below, and it
+costs exactly what a `failed` backup costs: conversions downgrade to
+**register-the-employee-and-leave-the-skill**, two live paths instead of one, and the sweep does not
+run. Say that in the question. A user who declines having been told the cost has made a decision; one
+who declines without being told has been allowed to make a mistake quietly.
+
+*An earlier design took the backup unconditionally, with no offer to decline, on the reasoning that a
+backup you can decline is a backup that will be declined on the run that needed it. Superseded
+2026-08-01 by user directive; the risk it names is answered by pricing the decline in the question and
+degrading the run rather than by removing the choice.*
 
 **Under `--review`: skipped, and reported as `skipped (--review writes nothing)`.** Not "taken" and not
 "failed" — a third state, because a review run has nothing to protect: it makes no change a backup would
@@ -106,10 +130,16 @@ or proceeds without the protection it thinks it has:
 | `taken` | backup written and verified | proceed normally; full conversion available |
 | `no-content` | nothing to archive — no `CLAUDE.md`, no `.claude/`; `zip` reports "Nothing to do" | **proceed normally.** Nothing exists to protect, and only creation follows |
 | `failed` | content existed and the backup could not be written or verified | proceed; conversions downgrade to **register-the-employee-and-leave-the-skill** — two live paths instead of one. Degraded, safe, and reported |
+| `declined` | the user answered question 2 with no | **the same downgrade as `failed`**, and reported as a choice rather than a fault. Never rendered as an error, and never retried by asking again mid-run |
 
 A `failed` backup is never silently upgraded to "good enough". The report names the state, not just a
 ✗ — "backup failed (disk full); conversions restricted to non-destructive" is actionable, and a bare
 ✗ is not.
+
+**`declined` and `failed` share a consequence and must not share a line.** One is a decision and the
+other is a fault: reporting a declined backup as a failure tells the user something went wrong when
+nothing did, and reporting a failure as a decline attributes a disk error to them. `INV-BACKUP` prints
+the state by name for exactly this reason.
 
 ## Step 0.3 — Companion skills
 
@@ -165,37 +195,55 @@ installed, not a new install, so they run whether or not anything was checked. A
 not reach installed copies only ever helps new projects.
 
 **Read the current `advisorModel` from the project's settings** (both `.claude/settings.json` and
-`.claude/settings.local.json`). Its value pre-selects the advisor budget (Step 0.4c). The budget
+`.claude/settings.local.json`). Its value pre-selects the advisor object in the model budget (Step 0.4a). The budget
 decides what happens — not this gate.
 
-## Step 0.4 — Model budget, effort budget, advisor budget
+## Step 0.4 — Model budget, effort budget
 
-Three `AskUserQuestion` calls, seven objects, **fixed regardless of headcount**
-(`references/org-config.template.md`):
+Two `AskUserQuestion` calls, nine objects, **fixed regardless of headcount**
+(`references/org-config.template.md` § The four lanes). The four things managed separately are
+**analytical, creative, code, and advisor** — the first three are lanes employees run in, and the
+advisor is not.
 
-### Step 0.4a — Model budget
+### Step 0.4a — Model budget  (question 3 of 4 · 5 objects)
 
-Lead tier / IC tier / **creative-alternate**. Each question offers the four statics from
-`org-config.template.md` § Model statics, in the order listed there, plus "Other" for a hand-typed
-model ID. **No CEO question** — the CEO is the main session and runs on whatever model the user chose
-for their Claude Code session.
+| Object | What it sets |
+|---|---|
+| analytical — Lead | the Lead default. **There is no separate tier question**: the analytical lane supplies it |
+| analytical — IC | the IC default, same reason |
+| creative | one model for the whole creative lane, no tier split |
+| code | one model for the whole code lane, no tier split |
+| advisor | the main session's advisor. "Other" is where the user types **"No Advisor"** to decline |
 
-### Step 0.4b — Effort budget
+Each object offers the four statics from `org-config.template.md` § Model statics, in the order listed
+there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
+runs on whatever model the user chose for their Claude Code session.
 
-Lead / IC effort, and which departments run on the alternate model.
+The advisor object is pre-selected from the current `advisorModel` in project settings (read in Step
+0.3). Choosing a model writes `advisorModel`; "No Advisor" removes the setting. It runs only in the
+main session and does not compound with spawned employees, **which is why it has no effort object** —
+nothing spawns at an effort level it controls.
+
+### Step 0.4b — Effort budget  (question 4 of 4 · 4 objects)
+
+Analytical Lead, analytical IC, creative, code. The lane set is identical to the model budget minus the
+advisor, so a lane added to one is added to both or the two disagree about what a lane is.
 
 **The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
 and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a
 first run it is simply empty. An earlier form of this line claimed the panel's output as its source,
 and the ordering made that false (`procedures/audit.md` § Step 2).
 
-### Step 0.4c — Advisor budget
+### Which departments are in which lane is NOT a question
 
-Same four options in the same order. "Other" is where the user
-  types **"No Advisor"** to decline one. Pre-selected from the current `advisorModel` in project
-  settings (read in Step 0.3). Choosing a model writes `advisorModel`; choosing "No Advisor" removes
-  the setting. The advisor runs only in the main session — it does not compound with spawned
-  employees.
+It is derived at Step 2 from the work, then reported — never asked, because a per-department question
+scales with headcount and the fixed-object budget exists to prevent exactly that.
+
+**Image generation, content, and visual design are always creative** — a floor, not a default, and not
+overridable by the classifier (`org-config.template.md` § Creative). A department matching no lane
+falls to **analytical** and is **named in the report as unclassified**. Assignment is total and its
+residual is reported; a department budgeted by a default nobody chose must never look like one budgeted
+deliberately.
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
 anything else arrives via "Other."

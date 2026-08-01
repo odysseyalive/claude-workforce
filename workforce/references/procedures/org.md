@@ -199,7 +199,7 @@ nothing to happen?"
 @agent-<name>
   tier / dept:      3 (IC) / engineering
   reports to:       eng-lead        direct reports: (none)
-  model / effort:   <id> / medium   ← source: department override | tier default
+  model / effort:   <id> / medium   ← source: lane override | analytical default
   tier ceiling:     disallowedTools: Agent  [present]
   owns records:     code-evaluator
   triggers:         test, coverage, regression

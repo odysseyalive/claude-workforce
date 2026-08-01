@@ -103,7 +103,7 @@ inventing a latency it did not achieve.
 |---|---|---|
 | `/workforce evals [employee]` | low | Create or run an employee's measurement set |
 | `/workforce ablate <employee>` | high | Delete lines, add back only what earns its place |
-| `/workforce model-map` | low | The model, effort, and advisor budgets, standalone |
+| `/workforce model-map` | low | The model and effort budgets, standalone — analytical, creative, code, advisor |
 
 ```
 /workforce ablate <employee> --execute
@@ -195,7 +195,9 @@ assistant beneath it. Research is a department peer reached by a lead.
 
 ### Why every employee is model-pinned
 
-Each handbook carries its own `model:` and `effort:`, resolved as department override → tier default.
+Each handbook carries its own `model:` and `effort:`, resolved as employee pin → lane override →
+analytical tier default. The lanes are analytical, creative, and code; image generation, content, and
+visual design are always creative.
 The main loop only dispatches, so the session model does not affect the work.
 
 That removes a problem claude-enforcer had to solve: its `/route` must sometimes ask you to switch
