@@ -796,6 +796,41 @@ check(
     "keying on one skill name misses any other generator's store, and counting "
     "files rather than records reports a correct index as drifted",
 )
+# The extraction gate's denominator was wrong in BOTH directions on the same day.
+# bin/baseline scanned one file per skill, so protected spans in references/ and
+# hooks/ were invisible — the gate would pass "2 of 2" while two real spans went
+# unextracted and were then swept. And the ad-hoc census used during the sweep run
+# counted mid-line mentions, over-reporting 36 against a true 33. Only fixture f12,
+# hand-counted span by span, settles which rule is right.
+check(
+    "legacy-markers: a file-scope ownership header is not an orphan opener",
+    "A file-scope ownership header is not an unterminated span" in lm
+    and "13 files across two skills" in lm,
+    "excluding a well-formed whole-file ownership declaration from the sweep as a "
+    "hazard leaves its scaffolding permanently unremoved — residue reached through "
+    "the safety check",
+)
+check(
+    "baseline: pairing is per file, and file-scope headers are separated",
+    "PAIRING IS PER FILE" in _bl and "FILE-SCOPE OWNERSHIP HEADER IS NOT" in _bl,
+    "joining a skill's files to count totals is fine — a total is a sum. Pairing is "
+    "not: an opener in SKILL.md would silently pair with a closer in references/",
+)
+
+check(
+    "baseline: markers are censused across the whole skill, not just SKILL.md",
+    "SCAN THE WHOLE SKILL, NOT JUST SKILL.md" in _bl,
+    "the extraction gate asserts extracted against CENSUSED; a denominator that "
+    "reads one file per skill lets the sweep delete a protected span",
+)
+check(
+    "baseline: a fenced example is not a span, and a comment prefix is still line start",
+    "def defence" in _bl and "LINE-COMMENT PREFIX" in _bl,
+    "line-anchoring excluded inline backtick mentions but not fenced ones, and it "
+    "rejected the `# <!-- origin: ... -->` form that is the only way to carry a "
+    "marker in a shell file",
+)
+
 check(
     "audit: a credential or a sentinel never becomes a data skill",
     "except\ntwo classes the census already flags" in aud.replace("**","")
@@ -955,7 +990,8 @@ check(
 
 check(
     "baseline: marker totals and pairing use ONE anchoring rule",
-    "def ANCHORED" in _bl and "ANCHORED(rx).findall(body)" in _bl,
+    "def ANCHORED" in _bl and "ANCHORED(rx).findall(scan)" in _bl
+    and "ONE anchoring rule and ONE body" in _bl,
     "pairing anchored and the totals did not, so the same file counted one "
     "population two ways; the extraction gate then blocked on the inflated count",
 )

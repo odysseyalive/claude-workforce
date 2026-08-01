@@ -81,6 +81,24 @@ CRED_RX = re.compile(r"(token|secret|credential|auth|-key|\.env)", re.I)
 HOST_LOCAL_RX = re.compile(r"^\.(.*(cache|acked|nudge|-ts|mode|active|pending|reviewed|advised))", re.I)
 
 
+def defence(body):
+    """Blank out fenced code blocks, preserving line numbering.
+
+    Line-anchoring excludes an inline `<!-- ... -->` mention because it is not at
+    the start of a line. It does NOT exclude the same marker inside a ``` fence,
+    where it IS at line start — so a file documenting the marker format inflated
+    every count. Fixture f12: 1 real user span in a SKILL.md, censused as 2.
+    """
+    out, fenced = [], False
+    for line in body.split("\n"):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            out.append("")
+            continue
+        out.append("" if fenced else line)
+    return "\n".join(out)
+
+
 def ANCHORED(rx):
     """A marker is a span opener only when it STARTS a line.
 
@@ -88,7 +106,13 @@ def ANCHORED(rx):
     until 2026-07-31: pairing anchored, totals did not, so the same file counted
     one population two ways and the extraction gate blocked on the inflated one.
     """
-    return re.compile(r"^[ \t]*" + rx.pattern, re.M)
+    # A leading LINE-COMMENT PREFIX still counts as line start. Markers live in
+    # shell and PowerShell files as `# <!-- origin: ... -->`, which is the only way
+    # to carry one there — and requiring the comment to begin the line missed every
+    # such span. apps-odyssey-alive keeps user directives in exactly that shape
+    # inside `hooks/*.sh`. An inline mention is still excluded: it is not at line
+    # start with or without a prefix.
+    return re.compile(r"^[ \t]*(?:[#;]|//|--)?[ \t]*" + rx.pattern, re.M)
 
 
 def sh(args, cwd):
@@ -214,6 +238,7 @@ def census(root):
     no_marker = []
     quarantined = []
     unpaired = []
+    file_scope_owners = []
 
     names = sorted(os.listdir(skills_dir)) if os.path.isdir(skills_dir) else []
     for name in names:
@@ -253,9 +278,25 @@ def census(root):
         # extraction gate blocked a completable sweep because the census it was
         # asserting against was counting prose. The mentions are REPORTED rather
         # than dropped; a number that shrank without explanation is its own defect.
+        # SCAN THE WHOLE SKILL, NOT JUST SKILL.md. The extraction gate asserts
+        # extracted spans against CENSUSED spans, and this counted one file per
+        # skill — so protected `origin: user | immutable: true` spans living in
+        # references/ or hooks/ were invisible to the denominator. The gate would
+        # pass at "2 of 2" while two real spans went unextracted and were then
+        # swept. That is data loss of the protected class, reported as success.
+        # Fixture f12: 4 real user spans in one skill, 1 of them in SKILL.md.
+        marker_files = []
+        for _md, _ms, _mf in os.walk(sdir):
+            for _f in _mf:
+                if os.path.splitext(_f)[1].lower() in (".md", ".sh", ".ps1", ".py", ".txt"):
+                    _fp = os.path.relpath(os.path.join(_md, _f), root)
+                    marker_files.append((_fp, read(os.path.join(_md, _f))))
+        marker_body = [b for _f, b in marker_files]
+        scan = defence("\n".join(marker_body))
+        raw = "\n".join(marker_body)
         for key, rx in MARKERS.items():
-            n = len(ANCHORED(rx).findall(body))
-            mentions = len(rx.findall(body)) - n
+            n = len(ANCHORED(rx).findall(scan))
+            mentions = len(rx.findall(raw)) - n
             if n:
                 rec["markers"][key] = n
                 marker_totals[key] += n
@@ -273,13 +314,54 @@ def census(root):
         # the exclusion rule would have silently skipped a legitimate file. A
         # false positive on an exclusion gate is expensive: it looks like caution
         # and behaves like a dropped file.
-        anchored = lambda rx: re.compile(r"^[ \t]*" + rx, re.M)  # str patterns (PAIRS)
+        # ONE anchoring rule and ONE body for both computations. They diverged
+        # twice: first because pairing anchored and the totals did not, then
+        # because the totals gained fence-stripping, a comment-prefix anchor and a
+        # whole-skill scan while pairing kept the old local lambda. An assertion
+        # caught the second within the hour.
+        class _P:  # ANCHORED takes a compiled pattern; PAIRS holds strings
+            def __init__(self, pat): self.pattern = pat
+        # PAIRING IS PER FILE. Joining a skill's files into one body to count
+        # totals is fine — a total is a sum. Pairing is NOT: an opener in SKILL.md
+        # would silently pair with a closer in references/, and the whole point of
+        # this check is that a span runs opener-to-closer WITHIN a file. Introduced
+        # and caught in the same change as the whole-skill scan.
         for key, (o_rx, c_rx) in PAIRS.items():
-            o = len(anchored(o_rx).findall(body))
-            c = len(anchored(c_rx).findall(body))
-            if o != c:
+            o = c = 0
+            for _fp, _fb in marker_files:
+                _fs = defence(_fb)
+                o += len(ANCHORED(_P(o_rx)).findall(_fs))
+                c += len(ANCHORED(_P(c_rx)).findall(_fs))
+            per_file = [
+                (fp, len(ANCHORED(_P(o_rx)).findall(defence(fb))),
+                     len(ANCHORED(_P(c_rx)).findall(defence(fb))))
+                for fp, fb in marker_files
+            ]
+            # A FILE-SCOPE OWNERSHIP HEADER IS NOT AN ORPHAN OPENER. A file that
+            # opens with `<!-- origin: <owner> ... -->` in its first lines and
+            # never closes is declaring the WHOLE FILE machine-owned — a different,
+            # legitimate marker form. Measured on the real target: 13 files across
+            # two skills, every one well-formed, which this check would have
+            # excluded from the sweep as hazards. Thirteen files of scaffolding
+            # that then never gets removed is the residue problem, arrived at
+            # through the safety check.
+            def _file_scope(fp, body, a, b):
+                if not (a == 1 and b == 0 and key == "origin_span"):
+                    return False
+                head = "\n".join(defence(body).split("\n")[:6])
+                return bool(ANCHORED(_P(o_rx)).search(head))
+            _bodies = dict(marker_files)
+            file_scope = [fp for fp, a, b in per_file if _file_scope(fp, _bodies[fp], a, b)]
+            for fp in file_scope:
+                file_scope_owners.append({"skill": name, "file": fp})
+            imbalanced = [(fp, a, b) for fp, a, b in per_file
+                          if a != b and fp not in file_scope]
+            if imbalanced:
+                o = sum(a for _f, a, _b in imbalanced)
+                c = sum(b for _f, _a, b in imbalanced)
                 unpaired.append({
                     "skill": name, "marker": key, "openers": o, "closers": c,
+                    "files": [fp for fp, _a, _b in imbalanced],
                     "risk": "orphan closer survives the sweep as residue" if c > o
                             else "orphan opener — the sweep may swallow to the next closer",
                 })
@@ -534,6 +616,7 @@ def census(root):
         "skills": skills,
         "quarantined": quarantined,
         "unpaired_markers": unpaired,
+        "file_scope_owners": file_scope_owners,
         "unknown_marker_families": discover_marker_families(skills_dir),
         "skills_with_no_origin_marker": no_marker,
         "marker_totals": dict(marker_totals),

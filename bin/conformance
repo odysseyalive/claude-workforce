@@ -75,6 +75,11 @@ def assertions(exp, c):
         "hooks_on_disk_exact": len(c.get("hooks_on_disk") or []),
         "dead_wiring_exact": len(c.get("hooks_dead_wiring") or []),
         "orphaned_exact": len(c.get("hooks_orphaned") or []),
+        # f12: the extraction gate's denominator, hand-counted. INV-DIRECTIVES
+        # asserts extracted-against-censused, so an undercount here lets a sweep
+        # delete a protected span the run never extracted.
+        "user_immutable_exact": (c.get("marker_totals") or {}).get("origin_user_immutable", 0),
+        "foreign_exact": (c.get("marker_totals") or {}).get("origin_foreign", 0),
     }
     out = []
     for k, want in exp.items():
