@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 4 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -66,7 +66,50 @@ defense was rejected. Absence of a catalog is the trigger; nothing else.
 that produces no prose — the catalog still installs, so any employee can self-check, but an employee
 nobody manages and nothing dispatches to is a pass-through hop.
 
+**But it is MANDATORY, not optional, where the catalog's own directives require a spawn.** A
+customized catalog routinely carries user directives about how its evaluation must run — measured on
+the first real project, `text-eval`'s § Directives declare that any evaluation lacking a
+`glyph-counter` Verification Preamble is **invalid**, and that the reasoning evaluator must never run
+alone. An IC carries `disallowedTools: Agent` and can satisfy neither.
+
+So on such a catalog the IC self-check is **not a smaller version of the real check — it is a
+different check**, and the only node that can run the one the catalog demands is the evaluator
+employee a Lead dispatches. Three separate cold probes hit this seam on 2026-07-31; the last put it
+precisely: *"an employee who reads the catalog first, rather than the mapping first, could reasonably
+conclude the required check is unrunnable and escalate."* That escalation would be **correct**.
+
+**Detect it and say so.** Where a catalog's directives require spawning, the handbook's
+`## Verification` states what its tier-3 check does and does not cover, and the department's Lead
+carries the tier-4 dispatch as a named step. A project that leaves the evaluator unhired there has
+employees whose quality check is narrower than the catalog they cite.
+
 ---
+
+## An IC READS the catalog; it never INVOKES the skill
+
+A catalog lives in a skill, and a skill routinely instructs spawning its own agents — `text-eval`
+directs `glyph-counter` and `voiceprint-examiner`. An IC carries `disallowedTools: Agent` and an
+`ORG-CHAIN` block naming who it may delegate to. **So a handbook that says "run `/text-eval`" hands
+its executor an instruction it is forbidden to follow**, in a fresh context, with nobody to ask.
+
+Found on 2026-07-31 by a cold probe that hit it and got past it by luck — the handbook happened to say
+*"a catalog grep is the check"* rather than naming the skill, and the executor reported that the
+phrasing *"pre-empted that conflict rather than leaving me stuck."*
+
+**So the rule, and it is mechanical:**
+
+| Tier | What the handbook says |
+|---|---|
+| **IC, tier-3 self-check** | **read the catalog's reference files by path** — `.claude/skills/<catalog>/references/<file>.md`. Never invoke the skill |
+| **Lead, tier-4 review** | dispatch the evaluator **employee** by name. A Lead may delegate; that is the whole reason the evaluator exists as an employee |
+
+**Name the reference file, not the skill directory.** *"Grep against `.claude/skills/text-eval/`"* is
+a directory; an executor has to guess which file and which section. Name the file and the heading.
+
+**This is the second collision of its shape.** The first was `disallowedTools: Agent` versus a
+handbook that instructed delegation — caught by the Tier-Ceiling Gate. This one is the same conflict
+arriving through a *grounding library* rather than through the handbook's own prose, and no gate sees
+it because the instruction lives in someone else's file.
 
 ## Converting a customized evaluator — what "converts" actually produces
 
