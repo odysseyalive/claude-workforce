@@ -474,10 +474,14 @@ def census(root):
         buckets = {}
         for sub in subs:
             sd = os.path.join(dirpath, sub)
-            try:
-                mds = [f for f in os.listdir(sd) if f.endswith(".md")]
-            except OSError:
-                continue
+            # RECURSE INTO THE BUCKET. Records get filed into year or quarter
+            # subdirectories, and os.listdir stopped at the top level — fixture
+            # f10's hand count is 8 and a non-recursive walk reported 7, missing
+            # `decisions/2025/`. An undercount here is a record the migration
+            # never moves.
+            mds = []
+            for bd, _bs, bf in os.walk(sd):
+                mds.extend(f for f in bf if f.endswith(".md"))
             # COUNT RECORDS, NOT MARKDOWN FILES. The predecessor's buckets each
             # carry a README.md, and counting every .md reported 24 records against
             # an index correctly claiming 20 — a drift this project then cited as a

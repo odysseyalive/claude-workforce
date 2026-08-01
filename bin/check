@@ -145,6 +145,7 @@ _pfp2 = read("workforce/references/procedure-for-procedures.md")
 _stg = read("workforce/references/staging.md")
 _hire2 = read("workforce/references/procedures/hire.md")
 _pt = read("workforce/references/personnel-templates.md")
+_cf = read("bin/conformance")
 _asu = read("workforce/references/audit-setup.md")
 _ev = read("workforce/references/evaluators.md")
 _bl = read("bin/baseline")
@@ -795,6 +796,20 @@ check(
     "keying on one skill name misses any other generator's store, and counting "
     "files rather than records reports a correct index as drifted",
 )
+check(
+    "baseline: bucket record counts recurse",
+    "RECURSE INTO THE BUCKET" in _bl,
+    "records get filed into year subdirectories; a non-recursive walk undercounts, "
+    "and an undercount here is a record the migration never moves",
+)
+check(
+    "conformance: at least one number is asserted against a HAND count",
+    "ledger_total" in _cf and "TRUTH.md" in _cf
+    and "census checked against a person reading files" in _cf,
+    "every other assertion checks the census against the census; a confidently "
+    "wrong count propagated into five documents before anything caught it",
+)
+
 check(
     "personnel-templates: the ledger example records the correction, not the phantom",
     "Enumerating from the filesystem is still right" in _pt,
@@ -1789,6 +1804,12 @@ try:
             _readmap[_n.targets[0].id] = _n.value.args[0].value
 
     def _ws(s):
+        # Strip line-comment prefixes before normalizing. A wrapped literal in a
+        # markdown file continues with plain text; in a SOURCE file it continues
+        # with `# `, and keeping that made every source-file wrap invisible to
+        # this lint — which is how it missed one in bin/conformance minutes after
+        # being written.
+        s = re.sub(r"\n\s*#\s?", "\n", s)
         return " ".join(s.split())
 
     for _n in _a2.walk(_t2):
