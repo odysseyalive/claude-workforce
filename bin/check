@@ -967,13 +967,18 @@ check(
 # reachable from the text: one needed an executor holding a catalog that numbers
 # its own tiers, the other needed one whose ORG-CHAIN forbade what its grounding
 # library instructed.
+# CORRECTED the same day it landed. The first form said the evaluator employee
+# was the node that could satisfy a catalog mandating a spawn. The evaluator is an
+# IC; every IC carries disallowedTools: Agent; so it can spawn nothing either —
+# a fact stated four paragraphs higher in the same file. Only a Lead can.
 check(
-    "evaluators: the evaluator employee is mandatory where the catalog requires a spawn",
-    "MANDATORY, not optional, where the catalog" in _ev
-    and "it is a\ndifferent check" in _ev.replace("**", ""),
-    "a customized catalog can declare an evaluation invalid without an agent an IC "
-    "cannot spawn; the IC self-check is then not a smaller check but a different "
-    "one, and an executor that escalates is correct",
+    "evaluators: no employee satisfies a catalog that mandates a spawn — only a Lead",
+    "no employee can satisfy it" in _ev
+    and "That was false" in _ev
+    and "satisfiable only by a Lead running" in _ev,
+    "the evaluator employee is an IC and carries the same tier ceiling as the "
+    "employee it reviews; naming it as the answer contradicted the reason "
+    "evaluators exist as employees at all",
 )
 
 check(
@@ -1709,6 +1714,23 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13}
 _inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
+# bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
+# does not. So doctrine naming `bin/check` as THE structural mechanism sent an
+# installed user to a tool they do not have. On a host that mechanism is `verify`.
+check(
+    "invariants: structural enforcement names the mechanism a HOST actually has",
+    "does not ship" in inv and "on a host the structural mechanism is" in inv.lower()
+    and "verify" in inv,
+    "the manifest carries no bin/ entry; a project that installs this skill and "
+    "classifies a rule structural was being sent to a maintainer-only tool",
+)
+check(
+    "procedure-for-procedures: rule 8b points a host at verify, not bin/check",
+    "is this" in _pfp2 and "repo's own equivalent and does not ship" in _pfp2,
+    "rule 8b is the rule a handbook author follows; naming an unshipped tool "
+    "there is the one place it reaches someone who cannot run it",
+)
+
 check(
     "invariants: the enumerated set matches the count it declares",
     _inv_declared is not None and len(inv_rows) == _inv_declared,
