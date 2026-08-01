@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -210,6 +210,13 @@ Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.
 Anything not written to the file is lost — only the top-level summary reaches the human.
 Include one improvement observation when you have one (see the improvement quota in review.md).
 ```
+
+**`<run-id>` arrives in the work order**, never derived by the employee — the dispatch payload carries
+the artifact path (`procedures/org.md` § Canonical Dispatch CHECKPOINT clause 6). Say so in the
+handbook: a cold executor given only the text has no way to form one, and the alternative to saying it
+is that it invents one. Found by a probe on 2026-07-31 that **passed** — the harness had supplied the
+full path, so the gap was masked by the dispatch rather than closed by the text.
+
 
 ---
 

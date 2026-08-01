@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -40,6 +40,33 @@ employee for independent review (tier 4), because ICs cannot delegate.
 **A handbook may not report PASS on an unrun check.** The section states the command, the expected
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
 the exact output — never a third silent retry, never a downgraded claim.
+
+### "Tier" is three different scales — never write the number into a handbook
+
+`verification.md`'s ladder numbers checks. A catalog numbers its **own** tiers on a different axis —
+`text-eval` calls Tier 1 the grep-able surface and Tier 3 *"compositional tells … not regex."* And an
+`ORG-RECORD` numbers the employee's **org** tier. Three scales, one word.
+
+Measured 2026-07-31: a handbook said *"grep the draft — a tier-3 mechanical check"*, and a cold
+executor returned `AMBIGUOUS` because, read against the catalog it named, that instructs a grep of the
+one tier that catalog says cannot be grepped. The executor was right to stop.
+
+**So the ladder numbers here are a vocabulary for AUTHORING a handbook, never for instructing its
+executor.** A handbook names the section to check by heading and defers thresholds to the catalog. It
+states no tier number of its own.
+
+**And a catalog grep counts AUTHORED prose.** Three spans carry the catalog's own tells without the
+writer having chosen them, and each was found by a cold executor rather than by reading:
+
+| Exclude | Why |
+|---|---|
+| **the report about the draft** | a document that quotes the catalog matches it. One probe's first two passes produced wrong counts because its verification table matched its own trigger words |
+| **verbatim quotation** | a source's punctuation is the source's. Em-dash overuse ships `[hard]` in this catalog — actionable at first occurrence, not subject to clustering — so counting a faithful quotation fails the writer for someone else's habit, and the only way past it is to misquote |
+| **code, paths, identifiers** | inside backticks or fences, they are not prose at all |
+
+**Name every exclusion in the report.** The spans are identifiable — quote marks, fences, backticks —
+so an exclusion can always be pointed at. **One that cannot be pointed at is a way to pass; one that is
+named is a measurement.**
 
 ---
 
