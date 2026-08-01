@@ -819,12 +819,19 @@ check(
     "document is classed as data and gets a schema, an owner and a git policy",
 )
 
+# ONE SCAN. The same defect — one population, two computations — appeared four
+# times in this file, and two of those I introduced while fixing the first. A
+# fifth assertion that the scans agree would have been the wrong answer; the file
+# wanted one scan. Every marker consumer now reads scan_markers().
 check(
-    "baseline: the owner tally reads the same body as the totals",
-    "SAME BODY AS THE TOTALS" in _bl,
-    "the owner extraction read SKILL.md while the totals read the whole skill, so "
-    "the report printed 33 regions directly beneath a total of 66 — one population, "
-    "two computations, disagreeing in print",
+    "baseline: there is exactly ONE marker scanner, and every consumer reads it",
+    "def scan_markers" in _bl
+    and "ONE MARKER SCAN" in _bl
+    and "discover_marker_families" not in _bl,
+    "totals, mentions, owners, pairing, file-scope headers, family discovery and "
+    "has-origin were six computations over four different bodies with three "
+    "anchoring rules; a second detector in the same file is the defect, not a "
+    "missing check that they agree",
 )
 
 check(
@@ -1007,8 +1014,8 @@ check(
 
 check(
     "baseline: marker totals and pairing use ONE anchoring rule",
-    "def ANCHORED" in _bl and "ANCHORED(rx).findall(scan)" in _bl
-    and "ONE anchoring rule and ONE body" in _bl,
+    "def ANCHORED" in _bl and "ONE anchoring rule and ONE body" in _bl
+    and "def scan_markers" in _bl,
     "pairing anchored and the totals did not, so the same file counted one "
     "population two ways; the extraction gate then blocked on the inflated count",
 )

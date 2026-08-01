@@ -73,7 +73,9 @@ proposed a schema, an owner and a git policy for a procedure document.
 
 - **`text-eval`'s 2 unpaired markers** — `skill-builder`'s emission, not your customization. One-line
   repair, theirs or the generator's to apply.
-- **4 unknown marker families** (14 blocks) — quarantined, not swept.
+- **3 unknown marker families** (9 blocks) — quarantined, not swept. **Corrected from "4 / 14":** the
+  family detector counted names quoted inside fenced examples. `CREATIVE-SCRUB-EMBED` appears exactly
+  once in this tree, inside a fence — it is documented, never emitted, and was never a finding.
 - **CLAUDE.md 27KB** per subagent.
 - `claude-baseline-*.zip` carries the symlink manifest the backup itself writes.
 
