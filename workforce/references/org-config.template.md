@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 1 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -24,7 +24,7 @@ go stale between releases, and there is no discovery ladder.
 |---|---|---|---|
 | 1 | `claude-fable-5` | 1M | most capable; priced above the Opus tier |
 | 2 | `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
-| 3 | `claude-opus-4-8` | 1M | |
+| 3 | `claude-opus-4-7` | 1M | |
 | 4 | `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
 
 **Presented in this order, every time.** The "Other" field accepts any model ID typed by hand.
@@ -37,7 +37,7 @@ Use the full official model ID. Never an alias, never a date suffix on the IDs a
 | Tier | Model | Effort |
 |---|---|---|
 | Lead (2) | `claude-opus-5` | medium |
-| IC (3) | `claude-opus-4-8` | medium |
+| IC (3) | `claude-opus-4-7` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
 Claude Code session, not a budget setting.

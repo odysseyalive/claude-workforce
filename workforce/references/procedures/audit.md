@@ -538,7 +538,6 @@ not, fail **by name** — never a generic error.
 ```
 Budget Receipt
 | Tier / Dept        | Model            | Effort | Source                 |
-| CEO                | <id>             | high   | asked this run         |
 | Lead               | <id>             | medium | unchanged, pre-selected|
 | IC / engineering   | <id>             | medium | tier default           |
 | IC / content       | <id>             | medium | department override    |

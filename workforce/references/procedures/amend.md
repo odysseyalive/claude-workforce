@@ -1,6 +1,6 @@
 # amend — change a handbook or a data skill, with two keys
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 2 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The only path by which a handbook's text or a data skill's schema changes.** Strict execution and
 instant amendment are one invariant: an employee never works around its handbook, and a wrong handbook
 changes immediately.
@@ -22,6 +22,17 @@ never leaves the two silently disagreeing.
 Every amendment cites one: a `PERF`, a `DEF`, an `RFI`, an ablation result, or an audit finding.
 **An amendment with no trigger is not an amendment; it is an edit** — and edits to a released
 handbook without a recorded cause are how orgs drift.
+
+**The cited record must exist and be readable at the path cited.** Resolve it before writing anything;
+a citation that resolves to nothing is indistinguishable from no citation, and it is worse, because it
+reads as evidence. IF the record cannot be resolved → STOP and report the unresolved ID rather than
+proceeding on the citation's presence.
+
+**An amendment that ADDS a section answers one more question, in the record:** *what would this have
+prevented?* Name the failure, from the trigger. An addition that cannot name one is the anti-bloat
+case, not an amendment — route it to the General Operating Principles per the Failure-Attribution Gate
+clause 8 (`SKILL.md`), and let recurrence promote it later. Rewrites, deletions, and clarifications
+are exempt: only *new* content pays this, because only new content is paid for on every future spawn.
 
 ## Step 2 — Classify the region
 

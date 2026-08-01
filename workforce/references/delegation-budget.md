@@ -1,6 +1,6 @@
 # Delegation Budget — depth, fan-out, and the caps
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `/workforce budget` reports this; `audit` gates the org design on it. -->
 
 Three caps bound every org. **None of their values are written here** — they live in `platform.md`
@@ -121,3 +121,49 @@ Levers, in order of effect:
 
 `budget` prints a projected effort-weighted spawn cost before a large conversion. There is no
 metering and no mid-spawn abort; the estimate is an estimate, and it says so.
+
+---
+
+## Instruction volume — the second budget, and the one nothing was counting
+
+Fan-out bounds how many spawns happen. **Instruction volume bounds what each one costs**, and it is
+paid on every spawn forever, which is the argument `ablation.md` opens with. The two are independent:
+a narrow org of enormous handbooks is expensive in a way no fan-out number reveals.
+
+### The handbook length ceiling
+
+**150 lines**, and this is the only place the number is written. `verify` § Handbook conformance and
+`review` step 8 both check against it, and `org-config.md` § Caps overrides it per project.
+
+**A blank cell in `org-config.md` means this default, not "no ceiling."** It was blank in the shipped
+template while three consumers already checked "under the length ceiling" — a rule with three readers
+and no value, which is this project's signature defect arriving in its own budget file. Found
+2026-08-01.
+
+**This is a chosen budget, not a measurement, and it is labelled as one.** The basis is the IC
+template: ~57 body lines fully placeheld, so 150 is roughly 2.5× a filled template — room for a real
+procedure, tight enough that a handbook quietly covering two jobs exceeds it. Nothing was measured to
+produce it, so **over the ceiling is a structural finding proposing a split, never a refusal**. A
+number nobody measured may not block anyone's work (`platform.md` § DOCUMENTED).
+
+### Description bytes — reported, never capped
+
+Every registered employee's `description:` sits in the model's context on **every turn of every
+session**, whether or not that employee is ever dispatched to. It is the only part of a handbook paid
+by projects that never use it, which makes it the most expensive line per byte in the whole system.
+
+`budget` reports the org's total description bytes and the per-employee breakdown. **It sets no
+threshold**, because none has been measured and inventing one would refuse a valid description on a
+number with nothing behind it. The report is the mechanism; the judgment is the reader's.
+
+The two questions that make the number actionable, both from the same accounting:
+
+- **Does a trigger appear twice?** Synonyms restating one branch are duplication paid on every turn.
+- **Does the description restate what the body already says?** Identity belongs in `## Role`, which is
+  paid only when the employee actually runs.
+
+### Total instruction volume
+
+Sum of handbook bytes, per department, reported by `budget`. It is the denominator `ablate --org`'s
+`LOAD-BEARING` share is a fraction of — and unlike that share, it costs nothing to compute, so it is
+available every run rather than only after a full measured ablation.

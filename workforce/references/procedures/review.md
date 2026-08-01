@@ -1,6 +1,6 @@
 # review — performance review, where the subject is the document
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Assess an employee by assessing its handbook.** Runs its evals, re-reads it cold, checks for drift,
 and reports org health.
 
@@ -56,7 +56,22 @@ wrong about the data. **The exception is the git-policy check**, which is report
 immediately regardless of severity — a dataset whose ignore rule silently stopped covering it is a
 disclosure risk, and it does not wait for the next amendment cycle.
 
-**6. Bloat.** Length against the ceiling. Over → a *structural* finding: split the employee or move
+**7. Calibration age.** Compare the `ORG-RECORD`'s `calibrated-for` against the frontmatter `model:`
+(`references/org-chart-format.md`). Equal → the wording has been measured against the model executing
+it. Different, or `calibrated-for` absent → it has not, and the handbook is a candidate for
+`ablate --classify` (`references/ablation.md` § Two clocks).
+
+This is a **finding, never a `PERF`**. Nothing has gone wrong: a model release moves every handbook
+into this state at once, and treating that as a regression would attribute a platform event to a
+document. Report it and let `ablate` decide.
+
+**Print the count, always, including zero**, in the form
+`CALIBRATION  <n> of <m> handbooks calibrated against the model they run on`. A zero is a
+measurement; a missing line is silence, and silence reads as a pass
+(`references/invariants.md` § The rule). Absent `calibrated-for` counts against the total rather than
+being skipped — an unstamped handbook is unmeasured, which is the state being counted.
+
+**8. Bloat.** Length against the ceiling. Over → a *structural* finding: split the employee or move
 material into its grounding library. **Never resolved by accepting a longer handbook.**
 
 ---
@@ -72,6 +87,25 @@ patched faster than the underlying documents are improving.
 **The improvement quota.** Submissions per employee per month against the target, with **deletions and
 simplifications counted equally with additions**. Reported per department. A department far below the
 target is not submitting; one far above may be generating noise to hit a number.
+
+**The evidence line.** `amend` step 1 has always required a trigger record; nothing has ever counted
+whether they resolve, so the requirement has been enforced one amendment at a time by whoever happened
+to be writing it. Printed **always, including zeroes**:
+
+```
+EVIDENCE  <n> of <m> amendments cite a trigger that resolves
+          <k> principles entries at or past their third firing — owed a promotion
+```
+
+The second number closes a loop that was open. The Failure-Attribution Gate clause 8 (`SKILL.md`)
+promotes a principles entry into a handbook on its **third** firing, and nothing counted firings — so
+promotion depended on somebody remembering across sessions, which is the mechanism the whole project
+declines to rely on. A `k` above zero is a standing finding until the promotion happens or the entry is
+deliberately declined with a reason.
+
+**A low `n/m` is not a finding about the employees.** It is a finding about `amend`: unresolved
+citations mean records are being written and then moved, renamed, or never created. Report it against
+the procedure.
 
 **Handbook churn is a good sign — for handbooks.** Working Procedures *should* change; Carpenter
 treats that churn as evidence they are real. It is the Strategic Objective and the Principles whose

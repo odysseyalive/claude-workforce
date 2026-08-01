@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -162,6 +162,31 @@ them in the only legal place for them*. Read the list from the check; never rest
 
 This check is not pedantry. It is what makes a platform change a one-line edit instead of a hunt, and
 it caught five restatements in this project's own files during its first day.
+
+### The other direction — project values copied into handbooks
+
+The check above polices **workforce's** constants. A handbook copying **the project's** values — a
+port, a dependency version, a list of directories, a count of anything — is uncovered by it, and drifts
+the same way for the same reason. The rule this census measures is the drift test in
+`references/ablation.md`: a pointer cannot drift, a copy is a second canonical text.
+
+Reported at the two tiers `discovery.md` defines, never merged into one list:
+
+| Tier | What qualifies | Confidence |
+|---|---|---|
+| `MECHANICAL` | a literal that also appears in `org-config.md` — a cap, a model, a department name, a headcount | exact; the two are provably the same value |
+| `HEURISTIC` | a version string, a port, a path list, or a bare count in a handbook that names no source for it | a candidate, and it says so |
+
+```
+POINTERS  <n> MECHANICAL · <m> HEURISTIC · <k> lines already written as pointers
+```
+
+**Printed always, including three zeroes**, and **advisory at both tiers.** A copied literal is often
+correct — a handbook may legitimately state a value it owns. What the census reports is that nothing
+updates it when the source moves, which is a fact about the *link*, not a claim the line is wrong.
+
+Each finding carries the pointer that would replace it, per § Output. A `HEURISTIC` finding that names
+no replacement is not reportable: without one it is an observation that a number exists.
 
 ## Integrity sidecars
 

@@ -1,7 +1,8 @@
 # ablate — delete, then add back only what earns its place
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
-High risk; display by default. `/workforce ablate <employee> [--execute] [--budget N] [--section <name>]`
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+High risk; display by default.
+`/workforce ablate <employee> [--classify] [--execute] [--budget N] [--section <name>]`
 
 Method and doctrine: `references/ablation.md`.
 
@@ -13,6 +14,28 @@ Method and doctrine: `references/ablation.md`.
 
 Deleting lines and observing that nothing obviously broke is not evidence — the thing a line prevented
 may simply not have come up. The eval set is what turns "seems fine" into a number.
+
+## `--classify` — the route that runs without one
+
+`--classify` sorts the handbook into Territory / Steering / Enforceable, applying the limitation,
+audience, drift, and no-op tests (`references/ablation.md`). It needs no eval set, because it measures
+nothing.
+
+**It reads the same span the measured route skeletonizes — the body below the `ORG-RECORD`, never the
+frontmatter.** A first draft said "every line", which put `model:`, `disallowedTools:`, and `maxTurns`
+in front of a mode that cannot measure them and that the measured route never touches either.
+Frontmatter is `review` step 5's subject (`procedures/review.md`), where it is checked against the
+config of record rather than judged as prose.
+
+**Display-only, and `--classify --execute` is refused rather than honoured.** Report:
+"`--classify` proposes; only measurement drops. Run `evals <employee>`, then `ablate <employee>`."
+A candidate list is not a result, and a mode that could both classify and delete would let a reading
+do the job the precondition reserves for a number.
+
+Its output is the candidate list the measured run then pays for, plus two things the measured run
+cannot produce: the **Enforceable** lines, each with the check that would replace it — never dropped
+here, because a rule deleted without its check is a regression — and the per-line test that decided
+it, so a wrong call is arguable rather than opaque.
 
 ## Procedure
 
@@ -38,11 +61,16 @@ into the drop list.
 ## Never candidates
 
 Excluded mechanically, never offered: immutable blocks; the mandatory structural sections; the
-escalation sentinel; and **`disallowedTools: Agent` on any IC**.
+escalation sentinel; **the persona** (`personas.md`); and **`disallowedTools: Agent` on any IC**.
 
-That last one is exactly the class this command exists to find — decorative-looking, load-bearing —
-and it would measure as `NEUTRAL` because no eval set spawns anything. The answer is already known, so
-it is excluded rather than rediscovered.
+The list is stated in full in `references/ablation.md` and restated here because this is the file
+someone reads mid-run. **The two must agree**, and `bin/check` fails if they do not — this very
+paragraph diverged from the doctrine within one edit of the persona being added to it.
+
+The last two are exactly the class this command exists to find — decorative-looking, load-bearing.
+The persona prescribes how to think and so reads as pure Steering; `disallowedTools: Agent` would
+measure as `NEUTRAL` because no eval set spawns anything. Both answers are already known, so they are
+excluded rather than rediscovered.
 
 ## Cost bound
 
@@ -51,6 +79,16 @@ Naive ablation is *lines × cases* spawns, which exceeds the session cap for any
 Default `--budget 40`. Over budget, switch to **section bisection**: drop a whole section, run the
 set, recurse only where a delta appeared. **The report states which mode ran** — a bisected result is
 coarser, and claiming line-level precision it does not have would be worse than the coarseness.
+
+**Cost decides the budget; stakes decide the granularity** (`references/ablation.md` § Which route).
+Both are printed, always, as the report's first line:
+
+```
+ROUTE  classify | whole | per-section · stakes: HIGH | ORDINARY · <the test that decided it>
+```
+
+A coarser result with no stated cause reads as a choice nobody made. Naming the test that fired makes
+it arguable — which is the only way a wrong call gets corrected rather than inherited.
 
 ## `--org`
 

@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 9 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -23,12 +23,21 @@ and greppable.
 <!-- direct-reports: (none) | max-direct-spawns: 0 -->
 <!-- owns-records: code-evaluator | triggers: test, coverage, regression -->
 <!-- contract-stamp: sha256:… -->
+<!-- calibrated-for: <model-id> | calibrated-on: 2026-07-29 -->
 <!-- hired: 2026-07-29 | handbook-version: 3 -->
 <!-- ORG-RECORD END -->
 ```
 
 `contract-stamp` hashes the normalized `## Procedure` + `## Verification` sections. When the recomputed
 hash differs, the handbook changed since its last review and its eval baseline is stale.
+
+`calibrated-for` records the model the handbook's **wording** was last measured against — the model
+that was pinned when its evals last ran, or when it was last ablated. **It is not the frontmatter
+`model:` field and it is never copied from it**: `model:` is what the employee runs on now, and
+setting them equal by assignment is what makes the second decay clock unreadable. They are written by
+different acts — `model:` by the budget, `calibrated-for` only by a run that measured something. A
+mismatch is not a fault; it is the signal that the text is due for `ablate --classify`
+(`references/ablation.md` § Two clocks), and `review` counts it every run.
 
 > **Stamp generators must read back what they wrote.** claude-enforcer's
 > `INC-2026-07-29-sidecar-format-mismatch` records a checksum generator that emitted rows its own

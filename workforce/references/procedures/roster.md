@@ -11,14 +11,12 @@ Company — <project>                     harness: 2.1.220   canary: PASS 2026-0
 
 Payroll
 | Tier / Dept      | Model   | Effort | Source                  |
-| CEO              | <id>    | high   | asked 2026-07-29        |
 | Lead             | <id>    | medium | unchanged, pre-selected |
 | IC / engineering | <id>    | medium | tier default            |
 | IC / content     | <id>    | medium | department override     |
 
-Employees (9)
+Employees (8)
 | Employee | T | Dept | Reports to | Model | Owns | Released | Loadable |
-| ceo      | 1 | exec | —          | <id>  | —    | probe ✓  | yes      |
 | eng-lead | 2 | eng  | ceo        | <id>  | —    | probe ✓  | yes      |
 | eng-test | 3 | eng  | eng-lead   | <id>  | code-evaluator | probe ✓ | NO — restart to load |
 

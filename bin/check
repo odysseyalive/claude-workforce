@@ -160,6 +160,13 @@ _cov_src = read("bin/coverage")
 _hire = read("workforce/references/procedures/hire.md")
 _tpl_cfg = read("workforce/references/org-config.template.md")
 _plat = read("workforce/references/platform.md")
+abl = read("workforce/references/ablation.md")
+_abl2 = read("workforce/references/procedures/ablate.md")
+rev = read("workforce/references/procedures/review.md")
+dbg = read("workforce/references/delegation-budget.md")
+_bud = read("workforce/references/procedures/budget.md")
+_amd = read("workforce/references/procedures/amend.md")
+_ocfg = read("workforce/references/org-config.template.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
@@ -1909,6 +1916,19 @@ try:
         "pa_": "workforce/agents/provenance-analyst/AGENT.md",
         "cc_": "workforce/agents/content-classifier/AGENT.md",
         "da": "workforce/agents/doctrine-auditor/AGENT.md",
+        "abl": "workforce/references/ablation.md",
+        "_abl2": "workforce/references/procedures/ablate.md",
+        "rev": "workforce/references/procedures/review.md",
+        # `tpl` has been read since the first version of this file and used by the
+        # section-7 template assertions, but it was never in the map — so coverage
+        # reported handbook-templates.md at zero while four assertions named it.
+        # An attribution map that omits a live variable undercounts silently, which
+        # is the same defect class the coverage tool exists to report.
+        "tpl": "workforce/references/handbook-templates.md",
+        "dbg": "workforce/references/delegation-budget.md",
+        "_bud": "workforce/references/procedures/budget.md",
+        "_amd": "workforce/references/procedures/amend.md",
+        "_ocfg": "workforce/references/org-config.template.md",
     }
     _live = {}
     for _n in _ast.walk(_tree):
@@ -2306,6 +2326,221 @@ check(
     "discovery: quarantine is counted, not silent",
     "quarantined" in disc and "audited" in disc,
     "discovery.md must require reporting N audited · M quarantined",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9b. The cheap route, and the guard that keeps it cheap
+#
+# `ablate` measures; classification reads. Reading is nearly free, which is
+# exactly why it must never acquire the authority to delete — the eval-set
+# precondition is the only thing standing between "I read it and it looked
+# decorative" and a dropped line nobody can get back.
+# ─────────────────────────────────────────────────────────────────────────────
+check(
+    "ablation: handbook lines classify into three kinds",
+    all(k in abl for k in ("Territory", "Steering", "Enforceable")),
+    "ablation.md must name the classes; an unclassified line is triaged by feel",
+)
+check(
+    "ablation: classification proposes, measurement drops",
+    "A classification drops nothing." in abl and "proposes; only measurement drops" in _abl2,
+    "the cheap route must not acquire the authority the eval precondition reserves",
+)
+check(
+    "ablate: --classify cannot write, and refuses --execute",
+    "Display-only, and `--classify --execute` is refused" in _abl2,
+    "a mode that could both classify and delete lets a reading do a number's job",
+)
+check(
+    "ablation: the four tests for an unclassifiable line are named",
+    all(t in abl for t in ("The limitation test", "The audience test",
+                           "The drift test", "The no-op test")),
+    "the tests are what make the classification arguable rather than opinionated",
+)
+# The audience test is the one this project needs most and the one a capable
+# classifier gets wrong most confidently: it reasons about the line against
+# ITSELF, not against the cheaper pinned model that will actually read it.
+check(
+    "ablation: the audience test reads the employee's own model field",
+    "never from the model doing the classifying" in abl,
+    "scaffolding a delegating tier has outgrown can still be load-bearing for an IC "
+    "pinned a generation below it",
+)
+check(
+    "ablate: --classify reads the body, not the frontmatter",
+    "the body below the `ORG-RECORD`" in _abl2,
+    "frontmatter is review step 5's subject; a mode that cannot measure it must "
+    "not be the thing proposing to drop it",
+)
+# Both of these were found by classifying a real handbook rather than by reading
+# the draft — the persona survived two careful passes as obviously-fine prose.
+check(
+    "ablation: the persona is a never-candidate, in both files that list them",
+    all("personas.md" in b and "persona" in b for b in (abl, _abl2)),
+    "a persona reads as pure Steering and is the one thing an isolated context is "
+    "for; it is also the subject of a uniqueness check enforced at Phase A lint. "
+    "ablate.md restates the list, and it diverged within one edit of the addition",
+)
+check(
+    "ablation: the advisory half says it is advisory",
+    "tests above are ADVISORY" in abl,
+    "no check can tell territory from steering; claiming one is the overclaim "
+    "enforcement.md fails a run over",
+)
+
+# ── The second decay clock ───────────────────────────────────────────────────
+# Structural half: the field exists in the authority and in every template.
+# Procedural half: `review` prints the count. Neither alone makes it true.
+check(
+    "calibration: the field is defined where ORG-RECORD is defined",
+    "calibrated-for" in _ocf,
+    "org-chart-format.md owns ORG-RECORD; a field defined only in the templates "
+    "is a shape with no specification",
+)
+check(
+    "calibration: calibrated-for is distinguished from frontmatter model:",
+    "never copied from it" in _ocf,
+    "assigning calibrated-for from model: makes the two always agree, which is "
+    "the second clock reading zero forever",
+)
+check(
+    "calibration: every ORG-RECORD template carries the field",
+    tpl.count("calibrated-for") == tpl.count("<!-- ORG-RECORD START"),
+    f"{tpl.count('calibrated-for')} calibrated-for lines vs "
+    f"{tpl.count('<!-- ORG-RECORD START')} ORG-RECORD templates — a template "
+    "missing the field mints unstamped handbooks",
+)
+check(
+    "calibration: review prints the count, including zero",
+    "CALIBRATION" in rev and "including zero" in rev,
+    "a procedural claim's only enforcement is a counted line (invariants.md); a "
+    "missing line is indistinguishable from a check that never ran",
+)
+check(
+    "calibration: a stale calibration is a finding, not a PERF",
+    "finding, never a" in rev,
+    "a model release moves every handbook into this state at once; attributing "
+    "that to the document is blaming it for a platform event",
+)
+
+# ── Instruction volume: the second budget ────────────────────────────────────
+# The length ceiling had THREE readers — verify § Handbook conformance, review
+# step 8, and org-config.md § Caps — and no value anywhere. A rule with three
+# consumers and no number is this project's signature defect, arriving in the
+# file that holds its budgets.
+_CEILING_RX = re.compile(r"\*\*(\d+) lines\*\*, and this is the only place the number is written")
+_ceil = _CEILING_RX.search(dbg)
+check(
+    "volume: the handbook length ceiling has exactly one value, and it is stated",
+    _ceil is not None,
+    "delegation-budget.md must carry the number; three consumers check against it "
+    "and a blank org-config.md cell resolves to it",
+)
+# Stated once means stated once. The consumers may NAME the ceiling; none may
+# carry a second copy of the number.
+_ceil_n = _ceil.group(1) if _ceil else None
+_restated = [
+    p for p in declared
+    if p.endswith(".md")
+    and p != "workforce/references/delegation-budget.md"
+    and _ceil_n and re.search(rf"\b{_ceil_n}[- ]line", read(p))
+]
+check(
+    "volume: the ceiling value is not restated by its consumers",
+    # `_ceil_n is not None` is NOT redundant with the check above. Without it the
+    # census has nothing to search for, `_restated` is empty, and this reports a
+    # clean result about a scan it never ran — a vacuous pass, found by breaking
+    # the declaration and watching only ONE of the two assertions fire.
+    _ceil_n is not None and not _restated,
+    f"restated in: {_restated} — consumers name the ceiling, they do not copy it"
+    if _ceil_n else "the ceiling declaration is unreadable, so the restatement "
+    "census could not run; it reports nothing rather than reporting clean",
+)
+check(
+    "volume: a blank org-config cap resolves to the default, not to no cap",
+    "means this default, not" in dbg and "Handbook length ceiling" in _ocfg,
+    "a blank cell read as 'no ceiling' silently disables a check three files run",
+)
+check(
+    "volume: the ceiling is labelled a chosen budget, and cannot refuse work",
+    "chosen budget, not a measurement" in dbg and "never a refusal" in dbg,
+    "platform.md § DOCUMENTED bars an unmeasured number from blocking anyone; the "
+    "delegation caps were demoted for exactly this and the rule generalises",
+)
+check(
+    "volume: description bytes are reported against no threshold",
+    "reported, never capped" in dbg and "It sets no" in dbg,
+    "no measurement supports a description-length threshold; inventing one would "
+    "refuse a valid description on a number with nothing behind it",
+)
+check(
+    "volume: budget prints the CONTEXT line, including when it is all zeroes",
+    "CONTEXT" in _bud and "including\nwhen every number is zero" in _bud,
+    "a procedural claim's only enforcement is a counted line (invariants.md)",
+)
+
+# ── Evidence: the citation was required and never counted ────────────────────
+check(
+    "evidence: a cited trigger must resolve, not merely be present",
+    "must exist and be readable at the path cited" in _amd,
+    "a citation resolving to nothing is worse than none — it reads as evidence",
+)
+check(
+    "evidence: a new section names what it would have prevented",
+    "what would this have" in _amd,
+    "only NEW content is paid on every future spawn, so only new content pays this",
+)
+check(
+    "evidence: review prints the citation rate and the unpromoted count",
+    "EVIDENCE" in rev and "owed a promotion" in rev,
+    "SKILL.md clause 8 promotes a principles entry on its third firing and nothing "
+    "counted firings — promotion depended on somebody remembering across sessions",
+)
+
+# ── Pointers: the constants check, run in the other direction ────────────────
+check(
+    "pointers: the census reports project values copied into handbooks",
+    "POINTERS" in vfy and "MECHANICAL" in vfy and "HEURISTIC" in vfy,
+    "verify § Constants polices workforce's constants; a handbook copying the "
+    "PROJECT's values drifts the same way and was uncovered",
+)
+check(
+    "pointers: both tiers are advisory, and a finding carries its replacement",
+    "advisory at both tiers" in vfy,
+    "a copied literal is often correct; what the census reports is that nothing "
+    "updates it when the source moves — a fact about the link, not the line",
+)
+
+# ── Route: cost decides the budget, stakes decide the granularity ────────────
+check(
+    "route: the ablation route is chosen by stakes, not only by cost",
+    "Which route, by stakes" in abl and "HIGH" in abl and "ORDINARY" in abl,
+    "section bisection responds to arithmetic; nothing responded to what the "
+    "handbook guards",
+)
+check(
+    "route: the report states the route, the stakes, AND the reason",
+    "ROUTE" in _abl2 and "the test that decided it" in _abl2,
+    "which mode ran was already required; why was not, and a coarser result with "
+    "no stated cause reads as a choice nobody made",
+)
+
+# ── Procedure steps are numbered once ────────────────────────────────────────
+# review.md carried two step 6s for as long as it had six steps. Nothing read the
+# numbers, so nothing noticed — and a reader following "step 6" reaches whichever
+# one they scroll to first.
+_dupe_steps = []
+for _p in declared:
+    if "/procedures/" not in _p:
+        continue
+    _nums = [int(n) for n in re.findall(r"^\*\*(\d+)\.\s", read(_p), re.M)]
+    if len(_nums) != len(set(_nums)):
+        _dupe_steps.append((os.path.basename(_p), sorted(_nums)))
+check(
+    "procedures: bold step numbers are unique within a file",
+    not _dupe_steps,
+    f"{_dupe_steps} — a repeated step number makes 'step N' ambiguous to the "
+    "reader following it",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

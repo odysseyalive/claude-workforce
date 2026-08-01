@@ -1,6 +1,6 @@
 # budget — depth, fan-out, and spawn accounting
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Read-only; executes immediately. `/workforce budget`
 
 Arithmetic and caps: `references/delegation-budget.md`. Cap values: `platform.md` — **never restated
@@ -33,6 +33,23 @@ pays for a fresh context, the full `CLAUDE.md`, and a git status snapshot, multi
 
 **`CLAUDE.md` size is reported here**, because it is the highest-leverage lever in the system and it
 is not this project's file. A large `CLAUDE.md` is paid for on every spawn of every employee.
+
+**Instruction volume**, the second budget (`references/delegation-budget.md` § Instruction volume).
+Fan-out counts spawns; this counts what each one carries. Printed as one line, **always, including
+when every number is zero** — an org with no employees reports zeroes rather than omitting the line:
+
+```
+CONTEXT  <n> employees · <b> bytes of description paid every turn · <t> bytes of handbook
+         <k> over the length ceiling · longest description: <name> (<d> bytes)
+```
+
+Three readings, and only the first is a finding:
+
+| Number | What it means |
+|---|---|
+| over the ceiling | a **structural finding** — propose a split; never a refusal, the ceiling is a chosen budget rather than a measurement |
+| description bytes | reported against no threshold, because none is measured. The per-employee breakdown is what makes it actionable |
+| handbook bytes | the denominator `ablate --org`'s `LOAD-BEARING` share is a fraction of, available without a measured run |
 
 ## What it cannot do
 
