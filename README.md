@@ -136,6 +136,8 @@ Both are right — for different readers. A lead reasoning about how to coordina
 
 Every handbook names a check that proves the work: an exit code, a test suite, a file assertion. *"Review the output for quality"* gets rejected at authoring time, because an employee that can't verify itself either stops early or claims a success it didn't earn.
 
+Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it: `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with no model in the loop. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all.
+
 Some work has no command that can check it. There, the check is a catalog. Every project gets two evaluators — one for code quality, one for text authenticity — each carrying a list of tells and taxonomies. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this cluster three or more of these tells?"* is close to mechanical.
 
 ## Nobody Is Hired Until a Stranger Can Follow the Handbook
