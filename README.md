@@ -15,6 +15,7 @@ The part that surprises people is that the best orchestrator often isn't the mos
 Claude Workforce takes that insight and builds on it. Instead of one assistant doing everything, you get a company: a CEO that routes, leads that coordinate, and individual contributors that execute. Each one runs on the model that fits its job, carries a handbook it follows, stays inside a scope it won't leave, and passes a check that proves it did the work.
 
 ![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists, not playing louder, playing differently](assets/images/conductor.png)
+*The orchestrator's job is hearing how the others fit together, not playing louder than any of them.*
 
 ## How We Got Here
 
@@ -33,36 +34,7 @@ The fix wasn't harder rules. It was structure.
 A set of instructions with those three things is an employee. A set of employees is a company you can talk to.
 
 ![A forest path where breadcrumbs are being eaten by woodland creatures, but ahead the path leads to a warmly lit village of distinct workshops, each with a glowing sign, instructions that once faded now have permanent homes](assets/images/from-breadcrumbs-to-company.png)
-
-## Talking to the Company
-
-Describe the task. `/org` finds the owner.
-
-```
-/org fix the pricing copy on the homepage
-```
-
-That goes straight to one IC, the content writer who owns homepage copy.
-
-```
-/org the onboarding module needs a rewrite across design and content
-```
-
-That goes to a lead, who fans out across the department.
-
-```
-/org should we ship the signing module standalone?
-```
-
-That goes to the CEO, because it crosses departments and nobody below owns the answer.
-
-```
-/org we need someone who can audit accessibility
-```
-
-That has no owner, so it goes to HR as a hiring request.
-
-The CEO isn't a funnel. Routing everything through the top would burn a delegation level on every task and leave the people doing the work unable to delegate at all. `/org` dispatches to the *lowest* competent node. Ties resolve downward.
+*Instructions left at the start of a conversation get consumed by everything after. Employees don't fade. They have an address.*
 
 ## Getting Started
 
@@ -116,9 +88,40 @@ Preview the plan without writing anything. `audit --review`.
 
 Updating replaces the skill wholesale. Nothing you edit lives inside it, so there's no clobber risk.
 
+## Talking to the Company
+
+Describe the task. `/org` finds the owner.
+
+```
+/org fix the pricing copy on the homepage
+```
+
+That goes straight to one IC, the content writer who owns homepage copy.
+
+```
+/org the onboarding module needs a rewrite across design and content
+```
+
+That goes to a lead, who fans out across the department.
+
+```
+/org should we ship the signing module standalone?
+```
+
+That goes to the CEO, because it crosses departments and nobody below owns the answer.
+
+```
+/org we need someone who can audit accessibility
+```
+
+That has no owner, so it goes to HR as a hiring request.
+
+The CEO isn't a funnel. Routing everything through the top would burn a delegation level on every task and leave the people doing the work unable to delegate at all. `/org` dispatches to the *lowest* competent node. Ties resolve downward.
+
 ## Three Tiers, Measured
 
 ![A cross-section of a three-level workshop where the top figure surveys the landscape through a window, the middle figure coordinates between two doors, and the bottom figure works at a bench with precise tools, each level has its own job, and there is no level below the third](assets/images/three-tiers-new.png)
+*Three levels is all you get. The ceiling was measured before any of this was designed.*
 
 Delegation bottoms out three layers below your conversation. A canary measured that on a real host before any of this was designed: the session, plus CEO, plus lead, plus IC. No fourth tier.
 
@@ -143,6 +146,7 @@ Some work has no command that can check it. There, the check is a catalog. Every
 ## Nobody Is Hired Until a Stranger Can Follow the Handbook
 
 ![A stranger standing in the doorway of an organized workshop at dawn, reading a single page, golden morning light streaming in behind them. The regular workers are gone, the tools are laid out, and everything depends on whether the page is good enough](assets/images/cold-reader.png)
+*If the handbook can't survive a stranger reading it cold, it isn't finished.*
 
 Carpenter calls them "off-the-street people." His release rule is that a procedure isn't finished until someone uninvolved executes it cold and succeeds. Human organizations approximate this badly, because a colleague always knows *something*.
 
@@ -151,6 +155,7 @@ Here it's exact. A subagent is a genuinely fresh context: no conversation histor
 ## When Something Goes Wrong, the Document Is at Fault
 
 ![A close-up of hands holding a page, a fountain pen with warm red ink circling a sentence. The pen moves toward the page rather than toward the reader, because when something breaks, the fix goes to the document](assets/images/document-at-fault.png)
+*When something breaks, the fix goes into the text. Not into a conversation that vanishes tomorrow.*
 
 Two rules, both borrowed, both mechanical here.
 
