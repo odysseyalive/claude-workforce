@@ -168,6 +168,7 @@ _bud = read("workforce/references/procedures/budget.md")
 _amd = read("workforce/references/procedures/amend.md")
 _ocfg = read("workforce/references/org-config.template.md")
 dfr = read("workforce/references/deferred.md")
+upd = read("workforce/references/procedures/update.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
@@ -1931,6 +1932,9 @@ try:
         "_amd": "workforce/references/procedures/amend.md",
         "_ocfg": "workforce/references/org-config.template.md",
         "dfr": "workforce/references/deferred.md",
+        "upd": "workforce/references/procedures/update.md",
+        "_hb": "workforce/references/procedures/handbook.md",
+        "_vf": "workforce/references/verification.md",
     }
     _live = {}
     for _n in _ast.walk(_tree):
@@ -2049,6 +2053,27 @@ check(
     _cov_pairs == set(_VARMAP.items()),
     f"only in check: {sorted(set(_VARMAP.items()) - _cov_pairs)}; "
     f"only in coverage: {sorted(_cov_pairs - set(_VARMAP.items()))}",
+)
+
+# The drift check above compares the two maps to EACH OTHER. It cannot see a
+# variable missing from BOTH — which is silent, because the file then stamps
+# "0 assertion(s) name this file" while assertions name it. That is how `tpl`
+# survived (see its comment in `_VARMAP`), and adding `upd` reproduced it in one
+# edit. Derived from `read()` assignments, so a new file variable is attributed
+# by default and forgetting the map is what fails.
+_used_in_conds = set()
+for _n in _ast.walk(_tree):
+    if isinstance(_n, _ast.Call) and getattr(_n.func, "id", "") == "check" and len(_n.args) > 1:
+        _used_in_conds |= {x.id for x in _ast.walk(_n.args[1]) if isinstance(x, _ast.Name)}
+_unattributed = sorted(
+    v for v, p in _readmap.items()
+    if v in _used_in_conds and p.endswith(".md") and p in declared and v not in _VARMAP
+)
+check(
+    "coverage: every shipped-file variable used in an assertion is attributed",
+    not _unattributed,
+    f"read() into {_unattributed} and asserted on, but absent from both maps — "
+    "coverage will stamp those files at zero while assertions name them",
 )
 
 # The T-order is this project's most safety-critical constant and is restated in
@@ -2695,6 +2720,75 @@ check(
     "ROUTE" in _abl2 and "the test that decided it" in _abl2,
     "which mode ran was already required; why was not, and a coarser result with "
     "no stated cause reads as a choice nobody made",
+)
+
+# ── Update syncs; it does not audit ──────────────────────────────────────────
+check(
+    "update: the procedure inspects nothing in the project's org",
+    "never inspects the project's org" in upd
+    and "Do not run `verify` for them" in upd,
+    "update ran verify as its last step, so the cost of staying current scaled "
+    "with the size of the ORG rather than the release — and it was paid by "
+    "whichever copy was loaded, which the update cannot establish",
+)
+# The four install invocations are now restated in update.md, because update RUNS
+# one of them. That is a restatement, and this project fails a run over restated
+# constants that nothing compares — so compare them.
+#
+# Matched over raw text, NOT inside a delimiter: the README publishes these in
+# fenced code blocks and update.md carries them in backticked table cells. An
+# earlier form keyed on backticks, found zero in the README, and failed — loudly,
+# because the condition requires a non-empty README set. The `and _readme_cmds`
+# is that guard: comparing two empty sets is the vacuous pass this project's own
+# lint exists to catch.
+_INSTALL_RX = re.compile(
+    r"bash -c \"\$\(curl -fsSL \S+\)\"(?: -- --project)?"
+    r"|(?:\$env:WORKFORCE_SCOPE='project'; )?irm \S+install\.ps1 \| iex"
+)
+
+
+def _cmds(hay):
+    # `|` inside a markdown table cell must be written `\|`; unescape before
+    # comparing, or every PowerShell cell reads as a command the README lacks.
+    return set(_INSTALL_RX.findall(hay.replace("\\|", "|")))
+
+
+_readme_cmds = _cmds(readme)
+_upd_cmds = _cmds(upd)
+check(
+    "update: its four install commands are byte-identical to the README's",
+    _readme_cmds and _readme_cmds == _upd_cmds,
+    f"only in README: {sorted(_readme_cmds - _upd_cmds)}; "
+    f"only in update.md: {sorted(_upd_cmds - _readme_cmds)} — update runs the "
+    "published installer, so a command that drifts from the README updates to "
+    "something the install instructions never described",
+)
+check(
+    "update: there are exactly four of them, one per scope×platform cell",
+    len(_upd_cmds) == 4,
+    f"found {len(_upd_cmds)}: {sorted(_upd_cmds)} — the matrix is personal/project "
+    "× bash/PowerShell; a missing cell is a platform that falls through to a "
+    "hand-rolled fetch loop",
+)
+check(
+    "update: the census precedes every write, and names both locations",
+    "Census both install locations before deciding anything" in upd
+    and "~/.claude/skills/workforce" in upd
+    and "${CLAUDE_PROJECT_DIR}/.claude/skills/workforce" in upd,
+    "resolving scope from a flag alone updates a path the user did not expect, "
+    "which is indistinguishable from no update at all",
+)
+check(
+    "update: it does not reimplement the installer's fetch loop",
+    "does not carry its own copy of the download loop" in upd,
+    "'re-fetch every manifest file' is an instruction to reimplement the "
+    "installer; the manifest exists so both installers share ONE fetch loop",
+)
+check(
+    "update: it names the follow-up instead of performing it",
+    "Run `/workforce verify` to check the org against this release" in upd,
+    "dropping the sweep without handing off leaves the user with no next step; "
+    "the report has to name verify, not just decline to be it",
 )
 
 # ── Procedure steps are numbered once ────────────────────────────────────────

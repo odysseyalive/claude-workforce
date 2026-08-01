@@ -180,6 +180,12 @@ path and version **separately**, never as one aggregate that could hide a failur
 `vendor` to copy the active skill into a repo. Conflating them would let a mistyped flag silently add a
 second copy and change which one wins.
 
+Every run starts by looking at both locations — `~/.claude/skills/workforce` and this project's
+`.claude/skills/workforce` — and reports what it found before writing anything. It then runs the same
+install command the README publishes for that scope and platform, so updating and installing are the
+same operation and cannot drift apart. It syncs and stops; run `/workforce verify` afterward to check
+your org against the new release.
+
 ---
 
 ## Technical background

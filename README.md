@@ -88,6 +88,9 @@ Preview the plan without writing anything. `audit --review`.
 
 Updating replaces the skill wholesale. Nothing you edit lives inside it, so there's no clobber risk.
 
+It syncs and stops — it never inspects your org, so its cost doesn't grow with how much you've
+staffed. To check the org against the new release, run `/workforce verify` afterward.
+
 ## Talking to the Company
 
 Describe the task. `/org` finds the owner.
