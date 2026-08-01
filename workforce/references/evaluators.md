@@ -66,22 +66,37 @@ defense was rejected. Absence of a catalog is the trigger; nothing else.
 that produces no prose — the catalog still installs, so any employee can self-check, but an employee
 nobody manages and nothing dispatches to is a pass-through hop.
 
-**But it is MANDATORY, not optional, where the catalog's own directives require a spawn.** A
-customized catalog routinely carries user directives about how its evaluation must run — measured on
-the first real project, `text-eval`'s § Directives declare that any evaluation lacking a
-`glyph-counter` Verification Preamble is **invalid**, and that the reasoning evaluator must never run
-alone. An IC carries `disallowedTools: Agent` and can satisfy neither.
+**Where a catalog's own directives REQUIRE a spawn, no employee can satisfy it — and saying otherwise
+was wrong.** A customized catalog routinely carries user directives about how its evaluation must run.
+Measured on the first real project: `text-eval`'s § Directives declare any evaluation lacking a
+`glyph-counter` Verification Preamble **invalid**, and forbid the reasoning evaluator running alone.
 
-So on such a catalog the IC self-check is **not a smaller version of the real check — it is a
-different check**, and the only node that can run the one the catalog demands is the evaluator
-employee a Lead dispatches. Three separate cold probes hit this seam on 2026-07-31; the last put it
-precisely: *"an employee who reads the catalog first, rather than the mapping first, could reasonably
-conclude the required check is unrunnable and escalate."* That escalation would be **correct**.
+An IC carries `disallowedTools: Agent`. **The evaluator employee is also an IC** (see the table above),
+so it is terminal-tier too and can spawn nothing. An earlier form of this section said the evaluator
+was the node that could satisfy such a catalog. **That was false**, and it was false for a fact stated
+four paragraphs higher in this same file — the reason evaluators exist as employees at all is that ICs
+cannot delegate.
 
-**Detect it and say so.** Where a catalog's directives require spawning, the handbook's
-`## Verification` states what its tier-3 check does and does not cover, and the department's Lead
-carries the tier-4 dispatch as a named step. A project that leaves the evaluator unhired there has
-employees whose quality check is narrower than the catalog they cite.
+So the honest accounting, and every row of it is a consequence of the measured tier ceiling:
+
+| Node | Can spawn the catalog's agents? |
+|---|---|
+| IC doing the work | **no** — `disallowedTools: Agent` |
+| the evaluator IC | **no** — same ceiling, same reason |
+| the department **Lead** | **yes**, and it is the only node in the org that can |
+| the CEO / main session | yes |
+
+**Therefore: a catalog that mandates agent-based verification is satisfiable only by a Lead running
+the evaluation itself, or not at all inside the org.** Neither is what the two-layer design assumed.
+
+**State the gap; never dress it as covered.** The IC's tier-3 catalog grep is a *different, narrower*
+check than the catalog demands — not a smaller version of it. Its `## Verification` says which one it
+ran. A cold executor that reads the catalog first and escalates is **correct**, and three separate
+probes on 2026-07-31 hit that seam before anyone read the tier table closely enough to see why.
+
+**The evaluator is still hired**, because tier-4 review against a catalog is worth having and is
+unaffected by the file's writability (§ Ownership does not survive unappendability). It just is not
+the answer to this particular collision.
 
 ---
 

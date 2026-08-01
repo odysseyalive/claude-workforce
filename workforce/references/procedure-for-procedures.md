@@ -1,6 +1,6 @@
 # Procedure for Procedures — how every handbook is authored
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — normative. `handbook`, `hire`, `amend`, and `verify` all assert against
      this file. It governs its own format. -->
 
@@ -119,7 +119,8 @@ material into its grounding library. Never resolved by shipping a longer handboo
 (`platform.md`, `org-config.md`). A handbook that hardcodes one is a `verify` finding.
 
 **8b. A rule lands with its enforcement, in the same change.** Classify it first
-(`references/invariants.md`): **structural** → a `bin/check` assertion; **procedural** → a counted line
+(`references/invariants.md`): **structural** → a **`verify`** check on the host (`bin/check` is this
+repo's own equivalent and does not ship); **procedural** → a counted line
 in the run report; **advisory** → say so explicitly, so nobody later assumes a mechanism exists.
 
 A rule written without one of those three is not a rule, it is an intention. This project has recorded

@@ -1,16 +1,25 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
 be enforced.** Filing a claim under the wrong kind is how a rule ends up written and unwired.
 
-| Kind | Example | Enforced by |
-|---|---|---|
-| **Structural** — a property of shipped files | marker pairing, manifest completeness, an orphaned reference | a `bin/check` assertion |
+| Kind | Example | Enforced by — **on a host** | …**in this repo** |
+|---|---|---|---|
+| **Structural** — a property of files | marker pairing, an orphaned reference, a restated constant | a **`/workforce verify`** check | a `bin/check` assertion |
 | **Procedural** — a property of a *run* | backup before the first write, extraction before deletion | **a counted line in the run report** |
 | **Advisory** — guidance for a reader | "prefer the explicit `Read` for narrow needs" | nothing, and it says so |
+
+**`bin/check` does not ship, and this table used to name it as the only structural mechanism.** The
+manifest carries 66 files, all under `workforce/`; `bin/` is not among them. So a project that
+installs this skill, writes a rule, classifies it structural, and follows this table was being sent to
+a tool it does not have. **On a host the structural mechanism is `verify`** — which does ship, and
+whose whole job is detecting silent-failure classes. `bin/check` is this repo's own equivalent, and
+naming it here is correct only as the maintainer-side column.
+
+Found 2026-07-31 while answering what the distribution actually installs.
 
 **Procedural claims are the dangerous class**, because no static check can reach them and their absence
 looks exactly like their presence. Every defect this project has recorded of the written-and-unwired
