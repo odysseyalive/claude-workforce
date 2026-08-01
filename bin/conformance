@@ -61,6 +61,20 @@ def assertions(exp, c):
         "ledger_index_claims": sum(((c.get("predecessor_ledger") or {}).get("index_claims") or {}).values()),
         "ledger_buckets": len([k for k, v in (c.get("predecessor_ledger") or {}).items()
                                if isinstance(v, int) and k != "actual_total"]),
+        # f11: dataset and hook censuses, hand-classified. `_exact` because a
+        # floor would hide the over-count these exist to catch.
+        "datasets_exact": len(c.get("datasets") or []),
+        "datasets_owned_exact": len([d for d in (c.get("datasets") or [])
+                                     if not d.get("credential_shaped") and not d.get("host_local_sentinel")]),
+        "credential_exact": len(c.get("credential_shaped_files") or []),
+        "host_local_exact": len(c.get("host_local_sentinels") or []),
+        "policy_exact": len(c.get("policy_files") or []),
+        "hook_entries_exact": c.get("hook_entries_total", 0),
+        "hook_file_pointing_exact": c.get("hook_entries_file_pointing", 0),
+        "hook_inline_exact": len(c.get("hooks_inline_no_file") or []),
+        "hooks_on_disk_exact": len(c.get("hooks_on_disk") or []),
+        "dead_wiring_exact": len(c.get("hooks_dead_wiring") or []),
+        "orphaned_exact": len(c.get("hooks_orphaned") or []),
     }
     out = []
     for k, want in exp.items():
@@ -70,7 +84,7 @@ def assertions(exp, c):
             out.append((k, False, f"unknown expectation key — add it to conformance's `got` map"))
             continue
         have = got[k]
-        ok = have >= want if k.endswith("_min") else have == want
+        ok = have >= want if k.endswith("_min") else have == want  # _exact and bare keys are equality
         out.append((k, ok, f"want {'>=' if k.endswith('_min') else '='} {want}, got {have}"))
     return out
 
