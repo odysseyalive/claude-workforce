@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -99,6 +99,30 @@ unaffected by the file's writability (§ Ownership does not survive unappendabil
 the answer to this particular collision.
 
 ---
+
+## An evaluator's handbook asserts NOTHING about its catalog's structure
+
+Severity ladders, confidence tiers, clustering rules, `[hard]` classes — **each exists in some
+catalogs and not others**, and a handbook is where a wrong assumption becomes an unsatisfiable
+instruction handed to a cold executor.
+
+Measured 2026-07-31. Two evaluator handbooks were generated from one template, and the template said
+*"report findings with the catalog's own severity."* That is true of `text-eval`, which ships a
+CONSIDER / SHOULD FIX / MUST FIX ladder. It is **false** of `code-evaluator`'s mistake taxonomy, whose
+tables are *Class | What | Why it matters | Signal* with no ordering claim anywhere. The probe task
+then *required* the ranking, so a correct execution had to invent one or fail. It failed, correctly,
+and cited the escalation rule while doing so.
+
+**One sentence, correct for one catalog, shipped to both.** That is what generating handbooks from a
+shared template does to an assumption.
+
+**So:** every structural claim about a catalog is written **conditionally** — *"where the catalog
+states one"* — and the handbook says what to do when it does not. **Where a catalog declares no
+ordering, rank nothing and say so.** Inventing a severity is inventing a property of a file you did
+not write, which is principle 5 turned inside out.
+
+**And check the probe task against the same standard.** A probe that asks for something the catalog
+cannot supply is not a hard probe; **it is an unsatisfiable one**, and it fails every correct executor.
 
 ## An IC READS the catalog; it never INVOKES the skill
 
