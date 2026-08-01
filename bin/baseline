@@ -365,7 +365,12 @@ def census(root):
                     "risk": "orphan closer survives the sweep as residue" if c > o
                             else "orphan opener — the sweep may swallow to the next closer",
                 })
-        for owner in MARKERS["origin_foreign"].findall(body):
+        # SAME BODY AS THE TOTALS. This read `body` — SKILL.md only — while the
+        # totals read the whole skill, so the report showed "skill-builder — 33
+        # region(s)" directly beneath "marker origin_foreign 66". One population,
+        # two computations, disagreeing in print. Third occurrence of this exact
+        # shape in bin/baseline; the totals/pairing pair were the first two.
+        for owner in ANCHORED(MARKERS["origin_foreign"]).findall(scan):
             foreign_owners[owner] += 1
 
         if "origin:" not in body and rec["has_skill_md"]:
@@ -393,6 +398,7 @@ def census(root):
     # code, or state. Whatever matches none of those is UNCLASSIFIED, and an
     # unclassified file is a finding rather than a silent omission.
     datasets = []
+    name_matched_prose = []
     unclassified = []
     # POLICY FILES ARE NOT CONFINED TO THE SKILLS TREE. data-skills.md's whole
     # point about them is that they "routinely live in files no SKILL.md mentions,
@@ -452,6 +458,19 @@ def census(root):
                 or (fn.startswith(".") and CRED_RX.search(fn))
                 or (fn.startswith(".") and HOST_LOCAL_RX.search(fn))
             )
+            # AMBIGUOUS: name-matched inside an instruction directory. `references/`
+            # is grounding-library territory by convention, and STATE_NAME_RX wins
+            # over it — so `references/procedures/ledger.md`, whose first line is
+            # "## Ledger Command Procedure", is classed as data. Step 3b would then
+            # propose a schema, an owner and a git policy for a procedure document.
+            #
+            # Over-inclusion is still the SAFE direction for a census guarding
+            # against data loss, so the classification stands. What must not happen
+            # is that it stands SILENTLY: these are reported as their own class so a
+            # human resolves them rather than a data skill appearing for prose.
+            if is_state and in_ref_dir and ext == ".md" and STATE_NAME_RX.search(fn) \
+               and not in_state_dir:
+                name_matched_prose.append(rel)
             if not is_state:
                 # 4. Residual. Reported by name — never dropped.
                 unclassified.append({"path": rel, "bytes": os.path.getsize(full)
@@ -635,6 +654,7 @@ def census(root):
         "dataset_bytes_total": sum(max(0, d["bytes"]) for d in datasets),
         "files_accounted": accounted,
         "policy_files": sorted(policy_files),
+        "name_matched_prose": sorted(name_matched_prose),
         "predecessor_sidecar_files": sorted(sidecar_files),
         "unclassified_files": sorted(unclassified, key=lambda d: d["path"]),
         "credential_shaped_files": [d["path"] for d in datasets if d["credential_shaped"]],
@@ -719,6 +739,8 @@ def report(c):
     p(f"| dataset bytes | {c['dataset_bytes_total']} |")
     p(f"| files accounted for (instruction+code+state+residual) | {c['files_accounted']} |")
     p(f"| policy files (ignore rules — never move) | {len(c['policy_files'])} |")
+    if c.get("name_matched_prose"):
+        p(f"| **datasets AMBIGUOUS (name-matched in `references/`)** | **{len(c['name_matched_prose'])}** |")
     p(f"| predecessor sidecars | {len(c['predecessor_sidecar_files'])} |")
     p(f"| **UNCLASSIFIED (must be 0 or explained)** | **{len(c['unclassified_files'])}** |")
     p(f"| credential-shaped files | {len(c['credential_shaped_files'])} |")
