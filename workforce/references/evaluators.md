@@ -6,9 +6,10 @@
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
      names — do not conflate them in a procedure or a report. -->
 
-Two capabilities every project gets: **code quality review** and **text authenticity review**. Both
-originate in claude-enforcer, where `code-evaluator` and `text-eval` are force-installed companion
-skills carrying shipped catalogs.
+Three capabilities every project gets: **code quality review**, **text authenticity review**, and
+**image authenticity review**. The first two originate in claude-enforcer, where `code-evaluator` and
+`text-eval` are force-installed companion skills carrying shipped catalogs. The third, `image-eval`,
+originates here.
 
 ## Why they matter here specifically
 
@@ -48,14 +49,15 @@ only quality check is its own self-assessment should say so.
 
 ---
 
-## The two evaluators
+## The three evaluators
 
-| | `code-evaluator` | `text-eval` |
-|---|---|---|
-| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift |
-| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers |
-| Owner | an engineering IC | a content IC |
-| Hired when | the project has code | the project produces prose |
+| | `code-evaluator` | `text-eval` | `image-eval` |
+|---|---|---|---|
+| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | image authenticity — AI generation tells, technique violations, metadata provenance |
+| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
+| Seed source | claude-enforcer (migration import) or shipped minimal set | claude-enforcer (migration import) or shipped minimal set | `image-eval-seed.md` (this project only — no enforcer predecessor) |
+| Owner | an engineering IC | a content IC | a content or design IC |
+| Hired when | the project has code | the project produces prose | the project produces or ships images |
 
 **The catalog installs on ABSENCE ALONE, never gated on a declared department.** This is
 claude-enforcer's hard-won rule (`DEC-2026-06-12-install-on-absence`): an all-coding project received no
@@ -238,12 +240,19 @@ Seeding, in order:
 
 1. **claude-enforcer present on this machine?** Import its shipped catalogs once, recording the source
    path and its version anchor in the project's copy. This is the migration path, and it is the best
-   available seed because those catalogs are the real accumulated corpus.
-2. **Otherwise**, write a minimal seed from the structure below — **this project ships no seed file**, and
-an earlier form of this sentence promised one. On any machine without the predecessor installed, that
-branch had no artifact to copy. Author it here from: the structure, the severity tiers, the clustering
-   rule, the `[hard]` rows, and a starter set of entries. Mark it `seed-only` so its thinness is
-   visible rather than mistaken for a complete corpus.
+   available seed because those catalogs are the real accumulated corpus. (This applies to
+   `code-evaluator` and `text-eval` only. `image-eval` has no enforcer predecessor.)
+2. **Otherwise**, write a minimal seed from the structure below — **this project ships no seed file for
+   code or text evaluators**, and an earlier form of this sentence promised one. On any machine without
+   the predecessor installed, that branch had no artifact to copy. Author it here from: the structure,
+   the severity tiers, the clustering rule, the `[hard]` rows, and a starter set of entries. Mark it
+   `seed-only` so its thinness is visible rather than mistaken for a complete corpus.
+3. **For `image-eval`**, this project ships `image-eval-seed.md` as the seed. It covers AI image
+   patterns, technique authenticity (watercolor, oil, ink), visual clarity, metadata provenance, and
+   image-set evaluation. Where a project already carries an `image-eval` (e.g. odyssey-alive's
+   watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
+   new entries through the forcible-append mechanism. The project's customizations, medium-specific
+   checks, and user directives are never overwritten.
 
 **After the import, the dependency ends.** The catalog lives in the project at
 `${CLAUDE_PROJECT_DIR}/.claude/skills/<evaluator>/` as its owner's playbook, and it grows from the
