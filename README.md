@@ -10,11 +10,11 @@ You've probably switched models three times in one sitting without thinking abou
 
 We spent two years asking which model was best. [The answer turned out to be a routing problem, not a ranking one.](https://odysseyalive.com/focus/two-brains)
 
-Here's the part that surprises people: the best orchestrator often isn't the most powerful model. A conductor doesn't play louder than the orchestra. They hear how the pieces fit together. A model built for judgment and coordination can run a company of specialists better than a model built to write a million lines of code — because those are different jobs. The writer can't debug. The debugger can't write. Nobody complained.
+The part that surprises people is that the best orchestrator often isn't the most powerful model. A conductor doesn't play louder than the orchestra. They hear how the pieces fit together. A model built for judgment and coordination can run a company of specialists better than a model built to write a million lines of code, because those are different jobs. The writer can't debug. The debugger can't write. Nobody complained.
 
 Claude Workforce takes that insight and builds on it. Instead of one assistant doing everything, you get a company: a CEO that routes, leads that coordinate, and individual contributors that execute. Each one runs on the model that fits its job, carries a handbook it follows, stays inside a scope it won't leave, and passes a check that proves it did the work.
 
-![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists — not playing louder, playing differently](assets/images/conductor.png)
+![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists, not playing louder, playing differently](assets/images/conductor.png)
 
 ## How We Got Here
 
@@ -22,7 +22,7 @@ This project grew out of [claude-enforcer](https://github.com/odysseyalive/claud
 
 Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Researchers call it "lost in the middle." You've probably just called it Tuesday.
 
-The enforcer built layers to resist that: hardened skills, mechanical hooks, fresh-context validators that fire in their own isolated context where the conversation's noise can't reach them. And it worked — skills stopped drifting. But the longer the system ran, the clearer a different problem became.
+The enforcer built layers to resist that: hardened skills, mechanical hooks, fresh-context validators that fire in their own isolated context where the conversation's noise can't reach them. And it worked. Skills stopped drifting. But the longer the system ran, the clearer a different problem became.
 
 A hardened skill has no owner. Nothing stops it from wandering outside its domain. And it has no way to prove it actually did the job. You get a summary at the end and trust that what happened underneath was correct.
 
@@ -32,7 +32,7 @@ The fix wasn't harder rules. It was structure.
 
 A set of instructions with those three things is an employee. A set of employees is a company you can talk to.
 
-![A forest path where breadcrumbs are being eaten by woodland creatures, but ahead the path leads to a warmly lit village of distinct workshops, each with a glowing sign — instructions that once faded now have permanent homes](assets/images/from-breadcrumbs-to-company.png)
+![A forest path where breadcrumbs are being eaten by woodland creatures, but ahead the path leads to a warmly lit village of distinct workshops, each with a glowing sign, instructions that once faded now have permanent homes](assets/images/from-breadcrumbs-to-company.png)
 
 ## Talking to the Company
 
@@ -42,7 +42,7 @@ Describe the task. `/org` finds the owner.
 /org fix the pricing copy on the homepage
 ```
 
-That goes straight to one IC — the content writer who owns homepage copy.
+That goes straight to one IC, the content writer who owns homepage copy.
 
 ```
 /org the onboarding module needs a rewrite across design and content
@@ -72,7 +72,7 @@ Claude Code v2.1.32 or later. Check with `claude --version`.
 
 Pick a scope. Personal is the default and the right answer for almost everyone.
 
-**Personal install** — one copy at `~/.claude/skills/`, serving every project on this machine.
+**Personal install** puts one copy at `~/.claude/skills/`, serving every project on this machine.
 
 Linux / macOS:
 ```bash
@@ -84,7 +84,7 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex
 ```
 
-**Project install** — one copy inside a single repo, so it travels with a clone.
+**Project install** puts one copy inside a single repo, so it travels with a clone.
 
 Linux / macOS:
 ```bash
@@ -102,11 +102,11 @@ Then restart Claude Code and run your first audit:
 /workforce audit
 ```
 
-The audit reads your project — its layout, build tooling, purpose, history — and designs the smallest company that can do its work. It asks one question (which models at which tiers) and resolves everything else automatically with agent panels.
+The audit reads your project, its layout, build tooling, purpose, history, and designs the smallest company that can do its work. It asks one question (which models at which tiers) and resolves everything else automatically with agent panels.
 
 It works on empty projects too. Thin evidence means a small roster, which is the right answer for a project that hasn't been built yet. A role whose verification can't be named is reported unstaffed, never hired. **A role with a runnable check is an employee. A role without one is a job title.**
 
-Preview the plan without writing anything: `audit --review`.
+Preview the plan without writing anything. `audit --review`.
 
 ### Updating
 
@@ -118,11 +118,11 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 
 ## Three Tiers, Measured
 
-![A cross-section of a three-level workshop: the top figure surveys the landscape through a window, the middle figure coordinates between two doors, the bottom figure works at a bench with precise tools — each level has its own job, and there is no level below the third](assets/images/three-tiers-new.png)
+![A cross-section of a three-level workshop where the top figure surveys the landscape through a window, the middle figure coordinates between two doors, and the bottom figure works at a bench with precise tools, each level has its own job, and there is no level below the third](assets/images/three-tiers-new.png)
 
 Delegation bottoms out three layers below your conversation. A canary measured that on a real host before any of this was designed: the session, plus CEO, plus lead, plus IC. No fourth tier.
 
-A tier past the ceiling doesn't error — it collapses. The deepest employee loses its ability to delegate and quietly does the work itself, while its handbook still says it delegated. The failure reads as success, so the limit is enforced rather than suggested.
+A tier past the ceiling doesn't error. It collapses. The deepest employee loses its ability to delegate and quietly does the work itself, while its handbook still says it delegated. The failure reads as success, so the limit is enforced rather than suggested.
 
 ## Employee Handbooks
 
@@ -130,19 +130,19 @@ Two sources shaped the handbooks, and they disagree.
 
 Boris Cherny, the creator of Claude Code, argues at [Startup School 2026](https://www.ycrootaccess.com/p/boris-cherny-building-claude-code) that modern models need three things and nothing more: the task, the guardrails, and the exit criteria. Over-specifying steps is the failure mode he sees most.
 
-Sam Carpenter, who wrote [*Work the System*](https://www.workthesystem.com), argues the exact opposite: assume nothing, because the person executing has never seen the job. Write every step. His whole book is built on that premise — and his document hierarchy is the skeleton of this project. A Strategic Objective at the top. Operating principles underneath. Working procedures at the bottom. Every decision conforms to the layer above it, and a case no procedure covers falls upward to the principles rather than getting a new rule written for it. That second half is the part that keeps a company from drowning in documentation about things that happened once.
+Sam Carpenter, who wrote [*Work the System*](https://www.workthesystem.com), argues the exact opposite. Assume nothing, because the person executing has never seen the job. Write every step. His whole book is built on that premise, and his document hierarchy is the skeleton of this project. A Strategic Objective at the top. Operating principles underneath. Working procedures at the bottom. Every decision conforms to the layer above it, and a case no procedure covers falls upward to the principles rather than getting a new rule written for it. That second half is the part that keeps a company from drowning in documentation about things that happened once.
 
-Both are right — for different readers. A lead reasoning about how to coordinate a department needs latitude. An IC running in a fresh context with no history and nobody to ask needs determinism. Leads get charters. ICs get numbered procedures.
+Both are right, for different readers. A lead reasoning about how to coordinate a department needs latitude. An IC running in a fresh context with no history and nobody to ask needs determinism. Leads get charters. ICs get numbered procedures.
 
 Every handbook names a check that proves the work: an exit code, a test suite, a file assertion. *"Review the output for quality"* gets rejected at authoring time, because an employee that can't verify itself either stops early or claims a success it didn't earn.
 
-Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it: `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with no model in the loop. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all.
+Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it. `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with no model in the loop. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all.
 
-Some work has no command that can check it. There, the check is a catalog. Every project gets two evaluators — one for code quality, one for text authenticity — each carrying a list of tells and taxonomies. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this cluster three or more of these tells?"* is close to mechanical.
+Some work has no command that can check it. There, the check is a catalog. Every project gets two evaluators, one for code quality and one for text authenticity, each carrying a list of tells and taxonomies. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this cluster three or more of these tells?"* is close to mechanical.
 
 ## Nobody Is Hired Until a Stranger Can Follow the Handbook
 
-![A stranger standing in the doorway of an organized workshop at dawn, reading a single page, golden morning light streaming in behind them — the regular workers are gone, the tools are laid out, and everything depends on whether the page is good enough](assets/images/cold-reader.png)
+![A stranger standing in the doorway of an organized workshop at dawn, reading a single page, golden morning light streaming in behind them. The regular workers are gone, the tools are laid out, and everything depends on whether the page is good enough](assets/images/cold-reader.png)
 
 Carpenter calls them "off-the-street people." His release rule is that a procedure isn't finished until someone uninvolved executes it cold and succeeds. Human organizations approximate this badly, because a colleague always knows *something*.
 
@@ -150,7 +150,7 @@ Here it's exact. A subagent is a genuinely fresh context: no conversation histor
 
 ## When Something Goes Wrong, the Document Is at Fault
 
-![A close-up of hands holding a page, a fountain pen with warm red ink circling a sentence — the pen moves toward the page rather than toward the reader, because when something breaks, the fix goes to the document](assets/images/document-at-fault.png)
+![A close-up of hands holding a page, a fountain pen with warm red ink circling a sentence. The pen moves toward the page rather than toward the reader, because when something breaks, the fix goes to the document](assets/images/document-at-fault.png)
 
 Two rules, both borrowed, both mechanical here.
 
@@ -210,7 +210,7 @@ If the skill is gone and you can't run the command, the restore kit inside `.cla
 
 ## Learn More
 
-- [Two Brains: Why Dynamic Model Routing Beats Picking One AI](https://odysseyalive.com/focus/two-brains). The routing insight underneath this project — why the answer to "which model is best?" is a routing problem, not a ranking one.
+- [Two Brains: Why Dynamic Model Routing Beats Picking One AI](https://odysseyalive.com/focus/two-brains). The routing insight underneath this project, and why the answer to "which model is best?" is a routing problem, not a ranking one.
 - [Context Is the Interface](https://odysseyalive.com/focus/context-is-the-interface). Why what you show a model before you speak matters more than what you say.
 - [Your AI Has Amnesia](https://odysseyalive.com/focus/your-ai-has-amnesia). Why assistants forget instructions, and why a cold reader can test a handbook its author can't.
 - [Mrinank Sharma, Please Come Back to Work](https://odysseyalive.com/focus/mrinank-sharma-please-come-back-to-work). Why adversarial agents outperform consensus, and why the audit's panels are built to disagree.
@@ -228,11 +228,11 @@ Issues and pull requests are welcome. I can't promise a response time.
 
 This project has two intellectual parents, and they disagree on almost everything.
 
-**Sam Carpenter** wrote [*Work the System*](https://www.workthesystem.com), and the document hierarchy that holds this project together — Strategic Objective, operating principles, working procedures — is his. So is the conviction that a procedure must be written for someone who has never seen the job, and that the document is at fault when work goes wrong. Carpenter ran a telephone answering service in Bend, Oregon for twenty-seven years. He transformed it from chaos into a machine that churned out thousands of dollars of profits while he worked two hours a week instead of eighty. He did it by writing down every process, assuming nothing, and treating every failure as a defect in the documentation rather than a defect in the person. That idea — that if you can't quote the line, you can't blame the reader — is the foundation of every employee handbook in this system.
+**Sam Carpenter** wrote [*Work the System*](https://www.workthesystem.com), and the document hierarchy that holds this project together (Strategic Objective, operating principles, working procedures) is his. So is the conviction that a procedure must be written for someone who has never seen the job, and that the document is at fault when work goes wrong. Carpenter ran a telephone answering service in Bend, Oregon for twenty-seven years. He transformed it from chaos into a machine that churned out thousands of dollars of profits while he worked two hours a week instead of eighty. He did it by writing down every process, assuming nothing, and treating every failure as a defect in the documentation rather than a defect in the person. That idea, that if you can't quote the line you can't blame the reader, is the foundation of every employee handbook in this system.
 
 **Boris Cherny** built [Claude Code](https://docs.anthropic.com/en/docs/claude-code), and his argument runs the other direction: modern models need the task, the guardrails, and the exit criteria. Nothing more. Over-specifying steps is how experienced engineers hobble models that are already smarter than the instructions they're being given. At Startup School 2026, he said to delete 80% of your system prompt with every new model generation, because most of it is compensating for weaknesses the model no longer has.
 
-Both are right. Carpenter is right for workers executing cold, with no history and nobody to ask. Cherny is right for coordinators reasoning about how to get something done. That disagreement settled the shape of the handbooks: ICs get procedures, leads get charters, and neither side had to win.
+Both are right. Carpenter is right for workers executing cold, with no history and nobody to ask. Cherny is right for coordinators reasoning about how to get something done. That disagreement settled the shape of the handbooks. ICs get procedures, leads get charters, and neither side had to win.
 
 ### People
 
@@ -240,7 +240,7 @@ Special thanks to **Joe Loudermilk**, who helped me understand why giving an LLM
 
 Special thanks to **Wouter Dieters**, who helped me connect organizational theory to agency. An agent behaves differently once it has a role, a scope it won't leave, a check to pass, and someone it answers to. That observation is the design.
 
-Thanks to **Sjoerd Tiemensma**, who convinced me to toss CLAUDE.md in favor of more agency. That nudge cleared the path for agents to own their own context instead of inheriting a shared script — which turned out to be the whole point.
+Thanks to **Sjoerd Tiemensma**, who convinced me to toss CLAUDE.md in favor of more agency. That nudge cleared the path for agents to own their own context instead of inheriting a shared script, which turned out to be the whole point.
 
 Thanks to **Jeff Polack**, who pointed out that this should support a personal install. That turned out to reshape the whole design, because it meant the skill holds no project state at all and the company lives entirely in `.claude/`.
 
