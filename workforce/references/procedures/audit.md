@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 9 assertion(s) in bin/check name this file; 42 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 10 assertion(s) in bin/check name this file; 43 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -367,6 +367,16 @@ Datasets   7 state files · 5 warrant a data skill · 1 credential-shaped · 1 h
 
 A bare "7 datasets" and a bare "5 datasets" are both wrong — the first proposes owners for a secret,
 the second silently drops two files from the accounting.
+
+**And a third population: AMBIGUOUS — name-matched inside an instruction directory.** `references/` is
+grounding-library territory by convention, and the state-name heuristic wins over it. Measured on the
+real target: `references/procedures/ledger.md`, whose first line is *"## Ledger Command Procedure"*, is
+classed as data — so this step would propose a schema, an owner and a git policy **for a procedure
+document**, and a data skill's contents never move.
+
+**Over-inclusion stays**, because the census guards against data loss and under-inclusion is the
+expensive error. What must not stay is the silence: report these separately and let a human resolve
+them. A data skill appearing for prose is a misclassification nobody chose.
 
 **Do not scan for files that look like data.** That was the first design and it failed the way this kind
 of design always fails: it found what it already knew to look for. State hides under at least five
