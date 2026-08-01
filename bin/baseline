@@ -312,7 +312,20 @@ def census(root):
     # unclassified file is a finding rather than a silent omission.
     datasets = []
     unclassified = []
+    # POLICY FILES ARE NOT CONFINED TO THE SKILLS TREE. data-skills.md's whole
+    # point about them is that they "routinely live in files no SKILL.md mentions,
+    # and in more than one of them" — and this scan only walked skills/, so a
+    # `.claude/.gitignore` or a project-root one counted zero. § Git policy then
+    # has to name the ignore rule's file BY PATH, and there was nothing to name.
     policy_files = []
+    for _pd, _ps, _pf in os.walk(root):
+        if ".git" in _pd.split(os.sep) or "node_modules" in _pd.split(os.sep):
+            continue
+        if os.path.relpath(_pd, root).split(os.sep)[0] in ("fixtures",):
+            continue
+        for _f in _pf:
+            if _f in (".gitignore", ".gitattributes"):
+                policy_files.append(os.path.relpath(os.path.join(_pd, _f), root))
     sidecar_files = []
     accounted = 0
     for dirpath, dirnames, filenames in os.walk(skills_dir):
@@ -332,8 +345,7 @@ def census(root):
             #    disposable. Load-bearing, tracked, and never moved. Counted
             #    separately because losing one silently commits private data.
             if fn in (".gitignore", ".gitattributes"):
-                policy_files.append(rel)
-                continue
+                continue  # already collected project-wide above
             # 2. Instruction — the skill's own prose. Never state. Includes
             #    root-level `reference.md`: this project's own survey target puts
             #    reference prose at the skill root, not under references/.

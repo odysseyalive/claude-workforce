@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 40 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 9 assertion(s) in bin/check name this file; 42 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -346,7 +346,27 @@ an owner cannot be assigned to a dataset nobody found.
 
 ### Datasets — enumerate, then classify by exclusion
 
-Every persistent-state file gets a **data skill** and exactly one owner (`data-skills.md`).
+Every persistent-state file gets a **data skill** and exactly one owner (`data-skills.md`) — **except
+two classes the census already flags and nothing was reading.**
+
+| Class | Why it is not a data skill | What happens instead |
+|---|---|---|
+| **credential-shaped** — `.env`, `*token*`, `*secret*`, `*-key*` | a data skill declares a schema, an owner, and a git policy for something that must never be archived or committed. Wrapping a secret in one is the opposite of handling it | **report it by path, own nothing.** Secret handling is the user's |
+| **host-local sentinel** — a dotfile cache, `-ts`, `acked`, `pending` | a data skill asserts durability and an owner for a file whose whole nature is that it is disposable and machine-specific | report it as disposable; it is not migrated, not owned, not backed up |
+
+**The census has carried `credential_shaped` and `host_local_sentinel` on every dataset record from the
+start, and no rule read either one.** Measured on fixture `f11`: 7 state files, of which 2 are flagged —
+so a run following this step literally would have proposed a data skill for a `.env.example` and for a
+`.seen-cache`. The flags were right; they were decorative.
+
+**Report both populations and the subtraction**, never a single number:
+
+```
+Datasets   7 state files · 5 warrant a data skill · 1 credential-shaped · 1 host-local sentinel
+```
+
+A bare "7 datasets" and a bare "5 datasets" are both wrong — the first proposes owners for a secret,
+the second silently drops two files from the accounting.
 
 **Do not scan for files that look like data.** That was the first design and it failed the way this kind
 of design always fails: it found what it already knew to look for. State hides under at least five
