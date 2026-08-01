@@ -98,7 +98,8 @@ not dispatch to it.
 
 ## Step 7 — Record
 
-Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`.
+Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`
+(`references/deferred.md` — the queue, and who drains it).
 Update the `EMP` amendment history with both keys and the real latency. Close the triggering record.
 
 ---

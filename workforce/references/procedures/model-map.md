@@ -1,6 +1,6 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same three calls `references/audit-setup.md` § Step 0.4 runs, without
@@ -43,9 +43,12 @@ which is exactly what the fixed-object budget prevents.
 
 ## Model Rewrite
 
-A changed cell queues one task **per affected handbook**, rewriting **only** the `model:` and
-`effort:` frontmatter lines, verified by re-reading the file. It runs **before** `org index`, so the
-chart reflects the rewritten values rather than the previous ones.
+A changed cell queues one task **per affected handbook** (`references/deferred.md`), rewriting **only**
+the `model:` and `effort:` frontmatter lines, verified by re-reading the file. It runs **before**
+`org index`, so the chart reflects the rewritten values rather than the previous ones.
+
+**A queued rewrite still requires `--execute`.** The queue decides that the work happens, never how,
+and it is never a route around a gate.
 
 A changed advisor model writes or removes `advisorModel` in the project's `.claude/settings.json`
 (or `.claude/settings.local.json`, whichever carried it). "None" removes the key entirely.

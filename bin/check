@@ -167,6 +167,7 @@ dbg = read("workforce/references/delegation-budget.md")
 _bud = read("workforce/references/procedures/budget.md")
 _amd = read("workforce/references/procedures/amend.md")
 _ocfg = read("workforce/references/org-config.template.md")
+dfr = read("workforce/references/deferred.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
@@ -1929,6 +1930,7 @@ try:
         "_bud": "workforce/references/procedures/budget.md",
         "_amd": "workforce/references/procedures/amend.md",
         "_ocfg": "workforce/references/org-config.template.md",
+        "dfr": "workforce/references/deferred.md",
     }
     _live = {}
     for _n in _ast.walk(_tree):
@@ -2421,6 +2423,111 @@ check(
     "finding, never a" in rev,
     "a model release moves every handbook into this state at once; attributing "
     "that to the document is blaming it for a platform event",
+)
+
+# ── The question budget: the count, the table, and the sections must agree ───
+# Three separate statements of the same number — "Three questions is the whole
+# surface", the budget table's numbered rows, and the Step 0.4 subsections —
+# with nothing comparing them. The whole point of the budget is that it is a
+# CEILING, and a ceiling nothing counts is a preference.
+_Q_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5}
+_q_decl = re.search(r"\*\*(\w+) questions is the whole surface", _asu)
+_q_declared = _Q_WORDS.get(_q_decl.group(1).lower()) if _q_decl else None
+_q_rows = re.findall(r"^\|\s*(\d+)\s*\|\s*(0\.4[a-z])\s*\|", _asu, re.M)
+_q_sections = re.findall(r"^###\s+Step\s+(0\.4[a-z])\b", _asu, re.M)
+check(
+    "questions: the declared count, the table rows, and the sections all agree",
+    _q_declared is not None
+    and len(_q_rows) == _q_declared
+    and [r[1] for r in _q_rows] == _q_sections,
+    f"declared {_q_declared}; table rows {[r[1] for r in _q_rows]}; "
+    f"sections {_q_sections} — a question added to one of the three and not the "
+    "others is a question the budget does not know it is spending",
+)
+check(
+    "questions: the sanctioned fourth is named, and bounded to one mode",
+    "charter-first" in _asu and "nowhere else" in _asu,
+    "audit-setup.md must name charter-first as the ONLY sanctioned addition and "
+    "say where it does not apply; an unbounded exception is not a ceiling",
+)
+check(
+    "questions: adding one is a design change, not a convenience",
+    "Adding a question is a design change" in _asu,
+    "the failure is real — a run that stops forty times is a run nobody finishes",
+)
+
+# ── The deferred-work queue: seven writers, and now a reader ─────────────────
+# Six files said "queue a `review`" and one "queues one task", and NO QUEUE
+# EXISTED — no location, no shape, no drain, nothing that would notice a queued
+# item never happening. Seven writers, zero readers. This block is the pairing.
+_QUEUE_RX = re.compile(r"queues? (?:a|one) [`*]")
+_queue_writers = sorted(
+    p for p in declared
+    if p.endswith(".md")
+    and p != "workforce/references/deferred.md"
+    and _QUEUE_RX.search(read(p))
+)
+_unrouted = [p for p in _queue_writers if "references/deferred.md" not in read(p)]
+check(
+    "deferred: every file that queues work names the queue it queues into",
+    not _unrouted,
+    f"{_unrouted} — an instruction to queue, with nothing defining the queue, is "
+    "the written-and-unwired pattern with seven authors instead of one",
+)
+check(
+    "deferred: the queue is project state, never inside the skill",
+    "never inside the skill" in dfr and "scopes.md" in dfr,
+    "one installed skill serves many projects; a shared backlog merges them",
+)
+check(
+    "deferred: a row names a runnable command, not a category",
+    "never a category" in dfr,
+    "'re-check this later' names nothing a reader can execute",
+)
+# The two halves. Either alone reproduces the failure: surfacing without
+# draining is a backlog nobody clears; draining without surfacing is invisible
+# to whoever runs a different command.
+check(
+    "deferred: the backlog rides the provenance header, so every command shows it",
+    "deferred    <n> open" in vfy and "deferred" in dfr,
+    "a backlog reported only by the command that created a row is invisible to a "
+    "user who runs a different one — which is the failure being fixed",
+)
+check(
+    "deferred: a command drains its own rows and never another command's",
+    "NEVER discharges a row belonging to another command" in dfr,
+    "a read-only command that quietly ran three reviews is unrequested work; "
+    "SKILL.md § Display vs. Execute exists to prevent exactly that",
+)
+check(
+    "deferred: the queue is never a route around a gate",
+    "a route around a gate" in dfr and "a route around a gate" in read(
+        "workforce/references/procedures/model-map.md"),
+    "a queued model-map still requires --execute; the queue decides THAT work "
+    "happens, never HOW",
+)
+# The honest limit. Overclaiming here would be the exact failure enforcement.md
+# opens with — a document promising a guarantee the runtime will not keep.
+check(
+    "deferred: the guarantee stops where it actually stops, and says so",
+    "cannot run a command the user never runs" in dfr and "not guaranteed" in dfr,
+    "the mechanism cannot invoke commands; claiming otherwise is the overclaim "
+    "this project fails a run over",
+)
+check(
+    "deferred: an aged row cannot be closed by recording it",
+    "never closed by recording it" in dfr and "acknowledged" in dfr,
+    "a flag is not a fix (SKILL.md § Directives); without this an AGED row "
+    "becomes a permanent line item that reads as handled",
+)
+# The Run Invariants block restated its own row count in audit.md, and said
+# "Ten" while the table held eleven. Nothing compared them, because the check
+# read invariants.md's declaration against invariants.md's table only.
+check(
+    "invariants: the run report does not restate the row count",
+    not re.search(r"\b(?:Ten|Eleven|Twelve|Thirteen)\s+rows\b", aud),
+    "audit.md said 'Ten rows' while the table held eleven — a restated constant "
+    "in the instruction to print the table it restates",
 )
 
 # ── Instruction volume: the second budget ────────────────────────────────────

@@ -82,7 +82,7 @@ parse is the "reads as success" failure:
 | unparseable | `QUARANTINED: <error>` |
 | in chart, no file | `GHOST` |
 | `reports-to` names nobody | `ORPHAN → provisionally under ceo (flagged)` |
-| stamp ≠ recomputed | `CONTRACT-DRIFT` → queue a `review` |
+| stamp ≠ recomputed | `CONTRACT-DRIFT` → queue a `review` (`references/deferred.md`) |
 | on disk, not loadable this session | `PENDING-RESTART` |
 
 `PENDING-RESTART` compares the roster against the agent types actually available. Agents register on a

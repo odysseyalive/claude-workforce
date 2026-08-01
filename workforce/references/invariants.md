@@ -39,13 +39,13 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Eleven, and the list is closed: adding a procedural invariant means adding a row here and a line to the
+Twelve, and the list is closed: adding a procedural invariant means adding a row here and a line to the
 report, in the same change.
 
-*(It was ten until 2026-07-31. "Closed" means **no row is added without its report line**, never that
-the set is finished — a list that cannot grow stops describing the runs it governs, and the rule that
-matters is the pairing, not the count. Row 11 was added with its line, its owner, and its `bin/check`
-assertion in one change.)*
+*(It was ten until 2026-07-31, and eleven until 2026-08-01. "Closed" means **no row is added without
+its report line**, never that the set is finished — a list that cannot grow stops describing the runs
+it governs, and the rule that matters is the pairing, not the count. Rows 11 and 12 were each added
+with their line, their owner, and their `bin/check` assertion in one change.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -60,6 +60,7 @@ assertion in one change.)*
 | 9 | no dead wiring after hook relocation | `INV-HOOKS` | references/procedures/audit.md |
 | 10 | ledger migration matches the filesystem | `INV-LEDGER` | references/procedures/ledger.md |
 | 11 | every mechanical invariant has a maintainer, and every maintainer passed its negative test | `INV-MAINTAINERS` | references/data-skills.md |
+| 12 | no deferred row was dropped; the queue arithmetic balances | `INV-DEFERRED` | references/deferred.md |
 
 **The token is the link, and it is what makes the pairing checkable.** Each `INV-*` token appears in
 exactly two places: this table, and the procedure that owes the count. `bin/check` resolves every row's

@@ -183,7 +183,7 @@ what it could not parse is the "reads as success" failure.
 | Frontmatter or ORG-RECORD unparseable | `QUARANTINED: <error>` — `/org` answers matching asks with "exists but unreadable; `/workforce audit` has a repair task" rather than a false no-match |
 | Chart row with no file on disk | `GHOST` — dropped; any `ORG-CHAIN` still naming it is a reported finding |
 | `reports-to` names nobody | `ORPHAN → provisionally under ceo (flagged)` — never silently reparented in the file |
-| `contract-stamp` ≠ recomputed hash | `CONTRACT-DRIFT` — queues a `review`; the eval baseline is stale |
+| `contract-stamp` ≠ recomputed hash | `CONTRACT-DRIFT` — queues a `review` (`references/deferred.md`); the eval baseline is stale |
 | Registered on disk but not loaded this session | `PENDING-RESTART` — see below |
 
 **`PENDING-RESTART` names a delay, not a restart requirement** (`platform.md` fact 3 — both agents and

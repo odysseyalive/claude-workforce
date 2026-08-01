@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 6 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -44,6 +44,7 @@ harness     claude <version>         facts: CURRENT | STALE (measured on <versio
 facts from  shipped baseline | project-local (<path>)
 canary      PASS | PASS (on record) | UNAVAILABLE | FAIL
 org         <n> employees / <n> departments      chart: <path>
+deferred    <n> open · <m> aged past the threshold · oldest: <id> (<age> invocations)
 ```
 
 Three rules, each from a finding that was true and useless without it:
@@ -55,6 +56,11 @@ Three rules, each from a finding that was true and useless without it:
   result, and a reader cannot tell a passing check from a check that never ran.
 - **Never print the same line for a verified and an unverified run.** This is why `canary` is on the
   header rather than buried: `UNAVAILABLE` and `PASS` mean opposite things about everything below.
+
+**`deferred` rides the header for the same reason `canary` does** (`references/deferred.md`). A
+backlog reported only by the command that created a row is invisible to a user who runs a different
+one — and the whole failure being fixed is a queued item nobody returns to. On the header it is seen
+from every surface, including `roster`, which does nothing else with it.
 
 ## Install and scope
 

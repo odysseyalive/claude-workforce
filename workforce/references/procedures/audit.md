@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 10 assertion(s) in bin/check name this file; 43 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 11 assertion(s) in bin/check name this file; 43 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -620,8 +620,13 @@ prevent.
 
 ## Step 7 — Close
 
-**Print the Run Invariants block first** (`references/invariants.md`). Ten rows, every one present
-including the zeroes, before any finding. It answers a different question from the rest of the report —
+**Print the Run Invariants block first** (`references/invariants.md`). **Every row that file
+enumerates**, present including the zeroes, before any finding — the count lives there and is not
+restated here, which is how this line came to say "ten" while the table held eleven.
+
+**`INV-DEFERRED` is among them** (`references/deferred.md`): rows carried in, discharged, added, and
+AGED, with the arithmetic balanced against the queue on disk. An audit that adds work to a backlog
+already stalled reports the AGED rows in the Execution Summary beside its own findings. It answers a different question from the rest of the report —
 not what this run *did*, but what it *upheld* — and a row that cannot be computed prints `NOT UPHELD`
 with the reason rather than being omitted.
 

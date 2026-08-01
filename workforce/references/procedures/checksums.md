@@ -38,7 +38,7 @@ Four rules follow, and they are not optional:
 | Target | Covers | Drift means |
 |---|---|---|
 | immutable directive blocks | verbatim content | a sacred block was reworded — a directive violation |
-| handbook `contract-stamp` | normalized `## Procedure` + `## Verification` | the eval baseline is stale; queue a `review` |
+| handbook `contract-stamp` | normalized `## Procedure` + `## Verification` | the eval baseline is stale; queue a `review` (`references/deferred.md`) |
 | `operating-principles` | the Strategic Objective and each principle | the constitution changed outside `charter` / `principles` |
 | data skill `## Schema` + `## Invariants` | normalized content | the contract several employees read changed outside `amend` |
 | extracted directives | each block in `.claude/workforce/directives/` | an extracted user directive was altered after its source was swept |
