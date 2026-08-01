@@ -53,6 +53,14 @@ def assertions(exp, c):
         "greenfield_code_min": g.get("code_files", 0),
         "greenfield_commits_min": g.get("git_commits", 0),
         "greenfield_manifests_min": len(g.get("manifests") or []),
+        # Asserted against a HAND count in the fixture's TRUTH.md. Every other
+        # number here is the census checked against the census; this one is the
+        # census checked against a person reading files. It exists because a
+        # confidently wrong count propagated into five documents on 2026-07-31.
+        "ledger_total": (c.get("predecessor_ledger") or {}).get("actual_total", 0),
+        "ledger_index_claims": sum(((c.get("predecessor_ledger") or {}).get("index_claims") or {}).values()),
+        "ledger_buckets": len([k for k, v in (c.get("predecessor_ledger") or {}).items()
+                               if isinstance(v, int) and k != "actual_total"]),
     }
     out = []
     for k, want in exp.items():
