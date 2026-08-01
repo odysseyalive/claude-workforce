@@ -154,7 +154,7 @@ Here it's exact. A subagent is a genuinely fresh context: no conversation histor
 
 ## When Something Goes Wrong, the Document Is at Fault
 
-![A close-up of hands holding a page, a fountain pen with warm red ink circling a sentence. The pen moves toward the page rather than toward the reader, because when something breaks, the fix goes to the document](assets/images/document-at-fault.png)
+![A craftsperson at a workbench, pen in hand, amending instructions pinned to the wall. The correction is fresh, and the work on the bench is coming together because the page got fixed](assets/images/document-at-fault.png)
 *When something breaks, the fix goes into the text. Not into a conversation that vanishes tomorrow.*
 
 Two rules, both borrowed, both mechanical here.
