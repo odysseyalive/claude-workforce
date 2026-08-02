@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 13 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 14 assertion(s) in bin/check name this file; 48 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -643,6 +643,19 @@ prevent — and removing the gateway while keeping the files is the quieter vers
 - **Rewrite dangling references — and this is a procedure, not a sentence.** Any surviving skill that
   named a removed command gets that reference stripped. A gate telling a reader to invoke something
   deleted is worse than no gate.
+
+  **A REDUCED skill points at its own moved sections, and this case is new.** Under the old rule the
+  whole `SKILL.md` was deleted, so an intra-skill dangling reference could not exist; reduction creates
+  it. Measured on a sandbox reduction of `invest`, 2026-08-01: the reduced skill kept
+  *"See § News Gather"* — a section that had just become handbook content, in a paragraph that itself
+  correctly stayed as `MECHANISM`.
+
+  So the sweep rewrites **two** populations, not one: references to removed *commands*, and references
+  to *sections that moved into a handbook*. The second resolves to the employee that now owns it —
+  "see § News Gather" becomes "the news-gather step is owned by `<employee>`" — never to a heading that
+  is no longer there. **A reduced skill whose cross-references still point at its own deleted sections
+  reads as corrupt to the next person who opens it**, and it is the most likely first impression of the
+  whole design.
 
   **Measured on the first sweep ever run: removing ONE `SKILL.md` left 16 surviving files naming the
   removed command.** At that scale "stripped" has to say what it removes, because the choices are not
