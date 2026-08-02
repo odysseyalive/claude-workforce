@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement: 10 assertion(s) in bin/check name this file; 35 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 11 assertion(s) in bin/check name this file; 35 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -42,7 +42,7 @@ report a total as though higher were better.
 | **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md **reduced to its mechanical remainder — deleted only if it has none** (§ The two paths, § Nothing is left behind) |
 | **SPLIT** | a workflow *and* persistent data | four ways — § SPLIT decomposes four ways. The skill **always survives** here: it is the data's gateway |
 | **CHARTER** | several distinct actors in one file | becomes a department: one Lead + N ICs |
-| **ORCHESTRATOR** | machinery that creates, registers, or drives agents | **stays a skill.** May gain employees it dispatches to; never becomes one |
+| **ORCHESTRATOR** | machinery whose **output** is agents — it creates, registers, or dispatches them. Decided by the removal test (§ ORCHESTRATOR), never by "it spawns one" | **stays a skill.** May gain employees it dispatches to; never becomes one |
 | **ADOPT** | already a registered agent | censused into the chart, **zero bytes changed** |
 | **RETAIN** | on the refusal list below | untouched |
 
@@ -227,8 +227,36 @@ after the whole org verifies.
 
 ## ORCHESTRATOR
 
-Qualifies if it writes or registers files under `.claude/agents/`, spawns subagents as a designed
-step, dispatches from a catalog, or assigns models and tool grants to a fleet.
+**Qualifies when agent machinery is the skill's OUTPUT**, not one of its steps:
+
+- it writes or registers files under `.claude/agents/`
+- it dispatches across a **catalog it did not author** — any skill, any agent, by description
+- it assigns models or tool grants to a fleet
+
+### The removal test — decidable, and it is the whole section
+
+> **Delete the spawn. Is there still a skill?**
+>
+> **Yes** → it is a domain workflow that *uses* an agent. **CHARTER** (or PROMOTE), and the agent it
+> spawns becomes the IC.
+> **No** → the spawn was the point. **ORCHESTRATOR.**
+
+`/focus` minus its validator is still a focus-article workflow, so the validator is a step and `/focus`
+is a CHARTER whose ICs are already written. `skill-builder` minus its agents is nothing at all — agents
+are what it produces.
+
+**"Spawns subagents as a designed step" was this test until 2026-08-01, and it was wrong.** It reads on
+any skill whose pipeline happens to include an agent, which on the first real target was **30-plus of
+45**. Every one was filed ORCHESTRATOR and stayed a skill — correctly, by the rule as written.
+
+**This is why that mattered more than it looks.** ORCHESTRATOR **survives succession** (§ What still
+refuses). So a project could declare succession, retire its generator, and find the library still
+frozen — for a completely different reason, reported as a considered decision with a reason per skill.
+Fixing the succession marker alone would not have moved a single one of those thirty.
+
+The tell for the wrong reading: an ORCHESTRATOR count that is a large fraction of the library. Real
+orchestrators are rare — on the first target exactly **two** qualify, and one of them is the superseded
+generator being removed.
 
 **Not RETAIN with nicer words.** RETAIN means "nothing here to convert." ORCHESTRATOR means
 "converting this would *remove* capability." An orchestrator sits **above** the org chart — the

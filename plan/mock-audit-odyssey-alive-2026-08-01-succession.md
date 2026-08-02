@@ -49,26 +49,37 @@ handbook"* landing on a real file. **Eleven skills take this path**, and under t
 of them would have become an employee wrapping a deterministic operation in a spawn, a handbook, a
 probe and a dispatch hop.
 
-## FINDING — `ORCHESTRATOR` was over-applied, and succession alone would not have fixed it
+## FINDING — `ORCHESTRATOR` was over-applied  ·  **FIXED, and the blame was misplaced**
 
 The first run's org chart lists **30+ skills** as orchestrators, on the test *"spawn subagents as a
 designed pipeline step"* — `/focus`, `/promote`, `/present`, `/newsletter`, `/edit`, `/research`,
 `/wit`, `/voice`, `/writing`, `/seo`, `/text-eval`, `/image`, `/image-eval`, and every business-ops
 skill.
 
-**That is the wrong test.** `conversion-taxonomy.md` defines ORCHESTRATOR as *machinery that creates,
-registers, or drives agents* — its purpose, not an implementation detail of its pipeline. A skill that
-spawns its own validator as one step is **precisely a CHARTER**: several actors in one file, and the
-validator it spawns is the IC.
+**A first draft of this review said the run used "the wrong test". That was wrong.**
+`conversion-taxonomy.md` § ORCHESTRATOR read, verbatim: *"Qualifies if it writes or registers files
+under `.claude/agents/`, **spawns subagents as a designed step**, dispatches from a catalog…"* — the
+run's phrase, from the doctrine. **It applied the documented rule correctly. The rule was wrong**, and
+the fix belonged in the file, not in the reading.
 
-Under the correct test only **two** qualify: `skill-builder` (creates and registers agents — and is the
-superseded generator, so it is removed) and `route` (dispatches across the whole catalog).
+Corrected to a decidable test:
 
-**This matters because it is independent of succession.** Even with succession declared, a run applying
-the loose test would classify 30+ skills ORCHESTRATOR, and ORCHESTRATOR survives succession by design.
-The library would have stayed frozen for a second reason after the first was fixed. Worth a hard test
-in `conversion-taxonomy.md` § ORCHESTRATOR: *does this skill exist to create or dispatch agents, or does
-it merely use one?*
+> **Delete the spawn. Is there still a skill?**
+> Yes → a domain workflow that *uses* an agent → **CHARTER**, and the agent it spawns becomes the IC.
+> No → the spawn was the point → **ORCHESTRATOR**.
+
+`/focus` minus its validator is still a focus-article workflow. `skill-builder` minus its agents is
+nothing at all. Under the corrected test exactly **two** qualify, and one is the superseded generator
+being removed.
+
+**Why this mattered more than a miscount.** ORCHESTRATOR **survives succession** by design. So a
+project could declare succession, retire its generator, and still find the library frozen — for a
+completely different reason, reported as a considered decision with a reason per skill. Fixing the
+succession marker alone would not have moved one of those thirty.
+
+Enforced two ways: a `bin/check` assertion on the removal test, proven by breaking; and a **counted
+report line** — `ORCHESTRATOR  2 of 45 (4%)` — because a large fraction of the library in that row is
+the observable symptom, and unprinted it reads as a considered result.
 
 ## BLOCKER — the batch does not fit one session
 

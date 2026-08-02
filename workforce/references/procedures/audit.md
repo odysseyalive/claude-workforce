@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 12 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 13 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -275,6 +275,19 @@ Skipped entirely in greenfield: there is nothing to classify, and that is not a 
 
 Assign every existing skill exactly one disposition per `references/conversion-taxonomy.md`. **Test for
 ORCHESTRATOR before CHARTER** — a dispatcher looks like several actors from outside.
+
+**Apply the removal test, and print the ORCHESTRATOR count with its fraction of the library.** *Delete
+the spawn — is there still a skill?* Yes → CHARTER, and the agent it spawned is the IC. A skill is not
+an orchestrator because its pipeline contains an agent.
+
+> `ORCHESTRATOR  2 of 45 (4%)`
+
+**A count above roughly a fifth of the library is the tell that the removal test was not applied**, and
+the run says so rather than reporting it as a considered result. Measured on the first real target: the
+prior wording — *"spawns subagents as a designed step"* — put **30-plus of 45** in this row, every one
+of them correct against the rule as written. Because ORCHESTRATOR survives succession, that froze the
+library *independently* of the succession marker, and it read as a deliberate decision with a reason
+per skill.
 
 **Branch on the succession marker Step 0.7 read** (`conversion-taxonomy.md` § SUCCESSION). Under
 `none` this is the coexistence pass and rules 3 and 7 refuse as written. Under `declared` those two stand
