@@ -20,7 +20,7 @@ A project with no skills is the ordinary case, not a degraded one.
 |---|---|
 | skills | 48 |
 | quarantined (unparseable) | 0 |
-| **UNPAIRED markers (sweep hazard)** | **5** |
+| **UNPAIRED markers (sweep hazard)** | **1** |
 | **UNKNOWN marker families (not in the table)** | **0** |
 | skills with no `origin:` marker | 6 |
 | marker `code_eval_embed` | 1 |
@@ -73,6 +73,18 @@ Ignore rules for that state are spread across:
 - `.claude/skills/opportunity-scout/.gitignore` — 2 dataset(s)
 - `.gitignore` — 17 dataset(s)
 
+## `origin:` spans by role
+
+Only a **paired span** is opened-and-closed. The other roles are unclosed BY DESIGN, and
+adding a closer to one is damage, not repair. `UNCLASSIFIED` is the only line that needs a
+human — and an orphan *closer* is reported separately, under unpaired markers.
+
+- `paired span` — 136
+- `file-scope header` — 17
+- `block attribute` — 2
+- `section header` — 1
+- `tail / append-point` — 1
+
 ## Marker families OUTSIDE the skills tree
 
 Handbooks, `CLAUDE.md`, and the settings file. A sweep scoped to `skills/` never reaches
@@ -91,11 +103,7 @@ own documentation describing a family is evidence it exists somewhere, never tha
 
 ## Unpaired markers — a sweep hazard
 
-- `focus` origin_span: 4 openers / 3 closers — orphan opener — the sweep may swallow to the next closer
 - `frontend-design` enforcement_annotation: 3 openers / 4 closers — orphan closer survives the sweep as residue
-- `frontend-design` origin_span: 4 openers / 3 closers — orphan opener — the sweep may swallow to the next closer
-- `invest` origin_span: 4 openers / 3 closers — orphan opener — the sweep may swallow to the next closer
-- `text-eval` origin_span: 1 openers / 0 closers — orphan opener — the sweep may swallow to the next closer
 
 ## Credential-shaped files inside the skill tree
 

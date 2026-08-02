@@ -168,6 +168,133 @@ def ANCHORED(rx):
 # ─────────────────────────────────────────────────────────────────────────────
 SCANNED_EXT = {".md", ".sh", ".ps1", ".py", ".txt"}
 
+# ─────────────────────────────────────────────────────────────────────────────
+# `origin:` HAS FIVE ROLES AND ONLY ONE IS A PAIRED SPAN
+#
+# Counting openers against closers reports every other role as an orphan opener
+# and a sweep hazard. Measured on odyssey-alive: four of five reported hazards
+# close nothing and are unclosed BY DESIGN, and "repairing" one is the damage —
+# `text-eval/references/ai-patterns.md:64` is an append point whose own next line
+# reads "Nothing above this marker was read, moved, or modified", so a closer
+# would bound a region documented as running to EOF and the next append would
+# land outside the region that owns it.
+#
+# The danger runs the other way too, which is why this is modelled rather than
+# silenced: a sweep treating `invest/SKILL.md:102` as opener-to-next-closer
+# swallows 255 lines on a marker that closes nothing.
+#
+# Classification is POSITIONAL — no guessing from prose. An opener that fits no
+# role is reported UNCLASSIFIED, never as a hazard the census has not established.
+# ─────────────────────────────────────────────────────────────────────────────
+ORIGIN_OPEN_RX = re.compile(r"^[ \t]*(?:[#;]|//|--)?[ \t]*<!--\s*origin:", re.M)
+ORIGIN_CLOSE_RX = re.compile(r"^[ \t]*(?:[#;]|//|--)?[ \t]*<!--\s*/origin\s*-->", re.M)
+HEADING_RX = re.compile(r"^#{2,6}\s")
+FILE_SCOPE_MAX_LINE = 6
+
+
+# An append point SAYS SO. Matched against the opener's own attributes and the
+# next two non-blank lines — the shape the real one takes on the target, where the
+# following comment reads "SKILL-BUILDER APPENDIX — machine-owned … Nothing above
+# this marker was read, moved, or modified."
+TAIL_DECL_RX = re.compile(
+    r"machine-owned|appendix|safe to replace|auto-generated|added by|nothing above",
+    re.I,
+)
+
+
+def _declares_tail(lines, ln):
+    """True when the opener or the lines just after it declare machine ownership."""
+    window = [lines[ln - 1]]
+    seen = 0
+    for l in lines[ln:]:
+        if not l.strip():
+            continue
+        window.append(l)
+        seen += 1
+        if seen >= 2:
+            break
+    return any(TAIL_DECL_RX.search(w) for w in window)
+
+
+def _other_family_ranges(lines):
+    """Line ranges of every NON-origin paired family, for role-3 containment."""
+    ranges = []
+    for key, (o_rx, c_rx) in PAIRS.items():
+        if key == "origin_span":
+            continue
+        opens, closes = [], []
+        for i, l in enumerate(lines, 1):
+            if re.search(r"^[ \t]*(?:[#;]|//|--)?[ \t]*" + o_rx, l):
+                opens.append(i)
+            elif re.search(r"^[ \t]*(?:[#;]|//|--)?[ \t]*" + c_rx, l):
+                closes.append(i)
+        for o in opens:
+            after = [c for c in closes if c > o]
+            if after:
+                ranges.append((o, after[0]))
+    return ranges
+
+
+def classify_origin_openers(body):
+    """Per-opener role. Returns (roles: Counter, unclassified: [line], orphan_closers: int)."""
+    lines = body.split("\n")
+    events = []
+    for i, l in enumerate(lines, 1):
+        if ORIGIN_CLOSE_RX.match(l):
+            events.append((i, "close"))
+        elif ORIGIN_OPEN_RX.match(l):
+            events.append((i, "open"))
+    blocks = _other_family_ranges(lines)
+    roles, unclassified = Counter(), []
+    open_lines = [i for i, k in events if k == "open"]
+    close_lines = [i for i, k in events if k == "close"]
+
+    for idx, (ln, kind) in enumerate(events):
+        if kind != "open":
+            continue
+        nxt = events[idx + 1] if idx + 1 < len(events) else None
+        if nxt and nxt[1] == "close":
+            roles["paired span"] += 1
+            continue
+        # Unclosed. Classify by position, most specific first.
+        nxt_txt = ""
+        for l2 in lines[ln:]:
+            if l2.strip() and not l2.lstrip().startswith("<!--"):
+                nxt_txt = l2
+                break
+        is_last_opener = ln == max(open_lines)
+        has_later_closer = bool([c for c in close_lines if c > ln])
+
+        if ln <= FILE_SCOPE_MAX_LINE:
+            roles["file-scope header"] += 1
+        elif any(a < ln < b for a, b in blocks):
+            roles["block attribute"] += 1
+        elif is_last_opener and not has_later_closer and _declares_tail(lines, ln):
+            # A TAIL IS THE LAST OPENER, not merely one lacking a closer. Ordering
+            # this before the heading test collapsed both roles into "tail" the
+            # moment a file's only closer sat above them — caught by f16, where a
+            # section header and an append point both went to tail.
+            #
+            # AND IT MUST DECLARE ITSELF. A genuine unterminated span is
+            # POSITIONALLY IDENTICAL to a legitimate append point: both are the last
+            # opener with no closer. Inferring the benign reading from position
+            # alone silently excuses every real scar — caught by f12, whose
+            # hand-authored `scarred` skill went from a finding to a clean "tail".
+            # The real append point on the target declares itself on the next line
+            # ("machine-owned … Nothing above this marker was read"); a scar does
+            # not. Undeclared stays UNCLASSIFIED, which is a human's problem, not a
+            # hazard the census has established.
+            roles["tail / append-point"] += 1
+        elif HEADING_RX.match(nxt_txt):
+            # A heading on the next meaningful line marks a section the opener owns
+            # up to the NEXT OPENER. `invest/SKILL.md:102` is the measured example.
+            roles["section header"] += 1
+        else:
+            roles["UNCLASSIFIED"] += 1
+            unclassified.append(ln)
+    orphan_closers = max(0, len(close_lines) - len(open_lines))
+    return roles, unclassified, orphan_closers
+
 
 def scan_markers(sdir, root):
     """Every marker fact about one skill directory, computed once."""
@@ -192,6 +319,7 @@ def scan_markers(sdir, root):
         "owners": Counter(), "pairing": [], "file_scope_owners": [],
         "families": Counter(),
         "family_mentions": Counter(),
+        "origin_roles": Counter(),
         "has_origin": bool(ANCHORED(re.compile(r"<!--\s*origin:")).search(joined)),
     }
     # ONE anchoring rule and ONE body for every computation below.
@@ -227,6 +355,27 @@ def scan_markers(sdir, root):
                 if ANCHORED(_P(o_rx)).search(head):
                     scope.append(fp)
         out["file_scope_owners"].extend(scope)
+
+        # `origin_span` IS NOT COUNTED, IT IS CLASSIFIED. Openers and closers
+        # disagreeing is the normal, correct shape for four of the five roles;
+        # only an opener fitting NO role, or a closer with no opener, is a finding.
+        if key == "origin_span":
+            for fp, b in defenced:
+                roles, unclassified, orphans = classify_origin_openers(b)
+                for r, n in roles.items():
+                    out["origin_roles"][r] += n
+                if unclassified or orphans:
+                    out["pairing"].append({
+                        "marker": key, "file": fp,
+                        "openers": len(unclassified), "closers": orphans,
+                        "files": [fp],
+                        "unclassified_lines": unclassified,
+                        "risk": ("an opener fitting none of the five known roles"
+                                 if unclassified else
+                                 "orphan closer survives the sweep as residue"),
+                    })
+            continue
+
         bad = [(fp, a, b) for fp, a, b in per_file if a != b and fp not in scope]
         if bad:
             out["pairing"].append({
@@ -361,6 +510,7 @@ def census(root):
     mention_totals = Counter()
     family_totals = Counter()
     family_mention_totals = Counter()
+    origin_role_totals = Counter()
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
@@ -421,6 +571,8 @@ def census(root):
             family_mention_totals[fam] += n
         for fp in mk["file_scope_owners"]:
             file_scope_owners.append({"skill": name, "file": fp})
+        for r, n in mk.get("origin_roles", {}).items():
+            origin_role_totals[r] += n
         for pr in mk["pairing"]:
             unpaired.append({
                 "skill": name, "marker": pr["marker"],
@@ -769,6 +921,7 @@ def census(root):
         # Families found OUTSIDE `.claude/skills/**` — handbooks, CLAUDE.md, the
         # settings file. Kept separate from the skill totals on purpose (see the
         # scan above); merging them would inflate the extraction denominator.
+        "origin_roles": dict(origin_role_totals),
         "families_outside_skills": dict(outside_families),
         "families_outside_skills_paths": {k: sorted(set(v)) for k, v in outside_paths.items()},
         # Families named only in prose — the predecessor's own docs describing a
@@ -925,6 +1078,17 @@ def report(c):
         p("")
         for k, v in sorted(c["ignore_rule_sources"].items()):
             p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c.get("origin_roles"):
+        p("## `origin:` spans by role")
+        p("")
+        p("Only a **paired span** is opened-and-closed. The other roles are unclosed BY DESIGN, and")
+        p("adding a closer to one is damage, not repair. `UNCLASSIFIED` is the only line that needs a")
+        p("human — and an orphan *closer* is reported separately, under unpaired markers.")
+        p("")
+        for k, v in sorted(c["origin_roles"].items(), key=lambda x: -x[1]):
+            mark = "**" if k == "UNCLASSIFIED" else ""
+            p(f"- {mark}`{k}`{mark} — {v}")
         p("")
     if c.get("families_outside_skills"):
         p("## Marker families OUTSIDE the skills tree")

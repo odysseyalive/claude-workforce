@@ -80,6 +80,12 @@ def assertions(exp, c):
         # f15: families found outside `.claude/skills/**`. `_exact` because the
         # failure this catches is a count of ZERO against spans that exist.
         "families_outside_skills_exact": len(c.get("families_outside_skills") or {}),
+        # f16: the five `origin:` roles. `origin_unclassified_exact` is the one
+        # that must stay 0 — it counts openers the census could not place, which
+        # are the only ones a human should look at.
+        "origin_roles_exact": len(c.get("origin_roles") or {}),
+        "origin_unclassified_exact": (c.get("origin_roles") or {}).get("UNCLASSIFIED", 0),
+        "unpaired_exact": len(c.get("unpaired_markers") or []),
         # f11: dataset and hook censuses, hand-classified. `_exact` because a
         # floor would hide the over-count these exist to catch.
         "datasets_exact": len(c.get("datasets") or []),

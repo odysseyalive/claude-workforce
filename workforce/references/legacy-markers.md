@@ -71,10 +71,10 @@ own defect.
 
 ### `origin:` has at least five roles, and only one of them is a paired span
 
-**OPEN, 2026-08-01.** The census reports every unclosed `origin:` as an orphan opener and a sweep
-hazard. Measured against `odyssey-alive`, **four of its five reported hazards are not missing a closer
-at all** — they are unclosed by design, and inserting one would fabricate a span the generator never
-wrote:
+**MODELLED, 2026-08-01** (`fixtures/f16-origin-roles`). The census used to report every unclosed
+`origin:` as an orphan opener and a sweep hazard. Measured against `odyssey-alive`, **four of its five
+reported hazards were not missing a closer at all** — they are unclosed by design, and inserting one
+would fabricate a span the generator never wrote:
 
 | role | example | terminated by |
 |---|---|---|
@@ -93,10 +93,22 @@ report:
 - **Treated as opener-to-next-closer by a sweep, they take real content with them.** `invest:102`'s
   next closer is at line 357: a sweep would swallow **255 lines** on a marker that closes nothing.
 
-**So the pairing check is right that these need a human, and wrong about what the human should do.**
-Until roles 3–5 are modelled, an unclosed `origin:` is *unclassified*, not *unpaired* — and the honest
-report says which of the five roles it could not rule out, rather than naming a hazard it has not
-established. Do not "repair" one by adding a closer.
+**So the pairing check was right that these need a human, and wrong about what the human should do.**
+`origin_span` is now **classified, not counted**: an opener fitting a known role is reported as that
+role, and only an opener fitting NONE — plus any orphan *closer* — is a finding. Do not "repair" one by
+adding a closer. On the target this took five reported hazards to one real orphan closer, with zero
+`UNCLASSIFIED`.
+
+**A tail must DECLARE itself, and this is the sharp edge.** A genuine unterminated span is
+*positionally identical* to a legitimate append point — both are the last opener with no closer. Role 4
+therefore requires an explicit machine-ownership declaration on the opener or the lines just after it
+(the real one reads *"machine-owned … Nothing above this marker was read, moved, or modified"*). An
+undeclared one stays `UNCLASSIFIED`.
+
+Inferring the benign reading from position alone silently excuses every real scar — which is exactly
+what happened on the first implementation, and `f12-verified-markers` caught it: its hand-authored
+unterminated span turned from a finding into a clean "tail". **A classifier that can only return the
+harmless answer is not a classifier.**
 
 ### The five families this project emits are its OWN, and the class is load-bearing
 

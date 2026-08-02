@@ -110,12 +110,15 @@ So every headline finding from the before-review is still open:
 | 6 agents missing `name:`/`description:` | **unchanged** |
 | 0 of 45 skills pin a model | **unchanged** |
 | 6 of 45 skills name a check | **unchanged** (the 8 new employees are all checked) |
-| 5 unpaired markers | **unchanged** — still a latent hazard for any future sweep |
+| 5 unpaired markers | **resolved as 1** — four were unclosed by design (`851bbef`, `f16-origin-roles`); one real orphan closer remains in `frontend-design` |
 
 **odyssey-alive now runs both systems side by side.** That is a coherent outcome of "succession: none,"
 but it is not what the standing directive asks for ("I don't want to leave any of the old system still
 there that doesn't need to be there"). Closing it is a deliberate second act — declaring succession
-from `skill-builder` — and the five unpaired markers must be resolved by hand *before* any sweep runs.
+from `skill-builder`. The five unpaired markers turned out to be **one**: `origin:` is now classified
+rather than counted, four of the five were legitimate roles, and the only genuine finding left is an
+orphan `enforcement_annotation` closer in `frontend-design` — an extra `END`, which survives a sweep as
+residue rather than swallowing content.
 
 ## Held, as required
 
