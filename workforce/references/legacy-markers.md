@@ -33,6 +33,11 @@ Stated once. `bin/check` fails on restatement elsewhere.
 | route-dispatch checkpoint | `<!--\s*ROUTE-DISPATCH-CHECKPOINT START` | scaffolding |
 | code-eval enforce | `<!--\s*CODE-EVAL-ENFORCE START` | scaffolding |
 | creative-scrub embed | `<!--\s*CREATIVE-SCRUB-EMBED START` | scaffolding |
+| org-dispatch checkpoint | `<!--\s*ORG-DISPATCH-CHECKPOINT START` | **own — never swept** |
+| org chain | `<!--\s*ORG-CHAIN START` | **own — never swept** |
+| org record | `<!--\s*ORG-RECORD START` | **own — never swept** |
+| workforce constitution | `<!--\s*WORKFORCE-CONSTITUTION START` | **own — never swept** |
+| workforce deny | `<!--\s*WORKFORCE-DENY START` | **own — never swept**; `disband` excises this span surgically, so losing it strands deny rules in the settings file |
 | integrity sidecar | a dotfile at a skill root whose body is hex digests — **by shape, never by filename**. `.directives.sha` is this project's own and is never swept as a predecessor's | scaffolding |
 | predecessor ledger | a `ledger/{incidents,decisions,patterns,flows}/` tree | **data — migrate** |
 
@@ -63,6 +68,37 @@ named somewhere.
 Mentions are still **reported**, never dropped. A generator's docs naming a family is evidence it
 exists somewhere; it is not evidence it is here, and a number that shrinks without explanation is its
 own defect.
+
+### The two families this project emits are its OWN, and the class is load-bearing
+
+Measured on the first completed audit, 2026-08-01. The run emitted **eight spans across three
+families**, and the census saw **one**:
+
+| family | written by | lands in | seen? |
+|---|---|---|---|
+| `ORG-DISPATCH-CHECKPOINT` | `org index` | `.claude/skills/org/SKILL.md` | reported as an unclassified **foreign** family |
+| `ORG-CHAIN` | `org embed` | `.claude/agents/*.md` (6 files) | **invisible** |
+| `WORKFORCE-CONSTITUTION` | `audit` | `CLAUDE.md` | **invisible** |
+
+Family discovery walked `.claude/skills/**` only, and neither `.claude/agents/` nor `CLAUDE.md` is
+under it. So this project became the generator its own detector could not account for — the exact
+failure this section was written about, arriving from the inside. Two further families, `ORG-RECORD`
+and `WORKFORCE-DENY`, were in the same blind spot and had simply not been emitted yet by that run.
+
+**Skills are not the only place a marker lands, and `org index` / `org embed` guarantee it.** Every
+skill change is followed by those two commands (`procedures/audit.md`: *model rewrite → `org index` →
+`org embed` → `verify` → the sweep*), and `embed` writes into handbooks, not skills. A detector scoped
+to the skills tree is therefore blind by construction to half of what this project emits.
+
+**They are classed `own — never swept`, and the temptation to file them as `scaffolding` is the trap.**
+`scaffolding` authorizes removal. A later run that swept them would delete the constitution out of the
+user's own `CLAUDE.md` and the dispatch block out of `org`, then report a clean sweep. The precedent is
+already here — `.directives.sha` is exempt for the same reason, and the foreign-origin regex has always
+excluded `workforce` by name.
+
+**A detector that stops at the skills tree cannot see a marker written outside it.** Discovery now
+covers `CLAUDE.md` and the `.claude/` root alongside the skills, because a marker no census can see is
+one no sweep can be reasoned about.
 
 The regexes match **openers only**. A pattern matching both an opener and its closing comment
 double-counts every block; the first hand census of a real project reported twice the true count for

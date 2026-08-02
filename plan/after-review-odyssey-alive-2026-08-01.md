@@ -60,22 +60,37 @@ are held open by C1. I checked this expecting residue and found the rule applied
 across 48 articles, then amended the *handbook* to read the enum from the schema rather than copying a
 corrected list — one canonical text, not two. `CLAUDE.md` was left alone and reported as a proposal.
 
-## Two NEW defects — in claude-workforce, found by its own output
+## Two NEW defects — in claude-workforce, found by its own output  ·  **FIXED 2026-08-01**
 
-**Workforce emits two marker families, and its own census handles neither correctly.**
+**Workforce emits five marker families and its own census could see one of them.** The first count
+here said two families and eight spans; enumerating the source properly found **five families, and 23
+spans invisible in this target alone**.
 
-| family | written to | census result |
-|---|---|---|
-| `ORG-DISPATCH-CHECKPOINT` | `.claude/skills/org/SKILL.md` | flagged **UNKNOWN — "classify before any sweep"** |
-| `WORKFORCE-CONSTITUTION` | `CLAUDE.md` | **invisible** — family discovery only walks `.claude/skills/**` |
+| family | written by | lands in | before the fix |
+|---|---|---|---|
+| `ORG-DISPATCH-CHECKPOINT` | `org index` | `.claude/skills/org/SKILL.md` | reported as an unclassified **foreign** family |
+| `ORG-RECORD` | `audit` | `.claude/agents/*.md` — **16 spans** | invisible |
+| `ORG-CHAIN` | `org embed` | `.claude/agents/*.md` — **6 spans** | invisible |
+| `WORKFORCE-CONSTITUTION` | `audit` | `CLAUDE.md` — 1 span | invisible |
+| `WORKFORCE-DENY` | `audit` | settings file | never emitted; storage form unspecified |
 
-Neither is in `legacy-markers.md`'s table. This is the same shape as the defect closed on 2026-08-01:
-the table's own rule is that it *grows from* families the detector finds, and workforce is now the
-generator emitting families that never reach it. A future run auditing this project would report
-workforce's own scaffolding as an unclassified foreign family.
+Family discovery walked `.claude/skills/**` only. But `org index` and `org embed` follow every skill
+change by procedure, and **`embed` writes into handbooks, not skills** — so the detector was blind by
+construction to half of what this project emits.
 
-The second is worse than the first: a marker the census cannot see is a marker no sweep can be reasoned
-about. **Fix both together** — add the two rows, and extend family discovery past the skills tree.
+**Fixed, and the class matters more than the count.** All five are `own — never swept`, NOT
+`scaffolding`. Filing them as scaffolding authorizes removal: a later run would have deleted the
+constitution out of the user's own `CLAUDE.md` and the deny span the `disband` command depends on,
+then reported a clean sweep. Discovery now covers `CLAUDE.md` and the `.claude/` tree outside
+`skills/`, counted **separately** from the skill totals — those are the extraction gate's denominator
+and `INV-DIRECTIVES` asserts against them, so merging would break a different invariant to fix this one.
+Fixture `f15-markers-outside-skills`, proven by breaking: the pre-fix census reports 0.
+
+`WORKFORCE-DENY` is deliberately **not** asserted. `enforcement.md` renders it as bare comment lines
+inside a JSON settings file, which strict JSON cannot hold, while the same section requires JSON-aware
+mutation. The storage form is unspecified and has never been emitted. It sits in the table so it is
+classed correctly if it appears; inventing a shape to detect is how `MODEL-SWITCH-GATE` became a
+phantom earlier the same day.
 
 ## What did NOT move, and why
 

@@ -21,7 +21,7 @@ A project with no skills is the ordinary case, not a degraded one.
 | skills | 48 |
 | quarantined (unparseable) | 0 |
 | **UNPAIRED markers (sweep hazard)** | **5** |
-| **UNKNOWN marker families (not in the table)** | **1** |
+| **UNKNOWN marker families (not in the table)** | **0** |
 | skills with no `origin:` marker | 6 |
 | marker `code_eval_embed` | 1 |
 | marker `code_eval_enforce` | 1 |
@@ -29,6 +29,7 @@ A project with no skills is the ordinary case, not a degraded one.
 | marker `enforcement_annotation` | 112 |
 | marker `lane_agent_embed` | 1 |
 | marker `model_lane_gate` | 12 |
+| marker `org_dispatch_checkpoint` | 1 |
 | marker `origin_foreign` | 98 |
 | marker `origin_user_immutable` | 55 |
 | marker `route_dispatch_checkpoint` | 1 |
@@ -72,16 +73,21 @@ Ignore rules for that state are spread across:
 - `.claude/skills/opportunity-scout/.gitignore` — 2 dataset(s)
 - `.gitignore` — 17 dataset(s)
 
+## Marker families OUTSIDE the skills tree
+
+Handbooks, `CLAUDE.md`, and the settings file. A sweep scoped to `skills/` never reaches
+these, and a census scoped to `skills/` never reports them.
+
+- `ORG-RECORD` — 16 span(s): `.claude/agents/content-evaluator.md`, `.claude/agents/content-lead.md`, `.claude/agents/content-writer.md` +13 more
+- `ORG-CHAIN` — 6 span(s): `.claude/agents/content-lead.md`, `.claude/agents/ops-lead.md`, `.claude/agents/site-lead.md` +3 more
+- `WORKFORCE-CONSTITUTION` — 1 span(s): `CLAUDE.md`
+
 ## Families MENTIONED but not present — do not classify these
 
 Named in prose or a table cell, with no anchored block anywhere in the tree. A generator's
 own documentation describing a family is evidence it exists somewhere, never that it is here.
 
 - `MODEL-SWITCH-GATE` — 1 mention(s), 0 blocks
-
-## Unknown marker families — the table is incomplete
-
-- `ORG-DISPATCH-CHECKPOINT` — 1 occurrence(s). Not in `legacy-markers.md`; classify before any sweep.
 
 ## Unpaired markers — a sweep hazard
 

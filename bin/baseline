@@ -43,6 +43,25 @@ MARKERS = {
     "route_dispatch_checkpoint": re.compile(r"<!--\s*ROUTE-DISPATCH-CHECKPOINT START"),
     "code_eval_enforce": re.compile(r"<!--\s*CODE-EVAL-ENFORCE START"),
     "creative_scrub_embed": re.compile(r"<!--\s*CREATIVE-SCRUB-EMBED START"),
+    # THIS PROJECT'S OWN output, classed `own — never swept` in legacy-markers.md.
+    # Known here so the census stops reporting them as unclassified FOREIGN families
+    # — which it did on the first completed audit, against markers we had just
+    # written ourselves.
+    "org_dispatch_checkpoint": re.compile(r"<!--\s*ORG-DISPATCH-CHECKPOINT START"),
+    "org_chain": re.compile(r"<!--\s*ORG-CHAIN START"),
+    "org_record": re.compile(r"<!--\s*ORG-RECORD START"),
+    "workforce_constitution": re.compile(r"<!--\s*WORKFORCE-CONSTITUTION START"),
+    "workforce_deny": re.compile(r"<!--\s*WORKFORCE-DENY START"),
+}
+
+# Families this project EMITS. Never predecessor residue, never sweepable. Kept as
+# a set rather than a comment because the distinction authorizes deletion: filing
+# any of these as scaffolding would let a later run sweep the constitution out of
+# the user's own CLAUDE.md, or the deny span out of the settings file that
+# `disband` needs to excise it, and report success either way.
+OWN_FAMILIES = {
+    "org_dispatch_checkpoint", "org_chain", "org_record",
+    "workforce_constitution", "workforce_deny",
 }
 
 # Paired markers: a sweep removes opener-to-closer, so pairing must be VERIFIED
@@ -62,6 +81,13 @@ PAIRS = {
                                   r"<!--\s*ROUTE-DISPATCH-CHECKPOINT END"),
     "code_eval_enforce": (r"<!--\s*CODE-EVAL-ENFORCE START", r"<!--\s*CODE-EVAL-ENFORCE END"),
     "creative_scrub_embed": (r"<!--\s*CREATIVE-SCRUB-EMBED START", r"<!--\s*CREATIVE-SCRUB-EMBED END"),
+    "org_dispatch_checkpoint": (r"<!--\s*ORG-DISPATCH-CHECKPOINT START",
+                                r"<!--\s*ORG-DISPATCH-CHECKPOINT END"),
+    "org_chain": (r"<!--\s*ORG-CHAIN START", r"<!--\s*ORG-CHAIN END"),
+    "org_record": (r"<!--\s*ORG-RECORD START", r"<!--\s*ORG-RECORD END"),
+    "workforce_constitution": (r"<!--\s*WORKFORCE-CONSTITUTION START",
+                               r"<!--\s*WORKFORCE-CONSTITUTION END"),
+    "workforce_deny": (r"<!--\s*WORKFORCE-DENY START", r"<!--\s*WORKFORCE-DENY END"),
     "origin_span": (r"<!--\s*origin:", r"<!--\s*/origin\s*-->"),
 }
 
@@ -417,6 +443,38 @@ def census(root):
         )
         skills[name] = rec
 
+    # ── Markers OUTSIDE the skills tree ──────────────────────────────────────
+    # A DETECTOR SCOPED TO `skills/` IS BLIND TO HALF OF WHAT THIS PROJECT EMITS.
+    # Measured on the first completed audit: eight spans across three families were
+    # written and the census saw ONE. `org embed` writes `ORG-CHAIN` into
+    # `.claude/agents/*.md`, `audit` writes `WORKFORCE-CONSTITUTION` into the
+    # project's `CLAUDE.md`, and `disband` depends on a `WORKFORCE-DENY` span in the
+    # settings file — none of which live under `skills/`. A marker no census can see
+    # is a marker no sweep can be reasoned about.
+    #
+    # Reported SEPARATELY from the skill totals rather than merged into them: the
+    # skill numbers are the extraction gate's denominator and INV-DIRECTIVES asserts
+    # against them, so quietly inflating them here would break a different invariant
+    # to fix this one.
+    outside_families = Counter()
+    outside_paths = {}
+    _outside_files = []
+    _cmd = os.path.join(root, "CLAUDE.md")
+    if os.path.isfile(_cmd):
+        _outside_files.append(_cmd)
+    _skills_abs = os.path.abspath(skills_dir)
+    for _d, _subs, _fns in os.walk(claude):
+        _dabs = os.path.abspath(_d)
+        if _dabs == _skills_abs or _dabs.startswith(_skills_abs + os.sep):
+            continue  # censused above; double counting would inflate the denominator
+        for _fn in _fns:
+            if os.path.splitext(_fn)[1].lower() in SCANNED_EXT | {".json"}:
+                _outside_files.append(os.path.join(_d, _fn))
+    for _fp in _outside_files:
+        for _fam in ANCHORED(GENERIC_PAIR_RX).findall(defence(read(_fp))):
+            outside_families[_fam] += 1
+            outside_paths.setdefault(_fam, []).append(os.path.relpath(_fp, root))
+
     # ── State / data inventory ───────────────────────────────────────────────
     # Walk the whole skills tree; classify anything that is persistent state
     # rather than instruction, and record its git disposition. The git status is
@@ -708,6 +766,11 @@ def census(root):
             if k.replace("-", "").lower() not in
                {x.replace("_", "").replace("-", "").lower() for x in PAIRS}
         },
+        # Families found OUTSIDE `.claude/skills/**` — handbooks, CLAUDE.md, the
+        # settings file. Kept separate from the skill totals on purpose (see the
+        # scan above); merging them would inflate the extraction denominator.
+        "families_outside_skills": dict(outside_families),
+        "families_outside_skills_paths": {k: sorted(set(v)) for k, v in outside_paths.items()},
         # Families named only in prose — the predecessor's own docs describing a
         # marker it emits elsewhere. Evidence the family exists, never evidence a
         # block is here, and never a candidate for the marker table.
@@ -862,6 +925,18 @@ def report(c):
         p("")
         for k, v in sorted(c["ignore_rule_sources"].items()):
             p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c.get("families_outside_skills"):
+        p("## Marker families OUTSIDE the skills tree")
+        p("")
+        p("Handbooks, `CLAUDE.md`, and the settings file. A sweep scoped to `skills/` never reaches")
+        p("these, and a census scoped to `skills/` never reports them.")
+        p("")
+        _op = c.get("families_outside_skills_paths") or {}
+        for k, v in sorted(c["families_outside_skills"].items(), key=lambda x: -x[1]):
+            _where = ", ".join(f"`{x}`" for x in _op.get(k, [])[:3])
+            _more = "" if len(_op.get(k, [])) <= 3 else f" +{len(_op[k]) - 3} more"
+            p(f"- `{k}` — {v} span(s): {_where}{_more}")
         p("")
     if c.get("family_mentions_only"):
         p("## Families MENTIONED but not present — do not classify these")
