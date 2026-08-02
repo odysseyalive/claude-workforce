@@ -2822,6 +2822,27 @@ multi = [
 check("README: one copyable command per fenced block", not multi, f"stacked: {multi}")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# The marker table and the census must name the same families
+# ─────────────────────────────────────────────────────────────────────────────
+# `legacy-markers.md` says of itself that the table "grows from" families the
+# generic detector finds. It said that on 2026-07-31, named three, and the table
+# did not grow — doctrine written, nothing making it true, which is this project's
+# dominant failure mode. The two lists drifting apart is silent in both directions:
+# a family in the table but not the census is never detected, and a family in the
+# census but not the table is re-reported as unclassified every run forever.
+_lm = read("workforce/references/legacy-markers.md")
+_bl = read("bin/baseline")
+_tbl = set(re.findall(r"`<!--\\s\*([A-Z][A-Z0-9-]{3,}) START`", _lm))
+_cen = set(re.findall(r"r\"<!--\\s\*([A-Z][A-Z0-9-]{3,}) START", _bl))
+check(
+    "markers: the table and the census name the same families",
+    _tbl == _cen,
+    f"only in legacy-markers.md: {sorted(_tbl - _cen) or 'none'} · "
+    f"only in bin/baseline: {sorted(_cen - _tbl) or 'none'} — a family in one and not "
+    "the other is either never detected or reported unclassified forever",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # A fixture that is not IN the repo is not a fixture
 # ─────────────────────────────────────────────────────────────────────────────
 # `bin/conformance` exits 1 and is the only instrument showing this system

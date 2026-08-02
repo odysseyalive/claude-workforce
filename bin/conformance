@@ -72,6 +72,11 @@ def assertions(exp, c):
         # distinction exists rather than assuming it.
         "ledger_index_present": bool((c.get("predecessor_ledger") or {}).get("index_present")),
         "ledger_index_states_counts": bool((c.get("predecessor_ledger") or {}).get("index_states_counts")),
+        # f14: a MENTIONED family is not a PRESENT one. `_exact` both ways —
+        # a floor on unknown families would hide the phantom this pair exists to
+        # catch, and silence on mentions would be the opposite error.
+        "unknown_families_exact": len(c.get("unknown_marker_families") or {}),
+        "family_mentions_only_exact": len(c.get("family_mentions_only") or {}),
         # f11: dataset and hook censuses, hand-classified. `_exact` because a
         # floor would hide the over-count these exist to catch.
         "datasets_exact": len(c.get("datasets") or []),

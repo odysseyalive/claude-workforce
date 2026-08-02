@@ -21,14 +21,17 @@ A project with no skills is the ordinary case, not a degraded one.
 | skills | 45 |
 | quarantined (unparseable) | 0 |
 | **UNPAIRED markers (sweep hazard)** | **5** |
-| **UNKNOWN marker families (not in the table)** | **4** |
+| **UNKNOWN marker families (not in the table)** | **0** |
 | skills with no `origin:` marker | 4 |
 | marker `code_eval_embed` | 1 |
+| marker `code_eval_enforce` | 1 |
+| marker `creative_scrub_embed` | 1 |
 | marker `enforcement_annotation` | 111 |
 | marker `lane_agent_embed` | 1 |
 | marker `model_lane_gate` | 12 |
 | marker `origin_foreign` | 98 |
 | marker `origin_user_immutable` | 55 |
+| marker `route_dispatch_checkpoint` | 1 |
 | marker `route_embed` | 13 |
 | integrity sidecars (any generator) | 36 |
 | skills naming `/route` in prose | 27 |
@@ -69,12 +72,12 @@ Ignore rules for that state are spread across:
 - `.claude/skills/opportunity-scout/.gitignore` — 2 dataset(s)
 - `.gitignore` — 17 dataset(s)
 
-## Unknown marker families — the table is incomplete
+## Families MENTIONED but not present — do not classify these
 
-- `ROUTE-DISPATCH-CHECKPOINT` — 5 occurrence(s). Not in `legacy-markers.md`; classify before any sweep.
-- `CODE-EVAL-ENFORCE` — 1 occurrence(s). Not in `legacy-markers.md`; classify before any sweep.
-- `CREATIVE-SCRUB-EMBED` — 1 occurrence(s). Not in `legacy-markers.md`; classify before any sweep.
-- `MODEL-SWITCH-GATE` — 1 occurrence(s). Not in `legacy-markers.md`; classify before any sweep.
+Named in prose or a table cell, with no anchored block anywhere in the tree. A generator's
+own documentation describing a family is evidence it exists somewhere, never that it is here.
+
+- `MODEL-SWITCH-GATE` — 1 mention(s), 0 blocks
 
 ## Unpaired markers — a sweep hazard
 

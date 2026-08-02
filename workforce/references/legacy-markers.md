@@ -30,6 +30,9 @@ Stated once. `bin/check` fails on restatement elsewhere.
 | code-eval embed | `<!--\s*CODE-EVAL-EMBED START` | scaffolding |
 | model-lane gate | `<!--\s*MODEL-LANE-GATE START` | scaffolding |
 | lane-agent embed | `<!--\s*LANE-AGENT-EMBED START` | scaffolding |
+| route-dispatch checkpoint | `<!--\s*ROUTE-DISPATCH-CHECKPOINT START` | scaffolding |
+| code-eval enforce | `<!--\s*CODE-EVAL-ENFORCE START` | scaffolding |
+| creative-scrub embed | `<!--\s*CREATIVE-SCRUB-EMBED START` | scaffolding |
 | integrity sidecar | a dotfile at a skill root whose body is hex digests — **by shape, never by filename**. `.directives.sha` is this project's own and is never swept as a predecessor's | scaffolding |
 | predecessor ledger | a `ledger/{incidents,decisions,patterns,flows}/` tree | **data — migrate** |
 
@@ -39,9 +42,27 @@ generator it has not met. Run the generic detector alongside the table and **rep
 that this table lacks** — they are a finding about this file, and the table grows from them.
 
 Measured on the first survey target, whose markers this project had been reading all day: the generic
-detector found **four families the table omitted** — `ROUTE-DISPATCH-CHECKPOINT` (7 blocks),
-`CREATIVE-SCRUB-EMBED` (2), `CODE-EVAL-ENFORCE` (2), `MODEL-SWITCH-GATE` (1). Twelve blocks a
-name-keyed sweep leaves behind as residue, or mis-pairs.
+detector found families the table omitted — `ROUTE-DISPATCH-CHECKPOINT`, `CREATIVE-SCRUB-EMBED` and
+`CODE-EVAL-ENFORCE`, one live block each. Blocks a name-keyed sweep leaves behind as residue, or
+mis-pairs. **The table above has since grown by those three**, which is what this section is for.
+
+### A family MENTIONED is not a family PRESENT
+
+The same run reported a fourth, `MODEL-SWITCH-GATE`, and **it was not there**. Its only occurrence was
+one row of the predecessor's own conversion documentation naming the family it knows how to harvest.
+The detector ran an unanchored match while the totals ran the anchored one — one population, two
+computations, the defect this file records three times already, arriving again in the one detector
+that had escaped the fix (fixture `f14-mentioned-not-present`, 2026-08-01).
+
+**Classifying a phantom is worse than missing a real family, because the table is what authorizes the
+sweep.** That particular phantom is documented as *harvest, never sweep*: filing it under scaffolding
+would have licensed deleting a span carrying a mode list and an immutable directive block. The near
+miss is the argument for the rule — a family reaches this table by **anchored block**, never by being
+named somewhere.
+
+Mentions are still **reported**, never dropped. A generator's docs naming a family is evidence it
+exists somewhere; it is not evidence it is here, and a number that shrinks without explanation is its
+own defect.
 
 The regexes match **openers only**. A pattern matching both an opener and its closing comment
 double-counts every block; the first hand census of a real project reported twice the true count for

@@ -37,6 +37,12 @@ MARKERS = {
     "code_eval_embed": re.compile(r"<!--\s*CODE-EVAL-EMBED START"),
     "model_lane_gate": re.compile(r"<!--\s*MODEL-LANE-GATE START"),
     "lane_agent_embed": re.compile(r"<!--\s*LANE-AGENT-EMBED START"),
+    # Classified 2026-08-01 from anchored blocks on the real target, one each.
+    # `bin/check` asserts this set equals legacy-markers.md's table; they drifted
+    # for a day because the table's own "grows from them" was never acted on.
+    "route_dispatch_checkpoint": re.compile(r"<!--\s*ROUTE-DISPATCH-CHECKPOINT START"),
+    "code_eval_enforce": re.compile(r"<!--\s*CODE-EVAL-ENFORCE START"),
+    "creative_scrub_embed": re.compile(r"<!--\s*CREATIVE-SCRUB-EMBED START"),
 }
 
 # Paired markers: a sweep removes opener-to-closer, so pairing must be VERIFIED
@@ -52,6 +58,10 @@ PAIRS = {
     "code_eval_embed": (r"<!--\s*CODE-EVAL-EMBED START", r"<!--\s*CODE-EVAL-EMBED END"),
     "model_lane_gate": (r"<!--\s*MODEL-LANE-GATE START", r"<!--\s*MODEL-LANE-GATE END"),
     "lane_agent_embed": (r"<!--\s*LANE-AGENT-EMBED START", r"<!--\s*LANE-AGENT-EMBED END"),
+    "route_dispatch_checkpoint": (r"<!--\s*ROUTE-DISPATCH-CHECKPOINT START",
+                                  r"<!--\s*ROUTE-DISPATCH-CHECKPOINT END"),
+    "code_eval_enforce": (r"<!--\s*CODE-EVAL-ENFORCE START", r"<!--\s*CODE-EVAL-ENFORCE END"),
+    "creative_scrub_embed": (r"<!--\s*CREATIVE-SCRUB-EMBED START", r"<!--\s*CREATIVE-SCRUB-EMBED END"),
     "origin_span": (r"<!--\s*origin:", r"<!--\s*/origin\s*-->"),
 }
 
@@ -155,6 +165,7 @@ def scan_markers(sdir, root):
         "totals": {}, "mentions": {},
         "owners": Counter(), "pairing": [], "file_scope_owners": [],
         "families": Counter(),
+        "family_mentions": Counter(),
         "has_origin": bool(ANCHORED(re.compile(r"<!--\s*origin:")).search(joined)),
     }
     # ONE anchoring rule and ONE body for every computation below.
@@ -200,8 +211,24 @@ def scan_markers(sdir, root):
             })
     # Family discovery reads the SAME files. It walked `.md` only, so a family in
     # a shell hook was invisible to it while its markers counted in the totals.
-    for name in GENERIC_PAIR_RX.findall(joined):
+    #
+    # AND IT MUST ANCHOR, for the same reason the totals do. A MENTIONED marker is
+    # not a PRESENT one: this detector ran a bare `findall`, so a family named
+    # inside a sentence or a table cell counted as a live block. On the real target
+    # that invented `MODEL-SWITCH-GATE` out of ONE row of the predecessor's own
+    # conversion documentation — `| **Foreign `MODEL-SWITCH-GATE` family** … `<!--
+    # MODEL-SWITCH-GATE START/END -->` markers |` — a family with no block anywhere
+    # in the tree. Classifying a phantom into the marker table is worse than
+    # missing a real one, because the table is what authorizes the sweep.
+    #
+    # Mentions are REPORTED, never dropped — same rule as the known markers above.
+    # A generator's docs naming a family is real evidence the family exists
+    # somewhere; it is just not evidence it is HERE.
+    for name in ANCHORED(GENERIC_PAIR_RX).findall(joined):
         out["families"][name] += 1
+    for name in GENERIC_PAIR_RX.findall(joined):
+        if name not in out["families"]:
+            out["family_mentions"][name] += 1
     return out
 
 
@@ -307,6 +334,7 @@ def census(root):
     marker_totals = Counter()
     mention_totals = Counter()
     family_totals = Counter()
+    family_mention_totals = Counter()
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
@@ -363,6 +391,8 @@ def census(root):
             foreign_owners[owner] += n
         for fam, n in mk["families"].items():
             family_totals[fam] += n
+        for fam, n in mk.get("family_mentions", {}).items():
+            family_mention_totals[fam] += n
         for fp in mk["file_scope_owners"]:
             file_scope_owners.append({"skill": name, "file": fp})
         for pr in mk["pairing"]:
@@ -678,6 +708,14 @@ def census(root):
             if k.replace("-", "").lower() not in
                {x.replace("_", "").replace("-", "").lower() for x in PAIRS}
         },
+        # Families named only in prose — the predecessor's own docs describing a
+        # marker it emits elsewhere. Evidence the family exists, never evidence a
+        # block is here, and never a candidate for the marker table.
+        "family_mentions_only": {
+            k: v for k, v in family_mention_totals.items()
+            if k.replace("-", "").lower() not in
+               {x.replace("_", "").replace("-", "").lower() for x in PAIRS}
+        },
         "skills_with_no_origin_marker": no_marker,
         "marker_totals": dict(marker_totals),
         "foreign_origin_owners": dict(foreign_owners),
@@ -824,6 +862,15 @@ def report(c):
         p("")
         for k, v in sorted(c["ignore_rule_sources"].items()):
             p(f"- `{k}` — {v} dataset(s)")
+        p("")
+    if c.get("family_mentions_only"):
+        p("## Families MENTIONED but not present — do not classify these")
+        p("")
+        p("Named in prose or a table cell, with no anchored block anywhere in the tree. A generator's")
+        p("own documentation describing a family is evidence it exists somewhere, never that it is here.")
+        p("")
+        for k, v in sorted(c["family_mentions_only"].items(), key=lambda x: -x[1]):
+            p(f"- `{k}` — {v} mention(s), 0 blocks")
         p("")
     if c.get("unknown_marker_families"):
         p("## Unknown marker families — the table is incomplete")
