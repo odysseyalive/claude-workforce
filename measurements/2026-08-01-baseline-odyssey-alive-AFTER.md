@@ -20,7 +20,7 @@ A project with no skills is the ordinary case, not a degraded one.
 |---|---|
 | skills | 48 |
 | quarantined (unparseable) | 0 |
-| **UNPAIRED markers (sweep hazard)** | **1** |
+| **UNPAIRED markers (sweep hazard)** | **0** |
 | **UNKNOWN marker families (not in the table)** | **0** |
 | skills with no `origin:` marker | 6 |
 | marker `code_eval_embed` | 1 |
@@ -100,10 +100,6 @@ Named in prose or a table cell, with no anchored block anywhere in the tree. A g
 own documentation describing a family is evidence it exists somewhere, never that it is here.
 
 - `MODEL-SWITCH-GATE` — 1 mention(s), 0 blocks
-
-## Unpaired markers — a sweep hazard
-
-- `frontend-design` enforcement_annotation: 3 openers / 4 closers — orphan closer survives the sweep as residue
 
 ## Credential-shaped files inside the skill tree
 

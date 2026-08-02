@@ -110,15 +110,23 @@ So every headline finding from the before-review is still open:
 | 6 agents missing `name:`/`description:` | **unchanged** |
 | 0 of 45 skills pin a model | **unchanged** |
 | 6 of 45 skills name a check | **unchanged** (the 8 new employees are all checked) |
-| 5 unpaired markers | **resolved as 1** — four were unclosed by design (`851bbef`, `f16-origin-roles`); one real orphan closer remains in `frontend-design` |
+| 5 unpaired markers | **CLEARED** — four were unclosed by design (`f16-origin-roles`); the one real orphan closer is fixed at the template that emitted it |
 
 **odyssey-alive now runs both systems side by side.** That is a coherent outcome of "succession: none,"
 but it is not what the standing directive asks for ("I don't want to leave any of the old system still
 there that doesn't need to be there"). Closing it is a deliberate second act — declaring succession
-from `skill-builder`. The five unpaired markers turned out to be **one**: `origin:` is now classified
-rather than counted, four of the five were legitimate roles, and the only genuine finding left is an
-orphan `enforcement_annotation` closer in `frontend-design` — an extra `END`, which survives a sweep as
-residue rather than swallowing content.
+from `skill-builder`. **The sweep prerequisite is now cleared: the census reports zero unpaired
+markers.** The five turned out to be one — `origin:` is classified rather than counted, and four were
+legitimate roles.
+
+The one real finding was an orphan `<!-- END ENFORCEMENT ANNOTATION -->` in `frontend-design`, and it
+was **not** a corruption of that file. `skill-builder`'s own template for the block —
+`references/lane-delegation.md` § LANE-AGENT-EMBED — emits that closer with no opener anywhere in it,
+so `frontend-design` was a faithful instance of a defective generator. Evidence: 35 of 37 `Source:`
+lines in the tree sit inside an open annotation; the two that do not are this instance and the template
+that produced it. Removing it from the instance alone would have left the next
+`/skill-builder agents --execute` to re-emit it, so both were fixed — two single-line deletions,
+nothing else touched.
 
 ## Held, as required
 
