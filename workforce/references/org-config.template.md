@@ -51,15 +51,25 @@ employee with no lane override resolves to the analytical row for its tier.
 
 | Tier | Model | Effort |
 |---|---|---|
-| Lead (2) | `claude-opus-5` | medium |
+| Lead (2) | `claude-opus-5` | high |
 | IC (3) | `claude-opus-4-8` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
 Claude Code session, not a budget setting.
 
-A blank model cell means the employee inherits the session model. IC effort defaults to `medium`
-deliberately — `high` across a wide wave is expensive and rarely changes an IC's mechanical output
-(`references/delegation-budget.md`).
+A blank model cell means the employee inherits the session model.
+
+**The two tiers differ deliberately, and the reason is spawn COUNT, not seniority.** `effort` is not a
+platform default this file is restating — absent the field a subagent *inherits the session*
+(`references/platform.md` fact 12b, **DOCUMENTED, not measured**), so every value here is a deliberate
+override of whatever the user is running.
+
+- **IC `medium`.** ICs are the wide wave. `high` across it is expensive and rarely changes mechanical
+  output (`references/delegation-budget.md`).
+- **Lead `high`.** Leads are 2–4 in the whole org and spawn once per work order, so the wide-wave cost
+  argument does not reach them. Their work — planning, dispatch, synthesis — is the judgment kind that
+  effort actually moves, and it is the tier whose mistakes are inherited by every IC beneath it. A
+  cheap Lead is the expensive place to save.
 
 ### Creative
 
@@ -83,11 +93,16 @@ it below.
 
 | Code model | |
 |---|---|
-| Code effort | medium |
+| Code effort | high |
 | Departments on code | |
 
 A blank model cell falls to the analytical row for that employee's tier — the same meaning a blank has
 everywhere else in this file.
+
+**Code runs `high` regardless of tier.** It is the one lane whose output is executed rather than read:
+a weak paragraph is edited, a weak patch ships a bug, and the check that catches it costs more than the
+effort that would have prevented it. This is a lane setting, so it overrides the analytical tier row
+for any employee on code — an IC on this lane runs `high`, not the IC row's `medium`.
 
 ### Session advisor
 

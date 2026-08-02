@@ -116,7 +116,10 @@ Levers, in order of effect:
 2. **Prefer narrow `Read` grounding over `skills:` preload.** `skills:` injects a skill's *full*
    content at startup. Grant it only when the employee genuinely needs the whole thing.
 3. **`model:` and `effort:` per employee.** IC effort defaults to `medium`, not `high` — `high` across
-   a wide wave is expensive and rarely changes an IC's mechanical output.
+   a wide wave is expensive and rarely changes an IC's mechanical output. **Leads and the code lane
+   default to `high`**, and that is not an inconsistency: the lever here is spawn count, and neither is
+   the wide wave. The values and their reasoning live in `org-config.template.md` § Analytical and
+   § Code; this list is about which levers exist, not what they are set to.
 4. **`maxTurns`** — bounds a runaway employee without bounding the org.
 
 `budget` prints a projected effort-weighted spawn cost before a large conversion. There is no
