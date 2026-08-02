@@ -3,11 +3,12 @@
 # Claude Workforce Installer (Linux / macOS)
 # Installs the workforce skill so it is available to your projects.
 #
-# Usage — PERSONAL install (default; one copy, every project on this machine):
+# ONE command, whether this is a first install or an update:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)"
 #
-# Usage — PROJECT install (vendored into this repo; travels with it and is
-# visible to collaborators and to remote sessions that only clone the repo):
+# It censuses BOTH install locations first and updates whatever it finds — both,
+# if both exist. Only a genuinely new install has a question to ask, and it asks
+# it once. Scope can still be forced, which skips the census entirely:
 #   bash -c "$(curl -fsSL .../install)" -- --project
 #   WORKFORCE_SCOPE=project bash -c "$(curl -fsSL .../install)"
 #
@@ -21,13 +22,16 @@ set -e
 
 REPO_URL="https://raw.githubusercontent.com/odysseyalive/claude-workforce/main"
 
+PERSONAL_SKILL_DIR="$HOME/.claude/skills/workforce"
+PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
+
 # ── Scope selection ───────────────────────────────────────────────────────────
 #
-# PERSONAL is the default. The shipped skill contains no project-specific
-# content — every piece of per-project state (org config, org chart, personnel
-# records, employee handbooks) is written into the PROJECT by `/workforce audit`,
-# never into the skill directory. So one installed copy serves every project,
-# and one `/workforce update` updates them all.
+# PERSONAL is the default for a NEW install. The shipped skill contains no
+# project-specific content — every piece of per-project state (org config, org
+# chart, personnel records, employee handbooks) is written into the PROJECT by
+# `/workforce audit`, never into the skill directory. So one installed copy
+# serves every project, and one `/workforce update` updates them all.
 #
 # Cowork runs on this machine, so in CODE MODE it reads this same ~/.claude/
 # setup — a personal install is fully visible there.
@@ -37,51 +41,132 @@ REPO_URL="https://raw.githubusercontent.com/odysseyalive/claude-workforce/main"
 # workforce on a repo that way, vendor the skill into it:
 #     /workforce vendor            (from inside that project)
 # or install with --project in the first place.
+#
+# BUT SCOPE IS NOT GUESSED WHEN A COPY ALREADY EXISTS. Defaulting to personal on
+# every run installs a SECOND copy beside a project install the user already had,
+# and skill precedence (personal > project) then silently shadows the one they
+# were editing. The census below is what makes one command safe to re-run: an
+# update goes where the thing being updated actually is.
 
-SCOPE="${WORKFORCE_SCOPE:-user}"
+SCOPE_EXPLICIT=""
 for arg in "$@"; do
     case "$arg" in
-        --project|--local) SCOPE="project" ;;
-        --user|--personal) SCOPE="user" ;;
+        --project|--local) SCOPE_EXPLICIT="project" ;;
+        --user|--personal) SCOPE_EXPLICIT="user" ;;
         --help|-h)
             echo "Usage: install [--user|--project]"
-            echo "  --user     install to ~/.claude/skills/workforce (default)"
-            echo "  --project  install to ./.claude/skills/workforce"
+            echo
+            echo "With no flag, existing installs are found and updated in place."
+            echo "A first-time install asks where to go."
+            echo
+            echo "  --user     force ~/.claude/skills/workforce"
+            echo "  --project  force ./.claude/skills/workforce"
             exit 0
             ;;
     esac
 done
 
-case "$SCOPE" in
-    user)
-        SKILL_ROOT="$HOME/.claude/skills"
-        SETTINGS_FILE="$HOME/.claude/settings.json"
-        SCOPE_LABEL="personal (~/.claude/skills)"
-        ;;
-    project)
-        SKILL_ROOT=".claude/skills"
-        SETTINGS_FILE=".claude/settings.local.json"
-        SCOPE_LABEL="project ($(pwd)/.claude/skills)"
-        ;;
-    *)
-        echo "Error: unknown WORKFORCE_SCOPE '$SCOPE' (expected 'user' or 'project')."
-        exit 1
-        ;;
-esac
-
-SKILL_DIR="$SKILL_ROOT/workforce"
+if [ -z "$SCOPE_EXPLICIT" ] && [ -n "$WORKFORCE_SCOPE" ]; then
+    case "$WORKFORCE_SCOPE" in
+        user|project) SCOPE_EXPLICIT="$WORKFORCE_SCOPE" ;;
+        *)
+            echo "Error: unknown WORKFORCE_SCOPE '$WORKFORCE_SCOPE' (expected 'user' or 'project')."
+            exit 1
+            ;;
+    esac
+fi
 
 echo "Claude Workforce Installer"
 echo "=========================="
-echo "Scope: $SCOPE_LABEL"
 echo
 
+# ── Census both locations before deciding anything ────────────────────────────
+#
+# Running from $HOME makes the two paths THE SAME DIRECTORY. Counting that once
+# as "both" would report a shadowing conflict against itself and install twice
+# into one place.
+HAVE_PERSONAL="no"
+HAVE_PROJECT="no"
+[ -d "$PERSONAL_SKILL_DIR" ] && HAVE_PERSONAL="yes"
+if [ "$PROJECT_SKILL_DIR" != "$PERSONAL_SKILL_DIR" ] && [ -d "$PROJECT_SKILL_DIR" ]; then
+    HAVE_PROJECT="yes"
+fi
+
+TARGETS=""
+MODE="install"
+
+if [ -n "$SCOPE_EXPLICIT" ]; then
+    TARGETS="$SCOPE_EXPLICIT"
+    if [ "$SCOPE_EXPLICIT" = "user" ] && [ "$HAVE_PERSONAL" = "yes" ]; then MODE="update"; fi
+    if [ "$SCOPE_EXPLICIT" = "project" ] && [ "$HAVE_PROJECT" = "yes" ]; then MODE="update"; fi
+elif [ "$HAVE_PERSONAL" = "yes" ] && [ "$HAVE_PROJECT" = "yes" ]; then
+    # BOTH get updated. Updating only one leaves the other on an older release,
+    # and since personal shadows project, the copy that keeps running could be
+    # the one that was skipped — an update that silently changes nothing.
+    TARGETS="user project"
+    MODE="update"
+    echo "Found workforce in BOTH locations:"
+    echo "    personal  $PERSONAL_SKILL_DIR"
+    echo "    project   $PROJECT_SKILL_DIR"
+    echo
+    echo "Updating both. Skill precedence is personal > project, so the personal"
+    echo "copy is the one that runs in this project; '/workforce verify' reports"
+    echo "which copy is active if you want to remove one."
+    echo
+elif [ "$HAVE_PERSONAL" = "yes" ]; then
+    TARGETS="user"
+    MODE="update"
+    echo "Found an existing personal install — updating it in place."
+    echo "    $PERSONAL_SKILL_DIR"
+    echo
+elif [ "$HAVE_PROJECT" = "yes" ]; then
+    TARGETS="project"
+    MODE="update"
+    echo "Found an existing project install — updating it in place."
+    echo "    $PROJECT_SKILL_DIR"
+    echo
+else
+    # A genuinely new install is the ONLY case with a question in it.
+    echo "No existing workforce install found."
+    echo
+    echo "  [1] Personal — $PERSONAL_SKILL_DIR"
+    echo "      Serves every project on this machine. Recommended."
+    echo
+    echo "  [2] Project  — $PROJECT_SKILL_DIR"
+    echo "      Travels with this repo, so collaborators and remote sessions that"
+    echo "      only clone it get the skill too."
+    echo
+    if [ -t 0 ]; then
+        printf 'Install where? [1/2, default 1] '
+        read -r reply
+        case "$reply" in
+            2|p|P|project|Project) TARGETS="project" ;;
+            *) TARGETS="user" ;;
+        esac
+        echo
+    else
+        # No terminal to ask with — a piped or CI run. Personal is the documented
+        # default and the reversible choice: it touches nothing inside the repo.
+        TARGETS="user"
+        echo "No terminal attached — installing PERSONAL (the default)."
+        echo "Re-run with --project to vendor it into this repo instead."
+        echo
+    fi
+fi
+
+# ── A NEW project install needs a CLAUDE.md ───────────────────────────────────
+#
 # A PROJECT install lands inside a repo, so that repo needs a CLAUDE.md — the
 # same precondition claude-enforcer enforces. A PERSONAL install is machine-wide
 # and is not tied to any repo, so it has no such precondition: you install once
 # here, then run `/workforce audit` inside whichever project you want an org for
 # (and *that* project needs its CLAUDE.md at that point, not now).
-if [ "$SCOPE" = "project" ] && [ ! -f "CLAUDE.md" ]; then
+#
+# UPDATES ARE EXEMPT. Blocking an update because a CLAUDE.md went missing would
+# strand an already-installed copy on an old release over a precondition that
+# only governs where a NEW copy may be created.
+case " $TARGETS " in *" project "*) WANTS_PROJECT="yes" ;; *) WANTS_PROJECT="no" ;; esac
+if [ "$WANTS_PROJECT" = "yes" ] && [ "$HAVE_PROJECT" = "no" ] && [ ! -f "CLAUDE.md" ]; then
     BOOTSTRAP_PROMPT='Goal: bootstrap a preliminary CLAUDE.md for this brand-new project, then install the workforce skill.
 
 First, create a durable task list with TaskCreate (so this work survives context compaction) covering the steps below, then work through them in order:
@@ -97,7 +182,7 @@ First, create a durable task list with TaskCreate (so this work survives context
 Begin with step 1 now.'
 
     print_bootstrap_help() {
-        echo "A --project install needs a CLAUDE.md at the repo root."
+        echo "A project install needs a CLAUDE.md at the repo root."
         echo
         echo "If this is an EXISTING project, the quickest path is:"
         echo
@@ -114,7 +199,7 @@ Begin with step 1 now.'
         echo
         echo "Or install personally instead — no CLAUDE.md needed now:"
         echo
-        echo "    bash -c \"\$(curl -fsSL $REPO_URL/install)\""
+        echo "    bash -c \"\$(curl -fsSL $REPO_URL/install)\" -- --user"
     }
 
     if ! command -v claude >/dev/null 2>&1; then
@@ -157,11 +242,11 @@ Begin with step 1 now.'
     exec claude "$BOOTSTRAP_PROMPT"
 fi
 
-# Warn about the precedence trap rather than silently shadowing.
-# Skill precedence is enterprise > personal > project, so a personal copy WINS
-# over a project copy of the same name. Installing personally while a project
-# copy exists means the project's version is silently overridden.
-if [ "$SCOPE" = "user" ] && [ -d ".claude/skills/workforce" ]; then
+# Warn about the precedence trap rather than silently shadowing. Skill precedence
+# is enterprise > personal > project, so a personal copy WINS over a project copy
+# of the same name. This fires only when a NEW personal copy is about to shadow an
+# existing project one — the both-exist update path says its own version above.
+if [ "$MODE" = "install" ] && [ "$TARGETS" = "user" ] && [ "$HAVE_PROJECT" = "yes" ]; then
     echo "Note: this project already has a vendored copy at .claude/skills/workforce."
     echo "      Skill precedence is personal > project, so the copy being installed"
     echo "      now will SHADOW it in this project. Run '/workforce verify' to see"
@@ -169,9 +254,7 @@ if [ "$SCOPE" = "user" ] && [ -d ".claude/skills/workforce" ]; then
     echo
 fi
 
-echo "Installing to $SKILL_DIR"
-
-# Download the shared manifest, then every file it lists.
+# Download the shared manifest ONCE, then install it to each target scope.
 # Manifest format: optional flag ("keep" = fetch only if absent,
 # "hook" = chmod +x after fetch) followed by the repo-relative path.
 echo "Downloading workforce..."
@@ -179,53 +262,72 @@ MANIFEST_TMP="$(mktemp)"
 trap 'rm -f "$MANIFEST_TMP"' EXIT
 curl -fsSL "$REPO_URL/manifest.txt" -o "$MANIFEST_TMP"
 
-while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-        ''|\#*) continue ;;
+install_to_scope() {
+    scope="$1"
+    case "$scope" in
+        user)
+            skill_dir="$PERSONAL_SKILL_DIR"
+            settings_file="$HOME/.claude/settings.json"
+            scope_label="personal (~/.claude/skills)"
+            ;;
+        project)
+            skill_dir="$PROJECT_SKILL_DIR"
+            settings_file=".claude/settings.local.json"
+            scope_label="project ($(pwd)/.claude/skills)"
+            ;;
     esac
 
-    flag=""
-    path="$line"
-    case "$line" in
-        "keep "*) flag="keep"; path="${line#keep }" ;;
-        "hook "*) flag="hook"; path="${line#hook }" ;;
-    esac
+    echo
+    echo "Scope: $scope_label"
+    echo "Installing to $skill_dir"
 
-    dest="$SKILL_DIR/${path#workforce/}"
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ''|\#*) continue ;;
+        esac
 
-    if [ "$flag" = "keep" ] && [ -f "$dest" ]; then
-        echo "Keeping existing $(basename "$dest") (preserving your edits)..."
-        continue
+        flag=""
+        path="$line"
+        case "$line" in
+            "keep "*) flag="keep"; path="${line#keep }" ;;
+            "hook "*) flag="hook"; path="${line#hook }" ;;
+        esac
+
+        dest="$skill_dir/${path#workforce/}"
+
+        if [ "$flag" = "keep" ] && [ -f "$dest" ]; then
+            echo "Keeping existing $(basename "$dest") (preserving your edits)..."
+            continue
+        fi
+
+        mkdir -p "$(dirname "$dest")"
+        curl -fsSL "$REPO_URL/$path" -o "$dest"
+
+        if [ "$flag" = "hook" ]; then
+            chmod +x "$dest"
+        fi
+    done < "$MANIFEST_TMP"
+
+    # Configure the delegation contract and the permissions the org needs.
+    #
+    # CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH is written EXPLICITLY even though 3 is the
+    # default: the three-tier org (CEO -> Lead -> IC) is a *contract* with that number,
+    # and `/workforce verify` reconciles against it. A host that lowered the value must
+    # fail loudly rather than silently flattening the org.
+    #
+    # CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION is deliberately NOT written. That cap
+    # cannot be disabled, and configuring it would imply a control we do not have.
+    #
+    # `Agent` in permissions.allow is not optional. Without it every single delegation
+    # raises a prompt, and an org that prompts on every hop is unusable. At user scope
+    # these land in ~/.claude/settings.json and therefore apply to every project on
+    # this machine — which is the point of a personal install, and is announced below.
+    echo "Configuring settings in $settings_file..."
+    if [ "$scope" = "user" ]; then
+        echo "  (user scope — these apply to every project on this machine)"
     fi
-
-    mkdir -p "$(dirname "$dest")"
-    curl -fsSL "$REPO_URL/$path" -o "$dest"
-
-    if [ "$flag" = "hook" ]; then
-        chmod +x "$dest"
-    fi
-done < "$MANIFEST_TMP"
-
-# Configure the delegation contract and the permissions the org needs.
-#
-# CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH is written EXPLICITLY even though 3 is the
-# default: the three-tier org (CEO -> Lead -> IC) is a *contract* with that number,
-# and `/workforce verify` reconciles against it. A host that lowered the value must
-# fail loudly rather than silently flattening the org.
-#
-# CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION is deliberately NOT written. That cap
-# cannot be disabled, and configuring it would imply a control we do not have.
-#
-# `Agent` in permissions.allow is not optional. Without it every single delegation
-# raises a prompt, and an org that prompts on every hop is unusable. At user scope
-# these land in ~/.claude/settings.json and therefore apply to every project on
-# this machine — which is the point of a personal install, and is announced below.
-echo "Configuring settings in $SETTINGS_FILE..."
-if [ "$SCOPE" = "user" ]; then
-    echo "  (user scope — these apply to every project on this machine)"
-fi
-if command -v python3 &>/dev/null; then
-    SETTINGS_FILE="$SETTINGS_FILE" python3 -c "
+    if command -v python3 &>/dev/null; then
+        SETTINGS_FILE="$settings_file" python3 -c "
 import json, os
 
 p = os.environ['SETTINGS_FILE']
@@ -268,15 +370,24 @@ if changed:
     json.dump(d, open(p, 'w'), indent=2)
     print(f'  Settings saved to {p}')
 "
-else
-    echo "  Warning: python3 not found. Add these to $SETTINGS_FILE manually:"
-    echo '  { "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3" },'
-    echo '    "permissions": { "allow": ["Agent", "SendMessage", "TaskCreate", "TaskUpdate",'
-    echo '                               "TaskList", "TaskGet", "WebSearch", "WebFetch"] } }'
-fi
+    else
+        echo "  Warning: python3 not found. Add these to $settings_file manually:"
+        echo '  { "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3" },'
+        echo '    "permissions": { "allow": ["Agent", "SendMessage", "TaskCreate", "TaskUpdate",'
+        echo '                               "TaskList", "TaskGet", "WebSearch", "WebFetch"] } }'
+    fi
+}
+
+for scope in $TARGETS; do
+    install_to_scope "$scope"
+done
 
 echo
-echo "Installation complete ($SCOPE scope)."
+if [ "$MODE" = "update" ]; then
+    echo "Update complete ($TARGETS)."
+else
+    echo "Installation complete ($TARGETS scope)."
+fi
 echo
 echo "NOTE: the skill is not immediately invocable. It registers later in this session,"
 echo "      or immediately after a restart -- restart Claude Code if you want it now."
@@ -284,7 +395,7 @@ echo "Newly written agent definitions are not IMMEDIATELY discoverable. They reg
 echo "later in a session on their own, but the delay is undetermined — restarting is"
 echo "the reliable way to reach new employees now."
 echo
-if [ "$SCOPE" = "user" ]; then
+case " $TARGETS " in *" user "*)
     echo "This install serves every project on this machine. Each project gets its"
     echo "own separate company: employees in its .claude/agents/, and its config,"
     echo "org chart, and personnel records in its .claude/workforce/."
@@ -295,7 +406,8 @@ if [ "$SCOPE" = "user" ]; then
     echo "shared with collaborators, run /workforce vendor from inside that repo"
     echo "to copy the skill into it."
     echo
-fi
+    ;;
+esac
 echo "Then, from inside a project:"
 echo "    /workforce audit          Survey the project and build its org"
 echo "    /org <describe a task>    Hand work to the right employee"

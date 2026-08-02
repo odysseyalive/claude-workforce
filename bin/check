@@ -2732,44 +2732,60 @@ check(
     "with the size of the ORG rather than the release — and it was paid by "
     "whichever copy was loaded, which the update cannot establish",
 )
-# The four install invocations are now restated in update.md, because update RUNS
-# one of them. That is a restatement, and this project fails a run over restated
-# constants that nothing compares — so compare them.
+# The install surface is ONE command per platform (README) and FOUR scope-forced
+# invocations (update.md), and those are deliberately different strings — so they
+# cannot be compared for identity the way they were when both files carried the
+# same four. What still has to hold is that update.md runs the SAME INSTALLER the
+# README publishes, from the same URL: a drift there updates to something the
+# install instructions never described.
 #
 # Matched over raw text, NOT inside a delimiter: the README publishes these in
 # fenced code blocks and update.md carries them in backticked table cells. An
 # earlier form keyed on backticks, found zero in the README, and failed — loudly,
-# because the condition requires a non-empty README set. The `and _readme_cmds`
-# is that guard: comparing two empty sets is the vacuous pass this project's own
-# lint exists to catch.
-_INSTALL_RX = re.compile(
-    r"bash -c \"\$\(curl -fsSL \S+\)\"(?: -- --project)?"
-    r"|(?:\$env:WORKFORCE_SCOPE='project'; )?irm \S+install\.ps1 \| iex"
+# because the conditions below require non-empty sets. That guard is kept:
+# comparing two empty sets is the vacuous pass this project's own lint exists to
+# catch.
+_ENTRY_RX = re.compile(
+    r"bash -c \"\$\(curl -fsSL (\S+)\)\"$"
+    r"|^irm (\S+install\.ps1) \| iex",
+    re.M,
+)
+_FORCED_RX = re.compile(
+    r"bash -c \"\$\(curl -fsSL (\S+)\)\" -- --(?:user|project)"
+    r"|\$env:WORKFORCE_SCOPE='(?:user|project)'; irm (\S+install\.ps1) \| iex"
 )
 
 
-def _cmds(hay):
-    # `|` inside a markdown table cell must be written `\|`; unescape before
-    # comparing, or every PowerShell cell reads as a command the README lacks.
-    return set(_INSTALL_RX.findall(hay.replace("\\|", "|")))
+def _urls(matches):
+    return {u for pair in matches for u in pair if u}
 
 
-_readme_cmds = _cmds(readme)
-_upd_cmds = _cmds(upd)
+# `|` inside a markdown table cell must be written `\|`; unescape before matching,
+# or every PowerShell cell reads as a command that is not there.
+_readme_entry = _urls(_ENTRY_RX.findall(readme.replace("\\|", "|")))
+_upd_forced = _FORCED_RX.findall(upd.replace("\\|", "|"))
+_upd_urls = _urls(_upd_forced)
 check(
-    "update: its four install commands are byte-identical to the README's",
-    _readme_cmds and _readme_cmds == _upd_cmds,
-    f"only in README: {sorted(_readme_cmds - _upd_cmds)}; "
-    f"only in update.md: {sorted(_upd_cmds - _readme_cmds)} — update runs the "
-    "published installer, so a command that drifts from the README updates to "
+    "install: the README publishes exactly one bare entry point per platform",
+    len(_readme_entry) == 2,
+    f"found {sorted(_readme_entry)} — the whole point of the census-first "
+    "installer is that a person types ONE line per platform; a second bare "
+    "variant is the four-command surface growing back",
+)
+check(
+    "update: it runs the installer the README publishes, from the same URL",
+    _upd_urls and _upd_urls == _readme_entry,
+    f"README entry points: {sorted(_readme_entry)}; update.md: {sorted(_upd_urls)} "
+    "— update fetches the published installer, so a URL that drifts updates to "
     "something the install instructions never described",
 )
 check(
-    "update: there are exactly four of them, one per scope×platform cell",
-    len(_upd_cmds) == 4,
-    f"found {len(_upd_cmds)}: {sorted(_upd_cmds)} — the matrix is personal/project "
-    "× bash/PowerShell; a missing cell is a platform that falls through to a "
-    "hand-rolled fetch loop",
+    "update: all four scope-forced invocations are present, one per scope×platform",
+    len(_upd_forced) == 4,
+    f"found {len(_upd_forced)} — the matrix is personal/project × bash/PowerShell. "
+    "update.md forces the scope precisely BECAUSE the bare command updates every "
+    "copy it finds, which would falsify step 2's report of the path replaced; a "
+    "missing cell is a platform that falls back to the bare command and over-updates",
 )
 check(
     "update: the census precedes every write, and names both locations",

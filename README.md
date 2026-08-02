@@ -42,9 +42,7 @@ Claude Code v2.1.32 or later. Check with `claude --version`.
 
 ### Install
 
-Pick a scope. Personal is the default and the right answer for almost everyone.
-
-**Personal install** puts one copy at `~/.claude/skills/`, serving every project on this machine.
+One command. Same command to install, and to update later.
 
 Linux / macOS:
 ```bash
@@ -56,17 +54,24 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex
 ```
 
-**Project install** puts one copy inside a single repo, so it travels with a clone.
+It looks in both places workforce can live before it does anything, and acts on what it finds:
 
-Linux / macOS:
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)" -- --project
-```
+| Found | What happens |
+|---|---|
+| an existing install | it is updated in place, at the path it is already at |
+| both a personal and a project copy | **both** are updated, and it tells you which one is shadowing the other |
+| nothing | it asks where to put it — personal or project |
 
-Windows PowerShell:
-```powershell
-$env:WORKFORCE_SCOPE='project'; irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex
-```
+That question is the only one, and it only comes up on a first install. Personal puts one copy at
+`~/.claude/skills/`, serving every project on this machine, and is the right answer for almost
+everyone. Project puts a copy inside this one repo, so it travels with a clone — the reason to pick
+it is collaborators, or sessions that only ever see the cloned repo.
+
+With no terminal to ask on — a CI or piped run — it installs personal and says so, rather than
+guessing at a repo it may not be sitting in.
+
+To skip the question and force a scope, add `-- --project` or `-- --user` on Linux / macOS, or set
+`$env:WORKFORCE_SCOPE='project'` before the PowerShell line.
 
 Then restart Claude Code and run your first audit:
 

@@ -95,13 +95,20 @@ locations have been looked at.
 3. **Refuse a version downgrade** unless `--force`. Naming both versions makes an accidental one
    impossible.
 
-4. **Run the published install command for that scope and platform — verbatim.** Do not fetch the
-   manifest and loop over it by hand; see § One fetch implementation below. Pick the cell:
+4. **Run the published installer with the scope FORCED — verbatim.** Do not fetch the manifest and
+   loop over it by hand; see § One fetch implementation below. Pick the cell:
 
    | | Linux / macOS | Windows PowerShell |
    |---|---|---|
-   | **personal** | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)"` | `irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 \| iex` |
+   | **personal** | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)" -- --user` | `$env:WORKFORCE_SCOPE='user'; irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 \| iex` |
    | **project** | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)" -- --project` | `$env:WORKFORCE_SCOPE='project'; irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 \| iex` |
+
+   **The scope is forced here even though the bare command would detect it.** The bare command — what
+   the README publishes — censuses both locations and updates *everything* it finds, which is the
+   right behavior for a person typing one line and the wrong behavior here: steps 1 and 2 already
+   resolved ONE target, and step 2's promise is to report the path being replaced. An invocation that
+   may also update a second copy makes that report false. Forcing the flag makes the command do
+   exactly what the census decided, no more.
 
    A `--project` run resolves `.claude/skills` **relative to the working directory**, so it must run
    from the project root. Run it from anywhere else and it installs a third copy somewhere new, which
