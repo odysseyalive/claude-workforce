@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 9 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 10 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -102,6 +102,29 @@ Enumeration is what every serious runner already ships, and it executes nothing:
 `playwright test --list`, `jest --listTests`, `pytest --collect-only`, `tsc --listFiles`,
 `eslint --print-config`. **A discovery mode that executes, writes, or deploys is not a discovery mode**
 — never call one to fill this cell.
+
+### Reduced skills are Mechanicals rows too
+
+A reduced skill is a one-off entry point that spawns nothing (`conversion-taxonomy.md` § The two
+paths), so it belongs in this table beside the shell commands — otherwise the quick path is invisible
+to dispatch and every mechanical ask pays for an agent hop to reach a skill the asker could have
+called directly.
+
+| Column | For a reduced skill |
+|---|---|
+| `Command` | `/skillname <args>` |
+| `Covers` / `Does NOT cover` | from the skill's own stated scope — the same two-cell discipline |
+| `Owner` | the employee that invokes it, or `(direct)` when only a human does |
+| `Destructive` | whether invoking it writes |
+| `Scope` | `declared` unless the skill ships an enumeration mode |
+
+**Most reduced skills are `declared`, and that is correct, not a defect.** A skill rarely has a
+`--list` mode, so its scope rests on its own prose. Under clause 2b(a) that makes it dispatchable as a
+**step inside a work order**, never as total coverage on its own — which is the right conservatism:
+one agent hop, against a wrong answer returned cheaply.
+
+**A data-gateway skill is never `Destructive: no` by default.** It fronts writes. Render it
+display-first per clause 2b(b) unless the row names a read-only invocation.
 
 ### `Scope` — the state that decides whether clause 2 may fire
 

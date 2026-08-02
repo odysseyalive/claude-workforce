@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 10 assertion(s) in bin/check name this file; 35 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -39,8 +39,8 @@ report a total as though higher were better.
 
 | Disposition | The skill is… | Result |
 |---|---|---|
-| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md **deleted** (§ Nothing is left behind) |
-| **SPLIT** | a workflow *and* persistent data | four ways — § SPLIT decomposes four ways |
+| **PROMOTE** | one actor's imperative workflow | becomes an IC; `references/` stays as its grounding library; SKILL.md **reduced to its mechanical remainder — deleted only if it has none** (§ The two paths, § Nothing is left behind) |
+| **SPLIT** | a workflow *and* persistent data | four ways — § SPLIT decomposes four ways. The skill **always survives** here: it is the data's gateway |
 | **CHARTER** | several distinct actors in one file | becomes a department: one Lead + N ICs |
 | **ORCHESTRATOR** | machinery that creates, registers, or drives agents | **stays a skill.** May gain employees it dispatches to; never becomes one |
 | **ADOPT** | already a registered agent | censused into the chart, **zero bytes changed** |
@@ -90,7 +90,12 @@ how the other three get handled by accident:
 | **Handbook** | the procedure, the judgment, the refusals, the output contract |
 | **Data skill** | the schema, invariants, degradation contract, git policy, owner (`data-skills.md`) |
 | **Stays exactly where it is** | the maintaining scripts and the registered hooks — **untouched, path unchanged** |
-| **Deleted** | the `SKILL.md`, once the handbook is live and verified |
+| **Reduced, never deleted** | the `SKILL.md` — it keeps the one-off commands and the data-gateway sections, and loses the judgment that became the handbook |
+
+**On a SPLIT the skill is never deleted.** It fronts a dataset, and § Skills are the gateway to their
+data structures makes that decisive on its own: deleting it strands live files that nothing can then
+legitimately reach. `SPLIT` is exactly the shape where the dual path pays — the employee holds the
+judgment, and the same lean skill serves both a human one-off and that employee's own reads and writes.
 
 The third row is the one that is easy to miss and expensive to get wrong. A skill's `scripts/` and
 `hooks/` are working implementations that typically cost incidents to get right, and their
@@ -100,9 +105,93 @@ maintains it.
 
 ---
 
+## The two paths — and why ONE artifact serves both
+
+
+**Conversion splits a skill along an axis. It does not choose between keeping and deleting it.**
+
+| Half | Where it goes | Why |
+|---|---|---|
+| **agency** — judgment, sequencing, refusals, when-to-act, what-to-refuse | the employee handbook | the part that needed a reader who can decide |
+| **mechanism** — the one-off command, the script call, the data gateway | **the skill, which survives lean** | the part that never needed one |
+
+The predecessor had to put both in one file, so every invocation paid for the pipeline: asking for a
+mechanical operation dragged an agent-spawning workflow behind it. Splitting them is what makes this
+project *better* rather than merely different — the directive in `SKILL.md` § Directives requires
+exactly that, and a conversion that leaves the quick path slower has failed on its own terms.
+
+**The enabling fact is mechanical, not stylistic.** Once the spawning pipeline moves to the employee,
+the remaining skill **spawns nothing** — so an IC carrying `disallowedTools: Agent` can invoke it. That
+is the whole reason one artifact can serve both callers:
+
+```
+you ──────────────────────────► /skillname          one-off, no agent hop
+you ──► /org <ask> ──► Lead ──► IC ──► /skillname   the same artifact, mid-task
+```
+
+Before conversion this is impossible, and the failure is observable: on the first completed audit every
+IC handbook had to carry *"MUST NOT invoke `/edit`, `/focus`, `/text-eval`, `/voice`, or any other
+skill … Invoking a skill hands you instructions to spawn agents you cannot spawn."* The employees sat
+beside 45 skills they could only read as documents. **That is the state conversion exists to end.**
+
+### Skills are the gateway to their data structures
+
+**A skill that fronts a dataset is retained on that basis alone**, whatever else its disposition would
+have been. The schema, the invariants, the maintaining scripts and the degradation contract are reached
+*through* it (`data-skills.md`), and the data never moves — so the gateway must not move either.
+
+This binds every future optimisation, not just the conversion: **an `ablate`, a `retire`, or a later
+audit may not remove the last invocable path to a live dataset.** Deleting the gateway does not delete
+the data; it strands it, which is worse, because the files remain and nothing can legitimately reach
+them.
+
+### The remainder test
+
+Applied per skill, after the handbook is live and verified:
+
+1. **Does anything in this skill do work without judgment?** A command to run, a script to call, a
+   dataset to read or write, a lookup to perform. → the skill **survives**, reduced to that.
+2. **Is the remainder only a pointer to the employee?** → delete it. That is a stub, and § Nothing is
+   left behind still forbids it.
+
+**A reduced skill is not a stub, and conflating the two loses the whole design.** A stub states no
+procedure and exists to redirect. A reduced skill states a procedure, runs, and returns a result — it
+simply no longer decides *whether* it should have been run. That judgment now lives in an employee.
+
+### What moves out is DELETED from the skill, in the same transaction
+
+**Reduction is subtractive and it is not optional.** Every span whose content became handbook text is
+removed from the `SKILL.md` in the transaction that registers the employee — not in a later pass, not
+"when we get to it".
+
+A skill that keeps its workflow *and* an employee that now owns that workflow are **two live copies of
+one job**. That is the exact failure RETAIN rule 7 refuses conversion to prevent, and it is worse when
+this project causes it than when a foreign generator does, because both copies are ours and neither is
+marked stale. They drift on the first amendment: the handbook is fixed, the skill is not, and the next
+reader follows whichever they found.
+
+It is also the standing directive, verbatim — *"I don't want to leave any of the old system still there
+that doesn't need to be there. it will be confusing."* Content that moved **does not need to be there**.
+
+| After conversion the skill holds | The skill must NOT hold |
+|---|---|
+| the one-off command, the script call | the procedure that decided when to run it |
+| the schema, invariants, degradation contract | the judgment about what the data means |
+| its `references/` grounding library | the refusals, the escalation path, the output contract |
+
+**The test is textual, not intentional.** If a section of the handbook and a section of the skill would
+both answer the same question, one of them is residue — and it is the skill's, because the employee is
+the unit of work (`SKILL.md` § Core Principles).
+
+**Reduction is verifiable, and `verify` treats it as a finding**: a converted skill whose surviving
+body still matches its handbook's `## Procedure` is reported, with both paths named. The employee's
+`ORG-RECORD` carries the skill it was promoted from, so the pair is always recoverable.
+
+---
+
 ## Nothing is left behind
 
-**A converted skill is deleted. It is never replaced by a stub.**
+**A converted skill is deleted when nothing invocable remains. It is never replaced by a stub.**
 
 A stub pointing at the employee that replaced it is a placeholder: it occupies a name, it states no
 procedure, and it exists only to tell a reader where the real thing went. That is residue, and residue
@@ -113,10 +202,21 @@ registers the employee and *verifies the registration* before anything touches t
 capability is reachable by the new path before the old one is removed. The stub was a courtesy pointer
 for someone typing the old command, never the safety mechanism.
 
-**What replaces the command surface** is the org's own entry point: a plain-language ask reaches the
-CEO and is dispatched, and `/workforce <employee> <args>` names the worker explicitly
-(`procedures/intent-router.md`). One entry point for a whole org scales past the point where
-remembering dozens of individual commands stops working.
+**The command surface is ADDED TO, never replaced.** An earlier form of this paragraph said the org's
+entry point *replaces* it — and that was wrong in a way that cost a whole conversion. It reduces the
+system to one path, so a one-line mechanical ask has to travel CEO → Lead → IC to reach a script it
+could have called directly, and the employees lose the ability to call it at all (§ The two paths).
+
+Both entry points are first-class, and they answer different asks:
+
+| Ask | Path |
+|---|---|
+| a one-off mechanical operation | `/skillname` directly — no agent hop, no dispatch |
+| work needing judgment, sequencing, or several actors | `/org <ask>` → CEO → Lead → IC, which may itself call `/skillname` |
+| a named worker, explicitly | `/workforce <employee> <args>` (`procedures/intent-router.md`) |
+
+One dispatch entry point for a whole org scales past the point where remembering dozens of individual
+commands stops working — **which is an argument for adding `/org`, not for deleting the commands.**
 
 **Deletion happens once, at the end of a verified run** — never per skill mid-run. Skills reference
 each other; deleting as you go leaves dangling references at every intermediate step, and a run that

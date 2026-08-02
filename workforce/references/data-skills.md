@@ -1,6 +1,6 @@
 # Data Skills — the artifact that holds an employee's records
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — every dataset an org touches has exactly one data skill and one owner. -->
 
 A **data skill** holds a dataset: its schema, its invariants, the scripts that maintain it, and the
@@ -231,3 +231,24 @@ empty directories on speculation — the same failure as treating a conversion c
 metric, and it produces confusing residue that is newly minted rather than inherited.
 
 `verify` enforces it. A data skill with no reader is a finding.
+
+## The gateway survives every optimisation, not just the conversion
+
+**A skill fronting live data is the only sanctioned path to it, so removing the skill strands the data.**
+The files are not deleted — which is precisely what makes this failure quiet. They stay on disk,
+correctly ignored or committed, with nothing left that may legitimately read or write them.
+
+This binds every command that can remove a skill, in perpetuity:
+
+| Command | The constraint |
+|---|---|
+| `audit` / conversion | a SPLIT reduces the skill; it never deletes it (`conversion-taxonomy.md` § SPLIT) |
+| `ablate` | may cut guidance **inside** a data skill; may never cut the skill itself while its dataset exists |
+| `retire` | retiring the owning employee re-homes the dataset to another; it does not remove the gateway |
+| a later `audit` | a reduced skill is not residue. Re-reading it as "leftover from the old system" is the failure this section exists to prevent |
+
+**The tell to watch for is a skill that looks empty of judgment.** After conversion that is exactly what
+a correct gateway looks like — mechanism, schema, and invariants, with every decision moved into a
+handbook. **Its thinness is the evidence that conversion worked, not that it is disposable.**
+
+The rule, stated once: **no removal may leave a live dataset with no invocable path to it.**

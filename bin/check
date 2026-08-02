@@ -1898,6 +1898,8 @@ try:
         "disc": "workforce/references/discovery.md",
         "stg": "workforce/references/staging.md",
         "ds": "workforce/references/data-skills.md",
+        "hbt_": "workforce/references/handbook-templates.md",
+        "ocf_": "workforce/references/org-chart-format.md",
         "vfy": "workforce/references/procedures/verify.md",
         "_asu": "workforce/references/audit-setup.md",
         "_od": "workforce/references/org-design.md",
@@ -2856,6 +2858,57 @@ check(
     f"only in legacy-markers.md: {sorted(_tbl - _cen) or 'none'} · "
     f"only in bin/baseline: {sorted(_cen - _tbl) or 'none'} — a family in one and not "
     "the other is either never detected or reported unclassified forever",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The two-path design — added 2026-08-01, after a conversion produced neither path
+# ─────────────────────────────────────────────────────────────────────────────
+# The first completed audit built 8 employees beside 45 skills, and every handbook
+# forbade its employee to invoke any of them. Doctrine said the org entry point
+# "replaces the command surface", so one path was designed away and the other was
+# never granted. Each assertion below pins one half of the corrected design to the
+# text that implements it.
+hbt_ = read("workforce/references/handbook-templates.md")
+ocf_ = read("workforce/references/org-chart-format.md")
+
+check(
+    "two paths: the command surface is ADDED TO, never replaced",
+    "The command surface is ADDED TO, never replaced" in ct
+    and "What replaces the command surface" not in ct,
+    "the retired claim reduces the system to one path: a one-line mechanical ask "
+    "travels CEO -> Lead -> IC to reach a script it could have called directly",
+)
+check(
+    "two paths: conversion reduces a skill to its mechanism, never deletes it blindly",
+    "The remainder test" in ct and "reduced to its mechanical remainder" in ct,
+    "PROMOTE deleting SKILL.md wholesale destroys the one-off entry point for that "
+    "capability, which is half the design",
+)
+check(
+    "two paths: what moved into a handbook is DELETED from the skill",
+    "What moves out is DELETED from the skill, in the same transaction" in ct
+    and "two live copies of one job" in ct,
+    "a skill keeping its workflow beside an employee that owns it is the "
+    "two-canonical-texts failure, caused by us rather than inherited",
+)
+check(
+    "two paths: employees are instructed to invoke reduced skills",
+    "Employees INVOKE skills" in hbt_ and "must not invoke" in hbt_,
+    "`Skill` is already in the default grant; without the instruction and the "
+    "spawn rule, handbooks forbid every skill and the org cannot reach its library",
+)
+check(
+    "two paths: reduced skills are dispatchable without an agent hop",
+    "Reduced skills are Mechanicals rows too" in ocf_,
+    "a one-off entry point absent from the chart is invisible to dispatch, so "
+    "every mechanical ask pays for a hop to reach a skill it could have called",
+)
+check(
+    "gateway: no removal may strand a live dataset",
+    "no removal may leave a live dataset with no invocable path to it" in ds
+    and "The gateway survives every optimisation" in ds,
+    "deleting a data skill does not delete its files — it strands them, which is "
+    "quieter and worse; ablate/retire/audit all have to honour this",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

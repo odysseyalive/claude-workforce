@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement: 8 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 9 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -18,6 +18,35 @@ Three templates. Fill every `<angle bracket>`; leave no placeholder in a written
   `references/org-config.template.md` § Resolution. Never invented, never hardcoded here, and never
   restated as an order — the levels change, and a handbook author copying a stale one pins the wrong model.
 - No `memory:`. Ever.
+
+---
+
+## Employees INVOKE skills — the second half of the two-path design
+
+**`Skill` is already in the default grant** (see above). What was missing was the instruction to use it,
+and the rule that says when it is safe — so the first completed audit produced eight employees sitting
+beside 45 skills that every one of their handbooks explicitly forbade them to call.
+
+**The rule is about spawning, not about rank.**
+
+| The skill… | An IC (`disallowedTools: Agent`) | Why |
+|---|---|---|
+| is **reduced** — mechanism only, spawns nothing | **invoke it** | nothing in it needs a tool the IC lacks |
+| is **unconverted** — its workflow spawns subagents | **must not invoke it** | it hands the IC instructions to spawn agents it cannot spawn; the run stalls or silently degrades |
+| is a **data skill** | **invoke it** — this is the only sanctioned path to its dataset | `conversion-taxonomy.md` § Skills are the gateway to their data structures |
+
+So a handbook written against an unconverted tree correctly reads reference files **by path**. That is a
+**degraded mode, and it must say so** — not the target state. Once the skill is reduced, the handbook is
+amended to invoke it, and the by-path workaround is removed rather than left as sediment.
+
+**Name the skills an employee may invoke, explicitly, in its `## Procedure`.** Naming a skill is a grant
+of reach, and an unnamed one is out of scope exactly like any other unlisted work — the same rule the
+`## Scope` section already applies to everything else.
+
+**`skills:` frontmatter is NOT how an employee reaches a skill.** That field *preloads full content at
+startup* and costs its bytes on every spawn (`delegation-budget.md`). Preload only what the employee
+needs in full on every run — `operating-principles`, and a playbook it owns. Everything else is invoked
+on demand, which is the cheap path and the reason the split exists.
 
 ---
 
