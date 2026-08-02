@@ -169,6 +169,54 @@ def ANCHORED(rx):
 SCANNED_EXT = {".md", ".sh", ".ps1", ".py", ".txt"}
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EMBEDDED USER TEXT — the half of the extraction gate that hides
+#
+# Generators quote the directive they implement into the machinery they emit, so
+# user text lives inside blocks that marker-matching classifies as disposable. A
+# gate counting immutable SPANS alone reports full coverage while the sweep deletes
+# all of it (legacy-markers.md § Embedded user text; 95 of 96 blocks on a real
+# project).
+#
+# COUNTED BLOCK-BOUNDED, START to matching END. A hand script using a fixed
+# character window from each marker over-counted 27 as 44 on 2026-08-01 — the
+# windows were ~3000 chars against true blocks of ~1300-1500, so each one ran into
+# the next block and counted its quotes twice. That number reached a published
+# preflight as the denominator a real run had to match, which would have flagged a
+# CORRECT run as broken. It lives here now because no count in this project is
+# hand-derived.
+QUOTE_RX = re.compile(r"[\u201c\u201d\"]([^\u201c\u201d\"]{40,})[\u201d\u201c\"]")
+
+
+def embedded_quotes(body):
+    """Quoted user spans inside scaffolding, counted ONCE each.
+
+    Scaffolding families NEST — an ENFORCEMENT ANNOTATION lives inside a
+    MODEL-LANE-GATE — so scanning per family counts an enclosed quote once per
+    enclosing block. Measured 2026-08-01: 35 by per-family scan against 27 real
+    spans. A sweep deletes a span once, so the gate must count it once: block
+    ranges are unioned first, then quotes are taken from the merged regions.
+    """
+    ranges = []
+    for key, (o_rx, c_rx) in PAIRS.items():
+        if key == "origin_span" or key in OWN_FAMILIES:
+            continue
+        for m in re.finditer(o_rx, body):
+            e = re.search(c_rx, body[m.end():])
+            ranges.append((m.start(), m.end() + e.end() if e else len(body)))
+    ranges.sort()
+    merged = []
+    for a, b in ranges:
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    found = []
+    for a, b in merged:
+        found.extend(QUOTE_RX.findall(body[a:b]))
+    return len(found), len(set(found))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # `origin:` HAS FIVE ROLES AND ONLY ONE IS A PAIRED SPAN
 #
 # Counting openers against closers reports every other role as an orphan opener
@@ -511,6 +559,7 @@ def census(root):
     family_totals = Counter()
     family_mention_totals = Counter()
     origin_role_totals = Counter()
+    embedded_occ = [0]
     foreign_owners = Counter()
     no_marker = []
     quarantined = []
@@ -573,6 +622,10 @@ def census(root):
             file_scope_owners.append({"skill": name, "file": fp})
         for r, n in mk.get("origin_roles", {}).items():
             origin_role_totals[r] += n
+        # Defenced, like every other marker computation — a fenced example of a
+        # quoted directive is a mention, not an embedded span.
+        _eo, _ = embedded_quotes("\n".join(defence(b) for _f, b in mk["files"]))
+        embedded_occ[0] += _eo
         for pr in mk["pairing"]:
             unpaired.append({
                 "skill": name, "marker": pr["marker"],
@@ -922,6 +975,7 @@ def census(root):
         # settings file. Kept separate from the skill totals on purpose (see the
         # scan above); merging them would inflate the extraction denominator.
         "origin_roles": dict(origin_role_totals),
+        "embedded_user_quotes": embedded_occ[0],
         "families_outside_skills": dict(outside_families),
         "families_outside_skills_paths": {k: sorted(set(v)) for k, v in outside_paths.items()},
         # Families named only in prose — the predecessor's own docs describing a
