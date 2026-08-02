@@ -16,6 +16,7 @@ and are recorded here so they cannot recur unnoticed.
 
 import os
 import re
+import subprocess
 import sys
 import glob
 
@@ -2819,6 +2820,47 @@ multi = [
     and len([x for x in b.strip().split("\n") if x.strip()]) > 1
 ]
 check("README: one copyable command per fenced block", not multi, f"stacked: {multi}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A fixture that is not IN the repo is not a fixture
+# ─────────────────────────────────────────────────────────────────────────────
+# `bin/conformance` exits 1 and is the only instrument showing this system
+# generalizes past one real target — and on 2026-08-01 it passed clean here while
+# failing 41 of 60 assertions on a fresh clone. The root `.gitignore` carried a
+# bare `.claude/`, which matches at EVERY depth and so swallowed the fixture trees
+# themselves; twelve fixtures were committed as a CLAUDE.md and a TRUTH.md
+# describing content that had never been pushed. Anchoring the pattern fixed those,
+# and then two files stayed hidden for a second reason: f11 SHIPS `.gitignore`
+# files as test data (the census reads them to classify git disposition), and git
+# honored them, suppressing the very files the fixture asserts on.
+#
+# So the rule cannot be about any one pattern. It is: every file under fixtures/
+# is tracked, whatever the reason it might not be. `git add -f` is the fix when a
+# fixture's own test data is the cause — never a new ignore rule, which would
+# change what the fixture measures.
+_fx = os.path.join(ROOT, "fixtures")
+if os.path.isdir(_fx):
+    try:
+        _r = subprocess.run(["git", "ls-files", "fixtures/"], cwd=ROOT,
+                            capture_output=True, text=True, timeout=30)
+        if _r.returncode != 0:
+            raise RuntimeError(_r.stderr.strip()[:120] or "git ls-files failed")
+        _tracked = set(_r.stdout.split())
+        _ondisk = set()
+        for _d, _s, _f in os.walk(_fx):
+            if ".git" in _d.split(os.sep):
+                continue
+            for _n in _f:
+                _ondisk.add(os.path.relpath(os.path.join(_d, _n), ROOT))
+        _untracked = sorted(_ondisk - _tracked)
+        check(
+            "fixtures: every fixture file is tracked in git",
+            not _untracked,
+            "untracked, so absent from any clone and silently unasserted there: "
+            + ", ".join(_untracked[:5]) + (" …" if len(_untracked) > 5 else ""),
+        )
+    except Exception as _e:  # no git, no assertion — never a false pass
+        warn("fixtures: tracked-ness not asserted", f"git unavailable ({_e})")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Warnings — worth knowing, not worth failing
