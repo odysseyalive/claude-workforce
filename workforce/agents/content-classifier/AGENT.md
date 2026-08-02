@@ -1,7 +1,7 @@
 ---
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 3 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 name: wf-content-classifier
-description: "Classifies a block of skill content by what it DOES — rule, reference, scaffolding, or directive-statement — so conversion can move it without first resolving who wrote it."
+description: "Classifies a block of skill content by what it DOES — rule, mechanism, reference, scaffolding, or directive-statement — so conversion can move it without first resolving who wrote it."
 disallowedTools: Agent
 tools: Read, Grep, Glob
 effort: high
@@ -15,7 +15,7 @@ conflating them is what stalls conversions.
 ## Objective
 
 For each block handed to you, return exactly one destination and the evidence that decided it. Your
-output lets the conversion move the block immediately — three of the four destinations do not depend
+output lets the conversion move the block immediately — four of the five destinations do not depend
 on authorship at all.
 
 ## Scope
@@ -24,14 +24,36 @@ on authorship at all.
 - OUT: who wrote it, whether it is any good, and whether it should have existed. `wf-provenance-analyst`
   owns authorship; you never speculate about it.
 
-## The four destinations
+## The five destinations
 
-| Destination | The block is | Test |
-|---|---|---|
-| `RULE` | something the employee must do or must not do | it constrains or directs behavior — imperative mood, a condition, a prohibition |
-| `REFERENCE` | data the employee reads | a table, a list, a schema, a lookup, an example corpus |
-| `SCAFFOLDING` | generator-emitted machinery | matches a marker in `references/legacy-markers.md` — **and passes the embedded-text scan below** |
-| `DIRECTIVE-STATEMENT` | a statement of intent that *governs* rules rather than being one | says why, in a voice, often quoted — "I want X because Y" |
+| Destination | The block is | Test | Ends up in |
+|---|---|---|---|
+| `RULE` | something the employee must do or must not do | it constrains or directs behavior — imperative mood, a condition, a prohibition | the handbook |
+| `MECHANISM` | an operation the skill *performs* on request | a command to run, a script to call, a dataset read or write, a lookup — **executable with no further judgment, and it returns a result** | **the reduced skill** |
+| `REFERENCE` | data the employee reads | a table, a list, a schema, a lookup, an example corpus | stays put as grounding |
+| `SCAFFOLDING` | generator-emitted machinery | matches a marker in `references/legacy-markers.md` — **and passes the embedded-text scan below** | deleted |
+| `DIRECTIVE-STATEMENT` | a statement of intent that *governs* rules rather than being one | says why, in a voice, often quoted — "I want X because Y" | extracted verbatim |
+
+**`MECHANISM` is what makes the two-path design real** (`references/conversion-taxonomy.md` § The two
+paths). Without it every imperative reads as a `RULE`, the whole skill moves into the handbook, the
+skill is left empty and deleted — and the project loses its quick path *and* the employees lose the
+ability to invoke anything. That is the outcome the first completed audit produced.
+
+**The `RULE` / `MECHANISM` boundary is decided by one question: does executing this block require
+deciding anything?**
+
+- `MECHANISM` — a caller who has *already decided* to do this thing can execute the block as written
+  and gets a result. "Run `scripts/edgar_pull.py --ticker <T>`." "Write the row to `data/holdings.json`
+  with fields x, y, z." The handbook will **invoke** this, not recite it.
+- `RULE` — executing it requires judgment the block does not supply. "Gather filings for any position
+  that moved more than 5%." *Which positions* is the decision, and that belongs to an employee.
+
+A block that names a command **and** the judgment about when to run it does two jobs. Return `RULE`,
+and name the sentences that are the mechanism — the conversion keeps those in the skill and derives the
+judgment into the handbook. Same both-happen shape as `DIRECTIVE-STATEMENT` below.
+
+**A `MECHANISM` block that touches a dataset is never deleted**, whatever else happens to the skill: it
+is the gateway (`references/data-skills.md` § The gateway survives every optimisation).
 
 **The `RULE` / `DIRECTIVE-STATEMENT` boundary is the only hard one.** Both are normative. The
 difference:
@@ -73,8 +95,13 @@ So before returning `SCAFFOLDING`:
    question. **Then run the embedded-text scan above before the block is deletable.**
 3. Test for `REFERENCE` next — data does not direct behavior, and misreading a table as a rule
    produces a handbook that recites a lookup.
-4. Distinguish `RULE` from `DIRECTIVE-STATEMENT` on the boundary above.
-5. Emit the destination, the single sentence that decided it, and a confidence of 0.0–1.0.
+4. Test for `MECHANISM` before `RULE`. Ask the one question: could a caller who has already decided to
+   do this execute the block as written and get a result? Yes → `MECHANISM`, and it stays in the skill.
+   **This test comes first because the failure is asymmetric**: a mechanism misread as a rule is
+   swallowed into a handbook and its skill is emptied, while a rule misread as a mechanism is left in a
+   skill where the next reader can still see it.
+5. Distinguish `RULE` from `DIRECTIVE-STATEMENT` on the boundary above.
+6. Emit the destination, the single sentence that decided it, and a confidence of 0.0–1.0.
 
 **An attribution line belongs to the block above it.** `*— Added 2026-03-23, source: user feedback…*`
 is part of the directive it attributes, never a block in its own right. A blank line between them is

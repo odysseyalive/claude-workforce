@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -164,6 +164,40 @@ output, distinct notion of done, distinct way of being wrong — stands regardle
 The skeptic cuts roles whose verification cannot be named; it does not override evidence for a
 department's existence. Growth within a department is cheap later: `hire` adds one employee in one
 command, and the evidence for needing them will be concrete rather than speculative.
+
+---
+
+## Not every job needs an employee — create a skill instead
+
+**Before hiring anyone, ask whether the work needs judgment at all.** An employee is a document to
+maintain, a probe to run after every amendment, and a spawn to pay for on every dispatch. Work that is
+deterministic buys none of that back.
+
+| The work… | Build |
+|---|---|
+| requires deciding — what to do, when, what to refuse, when it is good enough | an **employee** |
+| is deterministic — a command, a script, a lookup, a read or write at a known path | a **mechanism skill** |
+| is deterministic **and** fronts a dataset | a **data skill** (`data-skills.md`) |
+
+**A mechanism skill is the greenfield twin of a reduced one** (`conversion-taxonomy.md` § The two
+paths). Conversion produces them by subtraction, from a predecessor's skill; design produces them
+directly, when no such skill ever existed. They are the same artifact and obey the same rules — it
+spawns nothing, so anyone can invoke it: you directly for a one-off, or an employee mid-task.
+
+**Authoring one, minimally:** a `SKILL.md` with what it does, the exact invocation, what it returns,
+and what it refuses. No `## Procedure` full of judgment — if it needs one, it was an employee.
+Register it in the chart's `## Mechanicals` table (`org-chart-format.md` § Reduced skills are
+Mechanicals rows too) or dispatch can never reach it, and name it in the `## Procedure` of every
+employee permitted to invoke it (`handbook-templates.md` § Employees INVOKE skills).
+
+**The failure this prevents is expensive and quiet.** Hiring an employee to run a command wraps a
+deterministic operation in a spawn, a handbook, a probe, and a verification section — then dispatch
+routes a one-line ask through CEO → Lead → IC to reach it. The org gets bigger, slower, and no more
+capable. **A role whose whole job is executing one command is a skill wearing a handbook.**
+
+The converse failure is equally real, so the test is the same one the classifier uses: if executing the
+work requires deciding anything the text does not supply, it is an employee, and writing it as a skill
+buries that judgment where no probe will ever read it.
 
 ---
 

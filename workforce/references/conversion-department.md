@@ -52,7 +52,7 @@ Ask instead: **what does this block do?**
 | generator scaffolding | deleted, by marker | **no** |
 | a statement of the user's intent governing a rule | extracted verbatim, referenced by sha | **yes** |
 
-**Three of four destinations do not depend on who wrote it.** So:
+**Four of five destinations do not depend on who wrote it.** So:
 
 > **No conversion ever waits on an ownership question.** Function is resolved first, and the work
 > moves. Ownership is resolved second, and it decides only whether the original text is preserved
@@ -71,7 +71,7 @@ out wide and none of it needs to delegate further.
 
 | Role | Job | Output |
 |---|---|---|
-| **content-classifier** | function, per block | one of the four destinations, with the sentence that decided it |
+| **content-classifier** | function, per block | one of the five destinations, with the sentence that decided it |
 | **provenance-analyst** | ownership, for directive-shaped blocks only | an attribution with cited evidence, or `IMMATERIAL` / `UNRESOLVED` |
 | **conversion-auditor** | fidelity of the result | `LOST` / `CHANGED` / `INVENTED` / `RE-HOMED` |
 
