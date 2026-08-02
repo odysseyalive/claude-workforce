@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 11 assertion(s) in bin/check name this file; 46 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement: 12 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -603,14 +603,27 @@ Then, in order:
 
 | | Removed | Kept |
 |---|---|---|
-| marked skills | `SKILL.md` and any span the run moved | `references/`, `scripts/`, `hooks/`, and every dataset — **untouched, paths unchanged** |
+| marked skills | **only the blocks that moved** — every `RULE` and `DIRECTIVE-STATEMENT` span now living in a handbook | the `SKILL.md` itself, carrying its `MECHANISM` blocks; plus `references/`, `scripts/`, `hooks/`, and every dataset — **untouched, paths unchanged** |
 | predecessor scaffolding | marker-matched embeds, annotations, gates, sidecars, sentinels | anything matching no marker → **quarantined to the report** |
 | the superseded generator | itself | the working machinery it wrote |
 
-**A skill directory that still holds datasets, scripts, or hooks is not removed** — only its `SKILL.md`
-is. The directory continues to exist as the data skill's home. Removing a directory because its
+**The sweep REDUCES a converted skill; it deletes one only when nothing invocable remains**
+(`conversion-taxonomy.md` § The remainder test). Removing the `SKILL.md` wholesale destroys the one-off
+entry point for that capability and takes the employees' own access with it, since an employee reaches a
+capability by invoking the skill.
+
+**Reduction is subtractive and it happens HERE, not later.** The blocks that became handbook text are
+deleted in this step. A skill left holding a workflow an employee now owns is two live copies of one
+job, and they drift on the first amendment.
+
+**Delete the `SKILL.md` only when the remainder is a pointer** — no command, no script call, no dataset
+access, nothing but a redirect to the employee. That is a stub, and § Nothing is left behind forbids it.
+
+**A skill directory that still holds datasets, scripts, or hooks is never removed.** The directory
+continues to exist as the data skill's home, and its `SKILL.md` is the only sanctioned path to that data
+(`data-skills.md` § The gateway survives every optimisation). Removing a directory because its
 instruction file left would take the data with it, which is the one outcome the whole design is built to
-prevent.
+prevent — and removing the gateway while keeping the files is the quieter version of the same failure.
 
 ### After the sweep
 
