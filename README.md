@@ -4,6 +4,8 @@
 
 > **Supersedes** [claude-enforcer](https://github.com/odysseyalive/claude-enforcer). If you run the enforcer today, [here's the migration path](#coming-from-claude-enforcer).
 
+> **PAIRS WELL WITH:** playwright-mcp. Nobody here is hired without a check that proves the work, and web-facing employees are the hardest to hire, because a browser task rarely has an exit code. It captures a login once and scaffolds that into a deterministic Playwright suite, so the proof is a suite that passes rather than a model's opinion. It also replaces WebFetch, which subagents never receive. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
+
 ## Not Every Brain Does Every Job
 
 You've probably switched models three times in one sitting without thinking about it. Not because anything was broken, but because each one was good at a different thing. The coder refactored your auth flow without missing a test. The writer gave your draft a pulse. Neither could do the other's job.
