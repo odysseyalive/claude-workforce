@@ -1,0 +1,118 @@
+# After-review — `~/lab/odyssey-alive`, 2026-08-01
+
+The first full `/workforce audit` ever run to completion. Pairs with
+`plan/before-review-odyssey-alive-2026-08-01.md`; censuses are
+`measurements/2026-08-01-baseline-odyssey-alive-{BEFORE,AFTER}.{md,json}`.
+
+**Same instrument both sides.** `bin/baseline` last changed at `694ac76`, before the BEFORE capture,
+and has not been touched since — so the diff is a measurement, not a tooling artifact.
+
+Run id `audit-20260801-1`. Verdict: **the org is sound and the writing path works. The conversion did
+not happen, by a decision the run documented, so the predecessor findings from the before-review are
+all still open.**
+
+## What moved
+
+| | before | after |
+|---|---|---|
+| agents registered in `.claude/agents/` | 3 | **14** — 8 employees, 3 retained canaries, 3 pre-existing symlinks |
+| skills | 45 | 48 — `+operating-principles`, `+org`, `+personnel-ledger` |
+| employees with a runnable check | — | **8 of 8** |
+| defects recorded | 0 | **3**, all probe-raised, all `Status: amended` |
+| CLAUDE.md | 7,378 B | 8,202 B (+824, one `WORKFORCE-CONSTITUTION` block) |
+
+Three departments, three leads, five ICs: content (creative lane, `claude-opus-4-6`), site (code lane,
+`claude-opus-5`/high), ops (analytical, `claude-opus-4-8`, lead high / IC medium). Lane precedence
+resolved correctly everywhere — `content-lead` is a Lead on the creative lane and takes creative's
+`medium`, not the analytical Lead's `high`.
+
+## Verified by running it, not by reading it
+
+- `check-personnel-index.sh` → **exit 0**, "11 record(s), index agrees." The index-drift class that
+  cost this project two false findings is now enforced by a script in the target.
+- `lint-no-regression.sh` → **exit 0**, current 31 errors / 60 warnings == recorded baseline.
+- Every referenced artifact exists; `velite`, `lint`, `build`, `test:e2e`, `test:copy-truth` are all
+  real entries in `package.json`. **No invented checks.**
+- Transaction integrity: every employee shows `WRITE-INTENT` → `COMMITTED` with identical staged and
+  registered sha256, reaching T8. **No dangling `WRITE-INTENT` rows** — the transaction order, listed
+  in `CLAUDE.md` as never having run, ran.
+
+## The gates did their job, including when it hurt
+
+**The probe gate caught real ambiguity.** `site-engineer` returned FAIL and `site-lead` returned
+AMBIGUOUS on the same issue: the handbook required `pnpm lint` to exit 0, the work order was explicitly
+read-only, and the repo carries 31 pre-existing errors — so the gate was **unsatisfiable without
+violating the order**. Filed as `DEF-…-lint-gate-unsatisfiable`, fixed by replacing the absolute gate
+with a no-regression ratchet, re-probed clean. That is fixing the class, not the instance.
+
+**The canary refused to assert what it did not observe.** C2 (tier ceiling) is a measured PASS —
+`wf-ceiling-probe` declared `Agent` in both `tools:` and `disallowedTools:` and reported
+`HAS_AGENT: no`, so every IC's ceiling rests on measured behavior on this host. C1 (depth limit) is
+recorded **INCONCLUSIVE, not FAIL**: link C's result never propagated back to B, which is evidence
+about propagation and not about `Agent`. `TIER-LIMIT` was left at the shipped baseline.
+
+**The three retained canaries are correct, not residue.** `staging.md` § Fixture lifecycle retains a
+fixture on an *open* fact and sweeps it on a closed one. `wf-ceiling-probe` was swept; `wf-canary-a/b/c`
+are held open by C1. I checked this expecting residue and found the rule applied properly.
+
+**A stale doc was found and handled without touching the user's file.** The `content-lead` probe found
+`CLAUDE.md`'s four-category list contradicted `velite.config.ts`'s six. The run measured actual usage
+across 48 articles, then amended the *handbook* to read the enum from the schema rather than copying a
+corrected list — one canonical text, not two. `CLAUDE.md` was left alone and reported as a proposal.
+
+## Two NEW defects — in claude-workforce, found by its own output
+
+**Workforce emits two marker families, and its own census handles neither correctly.**
+
+| family | written to | census result |
+|---|---|---|
+| `ORG-DISPATCH-CHECKPOINT` | `.claude/skills/org/SKILL.md` | flagged **UNKNOWN — "classify before any sweep"** |
+| `WORKFORCE-CONSTITUTION` | `CLAUDE.md` | **invisible** — family discovery only walks `.claude/skills/**` |
+
+Neither is in `legacy-markers.md`'s table. This is the same shape as the defect closed on 2026-08-01:
+the table's own rule is that it *grows from* families the detector finds, and workforce is now the
+generator emitting families that never reach it. A future run auditing this project would report
+workforce's own scaffolding as an unclassified foreign family.
+
+The second is worse than the first: a marker the census cannot see is a marker no sweep can be reasoned
+about. **Fix both together** — add the two rows, and extend family discovery past the skills tree.
+
+## What did NOT move, and why
+
+`conversion-journal.md` line 3: *"No skill conversions this run (succession: none)."*
+
+This is correct behavior — `conversion-taxonomy.md` holds that succession must be declared FROM a named
+predecessor and that defaulting it "is an ERROR, not a default." The run also documented the decision
+rather than leaving it implicit: the org chart's **Orchestrators** table lists all 45 skills with a
+stated reason each stayed a skill (`/skill-builder` "owns 32 of the 45 skills").
+
+So every headline finding from the before-review is still open:
+
+| before-review finding | status |
+|---|---|
+| 54 of 57 in-skill agents unreachable | **unchanged** — 57 definitions, 3 symlinks |
+| name collisions (`voice-validator` ×4, `id-lookup` ×4, `image-validator` ×2) | **unchanged** |
+| 6 agents missing `name:`/`description:` | **unchanged** |
+| 0 of 45 skills pin a model | **unchanged** |
+| 6 of 45 skills name a check | **unchanged** (the 8 new employees are all checked) |
+| 5 unpaired markers | **unchanged** — still a latent hazard for any future sweep |
+
+**odyssey-alive now runs both systems side by side.** That is a coherent outcome of "succession: none,"
+but it is not what the standing directive asks for ("I don't want to leave any of the old system still
+there that doesn't need to be there"). Closing it is a deliberate second act — declaring succession
+from `skill-builder` — and the five unpaired markers must be resolved by hand *before* any sweep runs.
+
+## Held, as required
+
+`quarantined 0` · `dead wiring 0` · `UNCLASSIFIED 0` · ledger records 23 · datasets 44 ·
+credential-shaped files 3 · `origin_foreign` 98 · `origin_user_immutable` 55. Nothing was deleted;
+`.claude-backups/` predates the run and was not disturbed.
+
+## For the project owner, not for workforce
+
+- **`CLAUDE.md:42`'s category list is wrong in both directions.** It omits `groundwork` (19 articles,
+  second-most-used) and `digital-landscape` (1), and names `pattern-recognition` and `case-studies`,
+  which have **0** articles between them. The handbook now bypasses it; the line still misleads humans
+  and every non-workforce skill that reads it.
+- **31 ESLint errors / 60 warnings** are now a recorded baseline. The ratchet stops it worsening; it
+  does not pay it down.
