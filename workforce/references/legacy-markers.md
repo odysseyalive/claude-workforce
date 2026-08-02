@@ -69,7 +69,36 @@ Mentions are still **reported**, never dropped. A generator's docs naming a fami
 exists somewhere; it is not evidence it is here, and a number that shrinks without explanation is its
 own defect.
 
-### The two families this project emits are its OWN, and the class is load-bearing
+### `origin:` has at least five roles, and only one of them is a paired span
+
+**OPEN, 2026-08-01.** The census reports every unclosed `origin:` as an orphan opener and a sweep
+hazard. Measured against `odyssey-alive`, **four of its five reported hazards are not missing a closer
+at all** — they are unclosed by design, and inserting one would fabricate a span the generator never
+wrote:
+
+| role | example | terminated by |
+|---|---|---|
+| 1. paired span | `<!-- origin: … -->` … `<!-- /origin -->` | its own closer |
+| 2. file-scope header | first lines of a file, whole file owned | EOF — **already exempted** |
+| 3. **block attribute** | `focus/SKILL.md:130`, riding an `ENFORCEMENT ANNOTATION` block | `<!-- END ENFORCEMENT ANNOTATION -->` |
+| 4. **tail / append-point** | `text-eval/references/ai-patterns.md:64`, whose own next line reads *"Nothing above this marker was read, moved, or modified"* | EOF, by design |
+| 5. **section header** | `invest/SKILL.md:102`, after a `---` and before a `##` | the next section |
+
+Roles 3–5 are unhandled. The consequence runs **both** ways, which is why this is not merely a noisy
+report:
+
+- **Reported as hazards, they invite a "fix" that is itself the damage.** Adding `<!-- /origin -->` to
+  close role 4 would bound a region the generator documents as running to EOF, and a later append lands
+  outside the region that owns it.
+- **Treated as opener-to-next-closer by a sweep, they take real content with them.** `invest:102`'s
+  next closer is at line 357: a sweep would swallow **255 lines** on a marker that closes nothing.
+
+**So the pairing check is right that these need a human, and wrong about what the human should do.**
+Until roles 3–5 are modelled, an unclosed `origin:` is *unclassified*, not *unpaired* — and the honest
+report says which of the five roles it could not rule out, rather than naming a hazard it has not
+established. Do not "repair" one by adding a closer.
+
+### The five families this project emits are its OWN, and the class is load-bearing
 
 Measured on the first completed audit, 2026-08-01. The run emitted **eight spans across three
 families**, and the census saw **one**:
