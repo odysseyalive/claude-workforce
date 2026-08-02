@@ -62,8 +62,15 @@ The instruments find different things, and 2026-07-31 measured the difference in
 | Instrument | Found |
 |---|---|
 | `bin/check` | restated constants, unpaired markers, a vacuous assertion, a duplicated paragraph |
-| `bin/baseline` | 4 unknown marker families, 2 unpaired-marker sweep hazards, a ledger index off by 4 |
+| `bin/baseline` | 4 unknown marker families, 2 unpaired-marker sweep hazards, ~~a ledger index off by 4~~ (**retracted 2026-08-01 — that drift was the census's own, not the target's**; `fixtures/f13-sibling-ledgers`) |
 | **the mock audit** | **`--review` wrote into the target** via two gates in the *other* file — and it corrected a known defect's characterization from "produces an empty chart" to "produces a lopsided plausible one," which changed how the fix had to be scoped |
+
+**A drift the census reports is a claim about the census too.** The ledger count has now been wrong
+three times — 24-vs-20 (counting `README.md`s), 27-vs-23 (an ancestor root fused two skills), and the
+`index claims 0` that the same wrong root manufactured — and **every time the target was right**. So
+when a census reports a discrepancy rather than a total, reproduce it by hand before recording it as a
+finding: it costs one `find | wc -l`, and the alternative has a 3-for-3 record of writing the
+instrument's bug into this file as the target's. `fixtures/` is where the reproduction lands.
 
 **Manage an anticipated issue through the mock audit rather than by reasoning about it.** The
 provisional-verification fix is the worked example: it was diagnosed by reading (correctly, as far as it

@@ -59,8 +59,19 @@ def assertions(exp, c):
         # confidently wrong count propagated into five documents on 2026-07-31.
         "ledger_total": (c.get("predecessor_ledger") or {}).get("actual_total", 0),
         "ledger_index_claims": sum(((c.get("predecessor_ledger") or {}).get("index_claims") or {}).values()),
-        "ledger_buckets": len([k for k, v in (c.get("predecessor_ledger") or {}).items()
-                               if isinstance(v, int) and k != "actual_total"]),
+        # Reads `record_types` — the explicit bucket list — NOT "every int-valued
+        # key that isn't actual_total". `isinstance(True, int)` is True in Python,
+        # so that filter counted any bool the census later added as a bucket, and
+        # the first two (`index_present`, `index_states_counts`) would have
+        # silently inflated every fixture's bucket count by 2.
+        "ledger_buckets": len((c.get("predecessor_ledger") or {}).get("record_types") or []),
+        # Distinguishes "the index states no counts" from "the index counted zero".
+        # `_states_counts` alone does NOT discriminate: on a census that never
+        # emitted the key it reads absent -> False and passes against broken code.
+        # `_index_present` is the half that fails there, so the pair asserts the
+        # distinction exists rather than assuming it.
+        "ledger_index_present": bool((c.get("predecessor_ledger") or {}).get("index_present")),
+        "ledger_index_states_counts": bool((c.get("predecessor_ledger") or {}).get("index_states_counts")),
         # f11: dataset and hook censuses, hand-classified. `_exact` because a
         # floor would hide the over-count these exist to catch.
         "datasets_exact": len(c.get("datasets") or []),

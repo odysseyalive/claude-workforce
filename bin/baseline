@@ -608,18 +608,50 @@ def census(root):
             for sub in subs:  # zero-record buckets are reported, never dropped
                 buckets.setdefault(sub, 0) if os.path.isdir(os.path.join(dirpath, sub)) else None
             candidates.append((dirpath, buckets))
+    # AN ANCESTOR OF A LEDGER IS NOT A LEDGER. Bucket sums are monotonic going
+    # up, so `max(sum)` systematically prefers the SHALLOWEST qualifying
+    # directory: once two sibling skills each hold dated records, `skills/`
+    # itself matches the shape with those skills as its "buckets" and wins.
+    # Measured on the real target — the census reported 27 records in
+    # {awareness-ledger: 23, steganographer: 4}, fusing one real ledger with an
+    # unrelated skill's scan output, and the true root (23 in 4 buckets) placed
+    # second and was discarded. The consequence is the one this block's header
+    # warns about: a migration pointed at `skills/` moves the wrong tree.
+    candidates = [
+        (dp, b) for dp, b in candidates
+        if not any(dp2 != dp and dp2.startswith(dp + os.sep) for dp2, _ in candidates)
+    ]
     if candidates:
         led_root, buckets = max(candidates, key=lambda c: sum(c[1].values()))
         ledger.update(buckets)
         ledger["root"] = os.path.relpath(led_root, root)
         ledger["record_types"] = sorted(buckets)
+        # Independent ledgers are REPORTED, never silently dropped. Picking the
+        # largest is a choice about which one to describe in detail, not evidence
+        # the others do not exist — and a migration that never hears about them
+        # leaves records behind.
+        ledger["other_roots"] = sorted(
+            os.path.relpath(dp, root) for dp, _ in candidates if dp != led_root
+        )
         idx = ""
         for cand in ("index.md", "INDEX.md", "README.md"):
             idx = idx or read(os.path.join(led_root, cand))
         claimed = re.findall(r"\|\s*([A-Za-z]{3,})\s*\|\s*(\d+)\s*\|", idx)
+        # AN EMPTY CLAIM MAP IS NOT A CLAIM OF ZERO. The map is filtered against
+        # `buckets`, so it comes back empty whenever the index counts something
+        # this root does not name — which is exactly what a wrong root above
+        # guarantees. On the real target the two defects compounded: the ancestor
+        # root supplied buckets {awareness-ledger, steganographer}, the index's
+        # real table counted {decisions, incidents, patterns, flows}, nothing
+        # survived the filter, and the report printed "index claims 0" against an
+        # actual 27 — a 27-record drift that did not exist. Both halves have to be
+        # distinguishable, so an index that states no counts THIS root recognizes
+        # is reported as such and never as the number zero.
         ledger["index_claims"] = {
             k.lower(): int(v) for k, v in claimed if k.lower() in buckets
         }
+        ledger["index_present"] = bool(idx)
+        ledger["index_states_counts"] = bool(ledger["index_claims"])
         ledger["actual_total"] = sum(buckets.values())
 
     # ── Where ignore rules for skill state actually live ─────────────────────
@@ -765,8 +797,15 @@ def report(c):
     p(f"| agent definitions inside skills | {len(c['agents']['in_skills'])} |")
     if c["predecessor_ledger"]:
         pl = c["predecessor_ledger"]
+        p(f"| predecessor ledger root | `{pl.get('root')}` |")
         p(f"| predecessor ledger records (actual) | {pl.get('actual_total')} |")
-        p(f"| predecessor ledger records (index claims) | {sum(pl.get('index_claims', {}).values())} |")
+        if pl.get("index_states_counts"):
+            p(f"| predecessor ledger records (index claims) | {sum(pl.get('index_claims', {}).values())} |")
+        else:
+            why = "index states no counts" if pl.get("index_present") else "no index found"
+            p(f"| predecessor ledger records (index claims) | — ({why}) |")
+        for other in pl.get("other_roots") or []:
+            p(f"| **separate ledger NOT described above** | `{other}` |")
     p("")
     if c["foreign_origin_owners"]:
         p("## Foreign `origin:` owners (detection is by marker, never by name)")
