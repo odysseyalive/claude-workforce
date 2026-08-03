@@ -191,6 +191,36 @@ appears anywhere in `.claude/skills/`, `~/.claude/skills/`, or as an `AGENT.md` 
 the run does not invent a variant**: silently becoming `records-holdings-2` produces two plausible names
 for one dataset and no way to tell which the org chart meant.
 
+## A predecessor's record system — converted, never re-typed
+
+**The commonest thing a superseded generator leaves behind is a knowledge base**, and it is the case
+most likely to be mishandled in both directions: stranded by a sweep that reads it as scaffolding, or
+mangled by a run that tries to translate its record types into this project's.
+
+`claude-enforcer`'s awareness ledger is the worked example — `INC` (incident), `DEC` (decision), `PAT`
+(pattern), `FLW` (flow), consulted before any non-trivial change.
+
+**Neither of those is the answer. Convert the ownership layer; leave the records alone.**
+
+| Layer | What happens |
+|---|---|
+| the record **bodies** | **untouched, byte-for-byte, at their existing paths.** They are the project's accumulated knowledge and nothing here can regenerate them |
+| the record **types** | **kept as they are.** `INC`/`DEC`/`PAT`/`FLW` describe the *project*; `EMP`/`PERF`/`DEF`/`AMD` describe *employees*. They answer different questions, and an `INC` re-typed as a `PERF` asserts that a project incident was an employee's performance |
+| the **schema and invariants** | extracted from the records and rules that exist (§ the conversion column above) |
+| the **owner** | one Records Owner employee, named in the chart (`records-ownership.md`) |
+| the **maintaining hook or script** | survives, re-owned, registration rewritten in the same transaction |
+| the **gateway skill** | reduced, never deleted (`conversion-taxonomy.md` § Skills are the gateway) |
+
+**Two ledgers in one project is the correct end state, not residue.** An org has a personnel ledger
+about its employees and the project keeps its knowledge base about itself. The standing directive
+against leaving the old system in place governs *"the old system that doesn't need to be there"* — a
+live knowledge base with 24 records nobody has replaced needs to be there. **Say so in the report**,
+because from a distance two ledgers look like the duplication that directive forbids.
+
+**What would make it residue:** an empty predecessor ledger, or one whose every record has been
+superseded by an equivalent in the org's own records. Neither is decided by counting; both are named
+in the report and left to the user.
+
 ## Scope: one dataset, one skill
 
 Scope a data skill to **one coherent dataset with one owner** — never to whichever skill happened to

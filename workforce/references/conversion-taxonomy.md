@@ -434,18 +434,33 @@ which system they are leaving, made silently, immediately before the only step t
 
 ### What still refuses — and this list is the point
 
-Succession is not "convert everything". Four refusals and one disposition survive it:
+Succession is not "convert everything". Four refusals, one disposition, and the gateway rule survive it:
 
 | Still refuses | Why it survives declared intent |
 |---|---|
+| **the data gateway** (§ Skills are the gateway to their data structures) | **A skill fronting a live dataset is never deleted, under succession or any other mode.** It is *reduced* — the judgment becomes a handbook, the dataset gains a contract (`data-skills.md`), the maintaining scripts and hooks survive re-owned — and what is left is the invocable path to the data. Deleting it strands the records: the files remain and nothing may legitimately reach them, which is worse than any conversion it would have bought |
 | **ORCHESTRATOR** | The user's own immutable directive in this file makes it first-class. Machinery that creates and runs agents stays a skill. **Succession never overrides it.** Exception: `skill-builder` is the superseded generator and is removed entirely under succession (§ ORCHESTRATOR above) |
 | **Rule 4** — pure reference, data, lookup tables | Already an employee's grounding library. Nothing to convert; converting a table produces an employee with no job |
 | **Rule 1** — `disable-model-invocation: true` | A per-skill opt-out the user wrote by hand. A project-level "take over" is the broader signal; the narrower one wins. Report it and let the user clear it per skill |
 | **Rule 6** — quarantined, frontmatter unparseable | Never convert what you cannot read. Safety, not policy |
 | **Rule 2** — imperative content *only* inside an immutable span | Mechanical, not protective: immutable spans are never copied or moved, so there is nothing outside the block to convert. A skill with content on *both* sides still converts — the handbook references the block and stamps a `directives-sha` |
 
-**So the end state of a full succession is orchestrators plus reference data**, which is the shape the takeover
-is aiming at rather than an accident of it.
+**So the end state of a full succession is orchestrators plus reference data plus the data gateways**,
+which is the shape the takeover is aiming at rather than an accident of it.
+
+**The gateway row was missing from this list until 2026-08-03**, and the list claims to be the point.
+The rule stating it reads as absolute — *"retained on that basis alone, whatever else its disposition
+would have been"*, binding *"every future optimisation"* — so the two texts pointed opposite ways with
+nothing deciding between them. Found by a user asking what happens to a predecessor-installed ledger
+skill under succession. **The reconciliation is that both are right and they were describing different
+verbs:** succession makes the skill *eligible* and removes its **scaffolding**; the gateway rule forbids
+removing the **skill**. It is reduced, never deleted.
+
+**Read `data it maintained → migrated` in that light.** Migration means the dataset gains a data-skill
+contract and an owner — schema, invariants, degradation, git policy — and is enumerated from the
+filesystem rather than trusted to the predecessor's own index. **It does not mean the files move**
+(`data-skills.md` § The data never moves) and it does not mean the path to them is removed. A run that
+reads that row as licence to delete a gateway has inverted it.
 
 ### What succession removes — the half that was missing
 
