@@ -7,7 +7,7 @@ The single most important table in this project:
 
 | Want | Mechanism | Actually? |
 |---|---|---|
-| Employee cannot delegate | `disallowedTools: Agent` | **PREVENTS** — measured (`platform.md` fact 2c) |
+| Employee cannot delegate | `disallowedTools: Agent` | **PREVENTS for a plain subagent spawn** — measured (fact 2c). **CANNOT when the same employee is invoked as a NAMED TEAMMATE** — measured 2026-08-03 (fact 2d): the harness grants the teammate toolset, `Agent` included, and the definition's `disallowedTools:` is not honored |
 | Org cannot exceed the tier limit | harness depth limit | **PREVENTS** — measured (fact 1) |
 | Employee cannot reach an MCP server its explicit `tools:` grant does not name | `tools:` | **PREVENTS** when `tools:` is set — measured (fact 13). Does not apply when `tools:` is omitted: the default grant includes `ToolSearch` and all configured servers (deferred) |
 | Employee cannot read/write certain paths | `permissions.deny` | **PREVENTS** |
@@ -19,6 +19,13 @@ The single most important table in this project:
 
 **Anything in a "cannot" row must never be described as enforced, guaranteed, prevented, or
 sandboxed.** That is a gate, not a style preference (Chain-of-Command Gate, `SKILL.md`).
+
+**And a PREVENTS row carries the conditions it was measured under.** The first row said `PREVENTS`
+flat for five days. It was true — for the spawn form the measurement used. A user's `verify` run then
+measured the same fixture arriving with `Agent` when invoked as a named teammate, which means the tier
+ceiling of every IC in every org depends on **how it is invoked**, not only on what its handbook says.
+*A guarantee stated without its conditions is an overclaim that has not been caught yet* — and this one
+was caught by the project's own canary, from a FAIL that looked like a host problem.
 
 ---
 

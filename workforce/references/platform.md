@@ -109,6 +109,42 @@ prevent. It went unnoticed because it was written in the same edit that recorded
 which is what a static check can verify. The runtime behavior is now measured, but it is measured **once
 per host by the canary**, never inferred per handbook from the presence of a string.
 
+### Fact 2d — a NAMED TEAMMATE spawn ignores `tools:` and `disallowedTools:` ✅ MEASURED
+
+**This is the condition on fact 2c, and it was not known when 2c was promoted.**
+
+**Measured 2026-08-03 on Claude Code 2.1.221**, during `/workforce verify` on a real org. Same fixture
+(`wf-ceiling-probe`), same session, two spawns:
+
+| Spawn form | Tools it actually saw | `Agent`? |
+|---|---|---|
+| **named teammate** | `Read, Write, Agent, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate` | **present** |
+| plain subagent | `Read, Write` | absent |
+
+**Naming an agent puts the session in agent-teams mode, and the harness then grants the teammate
+toolset instead of honoring the definition's `tools:` / `disallowedTools:`.** Reproduced: the named
+form returned `HAS_AGENT: yes` on two separate occasions from the fixture whose plain spawn returns
+`Read, Write`.
+
+**Gated by a host setting**, observed at `.claude/settings.local.json` as
+`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"`. Whether the behavior exists with the flag off is
+**not measured** — do not assume either way.
+
+**What it costs.** Every IC's tier ceiling rests on `disallowedTools: Agent`. Invoke any IC as a named
+teammate and the ceiling is not there. So fact 2c is true **for the spawn form it was measured on**,
+and `enforcement.md`'s PREVENTS row now carries that condition rather than stating the guarantee flat.
+
+**A second effect, INFERRED and not proven:** in the confounded run `wf-canary-c` reported `Agent`
+present at nominal depth 3; in the clean run, absent. Both were unnamed spawns and only the chain's
+root differed, which reads as a named-teammate root sitting one level shallower. **The A/B on the tool
+grant is clean evidence; this is a coherent reading of a single discrepancy and is recorded as such.**
+
+**The canary found this by FAILING first.** Its initial run returned FAIL on both assertions, and the
+failure was neither the host nor the spec — it was how the fixture was spawned. `staging.md` § Phase C
+already says a canary FAIL is not self-evidently a host problem and the expectation must be confirmed
+before it is believed. That rule, written from an earlier accident, is what turned a false FAIL into
+the most consequential measurement this project has made.
+
 ### Fact 3 — Agents and skills register on a DELAY, not on restart ✅ CORRECTED
 
 **This row was wrong twice before being measured properly. Read the correction, not the conclusion.**

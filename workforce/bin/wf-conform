@@ -164,8 +164,24 @@ def check_handbook(path, body, res, ceiling):
     res.add(tier is not None, f"{n}: ORG-RECORD states a tier",
             "no `tier: N` in the ORG-RECORD block; tier drives every other rule here")
 
-    # Section presence and order. A Lead (tier 2) legitimately has no ## Procedure.
-    expected = [s for s in SECTIONS if not (tier == 2 and s == "## Procedure")]
+    # Section presence and order, per procedure-for-procedures.md § File shape —
+    # which marks TWO sections tier-conditional, and this checked only one.
+    #
+    #   ## Procedure          Lead: —   IC: yes    (a coordinator gets no script)
+    #   ## Chain of Command   Lead: yes IC: —      (an IC has no subordinates)
+    #
+    # Measured 2026-08-03 by `/workforce verify` on a real org: 9 reported failures,
+    # ALL FALSE — every IC flagged for missing a section the spec says it must not
+    # have, and `handbook-templates.md` § IC correctly omits. This is the exact
+    # failure class verify.md documents: a validator holding files to a contract
+    # they were never under. Attribution is the DOCUMENT — this script.
+    #
+    # It matters more than a wrong count: a check that always fails stops being read.
+    expected = [
+        s for s in SECTIONS
+        if not (tier == 2 and s == "## Procedure")
+        and not (tier == 3 and s == "## Chain of Command")
+    ]
     positions, missing = [], []
     for s in expected:
         i = body.find("\n" + s)
