@@ -411,9 +411,21 @@ Runs at the end of Step 0, after the backup and before any writing gate.
 2. **Compute the required set** from the org this run designed: `Agent` (without it every hop prompts —
    `scopes.md`), `Bash` where any employee's `## Verification` or any `## Mechanicals` row names a
    command, plus each MCP server named by a handbook grant.
-3. **Add only what is absent.** Never edit, reorder, or remove an existing entry. Additions land inside
-   `<!-- WORKFORCE-PERMS START -->` / `<!-- WORKFORCE-PERMS END -->` ownership markers so `disband`
-   excises them surgically, the same convention `WORKFORCE-DENY` already uses (`enforcement.md`).
+3. **Add only what is absent FROM THE UNION OF ALL FOUR SCOPES, not from the write target.** Permission
+   rules concatenate across scopes rather than replace (`platform.md` fact 17), so a grant present in
+   user settings is already in force and adding a second copy to the project file is a redundant write
+   into a file the user owns. *This step said only "add only what is absent" until the 2026-08-03 mock
+   audit found the ambiguity: on the target, `Agent` was absent from `.claude/settings.local.json` and
+   present in `~/.claude/settings.json`, so the two readings give opposite writes.*
+3b. **Never widen a scoped grant into a blanket one.** If the project grants `Bash(pnpm lint:*)` and an
+   employee needs `pnpm test:e2e`, add `Bash(pnpm test:e2e:*)` — **never bare `Bash`**. *The mock audit
+   found this was the real risk: the target carries 282 narrowly-scoped `Bash(...)` rules and no blanket
+   grant. Adding bare `Bash` removes nothing, so `0 removed` would print truthfully while the user's
+   entire permissions posture was superseded by a wider rule. **Not overwriting a preference is not the
+   same as not defeating it.*** Where the needed command cannot be scoped, report it and add nothing.
+3c. **Ownership is recorded in `.claude/workforce/.settings-owned.json`**, never as markers inside the
+   settings file — **JSON has no comments** (`enforcement.md` § The machine-owned region). Write the
+   sidecar in the same transaction and read it back.
 4. **A conflict is a finding, never an edit.** A required grant contradicted by an existing `deny` is
    reported with both lines quoted and the org's affected capability named. **It is never resolved by
    removing the user's rule** — that rule is the evidence of an intent this run does not have.

@@ -38,7 +38,9 @@ it may be a registration workforce never created.
 **4. Replay the symlink manifest.** Every registration that was a symlink before conversion must be a
 symlink to its recorded target again. Repair or report, with the count.
 
-**5. Clean settings surgically.** Excise the `WORKFORCE-DENY` region and the keys workforce added,
+**5. Clean settings surgically.** Remove exactly the values `.claude/workforce/.settings-owned.json`
+names — never a marker region, never an inference from a rule's shape, and never anything the sidecar
+does not name. An absent sidecar means workforce owns nothing: remove nothing and report it. Then the keys workforce added,
 JSON-aware — parse, mutate, validate, write. **Never rewrite the file wholesale**: it holds the user's
 own rules, and permission rules merge across scopes. Leave every user key untouched.
 

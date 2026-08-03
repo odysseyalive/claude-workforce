@@ -37,7 +37,7 @@ Stated once. `bin/check` fails on restatement elsewhere.
 | org chain | `<!--\s*ORG-CHAIN START` | **own — never swept** |
 | org record | `<!--\s*ORG-RECORD START` | **own — never swept** |
 | workforce constitution | `<!--\s*WORKFORCE-CONSTITUTION START` | **own — never swept** |
-| workforce deny | `<!--\s*WORKFORCE-DENY START` | **own — never swept**; `disband` excises this span surgically, so losing it strands deny rules in the settings file |
+| ~~workforce deny~~ | ~~`<!--\s*WORKFORCE-DENY START`~~ | **RETRACTED 2026-08-03.** This family never existed and could not: the settings file is JSON and JSON has no comments. Ownership is a sidecar (`enforcement.md` § The machine-owned region). A sweep looking for this marker finds nothing and must not read that as "no workforce rules present" |
 | integrity sidecar | a dotfile at a skill root whose body is hex digests — **by shape, never by filename**. `.directives.sha` is this project's own and is never swept as a predecessor's | scaffolding |
 | predecessor ledger | a `ledger/{incidents,decisions,patterns,flows}/` tree | **data — migrate** |
 

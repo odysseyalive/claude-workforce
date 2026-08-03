@@ -157,20 +157,46 @@ four exceptions, and now there are no exceptions. Useful events: `SubagentStart`
 why the session cap is advisory everywhere it appears. **And a hook must fail open** — one that errors
 must not wedge the session.
 
-## `permissions.deny` and the machine-owned region
+## The machine-owned region — a sidecar, because **JSON has no comments**
 
-Deny rules the org writes live between ownership markers so `disband` can excise them surgically:
+**The settings file is JSON. `<!-- … -->` markers cannot exist in it.** This section specified them
+anyway, alongside the correct instruction to *"parse, mutate, validate, write"* — two rules that cannot
+both hold, six lines apart. A run following the marker half produces a file `json.loads` rejects.
+
+*Measured 2026-08-03 against `~/lab/odyssey-alive` during a `--review` mock audit:
+`json.loads('{"a":1, <!-- WORKFORCE-PERMS START --> "b":2}')` →
+`Expecting property name enclosed in double quotes`. The defect was inherited here and had been
+propagated into two new procedures the same day before the mock audit caught it. Nothing had run the
+step; that is the entire reason it survived.*
+
+**Ownership is recorded in a sidecar, not in the file being owned:**
 
 ```
-<!-- WORKFORCE-DENY START -->
-…rules…
-<!-- WORKFORCE-DENY END -->
+.claude/workforce/.settings-owned.json
+{
+  "settings_file": ".claude/settings.local.json",
+  "permissions.allow": ["Agent"],
+  "permissions.deny":  ["Bash(rm -rf:*)"],
+  "hooks":             [{"event": "PostToolUse", "matcher": "Edit|Write",
+                         "command": ".claude/skills/workforce/bin/wf-protect-directives"}]
+}
 ```
 
-**Mutate the settings file JSON-aware** — parse, mutate, validate, write. Never by regex, and never
-by rewriting the file wholesale: it holds the user's own rules, and permission rules merge across
-scopes rather than override (`scopes.md`). A user hand-editing inside the markers loses those edits on
-the next write, and the markers say so.
+`disband` removes exactly the entries this file names, from the file it names, and nothing else. That
+is **stronger** than a marker region, not a workaround: a marker delimits a *span*, so a user rule that
+lands inside it by reformatting gets excised too. A sidecar names *values*, so removal is exact
+regardless of how the settings file has since been reordered by a hand edit or a formatter.
+
+**Three rules, all load-bearing:**
+
+1. **Mutate JSON-aware** — parse, mutate, validate, write. Never by regex, never by rewriting the file
+   wholesale: it holds the user's own rules, and permission rules merge across scopes rather than
+   override (`platform.md` fact 17).
+2. **The sidecar is written in the same transaction as the settings change**, and read back. A sidecar
+   naming a rule that was never written, or a rule written with no sidecar entry, both leave `disband`
+   guessing — and it must never guess about the user's settings.
+3. **An absent sidecar means workforce owns nothing**, so `disband` removes nothing and says so. It
+   never infers ownership from a rule's shape; a rule that *looks* like ours may be the user's.
 
 ---
 

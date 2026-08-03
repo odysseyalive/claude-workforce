@@ -668,7 +668,7 @@ check(
     "shipped hooks: each has a wiring command and a report of whether it is wired",
     not _hooks or (
         "workforce/references/procedures/hooks.md" in declared
-        and "WORKFORCE-HOOKS" in read("workforce/references/procedures/hooks.md")
+        and ".settings-owned.json" in read("workforce/references/procedures/hooks.md")
         and "Hook wiring" in read("workforce/references/procedures/verify.md")
     ),
     f"declared hooks: {_hooks} — the four inherited hooks were deleted because they "
@@ -3255,6 +3255,41 @@ check(
     and "Never write managed settings" in _as,
     "the four scopes have a precedence order (scopes.md); a run that writes to a "
     "guessed path can silently be overridden by one that outranks it",
+)
+# Scoped to where INSTRUCTIONS live. legacy-markers.md carries the retraction and
+# enforcement.md carries the json.loads evidence; banning the string outright would
+# forbid recording that the family was retracted, which is how a retraction quietly
+# reverts. A specification is what must not exist.
+_marker_specs = [
+    p_ for p_ in declared
+    if (p_.startswith("workforce/references/procedures/") or p_ == "workforce/SKILL.md"
+        or p_ == "workforce/references/audit-setup.md")
+    and any(m in read(p_) for m in
+            ("WORKFORCE-DENY START", "WORKFORCE-PERMS START", "WORKFORCE-HOOKS START"))
+]
+check(
+    "settings: ownership is a sidecar, never comment markers inside JSON",
+    not _marker_specs
+    and ".settings-owned.json" in _as
+    and "RETRACTED" in read("workforce/references/legacy-markers.md"),
+    "the settings file is JSON and JSON has no comments — `json.loads` rejects a "
+    "`<!-- ... -->` marker outright. This was specified in four files alongside the "
+    "correct 'parse, mutate, validate, write', and survived because nothing had run "
+    "the step. Found by the 2026-08-03 --review mock audit",
+)
+check(
+    "permissions: a scoped grant is never widened into a blanket one",
+    "Never widen a scoped grant" in _as and "never bare `Bash`" in _as,
+    "the first real target carried 282 narrowly-scoped Bash rules and no blanket "
+    "grant; adding bare `Bash` removes nothing, so `0 removed` prints truthfully "
+    "while the user's whole posture is superseded by a wider rule",
+)
+check(
+    "permissions: absence is judged against the union of scopes, not the write target",
+    "UNION OF ALL FOUR SCOPES" in _as,
+    "rules concatenate across scopes (fact 17), so a grant in user settings is "
+    "already in force; 'add what is absent' without naming the reference set gives "
+    "two readings and opposite writes",
 )
 check(
     "permissions: additions only — nothing the user wrote is removed or edited",

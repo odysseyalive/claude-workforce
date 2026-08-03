@@ -118,13 +118,46 @@ class Census:
         return row
 
     def collisions(self):
-        """A name occupied anywhere in the union is occupied."""
+        """A name occupied anywhere in the union is occupied.
+
+        DEDUPE BY REAL PATH FIRST. A symlink in `.claude/agents/` pointing at an
+        in-skill `AGENT.md` is the SAME FILE reached two ways — it is the standard
+        install pattern for skills that ship agents, not a name conflict. Counting
+        both ends produced three false collisions on the first real target, and a
+        collision is BLOCKING (exit 2, and precondition 1(b) of the Atomic-or-Absent
+        gate), so the false positives would have halted a correctly-configured
+        project's audit.
+
+        Found 2026-08-03 by running this against ~/lab/odyssey-alive: 5 reported,
+        3 were symlink aliases, 2 were real. This repo's CLAUDE.md already records
+        the pattern — a drift the census reports is a claim about the census too,
+        and every previous time the target was right. That is now four for four.
+        """
         seen = {}
         for row in self.agents + self.skill_agents:
             if not row["name"]:
                 continue
-            seen.setdefault(row["name"], []).append(row["path"])
-        return {n: paths for n, paths in seen.items() if len(paths) > 1}
+            # realpath collapses symlink aliases; identical inodes are one occupant.
+            try:
+                key = os.path.realpath(row["path"])
+            except OSError:
+                key = row["path"]
+            seen.setdefault(row["name"], {})[key] = row["path"]
+        return {
+            n: sorted(paths.values())
+            for n, paths in seen.items()
+            if len(paths) > 1
+        }
+
+    def aliases(self):
+        """Distinct paths resolving to one file — reported, never a collision."""
+        by_real = {}
+        for row in self.agents + self.skill_agents:
+            try:
+                by_real.setdefault(os.path.realpath(row["path"]), []).append(row["path"])
+            except OSError:
+                pass
+        return {r: p for r, p in by_real.items() if len(p) > 1}
 
     # ── markers ──────────────────────────────────────────────────────────────
     def census_markers(self):
@@ -205,6 +238,7 @@ class Census:
                 "dangling": sum(1 for a in self.agents if a["dangling"]),
             },
             "collisions": col,
+            "aliases": self.aliases(),
             "marker_families": dict(sorted(self.markers.items())),
             "unpaired_markers": self.unpaired,
             "immutable_blocks": {
@@ -279,6 +313,7 @@ def main():
         )
         print(f"  hooks       {len(s['hooks'])} wired · "
               f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir")
+        print(f"  aliases     {len(s['aliases'])} file(s) reachable by >1 path (symlinks — not collisions)")
         print(f"  collisions  {len(s['collisions'])}")
         for name, paths in s["collisions"].items():
             print(f"    ! {name}: {', '.join(paths)}")

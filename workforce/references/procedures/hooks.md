@@ -59,12 +59,12 @@ to wire and nothing to orphan.
 3. **On unix, verify the executable bit.** The `hook` manifest flag sets it at install time; a copy
    moved by hand may have lost it. Report and fix it, or report and skip — never register a file the
    host cannot run.
-4. **Write the registration inside ownership markers** — `<!-- WORKFORCE-HOOKS START -->` /
-   `<!-- WORKFORCE-HOOKS END -->` — the same convention `WORKFORCE-DENY` and `WORKFORCE-PERMS` use, so
-   `disband` excises it surgically and nothing outside the markers is touched.
+4. **Record the registration in `.claude/workforce/.settings-owned.json`**, and mutate the settings file
+   JSON-aware — parse, add, validate, write. **Never comment markers: the settings file is JSON and JSON
+   has no comments** (`enforcement.md` § The machine-owned region). The sidecar names the exact `event`,
+   `matcher`, and `command` workforce added, so `disband` removes those and nothing else.
 5. **Never duplicate a registration.** Present and matching → NOOP. Present and differing → REFRESH in
-   place. One marker without its pair → **REPORT and SKIP**; that is tampering or a partial edit and is
-   never auto-repaired.
+   place. A registration the sidecar does not name is **the user's** — leave it, and report it.
 6. **Read back and confirm** the settings file still parses as JSON and the registration is present
    exactly once. On failure, restore the pre-edit content and report. **Never report a write that was
    not confirmed by re-reading.**
@@ -96,7 +96,8 @@ path, so the user reads the change before it happens.
 
 ## Unwiring
 
-`/workforce hooks --remove --execute` excises the `WORKFORCE-HOOKS` region and nothing else.
+`/workforce hooks --remove --execute` removes exactly the entries `.claude/workforce/.settings-owned.json`
+names, and nothing else. An absent sidecar means workforce owns nothing here: remove nothing, and say so.
 `disband` does the same as part of its wider sweep. **The hook file itself is not deleted by either** —
 removing a registration is reversible; deleting the file the user installed is not, and `restore` has
 nothing to restore from if the sweep took it.
