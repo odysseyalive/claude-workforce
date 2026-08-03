@@ -293,6 +293,46 @@ Mechanics:
 - **Structural fit is verified before the write.** No parseable insertion point → report it with the
   paste-ready text rather than guessing. Atomic-or-absent, as everywhere else.
 
+### Succession removes the source — reconcile BEFORE the sweep, not after
+
+**Forcible propagation compares the project's catalog against the predecessor's shipped one.** Under
+succession the predecessor is removed entirely (`conversion-taxonomy.md` § What still refuses), and it
+takes the source with it: the shipped catalog, its version anchor, and the gap-check that maintains
+them. **After the sweep there is nothing left to compare against**, and the propagation rule becomes a
+paragraph describing a mechanism with no input.
+
+**So the reconciliation is a precondition of the sweep, in the same way extraction and the backup are:**
+
+| Order | Step |
+|---|---|
+| 1 | Read the predecessor's shipped catalog and its version anchor **while it is still on disk** |
+| 2 | Run the gap comparison against every installed evaluator and **apply the additions** — this is the "never skipped, never offered, never a question" clause, and succession is when it finally matters |
+| 3 | **Re-home the anchor**: record the version and the source path in the project's own copy, so a later run can tell reconciled-at-v2 from never-reconciled |
+| 4 | Only then may the sweep remove the predecessor |
+
+**A run that removes the predecessor without step 2 has silently frozen every catalog in the project**
+at whatever version it happened to be, with no way to notice afterward. That is the same failure shape
+as a backup taken after the first write, and this project has already paid for that one.
+
+*Measured 2026-08-03 across two real projects. `~/university`'s `text-eval` carries a
+`SCRUB-GAP-APPENDIX` machine-owned region with **24 additional mechanisms** at catalog version 2, an
+ack sidecar as sole dedup authority, and a version anchor — exactly the shape § Forcible propagation
+describes. The other project's `text-eval` has **a 23k hand-grown `ai-patterns.md`, no appendix, no ack
+sidecar, and no anchor**: it was never reconciled, so it is missing every one of those mechanisms
+including nine `[hard]`-class provenance and residue checks. **Both projects were seeded from the same
+predecessor.** Declaring succession on the second one without step 2 would have made that permanent.*
+
+**Report the reconciliation, per evaluator, including the zeroes:**
+
+```
+CATALOGS   text-eval  v0 -> v2  · 24 mechanisms appended · 0 existing bytes modified
+           code-evaluator  v2 -> v2  · 0 appended (current)
+           image-eval  seed-only · no predecessor catalog
+```
+
+**`v0`** means *no anchor was found* — never reconciled — and it is not the same as `v2 → v2`. A run
+that cannot tell those apart reports a current catalog that has never been checked.
+
 ### When the catalog cannot be appended
 
 "Never skipped, never offered, never a question" is a rule about **maintenance the append can perform** — it

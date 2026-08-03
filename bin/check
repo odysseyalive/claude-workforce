@@ -822,6 +822,18 @@ check(
 # nothing executed, and a hand-derived count five minutes before the census ran.
 # ─────────────────────────────────────────────────────────────────────────────
 check(
+    "catalogs: reconciliation precedes the sweep that removes the source",
+    "Succession removes the source" in _ev
+    and "precondition of the sweep" in _ev
+    and "while it is still on disk" in _ev
+    and "v0" in _ev,
+    "propagation compares against the predecessor's shipped catalog; succession "
+    "removes the predecessor, so after the sweep there is nothing to compare "
+    "against. Same shape as a backup taken after the first write. Measured: two "
+    "projects seeded from one predecessor, one reconciled to v2 with 24 mechanisms, "
+    "the other never reconciled and carrying no anchor at all",
+)
+check(
     "records: a predecessor's knowledge base converts its ownership, not its record types",
     "converted, never re-typed" in ds
     and "untouched, byte-for-byte, at their existing paths" in ds
