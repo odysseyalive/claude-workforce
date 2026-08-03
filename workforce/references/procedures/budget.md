@@ -51,6 +51,45 @@ Three readings, and only the first is a finding:
 | description bytes | reported against no threshold, because none is measured. The per-employee breakdown is what makes it actionable |
 | handbook bytes | the denominator `ablate --org`'s `LOAD-BEARING` share is a fraction of, available without a measured run |
 
+## Context composition — what a spawn actually receives, by layer
+
+**Run the measurement; do not estimate it.**
+
+```bash
+.claude/skills/workforce/bin/wf-context --root "${CLAUDE_PROJECT_DIR}"
+```
+
+The two numbers above are aggregates: bytes paid every turn, and total handbook bytes. Neither answers
+the question that decides whether an org is worth its cost — **what is in the window when one employee
+starts work, and how much of it is the task?**
+
+| Layer | What it holds | Who controls it |
+|---|---|---|
+| `IDENTITY` | `CLAUDE.md` (project, ancestors, user scope) and the git snapshot | **not this project** — injected per spawn with no opt-out (`platform.md` fact 6) |
+| `ROUTING` | `ORG-CHAIN`, frontmatter, `## Role`, `## Scope`, `## Chain of Command` | the org chart |
+| `REFERENCE` | `## Directives`, `## Guardrails`, `## Verification`, `## Procedure`, and every `skills:` preload in full (fact 10) | the handbook |
+| `WORKING` | the work order and any prior-stage artifact | the dispatch — **composed per run and not on disk, so it reports `unmeasured` rather than 0.** A zero would read as "no task" |
+
+**The split is not cosmetic.** Reference material is meant to be internalised as a constraint; working
+material is meant to be transformed as input. Delivered as one undifferentiated block, the employee
+sorts them itself — and that sorting is work it was not asked to do. The layering, and the finding that
+scoped context outperforms a monolithic window, are from Van Clief & McDermott, *Interpretable Context
+Methodology* (arXiv:2603.16021v2), which measured 2–8k focused tokens per stage against ~42k
+monolithic. **Read that as an architectural argument, not a settled result — the authors state plainly
+that no controlled comparison was run.**
+
+**Report the identity share per employee, because it is the lever.** Measured 2026-08-03 on a real
+project: `CLAUDE.md` totalled 15,459 B across three files, and **identity was 81–91% of everything an
+employee received before any work order existed.** The same script against a project with a 32-byte
+`CLAUDE.md` reports 13%. Nothing about the org changed between those two runs.
+
+**Token figures are bytes ÷ 4 and are labelled approximate.** This project ships no tokenizer and does
+not guess precisely. **The ratio between layers is the finding; the absolute number is not.**
+
+**This is what makes `CLAUDE.md` size actionable.** The line above it reports bytes, which is a number.
+This reports a *share of every employee's starting context*, which is a decision — and the file is the
+user's, so the run proposes and never edits (§ What it reports).
+
 ## What it cannot do
 
 **The session cap is not enforceable.** It cannot be disabled, and no hook can deny a spawn —

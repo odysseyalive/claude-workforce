@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""wf-context — what a spawn actually receives, measured by layer.
+
+`/workforce budget` reported instruction volume as two aggregates: description
+bytes paid every turn, and total handbook bytes. Neither answers the question that
+decides whether an org is worth its cost — **what is in the context window when one
+employee starts work, and how much of it is the task?**
+
+The layering follows Van Clief & McDermott, "Interpretable Context Methodology"
+(arXiv:2603.16021v2), which measured the same decomposition for staged workflows
+and found 2-8k focused tokens per stage against ~42k for the monolithic
+equivalent. Their sharpest claim is the one this script makes visible:
+
+    Reference material should be internalized as constraints; working artifacts
+    should be processed as input. Mixing persistent rules with per-run artifacts
+    in an undifferentiated context window forces the model to sort them on its own.
+
+So bytes are attributed to a layer rather than totalled:
+
+    IDENTITY   CLAUDE.md and the git snapshot — paid per spawn, no opt-out
+               (platform.md fact 6), and NOT this project's file
+    ROUTING    ORG-CHAIN, Role, Scope, Chain of Command — where am I, who do I
+               answer to, what is mine
+    REFERENCE  Guardrails, Directives, Verification, and every `skills:` preload —
+               stable across runs, internalised as constraints
+    WORKING    the work order and any prior-stage artifact — this run's input
+
+REPORTS; NEVER REPAIRS. Read-only. Estimates nothing it can measure, and says
+`unmeasured` where it genuinely cannot.
+
+Token figures are bytes/4 and are LABELLED APPROXIMATE. This project does not ship
+a tokenizer and will not guess precisely; the ratio between layers is the finding,
+not the absolute number.
+
+Exit codes
+    0  measured
+    2  could not read the tree
+
+Usage
+    wf-context [--root DIR] [--json PATH] [--quiet]
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+SKILLS_RX = re.compile(r"^skills:\s*(.+)$", re.M)
+ORG_CHAIN_RX = re.compile(r"<!-- ORG-CHAIN START.*?<!-- ORG-CHAIN END -->", re.S)
+
+# Section -> layer. A section absent from a handbook contributes nothing; a
+# section present but unlisted lands in REFERENCE, which is the conservative
+# direction: it counts as a standing constraint rather than as task input.
+LAYER_OF = {
+    "## Role": "routing",
+    "## Scope": "routing",
+    "## Chain of Command": "routing",
+    "## Directives": "reference",
+    "## Guardrails": "reference",
+    "## Verification": "reference",
+    "## Procedure": "reference",
+    "## Escalation": "reference",
+    "## Probe": "reference",
+    "## Reporting": "routing",
+}
+
+
+def read(path, errs):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        errs.append(f"{path}: {type(exc).__name__}")
+        return None
+
+
+def claude_md_chain(root, errs):
+    """Every CLAUDE.md a spawn inherits: project, ancestors, and user scope.
+
+    platform.md fact 6 — injected with no per-agent opt-out, so this is the floor
+    under every employee and it is the one number the org does not control.
+    """
+    out = []
+    d = os.path.abspath(root)
+    while True:
+        p = os.path.join(d, "CLAUDE.md")
+        if os.path.isfile(p):
+            out.append(p)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    user = os.path.expanduser("~/.claude/CLAUDE.md")
+    if os.path.isfile(user) and user not in out:
+        out.append(user)
+    return [(p, len(read(p, errs) or "")) for p in out]
+
+
+def split_sections(body):
+    """Body bytes per '## ' section, in document order."""
+    parts, cur, buf = {}, None, []
+    for line in body.splitlines(keepends=True):
+        if line.startswith("## "):
+            if cur:
+                parts[cur] = parts.get(cur, 0) + len("".join(buf))
+            cur, buf = line.strip(), [line]
+        elif cur:
+            buf.append(line)
+    if cur:
+        parts[cur] = parts.get(cur, 0) + len("".join(buf))
+    return parts
+
+
+def preload_bytes(root, fm_line, errs):
+    """`skills:` injects a skill's FULL content at startup (platform.md fact 10)."""
+    total, names = 0, []
+    for raw in re.split(r"[,\s]+", fm_line.strip().strip("[]")):
+        name = raw.strip().strip("'\"")
+        if not name:
+            continue
+        names.append(name)
+        for base in (os.path.join(root, ".claude", "skills", name),
+                     os.path.expanduser(f"~/.claude/skills/{name}")):
+            if os.path.isdir(base):
+                for dp, _dn, fns in os.walk(base):
+                    for fn in fns:
+                        if fn.endswith(".md"):
+                            total += len(read(os.path.join(dp, fn), errs) or "")
+                break
+    return total, names
+
+
+def measure(root, errs):
+    agents_dir = os.path.join(root, ".claude", "agents")
+    rows = []
+    identity = claude_md_chain(root, errs)
+    identity_bytes = sum(b for _, b in identity)
+
+    handbooks = []
+    if os.path.isdir(agents_dir):
+        for dp, _dn, fns in os.walk(agents_dir):
+            handbooks += [os.path.join(dp, f) for f in fns if f.endswith(".md")]
+
+    for p in sorted(handbooks):
+        body = read(p, errs)
+        if body is None:
+            continue
+        name = os.path.basename(p)[:-3]
+        fm = FM_RX.match(body)
+        fm_bytes = len(fm.group(0)) if fm else 0
+
+        chain = ORG_CHAIN_RX.search(body)
+        chain_bytes = len(chain.group(0)) if chain else 0
+
+        layers = {"routing": chain_bytes + fm_bytes, "reference": 0, "working": 0}
+        for sec, n in split_sections(body).items():
+            layers[LAYER_OF.get(sec, "reference")] += n
+
+        pre_bytes, pre_names = 0, []
+        m = SKILLS_RX.search(fm.group(1)) if fm else None
+        if m:
+            pre_bytes, pre_names = preload_bytes(root, m.group(1), errs)
+        layers["reference"] += pre_bytes
+
+        rows.append({
+            "employee": name,
+            "identity": identity_bytes,
+            "routing": layers["routing"],
+            "reference": layers["reference"],
+            "preload": pre_bytes,
+            "preloaded_skills": pre_names,
+            # The work order is composed per dispatch and does not exist on disk
+            # before one. Reporting 0 would read as "no task"; it is unmeasured.
+            "working": None,
+            "handbook_bytes": len(body),
+        })
+    return identity, identity_bytes, rows
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-context")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--json", dest="json_path")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-context: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    errs = []
+    identity, identity_bytes, rows = measure(root, errs)
+    payload = {"root": root, "identity_files": [{"path": p, "bytes": b} for p, b in identity],
+               "employees": rows, "unreadable": errs}
+
+    if args.json_path:
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+
+    if not args.quiet:
+        tok = lambda b: f"~{round(b / 4):,}"          # noqa: E731 — labelled approximate
+        print(f"wf-context — {root}")
+        print(f"  IDENTITY  {identity_bytes:,} B ({tok(identity_bytes)} tok approx) "
+              f"paid per spawn, no opt-out — not this project's file")
+        for p, b in identity:
+            print(f"            {b:>7,} B  {p}")
+        if not rows:
+            # A zero is a measurement. An org with no employees still reports.
+            print("  0 employees — nothing else to measure")
+        for r in rows:
+            var = r["routing"] + r["reference"]
+            total = r["identity"] + var
+            share = round(100 * r["identity"] / total) if total else 0
+            print(f"\n  {r['employee']}")
+            print(f"    identity   {r['identity']:>7,} B   {share}% of what arrives before any task")
+            print(f"    routing    {r['routing']:>7,} B   who am I, who do I answer to")
+            print(f"    reference  {r['reference']:>7,} B   constraints"
+                  + (f" (incl. {r['preload']:,} B preload: {', '.join(r['preloaded_skills'])})"
+                     if r["preload"] else ""))
+            print(f"    working        unmeasured   composed per dispatch; not on disk yet")
+            print(f"    ── standing total {total:,} B ({tok(total)} tok approx) before the work order")
+        for u in errs:
+            print(f"  ! unreadable {u}")
+    return 2 if errs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
