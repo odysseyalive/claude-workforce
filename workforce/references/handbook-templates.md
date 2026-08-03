@@ -232,8 +232,26 @@ Never proceed on a directive you could not read.
 ## Verification
 1. Run `<exact command>`. It must <exact expected result>.
 2. <Second check, if the first cannot cover the exit criteria.>
-3. On failure, fix and re-run — at most 2 attempts. On a third failure STOP and report
+3. **A work order that changed nothing passes on saying so.** Where a check tests for evidence of
+   change — a non-empty `git diff --stat`, a new artifact, a modified file — it is satisfied EITHER by
+   that evidence OR by an explicit statement that the work order was read-only. A read-only order that
+   did exactly what was asked is a PASS, and a check that cannot express that forces a FAIL for
+   correct work.
+4. **A check already failing before you started is `PRE-EXISTING`, not your failure.** Record its
+   before-state, report it as `PRE-EXISTING: <command> <output>`, and do NOT count it against this
+   work order. **Never fix it silently** — repairing something outside the order's scope is an
+   unrequested change, and the order did not authorize it.
+5. On failure, fix and re-run — at most 2 attempts. On a third failure STOP and report
    `FAIL: <exact command output>`. NEVER report PASS on a check you did not run.
+
+*Rows 3 and 4 are here because they were paid for. On the first real audit, two cold readers
+independently returned `AMBIGUOUS` on the same contradiction: a read-only probe whose `## Verification`
+demanded a non-empty diff and whose exit criteria demanded a lint that was already failing and which
+the probe was forbidden to fix. Both were right to stop —* **there was no reading under which the work
+order could pass.** *The run amended two generated handbooks and closed the defect. The template still
+had it, so every future hire in every project would have reproduced it and burned the same two probe
+cycles finding it. Lifted here 2026-08-03; `## Exit criteria` must agree with these rows or the two
+sections contradict each other, which is the defect itself.*
 
 ## Guardrails
 - NEVER edit files outside <the scope paths> **and your own reporting directory under

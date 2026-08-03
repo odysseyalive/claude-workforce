@@ -198,6 +198,24 @@ Two different things, both mandatory, easy to conflate:
 
 ---
 
+## Two cases every check must answer, or it fails correct work
+
+**A check is written for the run that changes something. Most runs do — and the two that don't are
+where a `## Verification` section turns into a trap.**
+
+| Case | The rule |
+|---|---|
+| **the work order was read-only** | A check that tests for *evidence of change* — a non-empty `git diff --stat`, a new file, a modified artifact — is satisfied **either** by that evidence **or** by an explicit statement that the order was read-only. Otherwise a run that did exactly what was asked is forced to report FAIL. |
+| **the check was already failing** | Record the before-state and report `PRE-EXISTING: <command> <output>`. It is **not** this run's failure, and it is **never fixed silently** — repairing something outside the order's scope is an unrequested change the order did not authorize. |
+
+**Both were found by cold readers, not by review.** On the first real audit two executors independently
+returned `AMBIGUOUS` on one handbook pair: the diff requirement and the exit criteria together
+described a read-only probe that could not pass by any reading. `AMBIGUOUS:` is a defect in the
+document (§ The Probe section is not the Verification section) and both were right to stop rather than
+guess. **The cheapest place to answer these is the template**, which is where they now live
+(`handbook-templates.md` § Verification) — the run that found them amended two generated handbooks and
+left the template untouched, so every later hire would have paid the same probe cycle.
+
 ## Authoring checklist
 
 1. Name the exact command or suite. Not a category — the literal invocation.
