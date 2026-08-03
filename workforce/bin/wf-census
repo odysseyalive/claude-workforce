@@ -32,15 +32,48 @@ import os
 import re
 import sys
 
-IMMUTABLE_OPEN = re.compile(r"<!--\s*origin:\s*user\s*\|\s*immutable:\s*true\s*-->")
-IMMUTABLE_CLOSE = re.compile(r"<!--\s*/origin\s*-->")
+# Anchored for the same reason MARKER_RX is: a file DOCUMENTING the marker
+# convention mentions it in prose and inside backticks. Unanchored, this reported
+# 10 of 21 immutable blocks "unpaired" on a real project — and an unpaired sacred
+# block is the most alarming thing this census can say, because the extraction gate
+# blocks every deletion on it. Also tolerant of the `| added: <date> |` field that
+# real blocks carry, which the old pattern silently refused to match.
+# PAIRING IS OVER ALL ORIGIN BLOCKS; the user-immutable count is a SUBSET of them.
+#
+# `<!-- /origin -->` closes ANY origin block — user, skill-builder, workforce — so
+# pairing user-immutable OPENS against every CLOSE compares two different
+# populations. Measured 2026-08-03: that arithmetic reported 30 of 59 sacred blocks
+# "unpaired" on a real project where the true figure is 0, because a typical file
+# holds one user block and two generator blocks and closes all three the same way.
+#
+# An unpaired sacred block is the most alarming thing this census can say — the
+# extraction gate blocks every deletion on it — so a false one is expensive twice.
+ORIGIN_OPEN = re.compile(r"^\s*<!--\s*origin:\s*[^>]*-->\s*$", re.M)
+ORIGIN_CLOSE = re.compile(r"^\s*<!--\s*/origin\s*-->\s*$", re.M)
+IMMUTABLE_OPEN = re.compile(
+    r"^\s*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->\s*$", re.M)
 NAME_RX = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
 
 # Marker families are open-ended by design: a foreign generator invents its own.
 # Report unknown families rather than dropping them — four unknown families on the
 # first real target is what taught this project that an allowlist here silently
 # under-counts (references/legacy-markers.md).
-MARKER_RX = re.compile(r"<!--\s*/?([A-Za-z][\w-]*(?:-[A-Za-z][\w-]*)*)\s+(START|END)\b", re.I)
+# A REAL marker is a standalone HTML comment on its own line. A marker NAMED inside
+# prose or backticks is documentation about markers, not one.
+#
+# Measured 2026-08-03: the unanchored form reported 11 unpaired "sweep hazards"
+# against a real project, ALL FALSE. The cause was sentences like
+#   - The `<!-- ROUTE-DISPATCH-CHECKPOINT START -->` marker is present exactly once
+#     and is paired with exactly one END marker
+# where START matches and the English "one END marker" does not. Five more were
+# inside workforce's OWN installed skill, so every host would see them on every
+# audit — and `procedures/audit.md` § Step 3b excludes an unpaired file from
+# extraction AND from the sweep until a human resolves it. A false hazard here
+# silently freezes a correct file.
+MARKER_RX = re.compile(
+    r"^\s*<!--\s*/?([A-Za-z][\w-]*(?:-[A-Za-z][\w-]*)*)\s+(START|END)\b[^>]*-->\s*$",
+    re.I | re.M,
+)
 
 
 class Census:
@@ -244,21 +277,57 @@ class Census:
                 body = self.read(p)
                 if body is None:
                     continue
-                depth = {}
+                # ORDER MATTERS, so this walks rather than sums. `END … START`
+                # balances to 0 under +1/-1 arithmetic and is a REAL hazard: a sweep
+                # keyed on the opener finds no boundary and takes the rest of the file.
+                depth, opened = {}, {}
                 for m in MARKER_RX.finditer(body):
                     fam, side = m.group(1).upper(), m.group(2).upper()
                     self.markers[fam] = self.markers.get(fam, 0) + 1
-                    depth[fam] = depth.get(fam, 0) + (1 if side == "START" else -1)
+                    if side == "START":
+                        opened[fam] = opened.get(fam, 0) + 1
+                        depth[fam] = depth.get(fam, 0) + 1
+                    else:
+                        if opened.get(fam, 0) == 0:
+                            self.unpaired.append(
+                                {"file": p, "family": fam, "imbalance": "END before START"})
+                        else:
+                            opened[fam] -= 1
+                        depth[fam] = depth.get(fam, 0) - 1
                 for fam, d in depth.items():
-                    if d != 0:
+                    if d > 0:
                         self.unpaired.append(
-                            {"file": p, "family": fam, "imbalance": d}
+                            {"file": p, "family": fam, "imbalance": f"{d} unclosed"}
                         )
-                opens = len(IMMUTABLE_OPEN.findall(body))
-                closes = len(IMMUTABLE_CLOSE.findall(body))
-                if opens:
+                # WALK, do not count. Two constructs share the `origin:` prefix:
+                # a PAIRED block closed by `<!-- /origin -->`, and a SINGLE-LINE
+                # annotation with no close (skill-builder uses both — see
+                # `manifest.txt` § Vendored evaluator catalogs). Counting opens
+                # against closes cannot tell them apart and over-reports every
+                # annotation as a hazard.
+                #
+                # The only question that gates the sweep: does a SACRED block have
+                # a close before the next origin marker? An unterminated sacred
+                # span is where extraction takes the wrong bytes. A generator's
+                # annotation is not a hazard and is not counted as one.
+                sacred = unterminated = 0
+                pending = False
+                for line in body.splitlines():
+                    ls = line.strip()
+                    if ORIGIN_CLOSE.match(line):
+                        pending = False
+                    elif ORIGIN_OPEN.match(line):
+                        if pending:
+                            unterminated += 1      # a sacred open, then another open
+                        is_sacred = bool(IMMUTABLE_OPEN.match(line))
+                        sacred += is_sacred
+                        pending = is_sacred
+                if pending:
+                    unterminated += 1              # sacred open, EOF, no close
+                if sacred or unterminated:
                     self.immutable_blocks.append(
-                        {"file": p, "open": opens, "close": closes, "paired": opens == closes}
+                        {"file": p, "sacred": sacred,
+                         "unterminated": unterminated, "paired": unterminated == 0}
                     )
 
     # ── hooks ────────────────────────────────────────────────────────────────
@@ -268,8 +337,10 @@ class Census:
         A hook whose command lands inside a skill directory is the case that
         matters: removing that skill takes a live safety mechanism with it.
         """
-        for rel in (".claude/settings.json", ".claude/settings.local.json"):
-            p = os.path.join(self.root, rel)
+        scopes = [(os.path.join(self.root, r), r) for r in
+                  (".claude/settings.json", ".claude/settings.local.json")]
+        scopes.append((os.path.expanduser("~/.claude/settings.json"), "~/.claude/settings.json"))
+        for p, rel in scopes:
             if not os.path.exists(p):
                 continue
             body = self.read(p)
@@ -313,8 +384,9 @@ class Census:
             "marker_families": dict(sorted(self.markers.items())),
             "unpaired_markers": self.unpaired,
             "immutable_blocks": {
-                "files": len(self.immutable_blocks),
-                "blocks": sum(b["open"] for b in self.immutable_blocks),
+                "files": len([b for b in self.immutable_blocks if b["sacred"]]),
+                "blocks": sum(b["sacred"] for b in self.immutable_blocks),
+                "unterminated": sum(b["unterminated"] for b in self.immutable_blocks),
                 "unpaired": [b for b in self.immutable_blocks if not b["paired"]],
             },
             "hooks": self.hooks,
@@ -381,8 +453,8 @@ def main():
         )
         ib = s["immutable_blocks"]
         print(
-            f"  immutable   {ib['blocks']} blocks in {ib['files']} files · "
-            f"{len(ib['unpaired'])} unpaired"
+            f"  immutable   {ib['blocks']} sacred blocks in {ib['files']} files · "
+            f"{ib['unterminated']} unterminated (extraction hazards)"
         )
         print(f"  hooks       {len(s['hooks'])} wired · "
               f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir")

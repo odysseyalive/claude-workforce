@@ -33,6 +33,39 @@ Four rules follow, and they are not optional:
 | `PARTIAL` | some blocks could not be read; coverage is incomplete and named |
 | `UNREADABLE` | the sidecar itself does not parse; treat as no coverage at all |
 
+## The row grammar — canonical, and the one thing this file did not state
+
+**One row per BLOCK. The digest is over the NORMALIZED block content, never the file.**
+
+```
+<sha256>  <path-relative-to-project-root>:directive:<N>
+```
+
+| Field | |
+|---|---|
+| `<sha256>` | 64 lowercase hex, of the block's content between its markers, normalized |
+| `<path>` | relative to `${CLAUDE_PROJECT_DIR}`, so a sidecar survives being moved with the tree |
+| `:directive:<N>` | 1-based index of the block **within that file**, in document order |
+
+**Normalization, stated once because two readers must apply the same rule:** strip leading and trailing
+whitespace from the span, then right-strip every line. Nothing else — no case folding, no whitespace
+collapsing inside a line, no markdown normalization. A sacred block's punctuation is the user's.
+
+**Comment lines start with `#` and are ignored. A data line that does not match is MALFORMED and is
+reported** — never skipped. Generators are strict, readers are liberal (rule 1 above), and "liberal"
+means tolerant of spacing, not tolerant of rows it cannot read.
+
+**Why per-block and not per-file.** A file-level digest answers "did this file change", which is the
+wrong question: a handbook changes constantly and its immutable block must not. Per-block is the only
+granularity where a MISMATCH means what this command says it means.
+
+*This grammar was unwritten until 2026-08-03 while **two shipped readers already parsed the file**.
+`wf-protect-directives` read `<sha>  <path>:directive:<N>` and hashed normalized block content;
+`wf-conform` split on a double space and hashed whole-file bytes. They could not agree even on a
+well-formed row, and each reported confidently. That is the incident this file opens by citing,
+reproduced inside the project that wrote the warning — and it happened because a rule said "emit
+exactly the canonical format" without the canonical format being anywhere.*
+
 ## What is stamped
 
 | Target | Covers | Drift means |

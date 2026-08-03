@@ -24,12 +24,41 @@
       "dup"
     ]
   },
+  "census-inverted": {
+    "exit": 0,
+    "script": "wf-census",
+    "want": [
+      "END before START"
+    ]
+  },
   "census-namespace": {
     "exit": 0,
     "script": "wf-census",
     "want": [
       "namespace   1 in-skill",
       "collisions  0 live"
+    ]
+  },
+  "census-prose-marker": {
+    "exit": 0,
+    "script": "wf-census",
+    "want": [
+      "0 unpaired"
+    ]
+  },
+  "census-sacred-orders": {
+    "exit": 0,
+    "script": "wf-census",
+    "want": [
+      "3 sacred blocks",
+      "0 unterminated"
+    ]
+  },
+  "census-unterminated": {
+    "exit": 0,
+    "script": "wf-census",
+    "want": [
+      "1 unterminated"
     ]
   },
   "conform-adopted": {
@@ -87,6 +116,40 @@
     "stdin_file": ".claude/agents/e.md",
     "want": [
       "UNPROTECTED"
+    ]
+  },
+  "sidecar-agree": {
+    "exit": 0,
+    "not": [
+      "sidecar:"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "0 failed"
+    ]
+  },
+  "sidecar-drift": {
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "directive:1 digest matches",
+      "flag, never repair"
+    ]
+  },
+  "sidecar-hook-drift": {
+    "exit": 0,
+    "script": "wf-protect-directives",
+    "stdin_file": ".claude/agents/sc.md",
+    "want": [
+      "DRIFT"
+    ]
+  },
+  "sidecar-malformed": {
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "none parseable",
+      "never examined"
     ]
   }
 }

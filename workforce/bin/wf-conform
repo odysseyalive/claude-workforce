@@ -63,6 +63,17 @@ TIER_RX = re.compile(r"tier:\s*(\d)")
 ORG_RECORD_RX = re.compile(r"<!--\s*ORG-RECORD\s+START\b", re.I)
 FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
+
+# CANONICAL SIDECAR GRAMMAR — identical to wf-protect-directives. Two readers of one
+# artifact must share one grammar and one normalization, or they cannot both be right.
+BLOCK_RX = re.compile(
+    r"<!--\s*origin:\s*user\s*\|[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S)
+ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
+
+
+def normalize(text):
+    """Trailing whitespace and final newline. Same rule both readers apply."""
+    return "\n".join(line.rstrip() for line in text.strip().splitlines())
 DEFAULT_LENGTH_CEILING = 150
 
 
@@ -214,30 +225,70 @@ def check_data_skill(path, body, res):
 
 
 def check_sidecar(root, res):
-    """Recompute the immutable-block digest against its stored sidecar."""
+    """Verify immutable-block digests against the sidecar, in the CANONICAL format.
+
+    `procedures/checksums.md` § The row grammar is the authority, and both readers
+    now implement it: one row per BLOCK, sha over the NORMALIZED block content.
+
+        <sha256>  <path-relative-to-project-root>:directive:<N>
+
+    This reader and `wf-protect-directives` used to disagree on both halves — this
+    one split on a double space and hashed whole FILE bytes, that one parsed
+    `:directive:N` and hashed normalized BLOCK content. Neither could ever agree
+    with the other, and no canonical format was written down anywhere, which is
+    verbatim the incident `checksums.md` opens by citing:
+
+        "a checksum generator wrote rows its own parser could not read. The hook
+         then reported clean about blocks it never examined."
+
+    Generators are strict; readers are liberal (checksums.md rule 1) — so a
+    malformed row is REPORTED, never silently skipped. A row this reader cannot
+    parse is a coverage gap, and a coverage gap is a finding.
+    """
     side = os.path.join(root, ".claude", "workforce", ".directives.sha")
-    ddir = os.path.join(root, ".claude", "workforce", "directives")
     if not os.path.exists(side):
         res.add(True, "sidecar: absent (no directives extracted yet)",
                 "absent is a first-class state, not an error")
         return
-    stored = {}
     body = read(side, res)
     if body is None:
         return
-    for line in body.splitlines():
-        if "  " in line:
-            sha, _, rel = line.partition("  ")
-            stored[rel.strip()] = sha.strip()
-    for rel, sha in stored.items():
-        p = os.path.join(ddir, os.path.basename(rel))
+
+    data = [l for l in body.splitlines() if l.strip() and not l.startswith("#")]
+    rows, malformed = {}, []
+    for line in data:
+        m = ROW_RX.match(line)
+        if m:
+            rows.setdefault(m.group(2), {})[int(m.group(3))] = m.group(1).lower()
+        else:
+            malformed.append(line.strip()[:70])
+
+    # A sidecar with data lines and no parseable rows is NO coverage, not clean.
+    if data and not rows:
+        res.add(False, "sidecar: parses",
+                f"{len(data)} data line(s), none parseable — this is the state that "
+                "reports clean about blocks it never examined")
+        return
+    for bad in malformed:
+        res.add(False, f"sidecar: malformed row {bad!r}", "canonical grammar: <sha>  <path>:directive:<N>")
+
+    for rel, blocks in sorted(rows.items()):
+        p = os.path.join(root, rel)
         if not os.path.exists(p):
-            res.add(False, f"sidecar: {rel} present", "stored digest names a file that is gone")
+            res.add(False, f"sidecar: {rel} present", "a stamped row names a file that is gone")
             continue
-        raw = open(p, "rb").read()
-        res.add(hashlib.sha256(raw).hexdigest() == sha,
-                f"sidecar: {rel} digest matches",
-                "a directive file changed after registration")
+        body_f = read(p, res)
+        if body_f is None:
+            continue
+        found = [normalize(m.group(1)) for m in BLOCK_RX.finditer(body_f)]
+        for i, want in sorted(blocks.items()):
+            if i > len(found):
+                res.add(False, f"sidecar: {rel}:directive:{i} present",
+                        "the sidecar stamps a block the file no longer has")
+                continue
+            got = hashlib.sha256(found[i - 1].encode("utf-8")).hexdigest()
+            res.add(got == want, f"sidecar: {rel}:directive:{i} digest matches",
+                    "a sacred block changed after it was stamped — flag, never repair")
 
 
 def main():
