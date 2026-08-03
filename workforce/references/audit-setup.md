@@ -541,6 +541,27 @@ plainly is required here rather than quietly substituting something adjacent.
 
 So the rule is: **add what is missing, remove nothing, report everything.**
 
+### BLOCKING — this command writes `permissions` only, and never `env`
+
+**No procedure in this project may add, edit, or enable an `env` key in any settings file.** The write
+surface is `permissions.allow` / `permissions.deny` and the `.settings-owned.json` sidecar that records
+what was added. An `env` key changes how the *whole host session* behaves, for every project and every
+tool, which is categorically outside what "review the permissions so the org can run" authorizes.
+
+**`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is named explicitly because it is the one that would look
+helpful.** Setting it to `1` puts the session in agent-teams mode, and `platform.md` fact 2d measured
+what that costs here: a named-teammate spawn **silently discards `disallowedTools:`**, so every IC's
+tier ceiling depends on the half of its frontmatter that survives, and fact 18 documents that
+`skills:` and `mcpServers:` are dropped in the same spawn form. **A run that enabled this flag would
+be disabling two of its own load-bearing mechanisms and reporting a healthy org.** It is never written,
+never suggested as a remedy, and its absence is never reported as a finding.
+
+**If the flag is already set by the user, that is theirs and it is not touched.** Report it once, in
+the permission findings at the end of the run, as: "`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled
+in <file>. Employees invoked as named teammates lose `disallowedTools:` and `skills:` (platform.md
+facts 2d, 18). The org still functions; its tier ceilings rest on the `tools:` allowlist alone." Then
+stop — the user's environment is not this command's to change.
+
 ### Under `--review`
 
 **Computes everything; writes nothing.** Resolve the settings file, compute the required set, diff it

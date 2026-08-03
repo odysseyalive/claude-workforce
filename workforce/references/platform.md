@@ -121,10 +121,26 @@ per host by the canary**, never inferred per handbook from the presence of a str
 | **named teammate** | `Read, Write, Agent, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate` | **present** |
 | plain subagent | `Read, Write` | absent |
 
-**Naming an agent puts the session in agent-teams mode, and the harness then grants the teammate
-toolset instead of honoring the definition's `tools:` / `disallowedTools:`.** Reproduced: the named
+**Naming an agent puts the session in agent-teams mode, and the harness then honors `tools:` while
+silently discarding `disallowedTools:`, forcing the coordination tools on top.** Reproduced: the named
 form returned `HAS_AGENT: yes` on two separate occasions from the fixture whose plain spawn returns
 `Read, Write`.
+
+*Corrected 2026-08-03.* This paragraph previously read "instead of honoring the definition's `tools:` /
+`disallowedTools:`" — **which the same measurement contradicts.** `wf-canary-ic` grants
+`tools: Read, Write, Agent` and revokes with `disallowedTools: Agent`; the teammate saw exactly that
+allowlist plus coordination tools. `tools:` was honored precisely. Only the revocation vanished. The
+[agent-teams reference](https://code.claude.com/docs/en/agent-teams) (read 2026-08-03, page stamped
+v2.1.178) states the honored half — *"The teammate honors that definition's `tools` allowlist and
+`model` … Team coordination tools such as `SendMessage` and the task management tools are always
+available to a teammate even when `tools` restricts other tools"* — **and never mentions
+`disallowedTools` anywhere on the page.** Zero occurrences.
+
+**The correction changes the mitigation, which is why it is worth the space.** "Nothing is honored"
+implies the ceiling is unreachable under teammates; the truth is that the *allowlist* ceiling holds and
+only the *denylist* ceiling fails. **An IC whose ceiling is expressed as a `tools:` allowlist that
+omits `Agent` keeps its ceiling as a teammate. One expressed as `disallowedTools: Agent` does not.**
+Those are the same intent written two ways, and only one survives — see `enforcement.md`.
 
 **Gated by a host setting**, observed at `.claude/settings.local.json` as
 `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"`. Whether the behavior exists with the flag off is
@@ -267,6 +283,12 @@ door — this is a *prevents*, and `enforcement.md` carries it as one.
 server that exists. That gap is the one that matters for anyone else running this project
 (`verification.md` § When the server is absent).
 
+**This fact is about `tools:`, not `mcpServers:`, and only the first survives a teammate spawn.** Fact
+18 records that the `mcpServers:` *frontmatter field* is dropped when a definition runs as a named
+teammate, while the `tools:` allowlist is documented as honored. The shipped web-facing grant is
+`tools:`-based, so it is on the surviving side of that line — **verify before assuming it, because the
+distinction is one word wide and nothing measures it yet.**
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
@@ -278,7 +300,7 @@ server that exists. That gap is the one that matters for anyone else running thi
 | 7 | Only the **top-level** subagent's summary returns to main | Drives the mandatory `## Reporting` convention: every employee writes `OUTPUT.md` and returns verdict + path + ≤3 lines | unverified |
 | 8 | Caps: 200 subagents/session (**cannot be disabled**), 20 concurrent | Drives department-width caps and the `/org` budget preflight | unverified |
 | 9 | `Agent(agent_type)` allowlists are **ignored** inside subagent definitions | The chain of command is prose + `permissions.deny` — detection, never prevention | unverified, and **load-bearing for the honesty clause**: if it were ever measured false, the Chain-of-Command Gate could be strengthened |
-| 10 | The agent `skills:` field preloads a skill's **full content** at startup; skills with `disable-model-invocation: true` cannot be preloaded | The only deterministic way to get the General Operating Principles into every isolated context | unverified |
+| 10 | The agent `skills:` field preloads a skill's **full content** at startup; skills with `disable-model-invocation: true` cannot be preloaded | The only deterministic way to get the General Operating Principles into every isolated context | unverified — **and fact 18 documents that this field is dropped entirely for a named teammate.** The one deterministic doctrine channel has a spawn form in which it does not exist |
 | 11 | `memory:` is auto-memory and is inert when `autoMemoryEnabled` is off | **Nothing blocks on this.** Handbooks omit `memory:` because records live in data skills, not because of this fact (`procedure-for-procedures.md` rule 9) — so the design holds whichever way it measures | unverified |
 | 12 | `model:` and `effort:` are per-agent frontmatter; `model:` defaults to `inherit`; resolution order is `CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session model | Every employee is model-pinned, which is why `/org` never needs a lane check or a model-switch prompt | partly corroborated — pinning is the documented default path; not canaried |
 | 12b | **`effort:` is optional and, when absent, INHERITS THE SESSION** — it is not a fixed platform default. Options `low, medium, high, xhigh, max`, availability depending on the model | Every effort value in `org-config.template.md` is therefore a deliberate **override of whatever the user is running**, not a restatement of a platform default. A budget row reading `medium` *downshifts* a session running `high`, which is a behavior change the budget must own rather than inherit silently | unverified — read from [the subagent frontmatter reference](https://code.claude.com/docs/en/sub-agents) on 2026-08-01, not canaried. Documentation has lost to measurement three times in this file (facts 2, 3, 4) |
@@ -286,6 +308,7 @@ server that exists. That gap is the one that matters for anyone else running thi
 | 15 | Subagents **inherit the parent session's permission context**; an absent or empty `permissions.allow` is **not** "deny all" | A grant the main session lacks is a grant no employee has, so the settings review at `audit-setup.md` § Permissions is an org-wide precondition rather than a per-agent one | unverified — same source and date |
 | 16 | **There is no per-agent `permissions:` frontmatter field.** The agent-side fields are `tools:`, `disallowedTools:`, `permissionMode:`, `mcpServers:`, `hooks:` — and `tools:`/`disallowedTools:` govern tool **presence** while `permissions.*` governs tool **use** | Load-bearing, and it is the fact that says a requested design is not expressible: per-agent permission *rules* cannot be written into a handbook. The capability boundary is per-agent; the usage rule is not | unverified — same source and date |
 | 17 | Permission rules from different settings scopes are **concatenated and deduplicated, not replaced** | **The guarantee behind `0 removed`** (`audit-setup.md` § Permissions): adding a grant cannot delete a rule the user wrote. If this measures false, that section's central promise fails and the conflict row must be revisited | unverified — same source and date, and the one here most worth canarying first |
+| 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. `wf-canary-ic` is the fixture |
 
 **Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
 that review **reports rather than blocks**. Three documented claims in this file have already lost to

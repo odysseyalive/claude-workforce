@@ -523,14 +523,37 @@ check(
     re.search(r"^background:\s*false\s*$", tpl, re.M),
     "must be a frontmatter LINE, not a prose mention",
 )
-# The `tools:` prohibition is as absolute as the `memory:` one and had no negative
-# assertion, while `memory:` did. An explicit list is EXACT, not a filter (fact 4b):
-# listing one tool costs every tool not listed.
+# `tools:` WAS prohibited outright here, on the sound ground that an explicit list is
+# EXACT, not a filter (fact 4b): listing one tool costs every tool not listed, and
+# under-enumerating silently strips capability.
+#
+# Amended 2026-08-03. The prohibition was right about the hazard and wrong about the
+# scope. A DELEGATING tier must keep the full inherited grant — it needs `Agent`, and
+# enumerating for it buys nothing. An IC must NOT, because `disallowedTools:` is
+# discarded for a named teammate (fact 2d) and the allowlist is the only half of its
+# ceiling that survives that spawn form.
+#
+# The exactness hazard is not dismissed, it is relocated: under-granting an IC breaks
+# its own verification command, which fails LOUDLY on the next run. A missing ceiling
+# fails silently and forever. This project prefers the loud failure.
+_ic_at = tpl.find("\n## IC\n")
 check(
-    "templates: no tools: field offered",
-    not re.search(r"^tools:\s*\S", tpl, re.M),
-    "omitting tools: gives the full default grant; an explicit list is exact, not a filter",
+    "templates: the IC block is locatable for tier-scoped checks",
+    _ic_at != -1,
+    "no '## IC' heading in handbook-templates.md — the two checks below would pass vacuously",
 )
+if _ic_at != -1:
+    _tpl_deleg, _tpl_ic = tpl[:_ic_at], tpl[_ic_at:]
+    check(
+        "templates: delegating tiers offer no tools: field",
+        not re.search(r"^tools:\s*\S", _tpl_deleg, re.M),
+        "CEO/Lead keep the full default grant; an explicit list is exact, not a filter (fact 4b)",
+    )
+    check(
+        "templates: the IC block DOES carry a tools: field",
+        re.search(r"^tools:\s*\S", _tpl_ic, re.M),
+        "an IC ceiling resting only on disallowedTools: does not exist for a named teammate (fact 2d)",
+    )
 # ORG-RECORD and ORG-CHAIN are marker families this project defines and never
 # pair-checked, while asserting pairing as first-class for every other family.
 for _fam in ("ORG-RECORD", "ORG-CHAIN"):
@@ -3960,6 +3983,69 @@ else:
                  f"workforce/ or bin/ since",
                  "update the open list in the change that closes an item, or a later "
                  "session is oriented by a snapshot of a day that has passed")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Teammate-safe tier ceilings — platform.md facts 2d and 18
+# ─────────────────────────────────────────────────────────────────────────────
+# A NAMED-TEAMMATE spawn silently discards `disallowedTools:` and honors `tools:`
+# (fact 2d), and drops `skills:`/`mcpServers:` entirely (fact 18, documented). So a
+# tier ceiling written only as a denylist does not exist in that spawn form, and
+# until 2026-08-03 the IC template shipped exactly that: `disallowedTools: Agent`
+# and no `tools:` line at all. Every generated IC was uncapped as a teammate.
+#
+# The shipped panel agents were never exposed — they carry explicit allowlists —
+# which is precisely why re-reading never found it: the examples on disk were right
+# and the template that generates employees was not.
+
+check("IC template carries a tools: allowlist",
+      "tools: <exact tools this IC needs" in tpl,
+      "handbook-templates.md IC frontmatter needs `tools:` beside `disallowedTools: Agent`")
+
+check("IC template tools: line forbids Agent",
+      "MUST NOT include Agent" in tpl,
+      "the allowlist is the half that survives a teammate spawn; it must exclude Agent")
+
+check("SKILL.md rule 3 blocks on the tools: allowlist too",
+      "allowlist omitting `Agent` (fact 2d)" in skill,
+      "rule 3 must STOP when an IC has no Agent-free `tools:` line")
+
+check("SKILL.md rule 6 permits tools: as a companion",
+      "is NOT a mechanism conflict" in skill,
+      "rule 6 forbade the only ceiling that survives a teammate spawn until 2026-08-03")
+
+_panel = sorted(glob.glob("workforce/agents/*/AGENT.md"))
+_bad_panel = []
+for _p in _panel:
+    _m = re.search(r"^tools:\s*(.+)$", read(_p), re.M)
+    if not _m or "Agent" in [_t.strip() for _t in _m.group(1).split(",")]:
+        _bad_panel.append(_p)
+check("every shipped panel agent has an Agent-free tools: allowlist",
+      bool(_panel) and not _bad_panel,
+      f"{len(_panel)} panel agents; offending: {_bad_panel}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The agent-teams flag is never written, and never present here
+# ─────────────────────────────────────────────────────────────────────────────
+check("audit-setup forbids writing env settings keys",
+      "never `env`" in _asu,
+      "the write surface is permissions.* only; env changes the whole host session")
+
+check("audit-setup names the agent-teams flag as never-written",
+      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" in _asu,
+      "the one env key that would look helpful must be named and refused explicitly")
+
+_env_writers = [_p for _p in manifest_paths() if _p.endswith(".md") and '"env"' in read(_p)]
+check("no shipped procedure writes an env settings key",
+      not _env_writers,
+      f"env write instruction in: {_env_writers}")
+
+_repo_settings = [_p for _p in (".claude/settings.json", ".claude/settings.local.json")
+                  if os.path.exists(_p)]
+_flagged_settings = [_p for _p in _repo_settings
+                     if "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" in read(_p)]
+check("agent-teams flag absent from this repo's settings",
+      not _flagged_settings,
+      f"enabled in {_flagged_settings} — named teammates would lose disallowedTools: and skills:")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

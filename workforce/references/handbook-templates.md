@@ -10,8 +10,11 @@ Three templates. Fill every `<angle bracket>`; leave no placeholder in a written
   `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus ~150 deferred behind
   `ToolSearch` including all configured MCP servers (fact 4). Listing even one tool costs you every
   tool you did not list (fact 4b). The only subtraction mechanism is `disallowedTools:`.
-- `disallowedTools: Agent` on every IC — **the only measured-reliable tier ceiling**, because depth
-  alone does not cap an IC reached through a directly-invoked Lead.
+- **`disallowedTools: Agent` AND a `tools:` allowlist omitting `Agent` — both, on every IC.** Depth
+  alone does not cap an IC reached through a directly-invoked Lead, and **neither line alone caps one
+  invoked as a named teammate.** A plain subagent spawn honors the denylist and a teammate spawn
+  discards it while honoring the allowlist (facts 2c, 2d), so the two lines cover two different spawn
+  forms and are not redundant. `SKILL.md` rule 3 blocks on both.
 - `background: false` on delegating tiers — defensive, **not** the mechanism that grants delegation.
   Its absence is reported, never blocking.
 - `model:` and `effort:` come from `org-config.md`, resolved per
@@ -47,6 +50,16 @@ of reach, and an unnamed one is out of scope exactly like any other unlisted wor
 startup* and costs its bytes on every spawn (`delegation-budget.md`). Preload only what the employee
 needs in full on every run — `operating-principles`, and a playbook it owns. Everything else is invoked
 on demand, which is the cheap path and the reason the split exists.
+
+**`skills:` does not survive a named-teammate spawn, and there is no frontmatter workaround.** Both
+`skills:` and `mcpServers:` are documented as "not applied" when a definition runs as a teammate
+(`platform.md` fact 18); the teammate loads skills from project and user settings like a regular
+session. So a teammate-spawned employee gets its handbook body — which *refers* to the operating
+principles — and none of the preloaded text those references assume it has read. **Write handbook
+bodies so that a missing preload degrades loudly rather than silently:** a body that says "follow the
+operating principles" reads identically whether or not they loaded, while one that names the specific
+constraint it depends on does not. This is a writing rule, not a check, and it is stated as advisory
+because nothing here can detect which spawn form a future caller will use.
 
 ---
 
@@ -188,6 +201,7 @@ description: "<What this employee does for <project>. Use for X, Y, Z.>"
 model: <IC tier model, or the department override>
 effort: <IC tier effort>
 background: true
+tools: <exact tools this IC needs — MUST NOT include Agent>
 disallowedTools: Agent
 skills: [operating-principles<, owned-playbook>]
 maxTurns: 40

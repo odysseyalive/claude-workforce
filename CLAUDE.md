@@ -233,11 +233,38 @@ door pointing at it.*
 - **`background: true` in *frontmatter* is still unmeasured.** Fact 2 measured the Agent tool's
   `run_in_background` *parameter*, which may not be the same thing. `wf-canary-*.md` in
   `.claude/agents/` are the fixtures for it. The design never blocks on `background:`, so this is a
-  loose end rather than a risk — but do not delete the fixtures until it is closed.
+  loose end rather than a risk — but do not delete the fixtures until it is closed. *Narrowed
+  2026-08-03: the [agent-teams reference](https://code.claude.com/docs/en/agent-teams) names "a subagent
+  definition that sets `background: true`" while documenting that an in-process teammate's background
+  request **errors**. So the frontmatter field is real and read — what stays unmeasured is what it does
+  on an ordinary spawn, which is still the question the fixtures exist to answer.*
 - **Fact 3's trigger is not wall-clock.** The old ">4.5 minutes" lower bound was falsified on
   2026-07-29: four fixtures were listed 3m06s after being written, across a user-turn boundary. A turn
   boundary is now the leading candidate; `wf-reload-probe` is retained to separate it from elapsed time.
   Nothing in the design waits on the trigger, so this stays a loose end.
+
+**Closed 2026-08-03 — the tier ceiling did not survive a named-teammate spawn.** Fact 2d was recorded
+correctly and its consequence was not followed through: the IC template shipped `disallowedTools: Agent`
+and **no `tools:` line at all**, so every generated IC was uncapped as a teammate. `bin/check` actively
+forbade the fix — `templates: no tools: field offered` — and `SKILL.md` rule 6 STOPped on it.
+
+The ceiling is now **both lines together**, because the two spawn forms discard different halves. Rule 3
+blocks on both, rule 6 permits the companion, the prohibition became tier-scoped (delegating tiers still
+carry no `tools:`; the IC block must), and six assertions were each **proven by breaking them**. Nine
+live ICs in `apps-odyssey-alive` were remediated with the default grant minus `Agent`.
+
+Three things about how this was found are worth keeping:
+
+| | |
+|---|---|
+| it came from **reading the vendor's docs**, not the code | fact 18 — `skills:` and `mcpServers:` are dropped for teammates — is documented intent, and no instrument here would ever have reported it |
+| the shipped panel agents were **never exposed** | they carry explicit allowlists, so every example on disk was correct while the template that generates employees was not. This is why re-reading found nothing |
+| a correct fact had a **wrong consequence** | fact 2d said the harness ignores `tools:`/`disallowedTools:`. The same measurement shows `tools:` was honored exactly; only the denylist vanished. The error made the ceiling look unreachable instead of half-reachable, which is the difference between "no fix exists" and a one-line fix |
+
+**Still open from this:** `skills:` has no frontmatter workaround — a teammate-spawned employee gets a
+handbook body referring to operating principles it never loaded. `handbook-templates.md` states the
+writing rule (degrade loudly, name the constraint) and marks it **advisory**, because nothing on disk
+can detect which spawn form a future caller will use.
 
 **Closed 2026-07-29 — the pre-run diagnosis against `odyssey-alive`** (45 skills, 31 of them
 skill-builder-owned, 57 in-skill `AGENT.md` files). Six seams found before running anything; five fixed,
