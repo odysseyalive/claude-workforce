@@ -179,7 +179,7 @@ skill's. `records-run-state`, `records-account-index`, `records-holdings`.
 
 Deriving from the dataset rather than the source skill is deliberate. A skill holding three datasets
 would otherwise produce `records-agenda-1..3`, which names the past instead of the contents and
-guarantees a collision the moment another skill's data is also called `agenda`.
+guarantees a collision the moment another skill's data carries the same name.
 
 Constraints, all mechanical: lowercase and hyphens only, ≤64 characters, no `claude` or `anthropic`,
 and **not a gerund** — the naming convention for skills prefers verb-ing forms for *activities*, and a

@@ -822,6 +822,18 @@ check(
 # nothing executed, and a hand-derived count five minutes before the census ran.
 # ─────────────────────────────────────────────────────────────────────────────
 check(
+    "shipped tree names no target project's skills in an example",
+    not any(
+        m in read(p_)
+        for p_ in declared if p_.endswith(".md")
+        for m in ("`agenda`", "`/focus`", "| `focus`", "| `agenda`")
+    ),
+    "the distribution ships to everyone; a reader whose project has no `agenda` "
+    "reads an example about a skill that does not exist. Placeholders (`<skill-a>`, "
+    "`<generator>`) carry the same meaning and travel. Quoted evidence from a real "
+    "run is the one exception and is marked as a quotation",
+)
+check(
     "dispositions: every skill's verdict is written to disk, not only printed",
     "WRITE THEM DOWN. Reporting is not recording." in aud
     and "dispositions.md" in aud

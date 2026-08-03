@@ -130,9 +130,10 @@ you ──► /org <ask> ──► Lead ──► IC ──► /skillname   the 
 ```
 
 Before conversion this is impossible, and the failure is observable: on the first completed audit every
-IC handbook had to carry *"MUST NOT invoke `/edit`, `/focus`, `/text-eval`, `/voice`, or any other
-skill … Invoking a skill hands you instructions to spawn agents you cannot spawn."* The employees sat
-beside 45 skills they could only read as documents. **That is the state conversion exists to end.**
+IC handbook had to carry *"MUST NOT invoke `/<skill>`, `/<skill>`, … or any other skill … Invoking a
+skill hands you instructions to spawn agents you cannot spawn."* (The original named four of that
+project's own skills; they are placeheld here because this file ships to projects that have none of
+them.) The employees sat beside 45 skills they could only read as documents. **That is the state conversion exists to end.**
 
 ### Skills are the gateway to their data structures
 
@@ -241,8 +242,8 @@ after the whole org verifies.
 > spawns becomes the IC.
 > **No** → the spawn was the point. **ORCHESTRATOR.**
 
-`/focus` minus its validator is still a focus-article workflow, so the validator is a step and `/focus`
-is a CHARTER whose ICs are already written. `skill-builder` minus its agents is nothing at all — agents
+A drafting workflow minus its validator is still a drafting workflow, so the validator is a step and
+the skill is a CHARTER whose ICs are already written. `skill-builder` minus its agents is nothing at all — agents
 are what it produces.
 
 **"Spawns subagents as a designed step" was this test until 2026-08-01, and it was wrong.** It reads on
@@ -362,6 +363,26 @@ department exists to do that work instead.
 ---
 
 ## SUCCESSION — when workforce is taking the library over
+
+<!-- origin: user | immutable: true -->
+> **"We want to make sure that the skills/etc that are specifically installed from ~/lab/claude-enforcer
+> are completely upgraded with the systems provided here, including the data managed by them."**
+
+*— Added 2026-08-03, source: user directive, on reviewing the first real audit and finding
+`skill-builder` and its 31 generated skills untouched. **Names the intent this whole section implements,
+and settles what had been left as a per-run judgment.** Three consequences, all of them already
+specified below and none of them new: the superseded generator is **removed entirely**, not retained as
+an ORCHESTRATOR; its emissions are dispositioned **by category** rather than deleted wholesale, so
+working machinery survives and is re-owned; and the **data it maintained is migrated, enumerated from
+the filesystem and never from that artifact's own index**. What the directive changes is that
+coexistence is no longer the right default for a claude-enforcer-managed tree — it is the wrong answer
+there, and a run that reports near-zero conversion yield on one should say so rather than call it
+correct.*
+
+*It does **not** widen anything. `from:` still names one owner the census actually found, every refusal
+still stands for artifacts owned by anyone else, and the extraction gate still blocks every deletion
+until `N of N` spans and `M of M` embedded quotes are out.*
+<!-- /origin -->
 
 Everything above assumes **coexistence**: workforce lands beside a skill library that someone else keeps
 maintaining, so it converts the narrow cases and leaves the rest. That is the safe default and it stays the
