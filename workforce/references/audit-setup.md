@@ -337,6 +337,35 @@ a low conversion count against a high foreign-owned count as a shortfall.
 
 ---
 
+## Name collisions — LIVE blocks, NAMESPACE advises, and they are different questions
+
+**A same-named pair is only a collision where the harness resolves names.** Agents resolve from
+`.claude/agents/` and `~/.claude/agents/` and nowhere else (`platform.md` fact 5). Two entries *there*
+sharing a `name:` is **LIVE**: one silently never loads, and that blocks precondition 1(b) of the
+Atomic-or-Absent gate.
+
+**An in-skill `AGENT.md` is not that.** Its skill loads it by path — *"Read
+`.claude/skills/<skill>/agents/<x>/AGENT.md`"* — so its `name:` is documentation, not an address
+(`staging.md` § The same constraint applies to workforce's own panel agents). Two skills carrying same-named templates collide over
+nothing: separate files, deliberately different, each caller naming the one it wants.
+
+| | Judged against | Verdict |
+|---|---|---|
+| **LIVE** | the resolving locations only | **BLOCKING** — one employee is unreachable |
+| **NAMESPACE** | the whole union, including in-skill `AGENT.md` | **ADVISORY** — constrains what workforce may *claim* for a new employee (`data-skills.md` § Naming), and says nothing about whether the target is broken |
+
+**Both print, always, including the zeroes.** `wf-census` reports them on separate lines.
+
+*Measured 2026-08-03. The first real target had five reported collisions and **zero real ones**: three
+were symlink aliases (`.claude/agents/x.md` → the in-skill file, same inode — the standard install
+pattern), and the other two were per-skill validator templates that no `subagent_type` ever names.
+Blocking on those would have halted the audit of a correctly configured project, and "fixing" them by
+renaming the user's working files would have written the census's bug into the target. **This project
+has now done that four times in its records and caught it every time by reproducing the count by hand
+first.** The rule earned its place; follow it.*
+
+---
+
 ## Permissions
 
 **The org has to be able to run once the audit ends, and nothing was checking that it could.**

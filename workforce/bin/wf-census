@@ -132,22 +132,71 @@ class Census:
         3 were symlink aliases, 2 were real. This repo's CLAUDE.md already records
         the pattern — a drift the census reports is a claim about the census too,
         and every previous time the target was right. That is now four for four.
+
+        AND THEN THE REMAINING TWO WERE NOT COLLISIONS EITHER.
+
+        RESOLVING is `.claude/agents/` and `~/.claude/agents/` — the only places the
+        harness resolves an agent from (`platform.md` fact 5). Two entries there
+        sharing a `name:` is a LIVE collision: one silently never loads.
+
+        An in-skill `AGENT.md` is different. Its skill loads it BY PATH ("Read
+        .claude/skills/<skill>/agents/<x>/AGENT.md"), so its `name:` is
+        documentation, not an address — `staging.md` § The same constraint applies to
+        workforce's own panel agents says exactly that. Two skills carrying a same-named template
+        collide over nothing; they are separate files, deliberately different, and
+        each caller names the one it wants.
+
+        THESE ARE TWO QUESTIONS AND THIS METHOD USED TO ANSWER ONLY ONE:
+
+          "safe for workforce to CLAIM for a new employee?"  -> the whole union,
+            because an in-skill template may be symlinked into a resolving
+            location later (`data-skills.md` § Naming). ADVISORY: it constrains
+            what we may name, never whether the user's tree is broken.
+          "is there a LIVE collision blocking this run?"      -> resolving
+            locations only. BLOCKING.
+
+        Conflating them made `namespace` blocking, and on the first real target
+        that meant halting the audit of a correctly-configured project over five
+        per-skill validator templates that had never collided with anything.
         """
+        def _dedupe(rows):
+            seen = {}
+            for row in rows:
+                if not row["name"]:
+                    continue
+                try:
+                    key = os.path.realpath(row["path"])
+                except OSError:
+                    key = row["path"]
+                seen.setdefault(row["name"], {})[key] = row["path"]
+            return {n: sorted(p.values()) for n, p in seen.items() if len(p) > 1}
+
+        return _dedupe(self.agents)
+
+    def namespace(self):
+        """Same-named in-skill templates. ADVISORY — reported, never blocking.
+
+        These constrain what workforce may name a new employee. They do not mean
+        anything is wrong with the tree.
+        """
+        live = set(self.collisions())
+        return {
+            n: paths
+            for n, paths in self._dedupe_all().items()
+            if n not in live
+        }
+
+    def _dedupe_all(self):
         seen = {}
         for row in self.agents + self.skill_agents:
             if not row["name"]:
                 continue
-            # realpath collapses symlink aliases; identical inodes are one occupant.
             try:
                 key = os.path.realpath(row["path"])
             except OSError:
                 key = row["path"]
             seen.setdefault(row["name"], {})[key] = row["path"]
-        return {
-            n: sorted(paths.values())
-            for n, paths in seen.items()
-            if len(paths) > 1
-        }
+        return {n: sorted(p.values()) for n, p in seen.items() if len(p) > 1}
 
     def aliases(self):
         """Distinct paths resolving to one file — reported, never a collision."""
@@ -239,6 +288,7 @@ class Census:
             },
             "collisions": col,
             "aliases": self.aliases(),
+            "namespace": self.namespace(),
             "marker_families": dict(sorted(self.markers.items())),
             "unpaired_markers": self.unpaired,
             "immutable_blocks": {
@@ -314,9 +364,14 @@ def main():
         print(f"  hooks       {len(s['hooks'])} wired · "
               f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir")
         print(f"  aliases     {len(s['aliases'])} file(s) reachable by >1 path (symlinks — not collisions)")
-        print(f"  collisions  {len(s['collisions'])}")
+        print(f"  namespace   {len(s['namespace'])} in-skill template name(s) shared "
+              f"(advisory — loaded by path, not resolved by name)")
+        print(f"  collisions  {len(s['collisions'])} live (resolving locations only)")
         for name, paths in s["collisions"].items():
             print(f"    ! {name}: {', '.join(paths)}")
+        for name, paths in s["namespace"].items():
+            print(f"    · {name}: {len(paths)} in-skill copies — advisory; workforce "
+                  f"may not claim this name")
         for f in s["unpaired_markers"]:
             print(f"    ! unpaired {f['family']} in {f['file']} (imbalance {f['imbalance']})")
         for p, why in s["unreadable"]:

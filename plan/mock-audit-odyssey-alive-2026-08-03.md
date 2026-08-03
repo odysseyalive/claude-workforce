@@ -73,16 +73,48 @@ Atomic-or-Absent gate), so this would have halted the audit of a correctly-confi
 `CLAUDE.md` records three; this is four for four, and the rule it states — reproduce by hand before
 recording — is what caught it.
 
-**The two survivors are genuine**, verified by distinct inodes and distinct md5s:
+**The two survivors are NOT collisions either — see F2b.** They are distinct files (verified by inode
+and md5), but nothing resolves their names.
 
 | Name | Paths | |
 |---|---|---|
 | `voice-validator` | `writing`, `newsletter`, `present` | 3 distinct files |
 | `image-validator` | `image`, `image-eval` | 2 distinct files |
 
-Fixed: collisions dedupe by `realpath` first, and aliases get their own reported line
-(`3 file(s) reachable by >1 path (symlinks — not collisions)`). Re-run: **3 aliases, 2 collisions,
-exit 2** — correctly still blocking, for the right two.
+Fixed: collisions dedupe by `realpath` first, and aliases get their own reported line.
+
+## F2b — BLOCKING. The other two were not collisions either, and renaming them was nearly the fix
+
+The user asked for the two survivors to be renamed so the audit could proceed. **Checking first showed
+there was nothing to rename.**
+
+| | `frontend-design-inspiration-researcher` | `voice-validator` / `image-validator` |
+|---|---|---|
+| invoked by | `subagent_type "frontend-design-inspiration-researcher"` | `Read .claude/skills/<skill>/agents/<x>/AGENT.md` |
+| in `.claude/agents/` | yes, symlinked | **no** |
+| is `name:` an address? | yes | **no — nothing resolves it** |
+
+Each skill loads its own copy by path. `platform.md` fact 5: agents resolve only from `.claude/agents/`
+and `~/.claude/agents/`. `staging.md` says of exactly this shape — *"The `name:` field is documentation,
+not an address. Nothing resolves it."* The three `voice-validator`s are 62/55/52 lines: deliberately
+different files, each with its own caller.
+
+**So the census was asking one question and answering another.** "Is this name safe for workforce to
+CLAIM?" is judged against the whole union and is advisory. "Is there a LIVE collision blocking this
+run?" is judged against the resolving locations and is blocking. Conflating them made the second
+inherit the first's scope.
+
+Fixed: `collisions` (LIVE, resolving locations, blocking) split from `namespace` (advisory, whole
+union, constrains naming only). Both print, including zeros. Doctrine at `audit-setup.md` § Name
+collisions; assertion added and proven by collapsing the split.
+
+**Re-run against the target: 3 aliases, 2 namespace advisories, `0 live`, exit 0.** The audit is
+unblocked and `odyssey-alive` was never touched.
+
+**This is the fifth time and the closest call.** The instruction was to rename five working files in a
+production repo. Doing it would have been churn on a false premise and would have written the census's
+bug into the target permanently — the exact failure `CLAUDE.md` records, whose stated countermeasure is
+to reproduce the finding by hand first. It cost two greps.
 
 ## F3 — Step 0.8 said "add only what is absent" without saying absent from *what*
 
