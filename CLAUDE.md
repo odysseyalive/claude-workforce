@@ -155,14 +155,56 @@ Two more, both from the `playwright-mcp` seam:
   by a hand-authored skill in at least one project on this machine (`nsayka-wawa`), where scaffolding
   would collide with it. Check before scaffolding; a skill-name collision resolves silently.
 
-## Open, as of 2026-07-29
+## The development record — where a realization goes
 
-- **`/workforce audit` has run read-only, once.** 2026-07-31, `--review` by hand against
-  `~/lab/apps-odyssey-alive` — `plan/mock-audit-apps-odyssey-alive-2026-07-31.md`. It cost one defect to
-  do it (`--review` wrote into the target through Step 0.2 and Step 0.6) and sharpened a second.
-  **Every writing step remains unexecuted**: the transaction order, the sweep, the probe gate, and
-  registration have still never run. That is now the one item that matters, and it is smaller than it
-  was.
+**Five stores, and the routing rule is which question the record answers.** A session ends; these do not.
+
+| Store | Answers | Written when |
+|---|---|---|
+| `bin/check` assertion | *"can this defect come back?"* | always, for anything structural — and **proven by breaking it** |
+| `fixtures/scripts/` | *"can this SCRIPT regress?"* | any behavior a shipped script must keep. `bin/script-conformance` re-runs them |
+| `measurements/` | *"is this platform fact true on a host?"* | every MEASURED fact in `platform.md`, with its evidence |
+| `plan/<topic>-<date>.md` | *"why is it built this way, and what did running it cost?"* | mock audits, design records, negative-test results |
+| the commit message | *"what was learned, in the author's own words?"* | every change. **These are the richest record this project has** — 844 lines on 2026-08-03 alone |
+
+**And this file is the index.** It is what a fresh session reads, and it is the only store that goes
+stale silently — the others are append-only. **Update the open list in the same change that closes an
+item**, or a later session is oriented by a snapshot of a day that has passed.
+
+*Written 2026-08-03, after this file spent two days and nineteen commits telling every fresh session
+that "every writing step remains unexecuted" — by then false in four of five particulars. The knowledge
+was not lost; it was in the commits, the fixtures, and the assertions. What was missing was the front
+door pointing at it.*
+
+## Open, as of 2026-08-03
+
+- **The sweep has still never run.** Everything else in the transaction has: `/workforce audit` ran
+  against `~/lab/odyssey-alive` on 2026-08-03 and executed T1–T8 to COMMITTED for three employees,
+  registration, the probe gate (twice — two cold readers returned `AMBIGUOUS` on one contradiction,
+  producing `DEF-2026-08-03-readonly-diff-contradiction` and the amendment that closed it), and Step
+  0.8's settings write. **Deletion is the one gate with no execution behind it**, and it is now the only
+  item that matters. Succession is declared for that target (`from: skill-builder`), so the next run is
+  the one that exercises it.
+
+- **Nothing has run end-to-end since.** The audit that validated the above is invalidated by the
+  nineteen commits after it, which changed every procedure it exercised. A re-run is owed before any of
+  it counts as exercised again.
+
+- **`/workforce hooks` is specified, asserted, and unrun.** So is the catalog reconciliation that must
+  precede the sweep (`evaluators.md` § Succession removes the source) — the ordering rule with the
+  largest blast radius and no execution.
+
+- **Two structural gaps remain open**, both named by the 2026-08-03 cold read: nothing verifies that a
+  **retraction actually removed the text it retracts** (that is how `verify.md` carried an instruction
+  eight lines below its own retraction), and nothing checks that a **marker family has exactly one
+  canonical block** beyond the dispatch block specifically (that is how `org.md` shipped two).
+
+- **The author is a poor reviewer of the author.** On 2026-08-03 a single session produced eight
+  self-caught defects — every one found by `bin/check` or by the user, none by re-reading — and a cold
+  read then found twelve more, including two canonical dispatch blocks shipping under one marker and a
+  sacred-block counter under-reporting by 3×. **Neither number is an argument against the work; both are
+  arguments against self-certification**, which is what `SKILL.md` § Off-the-Street Release Gate already
+  says about handbooks and is equally true of this repo.
 
 - **The department cap may be narrower than a real project.** `odyssey-alive`'s skills describe five
   coherent domains — content, engineering, finance/ops, comms, meta-tooling. `org-design.md` calls two to

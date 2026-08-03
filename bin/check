@@ -3767,6 +3767,29 @@ for p in declared:
 
 if not os.path.exists("CLAUDE.md"):
     warn("no CLAUDE.md at the repo root", "a fresh session here has no orientation")
+else:
+    # CLAUDE.md is the index and the ONLY store that goes stale silently — the
+    # others are append-only. It spent two days and nineteen commits telling every
+    # fresh session that "every writing step remains unexecuted", by then false in
+    # four of five particulars.
+    #
+    # REPORTED, NOT BLOCKED, and no threshold is invented: the numbers are printed
+    # and the judgment is the reader's. A count that fires at one commit is noise;
+    # a count nobody prints is how this went stale in the first place.
+    _m_open = re.search(r"^## Open, as of (\d{4}-\d{2}-\d{2})", read("CLAUDE.md"), re.M)
+    if not _m_open:
+        warn("CLAUDE.md states no 'Open, as of <date>'",
+             "the index has no date, so its staleness cannot be measured")
+    else:
+        _since = subprocess.run(
+            ["git", "log", "--oneline", f"--since={_m_open.group(1)}", "--", "workforce/", "bin/"],
+            capture_output=True, text=True).stdout.strip()
+        _n = len(_since.splitlines()) if _since else 0
+        if _n:
+            warn(f"CLAUDE.md open list is dated {_m_open.group(1)} — {_n} commit(s) to "
+                 f"workforce/ or bin/ since",
+                 "update the open list in the change that closes an item, or a later "
+                 "session is oriented by a snapshot of a day that has passed")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report
