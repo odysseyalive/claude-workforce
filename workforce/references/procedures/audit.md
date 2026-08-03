@@ -760,6 +760,29 @@ prevent — and removing the gateway while keeping the files is the quieter vers
 
 ## Step 7 — Close
 
+**WRITE THE REPORT, then print it.** Everything below goes to
+`${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/report.md` **and** to the terminal — the file
+first, so a run that dies mid-report still leaves what it had.
+
+*Measured 2026-08-03, second real audit. `dispositions.md` and `deferred.md` were written because they
+had been fixed that morning; **every counted line in the report was printed and lost** —
+`INV-DIRECTIVES`, `INV-EMBEDDED`, `INV-BACKUP`, `EDGES`, `CATALOGS`, `DIRECT`, the Budget Receipt, the
+Execution Summary. Zero files on the target contained any of them afterward.*
+
+**This is the fourth defect of one shape**, and the previous three were closed the same day: work
+computed correctly, reported honestly, and given no durable home. The tell is always the same — the
+run *says* the right thing and the tree cannot prove it later.
+
+**Why it is not cosmetic.** `INV-DIRECTIVES` is the count that proves every sacred block was extracted
+**before** anything could be deleted. On that run 13 directive files were extracted and the number
+saying so is gone, so the completeness of the extraction is now unverifiable from the tree — for
+exactly the population the gate exists to protect. **A number that gated a destructive step and then
+vanished is indistinguishable from a number nobody computed.**
+
+**One file per run, never overwritten.** The run-id is already in the path, and comparing two runs is
+the only way to tell whether a change helped — which is the whole argument for dependable outcomes
+(`conversion-taxonomy.md` § SUCCESSION, user directive).
+
 **Print the Run Invariants block first** (`references/invariants.md`). **Every row that file
 enumerates**, present including the zeroes, before any finding — the count lives there and is not
 restated here, which is how this line came to say "ten" while the table held eleven.
