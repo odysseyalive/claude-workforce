@@ -60,14 +60,14 @@ TIER_RX = re.compile(r"tier:\s*(\d)")
 # because its prose said "No ORG-RECORD". Substring tests over prose are how this
 # project's checks have gone wrong before (CLAUDE.md § Assertions match contiguous
 # fragments); the marker is structure and cannot be mentioned by accident.
-ORG_RECORD_RX = re.compile(r"<!--\s*ORG-RECORD\s+START\b", re.I)
+ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
 FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
 
 # CANONICAL SIDECAR GRAMMAR — identical to wf-protect-directives. Two readers of one
 # artifact must share one grammar and one normalization, or they cannot both be right.
 BLOCK_RX = re.compile(
-    r"<!--\s*origin:\s*user\s*\|[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->", re.S)
+    r"^[ \t]*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->[ \t]*$(.*?)^[ \t]*<!--\s*/origin\s*-->[ \t]*$", re.S | re.M)
 ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
 
 

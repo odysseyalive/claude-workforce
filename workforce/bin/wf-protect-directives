@@ -49,8 +49,8 @@ import re
 import sys
 
 BLOCK_RX = re.compile(
-    r"<!--\s*origin:\s*user\s*\|[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->",
-    re.S,
+    r"^[ \t]*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->[ \t]*$(.*?)^[ \t]*<!--\s*/origin\s*-->[ \t]*$",
+    re.S | re.M,
 )
 # Generators are strict; readers are liberal (procedures/checksums.md rule 1).
 ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)

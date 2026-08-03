@@ -2496,6 +2496,59 @@ try:
 except Exception as _e:  # a diagnostic must not die on the input it diagnoses
     _wrap_bugs.append(f"could not lint bin/check: {_e}")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS A, extended to the SHIPPED SCRIPTS — landed 2026-08-03.
+#
+# The wrap lint above covers bin/check only. The shipped scripts match TARGET
+# content, and their version of this class is an UNANCHORED marker pattern: a
+# regex for `<!-- X -->` that also matches the same text quoted inside prose or
+# backticks. Six instances in one session:
+#
+#   "ORG-RECORD" in body          matched prose reading "No ORG-RECORD"
+#   MARKER_RX                     matched `<!-- X START -->` in an English sentence
+#                                 -> 11 false sweep hazards on a real project
+#   IMMUTABLE_OPEN                too strict in the other direction: missed every
+#                                 block carrying an `added:` field -> counted 21
+#                                 sacred blocks where the truth was 59
+#
+# A marker is a standalone line. A pattern for one that is not line-anchored is
+# reading documentation ABOUT markers as markers.
+# ─────────────────────────────────────────────────────────────────────────────
+_anchor_bugs = []
+for _sp in manifest_exec_paths() + manifest_hook_paths():
+    try:
+        _src = read(_sp)
+        _tree = _a2.parse(_src)
+    except Exception as _e:
+        _anchor_bugs.append(f"could not lint {_sp}: {_e}")
+        continue
+    for _n in _a2.walk(_tree):
+        # re.compile("...<!--...") must be line-anchored.
+        if (isinstance(_n, _a2.Call)
+                and getattr(getattr(_n.func, "value", None), "id", "") == "re"
+                and getattr(_n.func, "attr", "") == "compile"
+                and _n.args and isinstance(_n.args[0], _a2.Constant)
+                and isinstance(_n.args[0].value, str)):
+            _pat = _n.args[0].value
+            if "<!--" in _pat and not _pat.lstrip("r").startswith(("^", "\\A")):
+                _anchor_bugs.append(
+                    f"{os.path.basename(_sp)}:{_n.lineno}: marker pattern is not "
+                    f"line-anchored — {_pat[:46]!r}")
+        # `"<!-- ..." in body` is the same defect without a regex.
+        if (isinstance(_n, _a2.Compare) and len(_n.ops) == 1
+                and isinstance(_n.ops[0], (_a2.In, _a2.NotIn))
+                and isinstance(_n.left, _a2.Constant)
+                and isinstance(_n.left.value, str) and "<!--" in _n.left.value):
+            _anchor_bugs.append(
+                f"{os.path.basename(_sp)}:{_n.lineno}: substring test for a marker "
+                f"— {_n.left.value[:40]!r}; anchor it")
+check(
+    "scripts: every marker pattern is line-anchored",
+    not _anchor_bugs,
+    "; ".join(_anchor_bugs) + " — an unanchored marker pattern reads documentation "
+    "ABOUT markers as markers. Six instances in one session, one of which "
+    "under-reported sacred blocks 21-vs-59 while the extraction gate reads that count",
+)
 check(
     "assertions: no substring literal is broken by a hard wrap in its target",
     not _wrap_bugs,
