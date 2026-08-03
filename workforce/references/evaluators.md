@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 29 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -238,15 +238,20 @@ project to be installed in order to function.
 
 Seeding, in order:
 
-1. **claude-enforcer present on this machine?** Import its shipped catalogs once, recording the source
-   path and its version anchor in the project's copy. This is the migration path, and it is the best
-   available seed because those catalogs are the real accumulated corpus. (This applies to
-   `code-evaluator` and `text-eval` only. `image-eval` has no enforcer predecessor.)
-2. **Otherwise**, write a minimal seed from the structure below — **this project ships no seed file for
-   code or text evaluators**, and an earlier form of this sentence promised one. On any machine without
-   the predecessor installed, that branch had no artifact to copy. Author it here from: the structure,
-   the severity tiers, the clustering rule, the `[hard]` rows, and a starter set of entries. Mark it
-   `seed-only` so its thinness is visible rather than mistaken for a complete corpus.
+1. **This project ships the catalogs. Copy them.** `references/catalogs/text/` and
+   `references/catalogs/code/` carry the portable corpora **verbatim**, each with its own version anchor
+   on line 1 (`creative-scrub-ref-version`, `code-eval-ref-version`). No predecessor needs to be
+   installed and no machine-dependent branch decides what a project gets.
+2. **claude-enforcer also present, and newer?** Reconcile against it and append the difference
+   (§ Forcible propagation). It is the same comparison run against any newer source; the shipped copy is
+   simply the floor.
+
+*Until 2026-08-03 step 1 read "import from claude-enforcer if it is on this machine, otherwise author a
+minimal seed", and this project shipped no text or code catalog at all. **Measured:** the portable
+source carries ~126 pattern rows; one real project's hand-grown catalog had ~57 and had never been
+reconciled; a second had ~49. Workforce shipped **zero**, so a fresh install on any machine without the
+predecessor was strictly thinner than the system it supersedes — which is the one outcome the standing
+directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what closes it.*
 3. **For `image-eval`**, this project ships `image-eval-seed.md` as the seed. It covers AI image
    patterns, technique authenticity (watercolor, oil, ink), visual clarity, metadata provenance, and
    image-set evaluation. Where a project already carries an `image-eval` (e.g. odyssey-alive's
@@ -259,10 +264,12 @@ Seeding, in order:
 project's own work. Nothing re-reads claude-enforcer afterward, and a project seeded from the shipped
 minimal set is fully functional rather than degraded.
 
-**Why the catalogs are not duplicated into this repo wholesale.** They are designed to grow, and two
-growing copies of one corpus is the two-canonical-texts failure this project refuses everywhere else,
-for the same reason an immutable block is referenced and never copied. Carrying the shipped seed plus
-the migration import keeps one canonical origin per project.
+**The vendored copy is an ORIGIN, not a second grower — that distinction is what makes it safe.** The
+two-canonical-texts rule bars two copies that both *change*. A shipped seed with a version anchor
+changes in exactly one place (here, by re-copying from source) and is only ever *read* downstream, which
+is the same shape claude-enforcer already ships and this file already describes consuming. What must
+never happen is workforce **editing** a vendored file to suit itself: that forks a corpus with one
+origin, and `manifest.txt` § Vendored evaluator catalogs says so at the top of the list.
 
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
 carry more of the weight. Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it

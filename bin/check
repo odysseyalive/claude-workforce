@@ -212,6 +212,23 @@ upd = read("workforce/references/procedures/update.md")
 # 1. Manifest is the single authoritative shipped-file list
 # ─────────────────────────────────────────────────────────────────────────────
 declared = manifest_paths()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VENDORED — copied verbatim from claude-enforcer, not authored here.
+#
+# These are the portable evaluator corpora. They follow the SOURCE project's
+# conventions (single-line `origin:` annotations rather than paired blocks,
+# its own heading structure, its own version anchors), and workforce's authoring
+# rules must not be applied to them: every one of those checks would demand an
+# edit, and editing a vendored file forks a corpus that has one origin.
+#
+# What still applies: manifest completeness, existence, and § Vendored catalogs'
+# own assertions (anchor present, byte-identical to source where the source is
+# reachable). What does not: origin pairing, duplicate headings, restated
+# constants, the coverage header, and the length warning.
+# ─────────────────────────────────────────────────────────────────────────────
+VENDORED = {p_ for p_ in declared if p_.startswith("workforce/references/catalogs/")}
+
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
 
@@ -270,7 +287,8 @@ CONST_RX = re.compile(
 )
 offenders = [
     p for p in declared
-    if p.endswith(".md") and p not in CONST_EXEMPT and CONST_RX.search(read(p))
+    if p.endswith(".md") and p not in CONST_EXEMPT and p not in VENDORED
+    and CONST_RX.search(read(p))
 ]
 check(
     "constants: stated once, outside the declared exceptions",
@@ -339,6 +357,11 @@ for _p in glob.glob("workforce/**/*.md", recursive=True):
 
 _anchor_broken = []
 for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
+    # A vendored catalog's internal citations resolve in the SOURCE project's
+    # tree, not ours — its changelog cites its own siblings by heading. Reading
+    # them here reports a broken anchor that is correct where it lives.
+    if _src in VENDORED:
+        continue
     for _m in CITE_RX.finditer(read(_src)):
         _raw, _sec = _m.group(1), _norm_heading(_m.group(2))
         if not _sec or _raw.startswith(GENERATED_TARGETS):
@@ -464,7 +487,7 @@ check(
 OPEN_RX = re.compile(r"^<!--\s*origin:.*-->\s*$", re.M)
 CLOSE_RX = re.compile(r"^<!--\s*/origin\s*-->\s*$", re.M)
 for p in declared:
-    if not p.endswith(".md"):
+    if not p.endswith(".md") or p in VENDORED:
         continue
     body = read(p)
     o, c = len(OPEN_RX.findall(body)), len(CLOSE_RX.findall(body))
@@ -575,7 +598,7 @@ DUP_EXEMPT = {
     "workforce/references/org-config.template.md",
 }
 for p in declared:
-    if not p.endswith(".md") or p in DUP_EXEMPT:
+    if not p.endswith(".md") or p in DUP_EXEMPT or p in VENDORED:
         continue
     n = os.path.basename(p)
     lines = [l.rstrip() for l in read(p).splitlines()]
@@ -821,6 +844,48 @@ check(
 # shape, a printed canary promise with no queue row, a stated spawn-ledger rule
 # nothing executed, and a hand-derived count five minutes before the census ran.
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Vendored evaluator catalogs, landed 2026-08-03.
+#
+# Workforce described forcible propagation and shipped nothing to propagate.
+# Measured: the portable source carries ~126 pattern rows; one real project had
+# ~57 hand-grown and never reconciled, another ~49. Workforce shipped ZERO, so a
+# fresh install on a machine without the predecessor was strictly thinner than the
+# system it supersedes — the one outcome the standing directive forbids.
+# ─────────────────────────────────────────────────────────────────────────────
+_vend_text = [p_ for p_ in VENDORED if "/text/" in p_]
+_vend_code = [p_ for p_ in VENDORED if "/code/" in p_]
+check(
+    "catalogs: the portable corpora ship, for text AND code",
+    len(_vend_text) >= 2 and len(_vend_code) >= 5,
+    f"vendored text={len(_vend_text)} code={len(_vend_code)} — describing a "
+    "propagation mechanism while shipping nothing to propagate makes a fresh "
+    "install thinner than the predecessor it replaces",
+)
+check(
+    "catalogs: every vendored file keeps its own version anchor on line 1",
+    all(
+        read(p_).splitlines()[0].startswith("<!--")
+        and ("ref-version:" in read(p_).splitlines()[0])
+        for p_ in VENDORED if p_.endswith(("text-tells.md", "version.md"))
+    ),
+    "the anchor is what forcible propagation compares against; a vendored file "
+    "without one cannot be reconciled and silently becomes a dead copy",
+)
+check(
+    "catalogs: vendored files carry no workforce enforcement header",
+    not any("in bin/check name this file" in read(p_) for p_ in VENDORED),
+    "stamping one would claim bin/check coverage over text this project did not "
+    "write, and would fork the file from the source it must match byte-for-byte",
+)
+check(
+    "catalogs: the vendored-vs-authored distinction is stated where it is enforced",
+    "VENDORED, NOT AUTHORED" in read("manifest.txt")
+    and "an ORIGIN, not a second grower" in _ev,
+    "the two-canonical-texts rule bars two copies that both CHANGE; a read-only "
+    "seed with an anchor is not that, and the difference has to be written down or "
+    "the next reader deletes the catalogs citing the rule",
+)
 check(
     "catalogs: the append target is the catalog file, and one condition only stops it",
     "The append target is the CATALOG FILE, never the skill" in _ev
@@ -3579,7 +3644,7 @@ check(
 # Warnings — worth knowing, not worth failing
 # ─────────────────────────────────────────────────────────────────────────────
 for p in declared:
-    if p.endswith(".md"):
+    if p.endswith(".md") and p not in VENDORED:
         n = len(read(p).splitlines())
         if n > 260:
             warn(f"{os.path.basename(p)} is {n} lines", "long reference; candidate for a split or ablation")

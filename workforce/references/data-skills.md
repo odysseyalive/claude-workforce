@@ -1,6 +1,6 @@
 # Data Skills — the artifact that holds an employee's records
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every dataset an org touches has exactly one data skill and one owner. -->
 
 A **data skill** holds a dataset: its schema, its invariants, the scripts that maintain it, and the

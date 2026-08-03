@@ -149,6 +149,12 @@ def main():
     for p in shipped:
         if not os.path.isfile(p):
             continue
+        # Vendored catalogs are copied verbatim from claude-enforcer. Stamping a
+        # workforce "Enforcement:" header into one would claim bin/check coverage
+        # over text this project did not write, and would fork the file from the
+        # source it must stay byte-identical to.
+        if p.startswith("workforce/references/catalogs/"):
+            continue
         rows.append((p, claims(p), len(g.get(p, []))))
     rows.sort(key=lambda r: (-r[1], r[0]))
 
@@ -170,7 +176,12 @@ def main():
                     f"`/workforce verify`): {a} assertion(s) in bin/check name this file; "
                     f"{c} normative claims total. {len(GENERIC)} generic assertions guard it "
                     f"too. Coverage is a floor, not a certificate. -->")
-            body = re.sub(r"<!-- Enforcement: \d+ assertion.*?-->\n", "", body, flags=re.S)
+            # Match BOTH header forms. The text gained a "(maintainer-facing…)" clause on
+            # 2026-08-03 and this regex still required "Enforcement:" immediately
+            # followed by a digit, so it stopped stripping the previous header and
+            # every --stamp run appended another one. Found by running it twice.
+            body = re.sub(r"<!-- Enforcement[^\n]*?\d+ assertion\(?s?\)? in bin/check[^\n]*-->\n",
+                          "", body)
             lines = body.split("\n")
             at = 1 if lines and lines[0].startswith("# ") else 0
             lines.insert(at + 1, line)
