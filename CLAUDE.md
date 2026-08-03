@@ -179,13 +179,25 @@ door pointing at it.*
 
 ## Open, as of 2026-08-03
 
-- **The sweep has still never run.** Everything else in the transaction has: `/workforce audit` ran
-  against `~/lab/odyssey-alive` on 2026-08-03 and executed T1–T8 to COMMITTED for three employees,
-  registration, the probe gate (twice — two cold readers returned `AMBIGUOUS` on one contradiction,
-  producing `DEF-2026-08-03-readonly-diff-contradiction` and the amendment that closed it), and Step
-  0.8's settings write. **Deletion is the one gate with no execution behind it**, and it is now the only
-  item that matters. Succession is declared for that target (`from: skill-builder`), so the next run is
-  the one that exercises it.
+- **The sweep has still never run.** Everything else in the transaction has, and it ran EARLIER than
+  this file used to claim. The first writing audit was **2026-07-31 against `~/lab/apps-odyssey-alive`**
+  — five T5 rows to COMMITTED, seven employees, five `DEF` records, and four `/org` work runs after it.
+  A second ran 2026-08-03 against `~/lab/odyssey-alive`: T1–T8 COMMITTED for three employees, the probe
+  gate twice (two cold readers returned `AMBIGUOUS` on one contradiction, producing
+  `DEF-2026-08-03-readonly-diff-contradiction` and the amendment that closed it), and Step 0.8's
+  settings write. **Deletion is the one gate with no execution behind it.**
+
+  *This file said the first transaction ran on 2026-08-03. It did not. The 2026-07-31 run left seven
+  employees in a project the user did not remember authorizing — because on that date the design was
+  "invocation is the consent and asked nothing" (`audit-setup.md` § Step 0, superseded 2026-08-01 by
+  user directive). **That run is why the consent question exists**, and this file had recorded the
+  lesson while getting the event wrong. `apps-odyssey-alive` was restored to its 2026-07-31 baseline on
+  2026-08-03; pre-restore state is in `measurements/2026-08-03-apps-odyssey-alive-PRE-RESTORE.zip`.*
+
+  **`apps-odyssey-alive` is not a git repository.** A zip in `.claude-backups/` was the only rollback
+  path, and it was taken sixteen minutes before the writes began. That combination — no VCS, a backup
+  whose freshness nobody checked, and succession now forced by default — is the worst case this project
+  can walk into, and it is the reason the backup question is a gate rather than a setting.
 
 - **Nothing has run end-to-end since.** The audit that validated the above is invalidated by the
   nineteen commits after it, which changed every procedure it exercised. A re-run is owed before any of
