@@ -163,6 +163,21 @@ enf = read("workforce/references/enforcement.md")
 plat = read("workforce/references/platform.md")
 disc = read("workforce/references/discovery.md")
 _org = read("workforce/references/procedures/org.md")
+# THE BLOCK, not the file. Every assertion below used to match `_org`, which is the
+# whole procedure — including the prose that EXPLAINS the block. So all nine of them
+# passed against explanations while the byte-canonical block that actually ships into
+# the user's /org went unchecked. Measured 2026-08-03: the first real run wrote a
+# paraphrase into /org with no markers, and nothing objected, because nothing was
+# looking at the artifact. An assertion that cannot fail is not an assertion.
+# Anchor on the AUTO-GENERATED marker, not the bare name: line ~116 names both
+# markers in prose on one line, so a naive split() returned the empty span between
+# them and every assertion below passed against "". The extractor for a check has
+# to be as exact as the check.
+_m_blk = re.search(
+    r"<!-- ORG-DISPATCH-CHECKPOINT START — auto-generated.*?-->\n(.*?)\n<!-- ORG-DISPATCH-CHECKPOINT END -->",
+    _org, re.S,
+)
+_org_block = _m_blk.group(1) if _m_blk else ""
 _ocf = read("workforce/references/org-chart-format.md")
 _pfp2 = read("workforce/references/procedure-for-procedures.md")
 _stg = read("workforce/references/staging.md")
@@ -799,21 +814,38 @@ check(
 # ─────────────────────────────────────────────────────────────────────────────
 
 check(
+    "org: the canonical block is copied, never composed for the project",
+    "COPY THE BLOCK. DO NOT WRITE ONE." in _org
+    and "never composed from this file's prose" in _org,
+    "the first real audit wrote /org a paraphrase with no markers; the rails did "
+    "not survive it (destructive-never-auto-run was simply gone) and the next "
+    "index would have inserted the canonical block beside it — two ladders, one file",
+)
+check(
+    "org: the block assertions read the block, not the file that explains it",
+    len(_org_block) > 2000 and "ORG-DISPATCH-CHECKPOINT" not in _org_block,
+    f"extracted {len(_org_block)} chars — nine assertions used to match the whole "
+    "procedure, so they were satisfied by the prose explaining the block while the "
+    "block went unchecked. They would all have passed against an empty block",
+)
+check(
     "org: the dispatch CHECKPOINT weighs mechanical before it picks a node",
-    "MECHANICAL BEFORE AGENTIC" in _org and "LOWEST COMPETENT NODE" in _org
-    and _org.index("MECHANICAL BEFORE AGENTIC") < _org.index("LOWEST COMPETENT NODE"),
+    "a command that already does the job beats an agent" in _org_block.lower()
+    and "lowest competent node" in _org_block.lower()
+    and _org_block.lower().index("beats an agent")
+    < _org_block.lower().index("otherwise, the lowest competent node"),
     "clause 2 must precede lowest-competent-node — a precedence rule that runs after "
     "the node is chosen has already lost the thing it was ordering",
 )
 check(
     "org: mechanical dispatch fires on total coverage only",
-    "TOTAL COVERAGE ONLY" in _org and "partial match" in _org,
+    "Partial is not whole" in _org_block and "unsure is not whole" in _org_block,
     "without it, a command that partly answers the ask returns a wrong result cheaply "
     "— worse than the agent hop it saved",
 )
 check(
     "org: a destructive mechanical is never auto-run",
-    "destructive" in _org.lower() and "display-first" in _org,
+    "deploys" in _org_block and "show it, never run it" in _org_block,
     "clause 2 would otherwise auto-run a deploy because its coverage claim matched",
 )
 check(
@@ -840,23 +872,24 @@ check(
 
 check(
     "org: data already in hand is a terminal rung, ahead of node selection",
-    "DATA IN HAND IS A TERMINAL ANSWER" in _org
-    and _org.index("DATA IN HAND IS A TERMINAL ANSWER") < _org.index("LOWEST COMPETENT NODE"),
+    "Data you already have is a finished answer" in _org_block
+    and _org_block.lower().index("finished answer")
+    < _org_block.lower().index("otherwise, the lowest competent node"),
     "clause 2f must precede lowest-competent-node; placed after it, the ladder has "
     "already chosen an agent for an ask that needed none",
 )
 check(
     "org: a direct answer names the artifact it came from",
-    "THE ARTIFACT IS NAMED OR THE CLAUSE DID NOT FIRE" in _org,
+    "Name what you read, or the rung did not fire" in _org_block,
     "2f is the one rung with no exit code behind it — an uncited direct answer is "
     "indistinguishable from a guess, which is worse than the spawn it saved",
 )
 check(
     "org: a direct answer is refused on stale, derived, or write asks",
-    "FOUR REFUSALS" in _org
-    and "PRIOR session" in _org
-    and "never answer from memory of a file" in _org
-    and "it never performs work" in _org,
+    "Four reasons this rung does not apply" in _org_block
+    and "earlier session" in _org_block
+    and "never answer from your memory of a file" in _org_block
+    and "never does work" in _org_block,
     "without the refusals 2f becomes a licence to answer from recollection; the "
     "prior-session case is the one that reads as success",
 )
@@ -879,7 +912,7 @@ check(
 #    defect in the TABLE; the door refuses, `index` reports.
 check(
     "org: an unclear coverage match resolves to an agent, not to a guess",
-    "UNCLEAR IS NOT TOTAL" in _org and "softest joint" in _org,
+    "unsure is not whole" in _org_block and "softest joint" in _org,
     "clause 2a must say what happens when totality is UNCLEAR — without it a literal "
     "reader treats plausible-but-unconfirmed as total, which is the whole risk",
 )
