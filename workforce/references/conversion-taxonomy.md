@@ -368,6 +368,11 @@ department exists to do that work instead.
 > **"We want to make sure that the skills/etc that are specifically installed from ~/lab/claude-enforcer
 > are completely upgraded with the systems provided here, including the data managed by them."**
 
+> **"It should not be opt in. it should be a forced succession or it will be confusing to the user. I
+> imagine the interaction will be a bit different under this new system than the old system. that
+> interaction has to provide dependable outcomes, otherwise it will be impossible to measure success and
+> make patches in the future that will make this project better."**
+
 *— Added 2026-08-03, source: user directive, on reviewing the first real audit and finding
 `skill-builder` and its 31 generated skills untouched. **Names the intent this whole section implements,
 and settles what had been left as a per-run judgment.** Three consequences, all of them already
@@ -393,8 +398,30 @@ It is not always the intent. `README.md` states that this project **supersedes c
 project whose library that generator produced, rule 7 refuses nearly every skill and the migration converts
 nothing. The rules and the promise contradicted each other, and the rules won silently.
 
-**Succession is the declared-intent mode that resolves it.** It is off unless
-`org-config.md` carries `<!-- succession: declared -->` (`org-config.template.md` § Per-project markers).
+**So succession from THIS project's own predecessor is not a mode. It is the default.** Where the
+census detects `skill-builder` / claude-enforcer as an owner, `succession: declared | from:
+skill-builder` is the value a fresh `org-config.md` is written with, and the run proceeds on it.
+
+*Made non-optional 2026-08-03 by the directive above. The argument is not convenience — it is
+measurement. An opt-in marker means one command against one tree has two possible outcomes depending on
+whether someone remembered a line, so two runs cannot be compared and no patch can be shown to have
+helped. `README.md` already promises that `audit` IS the migration path off claude-enforcer; an opt-in
+default made that promise conditional on knowledge the user had no way to acquire.*
+
+**It is forced FROM the superseded predecessor ONLY, and this is the whole safety of it.** Workforce
+supersedes claude-enforcer. It supersedes nothing else. Where the census detects any other generator —
+`forge`, a vendor's, one this project has never met — **succession stays off for that owner and is
+never inferred**, because the argument that a retired owner never runs again is true of the predecessor
+and false of everyone else (fixture `f2-two-generators`). A tree with both gets succession from
+`skill-builder` and every refusal intact for the other.
+
+**And it is stated at the consent gate rather than assumed.** The user is told, in question 1, that this
+project is managed by the superseded generator and that it will be replaced — so proceeding is the
+consent, and the outcome is dependable without a fifth question (`audit-setup.md` § Step 0 and § The
+question budget). **`--review` shows exactly what it would remove, and changes nothing.**
+
+**Opting OUT stays available and is one line:** `<!-- succession: none -->` in `org-config.md` holds the
+old coexistence behavior for a project that wants it. The default moved; the choice did not disappear.
 
 ### Succession is FROM a named predecessor — never from "the past"
 

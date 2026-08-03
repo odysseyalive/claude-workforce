@@ -78,6 +78,11 @@ written nothing — not a partial run, not a half-built org.
 >
 > **Nothing is removed until its replacement has been checked and works.**
 >
+> **If this project was set up by `skill-builder`, it is being replaced.** Its skills become agents
+> where they are one job, its records and scripts are kept and re-homed, and `skill-builder` itself is
+> removed at the end. Nothing is removed until its replacement has been checked and works, and you get
+> a full backup first.
+>
 > 1. **Go ahead** — Takes a few minutes. You'll see everything it plans before it writes anything.
 > 2. **Stop here** — Nothing is written and nothing changes.
 
@@ -409,6 +414,15 @@ budget receipt exists to prevent one gate over.
 This gate is also where `<!-- succession: -->` is read (`org-config.template.md` § Per-project markers), and
 its value changes what Step 3 may convert. Print it as its own line, always: `succession: none
 (coexistence)` or `succession: declared`.
+
+**Succession from the superseded predecessor is the DEFAULT, not a lever** (`conversion-taxonomy.md`
+§ SUCCESSION, and the user directive there). Where the census detects `skill-builder` as an owner, this
+gate writes `declared | from: skill-builder` into a fresh `org-config.md` and says so — it does not ask,
+because the consent question already told the user the predecessor is being replaced, and a second
+question about the same fact is a stop the user pays for and learns nothing from.
+
+**An existing `org-config.md` is never overwritten.** A project that set `none` by hand keeps it, and
+the run reports that it did — the default moved, the user's choice did not disappear.
 
 **Under `none`, count what the mode refused and say the lever exists.** A run that leaves the library intact
 because rules 3 and 7 fired looks identical to a run that found nothing to convert — and the user has no way

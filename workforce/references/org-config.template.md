@@ -187,7 +187,7 @@ Managed by `audit`. Hand-edit any of them; delete one to reset.
 <!-- audit-disclaimer: unset -->
 <!-- org-setup: unset -->
 <!-- budget-setup: unset -->
-<!-- succession: none -->
+<!-- succession: declared | from: skill-builder -->   (written only where the census DETECTED it; otherwise `none`)
 ```
 
 | Marker | States | Meaning |
