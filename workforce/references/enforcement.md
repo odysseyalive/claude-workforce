@@ -79,8 +79,10 @@ belongs in the DETECTS column with everything else here.
 
 ## Nothing ships dormant — the rule the hook findings actually support
 
-**claude-workforce ships zero hooks today. That is a current fact, not a prohibition**, and the
-difference took two corrections on the same day to reach.
+**claude-workforce ships exactly one hook, and the count is a current fact rather than a
+prohibition** — `wf-protect-directives`, `PostToolUse` on `Edit|Write`, guarding immutable directive
+blocks (`manifest.txt` § Hooks; `procedures/hooks.md`). Getting from "ships zero executables" to a
+stated count took two corrections on the same day.
 
 **Correction 1.** This section said *"claude-workforce ships zero executables"* and froze that into a
 `bin/check` assertion banning every `.sh`, `.ps1`, and `.py` in the distribution. The three findings
@@ -109,10 +111,18 @@ ban was doctrine that felt like a conclusion**, which is the tell `CLAUDE.md` na
 | anything **wired** — a procedure invokes it, or a command registers it *and* `verify` reports whether it is registered | **yes** | its absence is loud, so a fresh install cannot silently lose it |
 | anything **dormant** — no invoker, no registration path, or a registration nothing reports on | **never** | this is the whole of the finding, and it has now cost this project three times |
 
-**So a hook may ship — under conditions this project does not yet meet.** It needs a command that wires
-it, a `verify` row reporting wired-vs-orphaned, and both OS variants. That work is not done, so the
-count stays zero and **is reported as a current state rather than a principle.** What a hook would buy
-is stated plainly below and is real: edit-time detection between audits.
+**A hook ships only under three conditions, and the shipped one meets two and a half.** It needs a
+command that wires it — `/workforce hooks`, present. A `verify` row reporting wired / orphaned / dead
+wiring — `procedures/verify.md` § Hook wiring, present. And portability: the shipped hook is **one
+Python file rather than a bash/PowerShell pair**, which is why the third condition reads as met while
+being differently met. `claude-enforcer` ships both variants and its own `CLAUDE.md` records that the
+`.ps1` ports *"have NOT yet been executed on a real Windows host"* — two implementations, one
+unmeasured. One file is one behavior, and Python already ships here for the three scripts.
+
+*This section said the count "stays zero" for a full commit after the hook landed in the manifest.
+Written before the decision to ship one and never revisited — a stated fact about the distribution that
+the distribution contradicted, in the file whose whole job is refusing claims the runtime will not
+back.*
 
 Whatever ships carries the obligation `data-skills.md` § Maintainers puts on every maintainer:
 **released by making it fail, never by watching it pass**, with the negative test recorded. And it
@@ -145,12 +155,12 @@ What covers the ground instead:
 | handbook and data-skill conformance on a host | **`wf-conform`**, shipped and invoked by `verify` |
 | repo-level conformance (maintainers only) | `bin/check` in the source distribution — **not shipped**, and no shipped file may send a host to it |
 
-**What is genuinely lost:** edit-time detection between audits. A collision introduced by hand-editing
-`.claude/agents/` goes unnoticed until the next `verify`. That is a real gap, narrow, and stated rather
-than papered over.
+**What the shipped hook recovers** is edit-time detection between audits: drift in an immutable block
+is reported at the moment of the edit rather than at the next `verify`. **What is still lost** is
+everything it does not cover — a name collision introduced by hand-editing `.claude/agents/` still goes
+unnoticed until `verify` runs. Narrow, and stated rather than papered over.
 
-**If a host wants hooks**, it generates its own. That was always the rule for every hook except the
-four exceptions, and now there are no exceptions. Useful events: `SubagentStart` / `SubagentStop`
+**For anything beyond that, a host generates its own.** Useful events: `SubagentStart` / `SubagentStop`
 (matchers take the agent type name), `PreToolUse` / `PostToolUse`, `SessionStart`.
 
 **A hook can observe and it can block a tool call. It cannot deny a spawn against a quota**, which is

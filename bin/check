@@ -704,6 +704,15 @@ check(
     "command and a wired/orphaned report. An unflagged executable has neither",
 )
 check(
+    "hooks: the stated count matches what the manifest actually ships",
+    ("ships exactly one hook" in enf) == (len(manifest_hook_paths()) == 1)
+    and "ships zero hooks" not in enf,
+    f"manifest ships {len(manifest_hook_paths())} hook(s); enforcement.md said the "
+    "count 'stays zero' for a full commit after one landed. A stated fact about the "
+    "distribution that the distribution contradicts, in the file whose job is "
+    "refusing claims the runtime will not back",
+)
+check(
     "shipped hooks: each has a wiring command and a report of whether it is wired",
     not _hooks or (
         "workforce/references/procedures/hooks.md" in declared
@@ -1058,6 +1067,16 @@ check(
     "index would have inserted the canonical block beside it — two ladders, one file",
 )
 check(
+    "org: exactly ONE canonical dispatch block ships",
+    _org.count("ORG-DISPATCH-CHECKPOINT START — auto-generated") == 1,
+    f"found {_org.count('ORG-DISPATCH-CHECKPOINT START — auto-generated')} — the "
+    "plain-language rewrite inserted its block without removing the old one "
+    "(the replacement searched 'START —' with an em-dash and 'END' without, and the "
+    "PROSE line naming both markers matched the unanchored one, so `end` resolved "
+    "BEFORE `start`). FIVE assertions then passed against the stale block while the "
+    "canonical one went unchecked, and the extractor read only the first",
+)
+check(
     "org: the block assertions read the block, not the file that explains it",
     len(_org_block) > 2000 and "ORG-DISPATCH-CHECKPOINT" not in _org_block,
     f"extracted {len(_org_block)} chars — nine assertions used to match the whole "
@@ -1148,7 +1167,8 @@ check(
 #    defect in the TABLE; the door refuses, `index` reports.
 check(
     "org: an unclear coverage match resolves to an agent, not to a guess",
-    "unsure is not whole" in _org_block and "softest joint" in _org,
+    "unsure is not whole" in _org_block
+    and "Being wrong toward an agent costs one hop" in _org_block,
     "clause 2a must say what happens when totality is UNCLEAR — without it a literal "
     "reader treats plausible-but-unconfirmed as total, which is the whole risk",
 )
@@ -1709,14 +1729,15 @@ check(
 )
 check(
     "org: only a derived scope may satisfy total coverage",
-    "ONLY IF its `Scope` cell reads `derived`" in _org
+    "only if its `Scope` cell says `derived`" in _org_block
     and "`derived <date>`" in _ocf and "step only" in _ocf,
     "a `declared` row rests on prose somebody wrote; letting it answer an ask alone "
     "reinstates exactly the authored claim derivation exists to remove",
 )
 check(
     "org: a declared row costs a hop, never a capability",
-    "COSTS A HOP, NEVER A CAPABILITY" in _org and "as a STEP" in _org,
+    "Skipping a row costs a hop, never a capability" in _org_block
+    and "named step inside the work order" in _org_block,
     "strictness that discards a working command is not safety — a step-only row is "
     "still named in the work order, and the refusal is reported rather than silent",
 )
@@ -1742,7 +1763,8 @@ check(
 )
 check(
     "org: two rows claiming the same work stop the door and are fixed at index",
-    "TABLE DEFECT" in _org and "Do NOT pick the first" in _org
+    "a broken table, not a routing decision" in _org_block
+    and "Do not take the first" in _org_block
     and "never by deleting a row" in _ocf,
     "a dispatch-time tiebreak between two total-coverage claims is a guess dressed as "
     "a rule; the defect is that index wrote two answers to one question",
