@@ -67,9 +67,16 @@ written nothing — not a partial run, not a half-built org.
 
 > **Set this project up with a team of agents?**
 > This will: back up your project (next question), add a couple of small helper skills if they're
-> missing, look at what this project does, and write a set of agents to do it. Where one of your
-> existing skills is really just one job, it becomes an agent and the old skill is removed. Nothing
-> is deleted until the new setup is checked and working.
+> missing, look at what this project does, and write a set of agents to do it.
+>
+> Your existing skills are looked at one at a time, and **most of them stay**:
+> · one that runs a command or a script **stays**, trimmed down to just that, so you can still run it
+> yourself
+> · one that looks after a file or a set of records **stays** — it is how anything reaches that data
+> · one whose job is building or running other agents is **left alone**
+> · one that is really just a single job becomes an agent, and only then is the old copy removed
+>
+> **Nothing is removed until its replacement has been checked and works.**
 >
 > 1. **Go ahead** — Takes a few minutes. You'll see everything it plans before it writes anything.
 > 2. **Stop here** — Nothing is written and nothing changes.
@@ -125,6 +132,15 @@ already own.
 
 **Name the file paths and the command — those are concrete and they help.** `/workforce restore`,
 `.claude/`, `CLAUDE.md` are all fine: a reader can look at them. It is the *abstractions* that fail.
+
+**Plain is not the same as loose, and the first draft of the consent question proved it.** It said
+*"Where one of your existing skills is really just one job, it becomes an agent and the old skill is
+removed"* — readable, and wrong about the common case. Most skills **survive**: one holding a command
+or script is reduced to it, one fronting data is never deleted because that would strand the files,
+and one that builds agents is untouched (`conversion-taxonomy.md` § The remainder test, § Skills are
+the gateway). **A consent question that overstates what gets deleted asks the user to authorize
+something broader than what happens**, which is the one kind of inaccuracy a consent question cannot
+carry. Simplify the words; never the facts.
 
 *Added 2026-08-03 after the first real run. The backup question rendered as **"Archive the tree before
 anything is written?"** with an option reading **"Costs the sweep: conversions downgrade to
