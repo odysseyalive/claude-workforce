@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""script-conformance — run the four SHIPPED scripts against fixtures.
+
+`bin/conformance` does this for `bin/baseline` against 17 fixtures. The shipped
+scripts — wf-census, wf-conform, wf-context, wf-protect-directives — had negative
+tests that were run BY HAND in a scratch directory and written up in prose. That is
+an anecdote, not a test, and `bin/baseline`'s own docstring says why:
+
+    "A census that can be re-run is the only kind that can be compared."
+
+Each fixture is a tree under `fixtures/scripts/<case>/` plus a row in
+`expectations.json` naming the script, the required exit code, substrings that MUST
+appear, and substrings that must NOT. A stdin-driven script (the hook) takes
+`stdin_file` (a path inside the fixture, wrapped as a PostToolUse payload) or
+`stdin_raw`.
+
+**Exit code and output are both checked.** A script that exits correctly while
+reporting the wrong thing is the failure this project keeps finding — a report that
+reads clean about something it never examined.
+
+Usage
+    bin/script-conformance            # run all
+    bin/script-conformance census     # run cases whose name contains "census"
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIX = os.path.join(ROOT, "fixtures", "scripts")
+BIN = os.path.join(ROOT, "workforce", "bin")
+
+
+def run_case(name, spec):
+    tree = os.path.join(FIX, name)
+    script = os.path.join(BIN, spec["script"])
+    if not os.path.isdir(tree):
+        return False, f"fixture tree missing: {tree}"
+    if not os.path.isfile(script):
+        return False, f"script missing: {script}"
+
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=tree)
+    if "stdin_file" in spec or "stdin_raw" in spec:
+        payload = spec.get("stdin_raw")
+        if payload is None:
+            payload = json.dumps({"tool_input": {"file_path": os.path.join(tree, spec["stdin_file"])}})
+        p = subprocess.run([sys.executable, script], input=payload, text=True,
+                           capture_output=True, env=env, cwd=tree)
+    else:
+        p = subprocess.run([sys.executable, script, "--root", tree], text=True,
+                           capture_output=True, env=env)
+
+    out = p.stdout + p.stderr
+    problems = []
+    if p.returncode != spec["exit"]:
+        problems.append(f"exit {p.returncode}, expected {spec['exit']}")
+    for s in spec.get("want", []):
+        if s not in out:
+            problems.append(f"missing {s!r}")
+    for s in spec.get("not", []):
+        if s in out:
+            problems.append(f"present but forbidden: {s!r}")
+    return (not problems), "; ".join(problems) or "ok"
+
+
+def main():
+    filt = sys.argv[1] if len(sys.argv) > 1 else ""
+    spec_path = os.path.join(FIX, "expectations.json")
+    if not os.path.isfile(spec_path):
+        print(f"no expectations at {spec_path}", file=sys.stderr)
+        return 2
+    cases = json.load(open(spec_path))
+    names = sorted(n for n in cases if filt in n)
+
+    # A run that matched no case must not exit 0 — "nothing to check" and "all
+    # checks passed" are the same output otherwise, which is the failure mode
+    # this whole harness exists to make impossible.
+    if not names:
+        print(f"no fixture matched {filt!r} — refusing to report success", file=sys.stderr)
+        return 2
+
+    fails = []
+    for n in names:
+        ok, detail = run_case(n, cases[n])
+        print(f"  {'ok  ' if ok else 'FAIL'}  {n:<26} {'' if ok else detail}")
+        if not ok:
+            fails.append(n)
+
+    print(f"\n{len(names) - len(fails)} passed, {len(fails)} failed, "
+          f"{len(names)} of {len(cases)} cases run")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

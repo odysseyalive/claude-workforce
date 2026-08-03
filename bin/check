@@ -14,6 +14,7 @@ fine and something is wrong. Most were discovered by hand during the build
 and are recorded here so they cannot recur unnoticed.
 """
 
+import json
 import os
 import re
 import subprocess
@@ -855,6 +856,28 @@ check(
 # ─────────────────────────────────────────────────────────────────────────────
 _vend_text = [p_ for p_ in VENDORED if "/text/" in p_]
 _vend_code = [p_ for p_ in VENDORED if "/code/" in p_]
+# Every shipped script has a RE-RUNNABLE test, not a prose anecdote. The four were
+# released on negative tests run by hand in a scratch directory and written up in
+# plan/. bin/baseline's own docstring: "A census that can be re-run is the only kind
+# that can be compared." Proven by regressing wf-conform's ORG-RECORD discriminator
+# and wf-census's symlink dedupe and watching the harness fail.
+_fix_spec = "fixtures/scripts/expectations.json"
+_fix_cases = json.loads(read(_fix_spec)) if os.path.exists(_fix_spec) else {}
+_covered = {c["script"] for c in _fix_cases.values()}
+check(
+    "scripts: every shipped script has re-runnable fixtures",
+    os.path.exists("bin/script-conformance")
+    and all(os.path.basename(p_) in _covered for p_ in manifest_exec_paths() + manifest_hook_paths()),
+    f"fixtures cover {sorted(_covered)}; shipped are "
+    f"{sorted(os.path.basename(p_) for p_ in manifest_exec_paths() + manifest_hook_paths())} — "
+    "a script released on tests nobody can re-run is released on an anecdote",
+)
+check(
+    "scripts: the harness refuses to report success on an empty run",
+    "refusing to report success" in read("bin/script-conformance"),
+    "'nothing to check' and 'all checks passed' must not produce the same output; "
+    "that is the failure mode the harness exists to make impossible",
+)
 check(
     "context: composition is measured by layer, and the unmeasured layer says so",
     "wf-context" in _bud
