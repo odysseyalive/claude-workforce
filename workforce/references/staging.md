@@ -118,6 +118,11 @@ real artifact shows what it does to a correct one.
 
 ## Phase B — cold-read probe
 
+**Record the edge before spawning**, exactly as a dispatch does: write
+`.claude/workforce/work/<run-id>/audit-to-probe-<name>.spawn` first. A probe is a spawn, and the
+spawn ledger is what `review` diffs against the chart — a run whose spawns are invisible to it has no
+backstop at all (`enforcement.md`: the chain of command detects, it does not prevent).
+
 Spawns, no registration. This is the **off-the-street release gate** made mechanical: Carpenter
 requires an uninvolved party to execute the procedure cold, and a subagent is genuinely that — fresh
 isolated context, no conversation history, no memory of the authoring discussion. The uninvolved

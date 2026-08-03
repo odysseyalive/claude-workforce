@@ -77,6 +77,24 @@ from every surface, including `roster`, which does nothing else with it.
 | Every hook on disk is registered | an orphan — reported, never deleted |
 | Every `directives-sha` stamp resolves to a block that exists at the path it names | a stamp pointing into a swept skill — `checksums` reports `MISMATCH` one command after the run reported success |
 
+## Mechanicals table — the shape rung 2 dispatches from
+
+**Check the chart's `## Mechanicals` header against `org-chart-format.md` § Mechanicals, column for
+column.** A table with a different shape is not a smaller table; it is an **undispatchable** one, and
+its failure is silent: the section exists, it is populated, it reads sensibly, and rung 2 can never
+fire on it, so every ask falls through to an agent.
+
+| Finding | Meaning |
+|---|---|
+| header mismatch | rung 2 is inert — report the missing columns by name and name `/workforce org index` as the fix |
+| `Scope` cell absent or not `derived`/`declared` | that row can never satisfy total coverage (rung 2b(a)) |
+| `Does NOT cover` empty | an unfinished row, which rung 2b(e) refuses |
+| a project command with a discovery mode that has **no row** | the cheapest correct answer to some asks is missing from the ladder — **report each by name** |
+
+**That last row is the one that catches the real failure.** A chart can have a perfectly-shaped table
+and still leave `pnpm test:e2e` out of it, in which case rung 2 is technically live and practically
+empty. Enumerate the project's own commands and diff them against the table.
+
 ## Hook wiring
 
 **The row that makes shipping a hook safe at all.** Four inherited hooks were deleted because they

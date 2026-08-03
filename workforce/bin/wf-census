@@ -53,6 +53,7 @@ class Census:
         self.unpaired = []
         self.hooks = []
         self.immutable_blocks = []
+        self.skills = []
 
     # ── reading ──────────────────────────────────────────────────────────────
     def read(self, path):
@@ -208,6 +209,25 @@ class Census:
                 pass
         return {r: p for r, p in by_real.items() if len(p) > 1}
 
+    # ── skills ───────────────────────────────────────────────────────────────
+    def census_skills(self):
+        """Every installed skill, by directory holding a SKILL.md.
+
+        Added 2026-08-03. The first real audit's opening banner said "46 skills
+        present" against an actual 45 — hand-counted in Step 1, five minutes before
+        Step 1b ran the census that exists so counts are not hand-derived. The count
+        was never wrong because anyone was careless; it was wrong because nothing
+        produced it. `conversion-taxonomy.md` already ships the rule to users:
+        "No count in this project is hand-derived."
+        """
+        base = os.path.join(self.root, ".claude", "skills")
+        if not os.path.isdir(base):
+            return
+        for entry in sorted(os.listdir(base)):
+            d = os.path.join(base, entry)
+            if os.path.isdir(d) and os.path.exists(os.path.join(d, "SKILL.md")):
+                self.skills.append(entry)
+
     # ── markers ──────────────────────────────────────────────────────────────
     def census_markers(self):
         """Every marker family, and pairing.
@@ -279,6 +299,7 @@ class Census:
         col = self.collisions()
         return {
             "root": self.root,
+            "skills": {"count": len(self.skills), "names": self.skills},
             "agents": {
                 "project": sum(1 for a in self.agents if a["scope"] == "project"),
                 "personal": sum(1 for a in self.agents if a["scope"] == "personal"),
@@ -315,6 +336,7 @@ def main():
 
     c = Census(args.root)
     c.census_agents()
+    c.census_skills()
     c.census_markers()
     c.census_hooks()
     s = c.summary()
@@ -344,6 +366,7 @@ def main():
 
     if not args.quiet:
         ag = s["agents"]
+        print(f"  skills      {s['skills']['count']} installed")
         # Always all counts, including the zeroes. A zero is a measurement;
         # silence is not.
         print(f"wf-census — {s['root']}")

@@ -49,6 +49,22 @@ receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
 
 ## Step 1 — Survey the project
 
+**Run the census FIRST, and take every count in this run from it.**
+
+```bash
+.claude/skills/workforce/bin/wf-census --root "${CLAUDE_PROJECT_DIR}"
+```
+
+It is read-only and costs a second. **No count this run reports — skills, agents, hooks, markers,
+immutable blocks — is arrived at any other way**, including the opening banner. Where the census does
+not produce a number, the run does not state one.
+
+*The first real audit opened with "46 skills present" against an actual 45, hand-counted here five
+minutes before Step 1b ran the census that exists to prevent exactly that. The number was not wrong
+because anyone was careless — it was wrong because nothing produced it, and `conversion-taxonomy.md`
+already ships the rule: "No count in this project is hand-derived." Step 1b still runs; this is the
+same tool called earlier so the survey has real numbers to survey with.*
+
 **Survey the project, not just its skills.** The org is derived from the work the project involves;
 existing skills are additional evidence, never the only evidence (`references/org-design.md`).
 
@@ -735,6 +751,44 @@ Then the org, the fan-out budget, and the canary result **by state, with its con
 | `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
 
 A run that verified the host and a run that verified nothing must never print the same line.
+
+**And a printed promise is not a queued one — write the rows.** Every follow-up this run owes goes into
+`${CLAUDE_PROJECT_DIR}/.claude/workforce/deferred.md` (`references/deferred.md` owns the format) in the
+same step that prints it. At minimum, on `UNAVAILABLE`:
+
+| Row | Discharged by |
+|---|---|
+| tier ceiling unverified — re-run the canary | `/workforce verify` once the fixtures register |
+| `wf-canary-*` and `wf-ceiling-probe` fixtures live in the user's `.claude/agents/` | the same `verify`, which sweeps them once their fact is measured (`staging.md` § Fixture lifecycle) |
+
+*Measured 2026-08-03, first real audit. The canary returned `UNAVAILABLE`, the closing report printed
+the line above correctly — and **no `deferred.md` was written at all**, so the only record of the
+follow-up was a sentence in a chart the user would have to re-read. Four `wf-*` fixtures were left in
+their agent roster with nothing tracking their removal, which is precisely what `staging.md` refuses to
+do to somebody else's project. `deferred.md` exists because "a backlog reported only by the command that
+created a row is invisible to a user who runs a different one" — and this run reported one and created
+no row.*
+
+**A degraded run owes more rows than a clean one, not fewer.** Anything this run could not finish —
+a skipped conversion, an unprobed handbook, a reported permission conflict — is a row here or it is
+lost.
+
+**Print the spawn ledger, and print it even when it disagrees with itself:**
+
+```
+EDGES      7 spawns this run · 7 edge files recorded · 0 unrecorded
+```
+
+**The third number is the whole point.** Every spawn writes
+`.claude/workforce/work/<run-id>/<caller>-to-<callee>.spawn` before the `Agent` call (dispatch rung 1;
+`staging.md` § Phase B for probes), and `review` diffs those edges against the chart to find a
+dispatch the org chart never authorized. **An unrecorded spawn is invisible to that check forever** —
+it cannot be reconstructed after the run.
+
+*Measured 2026-08-03, first real audit: at least five spawns, **zero edge files**. The rule had been
+stated in the Chain-of-Command Gate since the beginning and nothing wrote one, so the org chart's only
+mechanical backstop had never once run. Recording is now part of the dispatch act rather than a
+separate obligation, and this line is what shows whether that held.*
 
 **Then propose the `CLAUDE.md` lines this run made false** — the `STALE` class, per `verify.md` § The
 user's own files. Quote each line, name the COMMITTED journal row that invalidated it, and print the

@@ -23,11 +23,34 @@ the `ORG-RECORD` block; recompute the `contract-stamp` over the normalized `## P
 Also inventory **orchestrator skills** (`conversion-taxonomy.md`) — they appear in the chart without
 being in the chain.
 
-**And inventory the mechanicals** — the table clause 2 dispatches from (`org-chart-format.md`
+**And inventory the mechanicals** — the table rung 2 dispatches from (`org-chart-format.md`
 § Mechanicals). Four sources, all already present: project command definitions (`package.json`
 `scripts`, `Makefile` targets, and whatever else the project's own `CLAUDE.md` names as its build and
 test commands), every `## Maintainers` row in every data skill, every employee's `## Verification`
 command, and skills whose entire surface is deterministic.
+
+**The header is fixed, and rung 2 cannot fire without it:**
+
+```
+| Command | Covers | Does NOT cover | Owner | Destructive | Scope | Source |
+```
+
+**Every column is load-bearing to a rung of the dispatch ladder**, which is why this is a shape and not
+a suggestion: `Scope` is what 2b(a) reads to decide the row may answer at all; `Does NOT cover` is what
+2 checks *first*; `Destructive` is what 2b(b) reads before running anything; `Command` is what 8 tests
+against disk. **A table missing any of them cannot be dispatched from, so rung 2 never fires and every
+ask falls through to an agent** — the exact cost the rung exists to avoid, arrived at silently.
+
+**Do not put a "skills you can invoke" list here.** That is a different, useful table and it is not
+this one: a reference list has no coverage boundary and no exit code, so nothing in it can satisfy
+rung 2. If the chart wants one, it goes under its own heading.
+
+*Measured 2026-08-03, first real audit. The generated chart's `## Mechanicals` read
+`| Mechanism | Invoked by | Note |` — a readable list of skills. Meanwhile `pnpm lint`, `pnpm build`,
+`pnpm test:e2e`, and `pnpm test:copy-truth` were sitting in `package.json` with real discovery modes,
+and appeared in the chart only inside employees' `## Verification` cells. **Rung 2 had zero rows it
+could fire on in the first org this project ever built**, and nothing reported that, because the
+section existed and was populated.*
 
 **Verify each command resolves before writing its row**, and drop — do not merely flag — one that does
 not. A row is an instruction to run something; a row for a command that is not there is dead wiring
@@ -139,10 +162,12 @@ CHECKPOINT — routing an ask. Work down the rungs and stop at the first that re
 that fired in your reply, so "why did an agent do that?" and "why didn't one?" both have an answer
 someone can read instead of re-derive.
 
-1. **Announce and act in the same message.** The reply that says `→ Dispatching to @agent-<name> (T<n>,
-   <dept>) — <why this is the lowest competent node>` must also make the `Agent` call. For rung 2 or 2f
-   it must run the command or give the answer. **Announcing without doing it is the whole reason this
-   rung is first.**
+1. **Announce, record, and act in the same message.** The reply that says `→ Dispatching to
+   @agent-<name> (T<n>, <dept>) — <why this is the lowest competent node>` must also write the edge
+   file `.claude/workforce/work/<run-id>/<caller>-to-<callee>.spawn` **and then** make the `Agent`
+   call. For rung 2 or 2f it must run the command or give the answer. **Announcing without doing it is
+   the whole reason this rung is first**, and an edge nobody recorded is a dispatch `review` can never
+   see — the org chart's only backstop is comparing what ran against what was allowed.
 
 2. **A command that already does the job beats an agent.** Read the chart's `## Mechanicals` table
    before choosing anyone. A row can answer the whole ask only if its `Scope` cell says `derived` — a

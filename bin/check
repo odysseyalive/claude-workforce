@@ -813,6 +813,56 @@ check(
 # than the agent hop it saved.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# The four defects the first real audit left behind, landed 2026-08-03.
+#
+# Every one was invisible to the run that produced it, because in each case the
+# artifact EXISTED and read sensibly — a populated Mechanicals table of the wrong
+# shape, a printed canary promise with no queue row, a stated spawn-ledger rule
+# nothing executed, and a hand-derived count five minutes before the census ran.
+# ─────────────────────────────────────────────────────────────────────────────
+check(
+    "mechanicals: the dispatch table's header is fixed and stated where index writes it",
+    "| Command | Covers | Does NOT cover | Owner | Destructive | Scope | Source |" in _org
+    and "cannot be dispatched from" in _org
+    and "Do not put a \"skills you can invoke\" list here" in _org,
+    "the first real chart wrote `| Mechanism | Invoked by | Note |`, so rung 2 had "
+    "zero rows it could fire on while four real commands sat in package.json — and "
+    "nothing reported it, because the section existed and was populated",
+)
+check(
+    "mechanicals: verify catches a table rung 2 cannot dispatch from",
+    # AND, not OR. Written as an `or` this passed with one literal broken — the
+    # dead-term-masked-by-an-or failure CLAUDE.md records, reproduced in the change
+    # that was fixing four other silent failures.
+    "undispatchable" in _vfy2 and "Mechanicals table — the shape" in _vfy2,
+    "a wrong-shaped table fails silently: it reads sensibly and every ask falls "
+    "through to an agent",
+)
+check(
+    "deferred: a printed promise is written as a row in the same step",
+    "a printed promise is not a queued one" in aud
+    and "deferred.md" in aud
+    and "A degraded run owes more rows" in aud,
+    "the first real audit printed 'Re-run /workforce verify once they load' and "
+    "wrote no deferred.md at all, leaving four wf-* fixtures in the user's agent "
+    "roster with nothing tracking their removal",
+)
+check(
+    "spawns: recording the edge is part of the dispatch act, and the ledger is printed",
+    "Announce, record, and act in the same message" in _org_block
+    and "EDGES" in aud and "unrecorded" in aud,
+    "at least five spawns and zero edge files on the first real run — the rule was "
+    "stated in the Chain-of-Command Gate from the beginning and nothing wrote one, "
+    "so the org chart's only mechanical backstop had never run",
+)
+check(
+    "counts: the survey runs the census first and takes every number from it",
+    "Run the census FIRST" in aud and "is arrived at any other way" in aud,
+    "the first real audit opened with '46 skills present' against an actual 45, "
+    "hand-counted five minutes before Step 1b ran the census that exists to "
+    "prevent exactly that",
+)
 check(
     "org: the canonical block is copied, never composed for the project",
     "COPY THE BLOCK. DO NOT WRITE ONE." in _org
