@@ -18,12 +18,12 @@ backup; the ordering rule is stated in Step 0.2 and is not a matter of convenien
 
 Companions install on absence. The org is designed from evidence and built. **The only questions are
 consent, the backup, the model budget, and the effort budget** — whether to proceed, whether to
-archive first, and which model and effort level each lane runs at.
+back up first, and which model and effort level each lane runs at.
 
 | # | Step | What happens | Calls | Objects |
 |---|---|---|---|---|
 | 1 | 0 | Consent — proceed with this audit, or stop | **1** | 1 |
-| 2 | 0.2 | Backup — archive the tree before anything is written | **1** | 1 |
+| 2 | 0.2 | Backup — copy the project before anything is written | **1** | 1 |
 | — | 0.3 | Absent companions installed automatically | 0 | — |
 | 3 | 0.4a | Model budget — analytical Lead/IC, creative, code, advisor | **1** | 5 |
 | 4 | 0.4b | Effort budget — analytical Lead/IC, creative, code | **1** | 4 |
@@ -60,8 +60,19 @@ instead.
 
 ## Step 0 — Consent  (question 1 of 4)
 
-**Ask before proceeding.** One object: proceed with this audit, or stop. A declined consent ends the
-run having written nothing — not a degraded run, not a partial one.
+**Ask before proceeding.** One object: proceed, or stop. A declined consent ends the run having
+written nothing — not a partial run, not a half-built org.
+
+**Use this wording** (§ How every question is worded):
+
+> **Set this project up with a team of agents?**
+> This will: back up your project (next question), add a couple of small helper skills if they're
+> missing, look at what this project does, and write a set of agents to do it. Where one of your
+> existing skills is really just one job, it becomes an agent and the old skill is removed. Nothing
+> is deleted until the new setup is checked and working.
+>
+> 1. **Go ahead** — Takes a few minutes. You'll see everything it plans before it writes anything.
+> 2. **Stop here** — Nothing is written and nothing changes.
 
 State what proceeding means in the question itself, because a consent nobody can price is not consent:
 the run backs up (question 2), installs absent companions, designs and builds an org, and converts
@@ -92,10 +103,53 @@ it does under `--review`, in its own section. This is the same coupling `procedu
 through 0.7 already declares in the other direction — *any gate added to `audit-setup.md` must be added
 there too.* A gate is added to both, and it declares its `--review` behavior, or it is not added.
 
+## How every question is worded — plain language, no exceptions
+
+**The four questions are the only part of this system a human reads.** Everything else in this
+distribution is written for an agent in a fresh context, and it is dense on purpose. **That register
+must not reach the questions.** A reader at question 2 of 4 has installed a skill and typed one
+command. They have not read `conversion-taxonomy.md`. They do not know what a sweep is.
+
+**Banned from any question text or option label — this is a list, and it is checked:**
+`archive` (as a verb), `the tree`, `sweep`, `disposition`, `conversion` / `convert`, `degrade` /
+`degraded`, `orchestrator`, `IC`, `Lead`, `tier`, `census`, `preflight`, `gate`, `invariant`,
+`canary`, `probe`, `handbook`, `employee`. Say what happens to **their project**, in words they
+already own.
+
+| Instead of | Write |
+|---|---|
+| "Archive the tree before anything is written?" | "Back up your project first?" |
+| "Proceed without an archive" | "Skip the backup" |
+| "conversions downgrade to register-the-employee-and-leave-the-skill — two live paths for one job" | "your existing skills stay where they are, so some jobs will have two copies until you delete the old ones yourself" |
+| "the sweep does not run" | "nothing gets deleted" |
+
+**Name the file paths and the command — those are concrete and they help.** `/workforce restore`,
+`.claude/`, `CLAUDE.md` are all fine: a reader can look at them. It is the *abstractions* that fail.
+
+*Added 2026-08-03 after the first real run. The backup question rendered as **"Archive the tree before
+anything is written?"** with an option reading **"Costs the sweep: conversions downgrade to
+register-the-employee-and-leave-the-skill — two live paths for one job instead of one."** Every word of
+that is accurate and it is unanswerable by the person being asked. **No question wording was specified
+anywhere**, so each question was composed from procedure prose written for agents, and the register came
+with it. Specifying the words is the fix; a rule about tone would not have been.*
+
+---
+
 ## Step 0.2 — Backup  (question 2 of 4)
 
-**Ask, then take the backup** (`procedures/backup.md`) — before any other gate writes anything. One
-object: archive the tree first, or proceed without an archive.
+**Ask, then take the backup** (`procedures/backup.md`) — before any other gate writes anything.
+
+**Use this wording.** It is not a suggestion to paraphrase — paraphrasing it is what produced the
+defect above:
+
+> **Back up your project first?**
+> This copies `.claude/` and `CLAUDE.md` into a zip file. If you don't like what this run does, run
+> `/workforce restore` and everything goes back exactly as it is now.
+>
+> 1. **Back up first** *(recommended)* — Takes a few seconds, and the whole run becomes undoable.
+> 2. **Skip the backup** — The run still works and nothing is lost. But your existing skills stay
+>    where they are instead of being cleaned up, so a few jobs will have two copies until you delete
+>    the old ones yourself.
 
 **Declining is answered, not refused.** `declined` is a fourth state beside the three below, and it
 costs exactly what a `failed` backup costs: conversions downgrade to

@@ -3248,6 +3248,48 @@ check(
 # ─────────────────────────────────────────────────────────────────────────────
 _as = read("workforce/references/audit-setup.md")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# The four questions are the only human-facing surface, landed 2026-08-03.
+#
+# No question wording was specified ANYWHERE, so each was composed from procedure
+# prose written for agents in a fresh context — dense on purpose — and the register
+# came with it. The first real run rendered "Archive the tree before anything is
+# written?" with an option reading "Costs the sweep: conversions downgrade to
+# register-the-employee-and-leave-the-skill". Accurate, and unanswerable by the
+# person being asked at question 2 of 4.
+#
+# Specifying the words is the fix. A rule about tone would not have been, which is
+# why this checks the SPECIFIED TEXT rather than asserting that a rule exists.
+# ─────────────────────────────────────────────────────────────────────────────
+_Q_BANNED = (
+    "archive the", "the tree", "sweep", "disposition", "conversions downgrade",
+    "degraded", "orchestrator", "canary", "invariant", "preflight", "census",
+)
+# Every block quoted under "Use this wording" is user-facing copy.
+# DOTALL with a bounded gap: the lead-in sentence may wrap across lines, which is
+# how the first version of this regex saw one block where there were two — an
+# assertion under-counting the thing it exists to count.
+_q_blocks = re.findall(r"\*\*Use this wording[^\n]*(?:\n[^\n>]*)*?\n\n((?:>.*\n)+)", _as)
+_q_leaks = {
+    w: b.strip()[:60]
+    for b in _q_blocks for w in _Q_BANNED
+    if w in b.lower()
+}
+check(
+    "questions: the four are specified verbatim, not composed from agent-facing prose",
+    len(_q_blocks) >= 2
+    and "How every question is worded" in _as
+    and "Back up your project first?" in _as,
+    f"found {len(_q_blocks)} specified question block(s) — the human-facing surface "
+    "must not be paraphrased out of procedure prose; that is what produced "
+    "'Archive the tree before anything is written?'",
+)
+check(
+    "questions: no internal vocabulary reaches the user-facing wording",
+    not _q_leaks,
+    f"banned terms in specified question copy: {_q_leaks} — a reader at question 2 "
+    "has typed one command and read nothing; say what happens to THEIR project",
+)
 check(
     "collisions: LIVE blocks and NAMESPACE advises, and the split is stated",
     "LIVE blocks" in _as and "NAMESPACE" in _as
