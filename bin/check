@@ -703,6 +703,31 @@ check(
     "applies: an `exec` must be invoked by a procedure, a `hook` must have a wiring "
     "command and a wired/orphaned report. An unflagged executable has neither",
 )
+# A shipped file must not instruct a host to open a path the host does not have.
+# enforcement.md states the rule; nothing enforced it, and a retracted instruction
+# survived eight lines below its own retraction for a full commit. The cold reader
+# named this as one of three structural gaps; this is the one with live instances.
+_HOST_SENDS = re.compile(r"(?:^|[^`\w])(?:Read|read|Search|search|Open|open|consult|Consult)"
+                         r"[^.\n]{0,40}`?bin/(?:check|baseline|coverage|conformance)`?", re.M)
+_sends = {}
+for p_ in declared:
+    if not p_.endswith(".md") or p_ in VENDORED:
+        continue
+    for m in _HOST_SENDS.finditer(read(p_)):
+        # A QUOTED instruction is a retraction reporting what the text used to say.
+        # Banning it outright would forbid recording that the instruction was
+        # withdrawn, which is how a retraction quietly reverts — the same trap the
+        # project-skill-name check fell into earlier the same day.
+        if '"' in m.group(0):
+            continue
+        _sends.setdefault(p_, []).append(m.group(0).strip()[:60])
+check(
+    "shipped files: none instructs a host to open a path that does not ship",
+    not _sends,
+    f"instructions pointing a host at maintainer-only tooling: {_sends} — "
+    "enforcement.md states this rule and nothing enforced it, so a retracted "
+    "instruction survived eight lines below its own retraction",
+)
 check(
     "hooks: the stated count matches what the manifest actually ships",
     ("ships exactly one hook" in enf) == (len(manifest_hook_paths()) == 1)
@@ -1033,6 +1058,16 @@ check(
     "undispatchable" in _vfy2 and "Mechanicals table — the shape" in _vfy2,
     "a wrong-shaped table fails silently: it reads sensibly and every ask falls "
     "through to an agent",
+)
+check(
+    "gates: every writing gate added today declares its --review behavior",
+    "### Under `--review`" in _asu
+    and "print the table, write no file" in aud
+    and "write no `deferred.md`" in aud,
+    "audit-setup.md states the rule once and every gate below carries it. Step 0.8 "
+    "went a full commit writing permission grants into settings.local.json with no "
+    "declaration — the same defect that rule was created to close, in the newest "
+    "gate and the one with the largest blast radius",
 )
 check(
     "deferred: a printed promise is written as a row in the same step",
@@ -2340,7 +2375,6 @@ try:
         "_hire2": "workforce/references/procedures/hire.md",
         "_bl": "bin/baseline",
         "_pt": "workforce/references/personnel-templates.md",
-        "_as": "workforce/references/audit-setup.md",
         "_ev": "workforce/references/evaluators.md",
         "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
@@ -3537,7 +3571,6 @@ check(
 # one blocking check built on an unmeasured fact; this is the same trade, made
 # correctly the first time.
 # ─────────────────────────────────────────────────────────────────────────────
-_as = read("workforce/references/audit-setup.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The four questions are the only human-facing surface, landed 2026-08-03.
@@ -3552,15 +3585,20 @@ _as = read("workforce/references/audit-setup.md")
 # Specifying the words is the fix. A rule about tone would not have been, which is
 # why this checks the SPECIFIED TEXT rather than asserting that a rule exists.
 # ─────────────────────────────────────────────────────────────────────────────
+# ONE list, matching audit-setup.md § How every question is worded. The two were
+# different lengths until 2026-08-03: this tuple omitted IC, Lead, tier, probe,
+# handbook, employee and conversion, while question 3's own option labels used
+# three of them. "This is a list, and it is checked" was false in both directions.
 _Q_BANNED = (
-    "archive the", "the tree", "sweep", "disposition", "conversions downgrade",
-    "degraded", "orchestrator", "canary", "invariant", "preflight", "census",
+    "archive the", "the tree", "sweep", "disposition", "conversion", "convert",
+    "degrade", "orchestrator", "canary", "invariant", "preflight", "census",
+    " ic ", " lead", "tier", "probe", "handbook", "employee",
 )
 # Every block quoted under "Use this wording" is user-facing copy.
 # DOTALL with a bounded gap: the lead-in sentence may wrap across lines, which is
 # how the first version of this regex saw one block where there were two — an
 # assertion under-counting the thing it exists to count.
-_q_blocks = re.findall(r"\*\*Use this wording[^\n]*(?:\n[^\n>]*)*?\n\n((?:>.*\n)+)", _as)
+_q_blocks = re.findall(r"\*\*Use this wording[^\n]*(?:\n[^\n>]*)*?\n\n((?:>.*\n)+)", _asu)
 _q_leaks = {
     w: b.strip()[:60]
     for b in _q_blocks for w in _Q_BANNED
@@ -3568,20 +3606,22 @@ _q_leaks = {
 }
 check(
     "questions: the four are specified verbatim, not composed from agent-facing prose",
-    len(_q_blocks) >= 2
-    and "How every question is worded" in _as
-    and "Back up your project first?" in _as,
-    f"found {len(_q_blocks)} specified question block(s) — the human-facing surface "
+    len(_q_blocks) >= 4
+    and "How every question is worded" in _asu
+    and "Back up your project first?" in _asu,
+    f"found {len(_q_blocks)} of 4 specified question block(s) — the budget is four "
+    "questions and half of them had no specified wording, with this threshold set to "
+    "the number that made it pass. The human-facing surface "
     "must not be paraphrased out of procedure prose; that is what produced "
     "'Archive the tree before anything is written?'",
 )
 check(
     "questions: consent states that most skills SURVIVE, not that they are removed",
-    "most of them stay" in _as
-    and "trimmed down to just that" in _as
-    and "it is how anything reaches that data" in _as
-    and "left alone" in _as
-    and "Simplify the words; never the facts" in _as,
+    "most of them stay" in _asu
+    and "trimmed down to just that" in _asu
+    and "it is how anything reaches that data" in _asu
+    and "left alone" in _asu
+    and "Simplify the words; never the facts" in _asu,
     "the first plain-language draft said 'it becomes an agent and the old skill is "
     "removed' — readable and wrong about the common case. A skill holding a command "
     "is reduced to it, one fronting data is never deleted, one that builds agents is "
@@ -3596,9 +3636,9 @@ check(
 )
 check(
     "collisions: LIVE blocks and NAMESPACE advises, and the split is stated",
-    "LIVE blocks" in _as and "NAMESPACE" in _as
-    and "resolving locations only" in _as
-    and "ADVISORY" in _as,
+    "LIVE blocks" in _asu and "NAMESPACE" in _asu
+    and "resolving locations only" in _asu
+    and "ADVISORY" in _asu,
     "an in-skill AGENT.md is loaded by path, so its `name:` is documentation and "
     "cannot collide (platform.md fact 5). The first real target reported five "
     "collisions and had zero: three symlink aliases and two per-skill templates. "
@@ -3606,9 +3646,9 @@ check(
 )
 check(
     "permissions: audit reviews the settings file, and resolves it rather than assuming it",
-    "## Permissions" in _as
-    and "Resolve the file, do not choose it" in _as
-    and "Never write managed settings" in _as,
+    "## Permissions" in _asu
+    and "Resolve the file, do not choose it" in _asu
+    and "Never write managed settings" in _asu,
     "the four scopes have a precedence order (scopes.md); a run that writes to a "
     "guessed path can silently be overridden by one that outranks it",
 )
@@ -3626,7 +3666,7 @@ _marker_specs = [
 check(
     "settings: ownership is a sidecar, never comment markers inside JSON",
     not _marker_specs
-    and ".settings-owned.json" in _as
+    and ".settings-owned.json" in _asu
     and "RETRACTED" in read("workforce/references/legacy-markers.md"),
     "the settings file is JSON and JSON has no comments — `json.loads` rejects a "
     "`<!-- ... -->` marker outright. This was specified in four files alongside the "
@@ -3635,50 +3675,50 @@ check(
 )
 check(
     "permissions: a scoped grant is never widened into a blanket one",
-    "Never widen a scoped grant" in _as and "never bare `Bash`" in _as,
+    "Never widen a scoped grant" in _asu and "never bare `Bash`" in _asu,
     "the first real target carried 282 narrowly-scoped Bash rules and no blanket "
     "grant; adding bare `Bash` removes nothing, so `0 removed` prints truthfully "
     "while the user's whole posture is superseded by a wider rule",
 )
 check(
     "permissions: absence is judged against the union of scopes, not the write target",
-    "UNION OF ALL FOUR SCOPES" in _as,
+    "UNION OF ALL FOUR SCOPES" in _asu,
     "rules concatenate across scopes (fact 17), so a grant in user settings is "
     "already in force; 'add what is absent' without naming the reference set gives "
     "two readings and opposite writes",
 )
 check(
     "permissions: additions only — nothing the user wrote is removed or edited",
-    "Add only what is absent" in _as
-    and "It is never resolved by" in _as
-    and "0 removed" in _as,
+    "Add only what is absent" in _asu
+    and "It is never resolved by" in _asu
+    and "0 removed" in _asu,
     "an exclusion the user wrote is evidence of intent, never an obstacle to route "
     "around; and a guarantee nobody prints is a guarantee nobody can check",
 )
 check(
     "permissions: findings are reported last, and are never a fifth question",
-    "final section of the run report" in _as
-    and "Not a question" in _as
-    and "this is not a fifth" in _as,
+    "final section of the run report" in _asu
+    and "Not a question" in _asu
+    and "this is not a fifth" in _asu,
     "the question budget is a ceiling of four (§ The question budget); permission "
     "findings are reported, not asked",
 )
 check(
     "permissions: every count prints, including the zeroes",
-    "always all five, including the zeroes" in _as,
+    "always all five, including the zeroes" in _asu,
     "0 added is a measurement that the org's needs were already met; silence is not",
 )
 check(
     "permissions: a conflict reports and does not fail the run",
-    "A conflict does not fail the run" in _as
-    and "bars an unverified fact from becoming a blocking check" in _as,
+    "A conflict does not fail the run" in _asu
+    and "bars an unverified fact from becoming a blocking check" in _asu,
     "facts 14-17 are DOCUMENTED and uncanaried; blocking on one would repeat the "
     "substitution delegation-budget.md had to retract",
 )
 check(
     "permissions: the non-existent per-agent field is stated plainly, not substituted",
-    "There is no `permissions:` frontmatter field" in _as
-    and "not literally available" in _as,
+    "There is no `permissions:` frontmatter field" in _asu
+    and "not literally available" in _asu,
     "the directive asked for per-agent permission rules; quietly shipping something "
     "adjacent and calling it done is the failure this project fails runs over",
 )

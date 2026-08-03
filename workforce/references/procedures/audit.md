@@ -368,6 +368,9 @@ skill, every skill, including the ones nothing happened to.**
 Sum 45 of 45. ✓
 ```
 
+**Under `--review`: print the table, write no file.** The analysis is the point and it costs the same
+either way; only the write is withheld.
+
 **This is the run's most expensive analysis and it was the only one thrown away.** Step 3 plus the
 Conversion Department is one classifier pass per skill, and until 2026-08-03 every verb here was
 *report* or *print* — so on the first real audit, 45 dispositions were computed and **two** survived,
@@ -801,6 +804,9 @@ their agent roster with nothing tracking their removal, which is precisely what 
 do to somebody else's project. `deferred.md` exists because "a backlog reported only by the command that
 created a row is invisible to a user who runs a different one" — and this run reported one and created
 no row.*
+
+**Under `--review`: print the rows that would be queued, write no `deferred.md`.** A review run owes
+nothing forward — it changed nothing that needs following up.
 
 **A degraded run owes more rows than a clean one, not fewer.** Anything this run could not finish —
 a skipped conversion, an unprobed handbook, a reported permission conflict — is a row here or it is

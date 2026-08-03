@@ -241,7 +241,8 @@ is now stated where its reader is, and the maintainer-side set is checked agains
 An earlier form of this section named four and omitted `org-config.template.md`. A `verify` following it
 would have reported the shipped model-budget statics as a constants violation — **re-opening the exact
 seam closed 2026-07-29**, where the budget had no model IDs to propose *because a check forbade putting
-them in the only legal place for them*. Read the list from the check; never restate it from memory.
+them in the only legal place for them*. **The list above is the whole of it — it is stated here because
+this is where its reader is**, and a `verify` running on a host has no `bin/check` to consult.
 
 This check is not pedantry. It is what makes a platform change a one-line edit instead of a hunt, and
 it caught five restatements in this project's own files during its first day.

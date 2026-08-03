@@ -65,10 +65,16 @@ starts work, and how much of it is the task?**
 
 | Layer | What it holds | Who controls it |
 |---|---|---|
-| `IDENTITY` | `CLAUDE.md` (project, ancestors, user scope) and the git snapshot | **not this project** — injected per spawn with no opt-out (`platform.md` fact 6) |
-| `ROUTING` | `ORG-CHAIN`, frontmatter, `## Role`, `## Scope`, `## Chain of Command` | the org chart |
+| `IDENTITY` | `CLAUDE.md` (project, ancestors, user scope). **The git-status snapshot fact 6 also names is NOT measured** — its size depends on working-tree state at spawn time and nothing on disk predicts it | **not this project** — injected per spawn with no opt-out |
+| `ROUTING` | frontmatter, `## Role`, `## Scope`, `## Chain of Command` (which contains `ORG-CHAIN` — counted once, reported separately), `## Reporting` | the org chart |
 | `REFERENCE` | `## Directives`, `## Guardrails`, `## Verification`, `## Procedure`, and every `skills:` preload in full (fact 10) | the handbook |
 | `WORKING` | the work order and any prior-stage artifact | the dispatch — **composed per run and not on disk, so it reports `unmeasured` rather than 0.** A zero would read as "no task" |
+
+**A section this table does not name falls to `REFERENCE`, and the count of those is printed.** An
+adopted handbook carries its own headings — every one lands in reference by the conservative default,
+and a run that did not say how many were unclassified would be reporting a composition it partly
+guessed. *Measured on a real project: three of three adopted agents had every section unclassified, so
+their `ROUTING` figure was frontmatter alone.*
 
 **The split is not cosmetic.** Reference material is meant to be internalised as a constraint; working
 material is meant to be transformed as input. Delivered as one undifferentiated block, the employee

@@ -17,8 +17,10 @@ equivalent. Their sharpest claim is the one this script makes visible:
 
 So bytes are attributed to a layer rather than totalled:
 
-    IDENTITY   CLAUDE.md and the git snapshot — paid per spawn, no opt-out
-               (platform.md fact 6), and NOT this project's file
+    IDENTITY   CLAUDE.md — paid per spawn, no opt-out (platform.md fact 6), and
+               NOT this project's file. The git-status snapshot fact 6 also names
+               is NOT included: its size depends on working-tree state at spawn
+               time and nothing on disk predicts it. Saying so beats guessing
     ROUTING    ORG-CHAIN, Role, Scope, Chain of Command — where am I, who do I
                answer to, what is mine
     REFERENCE  Guardrails, Directives, Verification, and every `skills:` preload —
@@ -151,11 +153,18 @@ def measure(root, errs):
         fm = FM_RX.match(body)
         fm_bytes = len(fm.group(0)) if fm else 0
 
+        # ORG-CHAIN lives INSIDE `## Chain of Command`, which already maps to
+        # routing — seeding it separately counted every governed handbook's routing
+        # bytes twice. Never observed, because the only real run had 0 governed
+        # handbooks. Reported here for its own sake, not added again.
         chain = ORG_CHAIN_RX.search(body)
         chain_bytes = len(chain.group(0)) if chain else 0
 
-        layers = {"routing": chain_bytes + fm_bytes, "reference": 0, "working": 0}
+        layers = {"routing": fm_bytes, "reference": 0, "working": 0}
+        unclassified = []
         for sec, n in split_sections(body).items():
+            if sec not in LAYER_OF:
+                unclassified.append(sec)
             layers[LAYER_OF.get(sec, "reference")] += n
 
         pre_bytes, pre_names = 0, []
@@ -171,6 +180,12 @@ def measure(root, errs):
             "reference": layers["reference"],
             "preload": pre_bytes,
             "preloaded_skills": pre_names,
+            "org_chain_bytes": chain_bytes,
+            # A handbook this project did not author has its own headings, all of
+            # which fall through to `reference`. Printing the count is the
+            # difference between a measurement and a number: the two sibling
+            # scripts both carry "always all counts, including the zeroes".
+            "unclassified_sections": unclassified,
             # The work order is composed per dispatch and does not exist on disk
             # before one. Reporting 0 would read as "no task"; it is unmeasured.
             "working": None,
@@ -205,6 +220,8 @@ def main():
         print(f"wf-context — {root}")
         print(f"  IDENTITY  {identity_bytes:,} B ({tok(identity_bytes)} tok approx) "
               f"paid per spawn, no opt-out — not this project's file")
+        print(f"            (git-status snapshot also injected per fact 6 — "
+              f"size is working-tree dependent and is NOT measured here)")
         for p, b in identity:
             print(f"            {b:>7,} B  {p}")
         if not rows:
@@ -220,6 +237,11 @@ def main():
             print(f"    reference  {r['reference']:>7,} B   constraints"
                   + (f" (incl. {r['preload']:,} B preload: {', '.join(r['preloaded_skills'])})"
                      if r["preload"] else ""))
+            if r["org_chain_bytes"]:
+                print(f"      of routing, ORG-CHAIN is {r['org_chain_bytes']:,} B")
+            u = r["unclassified_sections"]
+            print(f"    unclassified {len(u):>4} section(s) counted as reference"
+                  + (f": {', '.join(s_[:24] for s_ in u[:4])}" if u else ""))
             print(f"    working        unmeasured   composed per dispatch; not on disk yet")
             print(f"    ── standing total {total:,} B ({tok(total)} tok approx) before the work order")
         for u in errs:

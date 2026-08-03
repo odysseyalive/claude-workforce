@@ -117,11 +117,16 @@ distribution is written for an agent in a fresh context, and it is dense on purp
 must not reach the questions.** A reader at question 2 of 4 has installed a skill and typed one
 command. They have not read `conversion-taxonomy.md`. They do not know what a sweep is.
 
-**Banned from any question text or option label — this is a list, and it is checked:**
-`archive` (as a verb), `the tree`, `sweep`, `disposition`, `conversion` / `convert`, `degrade` /
-`degraded`, `orchestrator`, `IC`, `Lead`, `tier`, `census`, `preflight`, `gate`, `invariant`,
-`canary`, `probe`, `handbook`, `employee`. Say what happens to **their project**, in words they
-already own.
+**Banned from the QUESTION TEXT and from every option label — this is a list, and it is checked
+against the specified wording:** `archive` (as a verb), `the tree`, `sweep`, `disposition`,
+`conversion` / `convert`, `degrade` / `degraded`, `orchestrator`, `IC`, `Lead`, `tier`, `census`,
+`preflight`, `invariant`, `canary`, `probe`, `handbook`, `employee`. Say what happens to **their
+project**, in words they already own.
+
+*The doc's list and the check's list were different lengths until 2026-08-03 — the check omitted
+`IC`, `Lead`, `tier`, `probe`, `handbook`, `employee`, and `conversion`, while question 3's own option
+labels used three of them. "This is a list, and it is checked" was false in both directions. They are
+one list now.*
 
 | Instead of | Write |
 |---|---|
@@ -285,6 +290,20 @@ advisor is not.
 | code | one model for the whole code lane, no tier split |
 | advisor | the main session's advisor. "Other" is where the user types **"No Advisor"** to decline |
 
+**Use this wording** (§ How every question is worded). The internal lane names are the *object labels'*
+business; the question text is not the place for them:
+
+> **Which model should each kind of agent use?**
+> Different work needs different models, and each agent is pinned to one so you never get asked again.
+> You can change any of these later with `/workforce model-map`.
+>
+> · **Agents that coordinate** — they hand work out and check what comes back
+> · **Agents that do the work** — the ones actually editing files and running commands
+> · **Writing and design work**
+> · **Code work**
+> · **An advisor for you** — runs alongside you, not inside any agent. Pick "Other" and type
+>   **No Advisor** if you do not want one.
+
 Each object offers the four statics from `org-config.template.md` § Model statics, in the order listed
 there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
 runs on whatever model the user chose for their Claude Code session.
@@ -295,6 +314,14 @@ main session and does not compound with spawned employees, **which is why it has
 nothing spawns at an effort level it controls.
 
 ### Step 0.4b — Effort budget  (question 4 of 4 · 4 objects)
+
+**Use this wording** (§ How every question is worded):
+
+> **How hard should each kind of agent think?**
+> Higher settings are slower and cost more. The middle setting is right for most work; the agents that
+> coordinate benefit most from a higher one, because they are deciding rather than executing.
+>
+> · **Agents that coordinate** · **Agents that do the work** · **Writing and design work** · **Code work**
 
 Analytical Lead, analytical IC, creative, code. The lane set is identical to the model budget minus the
 advisor, so a lane added to one is added to both or the two disagree about what a lane is.
@@ -500,7 +527,20 @@ plainly is required here rather than quietly substituting something adjacent.
 
 So the rule is: **add what is missing, remove nothing, report everything.**
 
-### Procedure — Step 0.8, read-only until the report
+### Under `--review`
+
+**Computes everything; writes nothing.** Resolve the settings file, compute the required set, diff it
+against the union, and **print the block below exactly as it would appear** — with every `+` rendered
+as `would add`. No settings write, no `.settings-owned.json`, no marker.
+
+*Every writing gate declares its `--review` behavior in its own section (§ Every writing gate declares
+its `--review` behavior, 400 lines above). **This one did not, for a full commit**, while writing
+permission grants into `settings.local.json` — the same defect that section was created to close, in
+the newest gate, and the one with the largest blast radius. Its own heading also read "read-only until
+the report" while `procedures/audit.md` correctly says (in its Step 0 preamble) that it writes early and reports last;
+the heading was describing the `--review` path as if it were the only path.*
+
+### Procedure — Step 0.8
 
 Runs at the end of Step 0, after the backup and before any writing gate.
 
