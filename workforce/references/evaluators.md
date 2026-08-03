@@ -335,32 +335,67 @@ that cannot tell those apart reports a current catalog that has never been check
 
 ### When the catalog cannot be appended
 
-"Never skipped, never offered, never a question" is a rule about **maintenance the append can perform** — it
-is not a licence to write into a file this project does not own. Two conditions stop it, both detected at
-`audit-setup.md` § Step 0.7 and both reported as `catalog-unappendable`:
+<!-- origin: user | immutable: true -->
+> **"the audit should be able to modify any of these files"**
+
+*— Added 2026-08-03, source: user directive, on being told a catalog had been reported unappendable.
+The conservatism below was measured wrong on two counts the same day, and this directive is the reason
+it was re-checked rather than defended. It does **not** license writing inside an immutable span — that
+rule is older, is the user's first directive, and appending a new region after a span is not modifying
+it. It licenses everything else.*
+<!-- /origin -->
+
+**The append target is the CATALOG FILE, never the skill.** `evaluators.md` already states this for
+greps — *"Name the reference file, not the skill directory"* — and the same rule governs writes. A
+`SKILL.md` full of user directives says nothing about whether the catalog at
+`.claude/skills/<evaluator>/references/<catalog>.md` can take an appended region.
+
+*Measured 2026-08-03 across two real projects: `SKILL.md` carried 11 and 2 immutable spans
+respectively, and **the catalog file carried zero in both.** One of them already holds a
+`SCRUB-GAP-APPENDIX` machine-owned region written by the predecessor, proving the append works on
+exactly this shape. An audit had nonetheless reported that catalog read-only "because it carries
+`origin: user | immutable` spans" — reading the skill and reporting about the file.*
+
+**And a span inside the catalog file still does not stop the append.** A machine-owned region added at
+the end, outside every span, touches nothing: appending after an immutable block is not writing into
+one. The predecessor does exactly this and it is the whole reason a machine-owned region exists.
+
+So exactly one condition stops the append, and it is rare:
 
 | Condition | Why the append stops |
 |---|---|
-| the catalog's content sits entirely inside `origin: user \| immutable: true` spans | there is no machine-owned region to append into, and **immutable spans are never written** — that rule outranks this one |
-| its version anchor uses another generator's scheme | there is no common ground for the comparison, so "newer than" is undefined and an append would be guesswork |
+| **no legal insertion point exists** — the file is immutable end to end, with no position outside every span | there is nowhere to put a region without writing inside one, and **immutable spans are never written**. That rule outranks this one and always will |
 
-In both cases: **report the state, print the entries that would have been added, and write nothing.** A
-skipped append on an unappendable catalog is correct behavior, not a failed maintenance pass — and forcing
-one would produce exactly the two-canonical-texts outcome the forcible-propagation rule was written to avoid
-on the *other* side.
+**A foreign version anchor is NOT a blocker**, and treating it as one was the second error. Workforce
+writes **its own** anchor and its own region; it never has to interpret another generator's scheme.
+Record the foreign anchor verbatim as provenance, compare against ours, and append. "Newer than" is
+undefined only if you insist on one shared scheme, and nothing requires that.
+
+In that one case: **report the state, print the entries that would have been added, and write nothing.**
+A skipped append on a genuinely unappendable catalog is correct behavior, not a failed maintenance pass.
+
+**But verify the condition against the CATALOG FILE before reporting it, every time.** This state was
+reported twice on evidence read from the wrong file, and it is expensive to get wrong in this
+direction: an unappendable catalog is frozen, its evaluator loses its owner, and the entries that
+would have closed real gaps are printed once and discarded. **Reporting `catalog-unappendable` is a
+claim that a specific file has no position outside every immutable span — name the file and the spans,
+or do not make the claim.**
 
 An installed catalog this project did write, with its own anchor and its own machine-owned region, still
 receives the unconditional append. Nothing above weakens that case.
 
-**Ownership does not survive unappendability, but the employee does.** `records-ownership.md` defines a
+**Ownership does not survive genuine unappendability, but the employee does** — and after the
+correction above this case is rare rather than routine, so reaching it should itself prompt a re-check. `records-ownership.md` defines a
 Records Owner as the employee that *drafts every amendment* to a playbook. A catalog that cannot be written
 cannot receive one, so naming an owner for it asserts a capability the doctrine withholds — the same
 overclaim `enforcement.md` opens by refusing. So:
 
 - **Still hire the evaluator.** Reading the catalog and performing tier-4 review are unaffected by the
   file's writability, and that review is the entire reason the employee exists.
-- **Record `Records Owner: none (read-only: <reason>)`** on the catalog's chart row, with the reason —
-  `immutable` or `owned by <generator>` — stated rather than implied.
+- **Record `Records Owner: none (read-only: <reason>)`** on the catalog's chart row, naming **the file
+  and the spans** that leave no insertion point. `owned by <generator>` is **not** a reason on its own —
+  a foreign anchor never blocks the append, and foreign ownership of the *skill* says nothing about the
+  *catalog file*.
 - **Route change requests to the user**, not to an owner who cannot act on them. Growing the catalog is
   then the user's call, which is correct: it is their file, or another generator's.
 
