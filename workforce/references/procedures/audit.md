@@ -661,6 +661,11 @@ T-step tells the user something broke; it does not tell them what to type.
 
 ## Step 6b — The sweep (the only step that deletes)
 
+**A deferred sweep is completed by `/workforce sweep`, not by re-running this command.** When a
+precondition here refuses — and refusing is the gate working — everything above it succeeded and must
+not be discarded to retry one step. `procedures/sweep.md` re-asserts every precondition against the
+tree as it stands *then*, and finishes the one act. Queue `DEF-Q` rows against `/workforce sweep`.
+
 Every conversion marked its skill at T7; nothing has been unlinked. This step does it, once, after the
 whole org has verified.
 

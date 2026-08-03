@@ -179,6 +179,7 @@ _m_blk = re.search(
     _org, re.S,
 )
 _org_block = _m_blk.group(1) if _m_blk else ""
+_org_sk = read("workforce/SKILL.md")
 _ocf = read("workforce/references/org-chart-format.md")
 _pfp2 = read("workforce/references/procedure-for-procedures.md")
 _stg = read("workforce/references/staging.md")
@@ -1073,6 +1074,37 @@ check(
     "reads an example about a skill that does not exist. Placeholders (`<skill-a>`, "
     "`<generator>`) carry the same meaning and travel. Quoted evidence from a real "
     "run is the one exception and is marked as a quotation",
+)
+# The sweep is the only destructive step and was the only one with no way to reach
+# it twice. When its gate refused, the sole discharge was a full seven-step audit —
+# redoing the survey, census, org panel, disposition panels, the classifier pass,
+# the canary and the authoring, ALL of which had succeeded. That is restartable,
+# not resumable, which is the wrong property for anything that deletes.
+_swp = read("workforce/references/procedures/sweep.md")
+check(
+    "sweep: a deferred deletion is completable without re-running the audit",
+    "workforce/references/procedures/sweep.md" in declared
+    and "/workforce sweep" in _org_sk
+    and "not by re-running this command" in aud,
+    "DEF-Q-004's only discharge was `/workforce audit`; reaching one step meant "
+    "repeating six that had already succeeded",
+)
+check(
+    "sweep: it re-asserts every precondition NOW, and re-decides nothing",
+    "not as recorded by the earlier run" in _swp
+    and "It never re-dispositions" in _swp
+    and "N of N" in _swp,
+    "time passed between the audit and this command; a precondition that was true an "
+    "hour ago is not evidence. And re-deciding inside a command whose job is deletion "
+    "is how a sweep quietly becomes a conversion",
+)
+check(
+    "sweep: relocation precedes removal, in the same transaction",
+    "Relocate load-bearing machinery FIRST" in _swp
+    and "deletes first and" in _swp,
+    "two load-bearing hooks live inside the skill scheduled for removal on the first "
+    "real target; deleting before relocating produces dead wiring, which outranks "
+    "every other finding in the report",
 )
 check(
     "close: the run report is written to disk, not only printed",
