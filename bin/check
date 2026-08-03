@@ -906,6 +906,18 @@ check(
     f"{sorted(os.path.basename(p_) for p_ in manifest_exec_paths() + manifest_hook_paths())} — "
     "a script released on tests nobody can re-run is released on an anecdote",
 )
+# CLASS B mechanism (plan/defect-classes-2026-08-03.md): anything that writes must
+# be a no-op the second time. bin/coverage --stamp appended a header on EVERY run
+# for hours — nobody ran it twice because nothing did.
+check(
+    "writers: every tool that writes has an idempotence check",
+    os.path.exists("bin/idempotence")
+    and all(w in read("bin/idempotence") for w in ("coverage", "sync"))
+    and "never the live tree" in read("bin/idempotence"),
+    "bin/coverage --stamp duplicated its header on every run and 67 files carried "
+    "duplicates before anyone ran it twice; a conformance tool that mutates the "
+    "thing it checks has the defect it is looking for",
+)
 check(
     "scripts: the harness refuses to report success on an empty run",
     "refusing to report success" in read("bin/script-conformance"),

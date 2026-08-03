@@ -49,9 +49,14 @@ mature project documents its own markers.
 | `verify.md` retraction | left the retracted instruction standing eight lines below it |
 
 **Mechanisms:** exactly-one-canonical-block (dispatch block only — **the general form
-is open**); `shipped files: none instructs a host to open a path that does not ship`.
-**Idempotence is untested** for `bin/coverage --stamp` and `bin/sync`, and that is the
-gap this class most wants closed next.
+is open**); `shipped files: none instructs a host to open a path that does not ship`;
+and **`bin/idempotence`** — every writer invoked twice against a fresh copy, results
+compared byte-for-byte. It runs on a COPY, because a conformance tool that mutates
+what it checks has the defect it is looking for. Proven by reintroducing the original
+strip-regex bug: **67 files changed on the second run.**
+
+*Nobody ran `--stamp` twice because nothing did. That is the whole gap, and it is the
+cheapest class to close: the test is "run it again and diff."*
 
 ---
 

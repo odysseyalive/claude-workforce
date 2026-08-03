@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""idempotence — anything that writes must be a no-op the second time.
+
+CLASS B of `plan/defect-classes-2026-08-03.md`: *added the new without removing the
+old*, four instances in one session. The worst was silent for hours — `bin/coverage
+--stamp` appended a SECOND enforcement header on every run, because the regex that
+strips the previous one still required `Enforcement:` followed immediately by a
+digit after the header text gained a clause. Sixty-seven files carried duplicates
+before anyone ran it twice.
+
+Nobody ran it twice because nothing did. That is the whole gap.
+
+**Runs on a COPY, never the live tree.** A conformance tool that mutates the thing it
+is checking has the defect it is looking for. Each writer is invoked twice against a
+fresh copy and the two results are compared byte-for-byte.
+
+Exit codes
+    0  every writer is idempotent
+    1  at least one is not — the differing paths are named
+    2  the harness could not run
+
+Usage
+    bin/idempotence            # all writers
+    bin/idempotence coverage   # one, by name
+"""
+
+import filecmp
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Each writer: how to invoke it, and which subtree it is allowed to touch.
+WRITERS = {
+    "coverage": {
+        "argv": ["bin/coverage", "--stamp"],
+        "watch": "workforce",
+    },
+    "sync": {
+        "argv": ["bin/sync"],
+        "watch": ".claude/skills/workforce",
+    },
+}
+
+
+def snapshot(base, rel):
+    """Path -> bytes for every file under `rel`, so a diff names the file."""
+    out, root = {}, os.path.join(base, rel)
+    for dp, _dn, fns in os.walk(root):
+        for fn in fns:
+            p = os.path.join(dp, fn)
+            try:
+                out[os.path.relpath(p, root)] = open(p, "rb").read()
+            except OSError:
+                out[os.path.relpath(p, root)] = b"<unreadable>"
+    return out
+
+
+def run_writer(name, spec):
+    with tempfile.TemporaryDirectory(prefix=f"wf-idem-{name}-") as tmp:
+        work = os.path.join(tmp, "repo")
+        # `.git` is excluded: it is large, it is not what any writer touches, and
+        # copying it makes this slow enough that nobody runs it — which is how the
+        # original defect survived.
+        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "node_modules"))
+
+        for pass_no in (1, 2):
+            p = subprocess.run([sys.executable] + spec["argv"], cwd=work,
+                               capture_output=True, text=True)
+            if p.returncode not in (0,):
+                return False, f"pass {pass_no} exited {p.returncode}: {(p.stderr or p.stdout).strip()[:160]}"
+            if pass_no == 1:
+                first = snapshot(work, spec["watch"])
+
+        second = snapshot(work, spec["watch"])
+
+    added = sorted(set(second) - set(first))
+    removed = sorted(set(first) - set(second))
+    changed = sorted(k for k in first.keys() & second.keys() if first[k] != second[k])
+    if added or removed or changed:
+        bits = []
+        if changed:
+            bits.append(f"{len(changed)} changed on the 2nd run (e.g. {changed[0]})")
+        if added:
+            bits.append(f"{len(added)} added (e.g. {added[0]})")
+        if removed:
+            bits.append(f"{len(removed)} removed (e.g. {removed[0]})")
+        return False, "; ".join(bits)
+    return True, f"{len(first)} files identical after two runs"
+
+
+def main():
+    filt = sys.argv[1] if len(sys.argv) > 1 else ""
+    names = sorted(n for n in WRITERS if filt in n)
+    # "nothing matched" and "all passed" must not look the same.
+    if not names:
+        print(f"no writer matched {filt!r} — refusing to report success", file=sys.stderr)
+        return 2
+
+    fails = []
+    for n in names:
+        ok, detail = run_writer(n, WRITERS[n])
+        print(f"  {'ok  ' if ok else 'FAIL'}  {n:<12} {detail}")
+        if not ok:
+            fails.append(n)
+
+    print(f"\n{len(names) - len(fails)} idempotent, {len(fails)} not, "
+          f"{len(names)} of {len(WRITERS)} writers checked")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
