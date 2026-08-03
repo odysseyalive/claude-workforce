@@ -1,6 +1,6 @@
 # Platform Facts
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before designing any delegation, tier, or handbook frontmatter. -->
 
 ## Header — the constants, stated once
@@ -237,7 +237,7 @@ server that exists. That gap is the one that matters for anyone else running thi
 
 | # | Claim | Why it matters here | Status |
 |---|---|---|---|
-| 5 | Agents resolve only from `.claude/agents/` and `~/.claude/agents/`; identity comes solely from the `name:` field, and **subfolders do not namespace** | Two handbooks named `reviewer` in different subfolders collide **silently** — one simply wins by filesystem read order. Guarded by a blocking Phase A lint check and by `verify`, not by a hook (`enforcement.md` § Hooks) | unverified |
+| 5 | Agents resolve only from `.claude/agents/` and `~/.claude/agents/`; identity comes solely from the `name:` field, and **subfolders do not namespace** | Two handbooks named `reviewer` in different subfolders collide **silently** — one simply wins by filesystem read order. Guarded by a blocking Phase A lint check and by `verify`, not by a hook (`enforcement.md` § Nothing ships dormant) | unverified |
 | 6 | Every non-fork subagent receives a fresh isolated context **plus the full CLAUDE.md plus git status**, with no per-agent opt-out | CLAUDE.md cost is multiplied by fan-out; audit runs a CLAUDE.md size budget check | partly corroborated — isolation is evident; the injection cost is not measured |
 | 7 | Only the **top-level** subagent's summary returns to main | Drives the mandatory `## Reporting` convention: every employee writes `OUTPUT.md` and returns verdict + path + ≤3 lines | unverified |
 | 8 | Caps: 200 subagents/session (**cannot be disabled**), 20 concurrent | Drives department-width caps and the `/org` budget preflight | unverified |
@@ -246,6 +246,16 @@ server that exists. That gap is the one that matters for anyone else running thi
 | 11 | `memory:` is auto-memory and is inert when `autoMemoryEnabled` is off | **Nothing blocks on this.** Handbooks omit `memory:` because records live in data skills, not because of this fact (`procedure-for-procedures.md` rule 9) — so the design holds whichever way it measures | unverified |
 | 12 | `model:` and `effort:` are per-agent frontmatter; `model:` defaults to `inherit`; resolution order is `CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session model | Every employee is model-pinned, which is why `/org` never needs a lane check or a model-switch prompt | partly corroborated — pinning is the documented default path; not canaried |
 | 12b | **`effort:` is optional and, when absent, INHERITS THE SESSION** — it is not a fixed platform default. Options `low, medium, high, xhigh, max`, availability depending on the model | Every effort value in `org-config.template.md` is therefore a deliberate **override of whatever the user is running**, not a restatement of a platform default. A budget row reading `medium` *downshifts* a session running `high`, which is a behavior change the budget must own rather than inherit silently | unverified — read from [the subagent frontmatter reference](https://code.claude.com/docs/en/sub-agents) on 2026-08-01, not canaried. Documentation has lost to measurement three times in this file (facts 2, 3, 4) |
+| 14 | **Omitting `tools:` inherits every tool available to subagents — it is not a revocation.** Background subagents receive a narrower built-in set than foreground ones | The default grant is the safe default it was already treated as. Answers the standing worry that an agent with no `tools:` line silently resolves to *no* tools | unverified — read from [the subagent reference](https://code.claude.com/docs/en/sub-agents) on 2026-08-03, not canaried |
+| 15 | Subagents **inherit the parent session's permission context**; an absent or empty `permissions.allow` is **not** "deny all" | A grant the main session lacks is a grant no employee has, so the settings review at `audit-setup.md` § Permissions is an org-wide precondition rather than a per-agent one | unverified — same source and date |
+| 16 | **There is no per-agent `permissions:` frontmatter field.** The agent-side fields are `tools:`, `disallowedTools:`, `permissionMode:`, `mcpServers:`, `hooks:` — and `tools:`/`disallowedTools:` govern tool **presence** while `permissions.*` governs tool **use** | Load-bearing, and it is the fact that says a requested design is not expressible: per-agent permission *rules* cannot be written into a handbook. The capability boundary is per-agent; the usage rule is not | unverified — same source and date |
+| 17 | Permission rules from different settings scopes are **concatenated and deduplicated, not replaced** | **The guarantee behind `0 removed`** (`audit-setup.md` § Permissions): adding a grant cannot delete a rule the user wrote. If this measures false, that section's central promise fails and the conflict row must be revisited | unverified — same source and date, and the one here most worth canarying first |
+
+**Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
+that review **reports rather than blocks**. Three documented claims in this file have already lost to
+measurement (facts 2, 3, 4). These four are load-bearing for a procedure that writes into a user's
+settings file, which is precisely the combination that earns a canary before it earns a gate.
+
 **Do not mistake the agent listing for a measurement.** The harness's available-agent-types listing
 prints each definition's `tools:` line — the grant it *requested*. Fact 2c's run is the proof that this
 is not the resolved grant: the listing showed `Read, Write, Agent` for a fixture whose real grant

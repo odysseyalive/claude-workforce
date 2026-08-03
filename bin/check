@@ -113,17 +113,39 @@ CANCEL_RX = re.compile(
 def manifest_paths():
     """Shipped files.
 
-    The `keep ` / `hook ` flag prefixes are gone: they existed only for the four
-    hook files removed in b5ddbba, and no line used them afterward. A reappearing
-    prefix is caught by the check below rather than silently parsed.
+    `exec ` and `hook ` are both in use and are stripped here so every downstream
+    check sees a plain path. `keep ` remains unused and is caught below rather than
+    silently parsed.
     """
     out = []
     for line in read("manifest.txt").splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
+        for flag in ("exec ", "hook "):
+            if s.startswith(flag):
+                s = s[len(flag):].strip()
+                break
         out.append(s)
     return out
+
+
+def _flagged(flag):
+    return [
+        l.strip()[len(flag) + 1:].strip()
+        for l in read("manifest.txt").splitlines()
+        if l.strip().startswith(flag + " ")
+    ]
+
+
+def manifest_exec_paths():
+    """Paths carrying `exec` — invoked by a procedure, registered to nothing."""
+    return _flagged("exec")
+
+
+def manifest_hook_paths():
+    """Paths carrying `hook` — registered to a harness event by `/workforce hooks`."""
+    return _flagged("hook")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -178,12 +200,13 @@ declared = manifest_paths()
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
 
-flagged = [p for p in declared if p.split(" ")[0] in ("keep", "hook")]
+_keep_flagged = [l.strip() for l in read("manifest.txt").splitlines() if l.strip().startswith("keep ")]
 check(
-    "manifest: no flag prefixes",
-    not flagged,
-    f"flag-prefixed lines: {flagged} — `keep `/`hook ` handling was removed with the "
-    "hooks; re-adding a flag means re-adding its handling to bin/check and bin/sync",
+    "manifest: no `keep` flag without its handling",
+    not _keep_flagged,
+    f"keep-flagged lines: {_keep_flagged} — no shipped file is user-editable "
+    "(project state lives in the project, references/scopes.md). Re-adding the flag "
+    "means re-adding its handling to bin/check and bin/sync in the same change",
 )
 
 on_disk = {
@@ -542,7 +565,22 @@ for p in declared:
     n = os.path.basename(p)
     lines = [l.rstrip() for l in read(p).splitlines()]
 
-    heads = [l for l in lines if l.startswith("#")]
+    # A heading inside a fenced block is not a heading — it is a sample of one.
+    # Found 2026-08-03: procedure-for-procedures.md § Directives shows the literal
+    # `## Directives` section a handbook should carry, and the checker read that
+    # sample as a second real heading and failed the file for duplicating itself.
+    # The lazy repair is DUP_EXEMPT, which would blind the file to REAL duplicates
+    # forever — the exact trade this check exists to refuse. Strip the fences.
+    _fenced, _depth = set(), False
+    for _i, _l in enumerate(lines):
+        if _l.lstrip().startswith("```"):
+            _depth = not _depth
+            _fenced.add(_i)
+            continue
+        if _depth:
+            _fenced.add(_i)
+
+    heads = [l for i, l in enumerate(lines) if l.startswith("#") and i not in _fenced]
     dup_h = sorted({h for h in heads if heads.count(h) > 1})
     # Same title under different numbering — `## Step 1b — X` vs `## Step 1c — X`.
     titles = [re.sub(r"^#+\s*(?:Step\s+[\w.]+\s*[—-]\s*)?", "", h) for h in heads]
@@ -592,17 +630,76 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8c. This project ships no executables
+# 8c. This project ships no HOOKS. Scripts are a different question.
 #
-# The four inherited hook files were removed once measurement showed they had never
-# fired, could not be wired, and duplicated verify. Re-adding one is a decision that
-# should be deliberate, so it fails here rather than passing quietly.
+# This assertion read "no executables in the distribution" until 2026-08-03, and
+# its own justifying comment was entirely about the four inherited HOOK files —
+# removed once measurement showed they had never fired, could not be wired, and
+# duplicated verify. Every one of those findings is about a file registered to a
+# harness event. None is an argument against a script a procedure invokes and
+# reads an exit code from.
+#
+# The over-reach was not cosmetic. It forbade the distribution from carrying the
+# class of tool the maintainers rely on most, so `audit` Step 1b hand-derived a
+# census bin/baseline computes and `verify` re-specified in prose what bin/check
+# asserts — in the project whose second directive is to automate everywhere
+# feasible. See enforcement.md § Hooks for the line as it now falls.
+#
+# What survives from the original finding is the part that was always right: a
+# DORMANT file gives a fresh install no enforcement, so shipping one moves the gap
+# somewhere harder to see. Hence the third check below — a shipped script that no
+# procedure invokes is exactly the failure the hooks were deleted for.
 # ─────────────────────────────────────────────────────────────────────────────
-executables = [p_ for p_ in declared if p_.endswith((".sh", ".ps1", ".py")) or os.access(p_, os.X_OK)]
+_execs = manifest_exec_paths()
+_hooks = manifest_hook_paths()
+_stray = [
+    p_ for p_ in declared
+    if (p_.endswith((".sh", ".ps1")) or os.access(p_, os.X_OK))
+    and p_ not in _execs and p_ not in _hooks
+]
 check(
-    "shipped files: no executables in the distribution",
-    not executables,
-    f"executable or script files in the manifest: {executables} — see enforcement.md § Hooks",
+    "shipped files: every executable declares itself `exec` or `hook`",
+    not _stray,
+    f"executable but unflagged: {_stray} — the flag is what decides which obligation "
+    "applies: an `exec` must be invoked by a procedure, a `hook` must have a wiring "
+    "command and a wired/orphaned report. An unflagged executable has neither",
+)
+check(
+    "shipped hooks: each has a wiring command and a report of whether it is wired",
+    not _hooks or (
+        "workforce/references/procedures/hooks.md" in declared
+        and "WORKFORCE-HOOKS" in read("workforce/references/procedures/hooks.md")
+        and "Hook wiring" in read("workforce/references/procedures/verify.md")
+    ),
+    f"declared hooks: {_hooks} — the four inherited hooks were deleted because they "
+    "shipped dormant and the command documented to wire them did not exist. Shipping "
+    "one again without `/workforce hooks` and a verify row repeats that exactly",
+)
+check(
+    "shipped scripts: confined to workforce/bin/ and registered to no event",
+    all(p_.startswith("workforce/bin/") for p_ in _execs)
+    and not any(
+        ev in read(p_)
+        for p_ in _execs
+        for ev in ("PreToolUse", "PostToolUse", "SubagentStart", "SessionStart", "UserPromptSubmit")
+    ),
+    f"declared scripts: {_execs} — one naming a harness event is a hook wearing a "
+    "script's flag, and enforcement.md § Hooks says this project ships none",
+)
+# A PROCEDURE, not merely a mention. enforcement.md naming a script is
+# documentation; procedures/*.md naming it is the thing that runs it. The first
+# draft of this check accepted any .md and passed while nothing invoked either
+# script — the assertion testing that a file is wired, itself unwired.
+_procedure_text = "\n".join(
+    read(q) for q in declared if q.startswith("workforce/references/procedures/")
+)
+_uninvoked = [p_ for p_ in _execs if os.path.basename(p_) not in _procedure_text]
+check(
+    "shipped scripts: every one is invoked by a procedure",
+    not _uninvoked,
+    f"shipped but named by no procedure: {_uninvoked} — the hooks were deleted "
+    "precisely because they shipped dormant and the command to wire them did not "
+    "exist; a script nothing calls repeats that with a different file extension",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -724,6 +821,51 @@ check(
     "## Mechanicals" in _ocf and "Destructive" in _ocf and "no mechanicals" in _ocf,
     "clause 2 dispatches from this table; an absent table and an empty one must not "
     "look the same to a reader",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data-in-hand, landed 2026-08-03 — clause 2f.
+#
+# Clause 2 closed only half the user's directive. Its predicate is a Mechanicals
+# row with Scope: derived, and all five of its refusals resolve to a spawn — so
+# the commonest cheap answer of all, "the data is already here", was on no rung
+# at any point. A roster question answered from a chart already loaded is not a
+# command and can never become a row in that table.
+#
+# The asymmetry INVERTS relative to clause 2, which is why 2g is stricter than
+# 2b: a wrong mechanical dispatch returns a wrong answer with an exit code to
+# catch it; a wrong direct answer returns a confident one with nothing behind it.
+# Hence 2h — the artifact is cited or the clause did not fire.
+# ─────────────────────────────────────────────────────────────────────────────
+
+check(
+    "org: data already in hand is a terminal rung, ahead of node selection",
+    "DATA IN HAND IS A TERMINAL ANSWER" in _org
+    and _org.index("DATA IN HAND IS A TERMINAL ANSWER") < _org.index("LOWEST COMPETENT NODE"),
+    "clause 2f must precede lowest-competent-node; placed after it, the ladder has "
+    "already chosen an agent for an ask that needed none",
+)
+check(
+    "org: a direct answer names the artifact it came from",
+    "THE ARTIFACT IS NAMED OR THE CLAUSE DID NOT FIRE" in _org,
+    "2f is the one rung with no exit code behind it — an uncited direct answer is "
+    "indistinguishable from a guess, which is worse than the spawn it saved",
+)
+check(
+    "org: a direct answer is refused on stale, derived, or write asks",
+    "FOUR REFUSALS" in _org
+    and "PRIOR session" in _org
+    and "never answer from memory of a file" in _org
+    and "it never performs work" in _org,
+    "without the refusals 2f becomes a licence to answer from recollection; the "
+    "prior-session case is the one that reads as success",
+)
+check(
+    "org: the direct-answer count is reported, including the zero",
+    "DIRECT" in _org and "asks answered from data in hand" in _org
+    and "A zero is a real result" in _org,
+    "procedural enforcement is the counted line (invariants.md); without it an ask "
+    "answered directly and an ask nobody considered are identical from outside",
 )
 
 # ── The three weak points the design shipped with, closed 2026-07-31 ──────────
@@ -1792,7 +1934,7 @@ check(
 # meant to stop. Same shape as a backup ordered after the first write.
 check(
     "invariants: computed and gated before the sweep, not only printed at close",
-    "Compute the ten Run Invariants FIRST" in aud and "aborts the sweep" in aud,
+    "Compute every Run Invariant FIRST" in aud and "aborts the sweep" in aud,
     "a gate evaluated after the destructive step is not a gate",
 )
 check(
@@ -1861,7 +2003,7 @@ def _pos(hay, needle):
 
 
 _sweep = _pos(aud, "## Step 6b — The sweep")
-_gate = _pos(aud, "Compute the ten Run Invariants FIRST")
+_gate = _pos(aud, "Compute every Run Invariant FIRST")
 _close = _pos(aud, "## Step 7 — Close")
 check(
     "ordering: the invariant gate is positioned before the sweep it guards",
@@ -1907,6 +2049,7 @@ try:
         "_hire2": "workforce/references/procedures/hire.md",
         "_bl": "bin/baseline",
         "_pt": "workforce/references/personnel-templates.md",
+        "_as": "workforce/references/audit-setup.md",
         "_ev": "workforce/references/evaluators.md",
         "_vfy2": "workforce/references/procedures/verify.md",
         "_org": "workforce/references/procedures/org.md",
@@ -2616,11 +2759,36 @@ check(
 # The Run Invariants block restated its own row count in audit.md, and said
 # "Ten" while the table held eleven. Nothing compared them, because the check
 # read invariants.md's declaration against invariants.md's table only.
+#
+# Widened 2026-08-03. The narrow form matched "Ten rows" only, so audit.md's
+# "Compute the ten Run Invariants FIRST" sailed past it for the whole life of
+# the check — and TWO further assertions then hardcoded that exact string as
+# their match literal, pinning the wrong count in place from inside bin/check.
+# By then three files carried three different counts (ten / eleven / twelve).
+# So the scan is now class-wide: no shipped file pairs a number-word with this
+# population, and invariants.md's declaration line is the single exemption.
+_INV_COUNT_RX = re.compile(
+    r"\b(?:eight|nine|ten|eleven|twelve|thirteen)\s+"
+    r"(?:rows?|Run[- ]Invariants?)\b",
+    re.I,
+)
+_inv_restated = {}
+for _p in declared:
+    if not _p.endswith(".md"):
+        continue
+    for _m in _INV_COUNT_RX.finditer(read(_p)):
+        # invariants.md owns the count; its declaration is the one legal statement.
+        if _p.endswith("invariants.md") and _inv_decl and _m.start() >= _inv_decl.start():
+            if _m.start() == _inv_decl.start():
+                continue
+        _inv_restated.setdefault(_p, []).append(_m.group(0))
 check(
-    "invariants: the run report does not restate the row count",
-    not re.search(r"\b(?:Ten|Eleven|Twelve|Thirteen)\s+rows\b", aud),
-    "audit.md said 'Ten rows' while the table held eleven — a restated constant "
-    "in the instruction to print the table it restates",
+    "invariants: no shipped file restates the Run Invariant count",
+    not _inv_restated,
+    f"the count is owned by invariants.md's declaration and restated at: {_inv_restated} — "
+    "audit.md said 'ten Run Invariants' and invariants.md's own exemplar said 'eleven rows' "
+    "while the declaration said twelve; a run computing ten skips the gate on rows 11-12 "
+    "immediately before the only step that deletes",
 )
 
 # ── Instruction volume: the second budget ────────────────────────────────────
@@ -2998,6 +3166,164 @@ if os.path.isdir(_fx):
         )
     except Exception as _e:  # no git, no assertion — never a false pass
         warn("fixtures: tracked-ness not asserted", f"git unavailable ({_e})")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Directive survival, landed 2026-08-03.
+#
+# T2 extraction always worked: every immutable span is written verbatim and
+# byte-exact to .claude/workforce/directives/<skill>.md, read back, compared,
+# and a count short by one blocks the skill. What was missing was the LAST HOP.
+#
+# An employee is a fresh isolated context whose only inputs are its handbook,
+# its skills: preload, and CLAUDE.md. The directives directory is in none of
+# the three, so the user's words were preserved as an ARCHIVE and the employee
+# governed by them never saw them. handbook.md is right that COPYING the block
+# creates two canonical texts — so the fix is a POINTER plus a sha, never a copy.
+#
+# Measured: "directive" appeared ZERO times in handbook-templates.md and
+# personnel-templates.md, in the project whose first directive is that the
+# user's wording is sacred. Deleting SKILL.md's entire byte-exact extraction
+# gate left bin/check completely unchanged at the time this was found.
+# ─────────────────────────────────────────────────────────────────────────────
+
+check(
+    "directives: the fixed section table carries a Directives row",
+    "`## Directives`" in pfp and "Pointer only" in pfp,
+    "the section order is asserted and lint-blocking, so a Directives section an "
+    "author added by hand would have FAILED the lint — the slot has to exist here "
+    "before a template may carry one",
+)
+check(
+    "directives: the handbook section is a pointer, never a copy",
+    "## Directives" in tpl
+    and "POINTER ONLY" in tpl
+    and "never paste the block" in tpl,
+    "copying an immutable block into a handbook creates two canonical texts that "
+    "diverge on the first amendment (procedures/handbook.md); the pointer is what "
+    "keeps one canonical text reachable instead of merely archived",
+)
+check(
+    "directives: both handbook templates bind a sha the employee can check",
+    tpl.count("directives-sha") >= 3 and "DIRECTIVE-DRIFT" in tpl,
+    "without the sha a directive file edited after registration leaves every "
+    "handbook pointing confidently at text that changed; the employee's own first "
+    "step is what detects it",
+)
+check(
+    "directives: an employee with none says so, rather than omitting the section",
+    "(none bound)" in tpl and "(none bound)" in pfp,
+    "a zero is a measurement and a missing line is silence (invariants.md); an "
+    "absent section cannot be told from an author who forgot",
+)
+check(
+    "directives: the EMP record captures the originating ask verbatim",
+    "## Originating Ask" in _pt
+    and "origin: user | immutable: true" in _pt
+    and "Never tidied, never paraphrased, never summarized" in _pt,
+    "/org clause 10(b) hands hire the VERBATIM ask, hire hands handbook a role "
+    "brief, and the user's wording was dropped at that seam — preserved in transit "
+    "and stored nowhere. charter and principles were the only commands that ever "
+    "wrote a user's words to disk",
+)
+check(
+    "directives: an absent ask is recorded as absent, never reconstructed",
+    "no verbatim ask on record" in _pt and "never filled with a reconstruction" in _pt.lower(),
+    "a paraphrase inside an immutable block is worse than an honest absence: it "
+    "looks like the user's words, is not, and no later reader can tell",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Settings review, landed 2026-08-03 — audit-setup.md § Permissions.
+#
+# update and vendor write permission keys; verify reports on two of them. audit
+# — the command everyone runs first and the only one most users ever run —
+# touched permissions not at all. A fresh install could finish, report a healthy
+# org, and be unable to dispatch or run its own checks, with every artifact on
+# disk correct.
+#
+# The whole section rests on facts 14-17, which are DOCUMENTED and uncanaried,
+# so it REPORTS and never blocks. delegation-budget.md already had to retract
+# one blocking check built on an unmeasured fact; this is the same trade, made
+# correctly the first time.
+# ─────────────────────────────────────────────────────────────────────────────
+_as = read("workforce/references/audit-setup.md")
+
+check(
+    "permissions: audit reviews the settings file, and resolves it rather than assuming it",
+    "## Permissions" in _as
+    and "Resolve the file, do not choose it" in _as
+    and "Never write managed settings" in _as,
+    "the four scopes have a precedence order (scopes.md); a run that writes to a "
+    "guessed path can silently be overridden by one that outranks it",
+)
+check(
+    "permissions: additions only — nothing the user wrote is removed or edited",
+    "Add only what is absent" in _as
+    and "It is never resolved by" in _as
+    and "0 removed" in _as,
+    "an exclusion the user wrote is evidence of intent, never an obstacle to route "
+    "around; and a guarantee nobody prints is a guarantee nobody can check",
+)
+check(
+    "permissions: findings are reported last, and are never a fifth question",
+    "final section of the run report" in _as
+    and "Not a question" in _as
+    and "this is not a fifth" in _as,
+    "the question budget is a ceiling of four (§ The question budget); permission "
+    "findings are reported, not asked",
+)
+check(
+    "permissions: every count prints, including the zeroes",
+    "always all five, including the zeroes" in _as,
+    "0 added is a measurement that the org's needs were already met; silence is not",
+)
+check(
+    "permissions: a conflict reports and does not fail the run",
+    "A conflict does not fail the run" in _as
+    and "bars an unverified fact from becoming a blocking check" in _as,
+    "facts 14-17 are DOCUMENTED and uncanaried; blocking on one would repeat the "
+    "substitution delegation-budget.md had to retract",
+)
+check(
+    "permissions: the non-existent per-agent field is stated plainly, not substituted",
+    "There is no `permissions:` frontmatter field" in _as
+    and "not literally available" in _as,
+    "the directive asked for per-agent permission rules; quietly shipping something "
+    "adjacent and calling it done is the failure this project fails runs over",
+)
+check(
+    "platform: the researched permission facts are DOCUMENTED, never promoted silently",
+    all(f"| {n} |" in _plat for n in (14, 15, 16, 17))
+    and "earns a canary before it earns a gate" in _plat,
+    "four claims load-bearing for a procedure that writes into a user's settings "
+    "file; three documented claims in this file have already lost to measurement",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Every shipped agent has a caller, landed 2026-08-03.
+#
+# staging.md § The shipped panel definitions resolved this ONCE, for the three
+# Conversion Department members, and left the rest standing: four of seven
+# definitions had no procedure naming them BY PATH. The worst was
+# handbook-cold-reader — a 70-line persona for the off-the-street release gate,
+# while staging.md Phase B said "Spawn a generic agent" four lines below its own
+# warning that a caller reading only part of a definition gets an agent that
+# drifts with nothing reporting it.
+#
+# A definition that ships and is never loaded is this project's signature defect
+# (written, unwired) inside the artifacts meant to catch it. Path, not name: a
+# procedure naming an agent it never tells the caller to READ is the same bug.
+# ─────────────────────────────────────────────────────────────────────────────
+_agent_paths = [p_ for p_ in declared if p_.startswith("workforce/agents/")]
+_callers = "\n".join(read(p_) for p_ in declared if p_.endswith(".md") and not p_.startswith("workforce/agents/"))
+_uncalled = [p_ for p_ in _agent_paths if p_ not in _callers]
+check(
+    "agents: every shipped definition is loaded by path from a procedure",
+    not _uncalled,
+    f"shipped but convened by nothing: {_uncalled} — a definition nothing reads is "
+    "either dead weight on every install or a panel running without the persona it "
+    "was designed around; wire it or ablate it, and say which",
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Warnings — worth knowing, not worth failing

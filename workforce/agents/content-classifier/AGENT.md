@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: wf-content-classifier
 description: "Classifies a block of skill content by what it DOES — rule, mechanism, reference, scaffolding, or directive-statement — so conversion can move it without first resolving who wrote it."
 disallowedTools: Agent

@@ -1,6 +1,6 @@
 # Install Scopes — where the skill lives, where the company lives
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — read before writing any path, or before changing where state is stored. -->
 
 claude-workforce installs **personally by default** (`~/.claude/skills/workforce/`): one copy per
@@ -23,7 +23,7 @@ project on the machine.
 | `workforce/` — SKILL.md, references, procedures | `.claude/agents/*.md` — the employees |
 | the generated `/org` receptionist | `.claude/workforce/org-config.md` — tier→model, departments, markers |
 | `org-config.template.md` — the shipped template | `.claude/workforce/org-chart.md` |
-| the four shipped panel agents | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
+| the shipped panel agents (`manifest.txt` is the count) | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
 | | `.claude/workforce/work/**`, `evals/**`, `ablations/**`, the conversion journal |
 | | `.claude/skills/operating-principles/` — this project's Strategic Objective + General Operating Principles |
 | | `.claude-backups/` — backups and the restore kit |

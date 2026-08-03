@@ -1,6 +1,6 @@
 # evals — create and run an employee's measurement set
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 0 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 0 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce evals [employee]`
 
 Format and doctrine: `references/evals.md`. Location:

@@ -1,6 +1,6 @@
 # promote — IC to Lead
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk; display by default. `/workforce promote <employee> --execute`
 
 A promotion is a **structural change to the org**, not a title change. It alters delegation depth
@@ -35,7 +35,7 @@ fan-out. Over the concurrency cap → the answer is a structural rethink, not th
 | `ORG-RECORD` | tier 3, no reports | tier 2, direct reports, spawn budget |
 
 **Removing `disallowedTools: Agent` is the load-bearing edit.** It is the measured tier ceiling
-(`platform.md` fact 2b); until it is gone the employee cannot delegate regardless of what its chain of
+(`platform.md` fact 2c); until it is gone the employee cannot delegate regardless of what its chain of
 command says — and the failure would be silent, because it would simply do the work itself.
 
 ## Step 4 — Re-home the reports

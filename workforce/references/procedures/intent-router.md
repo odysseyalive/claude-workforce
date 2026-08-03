@@ -1,6 +1,14 @@
 # intent-router — freeform `/workforce <text>`
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+> **This runs in the main loop. It has no agent, deliberately — the definition was ablated 2026-08-03.**
+> Steps 1 and 1b are exact string matches against two enumerable sets: the command surface and the
+> roster. Spawning for that paid a fresh context and a full `CLAUDE.md` injection to re-read two files
+> the dispatcher already holds and return a table lookup — the user's second directive inverted at the
+> front door, and `procedures/org.md` clause 2's rule ("never spawn to run something that already
+> exists") applied to workforce's own entry point. Only the fall-through — an unknown token needing
+> intent classification — needs a model, and that is main-loop work with the user present.
+
 Classifies a freeform ask into a command. Runs when the first token is not a known command.
 
 ---

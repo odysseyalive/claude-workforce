@@ -1,6 +1,6 @@
 # Legacy Markers — recognizing a predecessor system by what it emitted
 
-<!-- Enforcement: 10 assertion(s) in bin/check name this file; 33 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 33 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the only sanctioned detector for predecessor artifacts. Names are never the detector. -->
 
 A project workforce lands on may already be managed by another generator. Removing that system —

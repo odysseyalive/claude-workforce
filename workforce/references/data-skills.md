@@ -1,6 +1,6 @@
 # Data Skills — the artifact that holds an employee's records
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every dataset an org touches has exactly one data skill and one owner. -->
 
 A **data skill** holds a dataset: its schema, its invariants, the scripts that maintain it, and the
@@ -155,7 +155,7 @@ where it has one; where it has none, `.claude/workforce/maintainers/<this-skill-
 
 **No hook registration, ever.** A maintainer is invoked from its owner's `## Verification` and nowhere
 else. Wiring one to a tool-use matcher would claim prevention the design does not deliver
-(`references/enforcement.md` § Hooks).
+(`references/enforcement.md` § Nothing ships dormant).
 
 **The prose is not deleted when the script is written.** `## Invariants` states the rule; the maintainer
 decides it. That is the relation `references/invariants.md` has with `bin/check` in this project's own

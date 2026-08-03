@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: wf-handbook-cold-reader
 description: "Executes a staged employee handbook cold, having never seen the project, to prove a stranger can follow it. Used by the off-the-street release gate."
 disallowedTools: Agent

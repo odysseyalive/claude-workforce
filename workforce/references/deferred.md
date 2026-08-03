@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.

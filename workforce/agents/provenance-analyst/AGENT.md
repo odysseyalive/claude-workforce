@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: wf-provenance-analyst
 description: "Measures the evidence for who a directive-shaped block came from — marker, duplication, sidecar, voice, downstream authority, git — and reports the full vector rather than a verdict. Distinguishes an immaterial question from an unresolved one."
 disallowedTools: Agent

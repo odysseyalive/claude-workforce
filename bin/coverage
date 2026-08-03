@@ -55,6 +55,7 @@ VAR_TO_FILE = {
     "_hire2": "workforce/references/procedures/hire.md",
     "_bl": "bin/baseline",
     "_pt": "workforce/references/personnel-templates.md",
+    "_as": "workforce/references/audit-setup.md",
     "_ev": "workforce/references/evaluators.md",
     "_vfy2": "workforce/references/procedures/verify.md",
     "_org": "workforce/references/procedures/org.md",
@@ -159,9 +160,16 @@ def main():
             # match and therefore never contradicts — a file earning exemption from the
             # coverage check by having no coverage.
             body = open(p, encoding="utf-8").read()
-            line = (f"<!-- Enforcement: {a} assertion(s) in bin/check name this file; "
+            # MAINTAINER-FACING, and it has to say so. bin/check and bin/coverage are
+            # NOT in the manifest, so this line ships to every host and named two
+            # tools the host does not have — 67 dangling pointers in the
+            # distribution. invariants.md caught exactly this class once and fixed
+            # it in one file; the header was never swept. On a host the equivalent
+            # is `/workforce verify` plus the shipped scripts.
+            line = (f"<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is "
+                    f"`/workforce verify`): {a} assertion(s) in bin/check name this file; "
                     f"{c} normative claims total. {len(GENERIC)} generic assertions guard it "
-                    f"too. Coverage is a floor, not a certificate — run bin/coverage. -->")
+                    f"too. Coverage is a floor, not a certificate. -->")
             body = re.sub(r"<!-- Enforcement: \d+ assertion.*?-->\n", "", body, flags=re.S)
             lines = body.split("\n")
             at = 1 if lines and lines[0].startswith("# ") else 0

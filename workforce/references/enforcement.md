@@ -1,13 +1,13 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
 
 | Want | Mechanism | Actually? |
 |---|---|---|
-| Employee cannot delegate | `disallowedTools: Agent` | **PREVENTS** — measured (`platform.md` fact 2b) |
+| Employee cannot delegate | `disallowedTools: Agent` | **PREVENTS** — measured (`platform.md` fact 2c) |
 | Org cannot exceed the tier limit | harness depth limit | **PREVENTS** — measured (fact 1) |
 | Employee cannot reach an MCP server its explicit `tools:` grant does not name | `tools:` | **PREVENTS** when `tools:` is set — measured (fact 13). Does not apply when `tools:` is omitted: the default grant includes `ToolSearch` and all configured servers (deferred) |
 | Employee cannot read/write certain paths | `permissions.deny` | **PREVENTS** |
@@ -77,9 +77,46 @@ Three rules, and they are the whole of it:
 **Workforce cannot lift a host constraint and must never describe itself as having done so.** This row
 belongs in the DETECTS column with everything else here.
 
-## Hooks — this project ships none
+## Nothing ships dormant — the rule the hook findings actually support
 
-**claude-workforce ships zero executables.** Not as an oversight: measured, then removed.
+**claude-workforce ships zero hooks today. That is a current fact, not a prohibition**, and the
+difference took two corrections on the same day to reach.
+
+**Correction 1.** This section said *"claude-workforce ships zero executables"* and froze that into a
+`bin/check` assertion banning every `.sh`, `.ps1`, and `.py` in the distribution. The three findings
+below are all about files registered to a harness event; none is an argument against a **script** a
+procedure invokes and reads an exit code from. The cost was paid by users: `audit` Step 1b hand-derived
+a census, `verify` re-specified in prose what a script asserts, and `conversion-taxonomy.md` shipped
+*"No count in this project is hand-derived"* to hosts with nothing to derive it. **A rule against hooks
+was quietly doing duty as a rule against automation**, in the project whose second directive is to
+automate everywhere feasible.
+
+**Correction 2, an hour later, prompted by the question "why would we be banning hooks?"** The narrowed
+rule — *hooks never, scripts yes* — was **the same over-reach one level down**. Read the three findings
+again and they are not three findings about hooks. They are **one finding about dormancy**:
+
+> **A mechanism that ships unwired enforces nothing, and looks like it does.**
+
+That is a claim about *wiring*, not about *file type*. It applies identically to a hook, a script, and
+an agent definition — and this project has now recorded the same failure in all three: four dormant
+hooks, two unshipped scripts, and four agent definitions no procedure convened. **The categorical hook
+ban was doctrine that felt like a conclusion**, which is the tell `CLAUDE.md` names.
+
+**The line, drawn where the measurement actually falls:**
+
+| | Ships? | The condition |
+|---|---|---|
+| anything **wired** — a procedure invokes it, or a command registers it *and* `verify` reports whether it is registered | **yes** | its absence is loud, so a fresh install cannot silently lose it |
+| anything **dormant** — no invoker, no registration path, or a registration nothing reports on | **never** | this is the whole of the finding, and it has now cost this project three times |
+
+**So a hook may ship — under conditions this project does not yet meet.** It needs a command that wires
+it, a `verify` row reporting wired-vs-orphaned, and both OS variants. That work is not done, so the
+count stays zero and **is reported as a current state rather than a principle.** What a hook would buy
+is stated plainly below and is real: edit-time detection between audits.
+
+Whatever ships carries the obligation `data-skills.md` § Maintainers puts on every maintainer:
+**released by making it fail, never by watching it pass**, with the negative test recorded. And it
+reports; it never repairs.
 
 Four hook files were inherited from claude-enforcer (`protect-directives` and `unique-employee`, each
 in bash and PowerShell). They were deleted once three things became clear together:
@@ -104,7 +141,9 @@ What covers the ground instead:
 |---|---|
 | name and persona collisions | Phase A lint (blocking, at authoring time) and `verify` |
 | immutable-block drift | `verify`'s integrity check, and the FLAG-NEVER-TOUCH rule in `amend` |
-| repo-level conformance | `bin/check` in the source distribution |
+| registry / marker census on a host | **`wf-census`**, shipped and invoked by `audit` Step 1b |
+| handbook and data-skill conformance on a host | **`wf-conform`**, shipped and invoked by `verify` |
+| repo-level conformance (maintainers only) | `bin/check` in the source distribution — **not shipped**, and no shipped file may send a host to it |
 
 **What is genuinely lost:** edit-time detection between audits. A collision introduced by hand-editing
 `.claude/agents/` goes unnoticed until the next `verify`. That is a real gap, narrow, and stated rather

@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement: 11 assertion(s) in bin/check name this file; 35 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 35 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -69,7 +69,7 @@ The disposition was `ORCHESTRATOR`; `foreign-owned` was the annotation. **Test f
 predecessor-system artifacts and are now removed under succession. The lesson stands — a preflight state
 is not a disposition, and the sum is what proves it — but neither skill is a live ORCHESTRATOR case.
 The population figure is corrected too: the original entry said 46, which was a miscount from a shell
-`ls` that emitted a header line. **No count in this project is hand-derived**; `bin/baseline` produces
+`ls` that emitted a header line. **No count in this project is hand-derived**; `wf-census` produces
 them.)*
 
 Judgment calls go to an agent panel; disagreement resolves to the more conservative disposition.

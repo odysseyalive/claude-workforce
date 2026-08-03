@@ -291,6 +291,12 @@ install_to_scope() {
         case "$line" in
             "keep "*) flag="keep"; path="${line#keep }" ;;
             "hook "*) flag="hook"; path="${line#hook }" ;;
+            # `exec` is `hook`'s mechanical twin — chmod +x, nothing else. It is a
+            # separate word because this project ships ZERO hooks and several
+            # scripts (references/enforcement.md § Hooks), and a manifest line
+            # reading `hook workforce/bin/wf-census` would contradict that in the
+            # one place a reader checks what actually ships.
+            "exec "*) flag="hook"; path="${line#exec }" ;;
         esac
 
         dest="$skill_dir/${path#workforce/}"

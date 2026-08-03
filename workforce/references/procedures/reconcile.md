@@ -1,6 +1,6 @@
 # reconcile — cross-employee conflicts
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk; display by default. `/workforce reconcile [--execute]`
 
 Finds places where two employees collide. **Overlap alone is never a finding** — only conflict that

@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement: 1 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -33,7 +33,7 @@ creates two canonical texts that will diverge.
 - **Tier:** from the org chart. Determines which template applies.
 - **`model` / `effort`:** from `org-config.md`, resolved per
   `references/org-config.template.md` § Resolution. Never invented.
-- **IC → `disallowedTools: Agent`.** Mandatory, blocking (`platform.md` fact 2b).
+- **IC → `disallowedTools: Agent`.** Mandatory, blocking (`platform.md` fact 2c).
 - **Delegating → `background: false`.** Set it; report if absent; never block on it (fact 2).
 - **No `tools:` field by default.** Omitting it gives the employee the full default grant —
   `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus all configured MCP

@@ -1,6 +1,6 @@
 # Procedure for Procedures — how every handbook is authored
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — normative. `handbook`, `hire`, `amend`, and `verify` all assert against
      this file. It governs its own format. -->
 
@@ -31,6 +31,7 @@ ORG-RECORD block          machine-owned org metadata (HTML comments)
 |---|---|---|---|
 | `## Role` | ✔ | ✔ | One paragraph: what you are accountable for, and what you are not |
 | `## Scope` | ✔ | ✔ | Explicit IN and OUT lists |
+| `## Directives` | ✔ | ✔ | **Pointer only** — the user directives that bind this employee, by path and sha (§ Directives) |
 | `## Chain of Command` | ✔ | — | Permitted subordinates **by name**, manager, escalation path |
 | `## Procedure` | — | ✔ | Numbered steps |
 | `## Verification` | ✔ | ✔ | A runnable check (`verification.md`) |
@@ -43,6 +44,49 @@ ORG-RECORD block          machine-owned org metadata (HTML comments)
 Leads get no `## Procedure`. That is deliberate: their job is judgment, and a numbered script for a
 coordinator is the over-specification failure. ICs get one because their work is mechanical and their
 context is cold.
+
+---
+
+## Directives
+
+**The user's own words bind the employee, and the employee has to be able to reach them.**
+
+Extraction was never the hard part. `hire.md` § Transaction Order T2 already writes every
+`<!-- origin: user | immutable: true -->` span verbatim and byte-exact to
+`.claude/workforce/directives/<skill>.md`, reads it back, compares, and blocks the skill if the count is
+short by one. That machinery works and is not changed here.
+
+**What was missing is the last hop.** An employee runs in a fresh isolated context whose only inputs are
+its handbook, its `skills:` preload, and the project's `CLAUDE.md`. `.claude/workforce/directives/` is in
+none of the three. So the directives were preserved as an *archive* and the employee governed by them
+never saw them — the words survived and stopped one file short of the reader. Found 2026-08-03, in the
+project whose first principle is that those words are sacred.
+
+**This section is a POINTER, never a copy.** `procedures/handbook.md` is right that copying an immutable
+block into a handbook creates two canonical texts that diverge on the first amendment. The fix is not to
+relax that rule; it is to make the single canonical text *reachable*:
+
+```markdown
+## Directives
+These bind you and outrank every step below. Read them before acting.
+- `.claude/workforce/directives/<skill>.md` — sha `<directives-sha>` — <N> block(s)
+If the file is absent or its sha does not match, STOP and report
+`DIRECTIVE-DRIFT: <path>`. Never proceed on a directive you could not read.
+```
+
+**Always present, and an employee with none says so** — `## Directives` reading `(none bound)` is a
+measurement; an absent section is silence, and this file cannot tell silence from an author who forgot.
+That is the same rule `invariants.md` states for a zero row.
+
+**The sha is what makes it a contract rather than a suggestion.** Without it, a directive file edited
+after registration leaves every handbook pointing confidently at text that has changed. With it, the
+employee's own first step detects the drift and stops. `checksums` already covers the sidecar; this puts
+the same digest where the reader is.
+
+**`review` re-resolves the pointer.** A handbook whose `directives-sha` no longer matches its target is
+CONTRACT-DRIFT, handled exactly like a stale `contract-stamp` (`procedures/org.md` § Mode: `index`) —
+because it is the same failure: a document asserting a relationship to a file that has moved underneath
+it.
 
 ---
 

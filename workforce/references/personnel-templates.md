@@ -1,6 +1,6 @@
 # Personnel Record Templates
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the HR ledger's schema. `ledger`, `review`, `amend`, `defect` write these. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/` — project state.
@@ -85,10 +85,33 @@ contract:
 **Department manager (KEY 2):** <employee-name> | human:<user>
 **Grounding library:** `.claude/skills/<skill>/references/**`
 **Owns records:** <playbooks, or (none)>
+**Directives:** `.claude/workforce/directives/<skill>.md` sha `<directives-sha>` | (none bound)
 **Hired:** YYYY-MM-DD
 
+## Originating Ask
+<!-- origin: user | immutable: true -->
+> **"<the user's own words that created this role, verbatim — the ask `/org` clause 10(b) handed to
+> `hire`, or the request the user typed. Never tidied, never paraphrased, never summarized. Typos,
+> grammar, and phrasing are preserved exactly as received.>"**
+
+*— Captured YYYY-MM-DD, source: <where the ask arrived>.*
+<!-- /origin -->
+
+**When no verbatim ask exists**, this section reads `(no verbatim ask on record — role derived from
+<evidence>)` and names the evidence. **It is never filled with a reconstruction.** A paraphrase written
+into an immutable block is worse than an honest absence: it looks like the user's words and is not, and
+no later reader can tell.
+
+**Why this is here and not only in the handbook.** The handbook's `## Directives` section is a *pointer*
+to standing directives that bind the employee (`procedure-for-procedures.md` § Directives). This is
+different: it is the one-time ask that caused the role to exist, and until 2026-08-03 nothing on the
+`hire` path wrote it anywhere. `/org` clause 10(b) hands the verbatim ask to `hire`, `hire` hands a role
+brief to `handbook`, and the user's wording was dropped at that seam — preserved in transit, stored
+nowhere. `charter` and `principles` were the only commands that ever captured a user's words to disk.
+
 ## Job Description
-<One paragraph. Never restates the handbook.>
+<One paragraph. Never restates the handbook, and never restates the Originating Ask above — that block
+is the user's words; this is the org's summary of the job. Where they disagree, the block wins.>
 
 ## Frontmatter of Record
 | Key | Value | Verified by | When |

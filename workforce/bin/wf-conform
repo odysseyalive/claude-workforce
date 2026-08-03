@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""wf-conform — the decidable half of `/workforce verify`, on a host.
+
+`procedures/verify.md` specifies ~48 checks; roughly 85% of them are decidable by
+reading files: section presence and order, a literal frontmatter line, a resolved
+path, a recomputed digest, a line count. Those were prose for a model to perform,
+once per run, on every host — while the repo's own conformance ran as a script.
+
+This is the script half. `verify` still owns the judgment half (persona quality,
+whether a stated invariant is really mechanical, whether a description over-claims)
+and still owns the report. THIS COMMAND DECIDES NOTHING IT CANNOT DECIDE: every
+check here has a binary answer or it is not here.
+
+REPORTS; NEVER REPAIRS. `enforcement.md` § Nothing ships dormant — a shipped script is invoked by a
+procedure and returns an exit code. It is not a hook and is registered to nothing.
+
+Exit codes
+    0  every check passed
+    1  at least one check failed
+    2  the tree could not be read — never 0 on an unreadable target
+
+Usage
+    wf-conform [--root DIR] [--json PATH] [--quiet]
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+
+# Section order is fixed and asserted (procedure-for-procedures.md § File shape).
+# Leads carry no `## Procedure`; everyone else carries every row.
+SECTIONS = [
+    "## Role",
+    "## Scope",
+    "## Directives",
+    "## Chain of Command",
+    "## Procedure",
+    "## Verification",
+    "## Guardrails",
+    "## Exit criteria",
+    "## Escalation",
+    "## Probe",
+    "## Reporting",
+]
+DATA_SKILL_SECTIONS = [
+    "## Schema",
+    "## Invariants",
+    "## Degradation",
+    "## Owner",
+    "## Git policy",
+    "## Seed",
+    "## Maintainers",
+]
+TIER_RX = re.compile(r"tier:\s*(\d)")
+# The GOVERNED discriminator. Must match the MARKER, not the words: a first pass
+# used `"ORG-RECORD" in body` and classified a hand-authored agent as governed
+# because its prose said "No ORG-RECORD". Substring tests over prose are how this
+# project's checks have gone wrong before (CLAUDE.md § Assertions match contiguous
+# fragments); the marker is structure and cannot be mentioned by accident.
+ORG_RECORD_RX = re.compile(r"<!--\s*ORG-RECORD\s+START\b", re.I)
+FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
+DEFAULT_LENGTH_CEILING = 150
+
+
+class Result:
+    def __init__(self):
+        self.rows = []
+        self.unreadable = []
+
+    def add(self, ok, name, detail=""):
+        self.rows.append({"ok": bool(ok), "check": name, "detail": detail})
+
+    @property
+    def failed(self):
+        """Governed rows only. An adopted agent's hazards are reported, not enforced."""
+        return [r for r in self.rows if not r["ok"] and not r.get("adopted")]
+
+    @property
+    def adopted_findings(self):
+        return [r for r in self.rows if not r["ok"] and r.get("adopted")]
+
+    @property
+    def adopted(self):
+        return [r for r in self.rows if r.get("adopted")]
+
+
+def read(path, res):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        res.unreadable.append(f"{path}: {type(exc).__name__}")
+        return None
+
+
+def frontmatter(body):
+    m = FM_RX.match(body or "")
+    if not m:
+        return None
+    fm = {}
+    for line in m.group(1).splitlines():
+        if ":" in line and not line.lstrip().startswith("#"):
+            k, _, v = line.partition(":")
+            fm[k.strip()] = v.strip()
+    return fm
+
+
+def check_adopted(path, body, res):
+    """An agent workforce did not author. Report; never impose a shape on it.
+
+    `conversion-taxonomy.md` ADOPT: "already a registered agent -> censused into
+    the chart, ZERO BYTES CHANGED." A hand-authored agent has no `## Probe`, no
+    `## Directives`, and no ORG-RECORD because nobody promised it would. Measuring
+    it against the handbook template reports a dozen failures about a contract it
+    was never under — which is noise that trains a reader to ignore the report.
+
+    Found by RUNNING this against a real brownfield project (odyssey-alive, three
+    hand-authored agents, six failures, every one of them wrong). Re-reading the
+    script did not find it; `CLAUDE.md` says that is the normal outcome.
+
+    Only genuine RUNTIME hazards are checked here, because those are bugs in
+    anyone's file regardless of who wrote it. They are reported and counted, and
+    they do NOT set the exit code: forcing a verdict on a file workforce does not
+    own is the same overreach `evaluators.md` refuses when a catalog cannot be
+    appended — skipped and reported, never forced.
+    """
+    n = os.path.basename(path)
+    hazards = []
+    if AGENT_ALLOWLIST_RX.search(body):
+        hazards.append(
+            "carries an `Agent(...)` allowlist — subagent definitions IGNORE these, "
+            "so the restriction does not exist at runtime"
+        )
+    res.rows.append({"ok": not hazards, "check": f"{n}: adopted (not workforce-authored)",
+                     "detail": "; ".join(hazards), "adopted": True})
+
+
+def check_handbook(path, body, res, ceiling):
+    n = os.path.basename(path)
+    fm = frontmatter(body)
+    res.add(fm is not None, f"{n}: frontmatter parses")
+    if fm is None:
+        return
+
+    tier = None
+    m = TIER_RX.search(body)
+    if m:
+        tier = int(m.group(1))
+    res.add(tier is not None, f"{n}: ORG-RECORD states a tier",
+            "no `tier: N` in the ORG-RECORD block; tier drives every other rule here")
+
+    # Section presence and order. A Lead (tier 2) legitimately has no ## Procedure.
+    expected = [s for s in SECTIONS if not (tier == 2 and s == "## Procedure")]
+    positions, missing = [], []
+    for s in expected:
+        i = body.find("\n" + s)
+        if i < 0:
+            missing.append(s)
+        else:
+            positions.append((i, s))
+    res.add(not missing, f"{n}: every required section present",
+            f"missing: {missing}")
+    ordered = [s for _, s in sorted(positions)]
+    res.add(ordered == [s for s in expected if s not in missing],
+            f"{n}: sections in the fixed order",
+            f"found order: {ordered}")
+
+    # The tier ceiling. What this verifies is PRESENCE OF THE LINE — a property of
+    # the text. Runtime behavior is the canary's job, established once per host and
+    # never inferred per handbook from the presence of a string.
+    if tier == 3:
+        res.add("disallowedTools: Agent" in body,
+                f"{n}: IC carries the literal `disallowedTools: Agent`",
+                "entry depth does not cap an IC (platform.md fact 2b); the ceiling "
+                "is fact 2c's mechanism and it has to be written down")
+
+    # An Agent() allowlist inside a subagent definition is DISCARDED at runtime, so
+    # its presence means the org chart is enforced by a mechanism that does nothing.
+    res.add(not AGENT_ALLOWLIST_RX.search(body),
+            f"{n}: no `Agent(...)` allowlist in the frontmatter",
+            "subagent definitions ignore these; the restriction does not exist at runtime")
+
+    # Directives reach the employee, or say plainly that none bind it.
+    if "## Directives" in body:
+        seg = body.split("## Directives", 1)[1].split("\n## ", 1)[0]
+        res.add("(none bound)" in seg or ".claude/workforce/directives/" in seg,
+                f"{n}: Directives section resolves or declares none",
+                "a blank Directives section reads as 'none bound' and is not")
+
+    body_lines = len(body.splitlines())
+    res.add(body_lines <= ceiling, f"{n}: within the {ceiling}-line ceiling",
+            f"{body_lines} lines — a structural finding proposing a split, never a refusal")
+
+    # A handbook that cannot say how to verify itself is not releasable.
+    if "## Verification" in body:
+        seg = body.split("## Verification", 1)[1].split("\n## ", 1)[0]
+        res.add(bool(seg.strip()), f"{n}: Verification section is not empty")
+
+
+def check_data_skill(path, body, res):
+    n = os.path.relpath(path)
+    missing = [s for s in DATA_SKILL_SECTIONS if ("\n" + s) not in body]
+    res.add(not missing, f"{n}: data skill carries every required section",
+            f"missing: {missing}")
+    if "## Invariants" in body:
+        seg = body.split("## Invariants", 1)[1].split("\n## ", 1)[0]
+        res.add("may never authorize a write" in seg,
+                f"{n}: carries the universal invariant",
+                "degraded state may cause more work; it may never authorize a write")
+
+
+def check_sidecar(root, res):
+    """Recompute the immutable-block digest against its stored sidecar."""
+    side = os.path.join(root, ".claude", "workforce", ".directives.sha")
+    ddir = os.path.join(root, ".claude", "workforce", "directives")
+    if not os.path.exists(side):
+        res.add(True, "sidecar: absent (no directives extracted yet)",
+                "absent is a first-class state, not an error")
+        return
+    stored = {}
+    body = read(side, res)
+    if body is None:
+        return
+    for line in body.splitlines():
+        if "  " in line:
+            sha, _, rel = line.partition("  ")
+            stored[rel.strip()] = sha.strip()
+    for rel, sha in stored.items():
+        p = os.path.join(ddir, os.path.basename(rel))
+        if not os.path.exists(p):
+            res.add(False, f"sidecar: {rel} present", "stored digest names a file that is gone")
+            continue
+        raw = open(p, "rb").read()
+        res.add(hashlib.sha256(raw).hexdigest() == sha,
+                f"sidecar: {rel} digest matches",
+                "a directive file changed after registration")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-conform")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--json", dest="json_path")
+    ap.add_argument("--ceiling", type=int, default=DEFAULT_LENGTH_CEILING)
+    ap.add_argument("--strict-adopted", action="store_true",
+                    help="hold adopted agents to the full handbook contract too "
+                         "(they are exempt by default: workforce did not author them)")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-conform: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    res = Result()
+    agents_dir = os.path.join(root, ".claude", "agents")
+    handbooks = []
+    if os.path.isdir(agents_dir):
+        for dp, _dn, fns in os.walk(agents_dir):
+            handbooks += [os.path.join(dp, f) for f in fns if f.endswith(".md")]
+    # GOVERNED vs ADOPTED. The ORG-RECORD block is the discriminator because it is
+    # the thing workforce writes and nothing else does — an agent without one was
+    # never placed under this contract. Frontmatter cannot decide it: `name:` and
+    # `description:` are universal.
+    for p in sorted(handbooks):
+        body = read(p, res)
+        if body is None:
+            continue
+        if ORG_RECORD_RX.search(body):
+            check_handbook(p, body, res, args.ceiling)
+        elif args.strict_adopted:
+            check_handbook(p, body, res, args.ceiling)
+        else:
+            check_adopted(p, body, res)
+
+    skills = os.path.join(root, ".claude", "skills")
+    if os.path.isdir(skills):
+        for entry in sorted(os.listdir(skills)):
+            if not entry.startswith("records-"):
+                continue
+            p = os.path.join(skills, entry, "SKILL.md")
+            if os.path.exists(p):
+                body = read(p, res)
+                if body is not None:
+                    check_data_skill(p, body, res)
+
+    check_sidecar(root, res)
+
+    if args.json_path:
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            json.dump({"rows": res.rows, "unreadable": res.unreadable}, fh, indent=2)
+
+    if not args.quiet:
+        governed = len(handbooks) - len(res.adopted)
+        # All counts, always, including the zeroes. A zero is a measurement.
+        print(f"wf-conform — {root}")
+        print(f"  {governed} governed · {len(res.adopted)} adopted (exempt) · "
+              f"{len(res.rows)} checks · {len(res.failed)} failed · "
+              f"{len(res.adopted_findings)} adopted-agent note(s) · "
+              f"{len(res.unreadable)} unreadable")
+        for r in res.failed:
+            print(f"  ✗ {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))
+        for r in res.adopted_findings:
+            # Reported, never enforced — it is not workforce's file.
+            print(f"  · {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))
+        for u in res.unreadable:
+            print(f"  ! unreadable {u}")
+        if res.adopted and not args.strict_adopted:
+            print(f"  ({len(res.adopted)} adopted agent(s) checked for runtime hazards only — "
+                  f"workforce did not author them. `--strict-adopted` to hold them to the "
+                  f"full contract.)")
+
+    if res.unreadable:
+        return 2
+    return 1 if res.failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

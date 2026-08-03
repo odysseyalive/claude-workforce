@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -30,7 +30,7 @@ verifiable at all.**
 ## Skill *and* employee — at different tiers
 
 The obvious design is "make them employees." That breaks on a measured constraint: **ICs carry
-`disallowedTools: Agent`** (`platform.md` fact 2b), so an IC can never dispatch to an evaluator. If
+`disallowedTools: Agent`** (`platform.md` fact 2c), so an IC can never dispatch to an evaluator. If
 review only existed as an employee, the employees who most need it could not reach it.
 
 So both, at the tier that can use each:

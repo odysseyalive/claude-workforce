@@ -231,6 +231,10 @@ Begin with step 1 now.
             $path = $line
             if ($line.StartsWith('keep ')) { $flag = 'keep'; $path = $line.Substring(5).Trim() }
             elseif ($line.StartsWith('hook ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
+            # `exec` is `hook`'s mechanical twin — chmod +x on unix, a no-op here.
+            # Separate word because this project ships zero hooks and several
+            # scripts; see references/enforcement.md § Hooks.
+            elseif ($line.StartsWith('exec ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
 
             $dest = Join-Path $skillDir ($path -replace '^workforce/', '')
 

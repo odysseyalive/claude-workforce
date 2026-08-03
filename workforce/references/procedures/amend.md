@@ -1,6 +1,6 @@
 # amend — change a handbook or a data skill, with two keys
 
-<!-- Enforcement: 2 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The only path by which a handbook's text or a data skill's schema changes.** Strict execution and
 instant amendment are one invariant: an employee never works around its handbook, and a wrong handbook
 changes immediately.
@@ -101,6 +101,28 @@ not dispatch to it.
 Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`
 (`references/deferred.md` — the queue, and who drains it).
 Update the `EMP` amendment history with both keys and the real latency. Close the triggering record.
+
+---
+
+## The second reader — did the rule land with its enforcement?
+
+**Before closing, dispatch `wf-doctrine-auditor`** (`workforce/agents/doctrine-auditor/AGENT.md`, read
+in full and passed as its body) against the amended span. It answers one question: **is this a rule with
+something making it true, or a rule that merely reads as complete?**
+
+It returns the amendment's class per `references/invariants.md` — **structural** (a `verify` check),
+**procedural** (a counted line in a run report), or **advisory** (nothing, said so explicitly) — plus
+the location of the mechanism, or `UNENFORCED: <the claim>`.
+
+**`UNENFORCED:` does not block the amendment.** It opens a `DEF` naming the unenforced claim, because an
+amendment held hostage to its own enforcement is how a defect stays open while the text stays wrong. But
+**an amendment that closes with no class recorded is incomplete**, and `review` reports it.
+
+*Why an agent and not a check: no static assertion can tell a rule that should have enforcement from one
+correctly left advisory — that judgment is the whole question. Why here: this is the project's
+dominant recorded failure mode, five defects of one shape, and `amend` is where new doctrine enters.
+The definition shipped from the beginning and no procedure convened it, which is that same failure
+wearing the shape of the thing meant to catch it.*
 
 ---
 

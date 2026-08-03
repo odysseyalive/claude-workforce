@@ -1,6 +1,6 @@
 # Image Evaluator — shipped seed catalog
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- This is the SEED for projects that have no image evaluator. It installs
      on absence alone (evaluators.md). A project that already has an image-eval
      receives only NEW entries through the forcible-append mechanism, never a

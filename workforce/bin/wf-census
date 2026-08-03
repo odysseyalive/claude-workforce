@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""wf-census — the registry, marker, and hook census `audit` runs on a host.
+
+Why a script and not a checklist. This project's own CLAUDE.md records the ledger
+count being wrong THREE TIMES — 24-vs-20, 27-vs-23, and an "index claims 0" that a
+wrong root manufactured — and every time the hand count was the thing that was
+wrong, not the target. A census that can be re-run is the only kind that can be
+compared, and `conversion-taxonomy.md` already ships the rule to users:
+
+    "No count in this project is hand-derived."
+
+Until 2026-08-03 that sentence named `bin/baseline`, which does not ship. This is
+the shipped half: the counts `audit` Step 1b needs, computed rather than read.
+
+REPORTS; NEVER REPAIRS. It writes exactly one artifact — the manifest it is asked
+for — and never edits an agent, a skill, or a settings file. Same rule
+`data-skills.md` § Maintainers puts on every maintainer.
+
+Exit codes
+    0  census complete, no blocking condition
+    2  a blocking condition: an unresolved name collision, or a path it could not
+       read. NEVER 0 on an unreadable tree — a validator exiting 0 on a file it
+       could not open reports health it did not measure.
+
+Usage
+    wf-census [--root DIR] [--json PATH] [--manifest PATH] [--quiet]
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+IMMUTABLE_OPEN = re.compile(r"<!--\s*origin:\s*user\s*\|\s*immutable:\s*true\s*-->")
+IMMUTABLE_CLOSE = re.compile(r"<!--\s*/origin\s*-->")
+NAME_RX = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
+
+# Marker families are open-ended by design: a foreign generator invents its own.
+# Report unknown families rather than dropping them — four unknown families on the
+# first real target is what taught this project that an allowlist here silently
+# under-counts (references/legacy-markers.md).
+MARKER_RX = re.compile(r"<!--\s*/?([A-Za-z][\w-]*(?:-[A-Za-z][\w-]*)*)\s+(START|END)\b", re.I)
+
+
+class Census:
+    def __init__(self, root):
+        self.root = os.path.abspath(root)
+        self.unreadable = []
+        self.agents = []
+        self.skill_agents = []
+        self.markers = {}
+        self.unpaired = []
+        self.hooks = []
+        self.immutable_blocks = []
+
+    # ── reading ──────────────────────────────────────────────────────────────
+    def read(self, path):
+        try:
+            with open(path, encoding="utf-8", errors="strict") as fh:
+                return fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            # Absent, empty, unreadable and malformed are four distinct states and
+            # each is answered. "Nothing to check" is not one of them.
+            self.unreadable.append((path, type(exc).__name__))
+            return None
+
+    # ── agents ───────────────────────────────────────────────────────────────
+    def census_agents(self):
+        """Both resolving locations, plus AGENT.md under skills.
+
+        Identity comes solely from `name:`; subfolders do NOT namespace, and a
+        duplicate resolves by filesystem read order with no documented precedence
+        — the loser simply never loads and nothing reports it. So a name occupied
+        ANYWHERE in the union is occupied.
+        """
+        locations = [
+            (os.path.join(self.root, ".claude", "agents"), "project"),
+            (os.path.expanduser("~/.claude/agents"), "personal"),
+        ]
+        for base, scope in locations:
+            if not os.path.isdir(base):
+                continue
+            for dirpath, _dirnames, filenames in os.walk(base):
+                for fn in filenames:
+                    if not fn.endswith(".md"):
+                        continue
+                    p = os.path.join(dirpath, fn)
+                    self.agents.append(self._agent_row(p, scope))
+
+        skills = os.path.join(self.root, ".claude", "skills")
+        if os.path.isdir(skills):
+            for dirpath, _dirnames, filenames in os.walk(skills):
+                for fn in filenames:
+                    if fn == "AGENT.md":
+                        p = os.path.join(dirpath, fn)
+                        self.skill_agents.append(self._agent_row(p, "in-skill"))
+
+    def _agent_row(self, path, scope):
+        row = {
+            "path": path,
+            "scope": scope,
+            "is_symlink": os.path.islink(path),
+            "link_target": None,
+            "resolved": None,
+            "dangling": False,
+            "name": None,
+        }
+        if row["is_symlink"]:
+            row["link_target"] = os.readlink(path)
+            resolved = os.path.realpath(path)
+            row["resolved"] = resolved
+            row["dangling"] = not os.path.exists(resolved)
+        body = self.read(path)
+        if body is not None:
+            m = NAME_RX.search(body)
+            row["name"] = m.group(1).strip() if m else None
+        return row
+
+    def collisions(self):
+        """A name occupied anywhere in the union is occupied."""
+        seen = {}
+        for row in self.agents + self.skill_agents:
+            if not row["name"]:
+                continue
+            seen.setdefault(row["name"], []).append(row["path"])
+        return {n: paths for n, paths in seen.items() if len(paths) > 1}
+
+    # ── markers ──────────────────────────────────────────────────────────────
+    def census_markers(self):
+        """Every marker family, and pairing.
+
+        An unpaired marker is a sweep hazard: a lone START means a removal pass has
+        no end boundary and takes the rest of the file with it. Report, never repair.
+        """
+        for dirpath, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", ".venv")]
+            for fn in filenames:
+                if not fn.endswith(".md"):
+                    continue
+                p = os.path.join(dirpath, fn)
+                body = self.read(p)
+                if body is None:
+                    continue
+                depth = {}
+                for m in MARKER_RX.finditer(body):
+                    fam, side = m.group(1).upper(), m.group(2).upper()
+                    self.markers[fam] = self.markers.get(fam, 0) + 1
+                    depth[fam] = depth.get(fam, 0) + (1 if side == "START" else -1)
+                for fam, d in depth.items():
+                    if d != 0:
+                        self.unpaired.append(
+                            {"file": p, "family": fam, "imbalance": d}
+                        )
+                opens = len(IMMUTABLE_OPEN.findall(body))
+                closes = len(IMMUTABLE_CLOSE.findall(body))
+                if opens:
+                    self.immutable_blocks.append(
+                        {"file": p, "open": opens, "close": closes, "paired": opens == closes}
+                    )
+
+    # ── hooks ────────────────────────────────────────────────────────────────
+    def census_hooks(self):
+        """Wired hooks from both settings scopes, with the resolved command path.
+
+        A hook whose command lands inside a skill directory is the case that
+        matters: removing that skill takes a live safety mechanism with it.
+        """
+        for rel in (".claude/settings.json", ".claude/settings.local.json"):
+            p = os.path.join(self.root, rel)
+            if not os.path.exists(p):
+                continue
+            body = self.read(p)
+            if body is None:
+                continue
+            try:
+                cfg = json.loads(body)
+            except json.JSONDecodeError as exc:
+                self.unreadable.append((p, f"JSONDecodeError: {exc.msg}"))
+                continue
+            for event, entries in (cfg.get("hooks") or {}).items():
+                for entry in entries if isinstance(entries, list) else []:
+                    for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
+                        cmd = h.get("command", "")
+                        self.hooks.append(
+                            {
+                                "settings": rel,
+                                "event": event,
+                                "matcher": entry.get("matcher"),
+                                "command": cmd,
+                                "in_skill_dir": ".claude/skills/" in cmd,
+                            }
+                        )
+
+    # ── report ───────────────────────────────────────────────────────────────
+    def summary(self):
+        col = self.collisions()
+        return {
+            "root": self.root,
+            "agents": {
+                "project": sum(1 for a in self.agents if a["scope"] == "project"),
+                "personal": sum(1 for a in self.agents if a["scope"] == "personal"),
+                "in_skill": len(self.skill_agents),
+                "symlinks": sum(1 for a in self.agents if a["is_symlink"]),
+                "dangling": sum(1 for a in self.agents if a["dangling"]),
+            },
+            "collisions": col,
+            "marker_families": dict(sorted(self.markers.items())),
+            "unpaired_markers": self.unpaired,
+            "immutable_blocks": {
+                "files": len(self.immutable_blocks),
+                "blocks": sum(b["open"] for b in self.immutable_blocks),
+                "unpaired": [b for b in self.immutable_blocks if not b["paired"]],
+            },
+            "hooks": self.hooks,
+            "unreadable": self.unreadable,
+        }
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-census")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--json", dest="json_path")
+    ap.add_argument("--manifest", dest="manifest_path")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    if not os.path.isdir(args.root):
+        print(f"wf-census: not a directory: {args.root}", file=sys.stderr)
+        return 2
+
+    c = Census(args.root)
+    c.census_agents()
+    c.census_markers()
+    c.census_hooks()
+    s = c.summary()
+
+    if args.json_path:
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            json.dump(s, fh, indent=2, sort_keys=True)
+
+    if args.manifest_path:
+        with open(args.manifest_path, "w", encoding="utf-8") as fh:
+            fh.write("# agent registry census — kind, link, resolved, owner, dangling\n")
+            for a in c.agents + c.skill_agents:
+                fh.write(
+                    "\t".join(
+                        [
+                            "symlink" if a["is_symlink"] else "file",
+                            a["path"],
+                            a["link_target"] or "-",
+                            a["resolved"] or "-",
+                            a["scope"],
+                            a["name"] or "(no name:)",
+                            "DANGLING" if a["dangling"] else "ok",
+                        ]
+                    )
+                    + "\n"
+                )
+
+    if not args.quiet:
+        ag = s["agents"]
+        # Always all counts, including the zeroes. A zero is a measurement;
+        # silence is not.
+        print(f"wf-census — {s['root']}")
+        print(
+            f"  agents      {ag['project']} project · {ag['personal']} personal · "
+            f"{ag['in_skill']} in-skill · {ag['symlinks']} symlinks · {ag['dangling']} dangling"
+        )
+        print(
+            f"  markers     {len(s['marker_families'])} families · "
+            f"{sum(s['marker_families'].values())} markers · "
+            f"{len(s['unpaired_markers'])} unpaired (sweep hazards)"
+        )
+        ib = s["immutable_blocks"]
+        print(
+            f"  immutable   {ib['blocks']} blocks in {ib['files']} files · "
+            f"{len(ib['unpaired'])} unpaired"
+        )
+        print(f"  hooks       {len(s['hooks'])} wired · "
+              f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir")
+        print(f"  collisions  {len(s['collisions'])}")
+        for name, paths in s["collisions"].items():
+            print(f"    ! {name}: {', '.join(paths)}")
+        for f in s["unpaired_markers"]:
+            print(f"    ! unpaired {f['family']} in {f['file']} (imbalance {f['imbalance']})")
+        for p, why in s["unreadable"]:
+            print(f"    ! unreadable {p}: {why}")
+
+    # A collision is blocking: it resolves silently by read order, so a run that
+    # continues past one has registered an employee that may never load.
+    return 2 if (s["collisions"] or s["unreadable"]) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

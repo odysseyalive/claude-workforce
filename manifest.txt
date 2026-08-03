@@ -8,20 +8,57 @@
 # Format: [flag] <path relative to repo root>
 #   (no flag)  fetch unconditionally, overwriting any existing copy
 #   keep       fetch only if absent on the host (user-editable file; never clobber)
-#   hook       fetch unconditionally; mark executable on unix systems
+#   hook       fetch unconditionally; chmod +x. Registered to a harness event by
+#              `/workforce hooks --execute`; `verify` reports whether it is wired
+#   exec       fetch unconditionally; chmod +x. Invoked by a procedure for its
+#              exit code; registered to nothing
 #
-# NOTE: `keep` and `hook` currently have no users. This project ships no
-# executables and no user-editable in-skill files: project state lives in the
-# project (references/scopes.md), and the four hook files were removed once
-# measurement showed they had never fired, could not be wired, and duplicated
-# checks `verify` already performs. Both flags are retained because the grammar
-# is shared with claude-enforcer's installers; neither is a dead branch to
-# "clean up" without checking that shared grammar first.
+# NOTE on `hook` vs `exec`. Mechanically identical — both chmod +x — and two words
+# because the DISTINCTION IS THE THING BEING TRACKED, not the file mode. A `hook`
+# fires unprompted and needs a wiring command and a wired/orphaned report; an
+# `exec` is called by name and its absence is loud on the next invocation.
+# references/enforcement.md § Nothing ships dormant draws the line.
+#
+# `keep` has no users: no shipped file is user-editable, because project state
+# lives in the project (references/scopes.md). It is retained because the grammar
+# is shared with claude-enforcer's installers; not a dead branch to "clean up"
+# without checking that shared grammar first.
+#
+# HISTORY, because this line moved twice on 2026-08-03 and the second move
+# corrected the first. The four inherited hooks were deleted for good reasons and
+# the deletion was then generalized into "ships no executables" — which forbade
+# the scripts too, so `audit` Step 1b hand-derived a census and `verify`
+# re-specified in prose what a script asserts, in the project whose second
+# directive is to automate everywhere feasible. Narrowing that to "ships no hooks"
+# was the same over-reach one level down: the finding underneath was never about
+# file type, it was that A MECHANISM SHIPPING UNWIRED ENFORCES NOTHING AND LOOKS
+# LIKE IT DOES. So hooks ship, with the wiring command whose absence was the
+# actual defect.
 #
 # Host destination: .claude/skills/workforce/<path minus leading "workforce/">
 
 workforce/SKILL.md
 workforce/.immutable.sha
+
+# ── Scripts ───────────────────────────────────────────────────────────────────
+# Invoked by a procedure and read for an exit code. Registered to nothing. Each
+# was released by being made to fail — negative tests recorded in
+# plan/ship-the-scripts-2026-08-03.md, per data-skills.md § Maintainers.
+exec workforce/bin/wf-census
+exec workforce/bin/wf-conform
+
+# ── Hooks ─────────────────────────────────────────────────────────────────────
+# Registered to a harness event by `/workforce hooks --execute`, which is the
+# mechanism whose ABSENCE killed the four inherited hooks: they shipped dormant
+# because the command documented to wire them did not exist. `verify` reports
+# wired / orphaned / dead-wiring, so dormancy is now visible rather than assumed.
+#
+# One Python file, not a bash/PowerShell pair. claude-enforcer ships both variants
+# and its own CLAUDE.md records that the .ps1 ports "have NOT yet been executed on
+# a real Windows host" — two implementations, one of them unmeasured. Python is
+# already a shipped dependency (the two scripts above), so one file is one
+# behavior on both platforms.
+hook workforce/bin/wf-protect-directives
 
 # ── References ────────────────────────────────────────────────────────────────
 workforce/references/principles.md
@@ -106,12 +143,12 @@ workforce/references/procedures/vendor.md
 workforce/references/procedures/reconcile.md
 workforce/references/procedures/checksums.md
 workforce/references/procedures/verify.md
+workforce/references/procedures/hooks.md
 workforce/references/procedures/intent-router.md
 workforce/references/procedures/update.md
 workforce/references/procedures/version.md
 
 # ── Agents ────────────────────────────────────────────────────────────────────
-workforce/agents/intent-router/AGENT.md
 workforce/agents/handbook-cold-reader/AGENT.md
 workforce/agents/headcount-skeptic/AGENT.md
 workforce/agents/conversion-auditor/AGENT.md

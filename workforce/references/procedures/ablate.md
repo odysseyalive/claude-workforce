@@ -1,6 +1,6 @@
 # ablate — delete, then add back only what earns its place
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk; display by default.
 `/workforce ablate <employee> [--classify] [--execute] [--budget N] [--section <name>]`
 

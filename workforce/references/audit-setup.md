@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement: 11 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -334,3 +334,112 @@ would authorize demoting dozens of working skills from an inference about intent
 another generator is the ordinary brownfield case: conversion yield near zero is the *correct* result there,
 and the audit's value comes from the org it designs for work no skill covers (`org-design.md`). Never report
 a low conversion count against a high foreign-owned count as a shortfall.
+
+---
+
+## Permissions
+
+**The org has to be able to run once the audit ends, and nothing was checking that it could.**
+`update` and `vendor` write permission keys; `verify` reports on two of them. **`audit` — the command
+everyone runs first, and the only one most users will ever run — touched permissions not at all.** A
+fresh install could therefore finish, report a healthy org, and be unable to dispatch or run its own
+mechanical checks, with every artifact on disk correct.
+
+<!-- origin: user | immutable: true -->
+> **"So what we need to make sure that we do is that when this project is running the audit that the
+> permissions are reviewed in that file and updated forcibly to make sure that this is all gonna work
+> right."**
+
+*— Added 2026-08-03, source: user directive. The user's stated premise is that people will run this who
+do not know much about permissions, and that agent permissions were deliberately left at default so
+there is **one place** to edit them. Review is therefore not advisory here: an install that cannot run
+is the failure this is written against.*
+
+> **"perhaps they've excluded permissions on a certain object which might indicate why we may want to
+> make sure that the agents have all of their own permissions so that we don't have to overwrite the
+> users's preferences but maybe we should put up a warning flag if they're noticed."**
+
+> **"maybe those any warnings specifically that have to do with permissions could be the last thing
+> mentioned in after the audit is complete."**
+
+*— Added 2026-08-03, source: user directive, same session, refining the first. An exclusion the user
+wrote is **evidence of intent**, never an obstacle to route around. Permission findings are reported
+**last, after the audit completes** — and they are reported, never asked: the question budget above is a
+ceiling of four and this is not a fifth.*
+<!-- /origin -->
+
+### What the harness actually does — DOCUMENTED, not measured
+
+**`platform.md` owns these facts; this table cites them and states what each one costs *here*.** They
+are facts **14–17**, all DOCUMENTED and none canaried, so they **may inform this procedure and may not
+block anyone's run** (`platform.md` § DOCUMENTED).
+
+| Fact | Consequence here |
+|---|---|
+| 14 — omitting `tools:` inherits, it does not revoke | the common worry is unfounded; omission is a safe default, not a silent revocation |
+| 4b (**measured**) — an explicit `tools:` is an exact list | unchanged, and the one row here that is not a documentation claim |
+| 15 — subagents inherit the session's permission context | a grant the main session lacks is a grant no employee has, which is why this is an org-wide precondition and not a per-agent one |
+| 16 — there is no per-agent `permissions:` field | the directive's literal form is not expressible in frontmatter; see below for the shape it does take |
+| 17 — rules across scopes concatenate rather than replace | **the load-bearing one** — it is the guarantee behind `0 removed`, and the first that should be canaried |
+
+Bare `"Bash"` grants all Bash commands (equivalent to `"Bash(*)"`), so the grant to add is one token.
+
+### The design the second directive asks for, and the shape it actually takes
+
+The directive asks that agents carry their own permissions so the user's file need not be overwritten.
+**There is no `permissions:` frontmatter field, so that is not literally available** — and saying so
+plainly is required here rather than quietly substituting something adjacent.
+
+**But the intent is satisfiable, by two facts pulling the same direction:**
+
+1. **What an agent *may reach* is already per-agent** — `tools:` and `disallowedTools:` are exactly
+   that, and every handbook already carries them. That is the capability boundary, and it lives with
+   the employee, not in settings.
+2. **What a tool *may do* is a settings rule — and settings rules concatenate.** So the thing the
+   directive was written to prevent cannot happen: **adding a grant never removes a user's rule.** The
+   two mechanisms sit at different levels and do not compete.
+
+So the rule is: **add what is missing, remove nothing, report everything.**
+
+### Procedure — Step 0.8, read-only until the report
+
+Runs at the end of Step 0, after the backup and before any writing gate.
+
+1. **Resolve the file, do not choose it.** Read all four scopes in precedence order (managed, local,
+   project, user — `scopes.md`). **Write to the file that already carries workforce keys; absent all
+   four, write `.claude/settings.local.json`.** Print the resolved path. Never write managed settings.
+2. **Compute the required set** from the org this run designed: `Agent` (without it every hop prompts —
+   `scopes.md`), `Bash` where any employee's `## Verification` or any `## Mechanicals` row names a
+   command, plus each MCP server named by a handbook grant.
+3. **Add only what is absent.** Never edit, reorder, or remove an existing entry. Additions land inside
+   `<!-- WORKFORCE-PERMS START -->` / `<!-- WORKFORCE-PERMS END -->` ownership markers so `disband`
+   excises them surgically, the same convention `WORKFORCE-DENY` already uses (`enforcement.md`).
+4. **A conflict is a finding, never an edit.** A required grant contradicted by an existing `deny` is
+   reported with both lines quoted and the org's affected capability named. **It is never resolved by
+   removing the user's rule** — that rule is the evidence of an intent this run does not have.
+5. **Verify by re-reading**, and report `PERMISSIONS UNVERIFIED` if the re-read does not parse — never
+   report a write that was not confirmed.
+
+### Where it is reported — last, and this is the directive
+
+**The permissions block is the final section of the run report, after the Execution Summary and after
+the findings.** Not a question, not a mid-run stop, not an interleaved warning.
+
+```
+PERMISSIONS  .claude/settings.local.json          ← resolved, not assumed
+  + Agent                    added
+  + Bash                     added
+  · Read                     already present
+  ! Bash(rm:*) in deny       CONFLICT — left as-is; `records-ledger` verification may prompt
+  2 added · 1 present · 1 conflict · 0 removed    ← always all five, including the zeroes
+```
+
+**All five counts, always, including the zeros** — `0 added` is a measurement that the org's needs were
+already met; silence is not (`invariants.md`). **`0 removed` is printed on every run** because it is the
+guarantee the second directive asks for, and a guarantee nobody prints is a guarantee nobody can check.
+
+**A conflict does not fail the run.** It cannot: the behavior it rests on is DOCUMENTED and unmeasured,
+and `platform.md` § DOCUMENTED bars an unverified fact from becoming a blocking check — the substitution
+`delegation-budget.md` already had to retract once. The org is reported as built, with the capability
+that will prompt or fail named. **If these facts are ever measured, the conflict row may become
+blocking, and the promotion belongs in the same edit that moves the row.**

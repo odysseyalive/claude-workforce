@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement: 6 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -77,6 +77,27 @@ from every surface, including `roster`, which does nothing else with it.
 | Every hook on disk is registered | an orphan — reported, never deleted |
 | Every `directives-sha` stamp resolves to a block that exists at the path it names | a stamp pointing into a swept skill — `checksums` reports `MISMATCH` one command after the run reported success |
 
+## Hook wiring
+
+**The row that makes shipping a hook safe at all.** Four inherited hooks were deleted because they
+shipped dormant and nothing reported it; the deletion then over-generalized twice
+(`enforcement.md` § Nothing ships dormant). What makes a shipped hook legitimate is not its file type —
+it is that `/workforce hooks` wires it and this row says whether it is wired.
+
+| State | Meaning |
+|---|---|
+| `WIRED` | registered in the resolved settings file, and its `command` resolves to a file on disk |
+| `ORPHANED` | the file is installed and **no registration names it** — the exact state the deleted hooks were in |
+| `DEAD WIRING` | a registration whose `command` resolves to nothing — **worse than absent**, because it reads as protection (`discovery.md` § Dead wiring) |
+| `NOT EXECUTABLE` | registered, on disk, and the host cannot run it |
+
+**Report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
+--execute`. `DEAD WIRING` → the same command, which drops registrations that do not resolve.
+
+**Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`,
+`PRESENT` with a block count or `ABSENT`. Absent is not an error — it is the day-one state — but a hook
+reporting `UNPROTECTED` on every edit forever is, and the fix is `/workforce checksums --execute`.
+
 ## Platform freshness
 
 Compare `platform.md` § Header (`MEASURED-ON`) against the running `claude --version`, and report which
@@ -124,10 +145,43 @@ agreeing against the third is a finding, not a tiebreak.
 
 ## Handbook conformance
 
-Sections present and ordered; every IC carries `disallowedTools: Agent`; no `Agent(` allowlist
-anywhere; every body path resolves; every tool used is granted and `Grep`/`Glob`/`WebFetch` are not
-assumed; guardrails contain literal NEVER / MUST NOT / STOP; escalation sentinel verbatim;
-`## Verification` names a runnable check; `## Probe` present; no `memory:`; under the length ceiling.
+**Run `wf-conform` first; it decides everything decidable here.**
+
+```bash
+.claude/skills/workforce/bin/wf-conform --root "${CLAUDE_PROJECT_DIR}"
+```
+
+Exit `0` all clear · `1` at least one check failed, each named · `2` the tree could not be read —
+**and never `0` on an unreadable target**, because a validator exiting 0 on a file it could not open
+reports health it did not measure.
+
+It covers: sections present and ordered; every IC carries the literal `disallowedTools: Agent`; no
+`Agent(` allowlist anywhere; `## Directives` resolves or declares `(none bound)`; `## Verification` is
+non-empty; the length ceiling; the immutable-block sidecar digests.
+
+**GOVERNED vs ADOPTED, and the script decides it by marker.** An agent carrying an `ORG-RECORD` block
+is under this contract; one without it was **never placed under it** — `conversion-taxonomy.md` ADOPT is
+*"censused into the chart, **zero bytes changed**."* Adopted agents are checked for genuine runtime
+hazards only (an `Agent(...)` allowlist is a bug in anyone's file), and those are **reported without
+setting the exit code**: forcing a verdict on a file workforce does not own is the overreach
+`evaluators.md` refuses when a catalog cannot be appended. `--strict-adopted` opts in. Both counts print,
+including the zeroes.
+
+*Found by running the script against a real brownfield project: three hand-authored agents produced six
+failures, every one of them about a contract those files were never under. Re-reading the script did not
+find it. **The first fix was wrong too** — it tested `"ORG-RECORD" in body`, so an agent whose prose said
+*"No ORG-RECORD"* classified as governed. The discriminator is the marker, which cannot be mentioned by
+accident.*
+
+**What it deliberately does not cover, and what this command still owns by reading:** whether a
+`## Verification` check is *real* or decoration, whether a persona is genuinely distinct, whether a
+`description:` over-claims, whether an invariant called mechanical actually is. **Every check in the
+script has a binary answer or it is not in the script** — dressing a judgment as a check is the failure
+`verification.md` rejects at tier 4, and moving one into a script would only hide it better.
+
+**Still read by this command:** every body path resolves; every tool used is granted and
+`Grep`/`Glob`/`WebFetch` are not assumed (`platform.md` fact 4); guardrails contain literal NEVER /
+MUST NOT / STOP; the escalation sentinel is verbatim; no `memory:`.
 
 **Released-state check:** any handbook amended since its last probe is **UNRELEASED** and must not be
 dispatched to.
@@ -156,10 +210,15 @@ for the reason § Constants gives below.
 
 **Grep for restated constants** — tier counts, caps, model IDs — outside their single source.
 
-**The sanctioned duplication points are `bin/check`'s `CONST_EXEMPT`, and there are seven:**
-`platform.md` (the source), `scopes.md` (documents the exception), **`org-config.template.md`** (the
-sanctioned home for model IDs, per `platform.md` § Derived constants), the two installers (they cannot
-read markdown at install time), and the two user-facing docs (`README.md`, `COMMANDS.md`).
+**The sanctioned duplication points, in this list and nowhere else:** `platform.md` (the source),
+`scopes.md` (documents the exception), **`org-config.template.md`** (the sanctioned home for model IDs,
+per `platform.md` § Derived constants), the two installers (they cannot read markdown at install time),
+and the two user-facing docs (`README.md`, `COMMANDS.md`).
+
+*This read "the sanctioned duplication points are `bin/check`'s `CONST_EXEMPT` … read the list from the
+check; never restate it from memory" — an instruction to a host to open a file that does not ship.
+`invariants.md` caught this class once and fixed it in one file; the sweep never reached here. The list
+is now stated where its reader is, and the maintainer-side set is checked against it by `bin/check`.*
 
 An earlier form of this section named four and omitted `org-config.template.md`. A `verify` following it
 would have reported the shipped model-budget statics as a constants violation — **re-opening the exact

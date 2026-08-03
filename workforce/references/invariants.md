@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -90,7 +90,7 @@ the gate unfireable.
 **This was wrong in the first version of this file, in the exact shape the project keeps recording.**
 The block was specified to print at close, the only deletion happens before close, and the sentence
 *"a run with any NOT UPHELD row does not proceed to a destructive step"* therefore described a gate that
-fires strictly after the thing it was meant to stop. Seven of the ten rows had no pre-sweep gate at all.
+fires strictly after the thing it was meant to stop. Most rows had no pre-sweep gate at all.
 Correct rule, contradicting implementation — the same defect as a backup ordered after the first write.
 
 ```
@@ -100,7 +100,7 @@ Run Invariants
   INV-EMBEDDED    95 of 95 extracted · 96 blocks scanned
   INV-MARKERS     42 files paired · 3 excluded unpaired
   INV-MAINTAINERS 4 mechanical · 4 maintainers · 4 negative tests passed · 6 contextual
-  …eleven rows, always all eleven…
+  …every remaining row, always all of them…
 ```
 
 **A row that cannot be computed prints `NOT UPHELD` with the reason** — never omitted, never inferred

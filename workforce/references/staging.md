@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement: 9 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -50,9 +50,9 @@ Three consequences worth stating, because each is a place this could silently ro
   file; a template gets it from whatever the caller pasted. If the caller reads only part of the
   definition, the agent drifts and nothing reports it. Read the whole file.
 
-**The alternative — installing them into `.claude/agents/`** — was rejected: it puts six `wf-*` entries
-in the user's agent list that they did not ask for, on a product whose entire premise is that the user's
-agent roster is theirs.
+**The alternative — installing them into `.claude/agents/`** — was rejected: it puts a `wf-*` entry per
+shipped definition in the user's agent list that they did not ask for, on a product whose entire premise
+is that the user's agent roster is theirs.
 
 ---
 
@@ -123,7 +123,17 @@ requires an uninvolved party to execute the procedure cold, and a subagent is ge
 isolated context, no conversation history, no memory of the authoring discussion. The uninvolved
 executor is free.
 
-Spawn a generic agent and give it the handbook's own `## Probe` task:
+**Read `workforce/agents/handbook-cold-reader/AGENT.md` in full and pass its body as the executor's
+system prompt**, then append the task block below. A shipped `AGENT.md` is a prompt template, not a
+registered agent (§ The shipped panel definitions), so the caller supplies it — **and a caller that
+reads only part of it gets an executor that drifts with nothing reporting it.**
+
+*This said "Spawn a generic agent" until 2026-08-03, while the definition shipped in the manifest and
+nothing loaded it. The release gate — the project's central claim that a handbook is proven by a
+stranger — was running without the persona that makes the stranger a competent one, and the file
+four lines above already stated why that fails. Three shipped definitions were in the same state.*
+
+Give the executor the handbook's own `## Probe` task:
 
 ```
 You have never seen this project before. Read <staged handbook path> and follow it exactly.

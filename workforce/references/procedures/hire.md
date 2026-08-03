@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement: 4 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 

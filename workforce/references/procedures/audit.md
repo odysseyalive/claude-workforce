@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement: 14 assertion(s) in bin/check name this file; 48 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 49 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -26,7 +26,13 @@ never as "run this command yourself."
 consent and the backup (questions 1 and 2), the model and effort budgets (questions 3 and 4), VCS
 preflight, the canary fixtures, and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
-name collisions.
+name collisions — and the **settings review (Step 0.8)**, which resolves the permissions file, adds only
+what the designed org is missing, and removes nothing.
+
+**Step 0.8 writes early and reports last, and the split is deliberate.** The grants have to be in place
+before anything dispatches or runs a mechanical check, so the write belongs in Step 0; the findings are
+the final section of the closing report, per the user directive at `audit-setup.md` § Permissions. It is
+never a question — the budget above is a ceiling of four.
 
 **Step 0.7 was absent from this list while Steps 3 and 3a consumed its output.** A run following this
 file literally never executed it, so the succession branch had no input and the disposition arithmetic
@@ -125,10 +131,30 @@ with them. A fresh project is where the budgets matter *most*: nothing is config
 
 ## Step 1b — Registry census: agents and hooks (before anything is staged)
 
-Write `.claude/workforce/.agents-symlink-manifest.txt`: for every entry in `.claude/agents/`, its
-kind, raw link text, resolved target, owning skill, and whether it dangles. **Under `--review`, compute
-it and print it; write nothing** — `--review` writes nothing anywhere, and this step and Step 3b were
-the two that contradicted that.
+**Run the census; do not perform it by hand.**
+
+```bash
+.claude/skills/workforce/bin/wf-census \
+  --root "${CLAUDE_PROJECT_DIR}" \
+  --manifest "${CLAUDE_PROJECT_DIR}/.claude/workforce/.agents-symlink-manifest.txt" \
+  --json     "${CLAUDE_PROJECT_DIR}/.claude/workforce/census.json"
+```
+
+Exit `0` is a clean census. Exit `2` is **blocking**: an unresolved name collision or a path it could
+not read, and precondition 1(b) of the Atomic-or-Absent gate is not satisfied. **Under `--review`, pass
+neither `--manifest` nor `--json`** — the run prints the census and writes nothing, which is the whole
+of that mode's contract. This step and Step 3b were the two that used to contradict it.
+
+**Why a script and not these paragraphs.** The counts below are `find`, `readlink`, `json.load`, and a
+group-by. This project's own ledger count has been wrong three times — 24-vs-20, 27-vs-23, and an
+"index claims 0" a wrong root manufactured — and **every time the hand count was the thing that was
+wrong, not the target.** `conversion-taxonomy.md` already ships the rule: *"No count in this project is
+hand-derived."* Until 2026-08-03 that sentence named a tool the manifest did not ship, and this step
+hand-derived them anyway.
+
+**The paragraphs below remain, and they are not redundant.** They state what the census *means* and
+what a run does about each finding — the relation `invariants.md` has with its own checks. The script
+decides; the text says what the decision is for. Neither is deleted for the other.
 
 **Census BOTH agent locations, not just this project's.** Agents resolve from `.claude/agents/` *and*
 `~/.claude/agents/`, identity comes solely from `name:`, and a collision resolves silently by
@@ -167,7 +193,7 @@ a skill directory**. Step 3 joins its dispositions against that mapping.
 A hook is wired to a path, never to a skill, so a skill's removal does not unwire its hooks — it turns
 them into **dead wiring**: registered, pointing at nothing, non-blocking, and silently enforcing nothing
 (`discovery.md` § Dead wiring). That is claude-enforcer's `protect-directives` defect inverted: there the
-hook read a sidecar no procedure wrote (`enforcement.md` § Hooks), here the registration outlives its
+hook read a sidecar no procedure wrote (`enforcement.md` § Nothing ships dormant), here the registration outlives its
 script. Both report clean while doing nothing.
 
 **Criticality decides how loudly.** A hook whose silent absence is a correctness or safety failure —
@@ -182,8 +208,9 @@ is outside what `disband` may excise, which makes it outside what `audit` may to
 
 Full method: `references/org-design.md`.
 
-A three-agent panel — domain reader, `headcount-skeptic`, premortem analyst — proposes departments
-from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
+A three-agent panel — domain reader, `headcount-skeptic`
+(`workforce/agents/headcount-skeptic/AGENT.md`, read in full and passed as its body), premortem analyst
+— proposes departments from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
 
 A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
 being wrong** — not by a distinct directory. Two to four is the normal answer.
@@ -585,7 +612,9 @@ T-step tells the user something broke; it does not tell them what to type.
 Every conversion marked its skill at T7; nothing has been unlinked. This step does it, once, after the
 whole org has verified.
 
-**Compute the ten Run Invariants FIRST** (`references/invariants.md`). Every row, including the zeroes.
+**Compute every Run Invariant FIRST** (`references/invariants.md` — that file owns the count; it is not
+restated here, which is how this line came to say "ten" while the table held twelve). Every row,
+including the zeroes.
 **Any row that computes to `NOT UPHELD` aborts the sweep** — that is the whole reason they are computed
 here rather than at close, where they are merely printed. `INV-VERIFY` (the org verified),
 `INV-CENSUS` (residual zero), and `INV-HOOKS` (no dead wiring) are computed at this point and gate here.

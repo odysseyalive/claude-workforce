@@ -1,6 +1,6 @@
 # Ablation — delete, then add back only what earns its place
 
-<!-- Enforcement: 7 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `ablate` refuses without an eval set. Amendments go through dual key. -->
 
 > *"Every six months, delete your CLAUDE.md, delete your skills, delete your hooks. See what the
@@ -163,7 +163,7 @@ Excluded mechanically, never offered:
   also the subject of a uniqueness check enforced at Phase A lint, so dropping one silently removes
   that check's subject. Found 2026-08-01 by classifying a real handbook: the classification route put
   the persona in the candidate list on its first run, and nothing here stopped it.
-- **`disallowedTools: Agent` on any IC** — the measured tier ceiling (`platform.md` fact 2b).
+- **`disallowedTools: Agent` on any IC** — the measured tier ceiling (`platform.md` fact 2c).
   Dropping it silently removes the org's shape guarantee, and it will read as `NEUTRAL` because the
   eval set almost certainly does not spawn anything.
 

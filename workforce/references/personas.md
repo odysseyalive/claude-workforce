@@ -1,6 +1,6 @@
 # Personas and Names
 
-<!-- Enforcement: 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — name collisions are SILENT. Phase A lint is the blocking backstop. -->
 
 ## Names: collisions are silent, and that is the whole problem
@@ -26,7 +26,7 @@ exist — while the org chart lists both and every report says the org is health
    being reported after the fact.
 
 **What is not a mitigation: a shipped hook.** Four were inherited from claude-enforcer and removed,
-because they had never fired, could not be wired, and duplicated `verify` (`enforcement.md` § Hooks).
+because they had never fired, could not be wired, and duplicated `verify` (`enforcement.md` § Nothing ships dormant).
 The residual gap is real and narrow: a collision introduced by hand-editing `.claude/agents/` between
 audits goes unnoticed until the next `verify`. A host that wants edit-time detection writes its own
 hook.
@@ -83,6 +83,10 @@ Where the audit needs judgment it convenes a panel rather than asking the user. 
 destructive action is not a mandate, and the cost of a wrong conversion is much higher than the cost
 of leaving a skill alone.
 
-Three shipped agents implement the recurring roles: `headcount-skeptic`, `handbook-cold-reader`, and
-`conversion-auditor`. Panels assembled for a specific decision draw fresh personas and must pass the
-same uniqueness check.
+The recurring roles are implemented by the definitions under `workforce/agents/` — **`manifest.txt` is
+the count, and it is not restated here**. Panels assembled for a specific decision draw fresh personas
+and must pass the same uniqueness check.
+
+*This sentence said "Three shipped agents" and named three, while `scopes.md` said four and
+`staging.md` said six, against a manifest that shipped seven. Three numbers, no two agreeing, none
+correct — a restated constant in three files, none of which `bin/check`'s constants pass covered.*

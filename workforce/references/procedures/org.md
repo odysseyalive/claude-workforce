@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement: 8 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -126,6 +126,9 @@ CHECKPOINT — Dispatch Required:
 2c. A `declared` ROW COSTS A HOP, NEVER A CAPABILITY. Refusing it here is not discarding it: name it in the work order as a step so the node runs the command instead of reproducing its work by hand (`procedure-for-procedures.md` rule 3b). Report which it was — "the table was read; `<command>` is `declared` and cannot answer this alone" — because a row refused for its state and a row nobody looked at are otherwise identical from outside.
 2d. TWO ROWS CLAIMING THE SAME WORK IS A TABLE DEFECT, NEVER A DISPATCH DECISION. IF two entries both match wholly → STOP. Report both rows verbatim and ask. Do NOT pick the first, the narrower, or the more proven — every one of those is a guess dressed as a rule, and the defect is that `index` wrote two answers to one question. Say so, and name `/workforce org index` as where it gets fixed.
 2e. A mechanical dispatch IS a dispatch: it announces, it reports, and its exit code is its verification — tier 1 (`references/verification.md`), which outranks the employee it replaced.
+2f. DATA IN HAND IS A TERMINAL ANSWER. IF the ask is answered by data this session already holds — a file already read, a command already run this session and its output still accurate, a roster or chart already loaded — ANSWER IT AND STOP. Do not spawn to re-derive what is already on screen. Announce `→ Answering directly (<the artifact that answers it>) — no spawn`, give the answer, and cite the artifact by path so the reader can check it rather than trust it. This is the user's directive, `SKILL.md` § Directives: *"if that data answers the users question directly why spin it up in agent use all those tokens"*.
+2g. FOUR REFUSALS, each sending the ask to clause 3, because the failure mode here is answering from stale or partial data rather than from none: (a) the data was read in a PRIOR session — re-read it or dispatch, never answer from memory of a file; (b) the ask needs judgment the data does not contain — a chart says who owns a file, not whether the code is correct; (c) answering would require *deriving* something the artifact does not state, which is analysis and belongs to a node; (d) the ask is a WRITE — this clause answers questions, it never performs work. **Reading more files to construct an answer is not this clause**; that is main-thread work under clause 10(c) and it is reported as such.
+2h. THE ARTIFACT IS NAMED OR THE CLAUSE DID NOT FIRE. An answer given under 2f cites the file, path, or command output it came from. An uncited direct answer is indistinguishable from a guess, and this clause is the one rung on the ladder with no exit code behind it.
 3. LOWEST COMPETENT NODE. One IC's scope covers it → that IC. Two or more ICs in one department, or intra-department sequencing → that Lead. Two or more departments, no owner, or strategic/ambiguous work → the CEO. TIES RESOLVE DOWNWARD — cheaper, fewer hops. The CEO is never a mandatory funnel.
 4. NO MODEL ASK. Every employee is model-pinned by its own frontmatter, so the active session model does not affect the work. NEVER ask the user to run `/model`, and never port a lane preflight from a dispatcher that does main-loop work.
 5. BUDGET PREFLIGHT. Compute projected spawns for this order. If it would exceed the remaining session budget, dispatch one tier lower or split the order, and say which you did.
@@ -154,6 +157,35 @@ exit code outranks the agent's report.
 mechanical work by hand once dispatched. What clause 2 does is put the cheap answer on the ladder and
 make the choice legible — `org status` quotes which rung fired, so "why did an agent do that?" has an
 answer that is read rather than re-derived.
+
+**Clause 2f closes the other half of the same directive, and it is a wider rule than clause 2.** Clause
+2 asks *"does a command already do this?"* — its predicate is a `## Mechanicals` row with `Scope:
+derived`, and its five refusals (2b) all resolve to a spawn. That leaves the commonest cheap answer of
+all off the ladder entirely: **the data is already here**. A roster question answered from a chart that
+is already loaded, a "which file owns this?" answered from a census this run just wrote — those are not
+commands and can never become rows in that table, so before 2f the ladder ran straight past them to
+*which agent*.
+
+The costs are asymmetric in the opposite direction from clause 2, which is why 2g exists and is
+stricter than 2b. Being wrong toward a spawn costs one hop. Being wrong toward a direct answer returns
+**a confident answer with no exit code behind it** — and unlike a mechanical dispatch, there is nothing
+to check it against. Hence 2h: the artifact is named, or the clause did not fire.
+
+**Its enforcement is PROCEDURAL, and it is a counted line** (`references/invariants.md` — no static
+check separates an ask that should have been answered directly from one correctly dispatched, because
+that difference is the judgment the clause is about). Printed on every run that dispatched anything,
+including the zeroes:
+
+```
+DIRECT     2 of 9 asks answered from data in hand · 7 dispatched
+           · project chart (.claude/workforce/org-chart.md) — "who owns pricing copy"
+           · census this run (.agents-symlink-manifest.txt) — "how many agents are registered"
+```
+
+**Both halves of that line are the measurement.** A zero is a real result — an org whose asks all
+needed a node. What the line prevents is the failure `org status` already names for a declined
+mechanical dispatch: from outside, an ask answered directly and an ask nobody thought about are
+identical.
 
 ---
 
@@ -207,6 +239,7 @@ nothing to happen?"
   release:          probe PASS 2026-07-29 · evals 7/7 · stamp current
   would receive:    "<sample ask>" → yes, as lowest competent node
                     "<other ask>"  → NO — `pnpm test` covers it wholly (mechanical, clause 2)
+                    "<third ask>"  → NO — answered from the chart already loaded (direct, clause 2f)
 ```
 
 **Quote the rung that fired.** "Why did an agent do that?" and "why didn't one?" are the same question

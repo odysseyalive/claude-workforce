@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement: 10 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the

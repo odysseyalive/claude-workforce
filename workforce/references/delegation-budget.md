@@ -1,6 +1,6 @@
 # Delegation Budget — depth, fan-out, and the caps
 
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `/workforce budget` reports this; `audit` gates the org design on it. -->
 
 Three caps bound every org. **None of their values are written here** — they live in `platform.md`
@@ -32,7 +32,8 @@ why this is a gate rather than a guideline.
 
 **Entry depth is not fixed.** An IC reached through CEO → Lead sits at the limit and is capped by the
 harness. The same IC reached through a directly-invoked Lead sits one level higher and is *not*. This
-is precisely why `disallowedTools: Agent` is mandatory on every IC (`platform.md` fact 2b) — it holds
+is precisely why `disallowedTools: Agent` is mandatory on every IC (fact 2b is why it is *needed*; fact
+2c is the measurement that it *works*) — it holds
 the shape invariant regardless of how the org was entered.
 
 ---
@@ -44,8 +45,18 @@ Worst case, by entry point, printed in the org chart header and recomputed by `o
 ```
 IC entry    = 1
 Lead entry  = 1 + min(direct_reports, lead_parallel_cap)
-CEO entry   = 1 + departments + Σ(per-Lead parallel spawns)
+CEO entry   =     departments + Σ(per-Lead parallel spawns)
 ```
+
+**The CEO term has no leading `1`, and the asymmetry is the point.** A directly-invoked IC or Lead *is*
+a spawn and counts itself. **The CEO is the main session** (`handbook-templates.md` § CEO), so it is not
+a spawn and must not be counted as one.
+
+*This line read `1 + departments + …` until 2026-08-03, and the table below — which is the half anyone
+actually reads — computed it without the `1`. Two answers to one question, eleven lines apart. The table
+was right. The consequence was not cosmetic: at five departments the formula gives 21 against a cap of
+20, so the row justifying the ≤4 default was arguing from a number that said the opposite of what the
+row concluded.*
 
 Per-node parallel caps are written into every `ORG-CHAIN` block, so an employee reads its own budget
 from its handbook in a fresh context rather than needing the chart.
@@ -84,7 +95,7 @@ cannot refuse. Everything available is mitigation, and it should be described as
    budget, dispatch one tier lower or split the work order.
 3. **A host-generated counter**, optional. A `SubagentStart` hook can increment
    `.claude/workforce/.spawn-count` and advise near the cap. This project ships no hooks
-   (`enforcement.md` § Hooks), so a host that wants the counter writes it. The `/org` preflight is the
+   (`enforcement.md` § Nothing ships dormant), so a host that wants the counter writes it. The `/org` preflight is the
    always-present backstop and does not depend on one.
 4. **Split large conversions across sessions** — documented, not automated.
 

@@ -1,13 +1,19 @@
 ---
-<!-- Enforcement: 3 assertion(s) in bin/check name this file; 42 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 43 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
-description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, backup, restore, rollback, disband, verify, update, version"
+description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
 version: "1.0"
 minimum-effort-level: high
 strictness: standard
-allowed-tools: Read, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
+allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
+hooks:
+  PostCompact:
+    - hooks:
+        - type: command
+          command: "echo '{\"additionalContext\": \"REMINDER: Directives are sacred. Never reword, paraphrase, summarize, or reorder text between <!-- origin: user | immutable: true --> markers. Move content — never rewrite it. The user's own words outrank every procedure in this skill.\"}'"
+          statusMessage: "Re-injecting directive awareness..."
 ---
 
 # Workforce
@@ -23,6 +29,7 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, Tas
 | `/workforce budget` | Delegation depth, fan-out, and spawn-cap accounting |
 | `/workforce hire [role]` | HR: add an employee and author its handbook |
 | `/workforce review [employee]` | Performance review: cold-read + evals + contract drift |
+| `/workforce hooks [--execute]` | Wire, report, or unwire the shipped hooks; `verify` reports dormancy |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
 <!-- /origin -->
 
@@ -58,8 +65,33 @@ Sets the standard for how a finding is closed: the cheap resolution is not a res
 the enforcement with the rule rather than after it, prove the fix by making it fail, and never close a
 finding by recording it. A flag is not a fix; a default is not a decision.*
 
+> **"The very first directive is the same directive the major directive that is in the Claude enforcer
+> project. That the users requests verbiage are absolutely retained, when building a new agents
+> (employees), skills, and scripts."**
+
+*— Added 2026-08-03, source: user directive, stated when asked whether this project fits how they work.
+**The user names this the first directive of all of them**, inherited from claude-enforcer. It is
+captured here in the order it arrived, not moved to the top: this block is never reordered, so
+precedence is stated rather than positional. It had governed the project for days without ever being
+written down — `plan/mechanical-before-agentic-2026-07-31.md` acted on its companion below while
+recording neither. Mechanics at `references/procedure-for-procedures.md` § Directives,
+`references/handbook-templates.md`, and `references/procedures/handbook.md`; the operational reading is
+— extraction is not enough, the words must reach the employee that is governed by them.*
+
+> **"use automated processes everywhere that's feasible and have handed data back to agents when it's
+> sufficient to do so otherwise, if that data answers the users question directly why spin it up in
+> agent use all those tokens"**
+
+*— Added 2026-08-03, source: user directive, same session, which the user numbers second of all of
+them. Governs every dispatch and every procedure step: an agent is the instrument of last resort, not
+first. Mechanics at `references/procedures/org.md` § Canonical Dispatch CHECKPOINT clauses 2 and 2f,
+`references/procedure-for-procedures.md` rule 3b, and `references/conversion-taxonomy.md` § The
+remainder test. Note the second clause: **data in hand that answers the question is itself a terminal
+answer**, which is a wider rule than "a command already does this."*
+
 *One further user directive — on skills that build and run agents — is recorded at
-`references/conversion-taxonomy.md`, beside the mechanics it governs. It is **not** restated here: a
+`references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
+findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
 sacred block copied to a second location is two canonical texts, which is the failure this project
 refuses everywhere else. Directives live once, wherever they were first captured.*
 <!-- /origin -->

@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""wf-protect-directives — PostToolUse hook guarding immutable directive blocks.
+
+Runs on Edit|Write. Detects byte-level drift in `<!-- origin: user | immutable:
+true -->` blocks across an org's handbooks and its extracted directive files, by
+comparing them against the `.directives.sha` sidecar `/workforce checksums` writes.
+
+WHY THIS EXISTS AT ALL. claude-enforcer defends the user's first directive — that
+their wording is retained verbatim — with a hook at edit time. claude-workforce
+inherited that hook, deleted it, and replaced it with detection at the next
+`verify`. Measured against the standing directive that a converted system must
+"work better and more efficient in the new format than they did before", that was
+a regression: the guard moved from the moment of the edit to whenever someone next
+runs a command.
+
+Three findings justified deleting the INHERITED copy. Two are still true of it and
+neither is true of this one; the third is now false outright:
+
+  1. "It had never fired — no command wired it."   -> `/workforce hooks` wires it,
+     and `verify` reports wired / orphaned / dead-wiring so dormancy is visible.
+  2. "It duplicated verify."                        -> verify runs when invoked;
+     this runs at the edit. The overlap is the point: one is a gate, one is a sweep.
+  3. "It read a sidecar nothing wrote."             -> FALSE NOW. `checksums`
+     generates `.directives.sha` (procedures/checksums.md). The artifact exists.
+
+FAIL-OPEN, NEVER FAIL-SILENT. Always exits 0. A PostToolUse exit 2 cannot undo an
+edit that already happened, and a hook bug must never block the user's work. "Loud"
+means the `additionalContext` channel fires. **An empty parse result must NEVER
+produce an empty report** — that combination is exactly what let a sidecar the
+reader could not read present as clean (claude-enforcer
+INC-2026-07-29-sidecar-format-mismatch, the second defect in that subsystem).
+
+REPORTS; NEVER REPAIRS. It cannot rewrite a directive back. `amend` flags and stops;
+so does this. Five classes, none of which is ever a silent skip:
+
+  DRIFT              row parses, hash differs from the recomputed block
+  MISSING BLOCK      sidecar names a block the file no longer has
+  MALFORMED ROW      a data line the canonical row regex cannot parse
+  UNPROTECTED BLOCK  a block in the file with no sidecar row (a coverage gap)
+  SIDECAR UNREADABLE the sidecar has data lines and none of them parse
+
+Regenerate after an INTENDED directive change:  /workforce checksums --execute
+"""
+
+import hashlib
+import json
+import os
+import re
+import sys
+
+BLOCK_RX = re.compile(
+    r"<!--\s*origin:\s*user\s*\|[^>]*immutable:\s*true\s*-->(.*?)<!--\s*/origin\s*-->",
+    re.S,
+)
+# Generators are strict; readers are liberal (procedures/checksums.md rule 1).
+ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
+
+
+def emit(message, system=False):
+    """The only output channel. Never silent when something was checked."""
+    key = "systemMessage" if system else "additionalContext"
+    print(json.dumps({key: message}))
+
+
+def normalize(text):
+    """Same normalization `checksums` uses: trailing whitespace and final newline."""
+    return "\n".join(line.rstrip() for line in text.strip().splitlines())
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        emit("wf-protect-directives: could not parse hook input — directive "
+             "protection was NOT verified for this edit", system=True)
+        return 0
+
+    path = (payload.get("tool_input") or {}).get("file_path") or ""
+    if not path:
+        return 0
+
+    norm = path.replace("\\", "/")
+    # Only files that can carry an org's sacred text.
+    if not (
+        "/.claude/agents/" in norm
+        or "/.claude/workforce/directives/" in norm
+        or norm.endswith("SKILL.md")
+    ):
+        return 0
+    if not os.path.exists(path):
+        return 0
+
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    sidecar = os.path.join(root, ".claude", "workforce", ".directives.sha")
+
+    try:
+        body = open(path, encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError) as exc:
+        emit(f"wf-protect-directives: {path} unreadable ({type(exc).__name__}) — "
+             "directive protection was NOT verified for this edit", system=True)
+        return 0
+
+    blocks = [normalize(m.group(1)) for m in BLOCK_RX.finditer(body)]
+
+    if not os.path.exists(sidecar):
+        if blocks:
+            # A coverage gap is a finding. Silence here is what the inherited
+            # defect looked like from outside.
+            emit(f"UNPROTECTED: {len(blocks)} immutable block(s) in {os.path.basename(path)} "
+                 f"and no .directives.sha sidecar exists. Run `/workforce checksums --execute` "
+                 f"to stamp them. Until then no edit to a sacred block is detectable.")
+        return 0
+
+    try:
+        side_text = open(sidecar, encoding="utf-8").read()
+    except OSError:
+        emit(f"SIDECAR UNREADABLE: {sidecar} could not be opened. Treat as NO coverage "
+             f"at all — {len(blocks)} block(s) in {os.path.basename(path)} are unverified.")
+        return 0
+
+    data_lines = [l for l in side_text.splitlines() if l.strip() and not l.startswith("#")]
+    rows, malformed = {}, []
+    for line in data_lines:
+        m = ROW_RX.match(line)
+        if m:
+            rows.setdefault(m.group(2), {})[int(m.group(3))] = m.group(1).lower()
+        else:
+            malformed.append(line.strip())
+
+    if data_lines and not rows:
+        emit(f"SIDECAR UNREADABLE: {len(data_lines)} data line(s) in .directives.sha and "
+             f"none parsed. This is the failure that reports clean about blocks it never "
+             f"examined — treat as no coverage. Regenerate with `/workforce checksums --execute`.")
+        return 0
+
+    rel = os.path.relpath(os.path.abspath(path), root).replace("\\", "/")
+    mine = rows.get(rel) or rows.get(os.path.basename(path)) or {}
+
+    findings = []
+    for i, content in enumerate(blocks, start=1):
+        want = mine.get(i)
+        if want is None:
+            findings.append(f"UNPROTECTED BLOCK: directive:{i} has no sidecar row")
+            continue
+        got = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if got != want:
+            findings.append(
+                f"DRIFT: directive:{i} content changed. A sacred block is never reworded, "
+                f"reordered, or summarized. Restore it, or if the change was intended run "
+                f"`/workforce checksums --execute`."
+            )
+    for i in sorted(set(mine) - set(range(1, len(blocks) + 1))):
+        findings.append(f"MISSING BLOCK: sidecar names directive:{i}; the file no longer has it")
+    for line in malformed:
+        findings.append(f"MALFORMED ROW: {line[:80]}")
+
+    # Coverage is reported as a count, never a bare "clean"
+    # (procedures/checksums.md rule 3).
+    if findings:
+        emit(f"DIRECTIVE PROTECTION — {os.path.basename(path)}: "
+             f"{len(blocks)} block(s) examined, {len(findings)} finding(s).\n"
+             + "\n".join(f"  - {f}" for f in findings))
+    elif blocks:
+        emit(f"Directive protection OK — {len(blocks)} of {len(blocks)} block(s) "
+             f"examined and matching in {os.path.basename(path)}.")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001 — fail-open is the contract
+        print(json.dumps({"systemMessage":
+                          f"wf-protect-directives crashed (non-fatal: {type(exc).__name__}) — "
+                          f"directive protection was NOT verified for this edit"}))
+        sys.exit(0)

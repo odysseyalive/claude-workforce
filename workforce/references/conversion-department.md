@@ -1,6 +1,6 @@
 # The Conversion Department — the judgment a regex cannot make
 
-<!-- Enforcement: 5 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate — run bin/coverage. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — UNSURE is not an outcome. This department is how the system exits it. -->
 
 Classifying a mature project's skill content is genuine work, not a lookup. Attempts to shortcut it
