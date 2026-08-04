@@ -283,6 +283,14 @@ door — this is a *prevents*, and `enforcement.md` carries it as one.
 server that exists. That gap is the one that matters for anyone else running this project
 (`verification.md` § When the server is absent).
 
+*Attempted 2026-08-03. The fixture is written and shipped — `.claude/agents/wf-mcp-absent-probe.md`,
+granting `mcp__this-server-does-not-exist` and reporting its own resolved tool list. **It did not
+register within the session that wrote it** (fact 3), so the spawn returned `Agent type not found`
+twice and the measurement is `UNAVAILABLE`, not `FAIL`. The fixture is retained precisely so the next
+session can spawn it in one call; deleting it would spend the setup again. **Do not record a result
+for this fact from the agent listing** — § Do not mistake the agent listing for a measurement applies
+here exactly.*
+
 **This fact is about `tools:`, not `mcpServers:`, and only the first survives a teammate spawn.** Fact
 18 records that the `mcpServers:` *frontmatter field* is dropped when a definition runs as a named
 teammate, while the `tools:` allowlist is documented as honored. The shipped web-facing grant is
@@ -308,6 +316,7 @@ distinction is one word wide and nothing measures it yet.**
 | 15 | Subagents **inherit the parent session's permission context**; an absent or empty `permissions.allow` is **not** "deny all" | A grant the main session lacks is a grant no employee has, so the settings review at `audit-setup.md` § Permissions is an org-wide precondition rather than a per-agent one | unverified — same source and date |
 | 16 | **There is no per-agent `permissions:` frontmatter field.** The agent-side fields are `tools:`, `disallowedTools:`, `permissionMode:`, `mcpServers:`, `hooks:` — and `tools:`/`disallowedTools:` govern tool **presence** while `permissions.*` governs tool **use** | Load-bearing, and it is the fact that says a requested design is not expressible: per-agent permission *rules* cannot be written into a handbook. The capability boundary is per-agent; the usage rule is not | unverified — same source and date |
 | 17 | Permission rules from different settings scopes are **concatenated and deduplicated, not replaced** | **The guarantee behind `0 removed`** (`audit-setup.md` § Permissions): adding a grant cannot delete a rule the user wrote. If this measures false, that section's central promise fails and the conflict row must be revisited | unverified — same source and date, and the one here most worth canarying first |
+| 13b | **A `tools:` grant naming an MCP server the host has not configured.** Fact 13 measured only servers that exist. The expected failure is **silent** — the grant resolves to nothing and the employee simply never sees the tool, which is indistinguishable from an employee that was never granted it | The case that matters for anyone else running this project: an org authored against one machine's MCP set, installed on another. `verification.md` § When the server is absent states the rule (check first, never grant blind) and **no procedure step verifies the server is configured**, so today it rests on an author remembering | unverified — fixture `.claude/agents/wf-mcp-absent-probe.md` is written and shipped; it did not register in the session that wrote it (fact 3), so the 2026-08-03 attempt is `UNAVAILABLE`, not `FAIL`. One spawn closes it |
 | 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. `wf-canary-ic` is the fixture |
 
 **Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
