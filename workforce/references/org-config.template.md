@@ -23,8 +23,8 @@ go stale between releases, and there is no discovery ladder.
 | # | Model ID | Context | Notes |
 |---|---|---|---|
 | 1 | `claude-fable-5` | 1M | most capable; priced above the Opus tier |
-| 2 | `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
-| 3 | `claude-opus-4-8` | 1M | |
+| 2 | `claude-opus-5` | 1M | the current Opus |
+| 3 | `claude-opus-4-8` | 1M | the analytical default, both tiers |
 | 4 | `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
 
 **Presented in this order, every time.** The "Other" field accepts any model ID typed by hand.
@@ -51,7 +51,7 @@ employee with no lane override resolves to the analytical row for its tier.
 
 | Tier | Model | Effort |
 |---|---|---|
-| Lead (2) | `claude-opus-5` | high |
+| Lead (2) | `claude-opus-4-8` | high |
 | IC (3) | `claude-opus-4-8` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
