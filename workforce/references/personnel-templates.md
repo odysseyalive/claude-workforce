@@ -205,10 +205,41 @@ did not cover the case. Proceed straight to the amendment.
 - [ ] NO DEFECT — the answer is present and unambiguous.
       **Requires quoting the line that answers it.** If it cannot be
       quoted, the disposition is AMEND.
+
+**Class fix:** <the change to the SKILL that stops this shape recurring in the
+      NEXT project — a named file and what it now asserts>
+      OR `INSTANCE-ONLY — <why this cannot recur elsewhere>`
 ```
 
 That last clause is the doctrine in one mechanical rule: **you may only blame the reader if you can
 point at the sentence.**
+
+### `Class fix:` is mandatory, and it is the field that stops this repeating
+
+**A DEF is written at the exact moment someone is fixing an instance.** That is why the question
+belongs here and nowhere else: it is asked while the author is holding the defect, not remembered
+afterwards.
+
+Every defect found in a *generated* org is evidence about the *generator*. A handbook that mis-stated
+a skill's capability, an index that went un-updated, a check that could not fail — the project where it
+surfaced is a sample, not the population. Fix only the sample and the next `audit` reproduces it, which
+is the failure mode `SKILL.md` § Directives calls out: *"fix the class rather than the instance."*
+
+So the field takes one of two values and **there is no third**:
+
+| Value | Means |
+|---|---|
+| a named workforce file and the assertion it now carries | the shape cannot recur — an `audit` would now refuse to author it |
+| `INSTANCE-ONLY — <reason>` | this could not arise in another project, **and the reason says why** |
+
+`INSTANCE-ONLY` with no reason, or a `Class fix:` naming an intention rather than a file, is not a
+disposition. **`wf-conform` fails a DEF record missing this field**, so a run that closes a defect
+without answering the question does not pass.
+
+*Added 2026-08-03, after three defects in one session were fixed in a target project and left standing
+in the skill that generates it. The rule already existed and was restated in `SKILL.md`, `CLAUDE.md`,
+and this file's own § Anti-bloat. Restating it a fourth time was not going to work; it needed a field
+with a check behind it.*
 
 ---
 

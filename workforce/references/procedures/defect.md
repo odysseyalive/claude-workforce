@@ -59,6 +59,23 @@ not being difficult; it found a hole.
 **If the answering line cannot be quoted, the disposition is AMEND.** That single mechanical rule is
 the whole doctrine: *you may only blame the reader if you can point at the sentence.*
 
+5b. **Answer `Class fix:` — mandatory, and it is the step that stops this recurring.** A DEF is written
+   at the exact moment someone is repairing an instance, which is why the question belongs here rather
+   than in a later review: it is asked while the author is holding the defect. **Every defect found in
+   a generated org is evidence about the generator.** Name the workforce file changed and what it now
+   asserts, or write `INSTANCE-ONLY — <why this cannot arise in another project>`. There is no third
+   value, `INSTANCE-ONLY` without a reason is not a disposition, and an intention is not a file.
+   `wf-conform` fails a DEF record missing it.
+
+5c. **Index the record.** Add it to `.claude/workforce/personnel/index.md` and correct the counts in
+   § Statistics. A record nothing points at is one the next reader never finds — and where the project
+   ships a personnel-index maintainer, **run it**; that is what it is for.
+
+   *Added 2026-08-03: four DEF records were written and none indexed, while the project's own
+   `check-personnel-index.sh` sat ready to catch it and exited 2 the moment anyone ran it. The script
+   worked. Nobody ran it. `wf-conform` now checks index membership so the omission cannot wait for
+   someone to remember.*
+
 6. **Amend and re-dispatch** the same work order. The employee then executes strictly — the handbook
    now covers the case.
 

@@ -264,6 +264,46 @@ def check_handbook(path, body, res, ceiling):
     # Deliberately one-directional: a granted server the body never mentions is NOT a
     # finding. Over-granting is a budget question, and this check has a binary answer
     # or it does not belong here (verify.md § What it deliberately does not cover).
+    # AN IC MAY INVOKE ONLY A SKILL THAT SPAWNS NOTHING, and until now nothing checked
+    # the skill. `conversion-taxonomy.md`: "the remaining skill spawns nothing — so an
+    # IC carrying `disallowedTools: Agent` can invoke it." The doctrine was right and
+    # unenforced, so a handbook could instruct an IC to invoke a spawning skill while
+    # ASSERTING the safety condition it violated.
+    #
+    # Measured 2026-08-03: `content-writer` (tier 3, `disallowedTools: Agent`) step 7
+    # read "Invoke `/copy-truth check` … it spawns nothing." That skill carries `Task`
+    # in `allowed-tools` and ships `agents/interface-claim-auditor/`. A tier ceiling
+    # with a documented route around it is not a ceiling.
+    # A handbook lives at <root>/.claude/agents/<name>.md, so the project root is three
+    # levels up. Derived rather than passed: this function's signature is shared by two
+    # call sites and a third for adopted agents.
+    _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(path))))
+    # MENTION IS NOT USE — the same distinction the MCP check above needed, arrived at
+    # the same way: by a first draft reporting two false positives on a real tree.
+    #   `## Scope` — "OUT: truth of capability claims (`content-writer` and `/copy-truth`)"
+    #                names a skill to DISCLAIM it.
+    #   a prohibition — "Do NOT invoke `/copy-truth`" names one to forbid it.
+    # Only `## Procedure` and `## Verification` say what the employee DOES, and within
+    # them a line carrying NEVER / MUST NOT / STOP / do not is a guardrail, not a step.
+    _acts = ""
+    for _sec in ("## Procedure", "## Verification"):
+        if _sec in body:
+            _acts += body.split(_sec, 1)[1].split("\n## ", 1)[0] + "\n"
+    _acts = "\n".join(l for l in _acts.splitlines() if not PROHIBITION_RX.search(l))
+    if tier == 3:
+        for sk in sorted(set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", _acts))):
+            sp = os.path.join(_root, ".claude", "skills", sk, "SKILL.md")
+            if not os.path.isfile(sp):
+                continue            # not a project skill; nothing to decide
+            sfm = frontmatter(read(sp, res) or "") or {}
+            spawns = {t.strip() for t in sfm.get("allowed-tools", "").split(",")} & {"Task", "Agent"}
+            res.add(not spawns, f"{n}: invokes only skills that spawn nothing (/{sk})",
+                    f"`/{sk}` carries {sorted(spawns)} in its `allowed-tools`, so invoking it is a "
+                    f"spawn path around this IC's `disallowedTools: Agent`. Re-home the step to a "
+                    f"delegating tier, or reduce the skill — do NOT strip its tool if it ships agents "
+                    f"that need it (conversion-taxonomy.md § an IC may invoke a skill that spawns "
+                    f"nothing).")
+
     granted = fm.get("tools")
     if granted is not None:
         wanted = set()
@@ -284,6 +324,68 @@ def check_handbook(path, body, res, ceiling):
               "alongside it: fact 13 measured that ToolSearch DEFERS tools that arrive "
               "loaded without it.",
         )
+
+
+def check_defects(root, res):
+    """Every DEF record names its class fix, and every record reaches the index.
+
+    THE FIELD THAT STOPS INSTANCE-ONLY FIXING. A DEF is written at the moment
+    someone is repairing an instance, so that is where the question "what stops the
+    NEXT project hitting this?" has to be forced. `personnel-templates.md` § DEF makes
+    `Class fix:` mandatory with exactly two legal values: a named workforce file, or
+    `INSTANCE-ONLY` with a reason.
+
+    Measured 2026-08-03: three defects found by cold readers were fixed in the target
+    project and left standing in the skill that generates it. The rule already existed
+    in three files. Restating it a fourth time was not the fix; a checked field was.
+
+    AND EVERY RECORD IS INDEXED. Four DEF records sat unindexed while the project's own
+    `check-personnel-index.sh` was ready to catch it and nobody ran it. A record nothing
+    points at is a record the next reader does not know exists.
+    """
+    pdir = os.path.join(root, ".claude", "workforce", "personnel")
+    ddir = os.path.join(pdir, "defects")
+    if not os.path.isdir(ddir):
+        return                      # no defects yet is legal
+
+    names = sorted(f for f in os.listdir(ddir)
+                   if f.startswith("DEF-") and f.endswith(".md"))
+    if not names:
+        return                      # an empty defects/ is also legal
+
+    # Read the index only once a record exists to check against it. Reading it
+    # unconditionally made a project with an empty `defects/` and no index.md report
+    # `unreadable` -> exit 2 -> "the tree could not be read", which is a false alarm
+    # about the whole run. Found by the fixture written for this very check.
+    ipath = os.path.join(pdir, "index.md")
+    index = (read(ipath, res) or "") if os.path.exists(ipath) else ""
+    res.add(os.path.exists(ipath), "personnel index exists to record defects in",
+            f"{len(names)} DEF record(s) on disk and no {ipath}")
+
+    for fn in names:
+        body = read(os.path.join(ddir, fn), res)
+        if body is None:
+            continue
+        stem = fn[:-3]
+
+        m = re.search(r"^\*\*Class fix:\*\*\s*(.+)$", body, re.M)
+        val = (m.group(1).strip() if m else "")
+        res.add(bool(m), f"{stem}: names a Class fix",
+                "a defect in a generated org is evidence about the generator; without this "
+                "field the shape recurs in the next project (personnel-templates.md § DEF)")
+        if m:
+            # INSTANCE-ONLY must carry a reason; anything else must name a file.
+            if val.upper().startswith("INSTANCE-ONLY"):
+                ok = len(val) > len("INSTANCE-ONLY") + 4
+                detail = "`INSTANCE-ONLY` with no reason is not a disposition"
+            else:
+                ok = bool(re.search(r"[\w./-]+\.(md|py|sh)\b|`[^`]+`", val))
+                detail = ("names an intention rather than a file — a class fix is a change to a "
+                          "named workforce file, or it is INSTANCE-ONLY with a reason")
+            res.add(ok, f"{stem}: Class fix is a file or a reasoned INSTANCE-ONLY", detail)
+
+        res.add(stem in index, f"{stem}: appears in the personnel index",
+                "a record nothing points at is one the next reader never finds")
 
 
 def check_journal(root, res):
@@ -496,6 +598,7 @@ def main():
 
     check_sidecar(root, res)
     check_journal(root, res)
+    check_defects(root, res)
 
     if args.json_path:
         with open(args.json_path, "w", encoding="utf-8") as fh:

@@ -4113,6 +4113,52 @@ check("wf-conform exempts aggregate journal rows",
       "aggregate row (undo is the backup)" in _wfc,
       "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Fixing the instance is not fixing the defect
+# ─────────────────────────────────────────────────────────────────────────────
+# The rule "fix the class rather than the instance" is stated in SKILL.md § Directives,
+# in CLAUDE.md, and in personnel-templates.md § Anti-bloat. On 2026-08-03 it was
+# violated three times in one session anyway: defects found by cold readers were fixed
+# in the target project and left standing in the skill that generates it.
+#
+# A fourth restatement was not going to work. The mechanism is a FIELD, checked, on the
+# artifact that is written at the exact moment an instance is being repaired.
+
+_pt = read("workforce/references/personnel-templates.md")
+check("the DEF template requires a Class fix",
+      "**Class fix:**" in _pt,
+      "the field that forces the generator question while the author is holding the defect")
+
+check("Class fix admits exactly two values",
+      "there is no third" in _pt,
+      "a named workforce file, or INSTANCE-ONLY with a reason — an intention is not a disposition")
+
+check("the defect procedure carries the Class fix step",
+      "Class fix:` — mandatory" in read("workforce/references/procedures/defect.md"),
+      "the template alone is not a procedure; the step must appear where the work is done")
+
+check("the defect procedure requires indexing the record",
+      "Index the record" in read("workforce/references/procedures/defect.md"),
+      "four DEF records went unindexed while the project's own maintainer sat unrun")
+
+check("wf-conform enforces the Class fix field",
+      "names a Class fix" in _wfc,
+      "doctrine restated four times did not hold; this is the check behind it")
+
+check("wf-conform checks DEF records reach the index",
+      "appears in the personnel index" in _wfc,
+      "a record nothing points at is one the next reader never finds")
+
+check("wf-conform forbids an IC invoking a spawning skill",
+      "invokes only skills that spawn nothing" in _wfc,
+      "conversion-taxonomy states an IC may invoke a skill only where it spawns nothing; "
+      "nothing read the skill's own allowed-tools until a handbook shipped the violation")
+
+check("the IC-spawn check scans actions, not mentions",
+      "MENTION IS NOT USE" in _wfc,
+      "a `## Scope` OUT: line and a prohibition both name a skill without invoking it — "
+      "the first draft reported both as violations")
+
 check("Phase B states the probe must run inside the target project",
       "the probe runs from a session whose project IS the target tree" in _stg,
       "a subagent inherits the spawner's project scope and skills resolve per project; probing "
