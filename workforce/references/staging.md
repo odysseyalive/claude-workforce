@@ -388,6 +388,13 @@ Fixtures persist **across** runs; that is what makes the canary reachable at all
    `--project` install into a repo that later moves, or a deleted fixture all put a run back in the
    write-this-run case.
 
+   **MEASURED 2026-08-04 on 2.1.221, both directions** (`measurements/2026-08-04-canary-from-shipped-fixtures.md`).
+   A spawn attempted ~40 minutes after writing the fixtures **in the same session** returned
+   `Agent type not found` — fact 3 holding, the expected negative. Fixtures present *before* a session
+   resolved on the **first** attempt and both assertions passed: `A=has-agent | B=has-agent | C=no-agent`
+   (TIER-LIMIT 3) and `CEILING=agent-withheld` (fact 2c). So the shipping fix is confirmed, and the
+   `UNAVAILABLE` branch below stops being the common case without ceasing to be correct.
+
    *Added 2026-08-04. This list previously opened at rule 1 and accepted the first-run loss outright:
    "the next run finds them registered." The next run is a **new session**, and a user who has just run
    an audit is told to run another one to clear DEGRADED marks the first could not clear. That is a

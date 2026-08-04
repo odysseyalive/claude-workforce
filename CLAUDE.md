@@ -295,7 +295,11 @@ exactly that and stopped. **Saying a state is wrong is not forbidding the exit t
 fixtures; Step 4b spawned them the same session; fact 3 makes that impossible. Both attempts UNAVAILABLE,
 13 handbooks DEGRADED, and a deferred row discharged by *"`/workforce verify` from a fresh session."*
 The four fixtures now carry a `canary` manifest flag and **install to `.claude/agents/`**, so the first
-audit finds them registered. `staging.md` had accepted the loss outright — *"the next run finds them
+audit finds them registered. **Measured 2026-08-04 on 2.1.221, both directions** — a spawn ~40 minutes
+after writing them *in the same session* returned `Agent type not found` (fact 3, the expected
+negative); fixtures present *before* a session resolved on the **first** attempt and both assertions
+passed: `A=has-agent | B=has-agent | C=no-agent` and `CEILING=agent-withheld`
+(`measurements/2026-08-04-canary-from-shipped-fixtures.md`). `staging.md` had accepted the loss outright — *"the next run finds them
 registered"* — and the next run is a new session, which was the whole complaint.
 
 *The lesson worth keeping: `bin/check` at 644 assertions, `bin/prove` at 37, and a walk-through against
