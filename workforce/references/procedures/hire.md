@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -208,6 +208,12 @@ source that does not exist, and the honest failure is that they invent one.
 |---|---|---|
 | **T2** extract directives | blocking, byte-exact | **N/A** — no source. Report `T2 N/A (hire)`, never a silent skip |
 | **T6b / T7** retire the skill | required, copy-then-mark | **N/A** — nothing to retire. **T8 follows T6 directly** |
+| **T7b** reduce + verify manifest | blocking, `A == B` | **N/A** — no source to reduce. The split still applies, at authoring time: § Step 3 |
+| **T7c** mark for the sweep | only on an empty remainder | **N/A** — nothing to mark |
+
+*T7b and T7c were added to the order on 2026-08-04 and were missing from this table for the rest of
+that day. The rule directly above — print the N/A rows rather than omitting them — is what would have
+caught it, and it did not, because a table is not a check.*
 
 **The invariant is unaffected and worth restating for this case.** A hire *creates* a path that did not
 exist, so the count runs zero → one. It never passes through the two-path window T7 exists to close, and

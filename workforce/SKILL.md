@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 54 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
@@ -303,6 +303,17 @@ that would apply exactly what it displayed — report first, apply on a separate
    and "nothing to convert" is never a stopping point.** Every mode asks every sanctioned setup
    question — a fresh project is where they matter most, and skipping them there is a recurring bug
    with a name.
+7c. **Creation and optimization are ONE workflow, not two.** Building a new capability and optimizing an
+   existing project run the same principles through the same files — `handbook.md` authors both,
+   `hire.md`'s transaction order registers both, `staging.md` gates both. **A rule added to the
+   conversion path is added to the creation path in the same change, or states in that change why it
+   cannot apply.** A conversion-only rule is a second system growing inside the first, and it is
+   invisible until somebody traces a path nobody has walked. Measured 2026-08-04: the mechanism/judgment
+   partition lived only in the conversion branch, so a single `audit` run produced two shapes —
+   converted skills separated correctly while employees hired from the evidence-backed roster took
+   everything into their handbooks. **That roster is the primary path (7b), so the optimization was
+   missing from the door most employees come through**, and nine live employees on the first real target
+   were authored without it. Fix the shared file, never the caller: fixing the caller is the instance.
 8. **Calibrate scaffolding to the reader.** Main-loop work runs with a human steering it: state the
    task, the guardrails, and the exit criteria, then let it work — over-specifying steps is the
    dominant failure mode there. Employee handbooks run in a fresh isolated context with no history

@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -24,6 +24,41 @@ preserve it.
 
 **Never copy an immutable block into a handbook.** Reference it and stamp a `directives-sha`. Copying
 creates two canonical texts that will diverge.
+
+### Step 1b — Partition the source: MECHANISM stays a skill, JUDGMENT becomes the handbook
+
+**BLOCKING, and it applies to EVERY case in the table above — including `hire`.** The user's directive
+(`SKILL.md` § Directives) makes skills the mechanism layer and employees the judgment layer. That is a
+rule about what a handbook *is*, not a rule about conversions, so it fires here — the one step every
+authoring path runs — rather than on the conversion branch alone.
+
+| Kind | Goes to |
+|---|---|
+| **MECHANISM** — a command to run, a script to call, a deterministic sequence with no decision point | a skill. `## Interface` declares it (`conversion-taxonomy.md` § The remainder test) |
+| **DATA** — a dataset the employee reads or writes | a data skill (§ Authoring a data skill; `hire.md` Step 3b) |
+| **CONNECTION** — an external server and its verbs | a skill carrying `## Connection` |
+| **JUDGMENT** — when, which, how much, what counts as good, refusals, escalation | **this handbook** |
+
+**On a conversion the mechanism already exists and is subtracted** (T7b). **On a hire there is nothing
+to subtract, and the mechanism has to be WRITTEN** — into a skill, not into the handbook. Same
+partition, arriving with different initial contents, exactly as `data-skills.md` frames greenfield
+against conversion: *conversion is the greenfield path arriving with the contents already in it.*
+
+**The handbook REFERENCES the skill's `## Interface`; it never restates it.** Two canonical texts is the
+failure this file already refuses one paragraph above, for immutable blocks, for the same reason.
+
+**IF the employee has no mechanism at all → say so and continue.** `no mechanism (judgment only)` is a
+legitimate and common outcome — a reviewer, an adjudicator, a strategist. A silent skip is not, because
+it is indistinguishable from a partition nobody performed.
+
+*Added 2026-08-04, after being asked whether the routines that build new workflows are the routines that
+optimize an existing project. **They share this file and diverged here.** The split lived only in T7b,
+so a single `audit` run produced two shapes: converted skills separated correctly, while employees hired
+from the evidence-backed roster took everything into their handbooks. That roster is the PRIMARY path —
+`SKILL.md` Core Principle 7b, the org comes from the work rather than the skills — so the optimization
+was missing from the door most employees come through. Nine live employees on the first real target were
+authored that way. Fixed here rather than in `hire.md`, because fixing the caller would have been the
+instance and this file is the class.*
 
 ## Step 2 — Resolve identity and frontmatter
 
