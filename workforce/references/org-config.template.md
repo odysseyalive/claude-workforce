@@ -46,6 +46,27 @@ budget question reads these cells and has no other source.*
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 
+## Effort statics — the ladder the effort budget proposes from
+
+The rungs are `max`, `xhigh`, `high`, `medium`, `low` (`references/platform.md` fact 12b — DOCUMENTED
+and unverified, and availability varies by model, so offer only rungs the selected model supports and
+never invent one).
+
+**Ordered by cost, most expensive first, and presented in that order every time** — the same rule as the
+model pool, and for a sharper reason: the two budget questions render back to back, so a reader who has
+just learned that the top of one list is the expensive end must not have to unlearn it one question
+later. Two lists ordered by opposite conventions are worse than either convention chosen consistently.
+
+**The label rule above applies here unchanged.** The recommended rung is marked where the ladder puts it
+and is never promoted to the top.
+
+There is no "Other" rung. The ladder is the whole set the harness accepts, so a hand-typed value could
+only be a rung already offered or one that does not exist.
+
+*The recommendation per lane is whatever the lane tables below already carry — Lead `high`, IC `medium`,
+creative `medium`, code `high`. This section sets the order the choices are shown in and changes none of
+them.*
+
 ## The four lanes
 
 Work is budgeted by **what kind of work it is**, not only by where the employee sits. Four lanes, each

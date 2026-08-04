@@ -341,6 +341,13 @@ nothing spawns at an effort level it controls.
 Analytical Lead, analytical IC, creative, code. The lane set is identical to the model budget minus the
 advisor, so a lane added to one is added to both or the two disagree about what a lane is.
 
+**The rungs are offered most expensive first**, in the order given by `org-config.template.md` § Effort
+statics, and **the recommendation rule is the model budget's rule unchanged**: `(recommended)` marks the
+lane's current rung where that order puts it and never promotes it to the first position. These two
+questions render back to back and must not be ordered by opposite conventions. Offer only the rungs the
+lane's selected model supports, and never invent one — the ladder is the complete set, so there is no
+"Other" here.
+
 **The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
 and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a
 first run it is simply empty. An earlier form of this line claimed the panel's output as its source,

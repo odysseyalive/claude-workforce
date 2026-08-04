@@ -2866,6 +2866,25 @@ check(
     "audit-setup.md Step 0.4a no longer forbids promoting the recommended static to "
     "first position; the cost ranking is the only thing that orders that list",
 )
+# The effort budget renders immediately after the model budget. Step 0.4b named
+# no order at all until 2026-08-03, so the host convention would have applied to
+# one question and not its neighbour — two lists, opposite conventions, back to
+# back. Parsed rather than string-matched so an ascending rewrite fails too.
+_rung_m = re.search(r"The rungs are ((?:`[a-z]+`(?:, )?)+)", _tpl_cfg)
+_rungs = re.findall(r"`([a-z]+)`", _rung_m.group(1)) if _rung_m else []
+check(
+    "org-config: the effort ladder is ordered most expensive first",
+    _rungs == ["max", "xhigh", "high", "medium", "low"],
+    f"effort rungs read {_rungs} — the ladder must descend by cost so it matches the "
+    "model pool it renders beside; platform.md fact 12b owns which rungs exist",
+)
+check(
+    "audit-setup: the effort budget orders its rungs most expensive first",
+    "The rungs are offered most expensive first" in _asu,
+    "audit-setup.md Step 0.4b no longer states the rung order, so the host convention "
+    "applies to it while the model budget overrides — the two render back to back",
+)
+
 _lane_recs = dict(
     (m.group(2).lower(), m.group(1))
     for m in re.finditer(
