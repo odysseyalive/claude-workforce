@@ -168,8 +168,28 @@ def main():
     root = os.path.abspath(args.root)
     r = classify(root)
     if r is None:
-        print(f"wf-claude-md: no readable CLAUDE.md under {root}", file=sys.stderr)
-        return 2
+        # ABSENT IS THE SPARSEST CASE, NOT AN ERROR. The directive is that CLAUDE.md is
+        # "built mechanically for each project" and kept "very sparce or next to
+        # nothing" — a project with none is already there, and refusing to act was the
+        # script declining the one case the directive most clearly covers.
+        #
+        # Only CHARTER-FIRST writes a CLAUDE.md today (`audit.md` Step 1a); a GREENFIELD
+        # project with source and no CLAUDE.md got nothing at all, so the generated
+        # region never landed and the org had no front door.
+        target = os.path.join(root, "CLAUDE.md")
+        if os.path.exists(target):
+            print(f"wf-claude-md: {target} exists but could not be read", file=sys.stderr)
+            return 2
+        print(f"wf-claude-md — {target}")
+        print("  ABSENT — nothing is injected per spawn today, which is the floor this "
+              "directive aims at")
+        if not args.execute:
+            print("  --execute would create it containing the generated region and nothing else")
+            return 0
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(region(root))
+        print(f"  created {target} — {os.path.getsize(target):,} B, region only, no prose invented")
+        return 0
 
     saved = sum(len(l) + 1 for _, l in r["duplicated"])
     prop = sum(len(l) + 1 for _, l in r["derivable"])

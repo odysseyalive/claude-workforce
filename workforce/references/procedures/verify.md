@@ -331,6 +331,16 @@ line only where `.claude/` is itself tracked, since otherwise it is already cove
 is noise. Under no VCS there is nothing to check, and already-ignored is a one-line notice rather than a
 finding.
 
+**CLAUDE.md is measured here, by the same two scripts the survey uses** — `wf-context` for the
+IDENTITY bytes every spawn pays, and `wf-claude-md` for the `DUPLICATED` / `DERIVABLE` / `USER` split
+(`references/claude-md.md`). Report all three counts including the zeroes.
+**DUPLICATED above zero is a finding**: those lines exist verbatim in a handbook, so the org pays twice and
+`wf-claude-md --execute` removes exactly them. `DERIVABLE` is reported and never removed, and
+`USER` is neither.
+
+*This file said nothing about CLAUDE.md's cost while `claude-md.md` stated that `verify` reports it.
+Doctrine on one side, silence on the other — written the same day, which is how fast that gap opens.*
+
 **`CLAUDE.md`, for content the conversion made false.** Distinct from the size proposal at `audit.md`
 Step 1, and the two never merge into one list:
 

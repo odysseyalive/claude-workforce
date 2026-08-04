@@ -80,8 +80,19 @@ is thin and the roster must be correspondingly small. An org proposed from guess
 small one proposed from facts.
 
 **Report CLAUDE.md size against a budget — and name what to cut.** It is injected into every subagent
-with no opt-out, so its length is multiplied by fan-out: the highest-leverage cost lever in the system,
-and it is not this project's file.
+with no opt-out, so its length is multiplied by fan-out: the highest-leverage cost lever in the system.
+
+**Measure it; never estimate it.** Both numbers come from scripts, and a survey that states either from
+a hand count is stating a number nothing produced:
+
+```bash
+.claude/skills/workforce/bin/wf-context   --root "${CLAUDE_PROJECT_DIR}"   # IDENTITY bytes per spawn
+.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}"   # DUPLICATED / DERIVABLE / USER
+```
+
+`wf-context` is what makes the cost legible rather than abstract — it reports IDENTITY against routing
+and reference, so "89% of what an employee receives before its task" is a measurement rather than a
+worry. It existed and was wired only into `budget`, so no audit ever printed it.
 
 A line count is a number; a number is not actionable. `/doctor` ships this check in the form worth
 copying — it "proposes trimming checked-in `CLAUDE.md` files by cutting content Claude could derive from
@@ -616,7 +627,7 @@ completes; a probe failure is fixed in the same run, never deferred.
 ## Step 6 — Execute
 
 Order: **conversions → handbooks → data skills → charter and principles → the Constitution Gate →
-model rewrite → `org index` → `org embed` → `claude-md` → `checksums` → `verify` → the sweep.**
+model rewrite → `org index` → `org embed` → `wf-claude-md` → `checksums` → `verify` → the sweep.**
 
 **`checksums` is in this list because it was in no list.** It generates
 `.claude/workforce/.directives.sha`, the sidecar `wf-protect-directives` compares every edit against —
@@ -627,7 +638,7 @@ every edit, forever**, and the only signal was a `verify` finding telling the us
 hand. That is the "nothing ships dormant" failure (`enforcement.md`) applied to the sidecar rather than
 the hook.
 
-**`claude-md` runs beside it, and for the same reason.** CLAUDE.md is injected into every subagent
+**`wf-claude-md` runs beside it, and for the same reason.** CLAUDE.md is injected into every subagent
 with no opt-out (fact 6), so a line duplicated between it and a handbook is paid on every spawn while
 the handbook copy is paid once. `wf-claude-md` writes the generated region and removes only lines
 proven verbatim in a handbook or extracted directive; `DERIVABLE` content is reported and never
