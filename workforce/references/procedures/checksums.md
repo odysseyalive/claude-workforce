@@ -47,6 +47,28 @@ Four rules follow, and they are not optional:
 | `<path>` | relative to `${CLAUDE_PROJECT_DIR}`, so a sidecar survives being moved with the tree |
 | `:directive:<N>` | 1-based index of the block **within that file**, in document order |
 
+**Block SELECTION, stated once for the same reason — and it was not stated at all until 2026-08-03.**
+This file specified how to *normalize* a block and never how to *find* one, so two readers of the same
+tree disagreed on the count:
+
+| Form | Counts as a block? |
+|---|---|
+| the marker **alone on its line** (leading whitespace allowed) | **yes** — this is the canonical form |
+| the marker inside a **fenced code example** | **yes** — a template ships its markers, and a sweep must see them |
+| the marker quoted **inline in prose or inside a JSON string** | **no** — it is a mention, not a block |
+
+**The discriminator is "alone on its line", and it is the whole rule.** A line quoting a START marker inside a JSON string literal — as `enforcement.md` § The machine-owned
+region does, to show why markers cannot live in JSON — documents a hazard. It does not open a region.
+
+*Written after a sweep's re-derivation took four attempts to agree with this command's own generator —
+64, then 65, then 71, converging on 76 of 76. **Every mismatch was an INDEX SHIFT, never content
+drift**: `directive:2` hashing to the digest recorded for `directive:1`, because one reader counted an
+inline mention as block 1 and the other did not. Content was never at risk and no user text was ever
+in doubt, which is exactly what made it survivable long enough to matter — a per-block digest whose
+per-block INDEX is computed differently by two readers reports MISMATCH on healthy files and OK on
+drifted ones, and this file's rule 1 ("generators are strict; readers are liberal") cannot resolve it
+because liberality about spacing says nothing about which spans exist.*
+
 **Normalization, stated once because two readers must apply the same rule:** strip leading and trailing
 whitespace from the span, then right-strip every line. Nothing else — no case folding, no whitespace
 collapsing inside a line, no markdown normalization. A sacred block's punctuation is the user's.

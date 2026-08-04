@@ -73,11 +73,31 @@ predecessor wrote survive re-owned, with their registrations rewritten *before* 
 them is removed (`conversion-taxonomy.md` § What succession removes). **A sweep that deletes first and
 relocates after has produced dead wiring**, and dead wiring outranks every other finding in the report.
 
+**Three things this step does that a plan reliably undercounts, all found by the first `--review` run:**
+
+| | |
+|---|---|
+| **Count FILES, not hooks** | a hook is commonly a `.sh` **and** a `.ps1` port. `DEF-Q-005` said "the two load-bearing hooks" and meant four files; the Windows variants would have been deleted in silence, and a user directive names them explicitly |
+| **Create the destination** | `.claude/workforce/maintainers/` does not exist until something makes it. Relocating into an absent directory is a failure discovered mid-transaction, after the first move |
+| **Record every rewritten registration in `.settings-owned.json`** | its schema already carries a `hooks` array (`enforcement.md` § The machine-owned region) and a run that rewrites a registration without recording it **strands that entry for `disband`**, which removes exactly what the sidecar names and nothing else. The relocation would then be permanent and unowned |
+
 **6. Sweep, once, atomically per target.** Then re-run the hook census and print `INV-HOOKS`: dead
 wiring must be **zero**.
 
 **7. Write the report** to `.claude/workforce/work/<run-id>/sweep-report.md` **before printing it**, and
 discharge the deferred rows this command owns.
+
+**"Owns" means the row names THIS command in its `discharged by` cell, and nothing else.** `deferred.md`
+is explicit that a command never discharges another command's rows. **So a row created before this
+command existed still points at `/workforce audit` and cannot be discharged here** — the run must
+report it as owned-by-another, not silently close it and not silently ignore it.
+
+*Found by the first `--review` run, 2026-08-03 (R1). `DEF-Q-004` and `DEF-Q-005` both read
+`discharged by: /workforce audit`, because **this command was authored precisely to make reaching that
+deletion cheap and neither row was repointed at it.** The command built to discharge them could not.
+The Reporting block below still shows `discharged: DEF-Q-004, DEF-Q-005` as its example, which is
+correct only once those rows name this command — repointing them is a `deferred.md` edit, not something
+the sweep may do to itself mid-run.*
 
 ---
 
