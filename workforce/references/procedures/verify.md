@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 27 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -217,6 +217,22 @@ constraint here" rather than as a gap.
 | Every section `references/data-skills.md` § Required sections lists is present, in that order | a dataset whose degradation contract, git policy, or maintainer list was never written — a reader finds no rule and infers there is none |
 | Every data skill is named as a dependency by at least one handbook | an orphan (`references/data-skills.md` § Every data skill is reachable from a handbook) — either dead, or never ours to write |
 | Every invariant classed `mechanical` has a maintainer, and every maintainer row records a negative-test result | an invariant demoted to prose, and a validator nobody ever saw reject anything — indistinguishable from `exit 0` |
+
+## Mechanism-layer conformance
+
+The two shapes the mechanism-layer directive introduced (`SKILL.md` § Directives). Both were specified
+with no checker on the day they landed — **the defect this project records more than any other, in the
+patch written to close it** — and both fail the same silent way: a missing section reads as "this skill
+has no contract" rather than as a gap.
+
+| Check | Catches |
+|---|---|
+| A **reduced** skill carries `## Interface` with all three rows — `Invoke`, `Returns`, `Fails` | an employee inferring the contract, which reintroduces exactly the variance the mechanism layer removes. A caller that cannot tell "no data" from "broken" treats one as the other |
+| A skill declaring `## Connection` names the **server**, the **auth mode**, and its verbs split **read** vs **write** | a wildcard grant. `invest-analyst` had to deny twelve Alpaca transacting verbs by exact name, because a wildcard would have re-granted `close_all_positions` |
+
+**A skill with no `## Connection` is conformant** — most have none. The check fires on a Connection
+block that is present and incomplete, never on its absence, because absence is the ordinary case and a
+check that demanded one everywhere would be inventing external tools.
 
 **Sections are checked for presence, not for contents.** A data skill whose `## Maintainers` list is
 empty is conformant — some datasets have no script, and inventing one to fill the section is worse than

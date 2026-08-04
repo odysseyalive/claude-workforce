@@ -195,10 +195,25 @@ why. A judgment nobody can audit is indistinguishable from a guess, and this one
 
 How an employee calls the reduced skill and what it hands back is exactly where the two layers meet,
 and it is what the directive is about: *mechanically created context that is solid and dependable.* So
-**every reduced skill declares its interface — the invocation, and the shape of what returns — and the
-handbook REFERENCES that declaration rather than restating it.** Two canonical texts is the failure
-this project refuses everywhere else, and an employee left to infer the contract reintroduces exactly
-the variance the mechanism layer exists to remove.
+**every reduced skill declares its interface — and the handbook REFERENCES that declaration rather than
+restating it.** Two canonical texts is the failure this project refuses everywhere else, and an
+employee left to infer the contract reintroduces exactly the variance the mechanism layer exists to
+remove.
+
+**It is a section, `## Interface`, with three rows and no prose.** *Specified here 2026-08-04 because
+the first version of this paragraph said "declares its invocation and return shape" and stopped —
+naming an artifact with no shape, beside a `## Schema` specified field by field. A declaration nobody
+can write wrongly is a declaration nobody writes.*
+
+| Row | Holds |
+|---|---|
+| `Invoke` | the literal invocation, runnable as written — the same string an employee puts in a `Bash` call |
+| `Returns` | the shape of what comes back: the format, the fields, and whether it is stable across calls |
+| `Fails` | the non-zero exits and what each means — an employee that cannot tell "no data" from "broken" will treat one as the other |
+
+**`Fails` is the row that earns the section.** A mechanism layer exists to be dependable, and a caller
+that reads a crash as an empty result is exactly the silent-wrong-answer class this project builds
+detection for. `verify` checks that a reduced skill carries all three rows.
 
 #### BLOCKING — reduction is a transform, verified by the invocation manifest
 

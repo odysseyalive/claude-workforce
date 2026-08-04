@@ -2562,6 +2562,39 @@ check(
 # its verification, and the conditional mark.
 _ct2 = read("workforce/references/conversion-taxonomy.md")
 _hire2 = read("workforce/references/procedures/hire.md")
+# Found 2026-08-04 by tracing a new-feature ask through /org rung 10(b) end to
+# end. `hire.md` mentioned data skills ZERO times while Step 2 placed "its
+# records" and Step 5 recorded an EMP — so the path that hands a new capability's
+# verbatim words to `hire` produced a handbook naming records nothing created.
+# audit Step 6 lists data skills in its order; this path never did. The producer
+# existed (`/workforce handbook <data-skill>`) and was wired into one path only.
+check(
+    "hire: an employee with persistent state gets its data skill before registering",
+    "## Step 3b" in _hire2 and "data skill" in _hire2
+    and "no records" in _hire2,
+    "Step 2 places the records and Step 5 records an EMP; without this step "
+    "nothing creates them, and the gap is invisible because the handbook reads "
+    "as though the dataset exists",
+)
+# Both shapes below shipped specified-and-uncheckable on the day they landed —
+# in the patch whose whole subject is doctrine written with nothing making it true.
+check(
+    "mechanism layer: the Interface declaration has a shape, not just a name",
+    "| `Invoke` |" in _ct2 and "| `Returns` |" in _ct2 and "| `Fails` |" in _ct2
+    and "## Interface" in _ct2,
+    "the first version named an artifact with no shape, beside a `## Schema` "
+    "specified field by field. A declaration nobody can write wrongly is a "
+    "declaration nobody writes",
+)
+check(
+    "mechanism layer: verify owns both new shapes, and absence of Connection is legal",
+    "Mechanism-layer conformance" in vfy
+    and "## Interface" in vfy
+    and "no `## Connection` is conformant" in vfy,
+    "a shape with no checker is the defect this project records more than any "
+    "other; and demanding a Connection block everywhere would invent external "
+    "tools for skills that reach none",
+)
 check(
     "remainder: audit APPLIES the cut in-run, mechanically, not by hand-editing",
     "wf-remainder --apply <SKILL.md> --drop" in aud

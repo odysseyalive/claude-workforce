@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -68,6 +68,26 @@ department and needs the department cap checked.
 
 Through `handbook.md`: identity, frontmatter, template, lint, probe. Nothing is registered until the
 cold-read probe passes.
+
+## Step 3b — Author its records, if it has any
+
+**BLOCKING — an employee whose handbook reads or writes persistent state does not register until that
+state has a data skill.** Step 2 placed "its records"; this is the step that creates them, via
+`/workforce handbook <data-skill> --execute` (`procedures/handbook.md` § Authoring a data skill;
+shape at `references/data-skills.md`).
+
+**This step did not exist, and its absence had one visible shape**: `hire.md` mentioned data skills
+**zero times** while Step 2 placed records and Step 5 recorded an `EMP`. So a capability arriving
+through `/org` rung 10(b) — the rung that hands a new feature's verbatim words to `hire` — produced a
+handbook naming records that nothing created. `audit` Step 6 lists data skills in its execution order;
+this path never did. Found 2026-08-04 by tracing a new-feature ask end to end.
+
+**The dataset may already exist**, and then this step writes the skill *around* it at its current path
+— `data-skills.md` § The data never moves governs, and it governs here exactly as it does on a
+conversion. Greenfield and conversion are one path arriving with different initial contents.
+
+**IF the employee touches no persistent state → say so and continue.** `no records` is a measurement;
+a silent skip is indistinguishable from a step that never ran.
 
 ## Step 4 — Register
 
