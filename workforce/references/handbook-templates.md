@@ -259,7 +259,9 @@ Never proceed on a directive you could not read.
 3. <…>
 
 ## Verification
-1. Run `<exact command>`. It must <exact expected result>.
+- Check: `<exact command>` — expect exit 0
+- Negative: `<the same command against an input that MUST be rejected>` — expect nonzero
+1. Run the Check above. It must <exact expected result>.
 2. <Second check, if the first cannot cover the exit criteria.>
 3. **A work order that changed nothing passes on saying so.** Where a check tests for evidence of
    change — a non-empty `git diff --stat`, a new artifact, a modified file — it is satisfied EITHER by
@@ -272,6 +274,23 @@ Never proceed on a directive you could not read.
    unrequested change, and the order did not authorize it.
 5. On failure, fix and re-run — at most 2 attempts. On a third failure STOP and report
    `FAIL: <exact command output>`. NEVER report PASS on a check you did not run.
+
+**The `Check:` / `Negative:` pair is the runnable form, and it is what `wf-checkrun` executes.** The
+numbered rows below state the employee's protocol; these two state the *commands*, in the one shape a
+script can find without guessing which backticked span in a section is a command and which is a
+filename. `--run` executes the Check; `--prove` executes the Negative and requires it to exit
+**non-zero**.
+
+**`Negative:` is not optional decoration, and it is the row that would have caught the worst
+verification defect this project has recorded.** `content-writer` shipped three checks of the form
+`bash <hook> <draft>` against hooks that read their payload on **stdin** and ignore any path argument.
+All three exited 0 unconditionally — including on a file of pure em-dashes. The employee whose entire
+job was prose quality had no working quality gate, and *every check resolved, and every check ran, and
+every check passed.* Only running it against an input that MUST be rejected separates a check from a
+decoration. The rule already existed one level up — `procedures/verify.md` requires a recorded
+negative-test result for every invariant classed `mechanical`, because *"a validator nobody ever saw
+reject anything"* is **indistinguishable from `exit 0`** — and it had simply never reached the
+handbooks.
 
 *Rows 3 and 4 are here because they were paid for. On the first real audit, two cold readers
 independently returned `AMBIGUOUS` on the same contradiction: a read-only probe whose `## Verification`

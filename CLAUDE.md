@@ -275,6 +275,52 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-04
 
+**Closed 2026-08-04 (latest) — the handbook verification gap. A check is not a check until it has been
+seen to fail.** The entire mechanical coverage of `## Verification` — the section `verification.md`
+opens by calling the highest-leverage one in any handbook — was `wf-conform`'s **"is not empty"**,
+which the word *"yes"* satisfies. Nothing resolved the named check against disk and nothing ran it.
+`verify.md` declared the question out of scope: *"whether a `## Verification` check is real or
+decoration."*
+
+**That sentence was half right, and the half it got wrong was already answered one file away.** "Is
+this check real?" is judgment; **"has it ever been observed to fail?"** is binary. `verify.md` has
+required a recorded negative-test result for every `mechanical` invariant since it was written —
+*"a validator nobody ever saw reject anything — indistinguishable from `exit 0`"* — and the rule had
+never reached the handbooks. **The doctrine existed, applied to the wrong population.**
+
+`content-writer` is the worked example, and it passed everything: three commands of the form
+`bash <hook> <draft>` against hooks that read their payload on **stdin** and ignore any path argument.
+**All three resolved, all three ran, all three exited 0 — including on a file of pure em-dashes.**
+
+| | |
+|---|---|
+| `wf-checkrun` | new. RESOLVED (every handbook, any shape) · `--run` RUNS · `--prove` **DISCRIMINATES** — the negative must exit non-zero |
+| the declared form | `- Check:` / `- Negative:`, mirroring how `## Probe` declares a task and the shape of a correct result. Undeclared is **reported, never failed** — the grandfathering `wf-conform` learned from 9 false failures |
+| `wf-conform` | gained "names at least one literal invocation" and an **advisory** channel that reports without setting the exit code |
+
+**Four defects in the patch, none found by re-reading.** `0 resolved · 19 dead` where all 19 were on
+disk (a both-ends `strip()` eating the leading dot of `.claude/`); three false-positive classes at
+once (`/text-eval` is a slash command); the first draft **short-circuited before the founding defect**,
+so it would have missed the one case it was written for; and `0 VACUOUS` beside `0 ran` reading as
+clean when it means **nothing executed** — `INV-BATCH` one level down.
+
+**And it exposed a live bug in `wf-conform` by reading the same bytes.** A handbook mentions
+`` `## Verification` `` in prose above the real heading, so `body.split(...)` handed **every** reader
+the tail of `## Procedure`. The old not-empty assertion **passed on the wrong segment**, which is why
+it survived as long as the check existed. Fixed as a class — one line-anchored `section()` in both
+scripts, covering `## Directives`, `## Procedure`, `## Invariants`. Resolved tokens on the real tree
+went 13 → 15.
+
+12 assertions, **each proven by breaking it**; 8 script fixtures; 5/5 writers idempotent. Record in
+`plan/handbook-verification-gap-2026-08-04.md`.
+
+*Still open from this:* **no handbook anywhere declares a `Check:` line yet**, so `--run` and
+`--prove` are exercised only by fixtures — the resolve layer works on the real population today and
+the run layer waits on migration. **`bin/prove` is blocked by a pre-existing red baseline**: four
+canary fixtures lack `measures-fact:`, and adding it would trip *"no fixture survives its own
+measurement"* and declare all four residue, colliding with the canary-from-shipped-fixtures design.
+Left untouched deliberately — it is a decision, not a lint. Author-run, not cold-read.
+
 **Closed 2026-08-04 (latest) — the mechanism layer. Skills own MECHANISM, employees own JUDGMENT.**
 A new user directive, and the organizing principle of conversion: *conversion **separates** a skill, it
 does not absorb one.* Judgment moves up into a handbook; mechanism — data acquisition, data management,

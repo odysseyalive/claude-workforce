@@ -41,6 +41,60 @@ employee for independent review (tier 4), because ICs cannot delegate.
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
 the exact output — never a third silent retry, never a downgraded claim.
 
+---
+
+## Three states, and only the third is a check
+
+**A check that has never been observed failing is indistinguishable from one that cannot fail.** The
+tier table above ranks what a check *is*; this ranks what is actually known about it.
+
+| State | Means | Established by |
+|---|---|---|
+| **RESOLVED** | the thing it names is on disk | `wf-checkrun` — mechanical, every handbook |
+| **RUNS** | it executes and exits 0 on the real input | `wf-checkrun --run` |
+| **DISCRIMINATES** | it also exits **non-zero** on an input declared as violating | `wf-checkrun --prove` |
+
+**RUNS is what everyone already calls verified, and it is the state the worst verification defect in
+this project's record passed three times.** `content-writer` shipped three commands of the form
+`bash <hook> <draft>` — "It must exit 0" — against hooks that read a PreToolUse payload on **stdin**
+and ignore any path argument. All three exited 0 unconditionally, *including on a file of pure
+em-dashes*. Every one resolved. Every one ran. Every one passed. The employee whose entire job was
+prose quality had no working quality gate, and the audit had granted `permissions.allow` entries for
+checks that could not check.
+
+**The rule is not new here — it is one level up, and it never reached the handbooks.**
+`procedures/verify.md` already requires that every invariant classed `mechanical` record a
+negative-test result, for exactly this reason: *"a validator nobody ever saw reject anything —
+indistinguishable from `exit 0`."* Applying it to `## Verification` is a class fix, not an invention.
+Its ancestor is `bin/prove`, which this project has demanded since 2026-08-03: **an assertion never
+observed failing might be testing nothing.**
+
+### The runnable form is declared
+
+A script cannot tell which backticked span in a section is a command — inline backticks hold exit
+codes, filenames, and section names as often as invocations, and an extractor that ran them would
+execute garbage. So the commands are declared, the same way `## Probe` declares a concrete task and
+the shape of a correct result:
+
+```markdown
+- Check: `npm test` — expect exit 0
+- Negative: `npm test -- --grep zzz-no-such-test` — expect nonzero
+```
+
+**Writing a `Negative:` is a design act, not paperwork.** It asks *what input must this reject?* — and
+a check whose author cannot name one has usually not written a check. Where the negative genuinely
+cannot be constructed, say so in the section and take the loss visibly, rather than leaving a blank
+that reads as proof.
+
+**A handbook with no `Check:` line is UNDECLARED — reported, never failed.** Every handbook authored
+before this contract is in that state, and failing them all at once reproduces the run that taught
+`wf-conform` its hardest lesson: 9 reported failures, every one of them false, and **a check that
+always fails stops being read.**
+
+**What resolution does NOT prove.** That a file exists says nothing about whether running it means
+anything — it is the necessary half, and `content-writer`'s hooks were all on disk. **Never report a
+resolved check as a verified one**; the states are printed separately for that reason.
+
 ### "Tier" is three different scales — never write the number into a handbook
 
 `verification.md`'s ladder numbers checks. A catalog numbers its **own** tiers on a different axis —

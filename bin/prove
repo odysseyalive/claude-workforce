@@ -35,11 +35,40 @@ DSC = "workforce/references/procedures/discharge.md"
 HIR = "workforce/references/procedures/hire.md"
 VFY = "workforce/references/procedures/verify.md"
 HBK = "workforce/references/procedures/handbook.md"
+CKR = "workforce/bin/wf-checkrun"
+CFM = "workforce/bin/wf-conform"
+VER = "workforce/references/verification.md"
+TPL = "workforce/references/handbook-templates.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── the handbook verification gap (2026-08-04) ───────────────────────────
+    ("wf-checkrun is shipped in the manifest",
+     MAN, "del", "exec workforce/bin/wf-checkrun\n"),
+    ("wf-checkrun names the VACUOUS state and what it means",
+     CKR, "del", "exit 0 on the input declared as violating"),
+    ("wf-checkrun prints resolution and falsification as separate counts",
+     CKR, "del", "discriminate \u00b7 "),
+    ("wf-checkrun says so when --run executed nothing",
+     CKR, "del", "NOTHING RAN"),
+    ("wf-checkrun never reports an undecidable command as dead",
+     CKR, "del", "never reported as dead"),
+    ("wf-checkrun runs nothing without --run or --prove",
+     CKR, "del", "if args.run:"),
+    ("wf-checkrun excludes the Negative: line from path resolution",
+     CKR, "del", "NEGATIVE_LINE_RX.sub"),
+    ("both section readers match the heading line-anchored",
+     CFM, "del", "re.escape(heading)"),
+    ("wf-conform reports a missing negative case without failing the file",
+     CFM, "del", 'not r.get("advisory")'),
+    ("verification.md states that only a falsified check is a check",
+     VER, "del", "Three states, and only the third is a check"),
+    ("verify.md no longer calls the real-or-decoration question uncheckable",
+     VFY, "append", "\nwhether a `## Verification` check is *real* or decoration\n"),
+    ("the IC template ships the declared runnable form",
+     TPL, "del", "- Check: `<exact command>`"),
     ("conversion-taxonomy forbids splitting a run across sessions",
      CT, "del", "a run is never split across sessions, and no gate may defer one"),
     ("conversion-taxonomy states the backup is what makes the batch safe",

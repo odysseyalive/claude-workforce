@@ -1,0 +1,531 @@
+#!/usr/bin/env python3
+"""wf-checkrun — resolve, run, and falsify the check a handbook names.
+
+`## Verification` is the highest-leverage section of any handbook
+(`references/verification.md`) and until now the ONLY thing any instrument asserted
+about it was that it is not empty (`wf-conform`). So a handbook could name a check
+that did not exist, or one that could not fail, and every count printed clean.
+
+Measured, and the reason this exists: `content-writer` on a real project shipped
+three `## Verification` commands of the form `bash <hook> <draft>` — "It must exit 0"
+— against hooks that read their JSON payload on **stdin** and ignore any path
+argument. All three exited 0 unconditionally, INCLUDING on a file of pure em-dashes.
+The employee whose entire job was prose quality had no working quality gate, and
+every PASS it had ever returned rested on three checks that could not fail. A cold
+reader found it; nothing mechanical could.
+
+THREE STATES, AND ONLY THE THIRD IS A CHECK:
+
+    RESOLVED      the thing it names is on disk. Necessary, nowhere near sufficient.
+    RUNS          it executes and exits 0 on the real input. THIS IS WHAT EVERYONE
+                  ALREADY CALLS VERIFIED, and content-writer passed it three times.
+    DISCRIMINATES it also exits NON-ZERO on a declared violating input.
+
+The third is the whole point, and it is this project's own discipline applied one
+level down: `bin/prove` proves a `bin/check` assertion by breaking it, and
+`procedures/verify.md` already requires that every invariant classed `mechanical`
+record a negative-test result — "a validator nobody ever saw reject anything —
+indistinguishable from `exit 0`." That rule existed for invariants and had simply
+never reached the handbooks. This is that class fix, not a new idea.
+
+WHAT IS BLOCKING AND WHAT IS NOT
+
+Resolution is MECHANICAL and applies to every governed handbook, whatever shape its
+section is written in: a path-like token that is not on disk is a DEAD CHECK, the
+exact analogue of `discovery.md` § Dead wiring, and it reads as protection while
+enforcing nothing.
+
+Running and falsifying need to know WHICH span is a command, and that is not
+decidable from prose. Inline backticks in a real `## Verification` hold exit codes,
+filenames, and section names as often as commands, so an extractor that ran them
+would execute garbage — over-capture here is not a bad report, it is a bad
+side effect. So the runnable form is DECLARED, exactly as `## Probe` declares a
+concrete task and the shape of a correct result:
+
+    - Check: `npm test` — expect exit 0
+    - Negative: `npm test -- --grep zzz-no-such-test` — expect nonzero
+
+A handbook with no `Check:` line is UNDECLARED: reported, with the fix named, and it
+does NOT set the exit code. That is the GOVERNED-vs-ADOPTED precedent in `wf-conform`
+— holding a file to a contract it was never under produced 9 reported failures on a
+real org, every one of them false, and "a check that always fails stops being read."
+
+UNDECIDABLE IS NEVER REPORTED AS DEAD. Inherited verbatim from `wf-census`, whose
+resolver this imports rather than restates: a bare name found on PATH, an inline
+`sh -c` pipeline, a command carrying an env var this process cannot expand. A false
+dead row invites someone to delete a working check, which is worse than silence.
+
+Usage
+    wf-checkrun [--root DIR] [--agent NAME] [--run] [--prove]
+                [--timeout SEC] [--json PATH] [--quiet]
+
+Exit
+    0  clean          1  at least one finding, each named
+    2  the tree could not be read — NEVER 0 on a target it could not open
+"""
+
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+
+# `## Verification` is the section; the ORG-RECORD marker is what puts a handbook
+# under this contract. Matching the MARKER rather than the string is deliberate:
+# wf-conform's first attempt tested `"ORG-RECORD" in body` and an agent whose prose
+# said "No ORG-RECORD" classified as governed.
+ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
+
+FENCE_RX = re.compile(r"^[ \t]*```[a-zA-Z]*[ \t]*\n(.*?)^[ \t]*```", re.S | re.M)
+BACKTICK_RX = re.compile(r"`([^`\n]+)`")
+
+# The declared runnable form. Tolerant of list markers and numbering, strict about
+# the keyword, because the keyword is the thing that makes it decidable.
+CHECK_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Check:[ \t]*`([^`\n]+)`", re.M)
+NEGATIVE_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Negative:[ \t]*`([^`\n]+)`", re.M)
+# The whole `Negative:` line, for removal before path resolution — see check_handbook.
+NEGATIVE_LINE_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Negative:.*$", re.M)
+
+# An unbound placeholder is why a check cannot be run at all, and it is mechanical.
+# content-writer's three commands were `check no-em-dashes <draft>` — the argument
+# the handbook never binds. Reporting THAT is more useful than a resolution verdict,
+# because it names why no one could have run the check as written.
+PLACEHOLDER_RX = re.compile(r"<([a-z][a-z0-9 _./-]*)>")
+
+# Command-shaped: a leading word followed by at least one argument. Used ONLY on the
+# undeclared path, where it is heuristic evidence and never a verdict.
+CMDISH_RX = re.compile(r"^[a-z][\w.-]*(?:\s+\S+)+$", re.I)
+
+# A token worth resolving carries a separator, so it is a path rather than a bare
+# subcommand — bare names are PATH lookups and belong to the UNDECIDABLE branch.
+# But "contains a slash" alone OVER-CAPTURES, and the first clean run against a real
+# tree showed all three ways it does:
+#
+#   `/text-eval`                      a SLASH COMMAND — a skill invocation, not a file
+#   `agents/interface-claim-auditor/` an unanchored prose fragment naming another
+#                                     skill's subdirectory, whose base this cannot know
+#   `.claude/`                        a bare prefix, quoted in a sentence about paths
+#
+# Reporting any of those as a dead check is the failure `discovery.md` reserves the
+# HEURISTIC tier for: a fuzzy signal that recommends an action is indistinguishable,
+# in a report, from a certain one. So the filter admits only unambiguous file
+# references, and anything else is not a file reference at all rather than an
+# undecidable one — the UNDECIDABLE state is for things that ARE paths and cannot be
+# resolved (an unexpanded variable, an unbound placeholder), never for prose.
+PATHY_RX = re.compile(r"^[~$./A-Za-z0-9_-]*/[^\s'\"`]*$")
+SLASH_CMD_RX = re.compile(r"^/[a-z][a-z0-9-]*/?$")
+EXT_RX = re.compile(r"\.[A-Za-z0-9]{1,6}$")
+ANCHORS = ("./", "../", "~", "$", ".claude/")
+
+SKIP_SCHEMES = ("http://", "https://", "mailto:", "git@")
+
+
+def is_file_reference(token):
+    """Whether this token unambiguously names a file, and may therefore be resolved."""
+    if SLASH_CMD_RX.match(token):
+        return False
+    parts = [p for p in token.split("/") if p]
+    if len(parts) < 2:
+        return False
+    if EXT_RX.search(parts[-1]):
+        return True
+    return token.startswith(ANCHORS) or os.path.isabs(token)
+
+
+def load_census():
+    """Import wf-census for its command resolver — one owner, never a second copy.
+
+    `resolve_hook_command` encodes rules that cost a real defect each to learn: an
+    interpreter runs its script argument and not itself; `${CLAUDE_PROJECT_DIR}`
+    expands; an env var this process cannot know makes the whole command
+    UNDECIDABLE rather than dead. Restating those 40 lines here would be the
+    `scopes.md` failure — eleven sites carrying the same lookup, fixed at one.
+
+    The manifest installs both scripts into the same directory, so the sibling is
+    always present; if it is not, this fails loudly rather than degrading to a
+    weaker resolver nobody asked for.
+    """
+    # NEVER leave bytecode behind. Importing a sibling writes `__pycache__/`
+    # into the SHIPPED bin/ directory, which `bin/check` correctly reports as an
+    # undeclared file the installers would never fetch — a read-only instrument
+    # that litters the tree it inspects. Caught on the first full run after the
+    # import landed.
+    _prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
+    loader = importlib.machinery.SourceFileLoader("wf_census", path)
+    spec = importlib.util.spec_from_loader("wf_census", loader)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = _prev
+    return mod
+
+
+def section(body, heading="## Verification"):
+    """Text under a HEADING — line-anchored, never a bare substring search.
+
+    Same rule and same reason as `wf-conform.section`: a prose line reading
+    "run the mechanical scan in `## Verification`" precedes the real heading in a
+    real handbook, and a substring split hands back the tail of `## Procedure`.
+    Both readers of this section must share one grammar or they cannot both be
+    right — the rule already stated for the sidecar digest.
+    """
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$(.*?)(?=^## |\Z)",
+                  body, re.S | re.M)
+    return m.group(1) if m else None
+
+
+def candidate_tokens(seg):
+    """Every path-like token the section names, from fences AND inline backticks.
+
+    BOTH sources, because under-capture is the failure mode. `wf-remainder` scored a
+    skill made entirely of live diagnostics at zero surface by reading only headings
+    it recognised, and would have marked a working skill for deletion. The rule it
+    landed on — every non-blank, non-comment fenced line counts — is the rule here.
+    """
+    tokens = []
+    for block in FENCE_RX.findall(seg):
+        for line in block.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            tokens.extend(re.split(r"[\s|;()&]+", line))
+    for span in BACKTICK_RX.findall(FENCE_RX.sub("", seg)):
+        tokens.extend(re.split(r"[\s|;()&]+", span))
+
+    out, seen = [], set()
+    for t in tokens:
+        # STRIP FROM THE RIGHT END ONLY. A single `strip("'\",.:")` also eats the
+        # LEADING dot of `.claude/...`, turning every project-relative path into a
+        # relative one that cannot exist — the first run of this script against a
+        # real tree reported `0 resolved · 19 dead` and every one of those 19 was
+        # this line. Both files it named were on disk, checked by hand.
+        #
+        # Which is the rule CLAUDE.md states about censuses: a drift the instrument
+        # reports is a claim about the instrument too, and it now has a 4-for-4
+        # record of being the one that was wrong.
+        t = t.strip().strip("'\"`")
+        t = t.lstrip("([")
+        t = t.rstrip(")],;:.")
+        if not t or t in seen:
+            continue
+        if t.startswith(SKIP_SCHEMES) or not PATHY_RX.match(t):
+            continue
+        if not is_file_reference(t):
+            continue
+        seen.add(t)
+        out.append(t)
+    return out
+
+
+def resolve_token(token, root):
+    """(abspath, exists) for a path-like token, or (None, None) when undecidable.
+
+    Mirrors `wf-census.resolve_hook_command`'s expansion rules for the same reason
+    it has them, and keeps its third state: a token this cannot decide is counted
+    apart and left alone.
+    """
+    path = token
+    for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+        path = path.replace(var, root)
+    path = os.path.expandvars(os.path.expanduser(path))
+    if "$" in path or PLACEHOLDER_RX.search(path):
+        return None, None
+    if not os.path.isabs(path):
+        path = os.path.join(root, path)
+    path = os.path.normpath(path)
+    return path, os.path.exists(path)
+
+
+def run_command(cmd, root, timeout):
+    """Execute one declared command. Returns (exit, output-tail, error-or-None).
+
+    `shell=True` IS THE REQUIREMENT, NOT AN OVERSIGHT, and the three things that
+    make it defensible are worth stating because a reader will flag it:
+
+    1. A real `## Verification` command is a pipeline. `verification.md` ranks "a
+       command with an exit code" tier 1 and the measured examples are
+       `npm test -- --grep zzz`, `tsc --noEmit`, and a `python3 -c … | bash <hook>`
+       that is the ONLY correct way to drive a stdin hook. Splitting those into
+       argv lists does not execute them, it changes them into something else.
+    2. NOTHING RUNS WITHOUT `--run` OR `--prove`. The default pass resolves paths
+       and executes nothing, which is the display-vs-execute rule SKILL.md applies
+       to every writing command.
+    3. The string comes from a governed handbook inside the tree being verified —
+       the same file, verbatim, that the employee executes every time it works.
+       Running it here grants no authority the org did not already have; declining
+       to run it would only mean nobody ever checks what the employee runs.
+
+    What it is NOT is a sandbox, and no report may describe it as one.
+    """
+    try:
+        # stdin is DEVNULL, never inherited. The founding defect was a hook that
+        # reads a JSON payload on stdin, so the very population this checks is full
+        # of commands that block forever on an inherited terminal — a hang that
+        # would present as `--timeout` expiring and read as a slow check.
+        p = subprocess.run(cmd, shell=True, cwd=root, timeout=timeout,
+                           stdin=subprocess.DEVNULL,
+                           capture_output=True, text=True)
+    except subprocess.TimeoutExpired:
+        return None, "", f"timed out after {timeout}s"
+    except OSError as exc:
+        return None, "", str(exc)
+    tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()
+    return p.returncode, (tail[-1][:160] if tail else ""), None
+
+
+class Report:
+    def __init__(self):
+        self.rows = []
+        self.findings = 0
+        self.unreadable = []
+
+    def add(self, agent, kind, subject, detail="", blocking=False):
+        self.rows.append({"agent": agent, "kind": kind, "subject": subject,
+                          "detail": detail, "blocking": blocking})
+        if blocking:
+            self.findings += 1
+
+    def count(self, kind):
+        return sum(1 for r in self.rows if r["kind"] == kind)
+
+
+def check_handbook(path, body, root, rep, resolver, args):
+    name = os.path.basename(path)
+    seen_dead = set()
+    governed = bool(ORG_RECORD_RX.search(body))
+    seg = section(body)
+
+    if seg is None or not seg.strip():
+        # wf-conform already owns "the section exists and is non-empty". Repeating
+        # its verdict here would make one defect print twice and the counts
+        # disagree; naming the owner is the whole row.
+        rep.add(name, "no-section", "## Verification",
+                "absent or empty — wf-conform owns this verdict", blocking=False)
+        return
+
+    # ── resolve ──────────────────────────────────────────────────────────────
+    # Applies to EVERY governed handbook whatever shape its section takes. A check
+    # naming a file that is not there is dead in the way a dead hook is dead: it
+    # reads as protection and enforces nothing.
+    #
+    # EXCEPT on a `Negative:` line, whose whole job is to construct a condition the
+    # check must reject — very often by naming a path that is deliberately absent.
+    # Resolving those reports the fixture's own design as a dead check, which is a
+    # false positive that would train an author to weaken the negative case to keep
+    # the report clean. Found by writing the first fixture that declared one.
+    resolvable = NEGATIVE_LINE_RX.sub("", seg)
+    for token in candidate_tokens(resolvable):
+        resolved, exists = resolve_token(token, root)
+        if resolved is None:
+            rep.add(name, "undecidable", token,
+                    "unexpanded variable or unbound placeholder — never reported as dead")
+        elif exists:
+            rep.add(name, "resolved", token, os.path.relpath(resolved, root))
+        else:
+            seen_dead.add(resolved)
+            rep.add(name, "dead", token,
+                    f"names {os.path.relpath(resolved, root)} — not on disk",
+                    blocking=governed)
+
+    # ── the declared runnable form ───────────────────────────────────────────
+    checks = CHECK_RX.findall(seg)
+    negatives = NEGATIVE_RX.findall(seg)
+
+    if not checks:
+        # UNDECLARED is not a failure. Every handbook authored before this contract
+        # existed is in this state, and failing them all would reproduce wf-conform's
+        # 9-false-failures run exactly.
+        rep.add(name, "undeclared", "## Verification",
+                "names no `Check:` line, so nothing here can run it. Add "
+                "`- Check: \\`<command>\\` — expect exit 0` (see references/verification.md)",
+                blocking=False)
+
+        # HEURISTIC, AND NEVER BLOCKING. Without a `Check:` line nothing can tell a
+        # command from prose, so this reads only the one shape that is unambiguous
+        # and was the founding defect: a command-shaped span carrying an argument
+        # the handbook never binds. content-writer's three were
+        # `check no-em-dashes <draft>`, and the first draft of this script skipped
+        # them entirely — it short-circuited here, so the tool would have missed
+        # the exact case it was written for on the population that has it today.
+        #
+        # It is "look here" evidence and it stays that (discovery.md § Reliability
+        # tiers): a HEURISTIC finding may never recommend an action, so this does
+        # not set the exit code no matter what it finds.
+        for span in BACKTICK_RX.findall(FENCE_RX.sub("", seg)):
+            span = span.strip()
+            if not CMDISH_RX.match(span):
+                continue
+            ph = PLACEHOLDER_RX.findall(span)
+            if not ph:
+                continue
+            rep.add(name, "suspect", span,
+                    f"command-shaped, with an unbound placeholder <{ph[0]}> the "
+                    f"handbook never binds — HEURISTIC, look here (undeclared, so "
+                    f"nothing can confirm this is a check)")
+        return
+
+    for cmd in checks:
+        # THE SHARED RESOLVER, on the one input it is right for: a whole command.
+        # The token pass above reads path-shaped spans and deliberately skips
+        # anything it cannot prove is a file, so `bash bin/verify` — no extension,
+        # no anchor — falls through it. `resolve_hook_command` unwraps the
+        # interpreter and answers exactly this, with the interpreter, env-var and
+        # UNDECIDABLE rules that each cost a real defect to learn. Deduped against
+        # the token pass by resolved path so one dead script is one row.
+        script, script_exists = resolver.resolve_hook_command(cmd)
+        if script is not None and not script_exists and script not in seen_dead:
+            seen_dead.add(script)
+            rep.add(name, "dead", cmd,
+                    f"runs {os.path.relpath(script, root)} — not on disk",
+                    blocking=governed)
+
+        placeholders = PLACEHOLDER_RX.findall(cmd)
+        if placeholders:
+            # The content-writer shape. Mechanical, binary, and it names WHY the
+            # check was never runnable rather than guessing at an argument.
+            rep.add(name, "not-runnable", cmd,
+                    f"unbound placeholder <{placeholders[0]}> — the handbook never "
+                    f"binds it, so this command cannot be executed as written",
+                    blocking=governed)
+            continue
+
+        if args.run:
+            code, tail, err = run_command(cmd, root, args.timeout)
+            if err:
+                rep.add(name, "run-error", cmd, err, blocking=governed)
+            elif code == 0:
+                rep.add(name, "ran", cmd, "exit 0")
+            else:
+                rep.add(name, "ran-nonzero", cmd, f"exit {code} — {tail}",
+                        blocking=governed)
+
+    # ── falsify ──────────────────────────────────────────────────────────────
+    # A check observed only passing is indistinguishable from `exit 0`. This is the
+    # row that would have caught content-writer.
+    if not negatives:
+        rep.add(name, "unproven", "; ".join(checks)[:120],
+                "no `Negative:` declared — this check has never been observed "
+                "failing and may be testing nothing", blocking=False)
+        return
+
+    for neg in negatives:
+        if PLACEHOLDER_RX.search(neg):
+            rep.add(name, "not-runnable", neg,
+                    "unbound placeholder in the negative case", blocking=governed)
+            continue
+        if not args.prove:
+            rep.add(name, "declared-negative", neg, "not run (--prove to execute)")
+            continue
+        code, tail, err = run_command(neg, root, args.timeout)
+        if err:
+            rep.add(name, "run-error", neg, err, blocking=governed)
+        elif code == 0:
+            # The defect itself, caught mechanically for the first time.
+            rep.add(name, "vacuous", neg,
+                    "exit 0 on the input declared as violating — this check CANNOT "
+                    "FAIL, so every PASS it has returned proves nothing",
+                    blocking=governed)
+        else:
+            rep.add(name, "discriminates", neg, f"exit {code} as declared")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-checkrun")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--agent", help="limit to one handbook by name")
+    ap.add_argument("--run", action="store_true",
+                    help="execute each declared Check: command")
+    ap.add_argument("--prove", action="store_true",
+                    help="execute each declared Negative: and require a non-zero exit")
+    ap.add_argument("--timeout", type=int, default=60)
+    ap.add_argument("--json", dest="json_path")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    agents_dir = os.path.join(root, ".claude", "agents")
+    rep = Report()
+
+    if not os.path.isdir(agents_dir):
+        print(f"wf-checkrun: no .claude/agents under {root}", file=sys.stderr)
+        return 2
+
+    paths = sorted(
+        os.path.join(agents_dir, f)
+        for f in os.listdir(agents_dir)
+        if f.endswith(".md") and (not args.agent or f[:-3] == args.agent)
+    )
+    if not paths:
+        print(f"wf-checkrun: no handbooks matched under {agents_dir}", file=sys.stderr)
+        return 2
+
+    resolver = load_census().Census(root)
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            # Quarantine is counted, never silent (discovery.md).
+            rep.unreadable.append((p, str(exc)))
+            continue
+        check_handbook(p, body, root, rep, resolver, args)
+
+    if not args.quiet:
+        glyph = {"resolved": "+", "dead": "!", "undecidable": "?",
+                 "not-runnable": "!", "ran": "+", "ran-nonzero": "!",
+                 "run-error": "!", "vacuous": "!", "discriminates": "+",
+                 "unproven": "~", "declared-negative": ".", "undeclared": "~",
+                 "no-section": "~"}
+        current = None
+        for r in rep.rows:
+            if r["agent"] != current:
+                current = r["agent"]
+                print(f"\nCHECKS  {current}")
+            print(f"  {glyph.get(r['kind'], '.')} {r['kind']:<18} {r['subject'][:64]}")
+            if r["detail"]:
+                print(f"      {r['detail']}")
+        for p, exc in rep.unreadable:
+            print(f"  ! unreadable        {p}\n      {exc}")
+
+        # Every count, including the zeroes. A zero is a measurement; silence is not.
+        print(
+            f"\n  {rep.count('resolved')} resolved · {rep.count('dead')} dead · "
+            f"{rep.count('undecidable')} undecidable · {rep.count('not-runnable')} not-runnable"
+        )
+        print(
+            f"  {rep.count('ran')} ran · {rep.count('ran-nonzero')} failed · "
+            f"{rep.count('discriminates')} discriminate · {rep.count('vacuous')} VACUOUS · "
+            f"{rep.count('unproven')} unproven · {rep.count('undeclared')} undeclared"
+        )
+        if not args.run:
+            print("  (resolution only — --run executes, --prove falsifies)")
+        elif rep.count("ran") == 0:
+            # `0 VACUOUS` beside `0 ran` reads as "no broken checks found". It means
+            # NOTHING WAS EXECUTED. This is INV-BATCH's rule one level down: a cost
+            # of zero is evidence the batch did not run, never evidence it was
+            # cheap. Found by running this against a real project, where all 13
+            # governed handbooks are undeclared and the summary looked clean.
+            print(f"  NOTHING RAN — 0 checks executed, so `0 VACUOUS` above is not "
+                  f"a finding about the checks. {rep.count('undeclared')} handbook(s) "
+                  f"declare no `Check:` line.")
+        print(f"  {len(rep.unreadable)} quarantined · {rep.findings} blocking finding(s)")
+
+    if args.json_path:
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            json.dump({"root": root, "rows": rep.rows,
+                       "unreadable": rep.unreadable,
+                       "findings": rep.findings}, fh, indent=2, sort_keys=True)
+
+    if rep.unreadable:
+        return 2
+    return 1 if rep.findings else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

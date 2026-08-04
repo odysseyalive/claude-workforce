@@ -177,7 +177,36 @@ reports health it did not measure.
 
 It covers: sections present and ordered; every IC carries the literal `disallowedTools: Agent`; no
 `Agent(` allowlist anywhere; `## Directives` resolves or declares `(none bound)`; `## Verification` is
-non-empty; the length ceiling; the immutable-block sidecar digests.
+non-empty and names at least one literal invocation; the length ceiling; the immutable-block sidecar
+digests.
+
+**Then run `wf-checkrun`, which stats and executes what `wf-conform` can only read.**
+
+```bash
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"            # resolve only
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}" --run --prove
+```
+
+Three states, and **only the third is a check** (`references/verification.md` § Three states):
+
+| Row | Means | Blocking |
+|---|---|---|
+| `resolved` / `dead` | the named file is, or is not, on disk | **dead is blocking** — the analogue of dead wiring |
+| `ran` / `ran-nonzero` | the declared `Check:` executes and its exit code | non-zero is blocking |
+| `discriminates` / **`VACUOUS`** | the declared `Negative:` exits non-zero, or **exits 0** | **VACUOUS is blocking** |
+| `not-runnable` | the command carries an argument the handbook never binds | blocking |
+| `undecidable` | a PATH lookup or an env var this process cannot expand | **never** reported as dead |
+| `undeclared` / `unproven` / `suspect` | no `Check:` line; no `Negative:`; a heuristic "look here" | **never blocking** |
+
+**The bare pass runs nothing** — display-vs-execute, and `--run` is the gesture. Report every count
+including the zeroes.
+
+**`VACUOUS` is the row this command exists for.** A check that exits 0 on the input declared as
+violating cannot fail, so every PASS it has ever returned proves nothing. Report it as a **functional
+regression of the employee**, never as a documentation nit.
+
+**Never report a `resolved` check as verified.** Resolution is the necessary half and nothing more:
+`content-writer`'s three broken hooks were all on disk.
 
 **GOVERNED vs ADOPTED, and the script decides it by marker.** An agent carrying an `ORG-RECORD` block
 is under this contract; one without it was **never placed under it** — `conversion-taxonomy.md` ADOPT is
@@ -194,10 +223,19 @@ find it. **The first fix was wrong too** — it tested `"ORG-RECORD" in body`, s
 accident.*
 
 **What it deliberately does not cover, and what this command still owns by reading:** whether a
-`## Verification` check is *real* or decoration, whether a persona is genuinely distinct, whether a
-`description:` over-claims, whether an invariant called mechanical actually is. **Every check in the
-script has a binary answer or it is not in the script** — dressing a judgment as a check is the failure
-`verification.md` rejects at tier 4, and moving one into a script would only hide it better.
+persona is genuinely distinct, whether a `description:` over-claims, whether an invariant called
+mechanical actually is. **Every check in the script has a binary answer or it is not in the script** —
+dressing a judgment as a check is the failure `verification.md` rejects at tier 4, and moving one into
+a script would only hide it better.
+
+*Corrected 2026-08-04. This list began **"whether a `## Verification` check is real or decoration"**,
+and that was the right call for `wf-conform` and the wrong conclusion about the question. "Is this
+check real?" is judgment; **"has it ever been observed to fail?"** is binary, and it is the same
+question. Splitting it that way is what `wf-checkrun --prove` runs, and it is the discipline this file
+already required one section down — a `mechanical` invariant must record a negative-test result,
+because a validator nobody ever saw reject anything is indistinguishable from `exit 0`. The rule was
+here the whole time, applied to invariants and never to the handbooks. A sentence declaring something
+uncheckable is worth re-reading whenever the neighbouring page checks it.*
 
 **Still read by this command:** every body path resolves; every tool used is granted and
 `Grep`/`Glob`/`WebFetch` are not assumed (`platform.md` fact 4); guardrails contain literal NEVER /

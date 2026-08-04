@@ -102,10 +102,32 @@ class Result:
     def add(self, ok, name, detail=""):
         self.rows.append({"ok": bool(ok), "check": name, "detail": detail})
 
+    def advise(self, name, detail=""):
+        """A finding that is reported and does NOT set the exit code.
+
+        Distinct from `adopted`, which must stay a count of FILES workforce did not
+        author — `main()` derives `governed = len(handbooks) - len(res.adopted)`, so
+        borrowing that key for an advisory row about a governed handbook would make
+        the census disagree with itself.
+
+        This channel exists for a contract that post-dates the files under it. The
+        negative-test record is the first: failing every handbook authored before it
+        would reproduce the run that taught this script its own hardest lesson —
+        9 reported failures, all false, and "a check that always fails stops being
+        read."
+        """
+        self.rows.append({"ok": False, "check": name, "detail": detail,
+                          "advisory": True})
+
     @property
     def failed(self):
         """Governed rows only. An adopted agent's hazards are reported, not enforced."""
-        return [r for r in self.rows if not r["ok"] and not r.get("adopted")]
+        return [r for r in self.rows
+                if not r["ok"] and not r.get("adopted") and not r.get("advisory")]
+
+    @property
+    def advisory_findings(self):
+        return [r for r in self.rows if r.get("advisory")]
 
     @property
     def adopted_findings(self):
@@ -114,6 +136,32 @@ class Result:
     @property
     def adopted(self):
         return [r for r in self.rows if r.get("adopted")]
+
+
+def section(body, heading):
+    """Text under a HEADING — line-anchored, never a bare substring search.
+
+    `body.split("## Verification", 1)[1]` splits at the FIRST occurrence anywhere,
+    including a prose mention. Measured 2026-08-04 on a real handbook:
+
+        line 58   6. Run the mechanical scan in `## Verification` — it answers …
+        line 63   ## Verification
+
+    so every check reading that section was handed the tail of `## Procedure`, and
+    the section it meant to examine was never read at all. The old "Verification is
+    not empty" assertion PASSED on that file — the wrong segment is also non-empty —
+    which is why nothing surfaced it for as long as the check has existed. A new
+    check reading the same bytes is what exposed it.
+
+    Fixed as a class: `## Directives` and `## Procedure` are read the same way and
+    carried the same defect. Fixing only the instance is the rule this project
+    violated in the same week it wrote it down.
+
+    Returns None when the heading is absent — distinct from an empty section.
+    """
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$(.*?)(?=^## |\Z)",
+                  body, re.S | re.M)
+    return m.group(1) if m else None
 
 
 def read(path, res):
@@ -229,8 +277,8 @@ def check_handbook(path, body, res, ceiling):
             "subagent definitions ignore these; the restriction does not exist at runtime")
 
     # Directives reach the employee, or say plainly that none bind it.
-    if "## Directives" in body:
-        seg = body.split("## Directives", 1)[1].split("\n## ", 1)[0]
+    seg = section(body, "## Directives")
+    if seg is not None:
         res.add("(none bound)" in seg or ".claude/workforce/directives/" in seg,
                 f"{n}: Directives section resolves or declares none",
                 "a blank Directives section reads as 'none bound' and is not")
@@ -240,9 +288,43 @@ def check_handbook(path, body, res, ceiling):
             f"{body_lines} lines — a structural finding proposing a split, never a refusal")
 
     # A handbook that cannot say how to verify itself is not releasable.
-    if "## Verification" in body:
-        seg = body.split("## Verification", 1)[1].split("\n## ", 1)[0]
+    #
+    # "not empty" was the ENTIRE mechanical coverage of the highest-leverage section
+    # in the file until 2026-08-04, and it is satisfied by the word "yes". The two
+    # rows below are still properties of the text — whether the check RESOLVES, RUNS,
+    # or can FAIL belongs to `wf-checkrun`, which stats and executes. Naming that
+    # owner here is deliberate: one defect, one verdict, or the counts disagree.
+    seg = section(body, "## Verification")
+    if seg is not None:
         res.add(bool(seg.strip()), f"{n}: Verification section is not empty")
+
+        # A section that names no command at all is decoration. `verification.md`
+        # § Authoring checklist rule 1: "Name the exact command or suite. Not a
+        # category — the literal invocation."
+        res.add(bool(re.search(r"`[^`\n]+`", seg)),
+                f"{n}: Verification names at least one literal invocation",
+                "no backticked command anywhere in the section — rule 1 of "
+                "verification.md's authoring checklist is a literal invocation, and "
+                "prose describing a category is the tier-4 row that file rejects")
+
+        # THE NEGATIVE-TEST RECORD. `procedures/verify.md` already requires this of
+        # every invariant classed `mechanical` — "a validator nobody ever saw reject
+        # anything — indistinguishable from `exit 0`" — and the rule simply never
+        # reached the handbooks, which is where it was needed most.
+        #
+        # NON-BLOCKING, and that is the GOVERNED-vs-ADOPTED precedent above: every
+        # handbook authored before this contract is in this state, and failing them
+        # all at once reproduces the 9-false-failures run that taught this script
+        # "a check that always fails stops being read."
+        if "Negative:" not in seg:
+            res.advise(
+                f"{n}: Verification declares no negative case",
+                "no `Negative:` line — this check has never been observed failing, "
+                "so it is indistinguishable from one that cannot fail. Declare a "
+                "Negative: line naming a command expected to exit non-zero; "
+                "`wf-checkrun --prove` then runs it and reports VACUOUS if it "
+                "exits 0.",
+            )
 
     # BODY-vs-GRANT COHERENCE — the first check here that compares the text to the
     # capability rather than to another piece of text.
@@ -287,8 +369,7 @@ def check_handbook(path, body, res, ceiling):
     # them a line carrying NEVER / MUST NOT / STOP / do not is a guardrail, not a step.
     _acts = ""
     for _sec in ("## Procedure", "## Verification"):
-        if _sec in body:
-            _acts += body.split(_sec, 1)[1].split("\n## ", 1)[0] + "\n"
+        _acts += (section(body, _sec) or "") + "\n"
     _acts = "\n".join(l for l in _acts.splitlines() if not PROHIBITION_RX.search(l))
     if tier == 3:
         for sk in sorted(set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", _acts))):
@@ -503,7 +584,7 @@ def check_data_skill(path, body, res):
     res.add(not missing, f"{n}: data skill carries every required section",
             f"missing: {missing}")
     if "## Invariants" in body:
-        seg = body.split("## Invariants", 1)[1].split("\n## ", 1)[0]
+        seg = section(body, "## Invariants") or ""
         res.add("may never authorize a write" in seg,
                 f"{n}: carries the universal invariant",
                 "degraded state may cause more work; it may never authorize a write")
@@ -640,9 +721,13 @@ def main():
         print(f"  {governed} governed · {len(res.adopted)} adopted (exempt) · "
               f"{len(res.rows)} checks · {len(res.failed)} failed · "
               f"{len(res.adopted_findings)} adopted-agent note(s) · "
+              f"{len(res.advisory_findings)} advisory · "
               f"{len(res.unreadable)} unreadable")
         for r in res.failed:
             print(f"  ✗ {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))
+        for r in res.advisory_findings:
+            # Reported, never enforced — the contract post-dates the file.
+            print(f"  ~ {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))
         for r in res.adopted_findings:
             # Reported, never enforced — it is not workforce's file.
             print(f"  · {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))

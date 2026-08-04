@@ -77,6 +77,114 @@
       "1 unterminated"
     ]
   },
+  "checkrun-dead": {
+    "_why": "A named check whose script is not on disk -- the analogue of dead wiring, and caught by RESOLUTION ALONE with no --run. A dead check reads as protection and enforces nothing.",
+    "exit": 1,
+    "not": [
+      "+ resolved"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "dead",
+      "not on disk",
+      "check-citations.sh"
+    ]
+  },
+  "checkrun-discriminates": {
+    "_why": "The same handbook against a hook that actually reads the file it is given. Proves the VACUOUS verdict is about the check and not about the harness -- without this pair, a script that reported VACUOUS unconditionally would pass.",
+    "args": [
+      "--run",
+      "--prove"
+    ],
+    "exit": 0,
+    "not": [
+      "! vacuous"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "discriminates",
+      "exit 2 as declared",
+      "0 VACUOUS"
+    ]
+  },
+  "checkrun-extensionless": {
+    "_why": "The under-capture hole the SHARED resolver closes. `bash bin/verify` has no extension and no anchor, so the token pass correctly refuses to call it a file reference -- wf-census.resolve_hook_command unwraps the interpreter and answers it. Without the import this case is silently clean, which is the shape of every 'reported clean about something it never examined' defect in this repo.",
+    "args": [
+      "--run",
+      "--prove"
+    ],
+    "exit": 1,
+    "not": [],
+    "script": "wf-checkrun",
+    "want": [
+      "dead",
+      "bin/verify",
+      "not on disk"
+    ]
+  },
+  "checkrun-nothing-ran": {
+    "_why": "--run against a population that declares no `Check:` line. `0 VACUOUS` beside `0 ran` reads as 'no broken checks found' and means NOTHING WAS EXECUTED -- INV-BATCH's rule one level down: a cost of zero is evidence the batch did not run, never evidence it was cheap. Found by running the real project, where the summary looked clean.",
+    "args": [
+      "--run",
+      "--prove"
+    ],
+    "exit": 0,
+    "not": [
+      "! vacuous"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "NOTHING RAN",
+      "declare no `Check:` line"
+    ]
+  },
+  "checkrun-notpaths": {
+    "_why": "REGRESSION GUARD for the two extractor bugs a real tree found on first run. `/text-eval` is a slash command and `agents/interface-claim-auditor/` an unanchored prose fragment; neither is a file and reporting either as dead invites deleting a working check. The first version also stripped the leading dot off `.claude/...`, reporting 0 resolved and 19 dead where all 19 were on disk -- so the resolved row here is load-bearing too.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "interface-claim-auditor"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "resolved",
+      "text-tells.md"
+    ]
+  },
+  "checkrun-placeholder": {
+    "_why": "content-writer's actual shape: `... <draft>`, an argument the handbook never binds. The hook EXISTS here, so `resolved` passes and the finding is solely that the command cannot be executed as written -- which is why no one ever ran it.",
+    "args": [
+      "--run",
+      "--prove"
+    ],
+    "exit": 1,
+    "not": [
+      "! dead"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "not-runnable",
+      "<draft>",
+      "never binds"
+    ]
+  },
+  "checkrun-vacuous": {
+    "_why": "The founding defect, mechanised. A hook that reads its payload on stdin and IGNORES its path argument exits 0 on the input declared as violating. Note the case also reports `ran exit 0` -- that row alone is what every instrument before this one called verified, and it is exactly what content-writer passed three times. Only --prove separates a check from a decoration.",
+    "args": [
+      "--run",
+      "--prove"
+    ],
+    "exit": 1,
+    "not": [
+      "+ discriminates"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "VACUOUS",
+      "CANNOT FAIL",
+      "1 blocking finding"
+    ]
+  },
   "claudemd-absent": {
     "exit": 0,
     "script": "wf-claude-md",
@@ -177,6 +285,31 @@
     "script": "wf-conform",
     "want": [
       "disallowedTools: Agent"
+    ]
+  },
+  "conform-no-negative": {
+    "_why": "A governed handbook with a Check: and NO Negative:. The advisory row must fire and the exit code must stay 0 -- the contract post-dates every handbook under it, and failing them all reproduces the 9-false-failures run that taught this script 'a check that always fails stops being read'. The bin/check assertion can only see that the channel EXISTS; only this can see that it does not block.",
+    "exit": 0,
+    "not": [
+      "\u2717 "
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 advisory",
+      "declares no negative case",
+      "0 failed"
+    ]
+  },
+  "conform-section-mention": {
+    "_why": "REGRESSION GUARD. `## Verification` is MENTIONED in prose at line 2 of ## Procedure before the real heading, so a substring split hands every reader the tail of ## Procedure and the real section is never examined. Found on a real handbook 2026-08-04: the old 'Verification is not empty' assertion PASSED on it, because the wrong segment is also non-empty. Both scripts now match the heading line-anchored; this asserts wf-conform reports no failure on the file.",
+    "exit": 0,
+    "not": [
+      "\u2717 "
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
     ]
   },
   "conform-tier-sections": {

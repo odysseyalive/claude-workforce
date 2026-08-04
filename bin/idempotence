@@ -57,6 +57,17 @@ WRITERS = {
                  "fixtures/scripts/claudemd-duplicated", "--execute"],
         "watch": "fixtures/scripts/claudemd-duplicated",
     },
+    # wf-checkrun writes only its --json report, but it also EXECUTES the commands a
+    # handbook declares — so the second pass proves the check itself left no residue
+    # in the tree it verified. A verification pass that mutates its target is the
+    # defect it exists to find.
+    "checkrun-json": {
+        "argv": ["workforce/bin/wf-checkrun", "--root",
+                 "fixtures/scripts/checkrun-discriminates", "--run", "--prove",
+                 "--quiet", "--json",
+                 "fixtures/scripts/checkrun-discriminates/report.json"],
+        "watch": "fixtures/scripts/checkrun-discriminates",
+    },
 }
 
 

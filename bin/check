@@ -5309,6 +5309,114 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# THE HANDBOOK VERIFICATION GAP — resolved, run, falsified
+#
+# Until 2026-08-04 the ENTIRE mechanical coverage of `## Verification` — the section
+# `verification.md` opens by calling the highest-leverage one in any handbook — was
+# `wf-conform`'s "is not empty", which the word "yes" satisfies. So a handbook could
+# name a check that did not exist, or one that could not fail, and every instrument
+# printed clean.
+#
+# It was not hypothetical: `content-writer` shipped three commands that exited 0 on a
+# file of pure em-dashes. Every one resolved, every one ran, every one passed. Found
+# by a cold reader, because nothing mechanical could see it.
+# ─────────────────────────────────────────────────────────────────────────────
+_ckr = read("workforce/bin/wf-checkrun")
+_cfm = read("workforce/bin/wf-conform")
+
+check(
+    "wf-checkrun is shipped in the manifest",
+    "exec workforce/bin/wf-checkrun" in read("manifest.txt"),
+    "a script absent from the manifest is not installed on any host, so the "
+    "procedure that names it resolves to nothing — the absent-producer shape",
+)
+check(
+    "wf-checkrun names the VACUOUS state and what it means",
+    "exit 0 on the input declared as violating" in _ckr,
+    "a check that exits 0 on the input declared as violating cannot fail, so every "
+    "PASS it ever returned proves nothing — the verdict has to say that, or it "
+    "reads as one more row",
+)
+check(
+    "wf-checkrun prints resolution and falsification as separate counts",
+    "discriminate \u00b7 " in _ckr,
+    "resolution, execution and falsification are three different claims and the "
+    "summary must never collapse them: content-writer's hooks were all on disk, "
+    "all ran, and all passed",
+)
+check(
+    "wf-checkrun says so when --run executed nothing",
+    "NOTHING RAN" in _ckr,
+    "`0 VACUOUS` beside `0 ran` reads as a clean finding and means nothing was "
+    "executed — INV-BATCH one level down: a cost of zero is evidence the batch did "
+    "not run, never evidence it was cheap",
+)
+check(
+    "wf-checkrun never reports an undecidable command as dead",
+    "never reported as dead" in _ckr,
+    "a false dead row invites someone to delete a working check, which is worse "
+    "than the silence it replaces (wf-census's own rule, inherited)",
+)
+check(
+    "wf-checkrun runs nothing without --run or --prove",
+    "if args.run:" in _ckr and "if not args.prove:" in _ckr,
+    "display-vs-execute — the bare pass resolves and executes nothing, and a "
+    "verification pass that ran commands by default would be a writing command "
+    "wearing a read-only name",
+)
+check(
+    "wf-checkrun treats an undeclared handbook as non-blocking",
+    'rep.add(name, "undeclared"' in _ckr and 'blocking=False' in _ckr,
+    "every handbook authored before this contract has no `Check:` line; failing "
+    "them all reproduces wf-conform's 9-false-failures run, and a check that "
+    "always fails stops being read",
+)
+check(
+    "wf-checkrun excludes the Negative: line from path resolution",
+    "NEGATIVE_LINE_RX.sub" in _ckr,
+    "a negative case constructs a condition the check must reject, very often by "
+    "naming a deliberately absent path; resolving those reports the fixture's own "
+    "design as a dead check and trains authors to weaken the negative case",
+)
+check(
+    "both section readers match the heading line-anchored",
+    _ckr.count('re.escape(heading)') == 1 and _cfm.count('re.escape(heading)') == 1
+    and 'body.split("## Verification", 1)' not in _cfm.split("Fixed as a class")[-1],
+    "a bare substring split matches a PROSE MENTION of the heading — measured on a "
+    "real handbook, where every reader was handed the tail of `## Procedure` and the "
+    "old not-empty assertion passed on the wrong segment",
+)
+check(
+    "wf-conform reports a missing negative case without failing the file",
+    'not r.get("advisory")' in _cfm,
+    "the negative-test record post-dates every handbook under it; it is reported "
+    "on its own channel and must not borrow the `adopted` key, which main() uses "
+    "to derive the governed count",
+)
+check(
+    "verification.md states that only a falsified check is a check",
+    "Three states, and only the third is a check" in _vf
+    and "indistinguishable from" in _vf,
+    "the rule already existed for invariants in verify.md and never reached the "
+    "handbooks; stating it here is what makes the wf-checkrun row doctrine rather "
+    "than a script's opinion",
+)
+check(
+    "verify.md no longer calls the real-or-decoration question uncheckable",
+    "whether a `## Verification` check is *real* or decoration" not in vfy
+    and "wf-checkrun" in vfy,
+    "that sentence declared the territory deliberately uncovered; leaving it "
+    "beside a gate that now checks it is a file disagreeing with itself",
+)
+check(
+    "the IC template ships the declared runnable form",
+    "- Check: `<exact command>`" in tpl and "- Negative:" in tpl,
+    "the cheapest place to answer this is the template — verification.md's own "
+    "lesson, learned when two generated handbooks were amended and the template "
+    "was left to reproduce the defect on every later hire",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")
