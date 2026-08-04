@@ -275,7 +275,14 @@ that had readers and no writer.
   guidance is wrong is **unsettled** — deliberately left open rather than resolved by widening a cap on
   one project's evidence. A project hitting it on the first real target is evidence about the cap, not
   about the project.
-- **A grant naming an MCP server the host has not configured is untested.** Fact 13 measured the grant
+- **Fact 13b — an MCP grant for an absent server — has a fixture and one spawn left.**
+  `.claude/agents/wf-mcp-absent-probe.md` is written and declares `measures-fact: 13b`. Three spawn
+  attempts on 2026-08-03 returned `Agent type not found`: fact 3's delay, in the session that wrote it.
+  `UNAVAILABLE`, never `FAIL`. **Do not delete the fixture** — the setup is the expensive part and one
+  spawn from a later session closes the fact. Splitting it out of fact 13 was itself the finding: the
+  open case had been living inside a MEASURED fact as a paragraph of caveat, where nothing could see it.
+
+- ~~**A grant naming an MCP server the host has not configured is untested.**~~ *(superseded by 13b above.)* Fact 13 measured the grant
   grammar against a server that exists; the absent-server case is the one that matters for anyone else
   running this project, and the expected failure is silent. `verification.md` § When the server is
   absent states the rule (check first, never grant blind, prefer the tier-1 command) — but no procedure
