@@ -2563,6 +2563,22 @@ check(
 _ct2 = read("workforce/references/conversion-taxonomy.md")
 _hire2 = read("workforce/references/procedures/hire.md")
 check(
+    "remainder: audit APPLIES the cut in-run, mechanically, not by hand-editing",
+    "wf-remainder --apply <SKILL.md> --drop" in aud
+    and "runs unasked" in aud
+    and "writes only if the surface" in aud,
+    "the reduction was specified from the beginning and no run performed it, "
+    "because no procedure step invoked anything. A doctrine file describing a "
+    "transform is not a step that performs one",
+)
+check(
+    "remainder: a refused cut is a re-cut, never a stop or a deferral",
+    "is a re-cut, not a stop" in aud,
+    "exit 1 from --apply means the cut named a mechanism section. Treating that "
+    "as a stop turns a corrigible mistake into the deferred run this project "
+    "keeps recording",
+)
+check(
     "remainder: the cut is a judgment with evidence, not a decision tree",
     "evidence a classifier weighs" in _ct2 and "never a mapping it applies" in _ct2,
     "Core Principle 8 — audit-side files carry principles, not decision trees. "

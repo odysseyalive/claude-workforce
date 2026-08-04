@@ -288,7 +288,8 @@ run**, so 31 skills were classified PROMOTE and 0 were reduced.
 
 | Piece | |
 |---|---|
-| `wf-remainder` | the **invocation manifest** — reduce, re-emit, `A == B` or abort and restore from `.orig`. Reduction is a transform, never a deletion with a rationale |
+| `wf-remainder` | `--apply … --drop <heading>` **performs** the cut, recomputes the manifest, and **writes only if the surface is unchanged**. A cut that would drop a command is REFUSED with the file untouched — a re-cut, never a stop |
+| `audit` Step 6 | conversions **reduce at T7b, in-run, unasked** — the step that did not exist. The reduction was specified from the beginning and no procedure ever invoked anything |
 | **T7b / T7c** | an insertion in the T-order, nothing moved. T7c marks for the sweep **only if the remainder is empty**, so deletion becomes the exception |
 | `wf-unique-persona` | the last `skill-builder` guarantee with no successor here. `enforcement.md` already called the edit-time gap real; Phase A lint fires at *authoring* time |
 | `## Connection` | server, auth mode, read/write verb split — `invest-analyst` denying twelve Alpaca verbs by name is the evidence |
@@ -317,13 +318,17 @@ eligible. Row 14 is *"printed its arithmetic **and ran in this run**"* — the a
 and the did-it-happen half skipped, so the row that exists to catch a stopping run certified one. **A
 cost of zero is evidence the batch did not run, never evidence it was cheap.**
 
-682 assertions, 60 proven by breaking, 44 script fixtures, 4/4 writers idempotent. Records in
+684 assertions, 62 proven by breaking, 46 script fixtures, 4/4 writers idempotent. Records in
 `plan/mechanism-layer-2026-08-04.md` and `plan/mock-audit-odyssey-alive-2026-08-04d.md`.
 
-**Still open from this:** **no reduction has ever been executed** — T7b is exercised as a measurement
-against real skills, but the cut itself and `A == B` across an actual reduction are untested outside
-fixtures. `wf-unique-persona` has never fired on a real collision. No skill anywhere declares a
-`## Connection` yet. And the mock audit was **author-run, not cold-read**.
+*A second defect, found the same way — by running it twice.* `bin/script-conformance` ran every case
+**in place**, so `remainder-apply-good` passed on the first run and failed on the second: the section it
+removes was already gone. Until a shipped script wrote to a tree, nothing could distinguish a passing
+fixture from a self-consuming one — **a fixture that only works once is a single observation, not a
+regression test.** Every case now runs against a copy; proven by running three times.
+
+**Still open from this:** `wf-unique-persona` has never fired on a real collision, no skill anywhere
+declares a `## Connection` yet, and the mock audit was **author-run, not cold-read**.
 
 **Closed 2026-08-04 (latest) — the run finished, and handed the remainder to a queue. `/workforce
 discharge`.** The `odyssey-alive` audit completed every step: 9 employees registered, 9 cold reads PASS,

@@ -25,8 +25,10 @@ Usage
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(ROOT, "fixtures", "scripts")
@@ -34,13 +36,29 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 
 
 def run_case(name, spec):
-    tree = os.path.join(FIX, name)
+    src = os.path.join(FIX, name)
     script = os.path.join(BIN, spec["script"])
-    if not os.path.isdir(tree):
-        return False, f"fixture tree missing: {tree}"
+    if not os.path.isdir(src):
+        return False, f"fixture tree missing: {src}"
     if not os.path.isfile(script):
         return False, f"script missing: {script}"
 
+    # EVERY case runs against a COPY. A script that writes would otherwise consume
+    # its own fixture: `remainder-apply-good` passed on the first run and failed on
+    # the second, because the section it removes was already gone. Until a shipped
+    # script wrote to the tree, nothing here could tell a passing case from a
+    # self-consuming one — and a fixture that only works once is not a regression
+    # test, it is a single observation. Found 2026-08-04, by running it twice.
+    tmp = tempfile.mkdtemp(prefix=f"wfsc-{name}-")
+    tree = os.path.join(tmp, name)
+    shutil.copytree(src, tree)
+    try:
+        return _run_in(tree, script, spec)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _run_in(tree, script, spec):
     env = dict(os.environ, CLAUDE_PROJECT_DIR=tree)
     if "stdin_file" in spec or "stdin_raw" in spec:
         payload = spec.get("stdin_raw")

@@ -70,6 +70,38 @@ VERB_RX = re.compile(r"`([a-z][a-z0-9_]{2,})`")
 FENCE_RX = re.compile(r"^[ \t]*(?:```|~~~)[^\n]*\n(.*?)^[ \t]*(?:```|~~~)[ \t]*$", re.S | re.M)
 
 
+def _section_span(text, heading):
+    """(start, end) of a section by heading text, or None. Case-insensitive."""
+    want = heading.strip().lower().lstrip("#").strip()
+    heads = list(HEADING_RX.finditer(text))
+    for i, m in enumerate(heads):
+        h = re.sub(r"[`*_]", "", m.group(2).strip().lower().rstrip(":")).strip()
+        if h != want:
+            continue
+        level, end = len(m.group(1)), len(text)
+        for nxt in heads[i + 1:]:
+            if len(nxt.group(1)) <= level:
+                end = nxt.start()
+                break
+        return m.start(), end
+    return None
+
+
+def apply_cut(text, drops):
+    """Remove each named section. Returns (new_text, removed, missing)."""
+    removed, missing, out = [], [], text
+    for h in drops:
+        span = _section_span(out, h)
+        if not span:
+            missing.append(h)
+            continue
+        start, end = span
+        removed.append((h, out[start:end].count("\n")))
+        out = out[:start] + out[end:]
+    out = re.sub(r"\n{4,}", "\n\n\n", out)
+    return out, removed, missing
+
+
 def _connection_spans(text):
     """Character ranges covered by a `## Connection` section."""
     spans, heads = [], list(HEADING_RX.finditer(text))
@@ -163,6 +195,36 @@ def main(argv):
         a = [l.strip() for l in read(rel(argv[2])).splitlines() if l.strip()]
         b = [l.strip() for l in read(rel(argv[3])).splitlines() if l.strip()]
         return _emit_diff(a, b, argv[2], argv[3])
+
+    if len(argv) >= 3 and argv[1] == "--apply":
+        path = rel(argv[2])
+        drops = [argv[i + 1] for i, a in enumerate(argv) if a == "--drop" and i + 1 < len(argv)]
+        if not drops:
+            print("--apply needs at least one --drop <heading>", file=sys.stderr)
+            return 2
+        before = read(path)
+        after, removed, missing = apply_cut(before, drops)
+        ma, mb = manifest(before), manifest(after)
+
+        for h in missing:
+            print(f"NOT FOUND  {h!r} — no such heading; nothing removed for it")
+        if set(ma) != set(mb):
+            print(f"REFUSED — reducing {path} would change its invocable surface:")
+            _emit_diff(ma, mb, "before", "after")
+            print("\nNothing was written. The named sections carry mechanism, not judgment:\n"
+                  "re-cut with the sections that actually moved into the handbook.")
+            return 1
+        if not removed:
+            print(f"no-op — nothing removed from {path} ({len(ma)} token(s) unchanged)")
+            return 0
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(after)
+        total = sum(n for _, n in removed)
+        print(f"reduced {path} — {len(removed)} section(s), {total} line(s) removed, "
+              f"surface identical ({len(ma)} token(s))")
+        for h, n in removed:
+            print(f"  dropped  {h}  ({n} lines)")
+        return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
     print("usage: wf-remainder --manifest <file> | --diff <before> <after> | "
           "--diff-manifest <a> <b>", file=sys.stderr)

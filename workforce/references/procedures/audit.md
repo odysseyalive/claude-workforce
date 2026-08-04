@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 32 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 34 assertion(s) in bin/check name this file; 67 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -676,13 +676,48 @@ defers a run.*
 
 ## Step 6 — Execute
 
-Order: **conversions → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
+Order: **conversions (each reduced at T7b) → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → the Constitution Gate → model rewrite → `org index` → `org embed` →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.**
 
 **Discharge sits between `verify` and the sweep** because it is the last step that may still change the
 tree, and the sweep is the first that cannot be undone. A queue drained after the deletion is a queue
 drained too late; a queue drained before `verify` is one whose repairs nothing re-checked.
+
+### Conversions REDUCE — this is the step, and it runs unasked
+
+**Every converted skill is reduced in its own transaction, at T7b, in this run.** Not proposed, not
+queued, not left for a later pass. The user's directive makes skills the mechanism layer and employees
+the judgment layer, so a conversion that authors a handbook and leaves the skill whole has done half
+the job and produced two live copies of it.
+
+Per skill, immediately after T6 verifies the registration:
+
+1. **Decide the cut** — a judgment, per skill, from the evidence
+   (`conversion-taxonomy.md` § The remainder test). Name the headings whose content became handbook
+   text. Record the cut and its reason in `dispositions.md`.
+2. **Apply it mechanically**, never by hand-editing:
+
+   ```
+   wf-remainder --apply <SKILL.md> --drop "<heading>" [--drop "<heading>" …]
+   ```
+
+   It removes the named sections, recomputes the invocation manifest, and **writes only if the surface
+   is unchanged**. A cut that would drop a command, a script path, a fenced command line, a mechanism
+   heading, or a declared verb is REFUSED with the lost tokens named and **the file left untouched** —
+   which means the cut named a mechanism section, so re-cut and apply again.
+3. **T7c** — mark for the sweep only if the remainder is now empty.
+
+**Exit 1 from `--apply` is a re-cut, not a stop.** The skill stays ✓; the run tries the corrected cut.
+A skill that cannot be reduced after a second attempt is marked ✗ with the refused tokens and the batch
+continues — never a deferral, never a queued row.
+
+**`INV-REMAINDER` is what proves this happened.** `N promoted · 0 reduced` is `NOT UPHELD`, which blocks
+the sweep and must be repaired in the run (`references/invariants.md`). That is the whole reason the row
+exists: the reduction has been specified since the beginning, no run ever performed it, **and nothing
+counted it** — so a run reducing zero looked exactly like a run reducing everything.
+
+**Under `--review`: print the cut per skill and the manifest token counts, apply nothing.**
 
 **The canary re-attempt sits third for a reason**: it may restamp every handbook's `Tier ceiling:` line,
 and that must land *before* `org index`, `org embed`, `wf-claude-md`, and `checksums` read or hash them.
