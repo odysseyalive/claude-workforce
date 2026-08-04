@@ -558,6 +558,19 @@ whole run. **Conversion is reversible by construction**, so batch size is not a 
 already spent, the headroom, and what the batch costs. A run that reports an overage without those four
 numbers has not measured one.
 
+**THE CAPACITY THAT STOPS A RUN MUST BE A MEASURED NUMBER THIS RUN PRINTED.** Not an impression, not a
+forecast, not "what remains of this session." Three capacities have now been used to defer a run — the
+concurrency cap, the session spawn cap, and the authoring context — and **all three were wrong in the
+same way**: an unmeasured quantity presented as a limit. `INV-BATCH`'s four numbers exist so that an
+overage is arithmetic rather than a feeling.
+
+**The authoring context is specifically NOT such a capacity, because it is not shared.** A dispatched
+author works in its own context window and returns only its result
+([sub-agents](https://code.claude.com/docs/en/sub-agents)); N handbooks cost N spawns and accumulate
+nothing in the caller. A run reaching for "I would run out of room" has found the tell that it was about
+to author in the wrong place — the remedy is to dispatch, and it is never to stop.
+`procedures/audit.md` § Step 5 carries the mechanism.
+
 **Where headroom genuinely is short, narrow the WAVE, never the run.** The concurrency cap and the
 session total are different numbers (`platform.md` fact 8), and conversions are *sequential* per-skill
 transactions — so a long batch draws down the session total and never touches the concurrent one.

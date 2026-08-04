@@ -376,6 +376,22 @@ Fixtures persist **across** runs; that is what makes the canary reachable at all
 3. **Do not delete them at the end of a run in which they never registered.** Deleting an
    unregistered fixture guarantees the next run is UNAVAILABLE too, forever. Retain them; the next run
    finds them registered and returns a real PASS or FAIL.
+
+0. **THE INSTALLER SHIPS THEM, WHICH IS WHY A FIRST RUN NO LONGER COSTS A RESTART.** The four fixtures
+   carry the `canary` manifest flag and install to `.claude/agents/` — not into the skill tree, because
+   an agent type registers from nowhere else. Between installing and running `/workforce` there is
+   always at least one turn boundary, so **the first audit finds them already registered** and Step 4b
+   can return a real verdict on the very first run.
+
+   Step 0.6 therefore **writes only what is missing**, and reports `fixtures: shipped (n present)` rather
+   than claiming to have authored them. Rules 1–4 below still govern, because a hand-installed tree, a
+   `--project` install into a repo that later moves, or a deleted fixture all put a run back in the
+   write-this-run case.
+
+   *Added 2026-08-04. This list previously opened at rule 1 and accepted the first-run loss outright:
+   "the next run finds them registered." The next run is a **new session**, and a user who has just run
+   an audit is told to run another one to clear DEGRADED marks the first could not clear. That is a
+   restart charged to the user for a fact the installer can settle before the first run exists.*
 4. **Delete them only after a run that actually used them**, and only once the result is recorded in
    `platform-local.md`. A recorded measurement outlives its fixture; an unrecorded one does not.
 

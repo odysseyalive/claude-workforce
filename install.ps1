@@ -211,11 +211,13 @@ Begin with step 1 now.
         switch ($scope) {
             'user' {
                 $skillDir     = $personalSkillDir
+                $agentsDir    = Join-Path $HOME '.claude/agents'
                 $settingsFile = Join-Path $HOME '.claude/settings.json'
                 $scopeLabel   = 'personal (~/.claude/skills)'
             }
             'project' {
                 $skillDir     = $projectSkillDir
+                $agentsDir    = Join-Path (Get-Location).Path '.claude/agents'
                 $settingsFile = '.claude/settings.local.json'
                 $scopeLabel   = "project ($(Get-Location)\.claude\skills)"
             }
@@ -237,8 +239,21 @@ Begin with step 1 now.
             # Separate word because this project ships zero hooks and several
             # scripts; see references/enforcement.md § Hooks.
             elseif ($line.StartsWith('exec ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
+            # `canary` files are agent DEFINITIONS and must land in .claude/agents/
+            # to register as agent types at all. Shipped so they are ALREADY
+            # REGISTERED by the first audit: fixtures written during a run cannot
+            # resolve in that run, which forced a restart to clear DEGRADED marks.
+            elseif ($line.StartsWith('canary ')) { $flag = 'canary'; $path = $line.Substring(7).Trim() }
 
-            $dest = Join-Path $skillDir ($path -replace '^workforce/', '')
+            if ($flag -eq 'canary') {
+
+                $dest = Join-Path $agentsDir (Split-Path $path -Leaf)
+
+            } else {
+
+                $dest = Join-Path $skillDir ($path -replace '^workforce/', '')
+
+            }
 
             if ($flag -eq 'keep' -and (Test-Path $dest -PathType Leaf)) {
                 Write-Host "Keeping existing $(Split-Path $dest -Leaf) (preserving your edits)..."
@@ -274,10 +289,15 @@ Begin with step 1 now.
             $line = $rawLine.Trim()
             if (-not $line -or $line.StartsWith('#')) { continue }
             $vPath = $line
-            foreach ($pre in @('keep ', 'hook ', 'exec ')) {
-                if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim() }
+            $vFlag = ''
+            foreach ($pre in @('keep ', 'hook ', 'exec ', 'canary ')) {
+                if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim(); $vFlag = $pre.Trim() }
             }
-            $vDest = Join-Path $skillDir ($vPath -replace '^workforce/', '')
+            if ($vFlag -eq 'canary') {
+                $vDest = Join-Path $agentsDir (Split-Path $vPath -Leaf)
+            } else {
+                $vDest = Join-Path $skillDir ($vPath -replace '^workforce/', '')
+            }
             $vTotal++
             if (-not (Test-Path $vDest -PathType Leaf) -or (Get-Item $vDest).Length -eq 0) {
                 $vMissing += $vPath

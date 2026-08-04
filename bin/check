@@ -114,16 +114,22 @@ CANCEL_RX = re.compile(
 def manifest_paths():
     """Shipped files.
 
-    `exec ` and `hook ` are both in use and are stripped here so every downstream
-    check sees a plain path. `keep ` remains unused and is caught below rather than
-    silently parsed.
+    `exec `, `hook ` and `canary ` are in use and are stripped here so every
+    downstream check sees a plain path. `keep ` remains unused and is caught below
+    rather than silently parsed.
+
+    `canary ` files are agent DEFINITIONS: they install to `.claude/agents/`, not
+    into the skill directory, because an agent type is only registered from there.
+    Shipping them means they are already registered when the first audit runs --
+    fixtures written DURING a run cannot resolve in that run (fact 3), which is
+    what forced a restart to clear every DEGRADED tier-ceiling mark.
     """
     out = []
     for line in read("manifest.txt").splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        for flag in ("exec ", "hook "):
+        for flag in ("exec ", "hook ", "canary "):
             if s.startswith(flag):
                 s = s[len(flag):].strip()
                 break
@@ -147,6 +153,11 @@ def manifest_exec_paths():
 def manifest_hook_paths():
     """Paths carrying `hook` — registered to a harness event by `/workforce hooks`."""
     return _flagged("hook")
+
+
+def manifest_canary_paths():
+    """Paths carrying `canary` — agent definitions installed to `.claude/agents/`."""
+    return _flagged("canary")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4114,6 +4125,60 @@ check(
 # forbade it -- the four-question ceiling, this gate's own "it does not ask", and
 # a user directive stating succession is not optional -- and not one was
 # checkable. The directive was captured the same day, in the user's words.
+# Third axis of platform.md fact 8's REPEAT OFFENDER pattern. A run designed a
+# 45-skill roster, expanded it to ~78 handbooks, converted 0 of 40 eligible, and
+# reported "the authoring context was [the constraint]" beside headroom 192 of
+# 200. It had 192 authors available and dispatched none: audit.md said "Then
+# author. Per employee" with no dispatch, so every draft landed in one window.
+_aud = read("workforce/references/procedures/audit.md")
+_inv = read("workforce/references/invariants.md")
+_stg = read("workforce/references/staging.md")
+check(
+    "canary: the fixtures ship with the install, so a first run can measure",
+    len(manifest_canary_paths()) == 4
+    and "THE INSTALLER SHIPS THEM" in _stg,
+    f"{len(manifest_canary_paths())} canary files in the manifest — fixtures written "
+    "DURING a run cannot register in that run (fact 3), so a first audit is forced "
+    "DEGRADED and the user pays a restart to clear marks it could not clear",
+)
+check(
+    "install: both installers place canary files in the agents dir, not the skill",
+    'dest="$agents_dir/$(basename "$path")"' in read("install")
+    and "$dest = Join-Path $agentsDir (Split-Path $path -Leaf)" in read("install.ps1"),
+    "a canary file copied into the skill tree registers no agent type at all — the "
+    "harness reads agent definitions from .claude/agents/ and nowhere else",
+)
+check(
+    "audit: handbooks are authored by dispatch, not in the caller's context",
+    "**Then author — BY DISPATCH, never inline.**" in _aud
+    and "The authoring context is not a shared resource" in _aud,
+    "audit.md Step 5 no longer dispatches authoring — inline authoring puts every "
+    "draft in one context window and manufactures the capacity limit that stopped "
+    "a run with 192 of 200 spawns unused",
+)
+check(
+    "audit: authoring capacity is never a reason to stop, convert less, or defer",
+    "is ever the stated reason to stop, convert, or defer" in _aud,
+    "audit.md dropped the rule that context capacity is a tell to dispatch rather "
+    "than a reason to stop — the fourth axis of this defect is written the moment "
+    "the prohibition is not",
+)
+check(
+    "conversion: a capacity that stops a run must be a number the run printed",
+    "MUST BE A MEASURED NUMBER THIS RUN PRINTED" in read(
+        "workforce/references/conversion-taxonomy.md"),
+    "conversion-taxonomy.md no longer requires a deferring capacity to be measured "
+    "— three capacities have deferred a run and all three were impressions",
+)
+check(
+    "invariants: NOT UPHELD is repaired in the run, never a legitimate exit",
+    "NEVER A LEGITIMATE EXIT" in _inv
+    and "the name of the rule that refused it" in _inv,
+    "invariants.md lets a run close on an unrepaired NOT UPHELD row — the row "
+    "blocks the sweep, it does not license ending the run, and a batch refused by "
+    "no per-item rule is a deferred RUN rather than a refused ACT",
+)
+
 check(
     "succession: is declared and reported, never asked",
     "**Succession is never a question.**" in _asu
@@ -4327,7 +4392,13 @@ if os.path.isdir(_personal):
     # the copy a session loads was a day behind. A sample cannot answer "is this copy
     # current"; only the whole manifest can.
     _drift, _missing, _compared = [], [], 0
+    # `canary` files install to `.claude/agents/`, never into the skill tree, so
+    # they are legitimately absent from the personal SKILL copy and comparing
+    # them there reports 4 permanent phantom absences.
+    _canary_set = set(manifest_canary_paths())
     for _src in sorted(declared):
+        if _src in _canary_set:
+            continue
         # manifest paths are repo-relative and ALREADY begin with "workforce/".
         # Joining "workforce" onto them again produced workforce/workforce/... ,
         # every os.path.exists missed, and the loop compared ZERO files while

@@ -130,6 +130,20 @@ per-skill rule is `NOT UPHELD`, not a plan.
 from the absence of a complaint. **Any `NOT UPHELD` row blocks the sweep**, which is enforceable only
 because the computation now precedes it.
 
+**`NOT UPHELD` IS A FAILURE TO REPAIR IN THIS RUN — NEVER A LEGITIMATE EXIT.** It blocks the sweep; it
+does not license ending the run. A run that prints `NOT UPHELD` and stops has used the invariant as a
+label for the thing it was written to prevent, and the report reads as diligence: the row is honest, the
+arithmetic is shown, and the work is undone. **IF a run is about to close with an unrepaired `NOT UPHELD`
+row → STOP and do the work the row names.** The only `NOT UPHELD` that may survive to the report is one
+where each item carries **the name of the rule that refused it** — that is a refused ACT, which is
+permitted. A whole batch refused by no rule is a deferred RUN, which is not.
+
+*Added 2026-08-04. A run reported `INV-SUCCESSION declared from skill-builder · 40 eligible · 0 converted
+· NOT UPHELD` and `INV-BATCH … DID NOT RUN` beside `cap 200 · spent 8 · headroom 192`, then said "I
+stopped there" and told the user to start a new session. Not one of the 40 carried a refusing rule. The
+paragraph above already called that "not a plan" and the run printed it anyway — because saying a state
+is wrong is not the same as forbidding the exit that reaches it.*
+
 ---
 
 ## Why this exists

@@ -641,10 +641,37 @@ an intent; the report is where the user sees what that turned out to mean — wh
 which still refused and under which rule, how many immutable blocks were extracted against how many
 censused, and that `disband` reverses it.
 
-**Then author.** Per employee, through `handbook.md`, under the transaction order in `hire.md`
-§ Transaction Order. Greenfield authors the whole roster as a batch (`hire.md` § Initial roster);
-brownfield authors conversions and new hires together. Every handbook is cold-read before its task
-completes; a probe failure is fixed in the same run, never deferred.
+**Then author — BY DISPATCH, never inline.** One subagent authors one handbook and returns it, through
+`handbook.md`, under the transaction order in `hire.md` § Transaction Order. Greenfield authors the whole
+roster as a batch (`hire.md` § Initial roster); brownfield authors conversions and new hires together.
+Every handbook is cold-read before its task completes; a probe failure is fixed in the same run, never
+deferred.
+
+**The authoring context is not a shared resource, and a run that treats it as one will stop.** Each
+subagent runs in **its own context window** and returns only its result
+([sub-agents](https://code.claude.com/docs/en/sub-agents), read 2026-08-04; DOCUMENTED, not measured —
+which is fine here because this fact **permits** work rather than blocking it, and `platform.md`'s bar
+applies to blocking checks). So N handbooks cost N spawns against the session cap and **do not accumulate
+in the caller's window.** Authoring inline is what makes a large roster look impossible: the main context
+holds every draft at once and runs out, exactly as predicted, from a constraint the platform does not
+impose.
+
+**The main context holds the roster, the returned verdicts, and the journal — never the drafts.** Run in
+waves under the concurrency cap (`delegation-budget.md`), sequentially across waves; a sequential batch
+draws only on the session total (`platform.md` fact 8).
+
+**IF the authoring capacity of THIS context is ever the stated reason to stop, convert, or defer → STOP
+and dispatch instead.** It is not a reason; it is the tell that authoring was about to be done in the
+wrong place.
+
+*Added 2026-08-04, after a run designed a 45-skill roster, expanded it to ~78 handbooks, and converted
+**0 of 40 eligible** — reporting `INV-SUCCESSION … NOT UPHELD`, `INV-BATCH … DID NOT RUN` beside `cap 200
+· spent 8 · headroom 192`, and telling the user to re-run in a new session. Its own account was exact:
+"The spawn budget was never the constraint — 192 of 200 left. The authoring context was." **It had 192
+authors available and wrote none of them.** This is `platform.md` fact 8's REPEAT OFFENDER pattern on a
+third axis — first the org-design path, then the conversion path on the spawn cap, now the conversion
+path on context — and the pattern is always the same: a capacity nobody measured becomes a gate that
+defers a run.*
 
 ## Step 6 — Execute
 

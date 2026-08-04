@@ -55,6 +55,17 @@ for line in open("manifest.txt", encoding="utf-8"):
             executable = True
             break
 
+    # `canary` files are agent DEFINITIONS. The installers place them in
+    # `.claude/agents/`, never inside the skill tree, so an agent type exists
+    # before the first audit runs. bin/sync mirrors the SKILL, so it skips them
+    # rather than copying a registerable agent into a directory where the
+    # harness will never look for one.
+    if s.startswith("canary "):
+        s = s[len("canary "):].strip()
+        if not os.path.isfile(s):
+            missing.append(f"{s} (declared canary, not on disk)")
+        continue
+
     if not s.startswith(PREFIX):
         missing.append(f"{s} (path does not start with {PREFIX!r})")
         continue

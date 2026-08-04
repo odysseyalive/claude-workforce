@@ -288,9 +288,14 @@ verify_scope() {
             "keep "*) vflag="keep"; vpath="${vline#keep }" ;;
             "hook "*) vflag="hook"; vpath="${vline#hook }" ;;
             "exec "*) vflag="hook"; vpath="${vline#exec }" ;;
+            "canary "*) vflag="canary"; vpath="${vline#canary }" ;;
         esac
 
-        vdest="$vdir/${vpath#workforce/}"
+        if [ "$vflag" = "canary" ]; then
+            vdest="$agents_dir/$(basename "$vpath")"
+        else
+            vdest="$vdir/${vpath#workforce/}"
+        fi
         v_total=$((v_total + 1))
 
         if [ ! -s "$vdest" ]; then
@@ -320,11 +325,13 @@ install_to_scope() {
     case "$scope" in
         user)
             skill_dir="$PERSONAL_SKILL_DIR"
+            agents_dir="$HOME/.claude/agents"
             settings_file="$HOME/.claude/settings.json"
             scope_label="personal (~/.claude/skills)"
             ;;
         project)
             skill_dir="$PROJECT_SKILL_DIR"
+            agents_dir="$(pwd)/.claude/agents"
             settings_file=".claude/settings.local.json"
             scope_label="project ($(pwd)/.claude/skills)"
             ;;
@@ -350,9 +357,20 @@ install_to_scope() {
             # reading `hook workforce/bin/wf-census` would contradict that in the
             # one place a reader checks what actually ships.
             "exec "*) flag="hook"; path="${line#exec }" ;;
+            # `canary` files do NOT live in the skill directory: they are agent
+            # definitions and must land in .claude/agents/ to be registered as
+            # agent types at all. Installed here so they are ALREADY REGISTERED
+            # by the first audit -- fact 3's delay means fixtures written during
+            # a run cannot resolve in that run, which forced a restart to clear
+            # every DEGRADED tier-ceiling mark.
+            "canary "*) flag="canary"; path="${line#canary }" ;;
         esac
 
-        dest="$skill_dir/${path#workforce/}"
+        if [ "$flag" = "canary" ]; then
+            dest="$agents_dir/$(basename "$path")"
+        else
+            dest="$skill_dir/${path#workforce/}"
+        fi
 
         if [ "$flag" = "keep" ] && [ -f "$dest" ]; then
             echo "Keeping existing $(basename "$dest") (preserving your edits)..."
