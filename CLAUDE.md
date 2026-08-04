@@ -316,10 +316,33 @@ went 13 → 15.
 
 *Still open from this:* **no handbook anywhere declares a `Check:` line yet**, so `--run` and
 `--prove` are exercised only by fixtures — the resolve layer works on the real population today and
-the run layer waits on migration. **`bin/prove` is blocked by a pre-existing red baseline**: four
-canary fixtures lack `measures-fact:`, and adding it would trip *"no fixture survives its own
-measurement"* and declare all four residue, colliding with the canary-from-shipped-fixtures design.
-Left untouched deliberately — it is a decision, not a lint. Author-run, not cold-read.
+the run layer waits on migration. Author-run, not cold-read.
+
+**Closed the same day — the canary lifecycle, and `bin/prove` ran for the first time.** The block was
+`fixtures: every live fixture declares the fact it measures`, failing before any of the above began.
+`bin/prove` refuses on a red baseline, so **the project's proof-by-breaking discipline had no working
+tool behind it** — the exact state `bin/prove` was written to end.
+
+**Two populations had appeared in one directory and nothing could tell them apart.** A canary now
+**ships** (manifest `canary` flag) and **re-measures per host and per harness version**
+(`platform.md` § Staleness), so its job recurs and it is never residue. A hand-placed probe answers
+one question and *is* residue — `wf-reload-probe` says so in its own frontmatter. Assertion B now
+exempts manifest-declared canaries; the four shipped ones declare `measures-fact:` in **source**.
+Their descriptions had said *"Safe to delete once platform-local.md records the measurement"* — **the
+one instruction that would have undone the exemption.**
+
+**The defect underneath was worse than the block.** The assertion globbed `.claude/agents/wf-*.md`
+and `.gitignore` ignores `/.claude/`, so **a fresh clone has zero fixtures there and the check passes
+reporting nothing.** It could only ever fire on a machine where an install had populated that
+directory. Same family as the personal-install check that compared zero files and reported green; it
+now reads the tracked manifest source, with an anti-vacuity guard.
+
+*I had the blast radius wrong and said so:* fact 1's heading carries `✅` but not the literal
+`MEASURED` that assertion B matches, so only `wf-ceiling-probe` collided — one fixture, not four.
+
+**`bin/prove`: 90 of 90 proven by breaking, restored clean.** Unblocking it re-proved the **75 prior
+cases that had been unrunnable behind the same red baseline**, each of which was until now a claim in
+a commit message. Record in `plan/handbook-verification-gap-2026-08-04.md` § The canary lifecycle.
 
 **Closed 2026-08-04 (latest) — the mechanism layer. Skills own MECHANISM, employees own JUDGMENT.**
 A new user directive, and the organizing principle of conversion: *conversion **separates** a skill, it

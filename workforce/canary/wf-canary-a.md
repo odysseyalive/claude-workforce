@@ -1,6 +1,12 @@
 ---
+# measures-fact: 1 — a SHIPPED canary, and NOT swept when that fact is
+# MEASURED. It re-measures per host and per harness version (platform.md
+# § Staleness stamps every fact and marks it STALE on a version change), so its
+# job recurs and it is never residue. `bin/check` exempts manifest-declared
+# canaries from the sweep for exactly this reason. A hand-placed throwaway probe
+# is the other population and IS swept — see wf-reload-probe.
 name: wf-canary-a
-description: Workforce tier canary, link A of the depth chain. Throwaway measurement fixture; not an employee. Safe to delete once platform-local.md records the measurement.
+description: Workforce tier canary, link A of the depth chain. Measurement fixture, not an employee; shipped so the first audit finds it registered.
 tools: Agent, Bash
 ---
 

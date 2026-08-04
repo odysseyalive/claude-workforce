@@ -49,10 +49,9 @@ always fails stops being read*.
 `bin/idempotence` — 5/5 writers idempotent, which also proves it leaves no residue in a tree whose
 commands it just executed.
 
-**`bin/prove` could not be used directly**: it refuses on a red baseline, and `fixtures: every live
-fixture declares the fact it measures` was already failing before this change (see Open below). The
-12 cases are recorded in `bin/prove` for when the baseline goes green, and were proven now by a
-scoped harness tolerating that one known failure.
+**`bin/prove` could not be used directly at first**: it refuses on a red baseline, and `fixtures:
+every live fixture declares the fact it measures` was already failing before this change. Closed the
+same day — see *The canary lifecycle* below. **All 15 cases now run under the real tool.**
 
 ## Four defects the patch had, all found by running it
 
@@ -106,12 +105,76 @@ The single `wf-conform` failure is a pre-existing `Class fix:` field on a DEF re
   anywhere declares a `Check:` line yet**. Both paths are exercised only by fixtures. The resolve
   layer works on the real population today; the run layer waits on migration, and `0 ran` on that
   tree is the honest reading.
-- **`bin/prove` is blocked by a pre-existing failure.** Four canary fixtures lack `measures-fact:`.
-  Adding it is four lines — but facts 1 and 2c are both ✅ MEASURED, so the companion assertion *"no
-  fixture survives its own measurement"* would immediately declare all four residue. That collides
-  with the 2026-08-04 design in which canaries ship via the manifest's `canary` flag so the first
-  audit finds them registered. **Left untouched: it is a real decision, not a lint.**
+- ~~**`bin/prove` is blocked by a pre-existing failure.**~~ **Closed 2026-08-04 — see below.**
 - **Author-run, not cold-read.** Per `SKILL.md` § Off-the-Street Release Gate the absences are
   untested.
 - `content-writer`'s checks 2 and 3 are still marked UNPROVEN in the live tree. `wf-checkrun` now
   names them; nothing has fixed them, and that is a different repository.
+
+---
+
+# The canary lifecycle — closing the `bin/prove` block, same day
+
+**The block.** `bin/prove` refuses on a red baseline, and `fixtures: every live fixture declares the
+fact it measures` had been failing before any of the above began. So **`bin/prove` was unrunnable**,
+and the project's proof-by-breaking discipline had no tool behind it — the state it was in on
+2026-08-03 when the tool was written to fix exactly that.
+
+**I got the blast radius wrong first.** I reported that facts 1 and 2c are both ✅ MEASURED, so all
+four canaries would be swept. Assertion B matches the **literal** `MEASURED`, and fact 1's heading is
+`✅` with no such word — so only `wf-ceiling-probe` (fact 2c, `✅ MEASURED`) actually collided. One
+fixture, not four. Checked before acting on it, which is the rule that keeps being worth following.
+
+## Two populations, opposite lifecycles
+
+Until 2026-08-04 there was one kind of fixture. Then canaries began **shipping** via the manifest's
+`canary` flag so the first audit finds them registered — and landed in the same directory, where
+neither assertion could tell them apart.
+
+| | Source | Lifecycle |
+|---|---|---|
+| **SHIPPED canary** | manifest `canary` flag, tracked in `workforce/canary/` | **re-measures per host and per harness version** (`platform.md` § Staleness stamps every fact and marks it STALE on a version change). Its job RECURS — never residue |
+| **LOCAL probe** | hand-placed in `.claude/agents/`, untracked | answers one open question, then IS residue. `wf-reload-probe`'s own frontmatter says *"swept by bin/check once that fact is MEASURED"* |
+
+**The evidence that exempting is right rather than convenient:** the 2026-08-04 canary measurement
+recorded **both** `A=has-agent | B=has-agent | C=no-agent` **and** `CEILING=agent-withheld`. That
+`CEILING=` line *is* `wf-ceiling-probe` — a live participant in the per-run canary, not a spent probe.
+Deleting it removes half the canary's assertions.
+
+## The bigger defect underneath
+
+**The assertion was vacuous on a fresh clone.** It globbed `.claude/agents/wf-*.md`, and
+`.gitignore:3` ignores `/.claude/`. **A fresh clone has zero fixtures there, so the glob is empty and
+the check passes reporting nothing.** It could only ever fire on a machine where an install had
+populated that directory — which is why it sat unnoticed until one did, and why nobody had seen it
+block `bin/prove`.
+
+Same family as the personal-install check that compared **zero** files and reported green. The fix
+asserts the **tracked source** (`manifest_canary_paths()`) for shipped canaries and keeps the local
+glob only for probes the manifest does not ship, with an anti-vacuity guard on both.
+
+## What landed
+
+| | |
+|---|---|
+| the four canaries | `measures-fact: 1` (a/b/c) and `2c` (ceiling-probe), in **source** so `bin/sync` and both installers carry it |
+| their descriptions | said *"Safe to delete once platform-local.md records the measurement"* — **the one instruction that would undo the exemption.** Corrected to name them shipped |
+| assertion B | exempts manifest-declared canaries, and the message says why |
+| assertion A | reads tracked source ∪ local probes, plus `the fixture-declaration check actually examined fixtures` |
+
+## Result
+
+**`bin/prove` runs for the first time in this repo's recorded history of having it: 90 of 90 proven
+by breaking, restored clean.** Unblocking it did not just prove this session's 15 — it re-proved the
+**75 prior cases that had been unrunnable behind the same red baseline**, every one of which had
+until now been a claim in a commit message.
+
+```
+bin/check               711 passed, 0 failed
+bin/prove                90 of 90 proven by breaking · restored clean: yes
+bin/script-conformance   55 passed, 0 failed
+bin/idempotence           5 idempotent, 5 of 5
+```
+
+**Still open:** nothing from this. The `background:` frontmatter question (fact 2) is untouched and
+`wf-canary-ic` / `wf-canary-lead` remain its fixtures, correctly unswept because fact 2 is ❌.

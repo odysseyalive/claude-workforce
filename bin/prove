@@ -39,11 +39,20 @@ CKR = "workforce/bin/wf-checkrun"
 CFM = "workforce/bin/wf-conform"
 VER = "workforce/references/verification.md"
 TPL = "workforce/references/handbook-templates.md"
+CANA = "workforce/canary/wf-canary-a.md"
+CHK = "bin/check"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── the canary fixture lifecycle (2026-08-04) ────────────────────────────
+    ("fixtures: every live fixture declares the fact it measures",
+     CANA, "del", "measures-fact: 1"),
+    ("the fixture-declaration check actually examined fixtures",
+     MAN, "del", 'canary workforce/canary/wf-canary-a.md\ncanary workforce/canary/wf-canary-b.md\ncanary workforce/canary/wf-canary-c.md\ncanary workforce/canary/wf-ceiling-probe.md\n'),
+    ("fixtures: no fixture survives its own measurement",
+     CHK, "del", '    if _name in _shipped_canaries:\n        continue                      # its job recurs; see the two populations above\n'),
     # ── the handbook verification gap (2026-08-04) ───────────────────────────
     ("wf-checkrun is shipped in the manifest",
      MAN, "del", "exec workforce/bin/wf-checkrun\n"),

@@ -3406,6 +3406,30 @@ check(
 _live_fixtures = {
     os.path.basename(p)[:-3] for p in glob.glob(".claude/agents/wf-*.md")
 }
+# TWO POPULATIONS, AND THEY HAVE OPPOSITE LIFECYCLES. Until 2026-08-04 there was
+# one: a hand-placed throwaway probe, written during a run to answer an open
+# question once, swept when its fact closed. Then canaries began SHIPPING via the
+# manifest's `canary` flag so the first audit finds them registered — and landed in
+# the same directory, where these checks could not tell them apart.
+#
+#   SHIPPED canary   manifest `canary` flag; tracked source in workforce/canary/.
+#                    Re-measures per host and per harness version (platform.md
+#                    § Staleness), so its job RECURS and it is never residue.
+#   LOCAL probe      hand-placed in .claude/agents/, untracked. Answers one open
+#                    question, then IS residue — wf-reload-probe says so itself.
+#
+# ASSERT THE SOURCE, NOT THE INSTALLED COPY. `.gitignore` ignores `/.claude/`, so
+# globbing `.claude/agents/` alone means a FRESH CLONE HAS ZERO FIXTURES AND THIS
+# PASSES REPORTING NOTHING — the same vacuous green that let the personal-install
+# check compare zero files for a day. The manifest paths are tracked and present in
+# every clone; the local glob is kept only for probes the manifest does not ship.
+_shipped_canary_srcs = sorted(manifest_canary_paths())
+_shipped_canaries = {os.path.basename(p)[:-3] for p in _shipped_canary_srcs}
+_local_probes = sorted(
+    p for p in glob.glob(".claude/agents/wf-*.md")
+    if os.path.basename(p)[:-3] not in _shipped_canaries
+)
+_fixture_paths = _shipped_canary_srcs + _local_probes
 # Each fixture DECLARES the fact it measures; the check resolves that fact's
 # status. Two earlier forms both passed vacuously: one regex whose non-greedy
 # span stopped at the first '#', then a per-section scan that matched a fixture
@@ -3416,15 +3440,27 @@ _fact_status = {
     for m in re.finditer(r"^### Fact (\w+) —.*$", _plat, re.M)
 }
 _closed = set()
-for _p in glob.glob(".claude/agents/wf-*.md"):
+for _p in _fixture_paths:
+    _name = os.path.basename(_p)[:-3]
+    if _name in _shipped_canaries:
+        continue                      # its job recurs; see the two populations above
     _m = re.search(r"measures-fact:\s*(\w+)", read(_p))
     if not _m:
         continue
     if "MEASURED" in _fact_status.get(_m.group(1), ""):
-        _closed.add(os.path.basename(_p)[:-3])
+        _closed.add(_name)
 _undeclared = sorted(
-    os.path.basename(p)[:-3] for p in glob.glob(".claude/agents/wf-*.md")
+    os.path.basename(p)[:-3] for p in _fixture_paths
     if "measures-fact:" not in read(p)
+)
+# The anti-vacuity guard. A population that is empty is not a population that
+# passed — the manifest ships canaries, so zero here means the flag was dropped.
+check(
+    "the fixture-declaration check actually examined fixtures",
+    len(_fixture_paths) > 0 and len(_shipped_canary_srcs) > 0,
+    f"examined {len(_fixture_paths)} fixture(s), {len(_shipped_canary_srcs)} of them "
+    "manifest-declared canaries — a check reading only `.claude/agents/` reports a "
+    "pass on any fresh clone, because .gitignore ignores that whole tree",
 )
 check(
     "fixtures: every live fixture declares the fact it measures",
@@ -3436,7 +3472,9 @@ check(
     "fixtures: no fixture survives its own measurement",
     not _closed,
     f"registered but its fact is MEASURED: {sorted(_closed)} — the evidence is in "
-    "measurements/; the fixture is residue",
+    "measurements/; the fixture is residue. SHIPPED canaries are exempt: they "
+    "re-measure per host and per harness version, so their job recurs and a "
+    "closed fact never makes them residue",
 )
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
