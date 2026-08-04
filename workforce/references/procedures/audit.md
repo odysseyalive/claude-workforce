@@ -616,7 +616,7 @@ completes; a probe failure is fixed in the same run, never deferred.
 ## Step 6 — Execute
 
 Order: **conversions → handbooks → data skills → charter and principles → the Constitution Gate →
-model rewrite → `org index` → `org embed` → `checksums` → `verify` → the sweep.**
+model rewrite → `org index` → `org embed` → `claude-md` → `checksums` → `verify` → the sweep.**
 
 **`checksums` is in this list because it was in no list.** It generates
 `.claude/workforce/.directives.sha`, the sidecar `wf-protect-directives` compares every edit against —
@@ -626,6 +626,13 @@ fresh install shipped with the hook that defends the user's first directive repo
 every edit, forever**, and the only signal was a `verify` finding telling the user to run a command by
 hand. That is the "nothing ships dormant" failure (`enforcement.md`) applied to the sidecar rather than
 the hook.
+
+**`claude-md` runs beside it, and for the same reason.** CLAUDE.md is injected into every subagent
+with no opt-out (fact 6), so a line duplicated between it and a handbook is paid on every spawn while
+the handbook copy is paid once. `wf-claude-md` writes the generated region and removes only lines
+proven verbatim in a handbook or extracted directive; `DERIVABLE` content is reported and never
+removed, and the user's own prose is never touched (`references/claude-md.md`). It runs after
+`org embed` because handbooks must be in final position before anything is compared against them.
 
 It runs **after** `org embed` and **before** `verify`: the immutable blocks must be in their final
 position before they are hashed, and `verify` must be able to report the sidecar it will then check.

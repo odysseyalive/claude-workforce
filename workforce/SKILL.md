@@ -90,6 +90,21 @@ first. Mechanics at `references/procedures/org.md` § Canonical Dispatch CHECKPO
 remainder test. Note the second clause: **data in hand that answers the question is itself a terminal
 answer**, which is a wider rule than "a command already does this."*
 
+> **"The CLAUDE.md should be built mechanically for each project by this project and it should be
+> very sparce or next to nothing. The skills, agents, etc should be what drives the project, not hte
+> CLAUDE.md file"**
+
+*— Added 2026-08-03, source: user directive, stated after `wf-context` measured a real org: **IDENTITY
+29,891 B, 89% of everything an employee receives before its task**, against 476 B of routing and 3,225 B
+of its own handbook — in a project with no source code. Fact 6 is why: CLAUDE.md is injected into every
+non-fork subagent with **no per-agent opt-out**, so it is the one context cost an org cannot control and
+it is multiplied by fan-out. This directive reverses a stance held until now — `audit.md` Step 1 and
+`verify.md` § The user's own files both read "never edit it — it is the user's file, and this is a
+proposal." Mechanics at `references/claude-md.md`; the operational reading is — **workforce generates a
+marked region and may remove only what it can prove moved into a handbook or an extracted directive.
+User prose that is not duplicated is never touched**, because directive one is retention, and a line
+living verbatim in a handbook has been retained, not deleted.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
