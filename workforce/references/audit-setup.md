@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 40 assertion(s) in bin/check name this file; 45 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -23,9 +23,9 @@ back up first, and which model and effort level each lane runs at.
 | # | Step | What happens | Calls | Objects |
 |---|---|---|---|---|
 | 1 | 0 | Consent — proceed with this audit, or stop | **1** | 1 |
-| 2 | 0.2 | Backup — copy the project before anything is written | **1** | 1 |
+| 2 | 0.2 | Backup — copy the project first · **and the session advisor** | **1** | 2 |
 | — | 0.3 | Absent companions installed automatically | 0 | — |
-| 3 | 0.4a | Model budget — analytical Lead/IC, creative, code, advisor | **1** | 5 |
+| 3 | 0.4a | Model budget — analytical Lead/IC, creative, code | **1** | 4 |
 | 4 | 0.4b | Effort budget — analytical Lead/IC, creative, code | **1** | 4 |
 | — | 5 | Org designed from evidence, built, and reported | 0 | — |
 
@@ -33,9 +33,19 @@ Everything else is a panel or an automatic gate. **Suppressed entirely** in head
 and `--quick` runs: those render nothing, write no markers, and install nothing that was not already
 authorized.
 
-**The advisor is an object inside the model budget, not a question of its own.** It is one of the four
-things managed separately — but it is answered on the same call as the lanes, because a fourth call
-asking one thing is a stop the user pays for and learns nothing from.
+**The advisor is an object on the BACKUP call, not a question of its own and not a lane.** It is one of
+the four things managed separately, but it is not one of the four *lanes* — `org-config.template.md`
+§ The four lanes says so itself: *"Not a lane employees run in — it reaches no employee."* It rides an
+existing call rather than taking one, because a fourth call asking one thing is a stop the user pays for
+and learns nothing from.
+
+*Moved off the model call 2026-08-04, for a hard reason and a soft one. **Hard: `AskUserQuestion`
+accepts at most FOUR objects per call, and the model budget declared five.** It could not render as
+specified, and what a user actually saw was a model budget shaped differently from the effort budget
+beside it — which is how this was noticed. **Soft: the two budgets must offer the SAME categories.**
+With the advisor among them they never could, because the advisor has no effort object and never will
+(§ Step 0.4a). Four lanes on both sides is the only arrangement where the two questions agree about what
+a lane is.*
 
 **Four questions is the whole surface, and it is a design constraint rather than a current count.**
 Discoveries, repairs, classifications, and deferrals are handled by the run — not escalated. Two places
@@ -178,6 +188,17 @@ defect above:
 >    where they are instead of being cleaned up, so a few jobs will have two copies until you delete
 >    the old ones yourself.
 
+**Second object on this call — the session advisor**, pre-selected from `advisorModel` (Step 0.3):
+
+> **An advisor for you?**
+> It runs alongside you, not inside any agent — a second opinion on what you are doing. Pick "Other"
+> and type **No Advisor** if you do not want one.
+
+It offers the same model pool as the model budget, in the same cost order, and **carries no
+recommendation**. It sits here rather than with the lanes because it is not a lane: it reaches no
+employee, it has no effort setting, and putting it among the four made the two budgets offer different
+categories — which is the mismatch this arrangement exists to remove.
+
 **Declining is answered, not refused.** `declined` is a fourth state beside the three below, and it
 costs exactly what a `failed` backup costs: conversions downgrade to
 **register-the-employee-and-leave-the-skill**, two live paths instead of one, and the sweep does not
@@ -276,17 +297,25 @@ installed, not a new install, so they run whether or not anything was checked. A
 not reach installed copies only ever helps new projects.
 
 **Read the current `advisorModel` from the project's settings** (both `.claude/settings.json` and
-`.claude/settings.local.json`). Its value pre-selects the advisor object in the model budget (Step 0.4a). The budget
+`.claude/settings.local.json`). Its value pre-selects the advisor object on the backup call (Step 0.2). The budget
 decides what happens — not this gate.
 
 ## Step 0.4 — Model budget, effort budget
 
-Two `AskUserQuestion` calls, nine objects, **fixed regardless of headcount**
-(`references/org-config.template.md` § The four lanes). The four things managed separately are
-**analytical, creative, code, and advisor** — the first three are lanes employees run in, and the
-advisor is not.
+Two `AskUserQuestion` calls, **four objects each**, fixed regardless of headcount
+(`references/org-config.template.md` § The four lanes).
 
-### Step 0.4a — Model budget  (question 3 of 4 · 5 objects)
+**BLOCKING — both calls offer the SAME four categories, in the same order: `analytical · Lead`,
+`analytical · IC`, `creative`, `code`.** One canonical set, owned by
+`org-config.template.md` § The four lanes and restated in neither budget. A category added to one is
+added to both in the same change, or the two questions disagree about what a lane is
+(`SKILL.md` Core Principle 7c).
+
+**No call may carry more than four objects — `AskUserQuestion` accepts at most four.** The advisor was a
+fifth here until 2026-08-04 and the call could not render; it is now an object on the backup call
+(§ Step 0.2), where it belongs, because the advisor is not a lane.
+
+### Step 0.4a — Model budget  (question 3 of 4 · 4 objects)
 
 | Object | What it sets |
 |---|---|
@@ -294,7 +323,6 @@ advisor is not.
 | analytical — IC | the IC default, same reason |
 | creative | one model for the whole creative lane, no tier split |
 | code | one model for the whole code lane, no tier split |
-| advisor | the main session's advisor. "Other" is where the user types **"No Advisor"** to decline |
 
 **Use this wording** (§ How every question is worded). The internal lane names are the *object labels'*
 business; the question text is not the place for them:
@@ -307,8 +335,6 @@ business; the question text is not the place for them:
 > · **Agents that do the work** — the ones actually editing files and running commands
 > · **Writing and design work**
 > · **Code work**
-> · **An advisor for you** — runs alongside you, not inside any agent. Pick "Other" and type
->   **No Advisor** if you do not want one.
 
 Each object offers the four statics from `org-config.template.md` § Model statics, in the order listed
 there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
@@ -323,10 +349,11 @@ the ranking is what lets a user read the cost of a choice at a glance. The advis
 recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
 model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
 
-The advisor object is pre-selected from the current `advisorModel` in project settings (read in Step
-0.3). Choosing a model writes `advisorModel`; "No Advisor" removes the setting. It runs only in the
-main session and does not compound with spawned employees, **which is why it has no effort object** —
-nothing spawns at an effort level it controls.
+**The advisor object lives on the backup call** (§ Step 0.2), pre-selected from the current
+`advisorModel` in project settings (read in Step 0.3). Choosing a model writes `advisorModel`;
+"No Advisor" removes the setting. It runs only in the main session and does not compound with spawned
+employees, **which is why it has no effort object** — nothing spawns at an effort level it controls, and
+that permanent asymmetry is exactly why it may not sit among the lanes.
 
 ### Step 0.4b — Effort budget  (question 4 of 4 · 4 objects)
 
@@ -338,8 +365,9 @@ nothing spawns at an effort level it controls.
 >
 > · **Agents that coordinate** · **Agents that do the work** · **Writing and design work** · **Code work**
 
-Analytical Lead, analytical IC, creative, code. The lane set is identical to the model budget minus the
-advisor, so a lane added to one is added to both or the two disagree about what a lane is.
+**The same four categories as Step 0.4a, in the same order** — `analytical · Lead`, `analytical · IC`,
+`creative`, `code`. Not "minus the advisor": the sets are now identical, because the advisor was never a
+lane and no longer sits among them.
 
 **The rungs are offered most expensive first**, in the order given by `org-config.template.md` § Effort
 statics, and **the recommendation rule is the model budget's rule unchanged**: `(recommended)` marks the

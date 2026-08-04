@@ -2575,6 +2575,37 @@ _hire2 = read("workforce/references/procedures/hire.md")
 # taking everything into their handbooks — and the roster is the PRIMARY path
 # (Core Principle 7b). Nine live employees on the first real target came that way.
 _hbk = read("workforce/references/procedures/handbook.md")
+# The two budget questions render back to back and offered DIFFERENT categories:
+# model carried five objects (the four lanes plus the advisor), effort carried
+# four. AskUserQuestion accepts at most four objects per call, so the model budget
+# could not render as specified — and the advisor was never a lane, has no effort
+# object, and never will. Noticed by a user reading the two questions side by side.
+_cfg2 = read("workforce/references/org-config.template.md")
+check(
+    "budget: the category set is canonical, stated once, and owned by org-config",
+    "THE CANONICAL BUDGET CATEGORIES, stated once and owned here" in _cfg2
+    and "`analytical · Lead`, `analytical · IC`, `creative`, `code`" in _cfg2,
+    "two questions each keeping their own list is how they came to disagree; the "
+    "set is stated in one file and restated in neither budget",
+)
+check(
+    "budget: both calls carry four objects, and no call may carry five",
+    "**four objects each**" in _asu
+    and "at most four" in _asu
+    and "question 3 of 4 · 4 objects" in _asu
+    and "question 4 of 4 · 4 objects" in _asu,
+    "the model budget declared five objects against a four-object tool limit, so "
+    "it could not render as written — and the mismatch was visible to the user as "
+    "two questions with different shapes",
+)
+check(
+    "budget: the advisor is not a lane and does not sit among the categories",
+    "not a question of its own and not a lane" in _asu
+    and "advisor object lives on the backup call" in _asu,
+    "the advisor reaches no employee and has no effort object, so among the lanes "
+    "it makes the two budgets permanently unequal — a fifth model category with "
+    "no effort counterpart",
+)
 check(
     "principles: creation and optimization are one workflow, stated as doctrine",
     "Creation and optimization are ONE workflow" in skill

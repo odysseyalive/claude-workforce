@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -63,14 +63,30 @@ and is never promoted to the top.
 There is no "Other" rung. The ladder is the whole set the harness accepts, so a hand-typed value could
 only be a rung already offered or one that does not exist.
 
-*The recommendation per lane is whatever the lane tables below already carry — Lead `high`, IC `medium`,
-creative `medium`, code `high`. This section sets the order the choices are shown in and changes none of
-them.*
+*The recommendation per lane is whatever the lane tables below already carry — `analytical · Lead`
+`high`, `analytical · IC` `medium`, `creative` `medium`, `code` `high`. **Named with the canonical
+categories** (§ The four lanes): this section previously wrote "Lead" and "IC" bare, which read as a tier
+axis beside a lane axis and is half of why the two budgets looked like different schemes. This section
+sets the order the choices are shown in and changes none of them.*
 
 ## The four lanes
 
-Work is budgeted by **what kind of work it is**, not only by where the employee sits. Four lanes, each
-addressed and managed separately:
+Work is budgeted by **what kind of work it is**, not only by where the employee sits.
+
+**THE CANONICAL BUDGET CATEGORIES, stated once and owned here:**
+`analytical · Lead`, `analytical · IC`, `creative`, `code`.
+
+**Both budget questions offer exactly these four, in this order** (`audit-setup.md` § Step 0.4). A
+category added to one is added to both in the same change (`SKILL.md` Core Principle 7c). Neither
+question keeps its own copy of the list, and `AskUserQuestion` accepts at most four objects per call —
+so a fifth category is not a design choice, it is a call that cannot render.
+
+*Corrected 2026-08-04. The model budget carried a fifth object, the advisor, and the effort budget
+carried four — so the two questions rendered with different categories back to back, which is how a user
+noticed. The advisor is not a lane (see the table's own last row), has no effort object and never will,
+and now rides the backup call.*
+
+Four lanes, each addressed and managed separately:
 
 | Lane | What it covers | Carries a tier split? |
 |---|---|---|
