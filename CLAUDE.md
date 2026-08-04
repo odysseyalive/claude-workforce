@@ -191,47 +191,55 @@ that "every writing step remains unexecuted" — by then false in four of five p
 was not lost; it was in the commits, the fixtures, and the assertions. What was missing was the front
 door pointing at it.*
 
-## Open, as of 2026-08-03
+## Open, as of 2026-08-03 (evening)
 
-- **The sweep has still never run.** Everything else in the transaction has, and it ran EARLIER than
-  this file used to claim. The first writing audit was **2026-07-31 against `~/lab/apps-odyssey-alive`**
-  — five T5 rows to COMMITTED, seven employees, five `DEF` records, and four `/org` work runs after it.
-  A second ran 2026-08-03 against `~/lab/odyssey-alive`: T1–T8 COMMITTED for three employees, the probe
-  gate twice (two cold readers returned `AMBIGUOUS` on one contradiction, producing
-  `DEF-2026-08-03-readonly-diff-contradiction` and the amendment that closed it), and Step 0.8's
-  settings write. **Deletion is the one gate with no execution behind it.**
+- **The sweep has still never run — and it is now the ONLY thing in the transaction that hasn't.**
+  Every gate in front of it is satisfied against `~/lab/apps-odyssey-alive`: backup verifies, journal
+  15/15 COMMITTED, the T7 `.orig` on disk and hash-matched (`f76a1787…` across live file, `.orig`, and
+  journal row), markers and directives clean, **13 of 13 handbooks cold-read and released**, the tier
+  canary PASSED on 2.1.221 and recorded in `platform-local.md`.
 
-  *This file said the first transaction ran on 2026-08-03. It did not. The 2026-07-31 run left seven
-  employees in a project the user did not remember authorizing — because on that date the design was
-  "invocation is the consent and asked nothing" (`audit-setup.md` § Step 0, superseded 2026-08-01 by
-  user directive). **That run is why the consent question exists**, and this file had recorded the
-  lesson while getting the event wrong. `apps-odyssey-alive` was restored to its 2026-07-31 baseline on
-  2026-08-03; pre-restore state is in `measurements/2026-08-03-apps-odyssey-alive-PRE-RESTORE.zip`.*
+  **It cannot be run from this repository's session.** The canary fixtures and the project's skills
+  resolve per project, so a sweep from here proceeds DEGRADED on the one gate protecting the only
+  destructive act. Run `/workforce verify` then `/workforce sweep` from a session whose cwd is that
+  project. `DEF-Q-005` was corrected the same day: it named two hooks, there are **four files**
+  (`protect-directives.{sh,ps1}`, `unique-persona.{sh,ps1}`) behind 2 registrations.
 
-  **`apps-odyssey-alive` is not a git repository.** A zip in `.claude-backups/` was the only rollback
-  path, and it was taken sixteen minutes before the writes began. That combination — no VCS, a backup
-  whose freshness nobody checked, and succession now forced by default — is the worst case this project
-  can walk into, and it is the reason the backup question is a gate rather than a setting.
+- **The probe gate has now run for real, and it earned its keep.** Thirteen cold readers, three defects
+  that authoring and a full audit had both missed: a flat contradiction in `eng-app` (`is a PASS` vs
+  `never PASS`, both applying to one order), a missing allocation rule in `eng-lead` **plus a `## Probe`
+  criterion the real build file cannot satisfy**, and `content-writer`'s three verification commands
+  that **exit 0 on any input** — the prose-quality employee had no working quality gate, and the audit
+  had granted `permissions.allow` entries for checks that cannot check.
 
-- **Nothing has run end-to-end since.** The audit that validated the above is invalidated by the
-  nineteen commits after it, which changed every procedure it exercised. A re-run is owed before any of
-  it counts as exercised again.
-
-- **`/workforce hooks` is specified, asserted, and unrun.** So is the catalog reconciliation that must
-  precede the sweep (`evaluators.md` § Succession removes the source) — the ordering rule with the
-  largest blast radius and no execution.
+- **`/workforce hooks` is still specified, asserted, and unrun.** So is the catalog reconciliation that
+  must precede the sweep (`evaluators.md` § Succession removes the source).
 
 - **Two structural gaps remain open**, both named by the 2026-08-03 cold read: nothing verifies that a
-  **retraction actually removed the text it retracts** (that is how `verify.md` carried an instruction
-  eight lines below its own retraction), and nothing checks that a **marker family has exactly one
-  canonical block** beyond the dispatch block specifically (that is how `org.md` shipped two).
+  **retraction actually removed the text it retracts**, and nothing checks that a **marker family has
+  exactly one canonical block** beyond the dispatch block specifically.
 
-- **The author is a poor reviewer of the author.** On 2026-08-03 a single session produced eight
-  self-caught defects — every one found by `bin/check` or by the user, none by re-reading — and a cold
-  read then found twelve more, including two canonical dispatch blocks shipping under one marker and a
-  sacred-block counter under-reporting by 3×. **Neither number is an argument against the work; both are
-  arguments against self-certification**, which is what `SKILL.md` § Off-the-Street Release Gate already
-  says about handbooks and is equally true of this repo.
+**Closed 2026-08-03 (evening) — the day's dominant defect shape, and the instrument for it.**
+Four defects in one day had one shape: **a consumer named, a producer assumed.** `.directives.sha` had
+two files naming `/workforce checksums` as the *remedy* for its absence and no procedure creating it.
+`platform-local.md` was read by audit's own canary table and written by nothing. The `.orig` was cited
+by a journal row whose gate checked the journal rather than the disk. `.current-run` was read by
+`sweep` step 1 and written by nothing — invisible because the one real project happened to have one.
+
+**Re-reading cannot find these: an absent producer leaves no trace in the file that consumes it.**
+`bin/check` now enumerates every `.claude/workforce/*` artifact any shipped file reads and requires a
+named producer for each, plus a second assertion that the named producer still mentions it. Its first
+run found three. A new artifact must be added to the map, which is the moment its author is asked *and
+what writes it?* — the same reason `Class fix:` is a field rather than a habit.
+
+**Also closed 2026-08-03 (evening).** `Class fix:` is now a mandatory, checked field on every DEF
+record — the rule "fix the class rather than the instance" was stated in three files and violated three
+times in one session anyway. CLAUDE.md is now generated into a marked region with proven duplication
+removed (`references/claude-md.md`), after `wf-context` measured **IDENTITY at 89% of everything an
+employee receives before its task**. An IC may no longer be told to invoke a skill that spawns, which
+is a tier ceiling with a documented route around it. And `audit` now runs `wf-claude-md` and
+`checksums`, and writes `platform-local.md`, `.current-run`, and the personnel index — five artifacts
+that had readers and no writer.
 
 - **The department cap may be narrower than a real project.** `odyssey-alive`'s skills describe five
   coherent domains — content, engineering, finance/ops, comms, meta-tooling. `org-design.md` calls two to

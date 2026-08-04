@@ -660,6 +660,19 @@ first writing gate. Re-taking it here would archive a tree this run has been mod
 Assert it succeeded (or that its state is `declined` / `no-content`) before the first conversion; never
 run it again.
 
+**Step 6 writes two run-scoped artifacts that had readers and no writer**, both found 2026-08-03 by
+the producer check in `bin/check`:
+
+| Artifact | Read by | Written here |
+|---|---|---|
+| `.claude/workforce/.current-run` | `sweep.md` step 1, to resume a deferred deletion | the run id, one line, before the first conversion |
+| `.claude/workforce/personnel/index.md` | `ledger`, `defect.md` step 5c, every `EMP` surface | regenerated from the filesystem after the last record is written |
+
+*`sweep` opened with "Read `.claude/workforce/.current-run`" and **no procedure created it**. The file
+existed in the one real project because that run happened to write it, so the gap was invisible in
+practice and total in the specification: a fresh org would have had a resumable sweep pointed at a file
+that was never made. The index had the same shape — named by three readers, produced by none.*
+
 **Pre-execution assertion:** every budget question demonstrably rendered this run. If one did
 not, fail **by name** — never a generic error.
 

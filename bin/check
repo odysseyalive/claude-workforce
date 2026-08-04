@@ -4114,6 +4114,71 @@ check("wf-conform exempts aggregate journal rows",
       "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EVERY ARTIFACT READ HAS A NAMED PRODUCER
+# ─────────────────────────────────────────────────────────────────────────────
+# The dominant defect shape of 2026-08-03, found four times in one day and never by
+# re-reading: a CONSUMER NAMED, A PRODUCER ASSUMED.
+#
+#   .directives.sha      `verify` and `hooks` each named `/workforce checksums` as the
+#                        REMEDY for its absence. No procedure created it. Every fresh
+#                        install shipped with directive protection reporting
+#                        UNPROTECTED forever.
+#   platform-local.md    audit's own canary table has a `PASS (on record)` row that
+#                        READS it. Nothing wrote it. A canary could pass on every run
+#                        forever and never be recorded.
+#   the `.orig` file     journal row 101 cited it, the sweep's gate checked the
+#                        journal rather than the disk, and the file never existed.
+#
+# Re-reading cannot find these: an absent producer leaves NO TRACE in the file that
+# consumes it. The only mechanical form is to enumerate what is read and require a
+# producer to be named for each.
+#
+# PRODUCERS is deliberately hand-maintained. A new artifact must be added here, which
+# is the moment its author is asked "and what writes it?" — the same reason `Class
+# fix:` is a field rather than a habit.
+PRODUCERS = {
+    ".claude/workforce/org-chart.md": "workforce/references/procedures/org.md",
+    ".claude/workforce/org-config.md": "workforce/references/audit-setup.md",
+    ".claude/workforce/deferred.md": "workforce/references/deferred.md",
+    ".claude/workforce/dispositions.md": "workforce/references/procedures/audit.md",
+    ".claude/workforce/.conversion-journal.md": "workforce/references/procedures/hire.md",
+    ".claude/workforce/.directives.sha": "workforce/references/procedures/checksums.md",
+    ".claude/workforce/.settings-owned.json": "workforce/references/audit-setup.md",
+    ".claude/workforce/platform-local.md": "workforce/references/procedures/audit.md",
+    ".claude/workforce/personnel/index.md": "workforce/references/procedures/audit.md",
+    ".claude/workforce/.current-run": "workforce/references/procedures/audit.md",
+    ".claude/workforce/census.json": "workforce/references/procedures/audit.md",
+    ".claude/workforce/.agents-symlink-manifest.txt": "workforce/references/procedures/audit.md",
+    ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
+}
+
+_shipped_md = [p for p in manifest_paths() if p.endswith(".md")]
+_artifacts = set()
+for _p in _shipped_md:
+    for _a in re.findall(r"\.claude/workforce/[A-Za-z0-9._/-]+", read(_p) or ""):
+        _a = _a.rstrip(".,)`'\"")
+        # directories and run-scoped paths have no single producer
+        if _a.endswith("/") or "/work/" in _a or "/staging/" in _a or "/evals/" in _a:
+            continue
+        if _a.count("/") >= 2 and not _a.split("/")[-1].count("."):
+            continue
+        _artifacts.add(_a)
+
+_unmapped = sorted(_artifacts - set(PRODUCERS))
+check("artifacts: every artifact a shipped file reads has a named producer",
+      not _unmapped,
+      f"no producer mapped for {_unmapped} — an absent producer leaves no trace in the file "
+      "that consumes it, which is how .directives.sha and platform-local.md each shipped with "
+      "a reader and no writer. Add it to PRODUCERS with the file that creates it.")
+
+_stale = sorted(a for a, prod in PRODUCERS.items()
+                if a in _artifacts and os.path.basename(a) not in (read(prod) or ""))
+check("artifacts: every named producer actually mentions its artifact",
+      not _stale,
+      f"mapped producer does not name the artifact: {_stale} — the map has gone stale, which "
+      "makes it a second place to be wrong rather than a check")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The CLAUDE.md machinery has to travel to the NEXT project
 # ─────────────────────────────────────────────────────────────────────────────
 # Asked on 2026-08-03, one hour after the machinery landed: "are they transmutable
