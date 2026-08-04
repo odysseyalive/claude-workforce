@@ -118,6 +118,27 @@ real artifact shows what it does to a correct one.
 
 ## Phase B — cold-read probe
 
+**BLOCKING — the probe runs from a session whose project IS the target tree.** A subagent inherits the
+spawning session's project scope, and **skills resolve per project**: a handbook that invokes
+`/<project-skill>` is unrunnable by an executor spawned from anywhere else, which returns a `FAIL:` that
+is entirely an artifact of where it was spawned. Absolute paths are not enough — the executor reads the
+handbook fine and then cannot invoke what the handbook tells it to.
+
+**IF the probe is spawned from outside the target project → the verdict for any handbook whose
+`## Procedure` invokes a project skill is `UNAVAILABLE`, never `FAIL`.** Report it as unprobed and name
+the remedy: re-run from a session in that tree.
+
+*Measured 2026-08-03. Thirteen handbooks were probed for `apps-odyssey-alive` from a session in
+`claude-workforce`. Twelve passed — their probe tasks happened not to invoke a project skill — and the
+thirteenth returned `FAIL: … Unknown skill: copy-truth` for a skill that is present on disk. A
+throwaway agent confirmed it: `SKILL.md` present, and the name absent from the executor's own
+available-skills list. **The handbook was correct and the harness was wrong**, which is the shape
+§ Phase C already warns about for the canary and this section did not carry for the probe.*
+
+**This is the second scope trap of the same family.** The tier canary needs the target project's
+registered `wf-canary-*` agent types; the probe needs its skills. Neither travels, and a run that
+assumes either does reports confidently about a tree it could not fully reach.
+
 **Record the edge before spawning**, exactly as a dispatch does: write
 `.claude/workforce/work/<run-id>/audit-to-probe-<name>.spawn` first. A probe is a spawn, and the
 spawn ledger is what `review` diffs against the chart — a run whose spawns are invisible to it has no
