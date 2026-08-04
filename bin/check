@@ -2920,6 +2920,42 @@ check(
     "behaviour cannot be reconstructed and SKILL.md principle 5 bars inventing it",
 )
 
+# sweep step 5 relocates "the hooks the predecessor wrote" before unlinking a
+# target. That input set had no producer: `in_skill_dir` is a global boolean
+# derived from a substring of the command text, which answers "inside some skill,
+# probably" and cannot answer "inside THIS target." Added 2026-08-04 with the
+# step-4 gate that refuses a target still holding one, so a missed relocation
+# refuses a deletion rather than manufacturing dead wiring.
+_sweep_md = read("workforce/references/procedures/sweep.md")
+check(
+    "census: a hook names the skill directory it resolves into",
+    "def owning_skill" in _census_src and '"skill": owner' in _census_src,
+    "wf-census no longer attributes a hook to its owning skill — sweep step 5 has "
+    "no computed input set and has to assemble one by hand from a substring flag",
+)
+check(
+    "sweep: refuses a target that still holds a live registration",
+    "no live registration still resolves inside a target" in _sweep_md,
+    "procedures/sweep.md dropped the precondition refusing a target whose hooks "
+    "were never relocated — the unlink would create the dead wiring INV-HOOKS "
+    "then requires to be zero, so the sweep would fail its own next step",
+)
+check(
+    "sweep: the relocation input set is computed, not eyeballed",
+    "The input set is computed, never eyeballed" in _sweep_md
+    and "Do not use the `in_skill_dir` flag for this" in _sweep_md,
+    "sweep step 5 no longer names wf-census as the producer of its input set, or "
+    "no longer warns off `in_skill_dir` — which cannot name a specific target",
+)
+check(
+    "conversion: the hooks-do-not-move rule states the fate it is scoped to",
+    '**"They do not move" is scoped to SPLIT, where the skill survives'
+    in read("workforce/references/conversion-taxonomy.md"),
+    "conversion-taxonomy.md states 'They do not move' absolutely while a later "
+    "table has succession rewriting the registration — one file, two readings, "
+    "which is the ORG-CHAIN failure shape",
+)
+
 # A bare `.claude/skills/workforce/bin/…` path assumes a PROJECT install. Personal
 # is the ordinary case, so every scripted step of a procedure written that way dies
 # on `no such file or directory`. Found 2026-08-03 by a real audit run; 11 sites

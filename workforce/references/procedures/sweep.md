@@ -64,6 +64,7 @@ records what was *actually* registered and marked at T7. The disposition table r
 | marker pairing (`INV-MARKERS`) | a file edited since the audit may have become an extraction hazard |
 | `INV-DIRECTIVES` / `INV-EMBEDDED` — `N of N` | **the sacred-block gate. Short by one → STOP.** Extraction completeness is asserted against the tree as it stands today |
 | the tier canary is not `FAIL` | `UNAVAILABLE` proceeds DEGRADED; `FAIL` stops |
+| **no live registration still resolves inside a target** | **the backstop that makes step 5 enforceable rather than aspirational.** `wf-census` reports `skill` per hook; any hook whose `skill` equals a target and whose relocation has not been recorded in `.settings-owned.json` → **refuse THAT target** and say which registration held it. Unlinking it would manufacture exactly the dead wiring `INV-HOOKS` then reports as zero-tolerance — the sweep would fail its own next step |
 
 **Time passed between the audit and this command, and every one of these is a claim about the tree
 right now.** A precondition that was true an hour ago is not evidence.
@@ -72,6 +73,26 @@ right now.** A precondition that was true an hour ago is not evidence.
 predecessor wrote survive re-owned, with their registrations rewritten *before* the file that holds
 them is removed (`conversion-taxonomy.md` § What succession removes). **A sweep that deletes first and
 relocates after has produced dead wiring**, and dead wiring outranks every other finding in the report.
+
+**The input set is computed, never eyeballed.** `wf-census` emits `skill` per hook — the skill directory
+its command actually resolves into, compared by real path so a symlinked skill still reports its true
+owner. The hooks this step must relocate are exactly those whose `skill` equals a target of this sweep:
+
+```bash
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}" --json "${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/census.json"
+```
+
+**Do not use the `in_skill_dir` flag for this.** It answers *"inside some skill, probably"* — it falls
+back to a substring of the command text when a command cannot be resolved — and this step needs *"inside
+THIS skill, certainly."* `skill` is `null` for anything undecidable, and an undecidable command is
+reported and left alone rather than relocated on a guess.
+
+*Added 2026-08-04. This step was fully specified and its input set was not: `skill` did not exist, so
+"the hooks the predecessor wrote" was a set the runner had to assemble by hand against a substring flag
+that cannot name a target. The gate in step 4 now refuses a target that still holds one, so a missed
+relocation refuses a deletion instead of producing the dead wiring this project just spent a commit
+learning to detect.*
 
 **Three things this step does that a plan reliably undercounts, all found by the first `--review` run:**
 

@@ -381,6 +381,27 @@ class Census:
         path = os.path.normpath(path)
         return path, os.path.exists(path)
 
+    def owning_skill(self, resolved):
+        """Which skill directory this hook's script lives in, exactly.
+
+        `sweep` step 5 must relocate the hooks belonging to THE TARGET it is about
+        to unlink, and that is a per-skill question. The `in_skill_dir` flag beside
+        it is a global boolean derived from a substring of the command text, which
+        answers "some skill, probably" and cannot answer "this one."
+
+        Returns the skill NAME, or None when the path is outside `.claude/skills/`
+        or the command was undecidable. Compares real paths, so a symlinked skill
+        directory still reports its true owner.
+        """
+        if not resolved:
+            return None
+        base = os.path.realpath(os.path.join(self.root, ".claude", "skills"))
+        target = os.path.realpath(resolved)
+        if not target.startswith(base + os.sep):
+            return None
+        rest = target[len(base) + 1:].split(os.sep)
+        return rest[0] if rest and rest[0] else None
+
     def census_hooks(self):
         """Wired hooks from both settings scopes, with the resolved command path.
 
@@ -406,13 +427,19 @@ class Census:
                     for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
                         cmd = h.get("command", "")
                         resolved, exists = self.resolve_hook_command(cmd)
+                        owner = self.owning_skill(resolved)
                         self.hooks.append(
                             {
                                 "settings": rel,
                                 "event": event,
                                 "matcher": entry.get("matcher"),
                                 "command": cmd,
-                                "in_skill_dir": ".claude/skills/" in cmd,
+                                # Resolution-based when the command is decidable;
+                                # the substring is a fallback for the rest and is
+                                # advisory only.
+                                "in_skill_dir": (owner is not None if resolved
+                                                 else ".claude/skills/" in cmd),
+                                "skill": owner,
                                 "resolved": resolved,
                                 "exists": exists,
                             }

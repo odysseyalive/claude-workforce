@@ -103,6 +103,18 @@ registrations are paths in settings that a conversion cannot see from the skill 
 move. `data-skills.md` § The data never moves states why, and the same reasoning covers the code that
 maintains it.
 
+**"They do not move" is scoped to SPLIT, where the skill survives — it is not a rule about hooks in
+general.** Under **succession** the skill directory is unlinked, so a hook inside it must be relocated
+and its registration rewritten *before* the unlink (§ What succession removes, and `procedures/sweep.md`
+step 5). The two are the same principle applied to different fates: a hook never silently loses its
+registration. Where the skill lives, that means leaving the path alone; where the skill is removed, it
+means rewriting the path in the same transaction.
+
+*Scope note added 2026-08-04. The absolute phrasing sat 400 lines from a succession table reading
+"registration rewritten in the same transaction," and a reader arriving at either one first had no way
+to tell it was conditional. This project fails a run over two files disagreeing about `ORG-CHAIN`; this
+was the same shape inside one file.*
+
 ---
 
 ## The two paths — and why ONE artifact serves both
