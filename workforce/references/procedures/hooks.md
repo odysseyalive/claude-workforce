@@ -53,10 +53,24 @@ to wire and nothing to orphan.
 1. **Resolve the settings file** exactly as `audit-setup.md` § Permissions does — all four scopes in
    precedence order, write to whichever already carries workforce keys, else
    `.claude/settings.local.json`. **Print the resolved path. Never write managed settings.**
-2. **Resolve the hook's absolute path** to the installed copy under
-   `.claude/skills/workforce/bin/wf-protect-directives`. **Verify the file exists before writing a
-   registration for it** — a registration pointing at nothing is dead wiring, which is the failure
-   `discovery.md` § Dead wiring names and which is *worse* than no hook, because it reads as protection.
+2. **Resolve the hook's absolute path THROUGH THE SAME SCOPE RESOLUTION AS THE SKILL** — project
+   first, then personal, exactly as `references/scopes.md` defines:
+
+   | Order | Path |
+   |---|---|
+   | 1 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |
+   | 2 | `~/.claude/skills/workforce/bin/wf-protect-directives` |
+
+   **Verify the file exists before writing a registration for it** — a registration pointing at nothing
+   is dead wiring, which is the failure `discovery.md` § Dead wiring names and which is *worse* than no
+   hook, because it reads as protection.
+
+   *This step named only the project path until 2026-08-03, when the command was executed for the first
+   time against a real project. **Workforce was installed at personal scope there — the ordinary case,
+   and the one `verify`'s own provenance header reports as `personal install … no project copy`** — so
+   the hook was not at the hardcoded path, the command correctly refused to create dead wiring, and it
+   would have refused **forever on every personal install**. A path assumed rather than resolved, which
+   is the same shape as an absent producer: the consumer was named and the lookup was not.*
 3. **On unix, verify the executable bit.** The `hook` manifest flag sets it at install time; a copy
    moved by hand may have lost it. Report and fix it, or report and skip — never register a file the
    host cannot run.

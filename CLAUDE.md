@@ -212,8 +212,18 @@ door pointing at it.*
   that **exit 0 on any input** — the prose-quality employee had no working quality gate, and the audit
   had granted `permissions.allow` entries for checks that cannot check.
 
-- **`/workforce hooks` is still specified, asserted, and unrun.** So is the catalog reconciliation that
-  must precede the sweep (`evaluators.md` § Succession removes the source).
+- ~~**`/workforce hooks` is specified, asserted, and unrun.**~~ **Run 2026-08-03 against
+  `apps-odyssey-alive`, display mode, and its first execution found a defect in itself.** Step 2
+  hardcoded `.claude/skills/workforce/bin/…` — a **project**-scope path — while workforce was installed
+  at **personal** scope there, which is the ordinary case and the one `verify`'s own header reports.
+  The hook was not at the assumed path, the command correctly refused rather than create dead wiring,
+  and it would have refused **forever on every personal install**. Step 2 now resolves project-then-
+  personal per `scopes.md`. *A path assumed rather than resolved is the same shape as an absent
+  producer: the consumer named, the lookup not.* The run also censused **9 orphaned hook files** on
+  disk registered nowhere — reported, never deleted.
+
+  **Still unrun:** the catalog reconciliation that must precede the sweep
+  (`evaluators.md` § Succession removes the source).
 
 - ~~**Two structural gaps remain open**~~ — **both closed 2026-08-03 (evening).** A retraction now
   carries its own check: a blanket `never write "X"` declaration makes X a retracted claim, and any line
