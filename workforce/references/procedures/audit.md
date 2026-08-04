@@ -649,9 +649,9 @@ deferred.
 
 **The authoring context is not a shared resource, and a run that treats it as one will stop.** Each
 subagent runs in **its own context window** and returns only its result
-([sub-agents](https://code.claude.com/docs/en/sub-agents), read 2026-08-04; DOCUMENTED, not measured —
-which is fine here because this fact **permits** work rather than blocking it, and `platform.md`'s bar
-applies to blocking checks). So N handbooks cost N spawns against the session cap and **do not accumulate
+(`platform.md` **fact 19 — MEASURED 2026-08-04**: four handbooks authored in one wave put
+**411,014 subagent tokens and 104 tool calls outside the caller**, 4 of 4 returned complete;
+`measurements/2026-08-04-dispatched-authoring.md`). So N handbooks cost N spawns against the session cap and **do not accumulate
 in the caller's window.** Authoring inline is what makes a large roster look impossible: the main context
 holds every draft at once and runs out, exactly as predicted, from a constraint the platform does not
 impose.
