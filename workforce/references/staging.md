@@ -238,6 +238,12 @@ is renamed next release, and a name list finds none of the renames while reporti
 same rule `legacy-markers.md` states for predecessor detection, and the same rule `platform.md` states
 about documentation: measure the behaviour, never the description of it.
 
+**The preflight that performs it is `references/audit-setup.md` § Step 0.9**, and it emits `INV-SPAWN`
+with its attempt count. **The instruction is not the behaviour, and reading it is the same substitution
+as reading a config key.** *On 2026-08-04 a real audit reported `UNAVAILABLE` from its own ambient
+policy line while printing `EDGES 0 spawns this run` — a verdict about a channel nobody had tried. The
+count exists so the two runs cannot look alike.*
+
 **What DEGRADED costs here, stated every time:**
 
 - Every handbook registered this run carries `Release Record: not probed (spawning unavailable)` —

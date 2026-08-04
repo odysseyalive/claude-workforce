@@ -43,6 +43,20 @@ WRITERS = {
         "argv": ["bin/sync"],
         "watch": ".claude/skills/workforce",
     },
+    # Both wf-claude-md write modes, against fixture trees inside the copy. The
+    # region is substituted rather than appended, and that is exactly the property
+    # `bin/coverage --stamp` got wrong for hours — a strip regex that stops matching
+    # its own output appends a second copy on every run, forever, silently.
+    "claude-md-ensure-region": {
+        "argv": ["workforce/bin/wf-claude-md", "--root",
+                 "fixtures/scripts/claudemd-ensure-region", "--ensure-region", "--execute"],
+        "watch": "fixtures/scripts/claudemd-ensure-region",
+    },
+    "claude-md-execute": {
+        "argv": ["workforce/bin/wf-claude-md", "--root",
+                 "fixtures/scripts/claudemd-duplicated", "--execute"],
+        "watch": "fixtures/scripts/claudemd-duplicated",
+    },
 }
 
 

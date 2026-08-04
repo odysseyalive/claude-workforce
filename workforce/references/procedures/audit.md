@@ -20,14 +20,20 @@ never as "run this command yourself."
 
 ---
 
-## Steps 0 through 0.7 — the setup gates
+## Steps 0 through 0.9 — the setup gates
 
 **Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
 consent and the backup (questions 1 and 2), the model and effort budgets (questions 3 and 4), VCS
 preflight, the canary fixtures, and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
-name collisions — and the **settings review (Step 0.8)**, which resolves the permissions file, adds only
-what the designed org is missing, and removes nothing.
+name collisions — the **settings review (Step 0.8)**, which resolves the permissions file, adds only
+what the designed org is missing, and removes nothing, and the **spawn capability preflight (Step
+0.9)**, which measures whether this host will spawn at all by attempting one throwaway spawn.
+
+**Step 0.9 is the producer for a measurement three later steps consume.** Step 2's design panel, every
+Phase B cold probe, and Step 4b's tier canary are all spawns; until 2026-08-04 each of them read an
+outcome that no gate produced, and a run that inferred `UNAVAILABLE` from its own ambient instructions
+degraded everything downstream without ever attempting one. Its outcome is `INV-SPAWN`.
 
 **Step 0.8 writes early and reports last, and the split is deliberate.** The grants have to be in place
 before anything dispatches or runs a mechanical check, so the write belongs in Step 0; the findings are

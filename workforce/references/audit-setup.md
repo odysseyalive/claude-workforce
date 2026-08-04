@@ -111,9 +111,10 @@ Step 0.6 writes agent fixtures into the user's `.claude/agents/`, which is the w
 preview that registers files.
 
 **So the rule is stated once, here, and every gate below carries it:** a gate that writes states what
-it does under `--review`, in its own section. This is the same coupling `procedures/audit.md` § Steps 0
-through 0.7 already declares in the other direction — *any gate added to `audit-setup.md` must be added
-there too.* A gate is added to both, and it declares its `--review` behavior, or it is not added.
+it does under `--review`, in its own section. This is the same coupling the setup-gate list in
+`procedures/audit.md` already declares in the other direction — *any gate added to `audit-setup.md`
+must be added there too.* A gate is added to both, and it declares its `--review` behavior, or it is
+not added.
 
 ## How every question is worded — plain language, no exceptions
 
@@ -638,3 +639,73 @@ and `platform.md` § DOCUMENTED bars an unverified fact from becoming a blocking
 `delegation-budget.md` already had to retract once. The org is reported as built, with the capability
 that will prompt or fail named. **If these facts are ever measured, the conflict row may become
 blocking, and the promotion belongs in the same edit that moves the row.**
+
+---
+
+## Step 0.9 — Spawn capability preflight (the measurement everything downstream consumes)
+
+**Attempt one throwaway spawn. Whether it happens is the answer.** That is the whole gate, and it is
+the last one before the survey because everything it feeds — the Step 2 design panel, Phase B cold
+probes, the Step 4b tier canary — is a spawn.
+
+**NEVER READ THE ANSWER ANYWHERE.** Not from a settings key, not from a cache, not from a flag name,
+and — the case that actually happened — **not from the run's own ambient instructions.** A session
+that reads a policy line and concludes it cannot spawn has measured the description of the behaviour,
+which is precisely the substitution `platform.md` bars for documented facts and `legacy-markers.md`
+bars for predecessor detection. The instruction is not the behaviour: its own condition is typically
+*unless the user asks*, so a session carrying it may spawn perfectly well.
+
+The throwaway is trivial by design — a built-in agent type, a prompt that asks for one token back, no
+tools, no work product. It proves the channel, nothing else.
+
+| Outcome | Meaning | What the run does |
+|---|---|---|
+| `AVAILABLE` | the spawn happened and returned | proceed normally; Step 2, Phase B, and Step 4b all run |
+| `UNAVAILABLE` | the spawn did not happen | **apply the remedy below, re-attempt once, then proceed DEGRADED** if it still does not happen |
+
+**On `UNAVAILABLE`, apply the remedy rather than reporting it.** The withdrawn-capability section of
+`enforcement.md` names the fix, and this is the step that performs it:
+
+```bash
+.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
+```
+
+That writes the generated region — which carries the standing cold-reader request — and **removes
+nothing**: `--ensure-region` never classifies a user line, which is why Step 6's full `--execute` is
+still a separate call after handbooks are in final position (`references/claude-md.md`).
+
+**Then re-attempt the spawn exactly once, and record whichever happens.** Do not claim the remedy
+worked, and do not claim it failed. **Whether the harness re-reads `CLAUDE.md` mid-session is
+UNMEASURED** — the file may only reach the main session at session start, in which case the request
+takes effect on the *next* run and this one still degrades. Both readings are consistent with the
+evidence, so the report states the retry's actual result and names the next session as the remedy's
+first real test. A gate that asserted either way would be asserting platform behaviour, which this
+project does not do.
+
+**This gate is never a question.** The question budget above is a ceiling of four and this is not a
+fifth — the remedy writes into a region `/workforce` already owns and rewrites every audit, so there
+is no user prose at stake to ask about.
+
+**Under `--review`: attempt the spawn, write nothing.** A throwaway spawn touches no file in the
+target, so the measurement is honest in review mode — and it is the one thing a review most needs to
+report, because `UNAVAILABLE` is what turns a proposed roster into a proposed *unprobed* roster.
+Report that `--execute` would write the region and did not.
+
+### `INV-SPAWN` — the line this gate owes
+
+```
+INV-SPAWN    measured behaviourally · AVAILABLE · 1 attempt        ← never inferred from a setting
+INV-SPAWN    measured behaviourally · UNAVAILABLE · 2 attempts · remedy written, retry unchanged
+```
+
+**The attempt count is the point.** A run that printed `UNAVAILABLE` with zero attempts did not
+measure anything, and that is indistinguishable in every other respect from a run that did.
+
+*Written 2026-08-04, after the first real audit of a second project reported `UNAVAILABLE` from
+reading its own ambient instruction, with `EDGES 0 spawns this run` on the same page proving no
+attempt was made. The rule had been stated in four files since 2026-07-31 —`SKILL.md` rule 3b,
+`enforcement.md`, `staging.md` § UNAVAILABLE, and `verify.md` — and **only `verify` had a step that
+performed it.** `audit` consumed the outcome and nothing produced it. The cost was the entire run:
+the design panel never convened, ten handbooks registered unprobed, thirty-five conversions deferred
+behind probes that were never attempted, and the sweep deferred behind those. Consumer named,
+producer assumed — the sixth of that shape, and the first to cost a whole audit.*

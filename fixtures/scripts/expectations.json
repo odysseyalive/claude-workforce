@@ -90,7 +90,7 @@
   "conform-adopted": {
     "exit": 0,
     "not": [
-      "\u2717 "
+      "✗ "
     ],
     "script": "wf-conform",
     "want": [
@@ -265,6 +265,38 @@
     "want": [
       "none parseable",
       "never examined"
+    ]
+  },
+  "claudemd-ensure-region": {
+    "_why": "--ensure-region runs at the spawn preflight, BEFORE any handbook exists. It must never classify or remove a user line: this tree carries a line that plain mode reports as DUPLICATED, and ensure-region must not mention it at all.",
+    "script": "wf-claude-md",
+    "args": [
+      "--ensure-region"
+    ],
+    "exit": 0,
+    "want": [
+      "--ensure-region",
+      "region prepended",
+      "no user line is classified or removed"
+    ],
+    "not": [
+      "would remove",
+      "DUPLICATED"
+    ]
+  },
+  "claudemd-ensure-region-present": {
+    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent — bin/idempotence asserts the second run writes the same bytes.",
+    "script": "wf-claude-md",
+    "args": [
+      "--ensure-region"
+    ],
+    "exit": 0,
+    "want": [
+      "region replaced"
+    ],
+    "not": [
+      "region prepended",
+      "would remove"
     ]
   }
 }

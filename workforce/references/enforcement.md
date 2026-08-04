@@ -74,12 +74,19 @@ Three rules, and they are the whole of it:
 1. **Measure the capability, never read the setting.** Attempt one throwaway spawn. Whether it happens
    is the answer. **Never grep a config file, cache, or flag name** — the channel is unversioned and a
    renamed key reads as absent, which reports success. Same rule as `legacy-markers.md` for predecessor
-   detection and `platform.md` for documented behaviour.
+   detection and `platform.md` for documented behaviour. **Nor read it from the run's own ambient
+   instructions**, which is the same substitution one level closer to home and is how a real audit
+   degraded on 2026-08-04 without attempting anything. Performed by the spawn capability preflight in
+   `references/audit-setup.md` and by `procedures/verify.md`; a rule stated here with no step
+   performing it is the defect this section is about.
 2. **Degrade loudly, per artifact.** `Release Record: not probed (spawning unavailable)` on every
    handbook, in the chart, and in the `EMP` file. **A blank field reads as a pass.**
-3. **Name the remedy.** These constraints are typically conditioned on *unless the user asks* — so an
-   explicit line in the project's `CLAUDE.md` requesting cold-reader agents satisfies the condition.
-   That is a real fix and it belongs in the report, not a shrug.
+3. **Apply the remedy, do not merely name it.** These constraints are typically conditioned
+   on *unless the user asks* — so an explicit line in the project's `CLAUDE.md` requesting cold-reader
+   agents satisfies the condition. **`wf-claude-md` emits that line into the generated region** and the
+   spawn preflight writes it on an `UNAVAILABLE`, because for one day this remedy was named in three
+   shipped files and produced by none of them. Naming a fix nobody performs is the shrug it was
+   written against.
 
 **Workforce cannot lift a host constraint and must never describe itself as having done so.** This row
 belongs in the DETECTS column with everything else here.

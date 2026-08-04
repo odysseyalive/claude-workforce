@@ -49,8 +49,8 @@ def run_case(name, spec):
         p = subprocess.run([sys.executable, script], input=payload, text=True,
                            capture_output=True, env=env, cwd=tree)
     else:
-        p = subprocess.run([sys.executable, script, "--root", tree], text=True,
-                           capture_output=True, env=env)
+        p = subprocess.run([sys.executable, script, "--root", tree] + spec.get("args", []),
+                           text=True, capture_output=True, env=env)
 
     out = p.stdout + p.stderr
     problems = []

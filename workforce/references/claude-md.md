@@ -22,6 +22,7 @@ the user's prose, and the distinction is mechanical rather than editorial.
 | Class | Disposition | Why |
 |---|---|---|
 | the generated region | rewritten every audit | between `WORKFORCE-CLAUDE-MD` markers; everything outside is untouched |
+| the standing cold-reader request | **inside the region** | the remedy `enforcement.md` names, given a producer — see below |
 | `DUPLICATED` | **removed** | the line exists **verbatim** in a handbook or an extracted directive |
 | `DERIVABLE` | reported, never removed | directory listings, dependency names, restated build commands |
 | `USER` | never touched, never proposed | everything else |
@@ -64,14 +65,47 @@ one of them:
 A project whose CLAUDE.md is large and entirely the user's own prose stays large. That is the user's
 call to make with a number in front of them, which is the whole of what this can honestly offer.
 
+## The standing cold-reader request — a remedy that had no producer
+
+**The region carries an explicit request for cold-reader agents, and this is the only file that can
+carry it.** The withdrawn-capability section of `enforcement.md` establishes that ambient policy
+suppressing subagent spawning is typically conditioned on *unless the user asks*, so the asking is the
+fix. It must live in `CLAUDE.md` specifically: the blocking instruction constrains the **main session**,
+which is the caller, and a handbook reaches only the callee — by which point the spawn that would have
+carried it is the thing that did not happen.
+
+**It costs bytes on every spawn, which is against this file's own thesis, so the number is stated rather
+than hidden:** ~260 B against a measured 15,459 B IDENTITY, or **1.7%**. What it buys is the tier canary
+and every Off-the-Street probe. A run without it registers every handbook unprobed — the one gate whose
+whole job is catching what an author cannot see in their own work — and on 2026-08-04 that cost a real
+audit its design panel, ten probes, thirty-five conversions, and the sweep behind them.
+
+**For a whole day this remedy was named in three shipped files and written by nothing** (`SKILL.md`
+rule 3b, `enforcement.md`, `staging.md` § UNAVAILABLE). Consumer named, producer assumed — and unlike
+the earlier five of that shape, this one was invisible from the maintainer's own repo, whose `CLAUDE.md`
+carries the request by hand. **A defect that cannot reproduce where it is being looked for is not a
+defect anyone finds by looking.**
+
 ## Where it runs
 
-`audit` Step 6, in the execution order, **after `org embed`** — handbooks and extracted directives must
-be in final position before anything is compared against them — and reported again by `verify`.
+Two calls, two moments, and they are not interchangeable.
+
+| Mode | When | What it may touch |
+|---|---|---|
+| `--ensure-region` | **Step 0.9**, the spawn preflight (`audit-setup.md`) | the region only — **never classifies or removes a user line** |
+| `--execute` | `audit` Step 6, **after `org embed`** | the region, plus `DUPLICATED` removals |
+
+The split is why `--ensure-region` exists. Step 0.9 runs before any handbook is authored, so a full
+`--execute` there would compute `DUPLICATED` against an incomplete corpus. `--ensure-region` cannot
+remove anything at all, so running it early is safe in the only direction that matters; Step 6 still
+does the real classification once handbooks are in final position. `verify` reports on both.
 
 ```bash
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}"            # report
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --execute  # write
+.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}"                        # report
+.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --execute              # write
+.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
 ```
 
 Exit `0` classified · `2` no readable CLAUDE.md. **Under `--review`, report and write nothing.**
+**`--ensure-region` is idempotent** — a prior region is stripped before the new one is placed, so a
+second run writes the same bytes and prints `UNCHANGED`. `bin/idempotence` asserts it.

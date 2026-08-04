@@ -191,6 +191,36 @@ that "every writing step remains unexecuted" — by then false in four of five p
 was not lost; it was in the commits, the fixtures, and the assertions. What was missing was the front
 door pointing at it.*
 
+**Closed 2026-08-04 — the sixth "consumer named, producer assumed," and the first to cost a whole run.**
+The second real audit of `odyssey-alive` reported `Cold probes: not run — spawning suppressed by ambient
+host instruction` beside `EDGES 0 spawns this run`. **A verdict about a channel nobody tried.** Four
+shipped files had stated *attempt one throwaway spawn at preflight* since 2026-07-31 — `SKILL.md` 3b,
+`enforcement.md`, `staging.md` § UNAVAILABLE, `verify.md` — and **only `verify` had a step performing
+it**; `audit-setup.md` said of its nearest gate *"This gate writes files and spawns nothing."* The
+remedy those files name — a cold-reader request in the project's `CLAUDE.md` — was written by nothing.
+
+The cost was the entire run: the Step 2 panel never convened, ten handbooks registered unprobed,
+thirty-five conversions deferred behind probes nobody attempted, and the sweep behind those.
+
+`audit-setup.md` § Step 0.9 now performs the measurement and emits `INV-SPAWN` **with its attempt
+count** — a verdict at zero attempts is a reading. `wf-claude-md` emits the standing request into the
+generated region and gained `--ensure-region`, a mode that writes the region and **cannot remove a user
+line**, so preflight can apply the remedy before any handbook exists. Eight `bin/check` assertions,
+each proven by breaking it; two script fixtures; both write modes in `bin/idempotence`. Record in
+`plan/mock-audit-odyssey-alive-2026-08-04.md`.
+
+**Why no amount of re-reading here would have found it.** *This* file carries the cold-reader request
+by hand — the § below, added 2026-07-31 for exactly this reason — so from a `claude-workforce` session
+the capability is always present and the defect cannot reproduce in the tree where anyone is looking.
+**A defect that only appears in someone else's project is not one careful reading of this one surfaces.**
+It is the strongest argument yet for `bin/baseline` and the mock audit being in the loop.
+
+*Still open from this:* whether the harness re-reads `CLAUDE.md` mid-session is **unmeasured**, so the
+remedy may only take effect on the next run. Step 0.9 records the retry's real result and claims
+nothing. And `odyssey-alive` has **no generated region at all** one audit later — `--ensure-region`
+reports `region prepended`, not `replaced` — so Step 6's `wf-claude-md` appears to stop at reporting
+when there is nothing to remove. Same family, not yet chased.
+
 ## Open, as of 2026-08-03 (evening)
 
 - **The sweep has still never run — and it is now the ONLY thing in the transaction that hasn't.**
