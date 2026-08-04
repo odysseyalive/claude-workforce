@@ -616,7 +616,20 @@ completes; a probe failure is fixed in the same run, never deferred.
 ## Step 6 — Execute
 
 Order: **conversions → handbooks → data skills → charter and principles → the Constitution Gate →
-model rewrite → `org index` → `org embed` → `verify` → the sweep.**
+model rewrite → `org index` → `org embed` → `checksums` → `verify` → the sweep.**
+
+**`checksums` is in this list because it was in no list.** It generates
+`.claude/workforce/.directives.sha`, the sidecar `wf-protect-directives` compares every edit against —
+and no procedure ran it. `verify` and `hooks` each name `/workforce checksums --execute` as the *remedy*
+for a missing sidecar, which presumes something creates it in the ordinary case. Nothing did. **So every
+fresh install shipped with the hook that defends the user's first directive reporting `UNPROTECTED` on
+every edit, forever**, and the only signal was a `verify` finding telling the user to run a command by
+hand. That is the "nothing ships dormant" failure (`enforcement.md`) applied to the sidecar rather than
+the hook.
+
+It runs **after** `org embed` and **before** `verify`: the immutable blocks must be in their final
+position before they are hashed, and `verify` must be able to report the sidecar it will then check.
+Under `--review`, print the row count and write nothing.
 
 **The Constitution Gate write is a named step because it had none.** `references/templates.md` specifies
 it in full — the marker pair, the ten lines, the insert-never-rewrite rule — and *no procedure wrote
@@ -823,11 +836,23 @@ Then the org, the fan-out budget, and the canary result **by state, with its con
 
 | Canary | Line to print |
 |---|---|
-| `PASS` | `tier ceiling: verified this run (canary PASS)` |
+| `PASS` | `tier ceiling: verified this run (canary PASS)` — **and WRITE `platform-local.md`** |
 | `PASS (on record)` | `tier ceiling: verified — platform-local.md matches the running harness` |
 | `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
 
 A run that verified the host and a run that verified nothing must never print the same line.
+
+**On `PASS`, the measurement is RECORDED, not just printed.** Write
+`.claude/workforce/platform-local.md` with `MEASURED-ON` (the running `claude --version`),
+`MEASURED-AT`, `TIER-LIMIT`, and one line per canary assertion with its evidence. Under `--review`,
+print it and write nothing.
+
+*Added 2026-08-03. The `PASS (on record)` row above requires that file, and **nothing in this project
+ever wrote it** — `verify` prints the row and says explicitly that it reports the fix rather than
+applying it, and `amend` clears the marks once the file exists. So a canary could pass on every run
+forever and the next run would still have to re-measure, because the only durable record of the
+measurement was a paragraph in a report. A fact measured and not written down is a fact this project
+does not have.*
 
 **And a printed promise is not a queued one — write the rows.** Every follow-up this run owes goes into
 `${CLAUDE_PROJECT_DIR}/.claude/workforce/deferred.md` (`references/deferred.md` owns the format) in the

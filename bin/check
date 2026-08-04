@@ -4114,6 +4114,42 @@ check("wf-conform exempts aggregate journal rows",
       "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# One audit run must actually do all of it
+# ─────────────────────────────────────────────────────────────────────────────
+# Asked directly on 2026-08-03: "are all of these steps now part of audit, so if I
+# run audit once, we are doing all these steps?" The answer was no, twice, and
+# neither gap was visible from reading `audit.md` — both were things NO command did.
+#
+#   checksums        `verify` and `hooks` both name `/workforce checksums --execute`
+#                    as the REMEDY for a missing sidecar, which presumes something
+#                    creates it. Nothing did. Every fresh install shipped with
+#                    wf-protect-directives reporting UNPROTECTED forever.
+#   platform-local   audit's own canary table has a `PASS (on record)` row that
+#                    reads that file, and nothing wrote it. A canary could pass on
+#                    every run forever and never be recorded.
+#
+# Both are the same shape: a consumer named, a producer assumed.
+
+check("audit runs checksums in its execution order",
+      "`checksums` → `verify`" in aud or "→ `checksums` →" in aud,
+      "the sidecar wf-protect-directives compares against was produced by no procedure")
+
+check("audit says why checksums was missing",
+      "because it was in no list" in aud,
+      "a step added without its reason is one the next editor removes as redundant")
+
+check("a PASS canary writes platform-local.md",
+      "and WRITE `platform-local.md`" in aud,
+      "audit's own table reads that file on a later run; nothing created it")
+
+check("audit states the measured-not-written rule",
+      "A fact measured and not written down" in aud,
+      "the canary result lived only in a report paragraph")
+# Short literal deliberately: the full sentence wraps at column ~100 in audit.md, so
+# asserting it whole matches nothing. This project's own self-lint caught that here,
+# which is the fourth time that hazard has been found by the check rather than a human.
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Fixing the instance is not fixing the defect
 # ─────────────────────────────────────────────────────────────────────────────
 # The rule "fix the class rather than the instance" is stated in SKILL.md § Directives,
