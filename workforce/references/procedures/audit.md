@@ -740,6 +740,22 @@ two-paths-live state** — which is degraded but correct, and reversible by `dis
    remove from marker matches at this step would silently re-include them — an orphan opener runs a span
    to the next closer and takes the content between two blocks with it.
 3. **The backup exists and verified.**
+**The canary is deliberately NOT in this list, and `sweep.md`'s is not wrong for having it.** Step 4b
+already gated on it *before any registration*: a `FAIL` aborted the run and never reached here, and an
+`UNAVAILABLE` registered DEGRADED with every handbook marked. By this point the canary's verdict has
+already decided what exists to sweep. **Standalone `/workforce sweep` must re-check it** because it runs
+later — possibly days later, possibly on an upgraded harness — and its own § 4 says every precondition
+is a claim about the tree *right now*.
+
+So an `UNAVAILABLE` canary does **not** block the sweep here. That is correct rather than lax: the
+canary establishes the **tier ceiling**, which governs whether an IC can spawn. **It says nothing about
+whether a deletion is recoverable**, and deletion safety rests entirely on preconditions 2, 3, and 4 —
+extraction complete, backup verified, `.orig` on disk and hash-matched.
+
+*Stated 2026-08-03. The two lists differed with no explanation, and `verify.md` § Detection vs treatment
+already warns what that produces: "five surfaces each carrying their own copy of the same rule is five
+copies that drift apart." A reader comparing them could only conclude one was missing a check.*
+
 4. **Every marked skill's `.orig` EXISTS ON DISK and hashes to its recorded `prior-sha`** — checked
    against the filesystem by `wf-conform`, never against the journal alone.
 
