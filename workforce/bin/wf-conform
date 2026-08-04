@@ -469,6 +469,34 @@ def check_journal(root, res):
         res.add(True, f"journal: {rows} T7 row(s) checked against disk")
 
 
+def check_catalogs(root, res):
+    """Every evaluator carries a catalog anchor before the sweep can remove the source.
+
+    `evaluators.md` § Succession removes the source makes reconciliation a PRECONDITION
+    of the sweep: the predecessor's catalog is readable only while it is still on disk,
+    and after the sweep the comparison has no input at all.
+
+    **`v0` and `reconciled, nothing to add` are opposite facts about the same zero**, and
+    without an anchor nothing can tell them apart. Measured 2026-08-03: all three
+    evaluators in a real project read `v0`, and the only genuine catalog pairing turned
+    out to be 0-missing — so a sweep would have frozen three catalogs permanently while
+    every visible number looked fine.
+    """
+    sk = os.path.join(root, ".claude", "skills")
+    if not os.path.isdir(sk):
+        return
+    evs = sorted(d for d in os.listdir(sk)
+                 if os.path.isdir(os.path.join(sk, d))
+                 and ("eval" in d or "evaluator" in d))
+    for e in evs:
+        anchor = os.path.join(sk, e, "CATALOG-ANCHOR.md")
+        ok = os.path.isfile(anchor)
+        res.add(ok, f"catalogs: {e} carries a reconciliation anchor",
+                "no CATALOG-ANCHOR.md — reads as v0, never reconciled. The sweep removes the "
+                "predecessor and with it the only thing this could be compared against "
+                "(evaluators.md § Succession removes the source).")
+
+
 def check_data_skill(path, body, res):
     n = os.path.relpath(path)
     missing = [s for s in DATA_SKILL_SECTIONS if ("\n" + s) not in body]
@@ -599,6 +627,7 @@ def main():
     check_sidecar(root, res)
     check_journal(root, res)
     check_defects(root, res)
+    check_catalogs(root, res)
 
     if args.json_path:
         with open(args.json_path, "w", encoding="utf-8") as fh:

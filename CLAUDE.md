@@ -222,8 +222,20 @@ door pointing at it.*
   producer: the consumer named, the lookup not.* The run also censused **9 orphaned hook files** on
   disk registered nowhere — reported, never deleted.
 
-  **Still unrun:** the catalog reconciliation that must precede the sweep
-  (`evaluators.md` § Succession removes the source).
+- ~~**the catalog reconciliation that must precede the sweep**~~ — **run 2026-08-03**, and it was the
+  precondition closest to doing real damage. All three evaluators in `apps-odyssey-alive` read **`v0`,
+  never reconciled**, with the predecessor's catalogs still on disk. The sweep would have frozen them
+  there permanently while every visible number looked fine.
+
+  The one genuine pairing — `text-eval` against `creative-integrity/text-tells.md` — came back
+  **0 missing**: 125 mechanisms present against the predecessor's 109. **The first comparison also
+  reported a 20-mechanism gap that was false**, from pairing `code-evaluator` with skill-builder's
+  *Discovered Patterns* build log, which is not a catalog. Verified before recording, per this file's
+  own rule about a census being a claim about the census.
+
+  Anchors are now written for all three, because **`v0` and "reconciled, nothing to add" are opposite
+  facts about the same zero** and nothing could tell them apart. `wf-conform` fails an evaluator with
+  no anchor.
 
 - ~~**Two structural gaps remain open**~~ — **both closed 2026-08-03 (evening).** A retraction now
   carries its own check: a blanket `never write "X"` declaration makes X a retracted claim, and any line
