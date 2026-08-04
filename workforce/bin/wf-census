@@ -30,6 +30,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import sys
 
 # Anchored for the same reason MARKER_RX is: a file DOCUMENTING the marker
@@ -331,6 +332,55 @@ class Census:
                     )
 
     # ── hooks ────────────────────────────────────────────────────────────────
+    def resolve_hook_command(self, cmd):
+        """The script a hook command would run, and whether it is on disk.
+
+        Returns (resolved_path, exists). BOTH ARE None WHEN THE COMMAND CANNOT BE
+        DECIDED -- an inline shell pipeline, a bare name found on PATH, anything
+        this cannot reduce to one file. An undecidable command is never reported
+        as dead: a false "dead wiring" row invites someone to delete a working
+        registration, which is worse than the silence this replaces.
+
+        Written 2026-08-04. This method's absence is why three dead registrations
+        in a real project survived a full audit unremarked -- `procedures/hooks.md`
+        declares a `dead wiring - command not on disk` count in its report block
+        and nothing computed it. The docstring below already promised "the
+        resolved command path" and no code resolved anything.
+        """
+        raw = (cmd or "").strip()
+        if not raw:
+            return None, None
+        try:
+            tokens = shlex.split(raw)
+        except ValueError:
+            return None, None
+        if not tokens:
+            return None, None
+
+        first = tokens[0]
+        # An interpreter invocation runs its script argument, not itself.
+        if os.path.basename(first) in ("sh", "bash", "zsh", "python", "python3", "node", "pwsh"):
+            args = [t for t in tokens[1:] if not t.startswith("-")]
+            if len(tokens) > 1 and tokens[1] in ("-c", "-Command"):
+                return None, None          # inline script: nothing to stat
+            if not args:
+                return None, None
+            first = args[0]
+
+        if "/" not in first:
+            return None, None              # resolved via PATH; not ours to judge
+
+        path = first
+        for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+            path = path.replace(var, self.root)
+        path = os.path.expandvars(os.path.expanduser(path))
+        if "$" in path:
+            return None, None              # an env var this process cannot know
+        if not os.path.isabs(path):
+            path = os.path.join(self.root, path)
+        path = os.path.normpath(path)
+        return path, os.path.exists(path)
+
     def census_hooks(self):
         """Wired hooks from both settings scopes, with the resolved command path.
 
@@ -355,6 +405,7 @@ class Census:
                 for entry in entries if isinstance(entries, list) else []:
                     for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
                         cmd = h.get("command", "")
+                        resolved, exists = self.resolve_hook_command(cmd)
                         self.hooks.append(
                             {
                                 "settings": rel,
@@ -362,6 +413,8 @@ class Census:
                                 "matcher": entry.get("matcher"),
                                 "command": cmd,
                                 "in_skill_dir": ".claude/skills/" in cmd,
+                                "resolved": resolved,
+                                "exists": exists,
                             }
                         )
 
@@ -456,8 +509,15 @@ def main():
             f"  immutable   {ib['blocks']} sacred blocks in {ib['files']} files · "
             f"{ib['unterminated']} unterminated (extraction hazards)"
         )
+        _dead = [h for h in s['hooks'] if h.get('exists') is False]
+        _unknown = sum(1 for h in s['hooks'] if h.get('exists') is None)
         print(f"  hooks       {len(s['hooks'])} wired · "
-              f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir")
+              f"{sum(1 for h in s['hooks'] if h['in_skill_dir'])} inside a skill dir · "
+              f"{len(_dead)} dead · {_unknown} undecidable")
+        # A dead registration is named, never just counted: the whole point is
+        # that someone can act on it, and `3 dead` is not actionable.
+        for h in _dead:
+            print(f"                DEAD  {h['event']:<14} {h['resolved']}")
         print(f"  aliases     {len(s['aliases'])} file(s) reachable by >1 path (symlinks — not collisions)")
         print(f"  namespace   {len(s['namespace'])} in-skill template name(s) shared "
               f"(advisory — loaded by path, not resolved by name)")

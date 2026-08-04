@@ -93,6 +93,33 @@ to wire and nothing to orphan.
 6. **Read back and confirm** the settings file still parses as JSON and the registration is present
    exactly once. On failure, restore the pre-edit content and report. **Never report a write that was
    not confirmed by re-reading.**
+6b. **Census EVERY registration, not only workforce's own, and resolve each command against disk.**
+   `wf-census` emits `resolved` and `exists` per hook; the `! dead wiring` and `! orphaned` rows below
+   are filled from it. A registration whose command is not on disk is **named with its resolved path**,
+   because `3 dead` is a number nobody can act on.
+
+   ```bash
+   WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+   "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}"
+   ```
+
+   **`exists: null` is UNDECIDABLE and is never reported as dead** — an inline `sh -c` pipeline, a bare
+   name found on `PATH`, a command carrying an env var this process cannot expand. It is counted
+   separately and left alone. A false dead-wiring row invites someone to delete a working registration,
+   which is worse than the silence it replaces.
+
+   **Report; do not repair.** A dead registration workforce does not own is **the user's** (step 5), and
+   the script behind it cannot be reconstructed — `SKILL.md` Core Principle 5 forbids inventing one.
+   Name the registration, name its settings file, and name the two things the user may do: restore the
+   script, or remove the entry. **Never fabricate a replacement hook**, and never delete a foreign
+   registration without `--remove --execute` naming it.
+
+   *Added 2026-08-04. The Reporting block below has declared a `dead wiring — command not on disk` count
+   since this command was written, and **nothing computed it** — `wf-census` recorded each command string
+   and never stat'd it, while its own docstring promised "the resolved command path." Three dead
+   registrations in a real project survived a full audit unremarked. Consumer named, producer assumed,
+   for the eighth time.*
+
 7. **Stamp the sidecar if it is missing.** `wf-protect-directives` reports `UNPROTECTED` when
    `.directives.sha` does not exist — correct behavior, and a permanent state until someone runs
    `/workforce checksums --execute`. Name that command in the report rather than leaving the user with

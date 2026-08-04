@@ -2872,6 +2872,54 @@ check(
     "audit-setup.md Step 0.4a no longer forbids promoting the recommended static to "
     "first position; the cost ranking is the only thing that orders that list",
 )
+# hooks.md's Reporting block declared a `dead wiring` count from the day it was
+# written and nothing produced it: wf-census stored each command string and never
+# stat'd it, while its own docstring promised "the resolved command path." Three
+# dead registrations in a real project survived a full audit. Consumer named,
+# producer assumed — the same family CLAUDE.md has recorded seven times.
+_census_src = read("workforce/bin/wf-census")
+_hooks_md_early = read("workforce/references/procedures/hooks.md")
+check(
+    "census: hook rows carry a resolved path and an existence verdict",
+    'def resolve_hook_command' in _census_src
+    and '"exists": exists' in _census_src
+    and '"resolved": resolved' in _census_src,
+    "wf-census no longer resolves hook commands — hooks.md reports a `dead wiring` "
+    "count that nothing computes, which is how three dead registrations survived "
+    "a full audit on a real project",
+)
+# Anchored on the FIXTURE, not on a word in the source. The first version of this
+# assertion tested `"undecidable" in source` and bin/prove returned VACUOUS: the
+# word occurs twice, so deleting one left it passing. A behaviour is guarded by a
+# test that exercises it, and this asserts that test is registered and still
+# claims both directions.
+_dh_exp = json.loads(read("fixtures/scripts/expectations.json")).get("census-deadhook", {})
+check(
+    "census: undecidable-is-not-dead has a regression fixture asserting both ways",
+    _dh_exp.get("script") == "wf-census"
+    and any("undecidable" in w for w in _dh_exp.get("want", []))
+    and any("dead" in w for w in _dh_exp.get("want", []))
+    and any("dead" in n for n in _dh_exp.get("not", [])),
+    "the census-deadhook fixture is missing or no longer asserts both a counted "
+    "dead registration and a NOT for the undecidable one — a PATH lookup or an "
+    "inline `sh -c` cannot be stat'd, and calling one dead invites deleting a "
+    "working registration",
+)
+check(
+    "hooks: a step produces the dead-wiring count its report declares",
+    "dead wiring — command not on disk" in _hooks_md_early
+    and "--root \"${CLAUDE_PROJECT_DIR}\"" in _hooks_md_early
+    and "never reported as dead" in _hooks_md_early,
+    "procedures/hooks.md declares a dead-wiring row with no step computing it, or "
+    "no longer states that an undecidable command is left alone",
+)
+check(
+    "hooks: workforce never fabricates a missing hook script",
+    "Never fabricate a replacement hook" in _hooks_md_early,
+    "hooks.md must forbid inventing a hook script for a dead registration — the "
+    "behaviour cannot be reconstructed and SKILL.md principle 5 bars inventing it",
+)
+
 # A bare `.claude/skills/workforce/bin/…` path assumes a PROJECT install. Personal
 # is the ordinary case, so every scripted step of a procedure written that way dies
 # on `no such file or directory`. Found 2026-08-03 by a real audit run; 11 sites
