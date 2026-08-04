@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""wf-unique-persona — PostToolUse hook guarding agent-name uniqueness.
+
+Runs on Edit|Write. Detects two registrations declaring the same `name:`, across
+the union of every directory a name can be occupied in.
+
+WHY THIS EXISTS AT ALL. It is the fourth and last capability inherited from
+`skill-builder`, and the only one with no workforce equivalent. Under declared
+succession `procedures/hooks.md` holds that "workforce owes that capability" —
+the standing directive is that a replaced system works BETTER in the new format,
+not that its guarantees quietly lapse. The predecessor cannot be deleted while
+one of its live guarantees has no successor, so this ships first.
+
+What workforce already had is `references/personas.md` Phase A lint, and it is
+NOT the same guarantee: **Phase A fires at authoring time; this fires at the
+edit.** `references/enforcement.md` already admitted the gap in its own words —
+"a name collision introduced by hand-editing `.claude/agents/` still goes
+unnoticed until the next `verify`. That is a real gap." One is a gate, one is a
+sweep, and the overlap is the point.
+
+WHY A COLLISION IS WORTH A HOOK. It is SILENT. `references/platform.md` fact 5:
+subfolders do not namespace, so two files declaring one name do not error —
+registering either resolves to whichever the harness happens to pick, and the
+org chart still names one employee. The failure reads as success, which is the
+class this project builds detection for.
+
+DETECTION, NEVER PREVENTION. `references/enforcement.md`'s table governs here as
+everywhere: a `PostToolUse` exit 2 cannot undo the edit that already happened.
+Describing this as preventing a collision would be exactly the overclaim the
+project refuses.
+
+FAIL-OPEN, NEVER FAIL-SILENT. Always exits 0. A hook bug must never block the
+user's work. But **an empty parse result must NEVER produce an empty report** —
+that combination is what lets a reader present as clean about files it never
+examined (the sibling hook carries the same rule for the same reason).
+
+Reports four classes, none of which is ever a silent skip:
+
+  COLLISION          another registration declares this same `name:`
+  NAME MISSING       the file is a registration and declares no `name:` at all
+  UNREADABLE         the edited file or a peer could not be read
+  SCAN INCOMPLETE    a directory that should have been scanned could not be
+"""
+
+import json
+import os
+import re
+import sys
+
+# `name:` in YAML frontmatter — first field block only, quoted or bare.
+FRONTMATTER_RX = re.compile(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+NAME_RX = re.compile(r"^[ \t]*name[ \t]*:[ \t]*(.+?)[ \t]*$", re.M)
+
+
+def emit(message, system=False):
+    """The only output channel. Never silent when something was checked."""
+    key = "systemMessage" if system else "additionalContext"
+    print(json.dumps({key: message}))
+
+
+def declared_name(path):
+    """(name, error). Exactly one is None."""
+    try:
+        body = open(path, encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, f"{type(exc).__name__}"
+    m = FRONTMATTER_RX.match(body)
+    if not m:
+        return None, None  # no frontmatter: not a registration, not an error
+    n = NAME_RX.search(m.group(1))
+    if not n:
+        return None, None
+    return n.group(1).strip().strip("\"'"), None
+
+
+def is_registration(norm):
+    """The union of places a name can be occupied.
+
+    `.claude/agents/**` is the registry itself. `AGENT.md` under `.claude/skills/**`
+    counts too: `procedures/audit.md` Step 1b censuses that union because a name
+    occupied anywhere in it is occupied, and subfolders do not namespace.
+    """
+    return (
+        "/.claude/agents/" in norm and norm.endswith(".md")
+    ) or (
+        "/.claude/skills/" in norm and os.path.basename(norm) == "AGENT.md"
+    )
+
+
+def scan_roots(project_root):
+    """Every root whose registrations share one namespace (`references/scopes.md`)."""
+    home = os.path.expanduser("~")
+    return [
+        os.path.join(project_root, ".claude", "agents"),
+        os.path.join(project_root, ".claude", "skills"),
+        os.path.join(home, ".claude", "agents"),
+    ]
+
+
+def peers(project_root, self_abs):
+    """(name -> [paths]), incomplete_roots. Scans recursively; fact 5."""
+    found, incomplete = {}, []
+    for root in scan_roots(project_root):
+        if not os.path.isdir(root):
+            continue
+        try:
+            walked = list(os.walk(root))
+        except OSError:
+            incomplete.append(root)
+            continue
+        for dirpath, _dirnames, filenames in walked:
+            for fn in filenames:
+                p = os.path.join(dirpath, fn)
+                norm = p.replace("\\", "/")
+                if not is_registration(norm):
+                    continue
+                if os.path.abspath(p) == self_abs:
+                    continue
+                nm, err = declared_name(p)
+                if err:
+                    incomplete.append(p)
+                    continue
+                if nm:
+                    found.setdefault(nm, []).append(p)
+    return found, incomplete
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        emit("wf-unique-persona: could not parse hook input — name uniqueness was "
+             "NOT verified for this edit", system=True)
+        return 0
+
+    path = (payload.get("tool_input") or {}).get("file_path") or ""
+    if not path:
+        return 0
+
+    norm = path.replace("\\", "/")
+    if not is_registration(norm):
+        return 0
+    if not os.path.exists(path):
+        return 0
+
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    self_abs = os.path.abspath(path)
+    base = os.path.basename(path)
+
+    name, err = declared_name(path)
+    if err:
+        emit(f"UNREADABLE: {base} could not be read ({err}) — name uniqueness was "
+             f"NOT verified for this edit.", system=True)
+        return 0
+    if not name:
+        emit(f"NAME MISSING: {base} sits in the agent registry and declares no `name:`. "
+             f"It cannot be dispatched, and nothing else can detect a collision with it.")
+        return 0
+
+    found, incomplete = peers(root, self_abs)
+    clashes = found.get(name, [])
+
+    lines = []
+    if clashes:
+        shown = ", ".join(os.path.relpath(p, root) for p in sorted(clashes)[:4])
+        more = f" (+{len(clashes) - 4} more)" if len(clashes) > 4 else ""
+        lines.append(
+            f"COLLISION: `name: {name}` in {base} is already declared by {shown}{more}. "
+            f"Subfolders do NOT namespace (platform.md fact 5), so this resolves silently "
+            f"to one of them and the other becomes unreachable. Rename one, then re-run "
+            f"`/workforce verify`."
+        )
+    if incomplete:
+        lines.append(
+            f"SCAN INCOMPLETE: {len(incomplete)} path(s) could not be read, so this check "
+            f"covered less than the whole registry: {', '.join(os.path.relpath(p, root) for p in incomplete[:3])}"
+        )
+
+    # Never silent about a file it actually examined.
+    if lines:
+        emit(" ".join(lines))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

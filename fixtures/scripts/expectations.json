@@ -25,6 +25,7 @@
     ]
   },
   "census-deadhook": {
+    "_why": "Three registrations: one live, one whose script was deleted, and one `jq` resolved on PATH. The jq row must be UNDECIDABLE, never dead -- calling it dead invites deleting a working registration. --json is asserted separately for per-skill ownership, which is the input set sweep step 5 relocates from.",
     "exit": 0,
     "not": [
       "DEAD           PreToolUse     jq",
@@ -37,8 +38,7 @@
       "1 undecidable",
       "DEAD  PreToolUse",
       "gone/hooks/vanished.sh"
-    ],
-    "_why": "Three registrations: one live, one whose script was deleted, and one `jq` resolved on PATH. The jq row must be UNDECIDABLE, never dead -- calling it dead invites deleting a working registration. --json is asserted separately for per-skill ownership, which is the input set sweep step 5 relocates from."
+    ]
   },
   "census-inverted": {
     "exit": 0,
@@ -91,6 +91,38 @@
     "want": [
       "DUPLICATED    1",
       "would remove"
+    ]
+  },
+  "claudemd-ensure-region": {
+    "_why": "--ensure-region runs at the spawn preflight, BEFORE any handbook exists. It must never classify or remove a user line: this tree carries a line that plain mode reports as DUPLICATED, and ensure-region must not mention it at all.",
+    "args": [
+      "--ensure-region"
+    ],
+    "exit": 0,
+    "not": [
+      "would remove",
+      "DUPLICATED"
+    ],
+    "script": "wf-claude-md",
+    "want": [
+      "--ensure-region",
+      "region prepended",
+      "no user line is classified or removed"
+    ]
+  },
+  "claudemd-ensure-region-present": {
+    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent \u2014 bin/idempotence asserts the second run writes the same bytes.",
+    "args": [
+      "--ensure-region"
+    ],
+    "exit": 0,
+    "not": [
+      "region prepended",
+      "would remove"
+    ],
+    "script": "wf-claude-md",
+    "want": [
+      "region replaced"
     ]
   },
   "claudemd-user-only": {
@@ -249,6 +281,99 @@
       "0 failed"
     ]
   },
+  "persona-badstdin": {
+    "exit": 0,
+    "script": "wf-unique-persona",
+    "stdin_raw": "not json",
+    "want": [
+      "NOT verified"
+    ]
+  },
+  "persona-collision": {
+    "exit": 0,
+    "script": "wf-unique-persona",
+    "stdin_file": ".claude/agents/a.md",
+    "want": [
+      "COLLISION",
+      "alpha",
+      "AGENT.md"
+    ]
+  },
+  "persona-noname": {
+    "exit": 0,
+    "script": "wf-unique-persona",
+    "stdin_file": ".claude/agents/a.md",
+    "want": [
+      "NAME MISSING"
+    ]
+  },
+  "persona-unique": {
+    "exit": 0,
+    "not": [
+      "COLLISION"
+    ],
+    "script": "wf-unique-persona",
+    "stdin_file": ".claude/agents/a.md"
+  },
+  "remainder-fenced": {
+    "args": [
+      "--diff",
+      "before.md",
+      "after.md"
+    ],
+    "exit": 0,
+    "not": [
+      "LOST"
+    ],
+    "script": "wf-remainder",
+    "want": [
+      "surface identical"
+    ]
+  },
+  "remainder-fenced-manifest": {
+    "args": [
+      "--manifest",
+      "before.md"
+    ],
+    "exit": 0,
+    "not": [
+      "run:# check the process"
+    ],
+    "script": "wf-remainder",
+    "want": [
+      "run:ps aux | grep native-host",
+      "run:kill $(pgrep -f native-host)"
+    ]
+  },
+  "remainder-gutted": {
+    "args": [
+      "--diff",
+      "before.md",
+      "after.md"
+    ],
+    "exit": 1,
+    "script": "wf-remainder",
+    "want": [
+      "SURFACE CHANGED",
+      "LOST    cmd:/demo sync",
+      "restore from the T7"
+    ]
+  },
+  "remainder-identical": {
+    "args": [
+      "--diff",
+      "before.md",
+      "after.md"
+    ],
+    "exit": 0,
+    "not": [
+      "LOST"
+    ],
+    "script": "wf-remainder",
+    "want": [
+      "surface identical"
+    ]
+  },
   "sidecar-agree": {
     "exit": 0,
     "not": [
@@ -281,38 +406,6 @@
     "want": [
       "none parseable",
       "never examined"
-    ]
-  },
-  "claudemd-ensure-region": {
-    "_why": "--ensure-region runs at the spawn preflight, BEFORE any handbook exists. It must never classify or remove a user line: this tree carries a line that plain mode reports as DUPLICATED, and ensure-region must not mention it at all.",
-    "script": "wf-claude-md",
-    "args": [
-      "--ensure-region"
-    ],
-    "exit": 0,
-    "want": [
-      "--ensure-region",
-      "region prepended",
-      "no user line is classified or removed"
-    ],
-    "not": [
-      "would remove",
-      "DUPLICATED"
-    ]
-  },
-  "claudemd-ensure-region-present": {
-    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent \u2014 bin/idempotence asserts the second run writes the same bytes.",
-    "script": "wf-claude-md",
-    "args": [
-      "--ensure-region"
-    ],
-    "exit": 0,
-    "want": [
-      "region replaced"
-    ],
-    "not": [
-      "region prepended",
-      "would remove"
     ]
   }
 }

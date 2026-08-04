@@ -2357,7 +2357,8 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # compare it to the table — that is the actual invariant. "Closed" was never about
 # a specific number; it is the rule that no row arrives without its report line.
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-              "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17}
+              "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+              "eighteen": 18}
 _inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 # bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
@@ -2549,6 +2550,71 @@ check(
     "the blocking rule named 'the command that wrote it'; the same run's newly "
     "hired employees are the same evasion one level down, and two of six measured "
     "rows read exactly that way",
+)
+# ─────────────────────────────────────────────────────────────────────────────
+# The mechanism layer — skills own mechanism, employees own judgment.
+#
+# The one real audit classified 31 skills PROMOTE and reduced ZERO, then reported
+# that "38 skills' judgment cannot fit into nine handbooks." That measured the
+# wrong thing: the handbook was never where the mechanism was going. The user's
+# directive makes conversion SEPARATE a skill rather than absorb one, and these
+# assertions hold the three parts that can silently not happen — the reduction,
+# its verification, and the conditional mark.
+_ct2 = read("workforce/references/conversion-taxonomy.md")
+_hire2 = read("workforce/references/procedures/hire.md")
+check(
+    "remainder: the cut is a judgment with evidence, not a decision tree",
+    "evidence a classifier weighs" in _ct2 and "never a mapping it applies" in _ct2,
+    "Core Principle 8 — audit-side files carry principles, not decision trees. "
+    "A section table read as a lookup produces a mechanical cut on a population "
+    "the classifier never actually judged",
+)
+check(
+    "remainder: the reduction is verified by the invocation manifest, before and after",
+    "REQUIRE A == B exactly" in _ct2 and "wf-remainder --manifest" in _ct2,
+    "directive one makes preservation the floor; without the manifest a reduction "
+    "that drops an invocation is indistinguishable from a clean one",
+)
+check(
+    "remainder: the manifest states what it does NOT prove",
+    "cannot show the right prose moved" in _ct2,
+    "a check that oversells itself is worse than none — A == B covers the surface, "
+    "never the classification, and the cold-read probe is what covers the rest",
+)
+check(
+    "remainder: every reduced skill declares its interface for the employee",
+    "declares its interface" in _ct2 and "REFERENCES that declaration" in _ct2,
+    "the interface is where the two layers meet; an employee left to infer the "
+    "contract reintroduces the variance the mechanism layer exists to remove",
+)
+check(
+    "T-order: T7b reduces and T7c marks only on an empty remainder",
+    "T7b" in _hire2 and "T7c" in _hire2
+    and "ONLY IF the remainder is empty" in _hire2
+    and "insertion, never a reorder" in _hire2,
+    "T7 used to mark every converted skill for deletion. Under the directive most "
+    "are reduced and survive, so an unconditional mark deletes working mechanism",
+)
+check(
+    "T-order: an unmarked skill is not read as a failed conversion",
+    "UNMARKED SKILL IS NOT A FAILED CONVERSION" in skill
+    and "Do not read an unmarked skill as a failed" in _hire2,
+    "most converted skills now survive T7c; a report treating unmarked as skipped "
+    "would recreate the 0-converted false alarm from the other direction",
+)
+check(
+    "batch: a batch that did not run may never print UPHELD",
+    "may never print `UPHELD`" in _ct2 and "never evidence it was cheap" in _ct2,
+    "a real report printed `batch cost 0 (no conversion executed)  UPHELD` on a run "
+    "with 38 eligible — the arithmetic half checked, the did-it-happen half skipped",
+)
+check(
+    "succession: workforce supplies the last predecessor guarantee before deleting it",
+    "wf-unique-persona" in read("manifest.txt")
+    and "wf-unique-persona" in read("workforce/references/procedures/hooks.md"),
+    "`skill-builder`'s unique-persona had no successor here, and enforcement.md "
+    "already called the edit-time gap real. Deleting the predecessor without it "
+    "downgrades a live guarantee, which directive one forbids",
 )
 check(
     "discharge: deletes nothing — the sweep stays the only destructive act",
@@ -3565,7 +3631,7 @@ check(
 # So the scan is now class-wide: no shipped file pairs a number-word with this
 # population, and invariants.md's declaration line is the single exemption.
 _INV_COUNT_RX = re.compile(
-    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\s+"
+    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen)\s+"
     r"(?:rows?|Run[- ]Invariants?)\b",
     re.I,
 )

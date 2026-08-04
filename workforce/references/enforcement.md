@@ -93,10 +93,20 @@ belongs in the DETECTS column with everything else here.
 
 ## Nothing ships dormant — the rule the hook findings actually support
 
-**claude-workforce ships exactly one hook, and the count is a current fact rather than a
-prohibition** — `wf-protect-directives`, `PostToolUse` on `Edit|Write`, guarding immutable directive
-blocks (`manifest.txt` § Hooks; `procedures/hooks.md`). Getting from "ships zero executables" to a
-stated count took two corrections on the same day.
+**claude-workforce ships exactly two hooks, and the count is a current fact rather than a
+prohibition** — `wf-protect-directives` and `wf-unique-persona`, both `PostToolUse` on `Edit|Write`,
+guarding immutable directive blocks and agent-name uniqueness respectively (`manifest.txt` § Hooks;
+`procedures/hooks.md`). Getting from "ships zero executables" to a stated count took two corrections on
+the same day.
+
+*The second landed 2026-08-04, and it closes a gap this file had already named against itself.* Under
+declared succession `procedures/hooks.md` holds that **workforce owes a predecessor's capability**, and
+`skill-builder`'s `unique-persona.sh` was the last one with no successor here. What existed was
+`personas.md` Phase A lint — **authoring-time**, where the hook is **edit-time** — and § Detection where
+prevention is impossible below still reads *"a name collision introduced by hand-editing
+`.claude/agents/` still goes unnoticed until the next `verify`. That is a real gap."* Deleting the
+predecessor without supplying the hook would have downgraded a live guarantee, which directive one
+forbids.
 
 **Correction 1.** This section said *"claude-workforce ships zero executables"* and froze that into a
 `bin/check` assertion banning every `.sh`, `.ps1`, and `.py` in the distribution. The three findings

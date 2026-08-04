@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -137,9 +137,41 @@ T4  journal WRITE-INTENT
 T5  register              →  .claude/agents/<name>.md          ← employee live; TWO paths live
 T6  verify registration   →  regular file, parses, hash matches
 T6b journal WRITE-INTENT (T7)   ← rollback cannot tell "after T6" from "after T7" without it
-T7  retire the skill      →  copy SKILL.md to .orig, then MARK for the sweep  ← still two paths
+T7  retire the skill      →  copy SKILL.md to .orig, hash it into the journal  ← still two paths
+T7b reduce + verify       →  manifest A · reduce · manifest B · REQUIRE A == B
+T7c mark for the sweep    →  ONLY IF the remainder is empty
 T8  journal COMMITTED
 ```
+
+**T7b and T7c are an insertion, never a reorder** (added 2026-08-04). The T-order is this project's
+most safety-critical constant; nothing above moved, and T7 keeps doing exactly what it did minus the
+mark.
+
+**T7b — the reduction, and it is BLOCKING.** Under the user's directive that skills own mechanism and
+employees own judgment (`SKILL.md` § Directives), a conversion **separates** a skill rather than
+absorbing it. So the judgment that became handbook text is removed from `SKILL.md` here, in the same
+transaction — and the result is verified rather than asserted:
+
+```
+wf-remainder --manifest <SKILL.md>   →  A      (before reducing)
+…apply the cut…
+wf-remainder --manifest <SKILL.md>   →  B      (after)
+wf-remainder --diff-manifest A B     →  exit 0 required
+```
+
+**IF the surface changed → restore from the T7 `.orig`, mark the skill ✗ with the lost tokens, and
+CONTINUE the batch** (§ Failure containment). Directive one makes preservation the floor, so a reduction
+is never accepted on the author's account of it. Full rules at `references/conversion-taxonomy.md`
+§ The remainder test.
+
+**T7c — the mark is now CONDITIONAL, and this is the substantive change.** T7 used to mark every
+converted skill for deletion. Under the directive most skills are **not** deleted: they are reduced and
+keep working, because their mechanism was never going into a handbook. A skill is marked for the sweep
+**only when its remainder is empty** — it held nothing but judgment, and that judgment is now live in an
+employee. The no-residue directive is satisfied by the reduction itself; deletion is the exception.
+
+**A skill that survives T7c is still a COMMITTED conversion.** Do not read an unmarked skill as a failed
+one: `INV-REMAINDER` prints reduced and deleted separately for exactly this reason.
 
 **The invariant:** at every observable instant the capability is reachable by **exactly one or exactly
 two paths — never zero.** A crash before T5 leaves the original untouched. A crash between T5 and T7

@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 16 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 16 assertion(s) in bin/check name this file; 57 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -170,6 +170,80 @@ Applied per skill, after the handbook is live and verified:
 **A reduced skill is not a stub, and conflating the two loses the whole design.** A stub states no
 procedure and exists to redirect. A reduced skill states a procedure, runs, and returns a result — it
 simply no longer decides *whether* it should have been run. That judgment now lives in an employee.
+
+#### The cut is a JUDGMENT the audit makes per skill, not a lookup
+
+Stated by the user 2026-08-04: *"It would have to be a judgement call by the ai during the audit to
+decide how to handle that with each skill and how they interface with agents."* That is the correct
+register and it is `SKILL.md` Core Principle 8 — audit-side reference files carry **principles, not
+decision trees**. So the table below is **evidence a classifier weighs**, never a mapping it applies:
+a skill that reads against the tells and still warrants a different cut gets that cut, **with its
+reason on disk**.
+
+| Kind | What it looks like | Usually |
+|---|---|---|
+| **MECHANISM** | a script invocation, a command table, a file layout, deterministic steps with no decision point | stays in `SKILL.md` |
+| **DATA** | schema, invariants, seed, git policy, owner, maintainers | stays — `references/data-skills.md` shape |
+| **CONNECTION** | external server, auth mode, verb list, read/write split | stays — § The `## Connection` shape |
+| **JUDGMENT** | when, which, how much, what counts as good, refusals, escalation | moves to the handbook |
+| **immutable span** | `<!-- origin: user \| immutable: true -->` | never moved, never copied |
+
+**The cut is recorded per skill, with its reason, in `dispositions.md`** — what stayed, what moved, and
+why. A judgment nobody can audit is indistinguishable from a guess, and this one edits working skills.
+
+#### The interface is part of the judgment, not a consequence of it
+
+How an employee calls the reduced skill and what it hands back is exactly where the two layers meet,
+and it is what the directive is about: *mechanically created context that is solid and dependable.* So
+**every reduced skill declares its interface — the invocation, and the shape of what returns — and the
+handbook REFERENCES that declaration rather than restating it.** Two canonical texts is the failure
+this project refuses everywhere else, and an employee left to infer the contract reintroduces exactly
+the variance the mechanism layer exists to remove.
+
+#### BLOCKING — reduction is a transform, verified by the invocation manifest
+
+Directive one makes preservation the floor: a converted system works **better** in the new format,
+never merely still exists. So a reduction is never accepted on the author's account of it.
+
+```
+manifest A = wf-remainder --manifest <SKILL.md>     before
+reduce
+manifest B = wf-remainder --manifest <SKILL.md>     after
+REQUIRE A == B exactly
+```
+
+**IF the surface changed → the reduction is ABORTED, the file restored from the T7 `.orig`, and the
+skill marked ✗ with the lost tokens named.** The batch continues (§ Failure containment). A reduction
+that drops an invocation has gutted a working skill, and without this it looks identical to a clean one.
+
+**The run prints `INV-REMAINDER`** (`references/invariants.md` row 18), always, including the zeroes:
+
+```
+INV-REMAINDER  31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
+```
+
+**`0 surface changes` is the number that proves preservation held**, and reduced-versus-deleted are
+printed separately because most converted skills now survive: an unmarked skill is a reduced one, not a
+skipped one. A run reporting `N promoted · 0 reduced` is `NOT UPHELD` — that is the state the one real
+audit shipped, with 31 promoted and the reduction never executed.
+
+**State what it does not prove.** `A == B` shows nothing was dropped from the *invocable surface*. It
+cannot show the right prose moved — a section can be correctly retained and wrongly classified. **The
+manifest is the floor under the judgment, not a substitute for it**; the cold-read probe covers the rest.
+`wf-remainder` is deliberately biased toward over-capture, because a false abort marks one skill ✗ and
+continues while a missed token ships a hollow skill that verifies clean.
+
+#### The `## Connection` shape
+
+A skill whose mechanism is a connection to an external tool declares it in one section: **the server,
+the auth mode, and its verbs split into read and write.** Nothing else in the distribution names this,
+and the evidence for it is measured — `invest-analyst` had to deny **twelve Alpaca transacting verbs by
+exact name**, because a wildcard would have re-granted `close_all_positions`. An explicit read/write
+split turns that from an author's care into a generated grant.
+
+**The outbound rule belongs here, stated once by the gateway** rather than repeated in every handbook
+that touches it: a write verb is rendered and returned as `OUTBOUND-PENDING:`, never fired, because the
+confirmation belongs where the user actually is.
 
 ### What moves out is DELETED from the skill, in the same transaction
 
@@ -557,6 +631,17 @@ whole run. **Conversion is reversible by construction**, so batch size is not a 
 **Print the arithmetic, never a judgment** — `INV-BATCH` (`invariants.md` row 14): the cap, the spawns
 already spent, the headroom, and what the batch costs. A run that reports an overage without those four
 numbers has not measured one.
+
+**BLOCKING — a batch that DID NOT RUN may never print `UPHELD`, whatever its cost line says.** Row 14
+is *"printed its arithmetic … **and ran in this run**"*, and the two halves are one invariant. IF
+eligible is greater than zero and converted is zero → the row is `NOT UPHELD`, always.
+
+*Added 2026-08-04, from a real report:* `INV-BATCH cap 200 · spent 28 · headroom 172 · batch cost 0 (no
+conversion executed)  UPHELD`, on a run with **38 eligible**. The arithmetic half was checked and the
+did-it-happen half was skipped, so the row that exists to catch a stopping run certified one. **A cost
+of zero is evidence the batch did not run, never evidence it was cheap.** Identical in shape to
+`INV-DEFERRED` balancing across four malformed rows — the number is right and it answers the wrong
+question.
 
 **THE CAPACITY THAT STOPS A RUN MUST BE A MEASURED NUMBER THIS RUN PRINTED.** Not an impression, not a
 forecast, not "what remains of this session." Three capacities have now been used to defer a run — the

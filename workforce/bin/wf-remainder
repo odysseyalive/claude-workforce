@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""wf-remainder — the invocation manifest that makes a reduction a transform.
+
+    wf-remainder --manifest <SKILL.md>          print the invocable surface, sorted
+    wf-remainder --diff <before> <after>        exit 1 on ANY surface change
+    wf-remainder --diff-manifest <a.txt> <b.txt>  same, for saved manifests
+
+WHY THIS EXISTS. The user's directive (`SKILL.md` § Directives) makes skills the
+mechanism layer: conversion SEPARATES a skill rather than absorbing it. Judgment
+moves into a handbook; mechanism stays and keeps working. `conversion-taxonomy.md`
+has said PROMOTE reduces a `SKILL.md` "to its mechanical remainder" since the
+beginning — and NOTHING CHECKED WHAT SURVIVED. On the one real audit, 31 skills
+were classified PROMOTE and 0 were reduced, so the gap had never been exercised.
+
+Directive one makes preservation the floor: a converted system must work BETTER in
+the new format, never merely still exist. So reduction is a transform with a
+verification, not a deletion with a rationale:
+
+    manifest A  =  surface before
+    reduce
+    manifest B  =  surface after
+    REQUIRE A == B, exactly. Any difference aborts and restores from .orig.
+
+WHAT IT DOES NOT PROVE, and this is stated because a check that oversells itself is
+worse than none. `A == B` proves nothing was dropped from the INVOCABLE SURFACE. It
+cannot prove the right prose moved — a section can be correctly retained and wrongly
+classified. The partition is a judgment the audit makes per skill; this is the floor
+under that judgment, and the cold-read probe is what covers the rest.
+
+BIASED TOWARD OVER-CAPTURE, DELIBERATELY. A token captured that is not really an
+invocation causes a false abort: the skill is marked ✗ with its path:line and the
+batch continues (`SKILL.md` § Atomic-or-Absent, rule 7). A token MISSED means a
+gutted skill that verifies clean. The failure modes are not symmetric, so ambiguity
+resolves toward capturing.
+"""
+
+import os
+import re
+import sys
+
+# ── What counts as surface ────────────────────────────────────────────────────
+# Headings that CARRY mechanism. A reduction may not remove one; judgment headings
+# (## When to use, ## Choosing, …) are exactly what is expected to disappear, so
+# they are deliberately absent from this set.
+MECHANISM_HEADINGS = {
+    "commands", "command surface", "quick commands", "usage", "invocation",
+    "schema", "invariants", "degradation", "owner", "git policy", "seed",
+    "maintainers", "connection", "scripts", "files", "layout", "data",
+}
+
+# A slash command in backticks: `/workforce sweep`, `/foo`
+CMD_RX = re.compile(r"`(/[a-z][\w-]*(?:\s+[a-z][\w-]*)*)`")
+# A script-ish path in backticks: `scripts/x.sh`, `./bin/y`, `bin/z.py`
+SCRIPT_RX = re.compile(
+    r"`((?:\./)?(?:[\w.-]+/)*[\w.-]+\.(?:sh|py|js|ts|rb|ps1|pl)|(?:\./)?(?:scripts|bin|hooks)/[\w.-]+)`"
+)
+HEADING_RX = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$", re.M)
+# Inside a ## Connection block, a backticked bare word is a declared verb.
+VERB_RX = re.compile(r"`([a-z][a-z0-9_]{2,})`")
+# A fenced code block. EVERY executable line inside one is surface.
+#
+# Added 2026-08-04, and it is the reason the mock audit is in the loop. Measured
+# against `odyssey-alive`'s 48 real skills, `browser` reported a surface of ZERO
+# and would therefore have been marked for deletion by T7c — while consisting
+# ENTIRELY of live diagnostics (`ps aux | grep …`, `kill $(pgrep -f …)`) in fenced
+# bash blocks under headings this file does not list as mechanism. A skill made of
+# nothing but commands scored as having no commands. That is the gutting the
+# manifest exists to prevent, produced by the manifest, and no fixture caught it
+# because every fixture was written by the same hand as the extractor.
+FENCE_RX = re.compile(r"^[ \t]*(?:```|~~~)[^\n]*\n(.*?)^[ \t]*(?:```|~~~)[ \t]*$", re.S | re.M)
+
+
+def _connection_spans(text):
+    """Character ranges covered by a `## Connection` section."""
+    spans, heads = [], list(HEADING_RX.finditer(text))
+    for i, m in enumerate(heads):
+        if m.group(2).strip().lower().rstrip(":") != "connection":
+            continue
+        level = len(m.group(1))
+        end = len(text)
+        for nxt in heads[i + 1:]:
+            if len(nxt.group(1)) <= level:
+                end = nxt.start()
+                break
+        spans.append((m.end(), end))
+    return spans
+
+
+def manifest(text):
+    """The invocable surface, as a sorted list of typed tokens."""
+    out = set()
+
+    for m in CMD_RX.finditer(text):
+        out.add("cmd:" + " ".join(m.group(1).split()))
+
+    for m in SCRIPT_RX.finditer(text):
+        p = m.group(1)
+        out.add("script:" + (p[2:] if p.startswith("./") else p))
+
+    for m in HEADING_RX.finditer(text):
+        h = m.group(2).strip().lower().rstrip(":")
+        # Strip inline code/emphasis so `## \`Schema\`` matches "schema".
+        h = re.sub(r"[`*_]", "", h).strip()
+        if h in MECHANISM_HEADINGS:
+            out.add("section:" + h)
+
+    for start, end in _connection_spans(text):
+        for m in VERB_RX.finditer(text[start:end]):
+            out.add("verb:" + m.group(1))
+
+    for m in FENCE_RX.finditer(text):
+        for line in m.group(1).splitlines():
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue  # blank, or a comment explaining the next line
+            out.add("run:" + " ".join(s.split()))
+
+    return sorted(out)
+
+
+def read(path):
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _emit_diff(before, after, label_a, label_b):
+    lost = [t for t in before if t not in set(after)]
+    gained = [t for t in after if t not in set(before)]
+    if not lost and not gained:
+        print(f"surface identical — {len(before)} token(s)")
+        return 0
+    print(f"SURFACE CHANGED  {label_a} -> {label_b}")
+    for t in lost:
+        print(f"  LOST    {t}")
+    for t in gained:
+        print(f"  GAINED  {t}")
+    print(
+        f"\n{len(lost)} lost, {len(gained)} gained. A reduction may not change the invocable\n"
+        f"surface: directive one makes preservation the floor. Abort the reduction and\n"
+        f"restore from the T7 `.orig`."
+    )
+    return 1
+
+
+def main(argv):
+    argv = list(argv)
+    root = ""
+    if len(argv) >= 3 and argv[1] == "--root":
+        root = argv[2]
+        del argv[1:3]
+
+    def rel(p):
+        return os.path.join(root, p) if root and not os.path.isabs(p) else p
+
+    if len(argv) >= 3 and argv[1] == "--manifest":
+        for t in manifest(read(rel(argv[2]))):
+            print(t)
+        return 0
+    if len(argv) >= 4 and argv[1] == "--diff":
+        return _emit_diff(manifest(read(rel(argv[2]))), manifest(read(rel(argv[3]))),
+                          argv[2], argv[3])
+    if len(argv) >= 4 and argv[1] == "--diff-manifest":
+        a = [l.strip() for l in read(rel(argv[2])).splitlines() if l.strip()]
+        b = [l.strip() for l in read(rel(argv[3])).splitlines() if l.strip()]
+        return _emit_diff(a, b, argv[2], argv[3])
+    print(__doc__.strip().splitlines()[0], file=sys.stderr)
+    print("usage: wf-remainder --manifest <file> | --diff <before> <after> | "
+          "--diff-manifest <a> <b>", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

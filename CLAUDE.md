@@ -275,6 +275,56 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-04
 
+**Closed 2026-08-04 (latest) — the mechanism layer. Skills own MECHANISM, employees own JUDGMENT.**
+A new user directive, and the organizing principle of conversion: *conversion **separates** a skill, it
+does not absorb one.* Judgment moves up into a handbook; mechanism — data acquisition, data management,
+connections to external tools — stays exactly where it is and keeps working.
+
+**It retires the sentence that deadlocked the last run.** *"38 skills' judgment cannot fit into nine
+handbooks against a 150-line ceiling"* measured the wrong thing: the handbook was never where the
+mechanism was going. No cap was widened; the axis was wrong. `conversion-taxonomy.md:42` had said
+PROMOTE reduces a `SKILL.md` "to its mechanical remainder" since the beginning — **and it had never
+run**, so 31 skills were classified PROMOTE and 0 were reduced.
+
+| Piece | |
+|---|---|
+| `wf-remainder` | the **invocation manifest** — reduce, re-emit, `A == B` or abort and restore from `.orig`. Reduction is a transform, never a deletion with a rationale |
+| **T7b / T7c** | an insertion in the T-order, nothing moved. T7c marks for the sweep **only if the remainder is empty**, so deletion becomes the exception |
+| `wf-unique-persona` | the last `skill-builder` guarantee with no successor here. `enforcement.md` already called the edit-time gap real; Phase A lint fires at *authoring* time |
+| `## Connection` | server, auth mode, read/write verb split — `invest-analyst` denying twelve Alpaca verbs by name is the evidence |
+| row 18 `INV-REMAINDER` | promoted · reduced · deleted · **surface changes**, printed separately |
+
+**The cut is a judgment, not a lookup** — the user's own framing, and Core Principle 8. The section
+table is evidence a classifier weighs; the cut is recorded per skill with its reason, and **the
+interface is part of the judgment**: each reduced skill declares its invocation and return shape, and
+the handbook references that rather than restating it.
+
+**The mock audit found a defect in the patch, in the first population it touched.** `wf-remainder`
+scored `browser` at **zero surface** — a skill consisting *entirely* of live diagnostics
+(`ps aux | grep …`, `kill $(pgrep -f …)`) in **fenced bash blocks**, under headings not in
+`MECHANISM_HEADINGS`. So T7c would have marked a working skill for deletion: **a skill made of nothing
+but commands, scoring as having no commands.** Under-capture is the failure mode `wf-remainder`'s own
+docstring designs against, and it shipped anyway — no fixture caught it because every fixture was
+written by the same hand as the extractor. Only a real tree had a `browser`.
+
+Fixed (every non-blank, non-comment fenced line is a `run:` token), and the measurement flipped:
+**0 of 48 skills have an empty remainder**, against 31 that the old unconditional T7 would have marked.
+That also makes `odyssey-alive`'s sweep-deletes-nothing outcome **legitimate for the first time** — the
+previous zero came from `0 converted`, a run that stopped; this one is measured per skill.
+
+*Also fixed here:* `INV-BATCH` printed `batch cost 0 (no conversion executed)  UPHELD` on a run with 38
+eligible. Row 14 is *"printed its arithmetic **and ran in this run**"* — the arithmetic half was checked
+and the did-it-happen half skipped, so the row that exists to catch a stopping run certified one. **A
+cost of zero is evidence the batch did not run, never evidence it was cheap.**
+
+682 assertions, 60 proven by breaking, 44 script fixtures, 4/4 writers idempotent. Records in
+`plan/mechanism-layer-2026-08-04.md` and `plan/mock-audit-odyssey-alive-2026-08-04d.md`.
+
+**Still open from this:** **no reduction has ever been executed** — T7b is exercised as a measurement
+against real skills, but the cut itself and `A == B` across an actual reduction are untested outside
+fixtures. `wf-unique-persona` has never fired on a real collision. No skill anywhere declares a
+`## Connection` yet. And the mock audit was **author-run, not cold-read**.
+
 **Closed 2026-08-04 (latest) — the run finished, and handed the remainder to a queue. `/workforce
 discharge`.** The `odyssey-alive` audit completed every step: 9 employees registered, 9 cold reads PASS,
 canary PASS on the first attempt from shipped fixtures. It then closed with **six deferred rows, four of

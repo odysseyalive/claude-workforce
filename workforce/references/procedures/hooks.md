@@ -34,6 +34,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | Hook | Event | Matcher | Guards |
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
+| `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
 
 **`PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse` exit 2 cannot undo an edit
 that already happened, so this hook is **detection, not prevention** — `enforcement.md`'s table governs

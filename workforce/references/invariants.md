@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Seventeen, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Eighteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -73,6 +73,7 @@ change.)*
 | 15 | declared succession with eligible skills converted at least one, or named the refusing rule per skill | `INV-SUCCESSION` | references/conversion-taxonomy.md |
 | 16 | the tier canary was attempted twice before any run reported DEGRADED | `INV-CANARY` | references/staging.md |
 | 17 | every deferred row was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
+| 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 
 **Rows 14, 15, and 16 exist because a run reported `0 of 37 converted` as success.** Each closes one
 leg of it: 14 forbids an unmeasured overage (the run compared 37 against nothing and called it a cap
@@ -122,6 +123,7 @@ Run Invariants
   INV-SUCCESSION  declared from skill-builder · 37 eligible · 37 converted · 0 unexplained
   INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped · 4 fixtures swept
   INV-CLOSE       6 candidates · 4 discharged · 2 decided · 0 queued · 0 uncited refusals
+  INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
   …every remaining row, always all of them…
 ```
 
