@@ -2357,7 +2357,7 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # compare it to the table — that is the actual invariant. "Closed" was never about
 # a specific number; it is the rule that no row arrives without its report line.
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-              "fourteen": 14, "fifteen": 15, "sixteen": 16}
+              "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17}
 _inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 # bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
@@ -2486,20 +2486,75 @@ def _pos(hay, needle):
     return i if i >= 0 else 10 ** 9
 
 
-_sweep = _pos(aud, "## Step 6b — The sweep")
+_sweep = _pos(aud, "## Step 6c — The sweep")
 _gate = _pos(aud, "Compute every Run Invariant FIRST")
 _close = _pos(aud, "## Step 7 — Close")
 check(
     "ordering: the invariant gate is positioned before the sweep it guards",
-    _gate < _sweep + len("## Step 6b — The sweep") + 4000 and _gate > _sweep,
-    "the gate must sit inside Step 6b, ahead of the removal table — a substring "
+    _gate < _sweep + len("## Step 6c — The sweep") + 4000 and _gate > _sweep,
+    "the gate must sit inside Step 6c, ahead of the removal table — a substring "
     "test cannot see that the block was moved",
 )
 check(
     "ordering: the sweep is sequenced before close",
     _sweep < _close,
-    "Step 6b must precede Step 7; an audit moved the sweep after close and every "
+    "Step 6c must precede Step 7; an audit moved the sweep after close and every "
     "substring assertion still passed",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Discharge — the drain for rows no command owns.
+#
+# `odyssey-alive` closed a run with six deferred rows of which FOUR were malformed
+# against deferred.md's own legitimacy rule: two named the run's own command
+# (`/workforce sweep`), two named the run's own newly hired org ("dispatching
+# `automation-engineer`"). INV-DEFERRED balanced perfectly across all six, because
+# it audits the ARITHMETIC of a queue and never the LEGITIMACY of a row.
+#
+# Position matters more than presence here. A NOT UPHELD invariant aborts the
+# sweep and discharge is what repairs one, so discharge placed after the sweep is
+# a gate firing strictly after the thing it was meant to stop — the exact defect
+# invariants.md records about its own first version.
+_dsc = read("workforce/references/procedures/discharge.md")
+_discharge = _pos(aud, "## Step 6b — Discharge")
+check(
+    "ordering: discharge is sequenced before the sweep it unblocks",
+    _discharge < _sweep,
+    "Step 6b must precede Step 6c. Discharge repairs the NOT UPHELD rows that abort "
+    "the sweep; placed after it, it repairs a gate that already refused and the run "
+    "ends unfinished one step later than before",
+)
+check(
+    "discharge: a refusal cites a shipped rule at path:line",
+    "cites a shipped rule at `path:line`" in _dsc,
+    "without it a refusal that merely SOUNDS like a rule closes a row. The two "
+    "measured refusals were 'a behavior change beyond what an audit may make "
+    "unasked' (in no shipped file) and a real rule about `audit` cited by a "
+    "command that is not `audit`",
+)
+check(
+    "discharge: a user decision is decided, never queued",
+    "DECIDED" in _dsc
+    and "no longer a queueable category" in _dsc
+    and "user decision" not in dfr.split("Two, and there used to be three")[0].split(
+        "| Legitimate | Example |"
+    )[-1],
+    "deferred.md must not list a user decision as legitimately queueable — the "
+    "queue was where decisions went to not be made",
+)
+check(
+    "discharge: this run's own org is not a discharger either",
+    "never discharged by this run's own ORG" in dfr
+    and "delays **dispatch by name**, not the work" in dfr,
+    "the blocking rule named 'the command that wrote it'; the same run's newly "
+    "hired employees are the same evasion one level down, and two of six measured "
+    "rows read exactly that way",
+)
+check(
+    "discharge: deletes nothing — the sweep stays the only destructive act",
+    "delete anything" in _dsc and "still the only destructive act" in _dsc,
+    "a drain that deletes is a second destructive path with none of the sweep's "
+    "gates, and it would run BEFORE the backup-verified sweep rather than after",
 )
 
 # The labelling pass. A doctrine audit found 96 of 201 claims unenforced and named
@@ -3510,7 +3565,7 @@ check(
 # So the scan is now class-wide: no shipped file pairs a number-word with this
 # population, and invariants.md's declaration line is the single exemption.
 _INV_COUNT_RX = re.compile(
-    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen)\s+"
+    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\s+"
     r"(?:rows?|Run[- ]Invariants?)\b",
     re.I,
 )

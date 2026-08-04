@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -37,9 +37,21 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 
 | Legitimate | Example |
 |---|---|
-| a **user decision** this project has no standing to make | *"`route` is annotated SUPERSEDED — removing a skill you rely on is your call"* |
 | a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
+
+**Two, and there used to be three.** *"A **user decision** this project has no standing to make"* was
+the third, and it is now the `DECIDED` outcome in `procedures/discharge.md` — put to the user as one
+consolidated prompt at the end of the run and acted on, never parked. The standing to make the decision
+was never the problem; **the queue was where decisions went to not be made.** `odyssey-alive` closed
+with two of them — whether a lint backlog is accepted, and whether three added deny rules stay — and
+both are answerable in a sentence by the person who was sitting right there.
+
+**And a row is never discharged by this run's own ORG, either.** The rule above says "the command that
+wrote it"; the same run's newly hired employees are the same evasion one level down. *"Dispatching
+`automation-engineer`"* names work this run could do — the employee's handbook is on disk, and
+`platform.md` fact 3 delays **dispatch by name**, not the work (`procedures/discharge.md` § How the
+work is dispatched). Two of `odyssey-alive`'s six rows read exactly that way.
 
 **And the precondition goes IN the cell.** `audit (re-run after the block is resolved)` is malformed —
 it names the command but not what must change first, so a reader cannot tell whether re-running is
@@ -67,6 +79,7 @@ matters is how many chances to discharge it went by.
 | `hire` | a transaction that failed with ✗ | `hire <role>` |
 | `amend` | `latency: pending-human-key` — suspended awaiting a human | `amend <target> --execute` |
 | `review` | a `NEUTRAL` line owed an eval case (`ablation.md`) | `evals <employee>` |
+| `audit` Step 6b | a row **no other command owns** — work the run left undone | `discharge --execute` |
 
 **Adding a source means adding a row to this table in the same change.** A `queue` instruction with no
 row here points at a queue that will not know what to do with it — which is the state this file was
@@ -99,6 +112,11 @@ deferred canary; `model-map --execute` discharges queued frontmatter rewrites.
 
 The user never has to know which command clears which row. They run the command they were going to run
 and the backlog for it empties as a precondition.
+
+**`discharge` is the drain for rows nobody else owns** (`procedures/discharge.md`). The two halves above
+route a row to *its* command; they say nothing about a row addressed to no command at all, and that is
+where a run's undone work accumulates — it is not queued *to* anything, so no entry-drain ever sees it.
+`audit` runs `discharge` at Step 6b for exactly this population.
 
 **A command NEVER discharges a row belonging to another command**, and this is the boundary that keeps
 the mechanism honest rather than surprising. A `roster` that quietly ran three reviews would be doing

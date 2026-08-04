@@ -1,7 +1,7 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 45 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 49 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
-description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, sweep, backup, restore, rollback, disband, verify, update, version"
+description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
 version: "1.0"
@@ -29,6 +29,7 @@ hooks:
 | `/workforce budget` | Delegation depth, fan-out, and spawn-cap accounting |
 | `/workforce hire [role]` | HR: add an employee and author its handbook |
 | `/workforce review [employee]` | Performance review: cold-read + evals + contract drift |
+| `/workforce discharge [--execute]` | Drain the deferred queue by doing the work — deletes nothing |
 | `/workforce sweep [--execute]` | Complete a deferred deletion — the only destructive act, resumable on its own |
 | `/workforce hooks [--execute]` | Wire, report, or unwire the shipped hooks; `verify` reports dormancy |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
@@ -246,7 +247,7 @@ a FAIL.
 
 High-risk commands default to **display mode** and require `--execute`: `hire`, `promote`,
 `transfer`, `retire`, `handbook`, `org embed`, `ablate`, `reconcile`, `vendor`, `restore`,
-`disband`, `rollback`. Low-risk and read-only commands run immediately: `roster`, `budget`,
+`disband`, `rollback`, `discharge`. Low-risk and read-only commands run immediately: `roster`, `budget`,
 `org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`.
 
 `audit` is the exception: running the command is the consent (`references/audit-setup.md`), and it

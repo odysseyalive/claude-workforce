@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,12 +39,16 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Sixteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Seventeen, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
 sixteen later the same day — rows 14, 15, and 16 landed together because they are one defect seen from
-three sides: a run that stops early and reports it as a plan. "Closed" means
+three sides: a run that stops early and reports it as a plan. **Row 17 is the fourth side of the same
+defect, and the one that survived all three**: a run that reaches the end, does every step, and hands
+the remainder to a queue. `INV-DEFERRED` (row 12) already counted that queue and balanced — it audits
+the arithmetic and never the legitimacy, so six rows of which four were malformed passed it cleanly.
+Counting a backlog correctly is not the same as being allowed to have one. "Closed" means
 **no row is added without its report line**, never that the set is finished — a list that cannot grow
 stops describing the runs it governs, and the rule that matters is the pairing, not the count. Rows
 11, 12, and 13 were each added with their line, their owner, and their `bin/check` assertion in one
@@ -68,6 +72,7 @@ change.)*
 | 14 | the conversion batch printed its arithmetic — cap, spent, headroom, cost — and ran in this run | `INV-BATCH` | references/conversion-taxonomy.md |
 | 15 | declared succession with eligible skills converted at least one, or named the refusing rule per skill | `INV-SUCCESSION` | references/conversion-taxonomy.md |
 | 16 | the tier canary was attempted twice before any run reported DEGRADED | `INV-CANARY` | references/staging.md |
+| 17 | every deferred row was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
 
 **Rows 14, 15, and 16 exist because a run reported `0 of 37 converted` as success.** Each closes one
 leg of it: 14 forbids an unmeasured overage (the run compared 37 against nothing and called it a cap
@@ -97,7 +102,7 @@ the gate unfireable.
 
 | | |
 |---|---|
-| **computed and gated** | as a precondition of the destructive step (`references/procedures/audit.md` § Step 6b) |
+| **computed and gated** | as a precondition of the destructive step (`references/procedures/audit.md` § Step 6c) |
 | **printed** | in the closing report, before the findings (§ Step 7) |
 
 **This was wrong in the first version of this file, in the exact shape the project keeps recording.**
@@ -116,6 +121,7 @@ Run Invariants
   INV-BATCH       cap 200 · spent 20 · headroom 180 · batch 37 · RUNS THIS RUN
   INV-SUCCESSION  declared from skill-builder · 37 eligible · 37 converted · 0 unexplained
   INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped · 4 fixtures swept
+  INV-CLOSE       6 candidates · 4 discharged · 2 decided · 0 queued · 0 uncited refusals
   …every remaining row, always all of them…
 ```
 

@@ -31,6 +31,7 @@ INV = "workforce/references/invariants.md"
 AUD2 = "workforce/references/procedures/audit.md"
 MAN = "manifest.txt"
 STG2 = "workforce/references/staging.md"
+DSC = "workforce/references/procedures/discharge.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -118,6 +119,17 @@ CASES = [
      CT, "del", "MUST BE A MEASURED NUMBER THIS RUN PRINTED"),
     ("invariants: NOT UPHELD is repaired in the run, never a legitimate exit",
      INV, "del", "NEVER A LEGITIMATE EXIT"),
+    # ── discharge: the drain for rows no command owns ────────────────────────
+    ("ordering: discharge is sequenced before the sweep it unblocks",
+     AUD, "del", "## Step 6b — Discharge"),
+    ("discharge: a refusal cites a shipped rule at path:line",
+     DSC, "del", "cites a shipped rule at `path:line`"),
+    ("discharge: a user decision is decided, never queued",
+     DSC, "del", "no longer a queueable category"),
+    ("discharge: this run's own org is not a discharger either",
+     DFR, "del", "never discharged by this run's own ORG"),
+    ("discharge: deletes nothing — the sweep stays the only destructive act",
+     DSC, "del", "still the only destructive act"),
     ("canary: the fixtures ship with the install, so a first run can measure",
      STG2, "del", "THE INSTALLER SHIPS THEM"),
     ("install: both installers place canary files in the agents dir, not the skill",

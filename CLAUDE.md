@@ -275,6 +275,48 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-04
 
+**Closed 2026-08-04 (latest) — the run finished, and handed the remainder to a queue. `/workforce
+discharge`.** The `odyssey-alive` audit completed every step: 9 employees registered, 9 cold reads PASS,
+canary PASS on the first attempt from shipped fixtures. It then closed with **six deferred rows, four of
+them malformed against `deferred.md`'s own blocking rule** — two discharged by `/workforce sweep` (this
+run's own command), two by *"dispatching `automation-engineer`"* (an employee this run hired minutes
+earlier). **The user asked for all of them directly and they were done with no issue**, which is what
+makes every one of those refusals *invented at close* rather than derived.
+
+**`INV-DEFERRED` passed on all six and was right to.** It counts carried / discharged / added / aged —
+**the arithmetic of a queue, never the legitimacy of a row.** Four malformed rows move none of those
+four numbers. This is the fourth side of the "a run that stops early" defect and the one that survived
+rows 14, 15, and 16: *counting a backlog correctly is not the same as being allowed to have one.*
+
+Two things the run got wrong that are worth keeping separate:
+
+| | |
+|---|---|
+| a refusal that **cites nothing** | *"a behavior change beyond what an audit may make unasked"* is in no shipped file, and `audit` auto-executes — running it **is** the consent. The companion refusal cited a real rule about `audit`, from a step that is not `audit` |
+| **dispatch confused with work** | fact 3 delays resolving an employee **by name**; its handbook is on disk immediately. Two rows read the delay as the work being impossible, with all but eight of the spawn budget unspent |
+
+`discharge` is its own command, not part of the sweep — rows 1 and 2 were *blocked by* the sweep while
+also being the work that unblocks it. It runs at **Step 6b, before** the sweep (renumbered 6c), because
+a `NOT UPHELD` row aborts the sweep and discharge is what repairs one; the first draft placed it at
+Step 7a and **reproduced `invariants.md`'s own recorded defect** — a gate firing strictly after the thing
+it was meant to stop. `bin/check`'s ordering assertion is position-aware for exactly that reason.
+
+Three outcomes and no fourth: **DISCHARGED** (the default), **DECIDED** (a preference, put to the user
+once and acted on — *"a user decision"* is **no longer a queueable category**, because the queue was
+where decisions went to not be made), **QUEUED** (another repository, or a measured host limit). Row 17
+`INV-CLOSE`; five assertions, each proven by breaking; record in
+`plan/mock-audit-odyssey-alive-2026-08-04c.md`.
+
+*Also settled, because it looked like this and was not:* **the sweep deleted nothing because nothing was
+marked.** Its input set is exactly the T7-marked skills, and `INV-SUCCESSION 38 eligible · 0 converted`
+means zero transactions ran. Not the registration delay — **T6 registration-verify is a file read, not a
+spawn.** The two get conflated because both say "registered."
+
+**Still open from this:** no `discharge --execute` has ever run — the classification is exercised, the
+work is not. The `DECIDED` prompt has no implementation walked against a host. The mock audit was
+**author-run, not cold-read**, so the absences are untested. And the 38 unconverted skills are the run's
+own shortfall, which discharge does not fix and must not claim to.
+
 **Closed 2026-08-04 (late) — the "a run finishes" patch WAS exercised end to end, and it failed on a
 third axis.** The real `odyssey-alive` run converted **0 of 40 eligible**, printed `INV-BATCH … DID NOT
 RUN` beside `cap 200 · spent 8 · headroom 192`, and told the user to start a new session. Its own

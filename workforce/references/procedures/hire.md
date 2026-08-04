@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -166,7 +166,7 @@ is indistinguishable from a conversion whose T7 was skipped — which is the one
 refuses. `T2 N/A (hire)` and `T7 N/A (hire)` cost two lines and remove the ambiguity.
 
 **The mark IS the COMMITTED T7 journal row.** It is not an annotation in the skill, not a sidecar, and
-not run-local state — `audit.md` § Step 6b enumerates the sweep's input set from those rows, and
+not run-local state — `audit.md` § Step 6c enumerates the sweep's input set from those rows, and
 `disband` reverses from the same place. An audit found the mark's representation specified nowhere in
 the distribution while five files used it; the journal was the only candidate any consumer read, so it
 is now the definition rather than the inference. The exemplar's `action` for a T7 row is `mark`, never
@@ -194,7 +194,7 @@ preserves instead is the only content the deletion could destroy — every
   the run as the single-file undo. **The `prior-sha` cell holds the 64-character digest and nothing
   else** — never `see .orig`, never `per-file`, never a description of where the value lives. A
   pointer cannot be compared against anything, and a cell that reads like a record while holding no
-  value is what let a COMMITTED T7 row ship with no `.orig` behind it (`audit.md` Step 6b
+  value is what let a COMMITTED T7 row ship with no `.orig` behind it (`audit.md` Step 6c
   precondition 4, corrected 2026-08-03). `wf-conform` fails any T7 row whose `prior-sha` is not a sha.
 - **T2 is asserted, not assumed.** The extracted immutable spans are read back and compared byte-exact
   against the source before T4, and the count is journalled. **A skill whose extraction is short by even

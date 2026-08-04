@@ -1,6 +1,6 @@
 # budget — depth, fan-out, and spawn accounting
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Read-only; executes immediately. `/workforce budget`
 
 Arithmetic and caps: `references/delegation-budget.md`. Cap values: `platform.md` — **never restated

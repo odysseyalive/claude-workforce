@@ -1,7 +1,8 @@
 # sweep — complete a deferred deletion, and nothing else
 
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive.** Display by default; `--execute` writes. **Never auto-fired**, and never reached from
-`audit` — `audit` runs its own Step 6b inline.
+`audit` — `audit` runs its own Step 6c inline.
 
 `/workforce sweep [--execute]`
 
@@ -11,7 +12,7 @@
 
 **The sweep is the only step that deletes, and it was the only step with no way to reach it twice.**
 
-`audit` § Step 6b is correctly gated: every Run Invariant computed first, `INV-VERIFY` asserting the
+`audit` § Step 6c is correctly gated: every Run Invariant computed first, `INV-VERIFY` asserting the
 org verified, four preconditions, a verified backup. When any of them refuses — and refusing is the
 gate working — the deletion is deferred. Until 2026-08-03 the only way to discharge that deferral was
 `/workforce audit`, a full seven-step re-run.

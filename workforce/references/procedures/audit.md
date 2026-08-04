@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 51 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 32 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -678,7 +678,11 @@ defers a run.*
 
 Order: **conversions → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → the Constitution Gate → model rewrite → `org index` → `org embed` →
-`wf-claude-md` → `checksums` → `verify` → the sweep.**
+`wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.**
+
+**Discharge sits between `verify` and the sweep** because it is the last step that may still change the
+tree, and the sweep is the first that cannot be undone. A queue drained after the deletion is a queue
+drained too late; a queue drained before `verify` is one whose repairs nothing re-checked.
 
 **The canary re-attempt sits third for a reason**: it may restamp every handbook's `Tier ceiling:` line,
 and that must land *before* `org index`, `org embed`, `wf-claude-md`, and `checksums` read or hash them.
@@ -796,7 +800,28 @@ what a second attempt would have closed here. The record of that decision is dir
 and the answer was to queue the rows more carefully rather than to attempt the measurement again.**
 Rows 1, 2, and 3 of `odyssey-alive`'s `deferred.md` are all this one gap.*
 
-## Step 6b — The sweep (the only step that deletes)
+## Step 6b — Discharge the queue (before the sweep, because it is what unblocks it)
+
+**Run `/workforce discharge --execute` (`references/procedures/discharge.md`) against the queue this
+run is about to close with.** Every OPEN row is classified into exactly three outcomes — DISCHARGED,
+DECIDED, or QUEUED — and a refusal that cites no shipped rule at `path:line` is not a refusal.
+
+**It runs HERE, not at close, and the placement is the whole mechanism.** A `NOT UPHELD` invariant
+aborts the sweep, and discharge is what repairs one. Placed after Step 6c it would be repairing a gate
+that had already refused, which is the defect `references/invariants.md` records about itself — *"the
+block was specified to print at close, the only deletion happens before close,"* a gate firing strictly
+after the thing it was meant to stop. Same shape, one step later.
+
+This is the existing split, applied to findings rather than counts: **computed and acted on before the
+sweep, printed at close.** Step 7 prints the drained queue; it does not decide it.
+
+**Findings Step 7 would otherwise compute at print time are computed here instead** — the `STALE`
+`CLAUDE.md` class, the permission deltas, the hook census. They are findings about a tree that this
+step can still change, and a finding first computed inside the report is one nothing can act on.
+
+**Under `--review`: classify and print, discharge nothing.** The run changed nothing to drain.
+
+## Step 6c — The sweep (the only step that deletes)
 
 **A deferred sweep is completed by `/workforce sweep`, not by re-running this command.** When a
 precondition here refuses — and refusing is the gate working — everything above it succeeded and must
@@ -1001,8 +1026,15 @@ same step that prints it.
 **BLOCKING — a row is queued only for work this run genuinely could not do.** Before writing any row,
 answer: *what discharges it?* If the answer names **this same command in a later session**, it is not a
 deferral — it is a run that stopped, and the work belongs in the run
-(`conversion-taxonomy.md` § What succession does not do). Legitimate rows name something else entirely:
-a **user decision** this project has no standing to make, or a fix **in another repository**.
+(`conversion-taxonomy.md` § What succession does not do). **It is also not a deferral if the answer names
+this run's own newly hired employees** — their handbooks are on disk, and fact 3 delays dispatch by name
+rather than the work.
+
+**By the time this step runs, Step 6b has already classified every row and drained what it could**, so
+the rows printed here are the residue: a fix in another repository, or a measured host limit with its
+attempt count. Two categories, and `deferred.md` owns the list — it is not restated here.
+**Print `INV-CLOSE`** with the rest of the invariant block; a queue with no classification line is
+indistinguishable from a queue nobody classified.
 
 **The three canary rows are conditional on Step 6a, and on a passing re-attempt there are none:**
 

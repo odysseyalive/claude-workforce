@@ -1,6 +1,6 @@
 # defect — a question is a bug report against the text
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **File a `DEF` when an employee could not answer a question against its own handbook.**
 
 `/workforce defect [target]` — low risk, executes immediately (it writes a record, not a handbook).

@@ -1,5 +1,6 @@
 # CLAUDE.md — the one context cost the org cannot control
 
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **`platform.md` fact 6: CLAUDE.md is injected into every non-fork subagent with no per-agent opt-out.**
 Its length is multiplied by fan-out. Measured on a real org, 2026-08-03:
 
