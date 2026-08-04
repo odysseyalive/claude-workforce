@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -210,6 +210,7 @@ source that does not exist, and the honest failure is that they invent one.
 | **T6b / T7** retire the skill | required, copy-then-mark | **N/A** — nothing to retire. **T8 follows T6 directly** |
 | **T7b** reduce + verify manifest | blocking, `A == B` | **N/A** — no source to reduce. The split still applies, at authoring time: § Step 3 |
 | **T7c** mark for the sweep | only on an empty remainder | **N/A** — nothing to mark |
+| **T4 / T5 / T6 / T8** journal, register, verify, commit | required | **required — identical.** A hire that writes no journal row cannot be disbanded |
 
 *T7b and T7c were added to the order on 2026-08-04 and were missing from this table for the rest of
 that day. The rule directly above — print the N/A rows rather than omitting them — is what would have
@@ -268,7 +269,17 @@ preserves instead is the only content the deletion could destroy — every
 ### The journal
 
 `.claude/workforce/.conversion-journal.md`, append-only, written **before each mutation that leaves the
-staging area** — T5 and T7. T1–T3 write only into `.claude/workforce/staging/` and
+staging area** — T5 and T7.
+
+**BLOCKING — a HIRE writes T5 and T8 rows exactly as a conversion does.** T2, T7, T7b and T7c are the
+only N/A steps (§ On a HIRE); T4, T5, T6 and T8 are required on every path. **The `skill` column reads
+`(hire)`** where there is no source skill — it is the row's *source*, not a claim that one existed.
+
+*Measured 2026-08-04 on the first real target: nine employees live in `.claude/agents/` and
+**`.conversion-journal.md` does not exist at all.** The row shape is keyed by `skill`, so a greenfield
+hire had nothing to key on and wrote nothing. **`disband` step 3 iterates COMMITTED T5 rows — with no
+rows it removes no employees**, so the run was advertised as reversible and was not. Third instance in
+one day of the creation path skipping what the conversion path does (`SKILL.md` Core Principle 7c).* T1–T3 write only into `.claude/workforce/staging/` and
 `.claude/workforce/directives/`, both of which `rollback` removes wholesale rather than replaying.
 
 An earlier form said "before each mutation" while the first row landed at T4, which was false on its own
@@ -281,6 +292,7 @@ backup: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UN
 | seq | skill | step | path | action | prior-sha | status |
 |-----|-------|------|------|--------|-----------|--------|
 | 001 | copy-truth | T5 | .claude/agents/content-copy-truth.md | create | (absent) | COMMITTED |
+| 00x | (hire)     | T5 | .claude/agents/ops-lead.md | create | (absent) | COMMITTED |
 | 002 | copy-truth | T7 | .claude/skills/copy-truth/SKILL.md | mark | a3f1… | COMMITTED |
 | 003 | analytics  | T5 | .claude/agents/data-analytics.md | create | (absent) | WRITE-INTENT |
 ```

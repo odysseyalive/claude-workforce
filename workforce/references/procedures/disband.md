@@ -1,6 +1,6 @@
 # disband — de-convert the project, keep its history
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive.** Display by default; `--execute` plus explicit confirmation. **Never auto-fired.**
 
 `/workforce disband --execute`
@@ -55,6 +55,16 @@ change reversed silently is indistinguishable from one that never happened.
 **6. Remove the Constitution Gate** from `CLAUDE.md`, between its markers only. Nothing else in that
 file is workforce's.
 
+**6b. Remove what this project's run CREATED, not only what it demoted.** Steps 2 and 3 reverse
+*conversions*; a run also **creates** artifacts that existed nowhere before — data skills authored at
+`hire.md` Step 3b, and companion skills installed at `audit-setup.md` § Step 0.3. Each is removed only
+when the journal or `.settings-owned.json` records workforce as its creator **and** its bytes still hash
+to what workforce wrote. Anything hand-edited is reported and left, exactly as a handbook is.
+
+*Added 2026-08-04. Step 2 restores demoted skills and nothing enumerated created ones, so a data skill a
+run authored survived every disband — residue by the definition of the standing directive, in the
+command whose whole job is leaving none.*
+
 **7. Preserve `.claude/workforce/`.** Move it to `.claude/workforce.disbanded-<date>/` and say so.
 
 **Disbanding a company does not burn its filing cabinet.** Personnel records, amendment history, and
@@ -70,6 +80,22 @@ went.
 **Restore skills before removing employees.** Between step 2 and step 3 both paths are live —
 degraded, and safe. The reverse order opens a window where the capability is reachable by neither,
 which is the state the whole conversion discipline exists to prevent.
+
+## What disband cannot reverse without a record
+
+**Every step above is driven by the journal or the settings sidecar. Where the record is absent, the
+step is a no-op — and it must SAY SO rather than report success.**
+
+**BLOCKING — before doing anything, compare COMMITTED T5 rows against `.claude/agents/` on disk.** If
+there are employees the journal does not name, print the count and the names, and state plainly that
+disband will not remove them. Then name `restore` and the backup path, which is the reversal that does
+not depend on a record this run may never have written.
+
+*Measured 2026-08-04 on the first real target: nine employees live and **no journal file at all** —
+zero conversions ran, and the hire path had never written a row because the row shape was keyed by a
+source skill a hire does not have. Step 3 would have iterated an empty set and reported a clean
+disband. **A reversal that silently reverses nothing is worse than one that refuses**, because the user
+proceeds believing the tree is clean.*
 
 ## What disband never does
 

@@ -2581,6 +2581,42 @@ _hbk = read("workforce/references/procedures/handbook.md")
 # could not render as specified — and the advisor was never a lane, has no effort
 # object, and never will. Noticed by a user reading the two questions side by side.
 _cfg2 = read("workforce/references/org-config.template.md")
+# Nine employees live on the first real target and NO journal file existed. The
+# row shape is keyed by `skill`, so a greenfield hire had nothing to key on and
+# wrote nothing; disband step 3 iterates COMMITTED T5 rows and would have removed
+# nothing while reporting a clean run. The closing report had told the user
+# `/workforce disband` reverses it — the claim shipped, the mechanism did not.
+_dsb2 = read("workforce/references/procedures/disband.md")
+check(
+    "journal: a hire writes T5/T8 rows exactly as a conversion does",
+    "a HIRE writes T5 and T8 rows exactly as a conversion does" in _hire2
+    and "`(hire)`" in _hire2,
+    "the row is keyed by `skill`; without an explicit source value a greenfield "
+    "hire writes nothing, and every journal-driven reversal silently covers none "
+    "of the employees the run created",
+)
+check(
+    "disband: refuses to report a clean reversal it cannot perform",
+    "compare COMMITTED T5 rows against" in _dsb2
+    and "will not remove them" in _dsb2,
+    "with no journal every step is a no-op; a reversal that silently reverses "
+    "nothing is worse than one that refuses, because the user proceeds believing "
+    "the tree is clean",
+)
+check(
+    "disband: removes what a run CREATED, not only what it demoted",
+    "CREATED, not only what it demoted" in _dsb2,
+    "a data skill authored by `hire` Step 3b survived every disband — residue, in "
+    "the command whose whole job is leaving none",
+)
+check(
+    "verify: reports whether the org is actually disbandable, and names the route",
+    "Reversibility" in vfy
+    and "roster N · journalled M · unjournalled K" in vfy
+    and "reversal that does not depend on this record" in vfy,
+    "the journal's absence is silent; and a user told only that reversal is broken "
+    "has been given a problem rather than a route",
+)
 check(
     "budget: the category set is canonical, stated once, and owned by org-config",
     "THE CANONICAL BUDGET CATEGORIES, stated once and owned here" in _cfg2

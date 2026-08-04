@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 30 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -217,6 +217,30 @@ constraint here" rather than as a gap.
 | Every section `references/data-skills.md` § Required sections lists is present, in that order | a dataset whose degradation contract, git policy, or maintainer list was never written — a reader finds no rule and infers there is none |
 | Every data skill is named as a dependency by at least one handbook | an orphan (`references/data-skills.md` § Every data skill is reachable from a handbook) — either dead, or never ours to write |
 | Every invariant classed `mechanical` has a maintainer, and every maintainer row records a negative-test result | an invariant demoted to prose, and a validator nobody ever saw reject anything — indistinguishable from `exit 0` |
+
+## Reversibility — is this org actually disbandable?
+
+**One question: could `disband` undo what is on disk right now?** Its answer is entirely the conversion
+journal, and the journal's absence is silent in the worst way — `disband` iterates an empty set, removes
+nothing, and reports a clean run.
+
+| Check | Catches |
+|---|---|
+| `.claude/workforce/.conversion-journal.md` exists | **no record at all.** Every journal-driven step becomes a no-op that reports success |
+| Every `.claude/agents/*.md` workforce wrote has a `COMMITTED` T5 row | **an employee disband cannot remove.** Report the count and each name |
+| Every `COMMITTED` T5 row resolves to a file on disk | a row for a handbook someone deleted by hand — `disband` will report a miss it cannot explain |
+| Every `COMMITTED` T7 row has its `.orig` on disk, hash-matched | a demoted skill with no undo, which is the one file the sweep is allowed to delete |
+
+**Print `roster N · journalled M · unjournalled K`, always, including at zero.** `K > 0` is the finding,
+and it is stated as *"`disband` will not remove K of N employees; `restore` from `<backup>` is the
+reversal that does not depend on this record."* **Naming the alternative is part of the finding** — a
+user told only that reversal is broken has been given a problem, not a route.
+
+*Measured 2026-08-04 on the first real target: **nine employees live, journal file absent entirely.**
+Zero conversions ran, and the hire path had never written a row because the row shape was keyed by a
+source skill a hire does not have (`hire.md` § The journal). Nothing anywhere reported it, and the run
+had closed by telling the user `/workforce disband` reverses it. **The claim was in the closing report;
+the mechanism was not on disk.**
 
 ## Mechanism-layer conformance
 
