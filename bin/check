@@ -2847,6 +2847,40 @@ check(
     "re-select their own default from the four options offered",
 )
 
+# The pool is ordered by cost so a user can price a choice at a glance, and the
+# HOST convention is the opposite: promote a recommended option to the top. That
+# convention silently reorders a list shared by five objects, so both files must
+# carry the override. Written 2026-08-03 by user correction after a Notes-column
+# edit re-annotated which model reads as recommended — "you were not suppose to
+# reorder the choices either."
+check(
+    "org-config: a recommendation is a label, never a list position",
+    "never a position" in _tpl_cfg,
+    "org-config.template.md no longer states that a recommendation is a label rather "
+    "than a position — without it the host convention applies and the cost ordering "
+    "is lost for every budget object",
+)
+check(
+    "audit-setup: the model budget never reorders to surface a recommendation",
+    "a recommendation never changes it" in _asu,
+    "audit-setup.md Step 0.4a no longer forbids promoting the recommended static to "
+    "first position; the cost ranking is the only thing that orders that list",
+)
+_lane_recs = dict(
+    (m.group(2).lower(), m.group(1))
+    for m in re.finditer(
+        r"`(claude-[\w.-]+)`[^|]*\|[^|]*\|[^|]*Recommended for (\w+)", _tpl_cfg
+    )
+)
+check(
+    "org-config: each lane recommendation names a model from the statics pool",
+    set(_lane_recs) == {"analytical", "creative", "code"}
+    and set(_lane_recs.values()) <= _pool,
+    f"lane recommendations are {_lane_recs} against pool {sorted(_pool)} — every "
+    "employee-bearing lane needs exactly one recommendation and it must be an ID the "
+    "question actually offers (the advisor object carries none by design)",
+)
+
 # Two shipped agents sharing a name resolve silently by filesystem order. The
 # file that exists to prevent this had zero assertions.
 _agent_names = {}

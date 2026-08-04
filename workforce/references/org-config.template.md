@@ -23,12 +23,26 @@ go stale between releases, and there is no discovery ladder.
 | # | Model ID | Context | Notes |
 |---|---|---|---|
 | 1 | `claude-fable-5` | 1M | most capable; priced above the Opus tier |
-| 2 | `claude-opus-5` | 1M | the current Opus; default for delegating tiers |
-| 3 | `claude-opus-4-8` | 1M | |
-| 4 | `claude-opus-4-6` | 1M | previous Opus; the usual creative alternate |
+| 2 | `claude-opus-5` | 1M | the current Opus. **Recommended for code** |
+| 3 | `claude-opus-4-8` | 1M | **Recommended for analytical** — supplies both the Lead and IC rows |
+| 4 | `claude-opus-4-6` | 1M | previous Opus. **Recommended for creative** |
 
-**Presented in this order, every time.** The "Other" field accepts any model ID typed by hand.
-On the advisor object, "Other" is where the user types "No Advisor" to decline one.
+**Ordered by cost, most expensive first, and presented in that order every time.** The "Other" field
+accepts any model ID typed by hand. On the advisor object, "Other" is where the user types "No Advisor"
+to decline one.
+
+**A recommendation is a label, never a position.** Mark the recommended model where the cost order
+already puts it; it is never promoted to the top of the list. This deliberately overrides the host
+convention that a recommended option leads the list, because here the order carries information of its
+own: a reader pricing a choice needs the list ranked by cost and by nothing else. Promoting one option
+to surface it destroys that ranking for every object that shares the pool — and the pool is shared by
+all five.
+
+*Which model is recommended for which lane is the user's stated preference, recorded 2026-08-03, and is
+NOT a measured result — nothing in this project benchmarks a model. As stated: `claude-opus-5` is the
+strongest at programming and is not the strongest elsewhere, `claude-opus-4-8` is the better analytical
+model, and `claude-opus-4-6` stays the creative pick. Edit the Notes column when that changes; the
+budget question reads these cells and has no other source.*
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 

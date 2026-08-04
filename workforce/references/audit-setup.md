@@ -314,6 +314,15 @@ Each object offers the four statics from `org-config.template.md` § Model stati
 there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
 runs on whatever model the user chose for their Claude Code session.
 
+**That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
+whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
+pick, creative takes creative, code takes code — and leave it sitting where the cost ranking put it.
+**Never promote it to the first position.** The host convention is that a recommended option leads the
+list; that convention is wrong here and is overridden on purpose, because the list is ranked by price and
+the ranking is what lets a user read the cost of a choice at a glance. The advisor object carries no
+recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
+model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
+
 The advisor object is pre-selected from the current `advisorModel` in project settings (read in Step
 0.3). Choosing a model writes `advisorModel`; "No Advisor" removes the setting. It runs only in the
 main session and does not compound with spawned employees, **which is why it has no effort object** —
