@@ -74,6 +74,11 @@ CASES = [
      CFM, "del", 'not r.get("advisory")'),
     ("verification.md states that only a falsified check is a check",
      VER, "del", "Three states, and only the third is a check"),
+    # Deleting the resolve-only block promotes the --agent --run --prove block to
+    # first, which is exactly the shape that shipped by mistake. An `append` case
+    # would NOT fire: the assertion reads the FIRST block and appending adds a last.
+    ("verify.md's own wf-checkrun invocation is resolve-only",
+     VFY, "del", '```bash\n"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"\n```'),
     ("verify.md no longer calls the real-or-decoration question uncheckable",
      VFY, "append", "\nwhether a `## Verification` check is *real* or decoration\n"),
     ("the IC template ships the declared runnable form",

@@ -5439,6 +5439,20 @@ check(
     "handbooks; stating it here is what makes the wf-checkrun row doctrine rather "
     "than a script's opinion",
 )
+# verify is READ-ONLY (SKILL.md § Display vs. Execute). `--run`/`--prove` execute
+# shell drawn from handbooks, so the invocation verify.md hands a reader must not
+# carry them. Shipped wrong on the first pass: a caveat UNDER the command block
+# does not gate the command block.
+_vfy_block = re.search(r"```bash\n([^`]*?wf-checkrun[^`]*?)```", vfy, re.S)
+check(
+    "verify.md's own wf-checkrun invocation is resolve-only",
+    _vfy_block is not None
+    and "--run" not in _vfy_block.group(1)
+    and "--prove" not in _vfy_block.group(1),
+    "the FIRST wf-checkrun block in verify.md carries --run or --prove — verify is "
+    "classified read-only and those flags execute handbook-supplied shell across "
+    "the whole org, unattended and outside any work order",
+)
 check(
     "verify.md no longer calls the real-or-decoration question uncheckable",
     "whether a `## Verification` check is *real* or decoration" not in vfy

@@ -183,9 +183,26 @@ digests.
 **Then run `wf-checkrun`, which stats and executes what `wf-conform` can only read.**
 
 ```bash
-"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"            # resolve only
-"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}" --run --prove
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"
 ```
+
+**That is the whole of what `verify` runs, and `--run` / `--prove` are NEVER added to it.** `verify`
+is a read-only command (`SKILL.md` § Display vs. Execute) and those flags **execute shell drawn from
+handbooks** — one employee's check is one thing, but sweeping every check in the org, unattended and
+outside any work order, is a different act with a different blast radius. Resolution answers the
+question this command owns: *is the named check even there?*
+
+**Falsifying them is a separate, explicit gesture**, and it belongs to whoever is amending a handbook:
+
+```bash
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}" --agent <name> --run --prove
+```
+
+*Added 2026-08-04, immediately after this section shipped with both invocations in one block. The
+prose already said "the bare pass runs nothing — `--run` is the gesture", and the code block handed a
+reader both lines anyway. **A caveat under a command block does not gate the command block.** That is
+this project's own dominant failure — correct doctrine with nothing making it true — reproduced by
+the change that added a gate to `## Verification`.*
 
 Three states, and **only the third is a check** (`references/verification.md` § Three states):
 

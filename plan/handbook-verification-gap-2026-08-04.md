@@ -36,7 +36,7 @@ verified. A cold reader found it; nothing mechanical could.
 | `wf-conform` | "not empty" now joined by "names at least one literal invocation", plus an **advisory** channel — a new `Result.advise` that reports without setting the exit code |
 | `verification.md` | § Three states, and only the third is a check |
 | `handbook-templates.md` | the IC template ships the `Check:`/`Negative:` pair — the cheapest place to answer it, which is that file's own recorded lesson |
-| `verify.md` | the "deliberately does not cover" list corrected, with the retraction stated rather than silently edited |
+| `verify.md` | the "deliberately does not cover" list corrected, with the retraction stated rather than silently edited. **`verify` runs `wf-checkrun` resolve-only**; falsification is a separate gesture scoped to one employee (see § The fifth defect) |
 
 **Grandfathering is deliberate.** A handbook with no `Check:` line is `undeclared`: reported, fix
 named, **exit code untouched**. Failing all 13 governed handbooks at once reproduces the run that
@@ -73,6 +73,47 @@ fixture.
 4. **`0 VACUOUS` beside `0 ran` read as clean.** It means *nothing executed*. `INV-BATCH` one level
    down: a cost of zero is evidence the batch did not run, never evidence it was cheap. The summary
    now says `NOTHING RAN` and why.
+
+## The fifth defect — found by a question, after it shipped, and the worst of them
+
+**The four above were found by running the thing. This one was found by the user asking
+"it won't run like that live, right?" — after the change was committed to `main`.**
+
+As shipped, the new § in `verify.md` handed a reader one code block containing *both* invocations:
+
+```bash
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"            # resolve only
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}" --run --prove
+```
+
+`verify` is classified **read-only, runs immediately** (`SKILL.md` § Display vs. Execute — no
+`--execute` required). So a host following that procedure would sweep **every governed handbook in
+the org, executing shell drawn from those handbooks**, unattended and outside any work order. One
+employee running its own check is the design; N handbooks' commands run in a batch by a read-only
+command is a different act with a different blast radius.
+
+**The prose directly beneath already said the right thing** — *"The bare pass runs nothing —
+display-vs-execute, and `--run` is the gesture"* — **and it did nothing.** A caveat under a command
+block does not gate the command block.
+
+That is this project's dominant failure mode, reproduced *by the change that added a gate to
+`## Verification`*. Writing correct doctrine feels like completing the work; it is complete as
+doctrine, which is exactly why re-reading never finds the gap. `bin/check` had 711 green assertions
+and none of them read what the procedure told a host to run.
+
+**Fixed:** `verify` resolves and nothing more; falsification is `--agent <name> --run --prove`, an
+explicit gesture belonging to whoever is amending that handbook. Assertion reads the FIRST
+`wf-checkrun` block in `verify.md` and fails if it carries either flag.
+
+*The proof case needed the same care the defect did.* An `append` mutation reports PROVEN while
+testing nothing — the assertion reads the first block and appending adds a last. The case deletes the
+resolve-only block, promoting the `--run` block to first, which reproduces the exact shipped shape.
+
+**What this says about the loop.** `bin/check`, `bin/prove`, `bin/script-conformance`,
+`bin/idempotence` and a mock audit against a real tree all passed on a procedure that told a host to
+execute arbitrary handbook shell under a read-only command. Every instrument here measures the
+scripts and the text; **none of them reads a procedure the way the model executing it will.** That
+gap is not closed by this patch.
 
 ## The bug in `wf-conform` this exposed
 

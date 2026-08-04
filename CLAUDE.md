@@ -314,6 +314,21 @@ went 13 → 15.
 12 assertions, **each proven by breaking it**; 8 script fixtures; 5/5 writers idempotent. Record in
 `plan/handbook-verification-gap-2026-08-04.md`.
 
+**A fifth defect shipped, and the user found it by asking a question.** *"It won't run like that
+live, right?"* — after the change was on `main`. The new § handed a reader **one code block with both
+invocations**, so a host following it would have swept every governed handbook **executing shell
+drawn from those handbooks**, under a command `SKILL.md` classifies read-only with no `--execute`.
+The prose beneath already said *"the bare pass runs nothing — `--run` is the gesture"* and **it did
+nothing: a caveat under a command block does not gate the command block.** The dominant failure mode
+of this project, reproduced by the change that added a gate to `## Verification`. `verify` now
+resolves only; falsification is `--agent <name> --run --prove`.
+
+**What it says about the loop, and this is the part worth keeping.** `bin/check` (711), `bin/prove`
+(90/90), `bin/script-conformance` (55), `bin/idempotence` (5/5) and a mock audit against a real tree
+**all passed on a procedure that told a host to execute arbitrary handbook shell under a read-only
+command.** Every instrument here measures the scripts and the text; **none reads a procedure the way
+the model executing it will.** Unclosed.
+
 *Still open from this:* **no handbook anywhere declares a `Check:` line yet**, so `--run` and
 `--prove` are exercised only by fixtures — the resolve layer works on the real population today and
 the run layer waits on migration. Author-run, not cold-read.
