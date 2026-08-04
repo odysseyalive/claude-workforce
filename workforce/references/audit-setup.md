@@ -372,6 +372,19 @@ marker may change a default; it may never drop a question.
 
 The run prints **`INV-BUDGET`** — questions rendered against questions owed (`references/invariants.md`).
 
+**`INV-BUDGET` fails in BOTH directions, and it used to fail in only one.** It read "every budget
+question rendered," which catches a *missing* question and is blind to an *extra* one — so the budget was
+a ceiling with a floor-only invariant. A run that renders five questions is as much a violation as one
+that renders three, and it is the more likely error: every added question feels locally justified.
+Print `rendered N of 4 owed`, and **N greater than 4 is UPHELD=false**, naming the surplus question
+verbatim.
+
+*Added 2026-08-04, after a run asked a fifth question — "Are you migrating off claude-enforcer, or
+running both systems?" — and held the org build on the answer. Three rules already forbade it: this
+ceiling, the § below that says this gate does not ask, and the user directive in `SKILL.md` that
+succession is not optional. None of the three was checkable, so all three were violated at once by a
+question that reads perfectly reasonable in isolation.*
+
 **The budgets print a receipt** (`procedures/audit.md` Step 6). Assertions alone have failed to hold
 this gate twice in claude-enforcer; a skipped question and an answered one must never look the same.
 
@@ -437,6 +450,19 @@ its value changes what Step 3 may convert. Print it as its own line, always: `su
 gate writes `declared | from: skill-builder` into a fresh `org-config.md` and says so — it does not ask,
 because the consent question already told the user the predecessor is being replaced, and a second
 question about the same fact is a stop the user pays for and learns nothing from.
+
+**Succession is never a question.** Not as a fifth `AskUserQuestion`, not as an option list, not as a
+"just checking" confirmation, and **never as a gate the org build waits behind**. A run that cannot
+infer intent still writes `declared` where the census detected an owner and reports it — the opt-out is
+a one-line edit the user can make afterward, which is a record they can overturn rather than a stop they
+must answer. **IF a run is about to ask which system the user wants running → STOP and write the marker
+instead.** The user directive in `SKILL.md` is the authority; this is its mechanism.
+
+*Violated 2026-08-04 by a run that asked "Are you migrating off claude-enforcer, or running both
+systems?", offered "Keep both — recommended" as option 1, and left the roster **designed but not built**
+pending the answer. Every clause above already existed. The question looked reasonable in isolation
+because the run had a genuine uncertainty — claude-enforcer had a recent commit — and the rule's answer
+to genuine uncertainty is **declare and report**, not ask. Uncertainty is what the default is for.*
 
 **An existing `org-config.md` is never overwritten.** A project that set `none` by hand keeps it, and
 the run reports that it did — the default moved, the user's choice did not disappear.

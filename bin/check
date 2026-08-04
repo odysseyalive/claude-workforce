@@ -2915,7 +2915,7 @@ check(
 )
 check(
     "hooks: workforce never fabricates a missing hook script",
-    "Never fabricate a replacement hook" in _hooks_md_early,
+    "Never fabricate a replacement" in _hooks_md_early,
     "hooks.md must forbid inventing a hook script for a dead registration — the "
     "behaviour cannot be reconstructed and SKILL.md principle 5 bars inventing it",
 )
@@ -4109,6 +4109,41 @@ check(
     "the question budget is a ceiling of four (§ The question budget); permission "
     "findings are reported, not asked",
 )
+# A run asked "Are you migrating off claude-enforcer, or running both systems?"
+# as a FIFTH question and held the org build on the answer. Three rules already
+# forbade it -- the four-question ceiling, this gate's own "it does not ask", and
+# a user directive stating succession is not optional -- and not one was
+# checkable. The directive was captured the same day, in the user's words.
+check(
+    "succession: is declared and reported, never asked",
+    "**Succession is never a question.**" in _asu
+    and "STOP and write the marker" in _asu,
+    "audit-setup.md no longer forbids asking about succession — the consent "
+    "question already states the predecessor is being replaced, so asking spends "
+    "a slot the four-question budget does not have and defers the run",
+)
+check(
+    "succession: the not-optional directive is captured verbatim",
+    "a succession wasn't optional when installing this" in read("workforce/SKILL.md"),
+    "the user directive that succession is not optional is missing from SKILL.md's "
+    "immutable block — it was stated more than once before being captured, which "
+    "is exactly why it recurred",
+)
+check(
+    "budget: INV-BUDGET fails on a SURPLUS question, not only a missing one",
+    "fails in BOTH directions" in _asu and "N greater than 4 is UPHELD=false" in _asu,
+    "INV-BUDGET read 'every budget question rendered', which is blind to an extra "
+    "question — a ceiling of four with a floor-only invariant",
+)
+check(
+    "hooks: a dead hook under succession is workforce's to supply, not to report",
+    "workforce owes that capability" in _hooks_md_early
+    and "Under succession the calculus" in _hooks_md_early,
+    "hooks.md states the never-fabricate rule without the succession carve-out — "
+    "under declared succession workforce IS the successor, so leaving a guarantee "
+    "dead breaches the conversion directive's floor while reporting success",
+)
+
 check(
     "permissions: every count prints, including the zeroes",
     "always all five, including the zeroes" in _asu,

@@ -108,11 +108,26 @@ to wire and nothing to orphan.
    separately and left alone. A false dead-wiring row invites someone to delete a working registration,
    which is worse than the silence it replaces.
 
-   **Report; do not repair.** A dead registration workforce does not own is **the user's** (step 5), and
-   the script behind it cannot be reconstructed — `SKILL.md` Core Principle 5 forbids inventing one.
-   Name the registration, name its settings file, and name the two things the user may do: restore the
-   script, or remove the entry. **Never fabricate a replacement hook**, and never delete a foreign
-   registration without `--remove --execute` naming it.
+   **What happens next depends on WHO OWNS the skill the dead hook belonged to, and the two cases are
+   opposite.** `wf-census` reports `skill` per hook, so the owner is computed, not guessed.
+
+   | Owner | Disposition |
+   |---|---|
+   | a skill **under `succession: declared`** — a predecessor workforce is replacing | **workforce owes that capability.** The guarantee was live before this run and the standing directive is that replaced systems work *better* in the new format, not that their guarantees quietly lapse. Supply the equivalent as a `wf-` hook, wire it, and record it in `.settings-owned.json` — or, where no equivalent exists yet, open a **DEF naming the lost guarantee in the predecessor's own terms** and report it as a functional regression of this run. Never close it by deleting the registration |
+   | any **other** skill — one workforce is not replacing | **report; do not repair.** It is the user's (step 5). Name the registration, its settings file, and the two things they may do: restore the script, or remove the entry |
+
+   **Never fabricate a replacement for a hook workforce is not taking over.** Inventing behaviour for a
+   third party's guard is the failure `SKILL.md` Core Principle 5 names, and a hook that exists and does
+   the wrong thing is worse than a registration that visibly fails. **Under succession the calculus
+   inverts**: workforce has *declared itself the successor*, so leaving the capability dead is not
+   neutrality — it is the conversion directive's floor being breached while a report says `0 failed`.
+   Never delete a foreign registration without `--remove --execute` naming it, in either case.
+
+   *Corrected 2026-08-04. This step shipped with the never-fabricate rule stated flatly, and the user
+   asked the obvious question — "shouldn't we create the missing code instead?" For a predecessor being
+   replaced, yes: `conversion-taxonomy.md` § What succession removes already says working machinery
+   "survives, re-owned," and a machine that is gone cannot survive by being reported. The flat rule was
+   correct for a stranger's hook and wrong for the case this project exists to handle.*
 
    *Added 2026-08-04. The Reporting block below has declared a `dead wiring — command not on disk` count
    since this command was written, and **nothing computed it** — `wf-census` recorded each command string

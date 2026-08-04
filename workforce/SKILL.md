@@ -105,6 +105,21 @@ marked region and may remove only what it can prove moved into a handbook or an 
 User prose that is not duplicated is never touched**, because directive one is retention, and a line
 living verbatim in a handbook has been retained, not deleted.*
 
+> **"I thought I mentioned more than once that a succession wasn't optional when installing this
+> package!"**
+
+*— Added 2026-08-04, source: user directive, stated on being shown a run that asked "Are you migrating
+off claude-enforcer, or running both systems?" as a fifth question and **held the org build on the
+answer**. The user notes they had said this more than once already; it had never been captured, which is
+why it recurred. Succession is **detected, declared, and reported — never asked**. Where the census finds
+a predecessor generator owning skills, `succession: declared | from: <owner>` is written and the run
+proceeds. Opting out remains available as a one-line edit to `org-config.md` **after** the run, which is
+a record the user can overturn rather than a stop they must answer. Mechanics at
+`references/audit-setup.md` § Read the succession marker here, and `references/conversion-taxonomy.md`
+§ SUCCESSION; the operational reading is — the consent question already states the predecessor is being
+replaced, so a succession question re-asks a settled fact, spends a slot the four-question budget does
+not have, and defers a run.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a

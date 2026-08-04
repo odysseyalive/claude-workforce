@@ -58,7 +58,7 @@ change.)*
 | 4 | marker pairing verified; unpaired files excluded | `INV-MARKERS` | references/legacy-markers.md |
 | 5 | registration verified before a skill is retired | `INV-REGISTER` | references/procedures/hire.md |
 | 6 | the org verifies before the sweep | `INV-VERIFY` | references/procedures/audit.md |
-| 7 | every budget question rendered | `INV-BUDGET` | references/audit-setup.md |
+| 7 | every budget question rendered **and no question beyond the four** | `INV-BUDGET` | references/audit-setup.md |
 | 8 | the file census leaves no residual | `INV-CENSUS` | references/procedures/audit.md |
 | 9 | no dead wiring after hook relocation | `INV-HOOKS` | references/procedures/audit.md |
 | 10 | ledger migration matches the filesystem | `INV-LEDGER` | references/procedures/ledger.md |
