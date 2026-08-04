@@ -30,8 +30,22 @@ a run that still cannot spawn degrades and says so.
 
 ```
 workforce/                    SOURCE — what ships. Edit here.
-.claude/skills/workforce/     RUNTIME — what a session here loads. Never edit.
+.claude/skills/workforce/     RUNTIME — rebuilt by bin/sync. Never edit.
+~/.claude/skills/workforce/   PERSONAL INSTALL — SHADOWS the runtime, and bin/sync
+                              does NOT write it. This is the copy a session loads.
 ```
+
+**There are three copies, not two, and the third is the one that resolves.** Skills resolve personal
+before project (`verify.md` § Install and scope), so a personal install shadows everything `bin/sync`
+builds — and `bin/sync` targets `DEST_ROOT` only, so the shadowing copy goes stale the moment source
+changes. `bin/check` now fails on the drift and names the fix; refreshing is a deliberate gesture,
+because sync rebuilds its target by deleting it and aiming that outside the repo is not a default
+worth having.
+
+*Found 2026-08-03, the expensive way: `wf-conform` gained a check, the personal copy did not, and the
+stale binary was used to verify a remediation and returned `0 failed` from a script that had no way to
+fail. It was caught because the check COUNT looked wrong, not because anything asserted it. This file
+had said "dual tree" for days.*
 
 **Always edit source, then `bin/sync`.** Reverse order loses work: the runtime is deleted and rebuilt on
 every sync. This is a directive inherited from claude-enforcer, where reverse-order edits repeatedly

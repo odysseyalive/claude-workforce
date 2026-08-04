@@ -59,6 +59,7 @@ records what was *actually* registered and marked at T7. The disposition table r
 | Precondition | Why re-checked rather than trusted |
 |---|---|
 | the backup exists and verifies | it may have been deleted, moved, or superseded since |
+| **every T7 `.orig` exists on disk and matches its `prior-sha`** | **the single-file undo for the act this command performs.** `wf-conform` decides it against the filesystem. **Absent → STOP**: deleting a skill whose `.orig` was never written makes the backup the only path back, and this command's whole reason for existing is that it is reached long after the run that took the backup. *Omitted from this table when it was written 2026-08-03, then found missing for real on `apps-odyssey-alive` the same day — the sweep would have deleted `skill-builder` with no `.orig` behind it* |
 | **every Run Invariant** (`invariants.md`) | `INV-VERIFY` is the one that deferred this sweep; it must pass *now*, not have passed once |
 | marker pairing (`INV-MARKERS`) | a file edited since the audit may have become an extraction hazard |
 | `INV-DIRECTIVES` / `INV-EMBEDDED` — `N of N` | **the sacred-block gate. Short by one → STOP.** Extraction completeness is asserted against the tree as it stands today |

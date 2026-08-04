@@ -4053,6 +4053,66 @@ check("wf-conform excludes servers named only to forbid them",
       "PROHIBITION_RX" in _wfc,
       "`- NEVER use mcp__x__*` is a guardrail, not a dependency — it read as one until fixed")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE THIRD COPY — a personal install shadows the runtime bin/sync builds
+# ─────────────────────────────────────────────────────────────────────────────
+# CLAUDE.md § The dual tree names two copies: source and `.claude/skills/workforce`.
+# There is a third. A personal install at `~/.claude/skills/workforce` SHADOWS the
+# project runtime, because skills resolve personal > project (`verify.md` § Install
+# and scope), and `bin/sync` writes only DEST_ROOT — it has never touched it.
+#
+# So after `bin/sync` the maintainer has a synced runtime that is not what loads,
+# and a loaded copy frozen at whenever `install` last ran. Measured 2026-08-03: the
+# personal `wf-conform` was missing a check added minutes earlier, was used to
+# verify a remediation, and returned `0 failed` from a script that could not fail.
+# The verification was re-run against source and held — but it was luck that the
+# count looked wrong enough to check.
+#
+# Detection only, and deliberately: `bin/sync` rebuilds DEST_ROOT by deleting it,
+# and pointing that at a directory outside the repo is not a change this check
+# should make on anyone's behalf.
+_personal = os.path.expanduser("~/.claude/skills/workforce")
+if os.path.isdir(_personal):
+    _drift = []
+    for _rel in ("SKILL.md", "bin/wf-conform", "bin/wf-census", "bin/wf-context"):
+        _a, _b = os.path.join("workforce", _rel), os.path.join(_personal, _rel)
+        if os.path.exists(_a) and os.path.exists(_b) and read(_a) != read(_b):
+            _drift.append(_rel)
+    check("personal install matches source (it shadows the runtime)",
+          not _drift,
+          f"drifted: {', '.join(_drift)} — `~/.claude/skills/workforce` resolves BEFORE "
+          "`.claude/skills/workforce`, so this is the copy a session loads and `bin/sync` "
+          "does not write it. Re-run the installer, or delete the personal install to let "
+          "the synced runtime resolve.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The undo artifact is checked as an artifact
+# ─────────────────────────────────────────────────────────────────────────────
+# `audit.md` Step 6b precondition 4 guarded the sweep's single-file undo by reading
+# the JOURNAL — a gate checking a claim the journal makes about itself. Row 101 on
+# apps-odyssey-alive read `prior-sha: see .orig`, status COMMITTED, with zero `.orig`
+# files on disk, and satisfied it. The sweep is the only command that deletes.
+
+check("audit's sweep precondition checks the filesystem, not the journal",
+      "EXISTS ON DISK and hashes to its recorded" in aud,
+      "'recorded and hashed in the journal' is satisfied by a row describing a file that isn't there")
+
+check("sweep's own preconditions include the .orig",
+      "the single-file undo for the act this command performs" in _swp,
+      "the command that deletes must check the undo exists before deleting")
+
+check("hire forbids a prior-sha that is not a sha",
+      "holds the 64-character digest and nothing" in _hire,
+      "`see .orig` and `per-file` both read like records and hold no comparable value")
+
+check("wf-conform checks T7 .orig against disk",
+      "T7 `.orig` exists on disk" in _wfc,
+      "the enforcement behind the three doctrine changes above")
+
+check("wf-conform exempts aggregate journal rows",
+      "aggregate row (undo is the backup)" in _wfc,
+      "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
+
 check("verify checks for the agent-teams flag on its install surface",
       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" in _vfy2,
       "verify is the canonical DETECTION surface; the flag was reported only by audit, "

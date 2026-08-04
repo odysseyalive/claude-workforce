@@ -286,6 +286,87 @@ def check_handbook(path, body, res, ceiling):
         )
 
 
+def check_journal(root, res):
+    """Every T7 row's `.orig` exists on disk and hashes to its recorded prior-sha.
+
+    THE UNDO ARTIFACT, CHECKED AS AN ARTIFACT. `SKILL.md` § Atomic-or-Absent rule 6:
+    "T7 IS COPY-THEN-MARK. Copy the live SKILL.md to `<staging>/<name>/SKILL.md.orig`
+    and record its sha in the journal BEFORE marking it. `.orig` is retained after the
+    run and is the single-file undo."
+
+    `audit.md` Step 6b precondition 4 guarded this as *"every marked skill has its
+    `.orig` recorded and hashed IN THE JOURNAL"* — and that is the whole defect. It
+    reads the journal to check a claim the journal makes about itself. A row can say
+    `prior-sha: see .orig` with no `.orig` anywhere and satisfy it.
+
+    Measured 2026-08-03 on apps-odyssey-alive: journal row 101 marked `skill-builder`
+    at T7, status COMMITTED, `prior-sha` reading `see .orig`, and ZERO `.orig` files on
+    disk. The sweep is the only command that deletes and this is its only single-file
+    undo; the gate in front of it could not tell the difference between an undo that
+    existed and a sentence saying one did.
+
+    Two findings, kept separate because they need different fixes:
+      MISSING   no file at the staging path       -> the undo does not exist
+      DRIFT     file present, sha != prior-sha    -> it exists and is not what was
+                                                    recorded; restoring it would write
+                                                    bytes nobody verified
+
+    A `prior-sha` that is not 64 hex characters is itself reported: the spec says
+    record the sha, and a pointer ("see .orig") is what let this hide.
+    """
+    jp = os.path.join(root, ".claude", "workforce", ".conversion-journal.md")
+    if not os.path.exists(jp):
+        return                      # no journal is not a finding; day-one is legal
+    body = read(jp, res)
+    if body is None:
+        return
+
+    staging = os.path.join(root, ".claude", "workforce", "staging")
+    rows = 0
+    for line in body.splitlines():
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
+        if len(cells) < 7 or cells[2] != "T7":
+            continue
+        name, path_cell, prior, status = cells[1], cells[3], cells[5], cells[6]
+        # N/A rows are printed deliberately (a hire has no predecessor to copy).
+        if "N/A" in status or "N/A" in prior or status == "✗":
+            continue
+
+        # AGGREGATE ROWS ARE NOT SKILLS. A journal may mark a class of edits in one
+        # row — "(all skills) | scaffolding blocks emitted by skill-builder" — and
+        # such a row has no single SKILL.md and never had an `.orig`. The path cell
+        # decides it: a real conversion row names a skill directory that exists.
+        # Without this the check demanded `staging/(all skills)/SKILL.md.orig`, a
+        # path nothing was ever going to write, and reported its absence as the same
+        # defect as a genuinely missing undo. One finding was real and one was the
+        # check misreading a row; reporting them identically devalues both.
+        if not os.path.isdir(os.path.join(root, path_cell)):
+            res.add(True, f"journal: {name} T7 is an aggregate row (undo is the backup)")
+            continue
+
+        rows += 1
+        orig = os.path.join(staging, name, "SKILL.md.orig")
+        if not os.path.exists(orig):
+            res.add(False, f"journal: {name} T7 `.orig` exists on disk",
+                    f"row marks {name} at T7 with status {status}, and {orig} is absent. "
+                    "The sweep's single-file undo does not exist. Restore it from the "
+                    "pre-run backup before any deletion.")
+            continue
+        res.add(True, f"journal: {name} T7 `.orig` exists on disk")
+        if not re.fullmatch(r"[0-9a-f]{64}", prior or "", re.I):
+            res.add(False, f"journal: {name} T7 prior-sha is a sha",
+                    f"prior-sha reads {prior!r}. The spec records a sha; a pointer "
+                    "cannot be compared against anything, which is how a missing "
+                    "`.orig` passed a gate that claimed to hash it.")
+            continue
+        got = hashlib.sha256(open(orig, "rb").read()).hexdigest()
+        res.add(got == prior.lower(), f"journal: {name} T7 `.orig` matches prior-sha",
+                f"recorded {prior[:16]}…, on disk {got[:16]}… — the undo artifact is "
+                "not the file that was recorded. Do not restore from it.")
+    if rows:
+        res.add(True, f"journal: {rows} T7 row(s) checked against disk")
+
+
 def check_data_skill(path, body, res):
     n = os.path.relpath(path)
     missing = [s for s in DATA_SKILL_SECTIONS if ("\n" + s) not in body]
@@ -414,6 +495,7 @@ def main():
                     check_data_skill(p, body, res)
 
     check_sidecar(root, res)
+    check_journal(root, res)
 
     if args.json_path:
         with open(args.json_path, "w", encoding="utf-8") as fh:

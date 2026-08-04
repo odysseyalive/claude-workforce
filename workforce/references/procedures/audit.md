@@ -696,7 +696,20 @@ two-paths-live state** — which is degraded but correct, and reversible by `dis
    remove from marker matches at this step would silently re-include them — an orphan opener runs a span
    to the next closer and takes the content between two blocks with it.
 3. **The backup exists and verified.**
-4. **Every marked skill has its `.orig` recorded and hashed** in the journal.
+4. **Every marked skill's `.orig` EXISTS ON DISK and hashes to its recorded `prior-sha`** — checked
+   against the filesystem by `wf-conform`, never against the journal alone.
+
+   *This read "recorded and hashed **in the journal**" until 2026-08-03, which is a gate reading the
+   journal to check a claim the journal makes about itself. Measured the same day on
+   `apps-odyssey-alive`: row 101 marked `skill-builder` at T7, status COMMITTED, `prior-sha` reading
+   `see .orig`, and **zero `.orig` files on disk**. A pointer is not a hash and cannot be compared
+   against anything. **The sweep is the only command that deletes and `.orig` is its only single-file
+   undo**, so the one precondition standing between a deletion and an unrecoverable one could not tell
+   an undo that existed from a sentence saying one did.*
+
+   **A `prior-sha` that is not 64 hex characters fails this precondition** regardless of what the file
+   on disk looks like. An aggregate row that marks a class of edits rather than one skill — a path cell
+   naming no skill directory — is exempt and says so: its undo is the backup.
 
 Then, in order:
 

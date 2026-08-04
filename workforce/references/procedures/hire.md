@@ -191,7 +191,11 @@ preserves instead is the only content the deletion could destroy — every
   live replacement. Unknown result counts as failure: "Refusing to retire `<skill>` — its replacement
   is unverified. The skill is left intact."
 - **T7 is copy-then-mark.** `.orig` is written and hashed into the journal first, and retained after
-  the run as the single-file undo.
+  the run as the single-file undo. **The `prior-sha` cell holds the 64-character digest and nothing
+  else** — never `see .orig`, never `per-file`, never a description of where the value lives. A
+  pointer cannot be compared against anything, and a cell that reads like a record while holding no
+  value is what let a COMMITTED T7 row ship with no `.orig` behind it (`audit.md` Step 6b
+  precondition 4, corrected 2026-08-03). `wf-conform` fails any T7 row whose `prior-sha` is not a sha.
 - **T2 is asserted, not assumed.** The extracted immutable spans are read back and compared byte-exact
   against the source before T4, and the count is journalled. **A skill whose extraction is short by even
   one block never reaches T5**, and the sweep may not remove any file whose extraction did not pass.
