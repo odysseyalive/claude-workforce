@@ -102,8 +102,12 @@ user's, so the run proposes and never edits (§ What it reports).
 `SubagentStart` can count, it cannot refuse. Everything here is advisory, and it says so rather than
 implying a control that does not exist.
 
-The real levers, in order: department width caps, dispatching to the lowest competent node, splitting
-large conversions across sessions, and keeping `CLAUDE.md` small.
+The real levers, in order: department width caps, dispatching to the lowest competent node, running a
+large conversion as sequential waves **inside one run**, and keeping `CLAUDE.md` small.
+
+*Splitting a conversion across sessions was retracted 2026-08-04 — it named no threshold, so it was
+never computable, and it postponed 37 of 37 conversions on a cap with 90% headroom
+(`conversion-taxonomy.md` § What succession does not do).*
 
 ## Gate behavior
 

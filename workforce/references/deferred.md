@@ -30,6 +30,26 @@ sessions in a system whose entire premise is that nobody does.
 nothing a reader can execute; `review eng-test` does. A row whose `discharged by` cell cannot be run
 verbatim is malformed, and a malformed row is a finding rather than a silent no-op.
 
+**BLOCKING — a row may never be discharged by re-running the command that wrote it, unaided.** If the
+cell names the same command with no changed precondition, the row is not deferred work — **it is a run
+that stopped**, and the work belonged in that run (`conversion-taxonomy.md` § What succession does not
+do). Every legitimate row names a precondition the run genuinely could not satisfy itself:
+
+| Legitimate | Example |
+|---|---|
+| a **user decision** this project has no standing to make | *"`route` is annotated SUPERSEDED — removing a skill you rely on is your call"* |
+| a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
+| a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
+
+**And the precondition goes IN the cell.** `audit (re-run after the block is resolved)` is malformed —
+it names the command but not what must change first, so a reader cannot tell whether re-running is
+sufficient or futile. `audit, once <catalog> has a machine-owned region` is a row someone can act on.
+
+*Added 2026-08-04. `odyssey-alive` closed a run whose queue held 9 rows, of which **5** named
+`/workforce audit`, `/workforce verify`, `/workforce amend`, or `/workforce sweep` — the run's own
+commands, in a later session, with no precondition that had changed. The queue was working exactly as
+specified; what it was queueing was the run declining to finish.*
+
 **`age` counts `/workforce` invocations, not days.** A backlog measured in wall-clock punishes a
 project nobody touched for a fortnight and forgives one that ran forty commands past an open row. What
 matters is how many chances to discharge it went by.
@@ -42,8 +62,8 @@ matters is how many chances to discharge it went by.
 |---|---|---|
 | `amend`, `handbook`, `org index`, `checksums`, `org-chart-format` | `contract-stamp` ≠ recomputation → `CONTRACT-DRIFT` | `review <employee>` |
 | `model-map` | a changed budget cell, one row per affected handbook | `model-map --execute` |
-| `audit` Step 4b / Step 7 | canary `UNAVAILABLE` — ceiling unverified | `verify` |
-| `audit` Step 0.7 | `catalog-unappendable` — the append was skipped | `audit` (re-run after the block is resolved) |
+| `audit` Step 7 | canary `UNAVAILABLE` **after Step 6a's second attempt** — never after the first | `verify`, once the fixtures register |
+| `audit` Step 0.7 | `catalog-unappendable` — the append was skipped | `audit`, once `<catalog>` has a machine-owned region — **the precondition, not just the command** |
 | `hire` | a transaction that failed with ✗ | `hire <role>` |
 | `amend` | `latency: pending-human-key` — suspended awaiting a human | `amend <target> --execute` |
 | `review` | a `NEUTRAL` line owed an eval case (`ablation.md`) | `evals <employee>` |

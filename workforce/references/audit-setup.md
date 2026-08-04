@@ -542,12 +542,19 @@ plainly is required here rather than quietly substituting something adjacent.
 
 So the rule is: **add what is missing, remove nothing, report everything.**
 
-### BLOCKING — this command writes `permissions` only, and never `env`
+### BLOCKING — this command never ADDS or ENABLES an `env` key, and removes exactly one
 
 **No procedure in this project may add, edit, or enable an `env` key in any settings file.** The write
 surface is `permissions.allow` / `permissions.deny` and the `.settings-owned.json` sidecar that records
 what was added. An `env` key changes how the *whole host session* behaves, for every project and every
 tool, which is categorically outside what "review the permissions so the org can run" authorizes.
+
+**That prohibition is about ADDING capability, and it does not reach the one key that REMOVES the org's
+own ceilings.** The asymmetry is the point: adding an `env` key grants the host a behavior nobody asked
+for, while `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` left in place *silently disables* two mechanisms every
+handbook this run writes depends on (facts 2d and 18). **Both directions are governed by the same
+question — does the host end the run doing what the org's text says it does?** — and for years only one
+direction was checked.
 
 **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is named explicitly because it is the one that would look
 helpful.** Setting it to `1` puts the session in agent-teams mode, and `platform.md` fact 2d measured
@@ -557,20 +564,51 @@ tier ceiling depends on the half of its frontmatter that survives, and fact 18 d
 be disabling two of its own load-bearing mechanisms and reporting a healthy org.** It is never written,
 never suggested as a remedy, and its absence is never reported as a finding.
 
-**If the flag is already set, it is not touched — but do NOT report it as the user's choice.** It is
+**If the flag is already set, what happens next depends on `succession:`, and on nothing else.** It is
 frequently written by an *installer*, not by a person: `claude-enforcer`'s `install` sets it
 unconditionally and its own `agents-teams.md` says so — *"The install script sets this automatically in
-`.claude/settings.local.json`."* Found set in `apps-odyssey-alive` on 2026-08-03, where the user did not
-know it was on.
+`.claude/settings.local.json`."* Found set in `apps-odyssey-alive` on 2026-08-03 and again in
+`odyssey-alive` on 2026-08-04, in both cases without the user knowing.
 
-So report the flag **and name its likely source**, in the permission findings at the end of the run:
-"`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled in <file>. Employees invoked as named teammates lose
-`disallowedTools:` and `skills:` (platform.md facts 2d, 18). The org still functions; its tier ceilings
-rest on the `tools:` allowlist alone. If you did not set this, grep your installed skills for the name —
-a predecessor installer may own it, in which case removing it from settings is undone by the next
-install." Then stop — the environment is not this command's to change, and **an installer-set flag is a
-question about which system the user wants running, which is theirs to answer** (`verify.md`
-§ A retired generator that came back states the same principle for a resurrected skill).
+| `succession:` | Action |
+|---|---|
+| `declared` (from `skill-builder`) | **REMOVE the key, and record it in `.settings-owned.json` so `disband` restores it.** The predecessor that wrote it is being removed by this same run |
+| absent, or `none`, or any other owner | **report only, and name the likely source.** Something this project does not supersede owns that flag, and removing it would be undone by the next install of a system still in service |
+
+**Why removal is correct under declared succession, and only there.** The standing objection was *"the
+next `claude-enforcer` install undoes it."* Under succession that objection dissolves: the installer that
+sets the flag belongs to the generator this run is deleting entirely, so there is no next install. The
+flag is not a preference the user expressed — it is **residue of the superseded system**, which the user
+directive at `SKILL.md` § Directives already governs: *"I don't want to leave any of the old system still
+there that doesn't need to be there. it will be confusing."* A setting that silently voids every IC's
+`disallowedTools:` is residue with teeth.
+
+**Removal is a JSON-aware edit of that one key** — parse, delete, validate, write — never a rewrite of
+the file, and never any other `env` key regardless of what else is found. Record it under a distinct
+`env_removed` section of `.settings-owned.json`, storing the **prior value** and not merely the name, so
+`disband` restores it exactly. **Under `--review`, print `would remove` and change nothing.**
+
+**BLOCKING — remove it only from the scope where it was found, and only from a scope this run
+resolved.** `env` keys do not merge the way permission rules do (fact 17 covers `permissions`, not
+`env`), so the flag lives in exactly one file and the run must name that file before touching it. **A
+personal-scope `env` key is never edited by a project-scope run.** Two keys make this concrete on a real
+host: `odyssey-alive` carries the agent-teams flag in `.claude/settings.local.json` while
+`~/.claude/settings.json` carries the **spawn-depth key that `platform.md` fact 1 calls a *contract***
+with the org's tier shape. **Removing the wrong one silently collapses the chain of command** — report
+every `env` key found, in every scope, and delete the one named above from the one file that holds it.
+
+Report it either way, in the permission findings at the end of the run — **removed** or **left, with its
+likely source**: "`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` was enabled in <file>. Employees invoked as
+named teammates lose `disallowedTools:` and `skills:` (platform.md facts 2d, 18), so every IC's tier
+ceiling would have rested on the `tools:` allowlist alone." A removal is never silent: it is the one
+`env` write this project makes, and the user learns of it in the same report that shows the grants.
+
+*Amended 2026-08-04. This section read "it is not touched … then stop — the environment is not this
+command's to change," and the run that followed it found the flag, wrote a correct paragraph about what
+it costs, and left the org running against a host that voids its ceilings. **`Resolve all issues with
+pizazz` names that outcome directly: "never close a finding by recording it. A flag is not a fix; a
+default is not a decision."** The deferral to the user was real but misplaced — the question "which
+system do you want running?" is precisely what `succession: declared` already answers.*
 
 ### Under `--review`
 

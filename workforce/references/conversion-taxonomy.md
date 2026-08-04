@@ -534,11 +534,46 @@ superseded generator, which is removed entirely). It changes which skills are *e
 conversion still runs the same atomic-or-absent transaction, still requires a verified backup for its
 destructive step, and is still reversed by `disband`.
 
-**Blast radius is the thing to watch.** Coexistence converts a handful; succession can convert dozens in one
-run, each with a cold probe. That approaches the session spawn cap
-(`delegation-budget.md` § The session cap), so report the eligible count *before* executing and split
-across sessions where it will not fit. A succession that dies half-way through the batch is why the
-per-skill transaction exists, but it is not a plan.
+**Blast radius was the thing watched, and it was the wrong thing.** Coexistence converts a handful;
+succession converts dozens in one run, each with a cold probe. **The whole batch runs in that one run.**
+
+*What makes that safe is not restraint — it is the backup.* `audit-setup.md` § Step 0.2 takes and
+verifies a full backup before the first write of the run, every conversion is an atomic-or-absent
+transaction, every retired skill keeps its `.orig` as a single-file undo, and `disband` reverses the
+whole run. **Conversion is reversible by construction**, so batch size is not a risk axis and never was.
+
+**Print the arithmetic, never a judgment** — `INV-BATCH` (`invariants.md` row 14): the cap, the spawns
+already spent, the headroom, and what the batch costs. A run that reports an overage without those four
+numbers has not measured one.
+
+**Where headroom genuinely is short, narrow the WAVE, never the run.** The concurrency cap and the
+session total are different numbers (`platform.md` fact 8), and conversions are *sequential* per-skill
+transactions — so a long batch draws down the session total and never touches the concurrent one.
+Sequential waves inside one run are the lever.
+
+**BLOCKING — a run is never split across sessions, and no gate may defer one.** A requirement that
+cannot be met for a given skill marks *that skill* ✗ with its `path:line` and the run **continues**
+(SKILL.md § Sacred-Directive Enforcement Gates, Atomic-or-Absent rule 7). Refusing an act is the design; postponing a run is not.
+
+**`INV-SUCCESSION` is how that is checked** (`invariants.md` row 15): under `succession: declared`,
+every eligible skill is **either converted or carries by name the rule that refused it** — rule 1, 2, 4,
+6, ORCHESTRATOR, or the data-gateway rule (§ What still refuses). A run reporting `N eligible ·
+0 converted` with no per-skill rule name is `NOT UPHELD` and **blocks the sweep**, because a succession
+that converted nothing has not superseded anything and the deletion it would authorize is unearned.
+
+*This is the invariant the `odyssey-alive` run of 2026-08-04 would have failed. It reported 37 eligible,
+0 converted, named no refusing rule for any of them, and closed with "this is the make-before-break state
+the design intends, not a partial failure." The immutable directive four screens above had already
+settled it: **"a run that reports near-zero conversion yield on one should say so rather than call it
+correct."***
+
+*Retracted 2026-08-04: this section read "report the eligible count before executing and split across
+sessions where it will not fit," closing with "a succession that dies half-way through the batch is why
+the per-skill transaction exists, but it is not a plan." Containment plus a verified backup **is** the
+plan — that sentence invented a risk the design had already eliminated. Every deferral in the
+`odyssey-alive` run of 2026-08-04 hung off it: **37 of 37 conversions postponed, against a cap of 200
+with 20 spent.** Neither the subtraction nor the "will not fit" threshold existed anywhere in the
+project — a gate with no number, which a cautious reading resolves as* stop *every time.*
 
 ## SUPERSEDED — redundancy is reported, never resolved
 

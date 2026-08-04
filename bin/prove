@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Prove each new bin/check assertion by breaking its target and confirming it fires.
+
+An assertion never observed failing might be testing nothing (CLAUDE.md).
+Each case mutates one file, runs bin/check, asserts the NAMED check appears in the
+failure list, then restores the file byte-for-byte.
+"""
+import pathlib, shutil, subprocess, sys, tempfile
+
+ROOT = pathlib.Path("/home/francis/lab/claude-workforce")
+
+CT  = "workforce/references/conversion-taxonomy.md"
+PL  = "workforce/references/platform.md"
+AUD = "workforce/references/procedures/audit.md"
+STG = "workforce/references/staging.md"
+DFR = "workforce/references/deferred.md"
+ASU = "workforce/references/audit-setup.md"
+ENF = "workforce/references/enforcement.md"
+DSB = "workforce/references/procedures/disband.md"
+ORG = "workforce/references/org-doctrine.md"   # victim for the append case
+
+# (check name, file, mode, payload)
+#   "del"    -> remove the literal
+#   "append" -> append the literal
+CASES = [
+    ("conversion-taxonomy forbids splitting a run across sessions",
+     CT, "del", "a run is never split across sessions, and no gate may defer one"),
+    ("conversion-taxonomy states the backup is what makes the batch safe",
+     CT, "del", "reversible by construction"),
+    ("no shipped file authorizes splitting a run across sessions",
+     ORG, "append", "\nWhere the batch is large, split it across sessions.\n"),
+    ("platform fact 8 is marked as a repeat blocking-check offender",
+     PL, "del", "REPEAT OFFENDER"),
+    ("audit has a Step 6a that re-attempts the canary in-run",
+     AUD, "del", "## Step 6a — Canary re-attempt"),
+    ("audit Step 6a restamps handbooks rather than queueing an amend",
+     AUD, "del", "The restamp IS `/workforce amend`, executed here rather than asked for"),
+    ("staging obliges a second canary attempt before DEGRADED",
+     STG, "del", "obliges a SECOND attempt inside the same run"),
+    ("deferred forbids a row discharged by re-running its own command",
+     DFR, "del", "may never be discharged by re-running the command that wrote it"),
+    ("deferred requires the precondition in the discharge cell",
+     DFR, "del", "it names the command but not what must change first"),
+    ("audit-setup removes the agent-teams flag under declared succession",
+     ASU, "del", "REMOVE the key, and record it in `.settings-owned.json`"),
+    ("audit-setup scopes the removal to declared succession only",
+     ASU, "del", "report only, and name the likely source"),
+    ("audit-setup scopes the env removal to the file that holds the key",
+     ASU, "del", "personal-scope `env` key is never edited by a project-scope run"),
+    ("the settings sidecar can express a removal, not only an addition",
+     ENF, "del", '"env_removed"'),
+    ("disband restores env_removed with its prior value",
+     DSB, "del", "replay `env_removed` in the opposite direction"),
+]
+
+
+def failing_checks():
+    r = subprocess.run(["./bin/check"], cwd=ROOT, capture_output=True, text=True)
+    return {ln.strip()[2:].strip()
+            for ln in r.stdout.splitlines() if ln.strip().startswith("✗ ")}
+
+
+baseline = failing_checks()
+if baseline:
+    print(f"REFUSING: bin/check is not green to begin with: {sorted(baseline)}")
+    sys.exit(1)
+print("baseline: 0 failures\n")
+
+results = []
+for name, relpath, mode, payload in CASES:
+    target = ROOT / relpath
+    backup = tempfile.NamedTemporaryFile(delete=False).name
+    shutil.copy2(target, backup)
+    try:
+        text = target.read_text()
+        if mode == "del":
+            if payload not in text:
+                results.append((name, "SETUP-FAIL", f"literal absent from {relpath}"))
+                continue
+            target.write_text(text.replace(payload, "", 1))
+        else:
+            target.write_text(text + payload)
+
+        fails = failing_checks()
+        if name in fails:
+            results.append((name, "PROVEN", f"fired on mutated {relpath}"))
+        else:
+            results.append((name, "VACUOUS", f"did NOT fire — {len(fails)} other failures"))
+    finally:
+        shutil.copy2(backup, target)
+        pathlib.Path(backup).unlink()
+
+after = failing_checks()
+print(f"{'STATUS':<10} CHECK")
+print("-" * 78)
+bad = 0
+for name, status, detail in results:
+    if status != "PROVEN":
+        bad += 1
+    print(f"{status:<10} {name}\n           {detail}")
+print("-" * 78)
+print(f"{len(results) - bad} of {len(results)} proven by breaking")
+print(f"restored clean: {'yes' if not after else 'NO — ' + str(sorted(after))}")
+sys.exit(1 if bad or after else 0)

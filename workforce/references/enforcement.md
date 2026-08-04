@@ -202,9 +202,18 @@ step; that is the entire reason it survived.*
   "permissions.allow": ["Agent"],
   "permissions.deny":  ["Bash(rm -rf:*)"],
   "hooks":             [{"event": "PostToolUse", "matcher": "Edit|Write",
-                         "command": ".claude/skills/workforce/bin/wf-protect-directives"}]
+                         "command": ".claude/skills/workforce/bin/wf-protect-directives"}],
+  "env_removed":       {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
 }
 ```
+
+**`env_removed` is the one section `disband` RESTORES rather than removes, and the asymmetry is
+deliberate.** Every other key records something workforce *added*, so reversal means deleting it. That
+one records a key workforce *deleted* — under declared succession only, per `audit-setup.md` § BLOCKING —
+so reversal means writing it back with the exact prior value. **A sidecar that could only express
+additions would have made the removal irreversible**, which is the one thing this project will not do to
+a user's settings file. It stores the prior *value*, never just the name, because restoring a key to `1`
+that was set to `0` is not a restoration.
 
 `disband` removes exactly the entries this file names, from the file it names, and nothing else. That
 is **stronger** than a marker region, not a workaround: a marker delimits a *span*, so a user rule that

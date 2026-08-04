@@ -97,7 +97,10 @@ cannot refuse. Everything available is mitigation, and it should be described as
    `.claude/workforce/.spawn-count` and advise near the cap. This project ships no hooks
    (`enforcement.md` § Nothing ships dormant), so a host that wants the counter writes it. The `/org` preflight is the
    always-present backstop and does not depend on one.
-4. **Split large conversions across sessions** — documented, not automated.
+4. **Sequential waves inside ONE run** — a long batch draws down the session total and never touches
+   the concurrent cap, so wave width is the lever. **A run is never split across sessions; that was
+   retracted 2026-08-04** (`conversion-taxonomy.md` § What succession does not do). It named no
+   threshold, so it was never computable, and every run resolved it as *stop*.
 
 ---
 

@@ -326,11 +326,21 @@ gate that refuses a user's work."*
 **UNAVAILABLE is the canary's version of STALE.** The doctrine was already written; the gate simply did
 not obey it.
 
-**What DEGRADED costs, and it must be stated every time:**
+**BLOCKING — `UNAVAILABLE` obliges a SECOND attempt inside the same run, and the run prints
+`INV-CANARY` with both outcomes** (`invariants.md` row 16). The stated cause is that the
+fixtures "register later in this session," and `platform.md` fact 3 measures that delay as *shorter than
+a session*. A run that accepts the first `UNAVAILABLE` as final has therefore declined to measure
+something it had every reason to expect would resolve before it finished. `audit` does this at
+**Step 6a**; any other caller re-attempts before it reports. **One attempt is a reading, not a
+measurement** — the same rule `INV-SPAWN` already applies to the spawn capability.
+
+**What DEGRADED costs — and it is only paid when the SECOND attempt also returns `UNAVAILABLE`:**
 
 - Every handbook registered this run is marked `Tier ceiling: unverified this run (canary UNAVAILABLE)`.
-- The closing report names the state and why — *"fixtures written this run; they register later in this
-  session or after a restart. Re-run `/workforce verify` once they load to confirm the ceiling."*
+  **On a passing re-attempt the mark is restamped in-run, never left for the user to clear.**
+- The closing report names the state, why, and **how many attempts were made**. A one-attempt DEGRADED
+  and a two-attempt DEGRADED are different findings: the first is a run that gave up, the second is a
+  real fact about the host.
 - `UNAVAILABLE` and `PASS` must never look the same in a report. A run that verified nothing and a run
   that verified the host are different runs.
 

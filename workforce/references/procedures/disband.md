@@ -38,11 +38,19 @@ it may be a registration workforce never created.
 **4. Replay the symlink manifest.** Every registration that was a symlink before conversion must be a
 symlink to its recorded target again. Repair or report, with the count.
 
-**5. Clean settings surgically.** Remove exactly the values `.claude/workforce/.settings-owned.json`
-names — never a marker region, never an inference from a rule's shape, and never anything the sidecar
-does not name. An absent sidecar means workforce owns nothing: remove nothing and report it. Then the keys workforce added,
-JSON-aware — parse, mutate, validate, write. **Never rewrite the file wholesale**: it holds the user's
-own rules, and permission rules merge across scopes. Leave every user key untouched.
+**5. Clean settings surgically — and RESTORE what was removed.** Remove exactly the values
+`.claude/workforce/.settings-owned.json` names — never a marker region, never an inference from a rule's
+shape, and never anything the sidecar does not name. An absent sidecar means workforce owns nothing:
+remove nothing and report it. Then the keys workforce added, JSON-aware — parse, mutate, validate, write.
+**Never rewrite the file wholesale**: it holds the user's own rules, and permission rules merge across
+scopes. Leave every user key untouched.
+
+**Then replay `env_removed` in the opposite direction** (`enforcement.md` § The machine-owned region):
+every key it names is written back with the **exact prior value it records**, not merely re-created. This
+is the only section of the sidecar that restores rather than deletes — audit removes
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` under declared succession, and a `disband` that only knew how to
+delete would leave that removal permanent. **Report the restored keys by name and value**; a settings
+change reversed silently is indistinguishable from one that never happened.
 
 **6. Remove the Constitution Gate** from `CLAUDE.md`, between its markers only. Nothing else in that
 file is workforce's.

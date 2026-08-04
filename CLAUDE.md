@@ -38,9 +38,18 @@ workforce/                    SOURCE — what ships. Edit here.
 **There are three copies, not two, and the third is the one that resolves.** Skills resolve personal
 before project (`verify.md` § Install and scope), so a personal install shadows everything `bin/sync`
 builds — and `bin/sync` targets `DEST_ROOT` only, so the shadowing copy goes stale the moment source
-changes. `bin/check` now fails on the drift and names the fix; refreshing is a deliberate gesture,
+changes. `bin/check` fails on the drift and names the fix; refreshing is a deliberate gesture,
 because sync rebuilds its target by deleting it and aiming that outside the repo is not a default
 worth having.
+
+*Corrected 2026-08-04 — this line said `bin/check` "now fails on the drift" and for a day it did not.*
+The check **sampled four files** (`SKILL.md` and three `bin/` scripts), and a change touching eleven
+reference files and none of those four passed green while the shadowing copy ran a day-old doctrine.
+Worse, it compared **zero** files: manifest paths already begin with `workforce/`, the loop joined
+`workforce` onto them again, every `os.path.exists` missed, and the `continue` skipped everything — **a
+pass reported without reading anything.** It now walks the whole manifest, and a companion assertion
+fails if the comparison is ever vacuous again. Found by *performing* the refresh, not by reading the
+check. A sample cannot answer "is this copy current."
 
 *Found 2026-08-03, the expensive way: `wf-conform` gained a check, the personal copy did not, and the
 stale binary was used to verify a remediation and returned `0 failed` from a script that had no way to
@@ -221,7 +230,59 @@ nothing. And `odyssey-alive` has **no generated region at all** one audit later 
 reports `region prepended`, not `replaced` — so Step 6's `wf-claude-md` appears to stop at reporting
 when there is nothing to remove. Same family, not yet chased.
 
-## Open, as of 2026-08-03 (evening)
+**Closed 2026-08-04 — "a run finishes; no gate defers one," the seventh instance and the one the user
+named.** Asked why `audit` never reaches the end, the answer was four causes with one shape: **a run
+that stopped and reported it as a plan.** The `odyssey-alive` run of 2026-08-04 converted **0 of 37**
+eligible skills, queued **9 deferred rows of which 5 named its own commands in a later session**, and
+closed with *"this is the make-before-break state the design intends, not a partial failure."*
+
+| Cause | The claim | Measured |
+|---|---|---|
+| the arithmetic was never done | "37 probes … exceeds the session spawn cap" | cap **200**, spent **20**, batch **37** — 57 of 200 |
+| the threshold did not exist | "split across sessions where it will not fit" | **no number** in any of the 3 sites carrying that instruction |
+| it blocked on an unmeasured fact | fact 8 | `unverified`, under a heading reading *"Do not build blocking checks on these"* |
+| zero yield was called correct | see above | the immutable SUCCESSION annotation already said the opposite |
+
+**`delegation-budget.md:77` had already caught this exact bug** on the org-design path and written
+*"reintroduced one file over."* It was reintroduced a second time, on the conversion path. `platform.md`
+fact 8 now carries **REPEAT OFFENDER** and its own history, because the fact keeps growing gates.
+
+**The user's correction is the doctrine.** The gates called "safety" here — extraction, symlink refusal,
+T6-before-T7 — are *their stated requirements*, not brakes; and conversion is **reversible by
+construction** (verified backup + per-skill `.orig` + `disband`). The sentence doing the damage was
+*"a succession that dies half-way … is not a plan."* Containment plus a backup **is** the plan. So:
+**a gate may refuse an ACT; it may never defer a RUN.** A skill that fails a requirement is marked ✗
+with its `path:line` and the run continues.
+
+Three invariants land with it — `INV-BATCH` (print cap · spent · headroom · cost, so an overage is four
+numbers rather than an impression), `INV-SUCCESSION` (declared succession with eligible skills converts
+at least one or names the refusing rule per skill), `INV-CANARY` (two attempts before any DEGRADED
+verdict). Plus **Step 6a**, which re-attempts the canary in-run and *restamps the handbooks itself* —
+closing `odyssey-alive` rows 1, 2, and 3, which existed only because Step 4b ran the canary at the one
+moment it could not succeed. And the agent-teams flag is now **removed** under declared succession,
+recorded in a new `env_removed` sidecar section that `disband` **restores** rather than deletes.
+
+Fifteen `bin/check` assertions, **each proven by breaking it** — by `bin/prove`, which is new. This
+project has demanded proof-by-breaking since 2026-08-03 with **no tool for it**; the proof was a claim
+in a commit message. Record in `plan/mock-audit-odyssey-alive-2026-08-04b.md`.
+
+*Two things about how this was found.* It came from **the user asking a question the file already
+answered wrong**: `audit.md:930` read *"Found 2026-08-03 by being asked whether one audit run does all
+of this in one session"* — the same question, whose answer had been to **queue the rows more carefully
+rather than do the work.** And the mock audit found a third defect neither `bin/check` nor `bin/baseline`
+could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
+this very patch run the old doctrine and look like a failure.
+
+## Open, as of 2026-08-04
+
+- **The "a run finishes" patch has not been exercised end to end, and that is the next thing to do.**
+  It is proven at the text layer (621 assertions, 14 of them proven by breaking) and walked against
+  `odyssey-alive`'s real numbers, but **no audit has actually run under it.** The user's plan is to reset
+  `odyssey-alive` and re-run; that run is the measurement. Two specific unknowns: whether Step 6a's
+  *second* canary attempt resolves on a cold host — the walk-through hit the `PASS`-on-first path,
+  because the prior run's fixtures were already registered — and whether 37 conversions in one run stay
+  inside the real spawn budget, which is fact 8 and still `unverified`. **The batch is bounded by
+  measurement now, not by a guess, so an overage is a finding rather than a stop.**
 
 - **The sweep has still never run — and it is now the ONLY thing in the transaction that hasn't.**
   Every gate in front of it is satisfied against `~/lab/apps-odyssey-alive`: backup verifies, journal

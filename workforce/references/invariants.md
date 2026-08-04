@@ -39,10 +39,12 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Sixteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
-*(It was ten until 2026-07-31, eleven until 2026-08-01, and twelve until 2026-08-04. "Closed" means
+*(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
+sixteen later the same day — rows 14, 15, and 16 landed together because they are one defect seen from
+three sides: a run that stops early and reports it as a plan. "Closed" means
 **no row is added without its report line**, never that the set is finished — a list that cannot grow
 stops describing the runs it governs, and the rule that matters is the pairing, not the count. Rows
 11, 12, and 13 were each added with their line, their owner, and their `bin/check` assertion in one
@@ -63,6 +65,15 @@ change.)*
 | 11 | every mechanical invariant has a maintainer, and every maintainer passed its negative test | `INV-MAINTAINERS` | references/data-skills.md |
 | 12 | no deferred row was dropped; the queue arithmetic balances | `INV-DEFERRED` | references/deferred.md |
 | 13 | the spawn capability was measured by attempting one, never read from a setting | `INV-SPAWN` | references/audit-setup.md |
+| 14 | the conversion batch printed its arithmetic — cap, spent, headroom, cost — and ran in this run | `INV-BATCH` | references/conversion-taxonomy.md |
+| 15 | declared succession with eligible skills converted at least one, or named the refusing rule per skill | `INV-SUCCESSION` | references/conversion-taxonomy.md |
+| 16 | the tier canary was attempted twice before any run reported DEGRADED | `INV-CANARY` | references/staging.md |
+
+**Rows 14, 15, and 16 exist because a run reported `0 of 37 converted` as success.** Each closes one
+leg of it: 14 forbids an unmeasured overage (the run compared 37 against nothing and called it a cap
+breach, on 200 with 20 spent), 15 forbids zero yield passing silently under declared succession, and 16
+forbids a single canary attempt becoming a DEGRADED verdict. **None of them can be satisfied by prose** —
+each is four numbers or a per-skill rule name.
 
 **The token is the link, and it is what makes the pairing checkable.** Each `INV-*` token appears in
 exactly two places: this table, and the procedure that owes the count. `bin/check` resolves every row's
@@ -102,8 +113,18 @@ Run Invariants
   INV-EMBEDDED    95 of 95 extracted · 96 blocks scanned
   INV-MARKERS     42 files paired · 3 excluded unpaired
   INV-MAINTAINERS 4 mechanical · 4 maintainers · 4 negative tests passed · 6 contextual
+  INV-BATCH       cap 200 · spent 20 · headroom 180 · batch 37 · RUNS THIS RUN
+  INV-SUCCESSION  declared from skill-builder · 37 eligible · 37 converted · 0 unexplained
+  INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped · 4 fixtures swept
   …every remaining row, always all of them…
 ```
+
+**Rows 14 and 16 are the two that a stopping run cannot fake.** `INV-BATCH` must show the subtraction,
+so "exceeds the cap" becomes a claim with four numbers behind it rather than an impression; and
+`INV-CANARY` must show two attempt outcomes, so a DEGRADED verdict cannot rest on the one attempt that
+was structurally guaranteed to fail. **`INV-SUCCESSION` closes the third leg: every eligible skill is
+either converted or carries the name of the rule that refused it** — `37 eligible · 0 converted` with no
+per-skill rule is `NOT UPHELD`, not a plan.
 
 **A row that cannot be computed prints `NOT UPHELD` with the reason** — never omitted, never inferred
 from the absence of a complaint. **Any `NOT UPHELD` row blocks the sweep**, which is enforceable only

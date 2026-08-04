@@ -2339,7 +2339,8 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # against a number no reader of invariants.md could see. Read the DECLARATION and
 # compare it to the table — that is the actual invariant. "Closed" was never about
 # a specific number; it is the rule that no row arrives without its report line.
-_INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13}
+_INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+              "fourteen": 14, "fifteen": 15, "sixteen": 16}
 _inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 # bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
@@ -3286,7 +3287,7 @@ check(
 # So the scan is now class-wide: no shipped file pairs a number-word with this
 # population, and invariants.md's declaration line is the single exemption.
 _INV_COUNT_RX = re.compile(
-    r"\b(?:eight|nine|ten|eleven|twelve|thirteen)\s+"
+    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen)\s+"
     r"(?:rows?|Run[- ]Invariants?)\b",
     re.I,
 )
@@ -4073,14 +4074,39 @@ check("wf-conform excludes servers named only to forbid them",
 # should make on anyone's behalf.
 _personal = os.path.expanduser("~/.claude/skills/workforce")
 if os.path.isdir(_personal):
-    _drift = []
-    for _rel in ("SKILL.md", "bin/wf-conform", "bin/wf-census", "bin/wf-context"):
-        _a, _b = os.path.join("workforce", _rel), os.path.join(_personal, _rel)
-        if os.path.exists(_a) and os.path.exists(_b) and read(_a) != read(_b):
+    # EVERY shipped file, never a hand-picked list. The sampled form (SKILL.md plus
+    # three bin/ scripts) passed on 2026-08-04 while eleven reference files carrying a
+    # whole doctrine change sat stale in the shadowing copy — the check was green and
+    # the copy a session loads was a day behind. A sample cannot answer "is this copy
+    # current"; only the whole manifest can.
+    _drift, _missing, _compared = [], [], 0
+    for _src in sorted(declared):
+        # manifest paths are repo-relative and ALREADY begin with "workforce/".
+        # Joining "workforce" onto them again produced workforce/workforce/... ,
+        # every os.path.exists missed, and the loop compared ZERO files while
+        # reporting a pass — a vacuous green found 2026-08-04.
+        if not _src.startswith("workforce/") or not os.path.exists(_src):
+            continue
+        _rel = _src[len("workforce/"):]
+        _b = os.path.join(_personal, _rel)
+        _compared += 1
+        if not os.path.exists(_b):
+            _missing.append(_rel)
+        elif read(_src) != read(_b):
             _drift.append(_rel)
+
+    # The anti-vacuity guard. A comparison that compared nothing is not a pass.
+    check("the personal-install drift check actually compared files",
+          _compared > 0,
+          f"compared {_compared} files — the check reported a pass without reading anything, "
+          "which is how eleven stale reference files sat behind a green run")
+
+    _n = len(_drift) + len(_missing)
+    _shown = ", ".join((_drift + _missing)[:6]) + (" …" if _n > 6 else "")
     check("personal install matches source (it shadows the runtime)",
-          not _drift,
-          f"drifted: {', '.join(_drift)} — `~/.claude/skills/workforce` resolves BEFORE "
+          not _drift and not _missing,
+          f"{len(_drift)} drifted, {len(_missing)} absent of {len(declared)} shipped files "
+          f"({_shown}) — `~/.claude/skills/workforce` resolves BEFORE "
           "`.claude/skills/workforce`, so this is the copy a session loads and `bin/sync` "
           "does not write it. Re-run the installer, or delete the personal install to let "
           "the synced runtime resolve.")
@@ -4126,8 +4152,8 @@ check("audit states the canary does not govern deletion safety",
       "It says nothing about" in aud,
       "the canary establishes the tier ceiling; recoverability rests on extraction, backup, and .orig")
 
-check("audit queues the amend row, not just the verify row",
-      "at the same time as the `verify` row" in aud,
+check("audit queues the amend row only when Step 6a could not clear it",
+      "6a restamps them itself on `PASS`" in aud,
       "the chain is audit -> verify -> amend; verify is read-only and will not write queue state, so "
       "a row only it could justify is a row nobody writes")
 
@@ -4459,14 +4485,14 @@ check("verify checks for the agent-teams flag on its install surface",
       "at the end of a run, which is not where anyone looks for it")
 
 check("audit-setup does not attribute the agent-teams flag to the user",
-      "not touched — but do NOT report it as the user's choice" in _asu,
+      "in both cases without the user knowing" in _asu,
       "an installer commonly sets it; claude-enforcer's install does so unconditionally")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The agent-teams flag is never written, and never present here
 # ─────────────────────────────────────────────────────────────────────────────
 check("audit-setup forbids writing env settings keys",
-      "never `env`" in _asu,
+      "never ADDS or ENABLES an `env` key" in _asu,
       "the write surface is permissions.* only; env changes the whole host session")
 
 check("audit-setup names the agent-teams flag as never-written",
@@ -4545,6 +4571,94 @@ check("the per-spawn cost of the standing request is stated, not hidden",
       "1.7%" in _cmd_md,
       "the region's whole thesis is minimizing bytes paid per spawn; adding to it without "
       "printing the number is the overclaim this project bars everywhere else")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A run finishes. No gate defers one.
+#
+# Added 2026-08-04 after a real audit reported `0 of 37 converted` as the design
+# working. Every assertion here was proven by breaking it before it landed.
+# ─────────────────────────────────────────────────────────────────────────────
+_dsb = read("workforce/references/procedures/disband.md")
+
+# The doctrine itself, at its canonical home.
+check("conversion-taxonomy forbids splitting a run across sessions",
+      "a run is never split across sessions, and no gate may defer one" in ct.lower(),
+      "the retracted rule named no threshold, so 'will not fit' was never computable and every "
+      "cautious reading resolved it as stop — 37 of 37 conversions postponed on a cap with 90% headroom")
+
+check("conversion-taxonomy states the backup is what makes the batch safe",
+      "reversible by construction" in ct,
+      "batch size was treated as a risk axis; a verified backup plus per-skill .orig plus disband "
+      "means it is not one, and saying so is what removes the reason to stop")
+
+# No shipped file may re-authorize the split. This is the regression guard:
+# fact 8 has become a blocking check twice already.
+_split_authorizers = sorted(
+    _p for _p in manifest_paths()
+    if _p.endswith(".md")
+    and re.search(r"split[^.]{0,40}across sessions", read(_p), re.I)
+    and not re.search(r"retract|never split", read(_p), re.I))
+check("no shipped file authorizes splitting a run across sessions",
+      not _split_authorizers,
+      f"session-split instruction without a retraction in: {_split_authorizers} — "
+      "fact 8 is DOCUMENTED and unmeasured; platform.md bars it from refusing work")
+
+check("platform fact 8 is marked as a repeat blocking-check offender",
+      "REPEAT OFFENDER" in plat and "It may **report**; it may not refuse" in plat,
+      "the same unmeasured cap became a blocking check on the org-design path (2026-08-03) and "
+      "again on the conversion path (2026-08-04); the fact carries its own history now")
+
+# The canary is attempted twice, and the run clears its own marks.
+check("audit has a Step 6a that re-attempts the canary in-run",
+      "## Step 6a — Canary re-attempt" in aud,
+      "Step 4b runs the canary immediately after Step 0.6 writes its fixtures, so UNAVAILABLE was "
+      "structurally certain on every first audit and three deferred rows followed automatically")
+
+check("audit Step 6a restamps handbooks rather than queueing an amend",
+      "The restamp IS `/workforce amend`, executed here rather than asked for" in aud,
+      "a run that can clear its own marks and instead asks the user to clear them has deferred a run")
+
+check("staging obliges a second canary attempt before DEGRADED",
+      "obliges a SECOND attempt inside the same run" in _stg,
+      "staging itself said the fixtures 'register later in this session' and then asked the user "
+      "to re-run; one attempt is a reading, not a measurement")
+
+# A deferred row must name work the run genuinely could not do.
+check("deferred forbids a row discharged by re-running its own command",
+      "may never be discharged by re-running the command that wrote it" in dfr,
+      "5 of odyssey-alive's 9 rows named audit/verify/amend/sweep with no changed precondition — "
+      "that is not deferred work, it is a run that stopped")
+
+check("deferred requires the precondition in the discharge cell",
+      "it names the command but not what must change first" in dfr,
+      "'audit (re-run after the block is resolved)' cannot tell a reader whether re-running is "
+      "sufficient or futile")
+
+# The env flag: removed under succession, restorable always.
+check("audit-setup removes the agent-teams flag under declared succession",
+      "REMOVE the key, and record it in `.settings-owned.json`" in _asu,
+      "leaving it voids every IC's disallowedTools: — the run wrote a correct paragraph about the "
+      "cost and left the org running against a host that breaks its ceilings")
+
+check("audit-setup scopes the removal to declared succession only",
+      "report only, and name the likely source" in _asu,
+      "under any other owner the flag belongs to a system still in service and removing it would "
+      "be undone by the next install")
+
+check("audit-setup scopes the env removal to the file that holds the key",
+      "A\n**personal-scope `env` key is never edited by a project-scope run.**" in _asu
+      or "personal-scope `env` key is never edited by a project-scope run" in _asu,
+      "env keys do not merge like permission rules; removing CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH "
+      "from the wrong scope silently collapses the three-tier chain of command (fact 1)")
+
+check("the settings sidecar can express a removal, not only an addition",
+      '"env_removed"' in enf and "RESTORES rather than removes" in enf,
+      "a sidecar that only recorded additions would have made the env removal irreversible")
+
+check("disband restores env_removed with its prior value",
+      "replay `env_removed` in the opposite direction" in _dsb and "exact prior value" in _dsb,
+      "every other sidecar section reverses by deleting; this one reverses by writing back, and a "
+      "disband that only knew how to delete would leave the removal permanent")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

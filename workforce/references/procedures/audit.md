@@ -359,10 +359,15 @@ Rule 2 was missing from this list and from `org-config.template.md` while the ta
 "the point" of its section — a run reading either restatement would have converted a skill whose
 imperative content sits only inside an immutable span.
 
-**Under `declared`, count the batch before executing it.** Dozens of conversions each carrying a cold probe
-approaches the session spawn cap (`delegation-budget.md` § The session cap). Print the eligible count, and
-where it will not fit in one session, say so and split — a batch that dies half-way is contained by the
-per-skill transaction, but being contained is not the same as being planned.
+**Under `declared`, count the batch, print `INV-BATCH`, then execute all of it.** Dozens of conversions
+each carrying a cold probe draw on the session spawn cap (`platform.md` fact 8) — so print the four
+numbers that decide it (cap · spent · headroom · batch cost) and run the batch in this run.
+**`INV-BATCH` is the whole gate; there is no session split** (`conversion-taxonomy.md` § What succession
+does not do). Where headroom is genuinely short, narrow the concurrent wave — conversions are sequential
+transactions, so the batch never touches the concurrency cap.
+
+*Retracted 2026-08-04: this read "where it will not fit in one session, say so and split." It named no
+threshold, so "will not fit" was never computable and the cautious reading — stop — won every time.*
 
 **Report dispositions with reasons. A conversion count is not a success metric.** An audit that
 converts two skills, correctly leaves fifteen alone, and hires three employees the skills never covered
@@ -600,15 +605,23 @@ Resolve to exactly one of the four outcomes in `staging.md` § The three outcome
 | Result | What Step 5 does |
 |---|---|
 | `PASS` / `PASS (on record)` | author and register normally |
-| `UNAVAILABLE` | **proceed, DEGRADED.** Register, mark every handbook `Tier ceiling: unverified this run`, and carry the state into Step 7 |
+| `UNAVAILABLE` | **proceed, DEGRADED — and carry the state into Step 6a, which RE-ATTEMPTS it in this run.** Register, mark every handbook `Tier ceiling: unverified this run`. That mark is provisional until 6a resolves it |
 | `FAIL` | **abort before any registration.** Confirm the expectation first — on the one occasion this has fired, the spec was at fault |
 
-**`UNAVAILABLE` is the expected result on a first audit** and is not a defect: the fixtures written at
-`references/audit-setup.md` § Step 0.6 have not registered yet. It is also the expected result headless. Never report it as FAIL, and
-never abort on it — a gate that refuses a fresh install because it cannot measure a host it has a
-shipped baseline for is a gate that fails for a reason that is not true.
+**`UNAVAILABLE` is the expected result HERE on a first audit** and is not a defect: the fixtures written
+at `references/audit-setup.md` § Step 0.6 have not registered yet. It is also the expected result
+headless. Never report it as FAIL, and never abort on it — a gate that refuses a fresh install because
+it cannot measure a host it has a shipped baseline for is a gate that fails for a reason that is not true.
 
-Record the result and cite it in the org chart header either way.
+**But it is NOT the run's final answer, and this step is no longer where the question is settled.**
+Fact 3 measures the registration delay as *shorter than a session* — so a first audit that stops asking
+here is guaranteed to end DEGRADED on a fact it could have measured before the run was over. Step 6a
+re-attempts it. Record this result, and cite it in the org chart header as the **first** attempt.
+
+*Amended 2026-08-04. Step 4b ran the canary immediately after Step 0.6 wrote its fixtures, which made
+`UNAVAILABLE` structurally certain on every first audit — and the run then queued three deferred rows
+(`verify`, fixture sweep, `amend`) asking the user to finish in another session what the delay would
+have released minutes later in this one.*
 
 ## Step 5 — Ratify, then author
 
@@ -632,8 +645,13 @@ completes; a probe failure is fixed in the same run, never deferred.
 
 ## Step 6 — Execute
 
-Order: **conversions → handbooks → data skills → charter and principles → the Constitution Gate →
-model rewrite → `org index` → `org embed` → `wf-claude-md` → `checksums` → `verify` → the sweep.**
+Order: **conversions → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
+principles → the Constitution Gate → model rewrite → `org index` → `org embed` →
+`wf-claude-md` → `checksums` → `verify` → the sweep.**
+
+**The canary re-attempt sits third for a reason**: it may restamp every handbook's `Tier ceiling:` line,
+and that must land *before* `org index`, `org embed`, `wf-claude-md`, and `checksums` read or hash them.
+A restamp after `checksums` would leave the sidecar describing bytes that no longer exist.
 
 **`checksums` is in this list because it was in no list.** It generates
 `.claude/workforce/.directives.sha`, the sidecar `wf-protect-directives` compares every edit against —
@@ -708,6 +726,44 @@ cell (`references/org-config.template.md` § The four lanes).
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+## Step 6a — Canary re-attempt (the step that keeps DEGRADED from leaving the run)
+
+**Runs only when Step 4b returned `UNAVAILABLE`.** On `PASS`, `PASS (on record)`, or `FAIL`, the
+question is already settled and this step is a no-op that prints why.
+
+Re-run `staging.md` § Phase C against the same fixtures. Nothing is rewritten and no fixture is
+re-authored: this is the *identical* measurement, attempted later, because the only thing that was
+missing at Step 4b was elapsed time and turn boundaries (`platform.md` fact 3 — the registration delay
+is shorter than a session, and a turn boundary is the leading trigger).
+
+| Second result | What this step does |
+|---|---|
+| `PASS` | **write `platform-local.md`, restamp every handbook's `Tier ceiling:` line in place, sweep the `wf-canary-*` and `wf-ceiling-probe` fixtures, and queue NOTHING.** The run is no longer degraded |
+| `UNAVAILABLE` again | stay DEGRADED, keep the marks, and queue the three rows at Step 7 — **now with two recorded attempts, not zero** |
+| `FAIL` | the ceiling is measurably broken. Do NOT sweep. Report it against every registered handbook and queue the remediation |
+
+**The restamp IS `/workforce amend`, executed here rather than asked for.** `amend`'s own procedure is
+the authority on how the line is rewritten; this step calls it, and the closing report counts the
+handbooks it touched. **A run that can clear its own marks and instead asks the user to clear them has
+deferred a run** (`conversion-taxonomy.md` § What succession does not do).
+
+**Print both attempts, always** — a single-attempt line and a two-attempt line must never read the same:
+
+```
+INV-CANARY   attempt 1 UNAVAILABLE (Step 4b, fixtures unregistered) · attempt 2 PASS (Step 6a)
+             platform-local.md written · 13 handbooks restamped · 4 fixtures swept
+```
+
+**Under `--review`: attempt the measurement, print the outcome, write nothing** — no `platform-local.md`,
+no restamp, no fixture sweep. The measurement is read-only; only its consequences write.
+
+*Added 2026-08-04. Step 4b ran the canary at the one moment it could not succeed, and Step 7 queued
+three rows — `verify`, the fixture sweep, and `amend` — asking the user to finish in another session
+what a second attempt would have closed here. The record of that decision is directly overhead at Step 7:
+"Found 2026-08-03 by being asked whether one audit run does all of this in one session." **It was asked,
+and the answer was to queue the rows more carefully rather than to attempt the measurement again.**
+Rows 1, 2, and 3 of `odyssey-alive`'s `deferred.md` are all this one gap.*
 
 ## Step 6b — The sweep (the only step that deletes)
 
@@ -909,24 +965,30 @@ does not have.*
 
 **And a printed promise is not a queued one — write the rows.** Every follow-up this run owes goes into
 `${CLAUDE_PROJECT_DIR}/.claude/workforce/deferred.md` (`references/deferred.md` owns the format) in the
-same step that prints it. At minimum, on `UNAVAILABLE`:
+same step that prints it.
 
-| Row | Discharged by |
-|---|---|
-| tier ceiling unverified — re-run the canary | `/workforce verify` once the fixtures register |
-| `wf-canary-*` and `wf-ceiling-probe` fixtures live in the user's `.claude/agents/` | the same `verify`, which sweeps them once their fact is measured (`staging.md` § Fixture lifecycle) |
-| **every handbook carries `Tier ceiling: unverified this run`** | **`/workforce amend`**, *after* the `verify` above passes the canary and writes `platform-local.md` |
+**BLOCKING — a row is queued only for work this run genuinely could not do.** Before writing any row,
+answer: *what discharges it?* If the answer names **this same command in a later session**, it is not a
+deferral — it is a run that stopped, and the work belongs in the run
+(`conversion-taxonomy.md` § What succession does not do). Legitimate rows name something else entirely:
+a **user decision** this project has no standing to make, or a fix **in another repository**.
 
-**Queue the `amend` row NOW, at the same time as the `verify` row, even though it cannot run yet.**
-The chain is `audit → verify → amend` and this run owes all three: `verify` measures the host and
-**reports** the fix, `amend` applies it. `verify` is read-only by contract and will not write queue
-state, so a row it alone could justify is a row nobody writes.
+**The three canary rows are conditional on Step 6a, and on a passing re-attempt there are none:**
 
-*Found 2026-08-03 by being asked whether one audit run does all of this in one session. It queued the
-first link and named the third in prose. **This file's own rule is directly overhead — "a printed
-promise is not a queued one — write the rows"** — and it was being applied to the link audit owns and
-not to the link audit can foresee. The marks would sit on every handbook after a passing canary, with
-nothing driving anyone to clear them.*
+| Row | Queued when | Discharged by |
+|---|---|---|
+| tier ceiling unverified — re-run the canary | **only if Step 6a's second attempt also returned `UNAVAILABLE`** | `/workforce verify` once the fixtures register |
+| `wf-canary-*` and `wf-ceiling-probe` fixtures live in the user's `.claude/agents/` | same condition — 6a sweeps them itself on `PASS` | the same `verify` (`staging.md` § Fixture lifecycle) |
+| every handbook carries `Tier ceiling: unverified this run` | same condition — 6a restamps them itself on `PASS` | `/workforce amend` |
+
+**Print the attempt count beside them.** Three rows after one attempt is a run that gave up; three rows
+after two is a host that will not register fixtures inside a run, which is a real finding about the host.
+
+*Rewritten 2026-08-04. These three were queued unconditionally, and the note that stood here read:
+"Found 2026-08-03 by being asked whether one audit run does all of this in one session." **The question
+was the right one and the answer was the wrong shape** — it improved the bookkeeping of work being
+postponed instead of attempting the measurement a second time. All three rows in `odyssey-alive`'s
+`deferred.md` were this, and every one of them would have been discharged by Step 6a.*
 
 *Measured 2026-08-03, first real audit. The canary returned `UNAVAILABLE`, the closing report printed
 the line above correctly — and **no `deferred.md` was written at all**, so the only record of the
