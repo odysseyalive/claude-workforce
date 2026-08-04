@@ -94,9 +94,9 @@ cannot refuse. Everything available is mitigation, and it should be described as
 2. **Budget preflight at the `/org` door** — projected spawn count against remaining budget; over
    budget, dispatch one tier lower or split the work order.
 3. **A host-generated counter**, optional. A `SubagentStart` hook can increment
-   `.claude/workforce/.spawn-count` and advise near the cap. This project ships no hooks
-   (`enforcement.md` § Nothing ships dormant), so a host that wants the counter writes it. The `/org` preflight is the
-   always-present backstop and does not depend on one.
+   `.claude/workforce/.spawn-count` and advise near the cap. The one hook this project ships guards
+   directive blocks, not spawn counts (`enforcement.md` § Nothing ships dormant), so a host that wants
+   the counter writes it. The `/org` preflight is the always-present backstop and does not depend on one.
 4. **Sequential waves inside ONE run** — a long batch draws down the session total and never touches
    the concurrent cap, so wave width is the lever. **A run is never split across sessions; that was
    retracted 2026-08-04** (`conversion-taxonomy.md` § What succession does not do). It named no

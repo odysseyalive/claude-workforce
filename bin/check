@@ -4979,6 +4979,68 @@ check("disband restores env_removed with its prior value",
       "disband that only knew how to delete would leave the removal permanent")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# The retracted "ships zero hooks / no executables" claim, everywhere it can hide
+# ─────────────────────────────────────────────────────────────────────────────
+# The count check above holds enforcement.md to the manifest. It held NOTHING
+# else: on 2026-08-04 a dev audit found the retracted claim still asserted, live,
+# in five more files — two shipped (delegation-budget.md, audit.md § hook census)
+# and three unshipped but read by every maintainer or user (CLAUDE.md § Layout,
+# both installer comments). Same class as the "restart required" lint: prose that
+# QUOTES the old claim as history is fine; prose that ASSERTS it is not. History
+# gets a one-line window either side, because these files hard-wrap at ~100
+# columns and the retraction token can land on the neighbouring line.
+_ZERO_ASSERT = re.compile(r"ships (?:\*\*)?(?:zero|ZERO|no) (?:hooks|executables)")
+_ZERO_OK = re.compile(r"(?:said|retract|correction|generalized|used to)")
+_zero_hits = []
+for _p in sorted(set([p_ for p_ in declared if p_.endswith(".md")]
+                     + ["CLAUDE.md", "README.md", "COMMANDS.md", "install", "install.ps1"])):
+    _zlines = read(_p).splitlines()
+    for _zi, _zline in enumerate(_zlines):
+        if _ZERO_ASSERT.search(_zline):
+            _zctx = "\n".join(_zlines[max(0, _zi - 1):_zi + 2])
+            if not _ZERO_OK.search(_zctx):
+                _zero_hits.append(f"{_p}:{_zi + 1}")
+check(
+    "hooks: no file asserts the distribution ships zero hooks or zero executables",
+    not _zero_hits,
+    f"retracted claim asserted at: {_zero_hits} — the manifest flags "
+    f"{len(manifest_hook_paths())} hook(s); quote the history with a retraction "
+    "token within one line, or state the current count",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A settings-merge failure is reported, never a mid-run death — both installers
+# ─────────────────────────────────────────────────────────────────────────────
+# A malformed pre-existing settings.json used to kill the bash installer with a
+# raw traceback AFTER all 87 files had verified: exit 1, no completion message,
+# and the manual-settings fallback only fired when python3 was ABSENT, not when
+# it failed. The user's broken file is the one input this step exists to handle,
+# and it was broken before the installer wrote anything.
+_instxt = read("install")
+_ps1txt = read("install.ps1")
+check(
+    "install: a settings-merge failure is reported, never a mid-run death",
+    "except ValueError" in _instxt and "SETTINGS NOT CONFIGURED" in _instxt
+    and "if ! SETTINGS_FILE=" in _instxt,
+    "the bash installer must catch the user's malformed settings.json (except "
+    "ValueError), keep set -e from aborting the run (if !), and say what remains "
+    "in the summary (SETTINGS NOT CONFIGURED)",
+)
+check(
+    "install: install.ps1 reports a settings-merge failure instead of dying",
+    "Could not parse" in _ps1txt and "SETTINGS NOT CONFIGURED" in _ps1txt,
+    "the PowerShell installer must catch ConvertFrom-Json failing on the user's "
+    "malformed settings file and say what remains in the summary",
+)
+check(
+    "install: install.ps1 never exits the user's console",
+    "closes their whole terminal" in _ps1txt and "exit 1" not in _ps1txt,
+    "`irm | iex` runs the installer in the user's own console, where `exit` closes "
+    "the whole terminal on exactly the path where the user most needs to read what "
+    "was printed — return instead, and keep the comment that says why",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")

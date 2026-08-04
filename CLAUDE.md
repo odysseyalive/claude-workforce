@@ -410,12 +410,14 @@ that had readers and no writer.
   guidance is wrong is **unsettled** — deliberately left open rather than resolved by widening a cap on
   one project's evidence. A project hitting it on the first real target is evidence about the cap, not
   about the project.
-- **Fact 13b — an MCP grant for an absent server — has a fixture and one spawn left.**
-  `.claude/agents/wf-mcp-absent-probe.md` is written and declares `measures-fact: 13b`. Three spawn
-  attempts on 2026-08-03 returned `Agent type not found`: fact 3's delay, in the session that wrote it.
-  `UNAVAILABLE`, never `FAIL`. **Do not delete the fixture** — the setup is the expensive part and one
-  spawn from a later session closes the fact. Splitting it out of fact 13 was itself the finding: the
-  open case had been living inside a MEASURED fact as a paragraph of caveat, where nothing could see it.
+- ~~**Fact 13b — an MCP grant for an absent server — has a fixture and one spawn left.**~~ **Closed
+  2026-08-03 — the spawn landed later the same day** (`measurements/2026-08-03-mcp-absent-server.md`,
+  Claude Code 2.1.221): the absent entry is dropped SILENTLY and the rest of the grant survives, now
+  ✅ MEASURED as fact 13b in `platform.md`. The fixture is gone, its job done. *This entry outlived its
+  own closure by a day — found 2026-08-04 by a dev audit, the "goes stale silently" failure this file
+  names about itself. What stays worth keeping: splitting 13b out of fact 13 was itself the finding —
+  the open case had been living inside a MEASURED fact as a paragraph of caveat, where nothing could
+  see it.*
 
 - ~~**A grant naming an MCP server the host has not configured is untested.**~~ *(superseded by 13b above.)* Fact 13 measured the grant
   grammar against a server that exists; the absent-server case is the one that matters for anyone else
@@ -496,7 +498,8 @@ reach, which `enforcement.md` now carries as a measured *prevents*.
 | `workforce/references/` | cross-cutting specs — start at `platform.md`, `scopes.md`, `org-design.md` |
 | `workforce/references/procedures/` | one procedure per command |
 | `workforce/agents/` | the shipped panel agents (leaf-only: all carry `disallowedTools: Agent`) |
-| — | this project ships **no executables**; see `references/enforcement.md` § Hooks |
+| `workforce/bin/` | five Python scripts; exactly one is a hook — `references/enforcement.md` § Hooks |
+| `workforce/canary/` | tier-canary agent fixtures; the manifest's `canary` flag lands them in `.claude/agents/` |
 | `manifest.txt` | the authoritative shipped-file list, consumed by both installers |
 | `measurements/` | evidence behind every MEASURED fact in `platform.md`; tracked, deliberately **not** shipped |
 | `bin/check`, `bin/sync` | conformance and mirror |

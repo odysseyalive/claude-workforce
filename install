@@ -264,6 +264,7 @@ curl -fsSL "$REPO_URL/manifest.txt" -o "$MANIFEST_TMP"
 
 FETCH_FAILED=""
 VERIFY_FAILED=""
+SETTINGS_FAILED=""
 
 # Post-install completeness pass. The manifest is the authoritative shipped-file
 # list, so "did the install include everything the project needs" is answerable
@@ -352,10 +353,10 @@ install_to_scope() {
             "keep "*) flag="keep"; path="${line#keep }" ;;
             "hook "*) flag="hook"; path="${line#hook }" ;;
             # `exec` is `hook`'s mechanical twin — chmod +x, nothing else. It is a
-            # separate word because this project ships ZERO hooks and several
-            # scripts (references/enforcement.md § Hooks), and a manifest line
-            # reading `hook workforce/bin/wf-census` would contradict that in the
-            # one place a reader checks what actually ships.
+            # separate word because this project ships exactly ONE hook and several
+            # plain scripts (references/enforcement.md § Hooks), and a manifest line
+            # reading `hook workforce/bin/wf-census` would claim a registration in
+            # the one place a reader checks what actually ships.
             "exec "*) flag="hook"; path="${line#exec }" ;;
             # `canary` files do NOT live in the skill directory: they are agent
             # definitions and must land in .claude/agents/ to be registered as
@@ -415,11 +416,25 @@ install_to_scope() {
         echo "  (user scope — these apply to every project on this machine)"
     fi
     if command -v python3 &>/dev/null; then
-        SETTINGS_FILE="$settings_file" python3 -c "
-import json, os
+        # `if !` keeps set -e from killing the run here. The parse failure below is
+        # the USER'S settings file, broken before this run wrote anything: the skill
+        # files above installed fine, and a traceback at this point reads as a failed
+        # install while naming no fix. Report it, touch nothing, and let the summary
+        # say what remains.
+        if ! SETTINGS_FILE="$settings_file" python3 -c "
+import json, os, sys
 
 p = os.environ['SETTINGS_FILE']
-d = json.load(open(p)) if os.path.exists(p) else {}
+try:
+    d = json.load(open(p)) if os.path.exists(p) else {}
+except ValueError as e:
+    print(f'  Could not parse {p} as JSON: {e}')
+    print('  Leaving it untouched. Fix the syntax and re-run this installer, or add')
+    print('  these settings yourself:')
+    print('  { \"env\": { \"CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH\": \"3\" },')
+    print('    \"permissions\": { \"allow\": [\"Agent\", \"SendMessage\", \"TaskCreate\", \"TaskUpdate\",')
+    print('                               \"TaskList\", \"TaskGet\", \"WebSearch\", \"WebFetch\"] } }')
+    sys.exit(3)
 changed = False
 
 env_vars = {'CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH': '3'}
@@ -457,7 +472,9 @@ if changed:
         os.makedirs(parent, exist_ok=True)
     json.dump(d, open(p, 'w'), indent=2)
     print(f'  Settings saved to {p}')
-"
+"; then
+            SETTINGS_FAILED="$SETTINGS_FAILED $settings_file"
+        fi
     else
         echo "  Warning: python3 not found. Add these to $settings_file manually:"
         echo '  { "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3" },'
@@ -479,6 +496,17 @@ if [ -n "$FETCH_FAILED" ] || [ -n "$VERIFY_FAILED" ]; then
     echo "  refetch whatever is absent. Files flagged \`keep\` are never overwritten."
     echo "  Finish this install before running any workforce command -- procedures invoke"
     echo "  the shipped scripts by path, and a missing one fails mid-run."
+    exit 1
+fi
+
+if [ -n "$SETTINGS_FAILED" ]; then
+    echo "SETTINGS NOT CONFIGURED."
+    echo "  Every skill file installed and verified, but these settings files could not"
+    echo "  be updated (details above):"
+    for sf in $SETTINGS_FAILED; do echo "    $sf"; done
+    echo
+    echo "  Workforce runs without them, but the org's delegation contract is not set:"
+    echo "  every delegation will raise a permission prompt until the settings are in."
     exit 1
 fi
 

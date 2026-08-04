@@ -206,6 +206,7 @@ Begin with step 1 now.
     $manifest = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/manifest.txt").Content -split "`n"
     $script:FetchFailed = @()
     $script:VerifyFailed = $false
+    $script:SettingsFailed = @()
 
     foreach ($scope in $targets) {
         switch ($scope) {
@@ -236,8 +237,8 @@ Begin with step 1 now.
             if ($line.StartsWith('keep ')) { $flag = 'keep'; $path = $line.Substring(5).Trim() }
             elseif ($line.StartsWith('hook ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
             # `exec` is `hook`'s mechanical twin — chmod +x on unix, a no-op here.
-            # Separate word because this project ships zero hooks and several
-            # scripts; see references/enforcement.md § Hooks.
+            # Separate word because this project ships exactly one hook and several
+            # plain scripts; see references/enforcement.md § Hooks.
             elseif ($line.StartsWith('exec ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
             # `canary` files are agent DEFINITIONS and must land in .claude/agents/
             # to register as agent types at all. Shipped so they are ALREADY
@@ -328,11 +329,27 @@ Begin with step 1 now.
             Write-Host '  (user scope — these apply to every project on this machine)'
         }
 
+        # The parse failure below is the USER'S settings file, broken before this
+        # run wrote anything: the skill files above installed fine, and a naked
+        # throw here reads as a failed install while naming no fix. Report it,
+        # touch nothing, and let the summary say what remains.
+        $settings = $null
         if (Test-Path $settingsFile -PathType Leaf) {
-            $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
+            try {
+                $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
+            } catch {
+                Write-Host "  Could not parse $settingsFile as JSON: $($_.Exception.Message)"
+                Write-Host '  Leaving it untouched. Fix the syntax and re-run this installer, or add'
+                Write-Host '  these settings yourself:'
+                Write-Host '  { "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3" },'
+                Write-Host '    "permissions": { "allow": ["Agent", "SendMessage", "TaskCreate", "TaskUpdate",'
+                Write-Host '                               "TaskList", "TaskGet", "WebSearch", "WebFetch"] } }'
+                $script:SettingsFailed += $settingsFile
+            }
         } else {
             $settings = New-Object PSObject
         }
+        if ($null -eq $settings) { continue }
         $changed = $false
 
         if (-not $settings.PSObject.Properties['env']) {
@@ -411,7 +428,21 @@ Begin with step 1 now.
         Write-Host '  refetch whatever is absent. Files flagged `keep` are never overwritten.'
         Write-Host '  Finish this install before running any workforce command -- procedures invoke'
         Write-Host '  the shipped scripts by path, and a missing one fails mid-run.'
-        exit 1
+        # NOT `exit`: the documented invocation is `irm | iex`, which runs this in the
+        # user's own console — `exit` there closes their whole terminal on the one
+        # path where they most need to read what it printed.
+        return
+    }
+
+    if ($script:SettingsFailed.Count -gt 0) {
+        Write-Host 'SETTINGS NOT CONFIGURED.'
+        Write-Host '  Every skill file installed and verified, but these settings files could not'
+        Write-Host '  be updated (details above):'
+        foreach ($sf in $script:SettingsFailed) { Write-Host "    $sf" }
+        Write-Host ''
+        Write-Host "  Workforce runs without them, but the org's delegation contract is not set:"
+        Write-Host '  every delegation will raise a permission prompt until the settings are in.'
+        return
     }
 
     if ($mode -eq 'update') {

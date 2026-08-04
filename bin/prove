@@ -122,6 +122,14 @@ CASES = [
      STG2, "del", "THE INSTALLER SHIPS THEM"),
     ("install: both installers place canary files in the agents dir, not the skill",
      INS, "del", 'dest="$agents_dir/$(basename "$path")"'),
+    ("hooks: no file asserts the distribution ships zero hooks or zero executables",
+     INS, "append", "\n# NB: this project ships ZERO hooks\n"),
+    ("install: a settings-merge failure is reported, never a mid-run death",
+     INS, "del", "SETTINGS NOT CONFIGURED"),
+    ("install: install.ps1 reports a settings-merge failure instead of dying",
+     PS1, "del", "SETTINGS NOT CONFIGURED"),
+    ("install: install.ps1 never exits the user's console",
+     PS1, "append", "\n# a stray exit 1 in a comment is enough: the check bans the token\n# exit 1\n"),
 ]
 
 

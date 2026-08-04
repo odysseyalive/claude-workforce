@@ -237,8 +237,9 @@ one that blocks destruction of billable or irreplaceable data — is **load-bear
 dead-wiring finding outranks every optimization finding in the report. Advisory dead wiring is ordinary
 cleanup. The distinction is what makes the finding actionable instead of a broken-path list.
 
-**Report, never rewire.** Workforce ships no hooks and does not manage a host's. A hook it did not write
-is outside what `disband` may excise, which makes it outside what `audit` may touch.
+**Report, never rewire.** The one hook workforce ships is wired by `/workforce hooks`, never by this
+census — and a host's own hooks are not workforce's to manage. A hook it did not write is outside what
+`disband` may excise, which makes it outside what `audit` may touch.
 
 ## Step 2 — Design the org (panel) — both modes
 
