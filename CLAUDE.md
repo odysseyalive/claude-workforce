@@ -275,7 +275,39 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-04
 
-- **The "a run finishes" patch has not been exercised end to end, and that is the next thing to do.**
+**Closed 2026-08-04 (late) — the "a run finishes" patch WAS exercised end to end, and it failed on a
+third axis.** The real `odyssey-alive` run converted **0 of 40 eligible**, printed `INV-BATCH … DID NOT
+RUN` beside `cap 200 · spent 8 · headroom 192`, and told the user to start a new session. Its own
+account: *"The spawn budget was never the constraint — 192 of 200 left. The authoring context was."*
+
+**It had 192 authors available and dispatched none.** `audit.md` Step 5 read *"Then author. Per
+employee"* with no dispatch, so every draft accumulated in one window and the roster genuinely was
+impossible — from a limit the design created. The vendor docs settle it: a subagent *"runs in its own
+context window … and returns only the summary"*, and agent teams exist for work that *"exceeds your
+context window."* Authoring is now **by dispatch**, and context capacity may never be a reason to stop.
+
+Fact 8's REPEAT OFFENDER pattern, **third axis** — org-design, then spawn cap, now context. The general
+rule landed with it: *the capacity that stops a run must be a number this run printed.* And the exit
+itself is closed: `invariants.md` had said 0-converted *"is NOT UPHELD, not a plan"*, and the run printed
+exactly that and stopped. **Saying a state is wrong is not forbidding the exit that reaches it.**
+
+**Also closed — the canary could not succeed on a first run, by construction.** Step 0.6 wrote the
+fixtures; Step 4b spawned them the same session; fact 3 makes that impossible. Both attempts UNAVAILABLE,
+13 handbooks DEGRADED, and a deferred row discharged by *"`/workforce verify` from a fresh session."*
+The four fixtures now carry a `canary` manifest flag and **install to `.claude/agents/`**, so the first
+audit finds them registered. `staging.md` had accepted the loss outright — *"the next run finds them
+registered"* — and the next run is a new session, which was the whole complaint.
+
+*The lesson worth keeping: `bin/check` at 644 assertions, `bin/prove` at 37, and a walk-through against
+this project's real numbers all passed while the run remained unable to finish. **Only running it found
+it.** The mock audit is in the loop for this reason and it was skipped for the patch that most needed it.*
+
+**Still open from this:** the three findings the run reported and nothing acted on — 3 dead
+`code-evaluator` registrations (the doctrine now says workforce owes that capability under succession;
+no run has executed it), `lab/CLAUDE.md` costing 7,680 B on every spawn, and zero mechanical enforcement
+of *"Odyssey Alive offers no SEO or social-media services"* against four such skills in the roster.
+
+- ~~**The "a run finishes" patch has not been exercised end to end, and that is the next thing to do.**~~
   It is proven at the text layer (621 assertions, 14 of them proven by breaking) and walked against
   `odyssey-alive`'s real numbers, but **no audit has actually run under it.** The user's plan is to reset
   `odyssey-alive` and re-run; that run is the measurement. Two specific unknowns: whether Step 6a's
