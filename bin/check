@@ -4024,6 +4024,40 @@ check("every shipped panel agent has an Agent-free tools: allowlist",
       f"{len(_panel)} panel agents; offending: {_bad_panel}")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Writing `tools:` severs MCP — the cost of the ceiling, paid once
+# ─────────────────────────────────────────────────────────────────────────────
+# The teammate fix above gave the IC template a `tools:` line. An explicit list is a
+# HARD CEILING for MCP (fact 13: ToolSearch searched a server its grant never named
+# and the schema was withheld), so that change silently cut every generated IC off
+# from every configured server. Measured the same day on apps-odyssey-alive: two
+# employees whose bodies route through nanobanana-mcp / playwright-mcp passed all 138
+# text checks and could not reach either.
+#
+# A rule lands with its enforcement. The doctrine is here; the detection is
+# wf-conform's body-vs-grant diff, asserted below.
+
+check("templates document that an explicit tools: severs MCP",
+      "SEVERS every MCP server" in tpl,
+      "the IC template gained `tools:` without stating what it subtracts")
+
+check("templates name the server-level grant form",
+      "mcp__<server>" in tpl,
+      "an IC needing MCP must name the server; `ToolSearch` is not a hedge (fact 13)")
+
+_wfc = read("workforce/bin/wf-conform")
+check("wf-conform diffs handbook body against its tools: grant",
+      "every MCP server its body uses is named in tools:" in _wfc,
+      "the only check here that compares text to capability rather than to more text")
+
+check("wf-conform excludes servers named only to forbid them",
+      "PROHIBITION_RX" in _wfc,
+      "`- NEVER use mcp__x__*` is a guardrail, not a dependency — it read as one until fixed")
+
+check("audit-setup does not attribute the agent-teams flag to the user",
+      "not touched — but do NOT report it as the user's choice" in _asu,
+      "an installer commonly sets it; claude-enforcer's install does so unconditionally")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The agent-teams flag is never written, and never present here
 # ─────────────────────────────────────────────────────────────────────────────
 check("audit-setup forbids writing env settings keys",

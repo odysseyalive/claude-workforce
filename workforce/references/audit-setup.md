@@ -556,11 +556,20 @@ tier ceiling depends on the half of its frontmatter that survives, and fact 18 d
 be disabling two of its own load-bearing mechanisms and reporting a healthy org.** It is never written,
 never suggested as a remedy, and its absence is never reported as a finding.
 
-**If the flag is already set by the user, that is theirs and it is not touched.** Report it once, in
-the permission findings at the end of the run, as: "`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled
-in <file>. Employees invoked as named teammates lose `disallowedTools:` and `skills:` (platform.md
-facts 2d, 18). The org still functions; its tier ceilings rest on the `tools:` allowlist alone." Then
-stop — the user's environment is not this command's to change.
+**If the flag is already set, it is not touched — but do NOT report it as the user's choice.** It is
+frequently written by an *installer*, not by a person: `claude-enforcer`'s `install` sets it
+unconditionally and its own `agents-teams.md` says so — *"The install script sets this automatically in
+`.claude/settings.local.json`."* Found set in `apps-odyssey-alive` on 2026-08-03, where the user did not
+know it was on.
+
+So report the flag **and name its likely source**, in the permission findings at the end of the run:
+"`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled in <file>. Employees invoked as named teammates lose
+`disallowedTools:` and `skills:` (platform.md facts 2d, 18). The org still functions; its tier ceilings
+rest on the `tools:` allowlist alone. If you did not set this, grep your installed skills for the name —
+a predecessor installer may own it, in which case removing it from settings is undone by the next
+install." Then stop — the environment is not this command's to change, and **an installer-set flag is a
+question about which system the user wants running, which is theirs to answer** (`verify.md`
+§ A retired generator that came back states the same principle for a resurrected skill).
 
 ### Under `--review`
 

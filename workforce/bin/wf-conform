@@ -64,6 +64,23 @@ ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
 FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
 
+# BODY-vs-GRANT COHERENCE. Both forms an MCP server is named in prose: the tool
+# prefix (`mcp__playwright-mcp__web_fetch`) and the bare slug (`playwright-mcp`).
+#
+# The character class EXCLUDES `_` deliberately. Server slugs contain hyphens and
+# tool names are separated by `__`, so a greedy `[A-Za-z0-9-]+` stops exactly at the
+# separator and never inside the name. The first draft used `[A-Za-z0-9_-]+?` with a
+# `\b` terminator, and `\b` matches at a hyphen — it read `mcp__playwright-mcp` as
+# the server `playwright`, then reported it missing from a grant that contained it.
+MCP_TOOL_RX = re.compile(r"mcp__([A-Za-z0-9-]+)")
+MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
+# A server named only to FORBID it is not a dependency. `procedure-for-procedures.md`
+# requires guardrails to carry a literal NEVER / MUST NOT / STOP, so keying off that
+# vocabulary is reading the project's own grammar rather than guessing at intent.
+# Without this, `- NEVER use any mcp__claude-in-chrome__* tool` reads as a dependency
+# on claude-in-chrome — measured against a real handbook, where it did exactly that.
+PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't\b|\bforbidden\b", re.I)
+
 # CANONICAL SIDECAR GRAMMAR — identical to wf-protect-directives. Two readers of one
 # artifact must share one grammar and one normalization, or they cannot both be right.
 BLOCK_RX = re.compile(
@@ -226,6 +243,47 @@ def check_handbook(path, body, res, ceiling):
     if "## Verification" in body:
         seg = body.split("## Verification", 1)[1].split("\n## ", 1)[0]
         res.add(bool(seg.strip()), f"{n}: Verification section is not empty")
+
+    # BODY-vs-GRANT COHERENCE — the first check here that compares the text to the
+    # capability rather than to another piece of text.
+    #
+    # `tools:` is a REAL CEILING FOR MCP, measured: platform.md fact 13's fixture held
+    # `ToolSearch`, searched a server its grant never named, and the schema was
+    # WITHHELD. Granting `ToolSearch` opens no side door. So an explicit `tools:` list
+    # that omits a server the body routes work through describes an employee that
+    # cannot do its job — and omitting `tools:` entirely does NOT have this problem,
+    # because absence inherits every configured server (fact 14).
+    #
+    # Measured 2026-08-03 by `/workforce verify` against apps-odyssey-alive:
+    # `design-imagery` and `research-analyst` passed all 138 checks here and could not
+    # reach nanobanana-mcp / playwright-mcp. Every check was about text; none compared
+    # the text to the grant. The gap was introduced by the same change that closed the
+    # teammate ceiling — adding an explicit allowlist severed an inherited reach nobody
+    # had written down as a dependency.
+    #
+    # Deliberately one-directional: a granted server the body never mentions is NOT a
+    # finding. Over-granting is a budget question, and this check has a binary answer
+    # or it does not belong here (verify.md § What it deliberately does not cover).
+    granted = fm.get("tools")
+    if granted is not None:
+        wanted = set()
+        for line in FM_RX.sub("", body, count=1).splitlines():
+            if PROHIBITION_RX.search(line):
+                continue          # named to forbid it, not to use it
+            wanted |= {s.lower() for s in MCP_TOOL_RX.findall(line)}
+            wanted |= {s.lower() for s in MCP_SLUG_RX.findall(line)}
+        have = {s.lower() for s in MCP_TOOL_RX.findall(granted)}
+        missing = sorted(wanted - have)
+        res.add(
+            not missing,
+            f"{n}: every MCP server its body uses is named in tools:",
+            "body routes work through " + ", ".join(missing)
+            + f" but `tools:` grants {sorted(have) or 'no MCP server'} — an explicit "
+              "allowlist is a hard ceiling for MCP (fact 13), so this employee cannot "
+              "reach it. Add `mcp__<server>` at server level, and do NOT add ToolSearch "
+              "alongside it: fact 13 measured that ToolSearch DEFERS tools that arrive "
+              "loaded without it.",
+        )
 
 
 def check_data_skill(path, body, res):

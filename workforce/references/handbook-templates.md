@@ -10,6 +10,17 @@ Three templates. Fill every `<angle bracket>`; leave no placeholder in a written
   `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus ~150 deferred behind
   `ToolSearch` including all configured MCP servers (fact 4). Listing even one tool costs you every
   tool you did not list (fact 4b). The only subtraction mechanism is `disallowedTools:`.
+- **Writing a `tools:` line SEVERS every MCP server, and that is the one subtraction nobody intends.**
+  Absence of `tools:` inherits every configured server (fact 14); an explicit list is a **hard ceiling**
+  for MCP, measured — fact 13's fixture held `ToolSearch`, searched a server its grant never named, and
+  the schema was **withheld**. `ToolSearch` is not a hedge and opens no side door. So an IC whose work
+  runs through an MCP server must name it **at server level** — `mcp__<server>` — and must **not** carry
+  `ToolSearch` alongside it, because fact 13 also measured that `ToolSearch` *defers* tools that arrive
+  loaded without it. **Check the server is actually configured before granting it** (`verification.md`
+  § When the server is absent): a grant naming an absent server fails silently.
+  *`wf-conform` enforces this by diffing the body against the grant. Written 2026-08-03 after the IC
+  template gained a `tools:` line to close the teammate ceiling and, in the same change, cut two live
+  employees off from the servers their handbooks route through — 138 text checks passed over both.*
 - **`disallowedTools: Agent` AND a `tools:` allowlist omitting `Agent` — both, on every IC.** Depth
   alone does not cap an IC reached through a directly-invoked Lead, and **neither line alone caps one
   invoked as a named teammate.** A plain subagent spawn honors the denylist and a teammate spawn
@@ -201,7 +212,7 @@ description: "<What this employee does for <project>. Use for X, Y, Z.>"
 model: <IC tier model, or the department override>
 effort: <IC tier effort>
 background: true
-tools: <exact tools this IC needs — MUST NOT include Agent>
+tools: <exact tools this IC needs — MUST NOT include Agent; name every MCP server it uses as mcp__<server>, and omit ToolSearch when you do>
 disallowedTools: Agent
 skills: [operating-principles<, owned-playbook>]
 maxTurns: 40
