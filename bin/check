@@ -4114,6 +4114,112 @@ check("wf-conform exempts aggregate journal rows",
       "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# A RETRACTION ACTUALLY REMOVED THE TEXT IT RETRACTS
+# ─────────────────────────────────────────────────────────────────────────────
+# CLAUDE.md carried this as an open structural gap: "nothing verifies that a
+# retraction actually removed the text it retracts (that is how verify.md carried an
+# instruction eight lines below its own retraction)."
+#
+# "restart required" is the worked example. It is a MEASURED falsehood, retracted in
+# platform.md, and CLAUDE.md records that it "has crept back into this file, audit.md,
+# bin/sync, and both installers once already." Six files now declare it retracted --
+# and nothing ever checked that the claim itself was gone.
+#
+# The declaration is the handle: a line saying `never write "X"` / `do not write "X"`
+# / `"X" ... is retracted` names the exact string that must not appear as a live
+# claim. Any OTHER line carrying X must also carry a retraction token, or it is the
+# retracted claim still being asserted.
+_shipped_md = [p for p in manifest_paths() if p.endswith('.md')]
+
+# The declaration must be BLANKET, not conditional. "Never write `derived` FOR an
+# enumeration that was not run" forbids a term in one context; the term is legitimate
+# everywhere else. A trailing for/when/unless/if/in clause marks that, and a
+# single-word phrase is almost always a term rather than a claim — "restart required"
+# is a claim, "derived" is a word. Both filters were added after the first run flagged
+# four legitimate uses of `derived`; this is the mention-vs-use distinction the MCP,
+# IC-spawn, and marker checks each needed too.
+RETRACTION_DECL = re.compile(
+    r'(?:never write|do not write|no longer write)\s+[`"]([^`"]{4,60}\s[^`"]{2,})[`"]'
+    r'(?!\s*(?:for|when|unless|if|in|on|about)\b)', re.I)
+RETRACTION_TOKEN = re.compile(
+    r'retract|never write|do not write|no longer write|superseded|falsehood'
+    r'|is not required|would be false|is false|not the only', re.I)
+# A WINDOW, NOT A LINE. Every reference here is hard-wrapped at ~100 columns, so the
+# qualifier that makes a mention legitimate routinely sits on the PREVIOUS line — the
+# first run flagged platform.md:211 for carrying the phrase while the word
+# "retraction" sat on 210. Reading one line at a time reproduces, inside this check,
+# the exact hazard `CLAUDE.md` § Assertions match contiguous fragments describes.
+RETRACT_WINDOW = 2
+
+_retracted, _live = set(), []
+for _p in _shipped_md + ["CLAUDE.md"]:
+    for _m in RETRACTION_DECL.finditer(read(_p) or ""):
+        _retracted.add(_m.group(1).strip())
+
+for _phrase in sorted(_retracted):
+    for _p in _shipped_md + ["CLAUDE.md"]:
+        _lines = (read(_p) or "").splitlines()
+        for _i, _line in enumerate(_lines, start=1):
+            if _phrase.lower() not in _line.lower():
+                continue
+            _ctx = "\n".join(_lines[max(0, _i - 1 - RETRACT_WINDOW): _i + RETRACT_WINDOW])
+            if not RETRACTION_TOKEN.search(_ctx):
+                _live.append(f"{_p}:{_i} asserts {_phrase!r}")
+
+check("retractions: no retracted claim is still asserted anywhere",
+      not _live,
+      f"{_live[:4]} — a line carrying a retracted phrase without a retraction token is the claim "
+      "living on. This is how a file carried an instruction eight lines below its own retraction.")
+
+check("retractions: at least one retraction is declared and therefore checked",
+      bool(_retracted),
+      "no `never write \"X\"` declaration found — the check would pass vacuously, which is the "
+      "failure mode it exists to catch")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ONE CANONICAL BLOCK PER MARKER FAMILY
+# ─────────────────────────────────────────────────────────────────────────────
+# CLAUDE.md carried this as an open structural gap: "nothing checks that a marker
+# family has exactly one canonical block beyond the dispatch block specifically (that
+# is how org.md shipped two)."
+#
+# Measured 2026-08-03: ORG-CHAIN had a populated template in BOTH
+# handbook-templates.md and procedures/org.md, and THEY DISAGREED — one said
+# escalation returns "to your caller", the other "to your manager". An author
+# following the template wrote one; `org embed` overwrote it with the other, because
+# the marker says "safe to replace" so the generator always wins.
+#
+# CANONICAL_HOME is hand-maintained for the same reason PRODUCERS is: a second
+# populated block forces someone to decide which file owns the text, rather than
+# leaving two to drift. Blocks under BODY_MIN bytes are marker pairs quoted in prose,
+# not definitions — the mention-vs-use distinction this project has now needed three
+# times.
+CANONICAL_HOME = {
+    "ORG-CHAIN": {"workforce/references/procedures/org.md"},
+    "ORG-DISPATCH-CHECKPOINT": {"workforce/references/procedures/org.md"},
+    # Two tier VARIANTS (CEO and IC) plus one filled ILLUSTRATION in the format spec.
+    # Different fill of one shape, not competing definitions.
+    "ORG-RECORD": {"workforce/references/handbook-templates.md",
+                   "workforce/references/org-chart-format.md"},
+    "NAME": {"workforce/references/legacy-markers.md"},
+}
+BODY_MIN = 200
+
+_fam_files = {}
+for _p in _shipped_md:
+    _b = read(_p) or ""
+    for _m in re.finditer(r"<!--\s*([A-Z][A-Z0-9-]+)\s+START\b(.*?)<!--\s*\1\s+END\s*-->", _b, re.S):
+        if len(_m.group(2)) >= BODY_MIN:
+            _fam_files.setdefault(_m.group(1), set()).add(_p)
+
+_stray = {f: sorted(fs - CANONICAL_HOME.get(f, set()))
+          for f, fs in _fam_files.items() if fs - CANONICAL_HOME.get(f, set())}
+check("markers: every family's canonical block lives where CANONICAL_HOME says",
+      not _stray,
+      f"populated blocks outside the declared home: {_stray} — two populated blocks of one family "
+      "drift, and the generated one always wins because the marker says 'safe to replace'")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # EVERY ARTIFACT READ HAS A NAMED PRODUCER
 # ─────────────────────────────────────────────────────────────────────────────
 # The dominant defect shape of 2026-08-03, found four times in one day and never by
@@ -4152,7 +4258,6 @@ PRODUCERS = {
     ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
 }
 
-_shipped_md = [p for p in manifest_paths() if p.endswith(".md")]
 _artifacts = set()
 for _p in _shipped_md:
     for _a in re.findall(r"\.claude/workforce/[A-Za-z0-9._/-]+", read(_p) or ""):

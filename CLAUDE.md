@@ -215,9 +215,15 @@ door pointing at it.*
 - **`/workforce hooks` is still specified, asserted, and unrun.** So is the catalog reconciliation that
   must precede the sweep (`evaluators.md` § Succession removes the source).
 
-- **Two structural gaps remain open**, both named by the 2026-08-03 cold read: nothing verifies that a
-  **retraction actually removed the text it retracts**, and nothing checks that a **marker family has
-  exactly one canonical block** beyond the dispatch block specifically.
+- ~~**Two structural gaps remain open**~~ — **both closed 2026-08-03 (evening).** A retraction now
+  carries its own check: a blanket `never write "X"` declaration makes X a retracted claim, and any line
+  asserting X without a retraction token within a **two-line window** fails. The window is the point —
+  the first run flagged `platform.md:211` for carrying the phrase while the word *retraction* sat on
+  210, which is this project's own hard-wrap hazard reproduced inside the check written to catch it.
+  And `CANONICAL_HOME` now maps each marker family to the file that owns its populated block; a second
+  one fails. It found `ORG-CHAIN` defined in two files **disagreeing on the escalation line** — one said
+  return "to your caller", the other "to your manager" — where an author followed the template and
+  `org embed` then overwrote it, because the marker says "safe to replace" so the generator always won.
 
 **Closed 2026-08-03 (evening) — the day's dominant defect shape, and the instrument for it.**
 Four defects in one day had one shape: **a consumer named, a producer assumed.** `.directives.sha` had
