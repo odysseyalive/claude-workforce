@@ -202,7 +202,7 @@ step; that is the entire reason it survived.*
   "permissions.allow": ["Agent"],
   "permissions.deny":  ["Bash(rm -rf:*)"],
   "hooks":             [{"event": "PostToolUse", "matcher": "Edit|Write",
-                         "command": ".claude/skills/workforce/bin/wf-protect-directives"}],
+                         "command": "/home/you/.claude/skills/workforce/bin/wf-protect-directives"}],
   "env_removed":       {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
 }
 ```

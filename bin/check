@@ -652,9 +652,15 @@ for p in declared:
 
     # Markers (`<!-- … -->`) repeat by design — six enforcement annotations open
     # with the same line. Their pairing is check 5's job, not this one's.
+    # The script resolver is the ONE sanctioned repeat: every command block runs
+    # in a fresh shell, so a block that inherited `$WF` from an earlier block would
+    # be broken for anyone who copies just that block. It is stated canonically in
+    # scopes.md § Resolving the shipped scripts, and the assertions below compare
+    # the copies against it — so this is a mechanical duplicate, not a restatement.
     prose = [
         l for l in lines
         if len(l) > 55 and not l.lstrip().startswith(("|", "#", "```", "<!--"))
+        and not l.startswith('WF="$HOME/.claude/skills/workforce"')
     ]
     dup_p = sorted({l for l in prose if prose.count(l) > 1})
     check(f"no restated paragraph in {n}", not dup_p, f"repeated verbatim: {[l[:70] for l in dup_p]}")
@@ -2866,6 +2872,75 @@ check(
     "audit-setup.md Step 0.4a no longer forbids promoting the recommended static to "
     "first position; the cost ranking is the only thing that orders that list",
 )
+# A bare `.claude/skills/workforce/bin/…` path assumes a PROJECT install. Personal
+# is the ordinary case, so every scripted step of a procedure written that way dies
+# on `no such file or directory`. Found 2026-08-03 by a real audit run; 11 sites
+# carried it, and procedures/hooks.md had already been fixed AT THE INSTANCE the
+# same week, which is why nothing generalised. scopes.md § Resolving the shipped
+# scripts owns the resolver; hooks.md keeps a table because a hook registration
+# needs a literal absolute path resolved at write time, not a shell variable.
+_RESOLVER = 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'
+_BARE_PATH = re.compile(r"(?<![\w/`~}])\.claude/skills/workforce/bin/")
+_bare = []
+for _p in declared:
+    if not _p.endswith(".md"):
+        continue
+    for _ln, _line in enumerate(read(_p).splitlines(), 1):
+        if _BARE_PATH.search(_line) and "Never write a bare" not in _line:
+            _bare.append(f"{_p}:{_ln}")
+check(
+    "scopes: no shipped file invokes a script by a bare project-scope path",
+    not _bare,
+    f"bare `.claude/skills/workforce/bin/` at: {_bare} — that path exists only on a "
+    "project install. Use the resolver in scopes.md § Resolving the shipped scripts",
+)
+check(
+    "scopes: the canonical script resolver is stated, and personal resolves first",
+    _RESOLVER in read("workforce/references/scopes.md"),
+    "scopes.md no longer carries the canonical resolver verbatim — every command "
+    "block copies it, so the copies have nothing to be compared against",
+)
+_res_users = [
+    _p for _p in declared
+    if _p.endswith(".md") and re.search(r'"\$WF/bin/wf-', read(_p))
+    and _RESOLVER not in read(_p)
+]
+check(
+    "scopes: every file using $WF also defines it",
+    not _res_users,
+    f"uses `$WF/bin/…` without the resolver: {_res_users} — each command block runs "
+    "in a fresh shell, so a block that inherits $WF from an earlier one is broken",
+)
+_hooks_md = read("workforce/references/procedures/hooks.md")
+# find(), not index() — a missing row must FAIL this check, not raise out of the
+# whole run. bin/prove breaks assertions by deleting their literal, so an
+# index()-based check would take every other assertion down with it.
+_hk_personal = _hooks_md.find("| 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |")
+_hk_project = _hooks_md.find("| 2 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |")
+check(
+    "hooks: the registration path resolves personal before project",
+    _hk_personal != -1 and _hk_project != -1 and _hk_personal < _hk_project,
+    "hooks.md orders the registration lookup project-first while citing scopes.md, "
+    "which defines skills as enterprise > personal > project — project-first can "
+    "return a copy that is shadowed by the one actually running",
+)
+
+# "Did the install include everything?" is answerable from the manifest, and until
+# 2026-08-03 neither installer asked: a failed curl left a gap that looked identical
+# to a clean run.
+for _inst, _needles in (
+    ("install", ["FETCH FAILED", "INCOMPLETE INSTALL", "verify_scope", "INSTALL INCOMPLETE"]),
+    ("install.ps1", ["FETCH FAILED", "INCOMPLETE INSTALL", "INSTALL INCOMPLETE"]),
+):
+    _txt = read(_inst)
+    _absent = [n for n in _needles if n not in _txt]
+    check(
+        f"install: {_inst} verifies every manifest file landed",
+        not _absent,
+        f"{_inst} is missing {_absent} — a partial install must not report success, "
+        "because the first symptom is a procedure dying on a missing script",
+    )
+
 # The effort budget renders immediately after the model budget. Step 0.4b named
 # no order at all until 2026-08-03, so the host convention would have applied to
 # one question and not its neighbour — two lists, opposite conventions, back to

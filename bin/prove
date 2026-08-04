@@ -19,6 +19,11 @@ ENF = "workforce/references/enforcement.md"
 DSB = "workforce/references/procedures/disband.md"
 ORG = "workforce/references/org-doctrine.md"   # victim for the append case
 CFG = "workforce/references/org-config.template.md"
+SCO = "workforce/references/scopes.md"
+BUD = "workforce/references/procedures/budget.md"
+HK  = "workforce/references/procedures/hooks.md"
+INS = "install"
+PS1 = "install.ps1"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -62,6 +67,18 @@ CASES = [
      CFG, "del", "`max`, `xhigh`, `high`, `medium`, `low`"),
     ("audit-setup: the effort budget orders its rungs most expensive first",
      ASU, "del", "The rungs are offered most expensive first"),
+    ("scopes: no shipped file invokes a script by a bare project-scope path",
+     ORG, "append", "\n.claude/skills/workforce/bin/wf-census --root x\n"),
+    ("scopes: the canonical script resolver is stated, and personal resolves first",
+     SCO, "del", 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
+    ("scopes: every file using $WF also defines it",
+     BUD, "del", 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
+    ("hooks: the registration path resolves personal before project",
+     HK, "del", "| 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |"),
+    ("install: install verifies every manifest file landed",
+     INS, "del", "INCOMPLETE INSTALL"),
+    ("install: install.ps1 verifies every manifest file landed",
+     PS1, "del", "INCOMPLETE INSTALL"),
 ]
 
 

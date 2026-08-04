@@ -721,7 +721,8 @@ tools, no work product. It proves the channel, nothing else.
 `enforcement.md` names the fix, and this is the step that performs it:
 
 ```bash
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
 ```
 
 That writes the generated region — which carries the standing cold-reader request — and **removes

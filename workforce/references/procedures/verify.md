@@ -167,7 +167,8 @@ agreeing against the third is a finding, not a tiebreak.
 **Run `wf-conform` first; it decides everything decidable here.**
 
 ```bash
-.claude/skills/workforce/bin/wf-conform --root "${CLAUDE_PROJECT_DIR}"
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-conform" --root "${CLAUDE_PROJECT_DIR}"
 ```
 
 Exit `0` all clear · `1` at least one check failed, each named · `2` the tree could not be read —

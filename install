@@ -262,6 +262,59 @@ MANIFEST_TMP="$(mktemp)"
 trap 'rm -f "$MANIFEST_TMP"' EXIT
 curl -fsSL "$REPO_URL/manifest.txt" -o "$MANIFEST_TMP"
 
+FETCH_FAILED=""
+VERIFY_FAILED=""
+
+# Post-install completeness pass. The manifest is the authoritative shipped-file
+# list, so "did the install include everything the project needs" is answerable
+# by re-reading it against disk -- and it was never asked. This both REPORTS what
+# is absent and CORRECTS what it can: a lost executable bit is restored in place
+# rather than reported, because a non-executable hook fails exactly like a
+# missing one and the fix needs no decision from anybody.
+verify_scope() {
+    vdir="$1"
+    v_total=0
+    v_missing=""
+    v_fixed=0
+
+    while IFS= read -r vline || [ -n "$vline" ]; do
+        case "$vline" in
+            ''|\#*) continue ;;
+        esac
+
+        vflag=""
+        vpath="$vline"
+        case "$vline" in
+            "keep "*) vflag="keep"; vpath="${vline#keep }" ;;
+            "hook "*) vflag="hook"; vpath="${vline#hook }" ;;
+            "exec "*) vflag="hook"; vpath="${vline#exec }" ;;
+        esac
+
+        vdest="$vdir/${vpath#workforce/}"
+        v_total=$((v_total + 1))
+
+        if [ ! -s "$vdest" ]; then
+            v_missing="$v_missing $vpath"
+            continue
+        fi
+
+        if [ "$vflag" = "hook" ] && [ ! -x "$vdest" ]; then
+            chmod +x "$vdest" && v_fixed=$((v_fixed + 1))
+        fi
+    done < "$MANIFEST_TMP"
+
+    if [ -n "$v_missing" ]; then
+        echo
+        echo "  INCOMPLETE INSTALL -- these files are missing or empty:"
+        for vm in $v_missing; do echo "    $vm"; done
+        VERIFY_FAILED="yes"
+    else
+        echo "  Verified: $v_total/$v_total files present."
+    fi
+    [ "$v_fixed" -gt 0 ] && echo "  Repaired the executable bit on $v_fixed file(s)."
+    return 0
+}
+
 install_to_scope() {
     scope="$1"
     case "$scope" in
@@ -307,12 +360,23 @@ install_to_scope() {
         fi
 
         mkdir -p "$(dirname "$dest")"
-        curl -fsSL "$REPO_URL/$path" -o "$dest"
+        # A failed fetch used to be silent: curl -f returns non-zero and the loop
+        # carried on, so a partial install looked exactly like a complete one and
+        # the first symptom was a procedure step dying on a missing script. Every
+        # fetch is now checked, and the run is verified again at the end.
+        if ! curl -fsSL "$REPO_URL/$path" -o "$dest"; then
+            echo "  FETCH FAILED: $path"
+            FETCH_FAILED="$FETCH_FAILED $path"
+            rm -f "$dest"
+            continue
+        fi
 
         if [ "$flag" = "hook" ]; then
             chmod +x "$dest"
         fi
     done < "$MANIFEST_TMP"
+
+    verify_scope "$skill_dir"
 
     # Configure the delegation contract and the permissions the org needs.
     #
@@ -389,6 +453,17 @@ for scope in $TARGETS; do
 done
 
 echo
+if [ -n "$FETCH_FAILED" ] || [ -n "$VERIFY_FAILED" ]; then
+    echo "INSTALL INCOMPLETE."
+    [ -n "$FETCH_FAILED" ] && { echo "  Downloads that failed:"; for ff in $FETCH_FAILED; do echo "    $ff"; done; }
+    echo
+    echo "  Re-run this installer to finish -- it is safe to run repeatedly and will"
+    echo "  refetch whatever is absent. Files flagged \`keep\` are never overwritten."
+    echo "  Finish this install before running any workforce command -- procedures invoke"
+    echo "  the shipped scripts by path, and a missing one fails mid-run."
+    exit 1
+fi
+
 if [ "$MODE" = "update" ]; then
     echo "Update complete ($TARGETS)."
 else

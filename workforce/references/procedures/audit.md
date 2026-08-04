@@ -58,7 +58,8 @@ receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
 **Run the census FIRST, and take every count in this run from it.**
 
 ```bash
-.claude/skills/workforce/bin/wf-census --root "${CLAUDE_PROJECT_DIR}"
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}"
 ```
 
 It is read-only and costs a second. **No count this run reports — skills, agents, hooks, markers,
@@ -92,8 +93,9 @@ with no opt-out, so its length is multiplied by fan-out: the highest-leverage co
 a hand count is stating a number nothing produced:
 
 ```bash
-.claude/skills/workforce/bin/wf-context   --root "${CLAUDE_PROJECT_DIR}"   # IDENTITY bytes per spawn
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}"   # DUPLICATED / DERIVABLE / USER
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-context"   --root "${CLAUDE_PROJECT_DIR}"   # IDENTITY bytes per spawn
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}"   # DUPLICATED / DERIVABLE / USER
 ```
 
 `wf-context` is what makes the cost legible rather than abstract — it reports IDENTITY against routing
@@ -167,7 +169,8 @@ with them. A fresh project is where the budgets matter *most*: nothing is config
 **Run the census; do not perform it by hand.**
 
 ```bash
-.claude/skills/workforce/bin/wf-census \
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-census" \
   --root "${CLAUDE_PROJECT_DIR}" \
   --manifest "${CLAUDE_PROJECT_DIR}/.claude/workforce/.agents-symlink-manifest.txt" \
   --json     "${CLAUDE_PROJECT_DIR}/.claude/workforce/census.json"

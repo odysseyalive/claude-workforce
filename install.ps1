@@ -204,6 +204,8 @@ Begin with step 1 now.
     # repo-relative path.
     Write-Host 'Downloading workforce...'
     $manifest = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/manifest.txt").Content -split "`n"
+    $script:FetchFailed = @()
+    $script:VerifyFailed = $false
 
     foreach ($scope in $targets) {
         switch ($scope) {
@@ -248,7 +250,46 @@ Begin with step 1 now.
                 New-Item -ItemType Directory -Force -Path $destDir | Out-Null
             }
 
-            Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/$path" -OutFile $dest
+            # A failed fetch used to be silent, so a partial install looked exactly
+            # like a complete one and the first symptom was a procedure step dying
+            # on a missing script. Every fetch is checked, and the scope is verified
+            # against the manifest once the loop finishes.
+            try {
+                Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/$path" -OutFile $dest -ErrorAction Stop
+            } catch {
+                Write-Host "  FETCH FAILED: $path"
+                $script:FetchFailed += $path
+                if (Test-Path $dest -PathType Leaf) { Remove-Item $dest -Force }
+                continue
+            }
+        }
+
+        # Post-install completeness pass -- the manifest is the authoritative
+        # shipped-file list, so "did the install include everything the project
+        # needs" is answerable by re-reading it against disk. There is no
+        # executable bit to repair on Windows; absence is the whole check here.
+        $vMissing = @()
+        $vTotal = 0
+        foreach ($rawLine in $manifest) {
+            $line = $rawLine.Trim()
+            if (-not $line -or $line.StartsWith('#')) { continue }
+            $vPath = $line
+            foreach ($pre in @('keep ', 'hook ', 'exec ')) {
+                if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim() }
+            }
+            $vDest = Join-Path $skillDir ($vPath -replace '^workforce/', '')
+            $vTotal++
+            if (-not (Test-Path $vDest -PathType Leaf) -or (Get-Item $vDest).Length -eq 0) {
+                $vMissing += $vPath
+            }
+        }
+        if ($vMissing.Count -gt 0) {
+            Write-Host ""
+            Write-Host "  INCOMPLETE INSTALL -- these files are missing or empty:"
+            foreach ($vm in $vMissing) { Write-Host "    $vm" }
+            $script:VerifyFailed = $true
+        } else {
+            Write-Host "  Verified: $vTotal/$vTotal files present."
         }
 
         # Configure the delegation contract and the permissions the org needs.
@@ -339,6 +380,20 @@ Begin with step 1 now.
     }
 
     Write-Host ''
+    if ($script:FetchFailed.Count -gt 0 -or $script:VerifyFailed) {
+        Write-Host 'INSTALL INCOMPLETE.'
+        if ($script:FetchFailed.Count -gt 0) {
+            Write-Host '  Downloads that failed:'
+            foreach ($ff in $script:FetchFailed) { Write-Host "    $ff" }
+        }
+        Write-Host ''
+        Write-Host '  Re-run this installer to finish -- it is safe to run repeatedly and will'
+        Write-Host '  refetch whatever is absent. Files flagged `keep` are never overwritten.'
+        Write-Host '  Finish this install before running any workforce command -- procedures invoke'
+        Write-Host '  the shipped scripts by path, and a missing one fails mid-run.'
+        exit 1
+    }
+
     if ($mode -eq 'update') {
         Write-Host "Update complete ($($targets -join ' '))."
     } else {

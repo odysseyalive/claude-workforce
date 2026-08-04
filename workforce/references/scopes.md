@@ -92,6 +92,42 @@ handbook of the same name will beat them without any error. That feature is deli
 
 ---
 
+## Resolving the shipped scripts — the one snippet, stated once
+
+Every procedure that runs `wf-census`, `wf-context`, `wf-claude-md`, `wf-conform`, or
+`wf-protect-directives` MUST resolve the skill directory. **Never write a bare
+`.claude/skills/workforce/bin/…` path into a shipped file.** That path assumes a project install, and a
+personal install is the ordinary case — it is what `verify`'s own provenance header reports on most
+hosts. A hardcoded project path does not degrade there; every scripted step of the procedure fails with
+`no such file or directory`.
+
+**This is the canonical resolver. Copy it verbatim; do not paraphrase it:**
+
+```bash
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+```
+
+Then invoke through it — `"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}"`.
+
+**Personal first, then project, because that is the order the harness itself resolves skills** (the
+table above: enterprise > personal > project). A resolver that checked project first could hand back a
+copy that is *shadowed* — the procedure would run one install's scripts while the session runs another
+install's instructions, and the two can be different versions with no warning anywhere.
+
+**It repeats in every command block on purpose.** Each block runs in a fresh shell, so a `WF` set in an
+earlier block is gone by the next one, and a reader who copies a single block must get a working
+command. This is a deliberate exception to *constants are stated once*: the resolver is stated once
+*here*, and the copies are mechanical duplicates that `bin/check` compares against this section rather
+than independent statements of the same fact.
+
+*Written 2026-08-03. Eleven shipped sites carried the bare project path, and a real `audit` run against
+a personal install failed at every one of them. `procedures/hooks.md` had already hit this on
+2026-08-03 and been fixed **at the instance** — the other eleven were never touched, which is the
+class-fix rule this project states in three files being violated in the same week it was written.
+`hooks.md` also had the order inverted while citing this file as its authority.*
+
+---
+
 ## Settings follow the scope
 
 | Scope | Settings file | Reach |

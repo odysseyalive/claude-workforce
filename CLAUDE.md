@@ -308,10 +308,18 @@ this very patch run the old doctrine and look like a failure.
   hardcoded `.claude/skills/workforce/bin/…` — a **project**-scope path — while workforce was installed
   at **personal** scope there, which is the ordinary case and the one `verify`'s own header reports.
   The hook was not at the assumed path, the command correctly refused rather than create dead wiring,
-  and it would have refused **forever on every personal install**. Step 2 now resolves project-then-
-  personal per `scopes.md`. *A path assumed rather than resolved is the same shape as an absent
-  producer: the consumer named, the lookup not.* The run also censused **9 orphaned hook files** on
-  disk registered nowhere — reported, never deleted.
+  and it would have refused **forever on every personal install**. *A path assumed rather than resolved
+  is the same shape as an absent producer: the consumer named, the lookup not.* The run also censused
+  **9 orphaned hook files** on disk registered nowhere — reported, never deleted.
+
+  **Corrected 2026-08-04 — this entry said "Step 2 now resolves project-then-personal per `scopes.md`,"
+  and both halves were wrong.** `scopes.md` defines skills as enterprise > **personal** > project, so
+  project-first is the inverse of the file it cited: it can return a copy that is *shadowed*, wiring a
+  hook to one install's script while the session runs another install's instructions. And it was a fix
+  **at the instance** — **eleven other shipped sites** carried the same bare project path and were never
+  touched, so a real `audit` against a personal install died at every scripted step. That is the
+  class-fix rule violated in the same week it was written down. `scopes.md` § Resolving the shipped
+  scripts now owns the one resolver; six assertions guard it, each proven by breaking.
 
 - ~~**the catalog reconciliation that must precede the sweep**~~ — **run 2026-08-03**, and it was the
   precondition closest to doing real damage. All three evaluators in `apps-odyssey-alive` read **`v0`,

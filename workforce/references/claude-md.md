@@ -101,9 +101,10 @@ remove anything at all, so running it early is safe in the only direction that m
 does the real classification once handbooks are in final position. `verify` reports on both.
 
 ```bash
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}"                        # report
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --execute              # write
-.claude/skills/workforce/bin/wf-claude-md --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}"                        # report
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}" --execute              # write
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
 ```
 
 Exit `0` classified · `2` no readable CLAUDE.md. **Under `--review`, report and write nothing.**

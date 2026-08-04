@@ -58,8 +58,18 @@ to wire and nothing to orphan.
 
    | Order | Path |
    |---|---|
-   | 1 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |
-   | 2 | `~/.claude/skills/workforce/bin/wf-protect-directives` |
+   | 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |
+   | 2 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |
+
+   **Personal is order 1**, matching `scopes.md` § Resolving the shipped scripts and the skill
+   precedence table it derives from. Write the resolved path **absolute** — expand `~` yourself; a
+   hook command is not run through a shell that will do it for you.
+
+   *Corrected 2026-08-03: this table read project-first while citing `scopes.md` as its authority, and
+   `scopes.md` says skills resolve **personal > project**. Project-first can return a copy that is
+   shadowed — the registration would point at one install's script while the session runs another
+   install's instructions, with no warning anywhere. The step was written the same day the bare-path
+   bug was fixed here and carried the inverse of the rule that fixed it.*
 
    **Verify the file exists before writing a registration for it** — a registration pointing at nothing
    is dead wiring, which is the failure `discovery.md` § Dead wiring names and which is *worse* than no
