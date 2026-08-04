@@ -4118,6 +4118,11 @@ check("wf-conform requires a catalog anchor per evaluator",
       "reconciliation is a PRECONDITION of the sweep: after it the predecessor's catalog is gone "
       "and `v0` becomes indistinguishable from `reconciled, nothing to add`")
 
+check("audit queues the amend row, not just the verify row",
+      "at the same time as the `verify` row" in aud,
+      "the chain is audit -> verify -> amend; verify is read-only and will not write queue state, so "
+      "a row only it could justify is a row nobody writes")
+
 check("sweep states it can only discharge rows naming it",
       "owned-by-another" in _swp,
       "a row created before this command existed still points at /workforce audit; the command built "

@@ -893,6 +893,18 @@ same step that prints it. At minimum, on `UNAVAILABLE`:
 |---|---|
 | tier ceiling unverified — re-run the canary | `/workforce verify` once the fixtures register |
 | `wf-canary-*` and `wf-ceiling-probe` fixtures live in the user's `.claude/agents/` | the same `verify`, which sweeps them once their fact is measured (`staging.md` § Fixture lifecycle) |
+| **every handbook carries `Tier ceiling: unverified this run`** | **`/workforce amend`**, *after* the `verify` above passes the canary and writes `platform-local.md` |
+
+**Queue the `amend` row NOW, at the same time as the `verify` row, even though it cannot run yet.**
+The chain is `audit → verify → amend` and this run owes all three: `verify` measures the host and
+**reports** the fix, `amend` applies it. `verify` is read-only by contract and will not write queue
+state, so a row it alone could justify is a row nobody writes.
+
+*Found 2026-08-03 by being asked whether one audit run does all of this in one session. It queued the
+first link and named the third in prose. **This file's own rule is directly overhead — "a printed
+promise is not a queued one — write the rows"** — and it was being applied to the link audit owns and
+not to the link audit can foresee. The marks would sit on every handbook after a passing canary, with
+nothing driving anyone to clear them.*
 
 *Measured 2026-08-03, first real audit. The canary returned `UNAVAILABLE`, the closing report printed
 the line above correctly — and **no `deferred.md` was written at all**, so the only record of the
