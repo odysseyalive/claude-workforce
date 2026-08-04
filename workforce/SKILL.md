@@ -121,6 +121,30 @@ a record the user can overturn rather than a stop they must answer. Mechanics at
 replaced, so a succession question re-asks a settled fact, spends a slot the four-question budget does
 not have, and defers a run.*
 
+> **"streamlining skills to be used for data aquisition, management and connections to external tools
+> is the idea that I had so that an agent doesn't have to be called to run the skill if it's not
+> necessary, saving token count. But agents can run those skills too, providing mechanically created
+> context that is solid and dependable. The agent would be designed to know what to do with that data
+> or what context to put it in."**
+
+*— Added 2026-08-04, source: user directive, stated on being shown that a real audit reduced **0 of 31**
+PROMOTE skills and created **1** data skill against 8 SPLITs. **This is the organizing principle of
+conversion, and it names the layer each kind of work belongs to**: skills own MECHANISM — data
+acquisition, data management, connections to external tools; employees own JUDGMENT. It is the
+structural consequence of the second directive above, which had governed dispatch but never the shape
+of what a conversion produces. Three things follow, and each is a rule rather than a preference:
+**(a)** a skill is invocable WITHOUT a spawn — if the data answers the question, the skill is the whole
+answer; **(b)** the same skill is invocable BY an employee, and what it returns is mechanically created
+context, identical on every call, which is why it is dependable in a way a summarizing agent is not;
+**(c)** the employee supplies only what the mechanism cannot — what the data means and where it goes.
+The operational reading is — **conversion SEPARATES a skill, it does not absorb one.** Judgment moves
+up into a handbook; mechanism stays exactly where it is and keeps working. A run that reports it cannot
+fit N skills into M handbooks has measured the wrong thing: the handbook was never where the mechanism
+was going. And because directive one makes preservation the floor, **reduction is a transform with a
+verification — the reduced skill must still answer every invocation it answered before** — never a
+deletion with a rationale. Mechanics at `references/conversion-taxonomy.md` § The remainder test and
+§ The two paths, `references/data-skills.md`, and `references/procedures/audit.md` Step 3.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
