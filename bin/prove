@@ -2,12 +2,65 @@
 """Prove each new bin/check assertion by breaking its target and confirming it fires.
 
 An assertion never observed failing might be testing nothing (CLAUDE.md).
-Each case mutates one file, runs bin/check, asserts the NAMED check appears in the
-failure list, then restores the file byte-for-byte.
-"""
-import pathlib, shutil, subprocess, sys, tempfile
+Each case breaks one file inside a DISPOSABLE COPY of the tree, runs that copy's
+bin/check, and asserts the NAMED check appears in the failure list.
 
-ROOT = pathlib.Path("/home/francis/lab/claude-workforce")
+THE WORKING TREE IS NEVER WRITTEN TO, and the run says so from a content hash taken
+before and after rather than from this sentence.
+
+Why it is built this way — MEASURED 2026-08-04, all three numbers from this host:
+
+    bin/check, one run ......................  1.8 s
+    bin/prove, sequential and in place ...... 181 s
+    bin/prove, parallel against copies ...... 60-88 s (4 workers, 4 cores; the
+                                                       spread is machine load)
+    default harness Bash timeout ............ 120 s
+
+The old design broke files in the real tree and restored them in a `finally`, so a
+full run could not fit in a foreground call. It was therefore habitually backgrounded
+— and a backgrounded process is killed by SIGTERM at session teardown, which does NOT
+run `finally`. Measured both directions: SIGINT restored the file, SIGTERM left it
+MUTATED with the temp backup orphaned, and nothing recorded which file it had been.
+That is a 181-second window in which the tree carries a deliberately-sabotaged file
+and `git commit -a` would commit it.
+
+Copies fix the cause rather than the symptom: workers are independent, so the run is
+parallel and fits in a foreground call, AND no signal at any moment can corrupt the
+tree, because the tree is not the thing being written.
+
+Note which of those two matters. 88 s clears the 120 s timeout on THIS host and that
+margin is not large — a slower or busier machine can still push a run past it. That is
+fine, and it is the point: backgrounding is now SAFE rather than merely unnecessary.
+The correctness of a run no longer depends on how long it takes. If a host does need
+to background it, pass a timeout and let the harness notify — never spawn a waiter
+that polls, which is the habit that surfaced this whole defect.
+
+The handler below survives for
+the smaller job it still has — unwinding the TemporaryDirectory contexts so a kill
+does not orphan them in /tmp. Never replace it with atexit: atexit handlers do not run
+on a default-disposition SIGTERM either.
+"""
+import concurrent.futures, hashlib, os, pathlib, shutil, signal, subprocess, sys, tempfile
+import threading
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent   # not hardcoded: a clone is a valid checkout
+
+IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv"}
+IGNORE = shutil.ignore_patterns(*IGNORED_DIRS)
+
+# One worker per core. bin/check is CPU-bound Python, and the work each worker does
+# is a subprocess, so threads are enough — the GIL is released across the wait.
+WORKERS = max(1, os.cpu_count() or 2)
+
+STOP = threading.Event()
+
+
+def _restore_and_die(signum, _frame):
+    raise KeyboardInterrupt(f"terminated by signal {signum}")
+
+
+for _sig in (signal.SIGTERM, signal.SIGHUP):
+    signal.signal(_sig, _restore_and_die)
 
 CT  = "workforce/references/conversion-taxonomy.md"
 PL  = "workforce/references/platform.md"
@@ -41,6 +94,7 @@ VER = "workforce/references/verification.md"
 TPL = "workforce/references/handbook-templates.md"
 CANA = "workforce/canary/wf-canary-a.md"
 CHK = "bin/check"
+PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -246,46 +300,120 @@ CASES = [
      PS1, "del", "SETTINGS NOT CONFIGURED"),
     ("install: install.ps1 never exits the user's console",
      PS1, "append", "\n# a stray exit 1 in a comment is enough: the check bans the token\n# exit 1\n"),
+    # THE ONLY SELF-TARGETING CASE, and it needs the split literal below to exist.
+    # Every other case stores its payload here and deletes it from ANOTHER file, so
+    # the payload occurs once in its target. This one's target IS this file, so a
+    # plainly-written payload would appear twice — in the code AND in this table —
+    # and `prove: every del payload occurs exactly once` fails it. Adjacent string
+    # literals are concatenated at PARSE time: the AST sees the whole payload, the
+    # file text never carries it contiguously, and the count in the target is 1.
+    # Do not join these into one literal; that is the vacuity the sibling check bans.
+    ("prove: each worker breaks a private copy of the tree",
+     PRV, "del", "shutil.copy" "tree(ROOT, work"),
+    ("prove: cases are applied to the copy, not to ROOT",
+     PRV, "del", "target = work" " / relpath"),
+    ("prove: a SIGTERM teardown unwinds the worker temp directories",
+     PRV, "del", "signal.SIG" "TERM, signal.SIGHUP"),
 ]
 
 
-def failing_checks():
-    r = subprocess.run(["./bin/check"], cwd=ROOT, capture_output=True, text=True)
+def failing_checks(root):
+    """Names of the checks bin/check reports failing, run against `root`'s own copy."""
+    r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True)
     return {ln.strip()[2:].strip()
             for ln in r.stdout.splitlines() if ln.strip().startswith("✗ ")}
 
 
-baseline = failing_checks()
+def tree_digest(root):
+    """Content hash of every tracked-ish file, so "untouched" is measured, not asserted."""
+    h = hashlib.sha256()
+    for p in sorted(root.rglob("*")):
+        if not p.is_file() or any(part in IGNORED_DIRS for part in p.parts):
+            continue
+        h.update(str(p.relative_to(root)).encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def run_shard(shard):
+    """Break each case in this shard inside a PRIVATE copy of the tree.
+
+    One copy per worker, not per case: the copy costs ~1 MB and a fraction of a
+    second, while bin/check costs ~1.8 s, so re-copying per case would dominate.
+    Restoring between cases within a shard keeps each case's baseline green — the
+    same guarantee the old in-place loop got from its backup file.
+    """
+    out = []
+    with tempfile.TemporaryDirectory(prefix="wf-prove-") as tmp:
+        work = pathlib.Path(tmp) / "tree"
+        shutil.copytree(ROOT, work, ignore=IGNORE)
+        for name, relpath, mode, payload in shard:
+            if STOP.is_set():
+                break
+            target = work / relpath
+            original = target.read_bytes()          # restore is byte-exact, not text-round-tripped
+            try:
+                text = original.decode()
+                if mode == "del":
+                    if payload not in text:
+                        out.append((name, "SETUP-FAIL", f"literal absent from {relpath}"))
+                        continue
+                    target.write_text(text.replace(payload, "", 1))
+                else:
+                    target.write_text(text + payload)
+
+                fails = failing_checks(work)
+                if name in fails:
+                    out.append((name, "PROVEN", f"fired on mutated {relpath}"))
+                else:
+                    out.append((name, "VACUOUS", f"did NOT fire — {len(fails)} other failures"))
+            finally:
+                target.write_bytes(original)
+    return out
+
+
+before = tree_digest(ROOT)
+baseline = failing_checks(ROOT)
 if baseline:
     print(f"REFUSING: bin/check is not green to begin with: {sorted(baseline)}")
     sys.exit(1)
-print("baseline: 0 failures\n")
+print(f"baseline: 0 failures · {len(CASES)} cases across {WORKERS} workers\n")
 
 results = []
-for name, relpath, mode, payload in CASES:
-    target = ROOT / relpath
-    backup = tempfile.NamedTemporaryFile(delete=False).name
-    shutil.copy2(target, backup)
-    try:
-        text = target.read_text()
-        if mode == "del":
-            if payload not in text:
-                results.append((name, "SETUP-FAIL", f"literal absent from {relpath}"))
-                continue
-            target.write_text(text.replace(payload, "", 1))
-        else:
-            target.write_text(text + payload)
+interrupted = ""
+shards = [CASES[i::WORKERS] for i in range(WORKERS)]
+pool = concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS)
+futures = [pool.submit(run_shard, s) for s in shards]
+try:
+    for f in concurrent.futures.as_completed(futures):
+        f.result()
+except KeyboardInterrupt as exc:
+    # Cancelling a RUNNING future does not stop it, so the stop is cooperative: each
+    # worker finishes the case in hand (~2 s), then breaks. That is what lets every
+    # TemporaryDirectory unwind normally instead of being orphaned in /tmp.
+    interrupted = str(exc)
+    STOP.set()
+    for f in futures:
+        f.cancel()
 
-        fails = failing_checks()
-        if name in fails:
-            results.append((name, "PROVEN", f"fired on mutated {relpath}"))
-        else:
-            results.append((name, "VACUOUS", f"did NOT fire — {len(fails)} other failures"))
-    finally:
-        shutil.copy2(backup, target)
-        pathlib.Path(backup).unlink()
+# Collect AFTER the pool has drained, never inside the interrupt handler: a shard that
+# finished a millisecond late would otherwise be dropped, and its cases would read as
+# "never ran" when they in fact ran and passed.
+pool.shutdown(wait=True)
+for f in futures:
+    if f.done() and not f.cancelled() and f.exception() is None:
+        results.extend(f.result())
 
-after = failing_checks()
+# Workers complete out of order, so restore the CASES order before printing. A report
+# whose row order changes run to run cannot be diffed against the previous run.
+_order = {name: i for i, (name, *_rest) in enumerate(CASES)}
+results.sort(key=lambda r: _order.get(r[0], len(CASES)))
+
+untouched = tree_digest(ROOT) == before
+after = failing_checks(ROOT)
+if interrupted:
+    print(f"\nINTERRUPTED ({interrupted}) after {len(results)} of {len(CASES)} cases.\n")
+
 print(f"{'STATUS':<10} CHECK")
 print("-" * 78)
 bad = 0
@@ -295,5 +423,12 @@ for name, status, detail in results:
     print(f"{status:<10} {name}\n           {detail}")
 print("-" * 78)
 print(f"{len(results) - bad} of {len(results)} proven by breaking")
-print(f"restored clean: {'yes' if not after else 'NO — ' + str(sorted(after))}")
-sys.exit(1 if bad or after else 0)
+print(f"working tree untouched: {'yes' if untouched else 'NO — run `git status`'}")
+print(f"baseline still clean:   {'yes' if not after else 'NO — ' + str(sorted(after))}")
+
+# An interrupted run exits 130, NOT 1. Collapsing them into one failing code makes a
+# run somebody killed indistinguishable from a run that found a vacuous assertion —
+# and the first is nothing while the second is the whole reason this tool exists.
+if interrupted:
+    sys.exit(130)
+sys.exit(1 if bad or after or not untouched else 0)

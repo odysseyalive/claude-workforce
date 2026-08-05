@@ -5801,6 +5801,48 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# bin/prove BREAKS A COPY, NEVER THE WORKING TREE
+#
+# bin/prove used to break real tracked files and restore them in a `finally`. A full
+# run is 181 s sequentially — longer than the 120 s default Bash timeout — so it was
+# habitually backgrounded, and a backgrounded process is killed by SIGTERM at session
+# teardown, which does NOT run `finally`. MEASURED 2026-08-04, both directions: SIGINT
+# restored the file, SIGTERM left it MUTATED with the temp backup orphaned and nothing
+# recording which file it had been. The next session sees an unexplained red baseline,
+# and a `git commit -a` inside that 181-second window commits the sabotage.
+#
+# Fixed at the cause: each worker breaks files inside a private disposable copy. That
+# makes the run parallel (so it fits a foreground call and never needs backgrounding)
+# AND makes the corruption unreachable by any signal, because the tree is not written.
+# These two assertions are the halves that must not drift back — one that the copy is
+# taken, one that cases are applied to the copy rather than to ROOT.
+# ─────────────────────────────────────────────────────────────────────────────
+check(
+    "prove: each worker breaks a private copy of the tree",
+    "shutil.copytree(ROOT, work" in _prove_src,
+    "without the copy, bin/prove is back to mutating tracked files in place — a "
+    "181-second window in which the working tree carries a deliberately-sabotaged "
+    "file, and any kill that is not SIGINT leaves it there unattributed",
+)
+check(
+    "prove: cases are applied to the copy, not to ROOT",
+    "target = work / relpath" in _prove_src,
+    "taking a copy and then writing to ROOT anyway is the same defect with more "
+    "code in front of it — the assertion has to name where the write LANDS",
+)
+
+# The handler survives the redesign for the smaller job it still has: unwinding the
+# TemporaryDirectory contexts so a kill does not orphan ~1 MB copies in /tmp. The
+# literal asserted is the REGISTRATION, not the handler — a handler defined and never
+# installed is the same silence with more code in front of it.
+check(
+    "prove: a SIGTERM teardown unwinds the worker temp directories",
+    "signal.SIGTERM, signal.SIGHUP" in _prove_src,
+    "TemporaryDirectory cleans up on normal unwind and on SIGINT, but not on a "
+    "default-disposition SIGTERM — which is what a session teardown sends",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")
