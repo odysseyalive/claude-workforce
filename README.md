@@ -187,6 +187,31 @@ Four things, stated without cushioning.
 
 **Cost scales with fan-out.** Each spawn pays for a fresh context plus your entire `CLAUDE.md`. Keeping that file small is the single highest-leverage thing you can do. The audit proposes specific cuts: what the model could derive from your codebase anyway, and what its own conversions made false.
 
+## If Your Repo Has a Test Corpus
+
+The audit surveys every markdown file under your project. If some of those files are **deliberately
+malformed test fixtures** — a corpus you built precisely so some tool could detect breakage — the
+survey will report your fixtures as real problems, and it may treat text inside them as your own
+words.
+
+Declare them in a **`.censusignore`** at your project root — one glob per line, `#` for comments:
+
+```gitignore
+# deliberately malformed trees; not project content
+fixtures/
+testdata/broken-*
+```
+
+Two things it deliberately does **not** do. It never guesses — there is no `fixtures/` default and no
+inference from directory names, so a project that declares nothing has everything surveyed, which is
+the normal case. And it never hides what it skipped: every run prints how many files were excluded by
+how many patterns, lists them, and **names any pattern that matched nothing**, because a pattern
+matching nothing looks like coverage and provides none.
+
+*This was found by running the tool against its own repository, where both reported "sweep hazards"
+turned out to be fixtures built to be broken, and half the files carrying user directives were test
+data.*
+
 ## Platform Facts Expire
 
 Before a line of this system was written, a canary measured two documented platform behaviors on a real host. One held. The other didn't, and the false one had already been built into a check that would have refused valid work.

@@ -115,6 +115,26 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-05
 
+**Closed 2026-08-05 (later) — the first `dev audit`, and everything it found.** Records in
+`plan/dev-audit-2026-08-05.md`. Asked to run the audit against this repository, three blockers
+surfaced, none of which any instrument here could have reported:
+
+| | |
+|---|---|
+| **`dev` was declared and unimplemented** | it existed in `SKILL.md` and `intent-router.md` and NOWHERE else — `audit.md` mentioned neither `dev` nor self-exclusion, so the documented way to point this tool at its own repo had no defined behaviour. The signature defect, in the escape hatch of the command that exists to find it |
+| **a collision is a disagreement, not a count of paths** | 4 "live collisions" were byte-identical copies of shipped canaries in two scopes. Split by CONTENT now; identical is an advisory DUPLICATE, differing still blocks, unreadable falls to the blocking side. **Third instance of a class `wf-census`'s own docstring already recorded twice** |
+| **a test corpus is not project content** | both "sweep hazards" were fixtures BUILT TO BE MALFORMED, and half the files carrying sacred blocks were test data. `.censusignore` — declared never inferred, every exclusion counted, every dead pattern named |
+
+**Three producer-side fixes followed**, each closing where the defect was made rather than where it
+showed: both installers report the cross-scope duplicates they create; `REPO_URL` became overridable
+so the installer is testable at all (**and it then ran end to end for the first time** — 92/92, with
+the new NOTE firing); and `bin/check`'s drift remedy stopped naming the action that silently installs
+older code.
+
+*Still open from this:* Step 2 onward — designing an org for claude-workforce itself — has not run.
+Not blocked; a design question whose evidence points at a small answer.
+
+
 **Closed 2026-08-05 — four defects, and three of them were invisible to every instrument here.**
 Records in `plan/prove-sigterm-restore-2026-08-04.md`, `plan/marker-integrity-and-succession-premise-2026-08-04.md`,
 `plan/inert-permission-grants-2026-08-04.md`, `plan/closing-report-deferrals-2026-08-05.md`.
