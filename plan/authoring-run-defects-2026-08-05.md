@@ -45,8 +45,22 @@ rather than deleted.
 repaired** — overwriting staging is a decision with a preferred direction, and this script does not
 make decisions.
 
-**Verified both ways**, and specifically that the passing case *ran* rather than being skipped:
-`rows found: 1 -> ok = [True]`.
+**And running it against a real tree corrected the fix.** The first draft made divergence BLOCKING.
+Against `odyssey-alive` it failed **16 of 16** — the shape of a false positive, so it was reproduced by
+hand before being believed: `business-lead` is 196 lines live against 172 staged, and the extra content
+is real. **The divergence is genuine and it is also NORMAL**: `amend` edits the released file and
+nothing resyncs staging, so every tree that has ever amended a handbook diverges.
+
+A check that fails on every healthy tree is the exact thing this script's own docstring warns about —
+*"a check that always fails stops being read"* — and it is what `verify.md` § a failure is not
+discounted was written against **in this same change**. I nearly shipped the defect I had just added a
+rule for. It is now **advisory**: the hazard reported is that a stale draft can be mistaken for
+authoritative, not that the bytes differ.
+
+**Verified both ways**, that the passing case *ran* rather than being skipped
+(`rows found: 1 -> ok = [True]`), and that the real tree now yields **16 advisory, 0 blocking**. A
+comparison that paired nothing says so, because 0 diverged beside 0 compared reads as clean and means
+the check never ran.
 
 ## 3. The brief said "I will register it" and never said WHEN
 

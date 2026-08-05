@@ -785,6 +785,7 @@ def main():
     # staging is a decision with a preferred direction, and this script does not make
     # decisions; `audit` Step 6 does, with the divergence named.
     staging = os.path.join(root, ".claude", "workforce", "staging", "agents")
+    compared = 0
     if os.path.isdir(staging):
         for p in sorted(handbooks):
             staged = os.path.join(staging, os.path.basename(p))
@@ -793,13 +794,47 @@ def main():
             live_b, staged_b = _digest(p), _digest(staged)
             if live_b is None or staged_b is None:
                 continue
-            res.add(live_b == staged_b,
-                    f"{os.path.basename(p)}: staged draft matches the registered bytes",
-                    "staging diverged AFTER registration, so a second unprobed version "
-                    "of a live employee exists. The REGISTERED file is the one that was "
-                    "probed and is authoritative; keep the draft under a distinct name "
-                    "if it is worth inspecting, and never let it overwrite the released "
-                    "bytes on the strength of being shorter")
+            live_n = len((read(p, res) or "").splitlines())
+            staged_n = len((read(staged, res) or "").splitlines())
+            compared += 1
+            if live_b == staged_b:
+                res.add(True, f"{os.path.basename(p)}: staged draft matches the registered bytes")
+                continue
+            # ADVISORY, NOT BLOCKING — and this is a correction made by MEASUREMENT.
+            #
+            # The first draft of this check used res.add(), and against a real tree it
+            # failed 16 of 16: every registered handbook had moved AHEAD of its staged
+            # copy, because `amend` edits the released file and nothing resyncs staging.
+            # Reproduced by hand before believing it (196 lines live against 172 staged,
+            # the extra content real) — this project's rule that a census reporting a
+            # discrepancy is a claim about the census too.
+            #
+            # So divergence is NORMAL on any tree that has ever amended a handbook, and
+            # a check that fails on every healthy tree is the one thing this script's
+            # own docstring warns about: "a check that always fails stops being read."
+            # I nearly shipped exactly what `verify.md` § a failure is not discounted
+            # was written against, in the same change that wrote it.
+            #
+            # What stays worth reporting is the HAZARD, not the difference: a stale
+            # staged draft can be mistaken for authoritative, which is how a shorter
+            # never-probed version of a live employee gets preferred by a later reader.
+            res.advise(
+                f"{os.path.basename(p)}: staged draft differs from the registered bytes "
+                f"(live {live_n} lines, staged {staged_n})",
+                "NORMAL after an amendment — `amend` edits the released file and nothing "
+                "resyncs staging. Reported so the draft is never mistaken for "
+                "authoritative: the REGISTERED file is the one that was probed. Never "
+                "let a staged draft overwrite released bytes on the strength of being "
+                "shorter or cleaner")
+
+    # A COUNT NOBODY PRINTS IS HOW "NOTHING RAN" READS AS "ALL CLEAR". If staging
+    # exists and nothing paired, the layout is not what this check expects and it
+    # silently examined nothing — the INV-BATCH lesson one level down.
+    if os.path.isdir(staging) and compared == 0:
+        res.advise("staging/agents exists but no handbook paired with a staged draft",
+                   "this check compared NOTHING. Either the tree uses a different "
+                   "staging layout or the drafts were cleaned; either way the "
+                   "divergence question went unanswered rather than answered clean")
 
     skills = os.path.join(root, ".claude", "skills")
     if os.path.isdir(skills):
