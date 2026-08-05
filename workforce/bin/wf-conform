@@ -80,6 +80,14 @@ MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
 # Without this, `- NEVER use any mcp__claude-in-chrome__* tool` reads as a dependency
 # on claude-in-chrome — measured against a real handbook, where it did exactly that.
 PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't\b|\bforbidden\b", re.I)
+# Harness slash-commands: real invocations that are not project files and never will
+# be. Naming one is correct, so an unresolved-command check that does not know them
+# reports every handbook that says `/compact` as broken.
+HARNESS_COMMANDS = {
+    "help", "clear", "model", "config", "init", "compact", "cost", "doctor", "login",
+    "logout", "memory", "status", "vim", "agents", "hooks", "mcp", "resume", "review",
+    "workforce", "org", "loop", "schedule", "run", "simplify", "security-review",
+}
 
 # CANONICAL SIDECAR GRAMMAR — identical to wf-protect-directives. Two readers of one
 # artifact must share one grammar and one normalization, or they cannot both be right.
@@ -433,7 +441,29 @@ def check_handbook(path, body, res, ceiling):
         for sk in sorted(set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", _acts))):
             sp = os.path.join(_root, ".claude", "skills", sk, "SKILL.md")
             if not os.path.isfile(sp):
-                continue            # not a project skill; nothing to decide
+                # NOT a project skill. Three legitimate reasons before it is a defect,
+                # and MEASURED 2026-08-05 every candidate on two real trees was one of
+                # them — so this reports 0 rather than nothing, which are different.
+                #   a PERSONAL skill      — resolves from ~/.claude/skills, invisible here
+                #   a HARNESS built-in    — /help, /model, /compact … not a project file
+                #   a PATH FRAGMENT       — `.../prose-evaluator/AGENT.md` and
+                #                           `<run-id>/business-correspondent/OUTPUT.md`
+                #                           both matched the command grammar. A trailing
+                #                           hyphen or a following `/` means it is a path.
+                if (sk.endswith("-") or sk in HARNESS_COMMANDS
+                        or re.search(r"/" + re.escape(sk) + r"/", _acts)
+                        or os.path.isfile(os.path.expanduser(
+                            os.path.join("~", ".claude", "skills", sk, "SKILL.md")))):
+                    continue
+                # ADVISORY, not a failure: the filters above are heuristics, and this
+                # project's rule is that a heuristic reports and never blocks.
+                res.advise(f"{n}: /{sk} resolves to no skill in either scope",
+                           f"`/{sk}` is named in ## Procedure or ## Verification and is "
+                           f"not a project skill, a personal skill, or a harness command. "
+                           f"The step cannot be performed as written, and nothing else "
+                           f"reported it — this branch was a bare `continue` until "
+                           f"2026-08-05")
+                continue
             sfm = frontmatter(read(sp, res) or "") or {}
             spawns = {t.strip() for t in sfm.get("allowed-tools", "").split(",")} & {"Task", "Agent"}
             res.add(not spawns, f"{n}: invokes only skills that spawn nothing (/{sk})",

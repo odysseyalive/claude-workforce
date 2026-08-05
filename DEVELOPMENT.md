@@ -231,15 +231,33 @@ survived in a docstring while the mechanism was deleted. Each now asserts the di
 That is the second-order version of the same failure: a check that tests vocabulary rather than
 behaviour is doctrine wearing enforcement.*
 
-**Open from this work.** **Step 6b consumes nothing** — detection, apply and the ratchet all run in Step
-1b, and a `REPORT` finding reaches the closing report and stops there. **The ratchet counts only
-`PASS-DEAD-SCRIPT`** — the two AUTO passes fix their findings rather than carrying them, so the baseline
-has one pass feeding it and its coverage is thin. And four **detection** gaps remain, which are a
-different thing from the apply gaps this change closed — nothing discovers them at all: a `/command`
-reference to a deleted skill (`wf-conform` has the lookup and a bare `continue`), a `permissions.allow`
-path that is gone, a stranded `.settings-owned.json` entry, and a `## Mechanicals` row whose command is
-no longer on disk. Dangling agent symlinks **are** detected and have no remedy, but measured 0 on both
-real trees — so under the admission rule that pass has no recorded defect yet and is correctly absent.
+**The detection gaps were closed by measuring them, and the measurement is the finding.** All four were
+run against both real trees on this machine, and **every one has an empty defect population**:
+
+| gap | measured | disposition |
+|---|---|---|
+| `/command` naming a deleted skill | **0**, both trees | **blind spot closed in code** — `wf-conform`'s bare `continue` now reports, behind three filters (personal skill, harness built-in, path fragment). Every candidate on both trees was one of those three: `.../prose-evaluator/AGENT.md` and `<run-id>/business-correspondent/OUTPUT.md` both match the command grammar |
+| `permissions.allow` naming an absent path | **0**, both trees | correctly absent |
+| stranded `.settings-owned.json` entry | **0**, both trees | correctly absent |
+| `## Mechanicals` row whose command is gone | **0** of 45 and **0** of 6 | correctly absent |
+| dangling agent symlink | **0**, both trees | detected already; no remedy, and none owed |
+
+**Absent, not deferred.** The admission rule is that no pass enters the catalog without a defect
+citation that resolves, and a detector with no instance is the speculative guidance Core Principle 9c
+prices at every spawn forever. **A measured zero is a closed item**; re-open any of them the day a
+transaction produces one, which is what `plan/transactions/` is for.
+
+*Each of these took two or three attempts to measure honestly. The first pass at `/command` reported
+20 findings, all path fragments; the first at `## Mechanicals` reported 13, all agent names from the
+roster table because the regex was not scoped to the section. **The instrument was wrong before the
+tree was**, for the fourth and fifth time in this session.*
+
+**Step 6b now consumes what Step 1b produces** — every surviving `REPORT` finding becomes a queue row
+with its measured precision as the reason. Without it a finding printed at close and stopped, which is
+`INV-CLOSE`'s exact shape arriving through a new door. **The ratchet counts `REPORT` findings only**,
+and that is correct rather than thin: an `AUTO` pass fixes its findings instead of carrying them, so
+there is nothing left for a baseline to hold.
+
 The remaining **instance defects** from the originating transaction are in its own record.
 
 **Closed 2026-08-05 — four defects from a real authoring run.** Record in

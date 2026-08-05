@@ -1009,6 +1009,18 @@ after the thing it was meant to stop. Same shape, one step later.
 This is the existing split, applied to findings rather than counts: **computed and acted on before the
 sweep, printed at close.** Step 7 prints the drained queue; it does not decide it.
 
+**Every surviving `REPORT` pass finding becomes a queue row here.** An `AUTO` pass has already fixed
+its findings in Step 1b, so it contributes nothing; a `REPORT` pass contributes each finding **with the
+measured precision that made it REPORT** as the row's reason. Without this the finding reaches the
+closing report and stops there, which is `INV-CLOSE`'s exact shape — *"a proposal narrated in the
+closing report was never a row, so the queue arithmetic balances while the run hands back work in
+prose."* A pass finding is a proposal about the project's own shape, and it is classified like every
+other one: DISCHARGED, DECIDED, or QUEUED, with no fourth disposition.
+
+*Added 2026-08-05. The pass catalog shipped with detection wired into Step 1b and nothing consuming it
+at 6b — findings printed and stopped. That is the same handing-back the queue exists to make visible,
+arriving through a new door.*
+
 **Findings Step 7 would otherwise compute at print time are computed here instead** — the `STALE`
 `CLAUDE.md` class, the permission deltas, the hook census. They are findings about a tree that this
 step can still change, and a finding first computed inside the report is one nothing can act on.
