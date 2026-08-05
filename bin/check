@@ -30,8 +30,13 @@ os.chdir(ROOT)
 # blocks too, so the stamp is a human act.
 if "--stamp" in sys.argv:
     import hashlib as _hl
+    # `immutable: true` is not required to be the LAST field — see § Marker grammar.
+    # A block the stamp cannot see is a block with no checksum, which is the failure
+    # this stamp exists to prevent. Indentation is deliberately still rejected: an
+    # indented marker inside a template is a mention, not a marker (line 501).
     _rx = re.compile(
-        r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+        r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
+        r"(.*?)^<!--\s*/origin\s*-->$",
         re.S | re.M)
     _rows = []
     for _f in sorted(glob.glob("workforce/**/*.md", recursive=True)):
@@ -2775,13 +2780,164 @@ check(
     "a cut crossing a marker boundary takes the opener and leaves the closer; the "
     "sweep then reads a malformed region. Ten of 32 real reductions did exactly this",
 )
+# ── PASS-MARKER-GRAMMAR ──────────────────────────────────────────────────────
+# Every reader of the sacred-marker grammar must ACCEPT the same blocks. This
+# replaces a textual pin that compared wf-remainder's regex SOURCE against a
+# literal copy of bin/check's, which is why the divergence below survived it:
+# the pin covered 2 of 8 readers, and compared spelling rather than behaviour.
+# A faithful copy of the wrong pattern satisfied it exactly.
+#
+# MEASURED 2026-08-05, across 2,923 files in this repo and odyssey-alive: five
+# readers accepted `immutable: true` in any field position and three required it
+# to be the last field before `-->`. 160 sacred blocks vs 157. The three that
+# could not see the other 3 were `bin/check --stamp` (which decides what gets a
+# checksum), `bin/check` § immutable blocks, and `wf-remainder`'s T7b refusal
+# (which decides whether a reduction that ate a user directive is caught). One of
+# the misses was `fixtures/scripts/census-sacred-orders` — a registered fixture
+# whose whole purpose is asserting field order does not matter.
+#
+# SCOPE: field order and internal spacing only. The readers still split on
+# INDENTATION and that is deliberate, not an oversight — an indented marker sits
+# inside a fenced template where it is a mention rather than a marker, and line
+# 501 records 8 false failures from counting mentions. Resolving that split needs
+# a ruling, not a widening; it is reported in plan/marker-grammar-2026-08-05.md.
+import ast as _ast
+
+
+def _marker_patterns(_path):
+    """(lineno, pattern) for each re.compile naming origin + immutable.
+
+    A pattern whose variable name carries MENTION is a deliberate INVERSE reader —
+    it exists to find the indented examples the counters must skip, so it rejects
+    every legal block on purpose. Excluded by name, because excluding it by line
+    number would silently stop covering whatever moved into that position.
+    """
+    try:
+        _tree = _ast.parse(read(_path))
+    except SyntaxError:
+        return
+    _named = {}
+    for _a in _ast.walk(_tree):
+        if isinstance(_a, _ast.Assign) and isinstance(_a.value, _ast.Call):
+            for _t in _a.targets:
+                if isinstance(_t, _ast.Name):
+                    _named[_a.value.lineno] = _t.id
+    for _n in _ast.walk(_tree):
+        if not (isinstance(_n, _ast.Call) and isinstance(_n.func, _ast.Attribute)
+                and _n.func.attr == "compile" and _n.args):
+            continue
+        _parts = []
+
+        def _collect(_a):
+            if isinstance(_a, _ast.Constant) and isinstance(_a.value, str):
+                _parts.append(_a.value)
+            elif isinstance(_a, _ast.BinOp) and isinstance(_a.op, _ast.Add):
+                _collect(_a.left)
+                _collect(_a.right)
+
+        _collect(_n.args[0])
+        _pat = "".join(_parts)
+        if _parts and "origin:" in _pat and "immutable" in _pat:
+            if "MENTION" in _named.get(_n.lineno, "").upper():
+                continue
+            yield _n.lineno, _pat
+
+
+def _sacred_block(_marker):
+    return "prose before\n" + _marker + "\n> a directive\n<!-- /origin -->\nafter\n"
+
+
+# Legal spellings every reader MUST accept. Ordering variants are the measured
+# defect; the fixture above ratifies them.
+_GRAMMAR_LEGAL = [
+    _sacred_block("<!-- origin: user | immutable: true -->"),
+    _sacred_block("<!-- origin: user | added: 2026-02-03 | immutable: true -->"),
+    _sacred_block("<!-- origin: user | immutable: true | added: 2026-02-14 -->"),
+    _sacred_block("<!--origin:user|immutable:true-->"),
+]
+# Spellings every reader MUST reject. A reader that accepts these would checksum,
+# guard, or refuse to cut a block that is not sacred.
+_GRAMMAR_ILLEGAL = [
+    _sacred_block("<!-- origin: workforce | immutable: true -->"),
+    _sacred_block("<!-- origin: user -->"),
+    _sacred_block("<!-- origin: user | immutable: false -->"),
+]
+
+_grammar_readers, _grammar_bad = 0, []
+for _path in ["bin/check", "bin/baseline"] + sorted(glob.glob("workforce/bin/wf-*")):
+    for _lineno, _pat in _marker_patterns(_path):
+        try:
+            _rx = re.compile(_pat, re.S | re.M)
+        except re.error as _e:
+            _grammar_bad.append(f"{_path}:{_lineno} uncompilable: {_e}")
+            continue
+        _grammar_readers += 1
+        _missed = [s for s in _GRAMMAR_LEGAL if not _rx.search(s)]
+        _wrong = [s for s in _GRAMMAR_ILLEGAL if _rx.search(s)]
+        if _missed:
+            _grammar_bad.append(
+                f"{_path}:{_lineno} REJECTS {len(_missed)} legal spelling(s), first: "
+                + _missed[0].splitlines()[1])
+        if _wrong:
+            _grammar_bad.append(
+                f"{_path}:{_lineno} ACCEPTS {len(_wrong)} illegal spelling(s), first: "
+                + _wrong[0].splitlines()[1])
+
+# ── The indentation ruling (2026-08-05) ──────────────────────────────────────
+# In markdown an indented line is a code block, so an INDENTED sacred marker is
+# documentation ABOUT the format and never a span opener. `bin/baseline` established
+# this and measured it — 68 naive against 37 anchored, 46% inflation — and the four
+# other readers never got the ruling. Measured on odyssey-alive: `wf-census` reported
+# 118 sacred blocks and TWO were a template example carrying a literal `YYYY-MM-DD`.
+#
+# THE EXCEPTION IS REAL AND IS NAMED HERE so it cannot be mistaken for drift.
+# `wf-claude-md`'s pattern is a MASK, not a counter: it marks spans the duplication
+# pass must not touch. Over-masking costs a surviving duplicate; under-masking
+# deletes a line inside a user directive. Counters and guards must be strict for the
+# same reason masks must not be, and the asymmetry runs the opposite way.
+_INDENTED = ("    <!-- origin: user | immutable: true -->\n> a directive\n"
+             "    <!-- /origin -->\n")
+_MASKS = {"wf-claude-md"}
+_indent_bad, _indent_seen = [], 0
+for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
+    for _lineno, _pat in _marker_patterns(_path):
+        if "^" not in _pat:
+            continue                       # unanchored family detector, not a reader
+        _indent_seen += 1
+        _strict_expected = os.path.basename(_path) not in _MASKS
+        try:
+            _matched = bool(re.compile(_pat, re.S | re.M).search(_INDENTED))
+        except re.error:
+            continue
+        if _strict_expected and _matched:
+            _indent_bad.append(f"{_path}:{_lineno} counts an INDENTED marker")
+        if not _strict_expected and not _matched:
+            _indent_bad.append(
+                f"{_path}:{_lineno} is a mask and stopped covering indented spans")
 check(
-    "remainder: the marker grammar is bin/check's, not a second one",
-    all(rx in _rem for rx in (r'r"^<!--\s*origin:.*-->\s*$"',
-                              r'r"^<!--\s*/origin\s*-->\s*$"')),
-    "wf-conform and wf-checkrun once disagreed about whether a decorated heading had "
-    "a section at all, so one reported it present and examined none of it. A second "
-    "marker grammar is that defect waiting on a different pair of files",
+    "grammar: counters and guards reject an indented marker; the mask does not",
+    not _indent_bad and _indent_seen >= 7,
+    (f"{_indent_bad}. " if _indent_bad else
+     f"only {_indent_seen} line-anchored readers examined, expected 7 — a reader "
+     "vanished or its file stopped parsing, and this check reports clean on an empty "
+     "set. That is the direction it fails silently in. ")
+    + "An indented marker sits in a code block and is an example. A "
+    "counter that includes it inflates; a guard that includes it fires on a date "
+    "format string and trains its reader to ignore it. A MASK that excludes it can "
+    "delete a line inside a user directive, which is why wf-claude-md is exempt by "
+    "name rather than by accident",
+)
+
+check(
+    "grammar: every sacred-marker reader accepts the same blocks",
+    not _grammar_bad and _grammar_readers >= 8,
+    (f"{_grammar_readers} readers tested; divergent: {_grammar_bad}. "
+     if _grammar_bad else
+     f"only {_grammar_readers} marker readers found — the extractor stopped seeing "
+     "them, so this check would pass on any grammar. ")
+    + "A reader that cannot see a sacred block will not checksum it, will not guard "
+    "it, and will not refuse a cut that eats it — while the readers that can see it "
+    "report the org healthy. Fix the pattern; do not narrow the corpus",
 )
 check(
     "remainder: every refusal reason is printed, not just the first",
@@ -2795,6 +2951,102 @@ check(
     "CANNOT SEE A MARKER" in _rem,
     "the file already said what the manifest does not prove and omitted this one, "
     "which is how ten reductions were accepted on a check that never covered them",
+)
+# ── PASS-DEAD-SCRIPT ─────────────────────────────────────────────────────────
+# `manifest()` compares `script:` tokens string to string and never stats one, so a
+# SKILL.md naming a deleted script yields the same token on BOTH sides of the T7b
+# diff and the blocking reduction gate passes clean. The detector reuses SCRIPT_RX
+# rather than adding a second extractor — the extraction is the part that was tuned,
+# and a fresh regex would re-earn the false positives that one already paid for.
+#
+# BOTH FILTERS ARE ASSERTED, because either one alone makes the detector useless in
+# a different direction. Measured against odyssey-alive's 48 skills, 2026-08-05:
+# without the bare-filename filter, 184 tokens instead of 79 and every added one a
+# mention. Without the MISROUTED/UNRESOLVED split, the one true finding
+# (`agenda` naming a path that lives under `invest`) is indistinguishable from
+# `invest` naming `src/stealth.ts`, which is a real file in the playwright-mcp
+# SERVER — collapsing them licenses rewriting a correct sentence.
+check(
+    "remainder: dead-script detection keeps both of its tuned filters",
+    "--dead-scripts" in _rem
+    and 'if "/" not in tok or tok in seen:' in _rem
+    and "MISROUTED" in _rem and "UNRESOLVED" in _rem
+    and "dead scripts   {len(rows)} unresolved" in _rem,
+    "a script token that resolves to nothing passes the reduction gate on both sides "
+    "because A == B compares spelling. The filters are the detector: without the "
+    "path-shape filter it reports every backticked filename in prose, and without the "
+    "two verdicts it cannot tell a wrong path from a correct reference to another "
+    "repository. A detector that reports everything is read by nobody",
+)
+
+# ── The pass catalog's admission rule ────────────────────────────────────────
+# references/passes.md: "No pass enters this catalog without a `defect` citation that
+# resolves to a recorded defect." That sentence is the only thing standing between a
+# catalog and a pile of speculative guidance, and a sentence enforces nothing — this
+# is the enforcement, landed in the same change as the rule (invariants.md § a rule
+# lands with its enforcement).
+#
+# Two directions, because each fails silently on its own: a row whose citation does
+# not resolve is doctrine wearing a reference, and a row with no detector anywhere is
+# the "consumer named, producer assumed" shape this project has recorded six times.
+_passes = read("workforce/references/passes.md")
+_pass_rows, _pass_bad = [], []
+for _line in _passes.splitlines():
+    if not _line.startswith("| `PASS-"):
+        continue
+    _cells = [c.strip() for c in _line.strip().strip("|").split("|")]
+    if len(_cells) < 7:
+        _pass_bad.append(f"{_cells[0]}: row has {len(_cells)} cells, expected 7")
+        continue
+    _tok, _cite = _cells[0].strip("`"), _cells[-1].strip("`")
+    _pass_rows.append(_tok)
+    if not os.path.exists(_cite):
+        _pass_bad.append(f"{_tok}: defect citation does not resolve: {_cite}")
+    _detectors = read("bin/check") + "".join(
+        read(_p) for _p in sorted(glob.glob("workforce/bin/wf-*")))
+    if _tok not in _detectors:
+        _pass_bad.append(f"{_tok}: no detector names this token")
+
+# ── The ratchet is keyed on findings, never on a count ───────────────────────
+# Two integers cannot distinguish "fixed one, introduced one" from "nothing changed",
+# and that is the only question a ratchet answers. Measured: a real project carries
+# `lint-baseline.txt` reading `errors=31 / warnings=60 / captured=<ts>`, which is
+# compatible with both histories and with "thirty-one fixed and thirty-one added".
+#
+# INHERITED is the clause that lets the catalog grow. A pass added after a baseline
+# was captured flags artifacts that were already there; without that verdict every
+# new pass reads as a decline, and the cheapest way to keep the number green becomes
+# never adding one. The discriminator is the `captured-passes` token set — never a
+# timestamp, which cannot say which detectors had run.
+_rat = read("workforce/bin/wf-ratchet")
+check(
+    "ratchet: keyed on findings, with INHERITED distinguished from REGRESSION",
+    # The DISCRIMINATION, not the vocabulary. Asserting the word INHERITED matches
+    # the docstring and every print string, so deleting the logic left the check
+    # green — proven VACUOUS on its first bin/prove run, which is the whole reason
+    # that step is mandatory. This fragment IS the verdict.
+    "k[0] not in known_then" in _rat
+    and "captured-passes" in _rat
+    and "INHERITED" in _rat and "REGRESSION" in _rat
+    and "IMPROVED" in _rat and "CARRIED" in _rat
+    and "NO BASELINE" in _rat
+    and "keys_now" in _rat and "keys_then" in _rat,
+    "a ratchet on totals cannot tell an introduced finding from a fixed one, so it "
+    "reports monotonic improvement while the tree churns; and one with no INHERITED "
+    "verdict punishes every catalog addition, which makes not adding a pass the "
+    "cheapest way to stay green. NO BASELINE must not print as zero regressions — "
+    "'nothing got worse' and 'nothing was compared' are different results",
+)
+
+check(
+    "passes: every catalog row cites a defect that resolves and has a detector",
+    _pass_rows and not _pass_bad,
+    (f"{_pass_bad}. " if _pass_bad else
+     "the catalog table parsed to zero rows — the row shape changed and this check "
+     "now passes on any content, which is the one failure a catalog cannot absorb. ")
+    + "A pass with no recorded defect behind it is speculative guidance, and Core "
+    "Principle 9c prices that at every spawn forever; a pass with no detector is "
+    "doctrine that reads as enforcement",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3569,7 +3821,8 @@ check(
 import hashlib
 
 _IMM_RX = re.compile(
-    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
+    r"(.*?)^<!--\s*/origin\s*-->$",
     re.S | re.M,
 )
 _stamped = {}
@@ -5163,6 +5416,7 @@ PRODUCERS = {
     ".claude/workforce/census.json": "workforce/references/procedures/audit.md",
     ".claude/workforce/.agents-symlink-manifest.txt": "workforce/references/procedures/audit.md",
     ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
+    ".claude/workforce/pass-baseline.md": "workforce/references/procedures/audit.md",
 }
 
 _artifacts = set()

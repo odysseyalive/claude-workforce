@@ -48,8 +48,14 @@ import os
 import re
 import sys
 
+# Column 0, and the indent is the discriminator: in markdown an indented line is a
+# code block, so an indented marker is documentation ABOUT the format. Measured
+# 2026-08-05 — this pattern treated a template example containing a literal
+# `YYYY-MM-DD` as a protected directive, so editing the template reported a
+# violation. A guard that fires on a date format string trains its reader to ignore
+# it. `bin/baseline` anchored for this reason and measured 46% inflation.
 BLOCK_RX = re.compile(
-    r"^[ \t]*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->[ \t]*$(.*?)^[ \t]*<!--\s*/origin\s*-->[ \t]*$",
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$(.*?)^<!--\s*/origin\s*-->$",
     re.S | re.M,
 )
 # Generators are strict; readers are liberal (procedures/checksums.md rule 1).

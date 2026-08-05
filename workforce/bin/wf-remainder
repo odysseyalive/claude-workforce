@@ -4,6 +4,7 @@
     wf-remainder --manifest <SKILL.md>          print the invocable surface, sorted
     wf-remainder --diff <before> <after>        exit 1 on ANY surface change
     wf-remainder --diff-manifest <a.txt> <b.txt>  same, for saved manifests
+    wf-remainder --root <tree> --dead-scripts   script: tokens that do not resolve
 
 WHY THIS EXISTS. The user's directive (`SKILL.md` § Directives) makes skills the
 mechanism layer: conversion SEPARATES a skill rather than absorbing it. Judgment
@@ -54,6 +55,7 @@ gutted skill that verifies clean. The failure modes are not symmetric, so ambigu
 resolves toward capturing.
 """
 
+import glob
 import hashlib
 import os
 import re
@@ -64,10 +66,28 @@ import sys
 # reader treats as paired and another does not is how a section gets reported present
 # and examined not at all — recorded in CLAUDE.md against `wf-conform` and
 # `wf-checkrun`, which disagreed about `## Verification (mechanical)`. One grammar.
+#
+# MEASURED 2026-08-05: the copy was faithful and the SOURCE was the outlier. Eight
+# readers of this grammar ship. Three required `immutable: true` to be the LAST field
+# before `-->` — `bin/check --stamp`, `bin/check` § immutable blocks, and this file —
+# and five did not. `fixtures/scripts/census-sacred-orders`, registered in
+# expectations.json, exists to assert that field ORDER inside the marker does not
+# matter: the project had already ruled, and the three readers deciding whether a
+# directive is checksummed, guarded, and preserved could not see the fixture saying so.
+# Widened here and at both bin/check sites in the same change.
+# `workforce/.immutable.sha` was unchanged: the hole was latent and would have opened
+# the first time a user wrote the fields in the other order.
+#
+# INDENTATION IS DELIBERATELY STILL REJECTED, and the readers still split on it. An
+# indented marker lives inside a fenced template, where it is a MENTION of the syntax
+# rather than a marker — bin/check line 501 records 8 false failures from counting
+# exactly that. Widening here would import them. The split is real and is reported
+# rather than silently resolved; see plan/marker-grammar-2026-08-05.md.
 ORIGIN_OPEN_RX = re.compile(r"^<!--\s*origin:.*-->\s*$", re.M)
 ORIGIN_CLOSE_RX = re.compile(r"^<!--\s*/origin\s*-->\s*$", re.M)
 SACRED_RX = re.compile(
-    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
+    r"(.*?)^<!--\s*/origin\s*-->$",
     re.S | re.M)
 ENF_OPEN = "<!-- ENFORCEMENT ANNOTATION"
 ENF_CLOSE = "<!-- END ENFORCEMENT ANNOTATION -->"
@@ -232,6 +252,57 @@ def _emit_diff(before, after, label_a, label_b):
     return 1
 
 
+# ── PASS-DEAD-SCRIPT ─────────────────────────────────────────────────────────
+# `manifest()` emits `script:<path>` tokens and NEVER stats one — A and B are
+# compared string to string, so a SKILL.md naming a script that is not on disk
+# passes the T7b reduction gate clean, on both sides. This reuses the SAME
+# SCRIPT_RX rather than a second extractor: the tuned part is the extraction, and
+# a fresh regex would re-earn the false positives that one already paid for.
+#
+# TWO FILTERS, both measured against odyssey-alive's 48 skills on 2026-08-05:
+#
+#   1. A BARE FILENAME IS A MENTION, NOT A REFERENCE. Requiring a `/` cut the
+#      candidate set from 184 tokens to 79 and removed every false positive of the
+#      "prose names a script" kind (`run ma.py`, `app.js`). 105 skipped.
+#   2. MISROUTED vs UNRESOLVED. Of the 3 survivors, hand-checking split them:
+#      `agenda` names `scripts/ma.py`, which exists — at `invest/scripts/ma.py`.
+#      `invest` names `src/stealth.ts`, which belongs to the playwright-mcp SERVER
+#      and is not this project's file at all. Same detector, opposite verdicts, and
+#      the discriminator is whether the BASENAME resolves anywhere in the tree.
+#      MISROUTED is a finding; UNRESOLVED is a candidate that may be external.
+#
+# REPORTS, NEVER REPAIRS. Measured precision on unique references was 1 true of 2,
+# and the false one names a real file in someone else's repository. Rewriting a
+# path on that evidence would edit a correct sentence.
+def dead_scripts(root):
+    """[(skill_path, token, verdict)] for path-shaped script tokens that do not resolve."""
+    skills_dir = os.path.join(root, ".claude", "skills")
+    basenames = {}
+    for dp, _dn, fn in os.walk(root):
+        if os.sep + ".git" in dp:
+            continue
+        for f in fn:
+            basenames.setdefault(f, os.path.relpath(os.path.join(dp, f), root))
+    out = []
+    for sk in sorted(glob.glob(os.path.join(skills_dir, "*", "SKILL.md"))):
+        here = os.path.dirname(sk)
+        seen = set()
+        for m in SCRIPT_RX.finditer(read(sk)):
+            tok = m.group(1)
+            tok = tok[2:] if tok.startswith("./") else tok
+            if "/" not in tok or tok in seen:
+                continue          # filter 1: a bare filename is a mention
+            seen.add(tok)
+            if any(os.path.exists(p) for p in
+                   (os.path.join(here, tok), os.path.join(root, tok),
+                    os.path.join(skills_dir, tok))):
+                continue
+            elsewhere = basenames.get(os.path.basename(tok))
+            out.append((os.path.relpath(sk, root), tok,
+                        "MISROUTED  -> " + elsewhere if elsewhere else "UNRESOLVED"))
+    return out
+
+
 def main(argv):
     argv = list(argv)
     root = ""
@@ -242,6 +313,17 @@ def main(argv):
     def rel(p):
         return os.path.join(root, p) if root and not os.path.isabs(p) else p
 
+    if len(argv) >= 2 and argv[1] == "--dead-scripts":
+        rows = dead_scripts(root or ".")
+        mis = sum(1 for _s, _t, v in rows if v.startswith("MISROUTED"))
+        # Counted line ALWAYS, including the zeroes: a detector that prints nothing
+        # on a clean tree is indistinguishable from one that did not run.
+        print(f"dead scripts   {len(rows)} unresolved · {mis} misrouted "
+              f"· {len(rows) - mis} not found in this tree")
+        for s, t, v in rows:
+            print(f"  {v.split()[0]:<10} {s}  ->  {t}"
+                  + ("" if v == "UNRESOLVED" else "   (" + v.split("-> ")[1] + ")"))
+        return 0
     if len(argv) >= 3 and argv[1] == "--manifest":
         for t in manifest(read(rel(argv[2]))):
             print(t)
@@ -313,7 +395,7 @@ def main(argv):
         return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
     print("usage: wf-remainder --manifest <file> | --diff <before> <after> | "
-          "--diff-manifest <a> <b>", file=sys.stderr)
+          "--diff-manifest <a> <b> | --root <tree> --dead-scripts", file=sys.stderr)
     return 2
 
 

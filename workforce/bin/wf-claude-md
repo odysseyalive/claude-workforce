@@ -79,6 +79,14 @@ STANDING_REQUEST = "\n".join([
 REGION_RX = re.compile(
     r"^<!--\s*WORKFORCE-CLAUDE-MD START.*?^<!--\s*WORKFORCE-CLAUDE-MD END\s*-->\s*$\n?",
     re.S | re.M)
+# DELIBERATELY TOLERANT OF INDENTATION, and it is the only sacred-marker reader that
+# is. This is a MASK, not a counter: it marks spans the duplication pass must not
+# touch. Over-masking costs a duplicate that survives; under-masking deletes a line
+# inside a user directive. The counting and guarding readers were narrowed to
+# column 0 on 2026-08-05 because an inflated count and a guard firing on a template
+# example are both defects — a mask has the opposite asymmetry and keeps the wider
+# grammar. `bin/check` § marker grammar asserts this exception by name rather than
+# letting it look like drift.
 IMMUTABLE_RX = re.compile(
     r"^[ \t]*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->.*?^[ \t]*<!--\s*/origin\s*-->",
     re.S | re.M)

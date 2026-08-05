@@ -232,6 +232,58 @@ not read, and precondition 1(b) of the Atomic-or-Absent gate is not satisfied. *
 neither `--manifest` nor `--json`** — the run prints the census and writes nothing, which is the whole
 of that mode's contract. This step and Step 3b were the two that used to contradict it.
 
+**Then run the optimization passes** (`references/passes.md`). They read; none of them writes, in any
+mode, so this is the same call under `--review` and under a live run:
+
+```bash
+"$WF/bin/wf-remainder" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --dead-scripts
+```
+
+Report the counted line **always, including the zeroes** — a detector that prints nothing on a clean
+tree is indistinguishable from one that did not run:
+
+```
+dead scripts   2 unresolved · 1 misrouted · 1 not found in this tree
+```
+
+**`MISROUTED` and `UNRESOLVED` are different findings and are never merged.** A misrouted token names a
+file that exists somewhere else in the tree: the file is real and the path is wrong, and it is a
+finding. An unresolved one resolves nowhere, which on a real tree has meant *a correct reference to a
+file in another repository* as often as a defect — measured 1 of 2 on the first run. **Neither is
+repaired here.** `passes.md` § What a pass may do sets the verdict at `REPORT`, and a pass that rewrote
+a correct sentence is not recoverable by re-running it.
+
+A finding is carried into the closing report and, if it needs work this run cannot do, into
+`deferred.md` with the rule that refused it. It never becomes an edit to a `SKILL.md` in this step.
+
+**Then ratchet the findings against the previous run:**
+
+```bash
+"$WF/bin/wf-ratchet" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+```
+
+Exit `1` is a **REGRESSION** — a finding that is new to the baseline whose pass already existed when
+the baseline was captured. That is the one failing case, and it is repaired in this run or the reason
+is recorded; it is never carried silently.
+
+**A count is not the ratchet, and this is why.** `IMPROVED` and `CARRIED` are allowed. `INHERITED` — a
+finding whose pass **did not exist** when the baseline was captured — is **not a regression**, because a
+newly added pass flags artifacts that were already there. Keying on findings rather than totals is what
+makes that distinguishable: two integers cannot tell *"fixed one, introduced one"* from *"nothing
+changed"*, and on a real project `lint-baseline.txt` reads `errors=31 / warnings=60`, which is
+compatible with both.
+
+**Under `--review`, run it without `--capture`** — the comparison prints and nothing is written. A live
+run writes `.claude/workforce/pass-baseline.md` with `--capture` **after** the findings have been acted
+on, never before: capturing first records the defects as acceptable and the ratchet then protects them.
+
+```bash
+"$WF/bin/wf-ratchet" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --capture   # live runs only
+```
+
+**First run on a project has no baseline**, and it says so rather than reporting zero regressions. That
+distinction is the whole difference between *"nothing got worse"* and *"nothing was compared"*.
+
 **Why a script and not these paragraphs.** The counts below are `find`, `readlink`, `json.load`, and a
 group-by. This project's own ledger count has been wrong three times — 24-vs-20, 27-vs-23, and an
 "index claims 0" a wrong root manufactured — and **every time the hand count was the thing that was

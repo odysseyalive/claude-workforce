@@ -115,7 +115,93 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-05
 
-**Closed 2026-08-05 (latest) — four defects from a real authoring run.** Record in
+**Closed 2026-08-05 (latest) — the optimization pass catalog, and the class that refused to
+generalize.** Records in `plan/transactions/2026-08-05-broom21-time.md`,
+`plan/marker-grammar-2026-08-05.md`, `plan/dead-script-2026-08-05.md`, and
+`plan/mock-audit-odyssey-alive-2026-08-05.md`.
+
+Origin: a user submitted a real `/org` transaction that worked and cost 3 agent runs, ~14 minutes and
+a user round trip to log 70 minutes of time. **Every blocker in it was false** — the org file already
+carried both IDs the second agent was spawned to resolve, and `is_billable` was documented in four
+files. Cause: one self-contradicting paragraph at `business-books.md:49`. The ask that followed was for
+a *system* rather than seven instance fixes.
+
+| | |
+|---|---|
+| **the founding class does not generalize, and that is the finding** | "an agent that is really a script" was the obvious first pass. Three `id-lookup` agents on one tree are **byte-identical on every mechanically keyable field** — `allowed-tools: Read, Grep`, `context: none` — and semantically different; `zoho`'s encodes a **user directive** (*"FORBIDDEN … Per user directive"*). `DEF-2026-08-05-mechanism-partition-ic-tier` had already measured the class at **5 true of 22**, and the written cure would have destroyed capability in the other 17. **Detection generalizes; remediation does not.** The catalog's default verdict is `REPORT` because of this number, not out of caution |
+| **`PASS-MARKER-GRAMMAR` — three of eight readers could not see a sacred block** | five accepted `immutable: true` in any field position; three required it last. The three were the ones deciding whether a user directive gets a **checksum**, is **asserted intact**, and is **protected from a cut** — and one of the blocks they could not see is `fixtures/scripts/census-sacred-orders`, a registered fixture whose whole purpose is asserting field order does not matter |
+| **the assertion written to prevent exactly this compared spelling** | `"remainder: the marker grammar is bin/check's, not a second one"` matched wf-remainder's regex **source text** against a literal copy of bin/check's — 2 of 8 readers, and a *faithful copy of a wrong pattern satisfied it exactly*. wf-remainder's comment said *"COPIED FROM bin/check … One grammar"* and was **true**: the copy was faithful and the source was the outlier. Replaced by an `ast` walk that compiles every reader's pattern and runs it against a corpus — it tests what patterns **accept**, covers all eight, and picks up any reader added later with no registration step |
+| **`PASS-DEAD-SCRIPT` — a blocking gate that never stats a file** | `manifest()` compares `script:` tokens string to string, so a `SKILL.md` naming a deleted script yields the same token on **both sides** of the T7b diff and the reduction gate passes clean. Two filters, both forced by hand-verification: a bare filename is a **mention** (184 tokens → 79), and `MISROUTED` (basename resolves elsewhere — real) is never merged with `UNRESOLVED` (may name a file in another repository — on the real tree, `src/stealth.ts` belongs to the `playwright-mcp` server) |
+| **the admission rule is enforced, not stated** | *no pass enters the catalog without a `defect` citation that resolves.* `bin/check` parses the table and fails on a citation that does not resolve or a token with no detector — **proven by breaking the citation rather than the row**, because a row that still reads like a pass while its evidence points nowhere is the shape a reader skims past |
+
+**The intake is the point, and it is new.** `plan/transactions/` — paste a transcript, unedited, and
+say *"review this transaction"*. A real transaction is the cheapest source of a defect class this
+project has and the only one that reports on the system **as a user meets it**; `bin/check` asserts
+text and `bin/baseline` measures a tree, and neither exercises a procedure. It is load-bearing rather
+than decorative because the admission rule requires a citation and a transaction record is one.
+
+**What the mock audit found, including against the patch.** `PASS-MARKER-GRAMMAR` fires on **zero**
+real blocks — 116 before, 116 after, and `.immutable.sha` byte-identical. The hole is entirely latent.
+Stated plainly because the pass is justified by a fixture and a cross-repo scan, **not by this tree**.
+
+And the scope decision was validated by measurement rather than argument: the first draft of the fix
+widened on **indentation** as well as field order. Measured, that would have added exactly two blocks —
+both the same template placeholder line containing a literal `YYYY-MM-DD` — so T7b would have begun
+refusing cuts to protect a date format string. **New finding in the other direction: `wf-census`
+reports 118 sacred blocks on that tree and two of them are not sacred blocks.** The tolerant readers
+over-count. Not fixed here: narrowing changes a count on every project already audited, which is a
+ruling and not a widening.
+
+*Four external traditions were checked and converge — [qntm's ratchet](https://qntm.org/ratchet) and
+its productions, OpenRewrite's **"do no harm"** recipe conventions, the compiler split of **legality
+from profitability**, and fitness-function-driven development. The ratchet literature's own warning is
+the one this catalog most needs: a ratchet freezes debt without draining it, and rule catalogs only ever
+grow because nobody wants to propose fewer rules. `ablate` applies to `passes.md` too, and the file says
+so.*
+
+**The indentation ruling, taken the same day.** Left open for one round, then answered by reading the
+instances: both are a **four-space indented markdown code block** showing the format, with a literal
+`YYYY-MM-DD`. In markdown an indented line *is* a code block. **And `bin/baseline` had already made
+this ruling and measured it** — 68 naive against 37 anchored, 46% inflation, *"the mentions are
+REPORTED rather than dropped; a number that shrank without explanation is its own defect"* — and the
+other four readers never got it. Counters and guards narrowed to column 0; **the one MASK
+(`wf-claude-md`) stayed tolerant and is exempt by name in `bin/check`**, because the asymmetry runs the
+other way: over-masking costs a surviving duplicate, under-masking deletes a line inside a user
+directive. odyssey-alive: `118 sacred blocks` → `116 sacred blocks · 2 indented mention(s) not
+counted`. **Proving it found that the check had no floor** — the first payload broke the file's syntax,
+`_marker_patterns` swallows `SyntaxError`, and the check reported clean on an empty set. It now
+requires 7 line-anchored readers and names the number when it does not get them.
+
+**The carve-out that caused the transaction is amended** —
+`odyssey-alive/.claude/workforce/personnel/DEF-2026-08-05-timesheet-carveout.md`. `business-books.md`
+step 5 read *"`/timesheet` is not yours to invoke"* unconditionally and then, **in the same numbered
+step**, applied the correct DATA/JUDGMENT test to `/zoho` and `/ynab`. The class fix already existed —
+`DEF-2026-08-04-skill-spawn-class`, opened by three cold readers, **one of them `business-books` asking
+about this exact skill** — and the handbook hard-coded an exception to it. The dominant failure, re-run:
+the class fix was written and one caller kept a local override that made it untrue. Both halves amended
+(`business-lead.md` carried the matching re-homing, and one side alone would leave the two handbooks
+disagreeing about an edge, which the Chain-of-Command Gate treats as a STOP). Both are now UNRELEASED
+pending re-probe, and both `contract-stamp` values are stale by design.
+
+**The ratchet exists** — `wf-ratchet`, keyed on findings and never on a count, with four verdicts and
+two paired fixtures. `ratchet-regression` and `ratchet-inherited` are the **same tree and the same
+finding**, differing only in `captured-passes`: one exits 1, the other exits 0. That pair is the
+discrimination two integers cannot make, made re-runnable. `INHERITED` is the clause that lets the
+catalog grow — without it every new pass reads as a decline and never adding one is the cheapest way to
+stay green. `NO BASELINE` prints distinctly, because *"nothing got worse"* and *"nothing was compared"*
+are different results. **Its check was VACUOUS on the first `bin/prove` run**: it asserted the word
+`INHERITED`, which survives in the docstring, so deleting the logic left it green. It now asserts the
+discriminating expression instead — the second time in this change that proof-by-breaking caught a
+check testing vocabulary rather than behaviour.
+
+**Open from this work.** **Step 6b consumes nothing** — detection and the ratchet are wired into Step
+1b, and a finding reaches the closing report and stops. **No pass has ever auto-applied**, so the six
+`AUTO` preconditions are unexercised. **The ratchet has one host-side pass feeding it**, so its shape is
+proven and its coverage is thin. And the remaining **instance defects** from the originating transaction
+are recorded in its record — the `/timesheet` Mechanicals rows, `verify.md:117` naming a remedy
+`hooks.md:167` cannot deliver, and `timesheet/agents/id-lookup` still being an agent that reads a table.
+
+**Closed 2026-08-05 — four defects from a real authoring run.** Record in
 `plan/authoring-run-defects-2026-08-05.md`. Each was verified absent before being fixed; none had any
 mechanical guard.
 

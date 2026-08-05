@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""wf-ratchet — monotonic improvement across audit runs, without a count.
+
+    wf-ratchet --root <tree>              compare findings to the baseline
+    wf-ratchet --root <tree> --capture    write the baseline from current findings
+
+A ratchet permits motion one way. This one is keyed on FINDINGS, never on totals,
+because two integers cannot tell "fixed one, introduced one" from "nothing changed" —
+and that is the only question a ratchet exists to answer. Measured on a real project:
+`.claude/workforce/lint-baseline.txt` reads `errors=31 / warnings=60 / captured=<ts>`
+and is compatible with all three of those histories.
+
+FOUR VERDICTS, and the third is the one a count gets wrong:
+
+    IMPROVED    in the baseline, gone now                      -> always allowed
+    CARRIED     in both                                        -> allowed
+    INHERITED   present now, and its PASS did not exist when
+                the baseline was captured                      -> NOT a regression
+    REGRESSION  present now, absent from the baseline, and its
+                pass DID exist then                            -> the only failure
+
+INHERITED is what makes the catalog able to grow. A pass added later flags artifacts
+that were already there; the findings are new to the baseline and are not new to the
+tree, and calling them regressions would mean every new pass looks like a decline.
+The discriminator is the `captured-passes:` header — the token set known at capture —
+never a timestamp, because a timestamp cannot say which detectors had run.
+
+WHAT IT DOES NOT DO. It freezes; it does not drain. qntm, who named the technique:
+"this technique does nothing to actively encourage the removal of these old patterns
+... those remaining 67 or so calls have been kind of lingering." Draining is
+`deferred.md` and `discharge`, and this file is not a substitute for either.
+
+REPORTS AND EXITS; IT NEVER EDITS A FINDING AWAY. Exit 1 on a regression is the whole
+of its enforcement.
+"""
+
+import glob
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+BASELINE = os.path.join(".claude", "workforce", "pass-baseline.md")
+ROW_RX = re.compile(r"^\|\s*`(PASS-[A-Z-]+)`\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|", re.M)
+HDR_RX = re.compile(r"^captured-passes:\s*(.*)$", re.M)
+
+
+def read(p):
+    """A diagnostic must not die on the input it exists to diagnose."""
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+# ── the host-side pass detectors ─────────────────────────────────────────────
+# Every host-side pass in references/passes.md contributes findings here, keyed
+# (token, artifact, locus). A pass whose verdict is REPORT still ratchets: the
+# ratchet governs whether a finding may APPEAR, never whether it is repaired.
+def findings(root):
+    out = []
+    wf = os.path.dirname(os.path.abspath(__file__))
+    # The shipped scripts carry no `.py` extension, so spec_from_file_location
+    # cannot infer a loader and returns None. Name the loader explicitly rather
+    # than renaming a file six other things invoke by path.
+    import importlib.util
+    from importlib.machinery import SourceFileLoader
+    # Never leave a __pycache__ beside a shipped script. Importing wf-remainder
+    # wrote one into `workforce/bin/` on the first run and `bin/check` caught it as
+    # an undeclared shipped file — in a user's install that is residue this project
+    # refuses to leave, in the directory the installer owns.
+    sys.dont_write_bytecode = True
+    _path = os.path.join(wf, "wf-remainder")
+    spec = importlib.util.spec_from_loader(
+        "wf_remainder", SourceFileLoader("wf_remainder", _path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for skill, token, verdict in mod.dead_scripts(root):
+        out.append(("PASS-DEAD-SCRIPT", skill, token, verdict.split()[0]))
+    return sorted(out)
+
+
+# The tokens this build knows how to detect. A baseline captured before a token
+# joined this set cannot have contained its findings — that is what makes
+# INHERITED decidable without a version number.
+KNOWN = ["PASS-DEAD-SCRIPT"]
+
+
+def load_baseline(root):
+    text = read(os.path.join(root, BASELINE))
+    if not text.strip():
+        return None, []
+    hdr = HDR_RX.search(text)
+    known = [t.strip() for t in hdr.group(1).split()] if hdr else []
+    return known, [(m.group(1), m.group(2), m.group(3)) for m in ROW_RX.finditer(text)]
+
+
+def capture(root, found):
+    path = os.path.join(root, BASELINE)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    lines = [
+        "# Pass baseline",
+        "",
+        "Keyed on findings, never on totals. `captured-passes` is the token set known when",
+        "this was written: a finding whose pass is absent from that list is INHERITED, not a",
+        "regression. Written by `wf-ratchet --capture`; a row is removed only by fixing the",
+        "finding, and moving one to ACCEPTED requires a `why` citing a shipped rule.",
+        "",
+        "captured-passes: " + " ".join(KNOWN),
+        "",
+        "| pass | artifact | locus | verdict | state | why |",
+        "|---|---|---|---|---|---|",
+    ]
+    for tok, art, loc, verdict in found:
+        lines.append(f"| `{tok}` | `{art}` | `{loc}` | {verdict} | OPEN | |")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return path
+
+
+def main(argv):
+    root = "."
+    if len(argv) >= 3 and argv[1] == "--root":
+        root = argv[2]
+        del argv[1:3]
+
+    found = findings(root)
+    keys_now = {(t, a, l) for t, a, l, _v in found}
+
+    if "--capture" in argv:
+        path = capture(root, found)
+        print(f"pass baseline   {len(found)} finding(s) captured · "
+              f"{len(KNOWN)} pass(es) known · {path}")
+        return 0
+
+    known_then, rows = load_baseline(root)
+    if known_then is None:
+        # A first run is a measurement, not a pass. Saying so is the difference
+        # between "no regressions" and "nothing to compare against".
+        print(f"pass ratchet    NO BASELINE — {len(found)} finding(s) present. "
+              f"Capture with `wf-ratchet --root <tree> --capture`")
+        return 0
+
+    keys_then = set(rows)
+    improved = keys_then - keys_now
+    carried = keys_then & keys_now
+    new = keys_now - keys_then
+    inherited = {k for k in new if k[0] not in known_then}
+    regressed = new - inherited
+
+    print(f"pass ratchet    {len(improved)} improved · {len(carried)} carried · "
+          f"{len(inherited)} inherited · {len(regressed)} REGRESSION(S)")
+    for t, a, l in sorted(improved):
+        print(f"  IMPROVED    {t}  {a}  {l}")
+    for t, a, l in sorted(inherited):
+        print(f"  INHERITED   {t}  {a}  {l}   (pass added since capture — not a regression)")
+    for t, a, l in sorted(regressed):
+        print(f"  REGRESSION  {t}  {a}  {l}")
+    return 1 if regressed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

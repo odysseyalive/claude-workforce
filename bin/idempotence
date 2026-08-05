@@ -76,6 +76,17 @@ WRITERS = {
                  "fixtures/scripts/permissions-apply", "--apply"],
         "watch": "fixtures/scripts/permissions-apply",
     },
+    # wf-ratchet --capture rewrites the baseline. A ratchet whose own writer is not
+    # idempotent is worse than none: the file it rewrites is the ONLY record of what
+    # was acceptable last run, so a capture that reorders rows or restamps a header
+    # makes every subsequent comparison diff against noise, and the regression it
+    # exists to catch is lost in it. Row order is sorted for exactly this reason, and
+    # nothing in the header is a timestamp.
+    "ratchet-capture": {
+        "argv": ["workforce/bin/wf-ratchet", "--root",
+                 "fixtures/scripts/ratchet-regression", "--capture"],
+        "watch": "fixtures/scripts/ratchet-regression",
+    },
 }
 
 

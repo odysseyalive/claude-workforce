@@ -81,6 +81,8 @@ CEN = "workforce/bin/wf-census"
 SWP = "workforce/references/procedures/sweep.md"
 SKL = "workforce/SKILL.md"
 INV = "workforce/references/invariants.md"
+PAS = "workforce/references/passes.md"
+RAT = "workforce/bin/wf-ratchet"
 AUD2 = "workforce/references/procedures/audit.md"
 MAN = "manifest.txt"
 STG2 = "workforce/references/staging.md"
@@ -389,8 +391,10 @@ CASES = [
      REM, "del", "lost  <!-- origin: user | immutable: true -->"),
     ("remainder: the cut refuses on an unpaired marker",
      REM, "del", '"enforcement-open"'),
-    ("remainder: the marker grammar is bin/check's, not a second one",
-     REM, "del", r'r"^<!--\s*origin:.*-->\s*$"'),
+    # The textual-pin case that lived here was retired 2026-08-05 with the assertion
+    # it proved. It compared wf-remainder's regex SOURCE to a literal copy of
+    # bin/check's — 2 of 8 readers, spelling not behaviour — and a faithful copy of a
+    # wrong pattern satisfied it. Replaced by the corpus case at the end of CASES.
     ("remainder: every refusal reason is printed, not just the first",
      REM, "del", "refused = False"),
     ("remainder: the docstring states that A == B cannot see a marker",
@@ -409,6 +413,43 @@ CASES = [
      PRV, "del", "target = work" " / relpath"),
     ("prove: a SIGTERM teardown unwinds the worker temp directories",
      PRV, "del", "signal.SIG" "TERM, signal.SIGHUP"),
+    # ── PASS-MARKER-GRAMMAR (2026-08-05) ─────────────────────────────────────
+    # Deleting the opening half of SACRED_RX leaves a pattern that still COMPILES
+    # and still matches every legal block — it just also matches blocks that are
+    # not sacred. That is the shape the corpus test exists for: the previous
+    # assertion compared regex source text between two files and a faithful copy
+    # of a wrong pattern satisfied it, which is how three readers drifted from
+    # five unnoticed. This case must fire on the ILLEGAL half, not the legal one.
+    ("grammar: every sacred-marker reader accepts the same blocks",
+     REM, "del", '    r"^<!--\\s*origin:\\s*user\\b[^>]*immutable:\\s*true[^>]*-->$"\n'),
+    # ── PASS-DEAD-SCRIPT (2026-08-05) ────────────────────────────────────────
+    # Break the path-shape filter, not the feature. Removing `--dead-scripts`
+    # wholesale would prove only that the check greps for a flag name. Removing the
+    # filter leaves a detector that still runs and still reports — on 184 tokens
+    # instead of 79, every added one a backticked filename in prose. That is the
+    # direction this pass actually fails in: not absent, but too loud to read.
+    ("remainder: dead-script detection keeps both of its tuned filters",
+     REM, "del", '            if "/" not in tok or tok in seen:\n'),
+    # Break the CITATION, not the row. A deleted row would shrink the table and could
+    # be caught by a count; a row that still reads like a pass while its evidence
+    # points nowhere is the shape the admission rule exists to refuse, and it is the
+    # one a reader skims straight past.
+    ("passes: every catalog row cites a defect that resolves and has a detector",
+     PAS, "del", "plan/dead-script-2026-08-05.md"),
+    # ── the indentation ruling (2026-08-05) ──────────────────────────────────
+    # Re-widen the COUNTER back to whitespace-tolerant. It still compiles, still
+    # counts every real block, and silently re-admits the two template examples that
+    # made a directive guard fire on a date format string. The regression direction
+    # here is inflation, not absence — the count goes UP and reads like more coverage.
+    ("grammar: counters and guards reject an indented marker; the mask does not",
+     CEN, "del", "    r\"^<!--\\s*origin:\\s*user\\b[^>]*immutable:\\s*true[^>]*-->$\", re.M)"),
+    # ── the ratchet (2026-08-05) ─────────────────────────────────────────────
+    # Delete the INHERITED verdict. The ratchet still runs, still keys on findings,
+    # and still catches real regressions — it just reclassifies every finding from a
+    # newly added pass as one. That is the failure that makes a catalog stop growing:
+    # adding a pass becomes the thing that turns the build red, so nobody adds one.
+    ("ratchet: keyed on findings, with INHERITED distinguished from REGRESSION",
+     RAT, "del", "    inherited = {k for k in new if k[0] not in known_then}\n"),
 ]
 
 

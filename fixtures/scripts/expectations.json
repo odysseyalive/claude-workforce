@@ -747,5 +747,65 @@
       "none parseable",
       "never examined"
     ]
+  },
+  "remainder-deadscript": {
+    "_why": "manifest() emits script: tokens and never stats one, so a SKILL.md naming a deleted script passes the blocking T7b reduction gate on both sides. Three behaviours are asserted together: a reference that resolves from its own skill is silent; a BARE FILENAME is a mention and is skipped (105 of 184 tokens on a real tree were this kind); and a token whose basename resolves elsewhere is MISROUTED (high confidence, the file is real and the path is wrong) while one that resolves nowhere is UNRESOLVED (it may name a file in another repository -- odyssey-alive's src/stealth.ts belongs to the playwright-mcp server). Collapsing the two verdicts would license rewriting a correct sentence.",
+    "script": "wf-remainder",
+    "args": [
+      "--dead-scripts"
+    ],
+    "exit": 0,
+    "want": [
+      "2 unresolved",
+      "1 misrouted",
+      "UNRESOLVED .claude/skills/alpha/SKILL.md  ->  scripts/vanished.sh",
+      "MISROUTED  .claude/skills/beta/SKILL.md  ->  scripts/live.sh",
+      ".claude/skills/alpha/scripts/live.sh"
+    ],
+    "not": [
+      "bare.py",
+      "alpha/SKILL.md  ->  scripts/live.sh"
+    ]
+  },
+  "census-indented-mention": {
+    "_why": "In markdown an indented line is a code block, so an indented sacred marker is documentation ABOUT the format and never a span opener. bin/baseline established this and measured 68 naive against 37 anchored -- 46% inflation -- and the other readers never got the ruling. Measured on odyssey-alive 2026-08-05: wf-census reported 118 sacred blocks and two were a template example carrying a literal YYYY-MM-DD, so a directive guard fired on a date format string. The mention is REPORTED, never silently dropped: a number that shrank without explanation is its own defect. Both halves are asserted -- the real block is counted, the indented one is not, and the mention count is printed.",
+    "script": "wf-census",
+    "exit": 0,
+    "want": [
+      "1 sacred blocks in 1 files",
+      "1 indented mention(s) not counted"
+    ],
+    "not": [
+      "2 sacred blocks",
+      "0 indented mention(s)"
+    ]
+  },
+  "ratchet-regression": {
+    "_why": "A finding absent from the baseline whose pass WAS known at capture is the one case the ratchet fails on. Paired with ratchet-inherited: identical tree, identical finding, and the only difference is captured-passes. If both pass, the discrimination two integers cannot make is real.",
+    "script": "wf-ratchet",
+    "exit": 1,
+    "want": [
+      "1 REGRESSION(S)",
+      "REGRESSION  PASS-DEAD-SCRIPT",
+      "scripts/gone.sh"
+    ],
+    "not": [
+      "inherited\n",
+      "0 REGRESSION(S)"
+    ]
+  },
+  "ratchet-inherited": {
+    "_why": "Same tree and same finding as ratchet-regression, with an EMPTY captured-passes: the baseline predates the pass, so the finding is INHERITED and exits 0. A newly added pass flags artifacts that were already there; calling those regressions would make every catalog addition look like a decline.",
+    "script": "wf-ratchet",
+    "exit": 0,
+    "want": [
+      "1 inherited",
+      "INHERITED   PASS-DEAD-SCRIPT",
+      "not a regression",
+      "0 REGRESSION(S)"
+    ],
+    "not": [
+      "REGRESSION  PASS-DEAD-SCRIPT"
+    ]
   }
 }

@@ -53,8 +53,24 @@ import sys
 # extraction gate blocks every deletion on it — so a false one is expensive twice.
 ORIGIN_OPEN = re.compile(r"^\s*<!--\s*origin:\s*[^>]*-->\s*$", re.M)
 ORIGIN_CLOSE = re.compile(r"^\s*<!--\s*/origin\s*-->\s*$", re.M)
+# LINE-ANCHORED AT COLUMN 0, and the indent is the discriminator. In markdown a line
+# indented four spaces IS a code block, so an indented marker is documentation ABOUT
+# the format, never a span opener. `bin/baseline` established this and measured it:
+# 68 naive against 37 anchored on the first sweep — 31 mentions, 46% inflation — and
+# the extraction gate blocked a completable sweep because the census it asserted
+# against was counting prose.
+#
+# Measured here 2026-08-05 on odyssey-alive: this pattern reported 118 sacred blocks
+# and TWO of them were not sacred blocks. Both were the same line inside an indented
+# example — `origin: user | added: YYYY-MM-DD | immutable: true`, where `YYYY-MM-DD`
+# is literal. A directive-protection hook firing on a date format string is a false
+# positive that trains a reader to ignore it.
 IMMUTABLE_OPEN = re.compile(
-    r"^\s*<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->\s*$", re.M)
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
+# Reported, never silently dropped — `bin/baseline`: "a number that shrank without
+# explanation is its own defect."
+IMMUTABLE_MENTION = re.compile(
+    r"^[ \t]+<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->[ \t]*$", re.M)
 NAME_RX = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
 
 # Marker families are open-ended by design: a foreign generator invents its own.
@@ -416,12 +432,16 @@ class Census:
                 # a close before the next origin marker? An unterminated sacred
                 # span is where extraction takes the wrong bytes. A generator's
                 # annotation is not a hazard and is not counted as one.
-                sacred = unterminated = 0
+                sacred = unterminated = mentions = 0
                 pending = False
                 for line in body.splitlines():
                     ls = line.strip()
                     if ORIGIN_CLOSE.match(line):
                         pending = False
+                    # BEFORE ORIGIN_OPEN, which is whitespace-tolerant and would
+                    # otherwise claim the line and report 0 mentions forever.
+                    elif IMMUTABLE_MENTION.match(line):
+                        mentions += 1          # indented: an example, not an opener
                     elif ORIGIN_OPEN.match(line):
                         if pending:
                             unterminated += 1      # a sacred open, then another open
@@ -430,9 +450,9 @@ class Census:
                         pending = is_sacred
                 if pending:
                     unterminated += 1              # sacred open, EOF, no close
-                if sacred or unterminated:
+                if sacred or unterminated or mentions:
                     self.immutable_blocks.append(
-                        {"file": p, "sacred": sacred,
+                        {"file": p, "sacred": sacred, "mentions": mentions,
                          "unterminated": unterminated, "paired": unterminated == 0}
                     )
 
@@ -577,6 +597,7 @@ class Census:
             "immutable_blocks": {
                 "files": len([b for b in self.immutable_blocks if b["sacred"]]),
                 "blocks": sum(b["sacred"] for b in self.immutable_blocks),
+                "mentions": sum(b.get("mentions", 0) for b in self.immutable_blocks),
                 "unterminated": sum(b["unterminated"] for b in self.immutable_blocks),
                 "unpaired": [b for b in self.immutable_blocks if not b["paired"]],
             },
@@ -660,7 +681,8 @@ def main():
         ib = s["immutable_blocks"]
         print(
             f"  immutable   {ib['blocks']} sacred blocks in {ib['files']} files · "
-            f"{ib['unterminated']} unterminated (extraction hazards)"
+            f"{ib['unterminated']} unterminated (extraction hazards) · "
+            f"{ib['mentions']} indented mention(s) not counted"
         )
         _dead = [h for h in s['hooks'] if h.get('exists') is False]
         _unknown = sum(1 for h in s['hooks'] if h.get('exists') is None)
