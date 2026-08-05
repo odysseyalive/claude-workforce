@@ -52,6 +52,21 @@ is the only section of the sidecar that restores rather than deletes — audit r
 delete would leave that removal permanent. **Report the restored keys by name and value**; a settings
 change reversed silently is indistinguishable from one that never happened.
 
+**Replay `hooks_removed` the same way, and for the same reason.** `PASS-DEAD-HOOK` (`passes.md`) removes
+registrations whose command resolves to nothing, and records each **whole prior entry** — event,
+matcher, command, and the settings file it came from. Write every one of them back exactly as recorded.
+
+It is the second restoring section, and it exists because the pass edits a file **workforce does not
+own**. Removal is legal there only because it is behaviour-neutral — the hook was already not running —
+and that argument holds only while the removal stays reversible. A sidecar that could not put those
+three lines back would make `--execute` a one-way edit to the user's settings, which is the thing
+`env_removed` was added to prevent. **Report each restored registration by event and command.**
+
+**And replay `files_removed`** — whole files a pass deleted, written back from the **content** the
+sidecar stores rather than merely re-created. `PASS-STALE-CANARY` removes throwaway canaries workforce
+itself wrote once their fact is measured; a path alone could not put one back, which is why the sidecar
+carries the bytes.
+
 **6. Remove the Constitution Gate** from `CLAUDE.md`, between its markers only. Nothing else in that
 file is workforce's.
 

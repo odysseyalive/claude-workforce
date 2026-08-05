@@ -115,7 +115,15 @@ it is that `/workforce hooks` wires it and this row says whether it is wired.
 | `NOT EXECUTABLE` | registered, on disk, and the host cannot run it |
 
 **Report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
---execute`. `DEAD WIRING` → the same command, which drops registrations that do not resolve.
+--execute`. `DEAD WIRING` → `wf-apply --root <tree> --execute` (`references/passes.md`
+§ `PASS-DEAD-HOOK`), which removes registrations that do not resolve, records each whole prior entry in
+`.settings-owned.json` § `hooks_removed`, and refuses any hook under declared succession.
+
+*Corrected 2026-08-05. This line named `/workforce hooks --execute` for both, and that command
+**could not do the second one**: `hooks.md` § Unwiring scopes `--remove --execute` to the entries
+`.settings-owned.json` already names, which by construction can never name a foreign registration. A
+shipped file pointed at a remedy with no producer — this project's signature defect, in the file whose
+job is reporting whether hooks work. The producer now exists.*
 
 **Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`,
 `PRESENT` with a block count or `ABSENT`. Absent is not an error — it is the day-one state — but a hook

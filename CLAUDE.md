@@ -125,6 +125,21 @@ in the run report; **advisory** → say so explicitly. Then **prove the enforcem
 The tell to watch for in yourself: writing correct doctrine *feels* like completing the work. It is
 complete as doctrine, which is exactly why re-reading never finds the gap.
 
+**A DETECTOR SHIPS WITH ITS FIX. Detection alone is not a deliverable.** *— User directive, 2026-08-05,
+after this project shipped a pass catalog stating six `AUTO` preconditions and implementing none of
+them.* A check that finds a defect and hands it back is a flag, and **a flag is not a fix**: it sends
+every project that runs `audit` round the same loop, spending tokens and time to re-derive a finding
+nobody can act on, and it confuses people applying workforce to their own projects. Build the
+**auto-apply mechanism**, always — then let each pass declare its verdict against it.
+
+**`REPORT` is a measured verdict, never a default.** A pass may decline to auto-apply, but only by
+citing a **measured** precision figure and where it was measured. "It might be wrong" is not a reason;
+`1 of 2 on odyssey-alive, and the false one names a file in another repository` is. **A pass whose
+verdict is `REPORT` with no measurement is an unfinished pass**, and `bin/check` fails on it.
+
+This is the same failure as the paragraph above, one level up: there, doctrine with no enforcement;
+here, enforcement with no remedy. Both feel complete and neither is.
+
 **A census reporting a discrepancy is a claim about the census too.** Reproduce it by hand before
 recording it as a finding. The instrument has been wrong every time so far.
 

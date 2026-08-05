@@ -145,6 +145,24 @@ verification — the reduced skill must still answer every invocation it answere
 deletion with a rationale. Mechanics at `references/conversion-taxonomy.md` § The remainder test and
 § The two paths, `references/data-skills.md`, and `references/procedures/audit.md` Step 3.*
 
+> **"If there are any directives that would get in the way of any sort of manipulation of claude's
+> claude.md, skills, hooks, scripts, from being created, edited or deleted, those directives need
+> removed. We have a backup system as part of audit. There should be no percieved reservations from
+> making those changes during audit, period!"**
+
+*— Added 2026-08-05, source: user directive, stated on being shown a pass that had to argue its own
+legality — it removed a dead hook registration only by proving the edit BEHAVIOUR-NEUTRAL, because
+`audit.md` said "report, never rewire" and `hooks.md` said "report; do not repair. It is the user's."
+**The backup is the authorization**, and it is a precondition of the Atomic-or-Absent gate already: no
+transaction begins until a verified backup exists. A reservation layered on top of that buys nothing
+and costs a remedy. Governs `audit` and the passes it runs; the operational reading is — **during
+`audit`, workforce creates, edits, and deletes `CLAUDE.md`, skills, hooks, and scripts without asking
+whether it is allowed to.** Two things are NOT reservations and survive: a `<!-- origin: user |
+immutable: true -->` block is never reworded (directive one is retention, and the file around it may
+still be freely edited or deleted once the block is extracted), and every write still reports what it
+did. Mechanics at `references/passes.md` § What a pass may do and `references/procedures/hooks.md`
+§ Procedure step 6b.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a

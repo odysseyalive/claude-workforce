@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""wf-apply — the auto-apply mechanism for the optimization pass catalog.
+
+    wf-apply --root <tree>              DISPLAY: print the exact edit, change nothing
+    wf-apply --root <tree> --execute    apply every AUTO pass, reversal written first
+
+WHY THIS EXISTS, and it is a user directive (references/passes.md § Directives):
+
+    "You always have to produce the autoapply mechanism. Otherwise, we'd be dealing
+     with going around and around, wasting tokens and time and confusing people who
+     are applying workforce to their projects."
+
+The catalog shipped with six AUTO preconditions written and none implemented. Every
+finding was handed back, and the closing report named "no pass has ever auto-applied"
+as a status rather than a defect. A detector without a remedy is a flag, and a flag is
+not a fix.
+
+THE SIX PRECONDITIONS, checked here rather than described. A pass declares AUTO only
+if all six hold, and each is a field on the pass so a reader can check the claim:
+
+  1. legality is MECHANICAL      — decidable with no judgment
+  2. not a sacred span           — an `origin: user | immutable: true` block is never
+                                   reworded; the file around it may be edited or deleted
+                                   freely once extracted. OWNERSHIP IS NOT A
+                                   PRECONDITION — the user removed that reservation on
+                                   2026-08-05, and the BACKUP is the authorization
+                                   (SKILL.md § Directives). Asking whether a file is
+                                   "workforce's" during an audit buys nothing and costs
+                                   a remedy.
+  3. reversal artifact FIRST     — written before the edit, never after
+  4. profit > 0, measured        — the count of findings the edit removes
+  5. precision measured at 1.00  — on a named tree, hand-verified
+  6. negative test recorded      — a bin/prove case exists for its check
+
+DISPLAY IS THE DEFAULT. `--execute` is the consent, and display mode prints the exact
+edit by path so it is read before it happens — the same shape `hooks.md` already
+applies to every write it makes.
+
+REPORT PASSES ARE PRINTED, NEVER APPLIED, and their measured reason is printed with
+them. A pass that declines to auto-apply owes the reader the number.
+"""
+
+import glob
+import json
+import os
+import re
+import sys
+
+sys.dont_write_bytecode = True
+
+
+def read(p):
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def _load(name):
+    """Import a sibling shipped script (they carry no .py extension)."""
+    import importlib.util
+    from importlib.machinery import SourceFileLoader
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    spec = importlib.util.spec_from_loader(
+        name.replace("-", "_"), SourceFileLoader(name.replace("-", "_"), path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+SIDECAR = os.path.join(".claude", "workforce", ".settings-owned.json")
+
+
+# ── succession ───────────────────────────────────────────────────────────────
+def succeeded_owners(root):
+    """Skills whose capability workforce has DECLARED ITSELF the successor to.
+
+    A dead hook belonging to one of these is NOT removable: hooks.md § step 6b holds
+    that workforce OWES that capability, so deleting the registration closes the
+    finding by breaching the conversion directive's floor while reporting success.
+    """
+    cfg = read(os.path.join(root, ".claude", "workforce", "org-config.md"))
+    return {m.group(1).strip() for m in
+            re.finditer(r"succession:\s*declared\s*\|\s*from:\s*(\S+)", cfg)}
+
+
+# ── PASS-DEAD-HOOK ───────────────────────────────────────────────────────────
+def detect_dead_hooks(root):
+    """Registrations whose command resolves to nothing. AUTO-removable.
+
+    `exists is False` ONLY — never `None`. An undecidable command (a bare `jq` found
+    on PATH) is reported and left alone; calling it dead invites deleting a working
+    registration, and wf-census keeps the two apart for exactly this reason.
+    """
+    census = _load("wf-census")
+    c = census.Census(root)
+    # Only what the hook census needs. `load_ignore` first: a .censusignore
+    # exclusion is the user's declaration and must apply here too, or this pass
+    # would edit a registration the census was told to leave alone.
+    c.load_ignore()
+    c.census_skills()
+    c.census_hooks()
+    out, owed = [], succeeded_owners(root)
+    for h in c.summary()["hooks"]:
+        if h.get("exists") is not False:
+            continue
+        if h.get("skill") in owed:
+            out.append((h, "REFUSED"))     # workforce owes this capability
+        else:
+            out.append((h, "REMOVABLE"))
+    return out
+
+
+def apply_dead_hooks(root, rows, execute):
+    """Remove each REMOVABLE registration, recording the prior entry for disband.
+
+    JSON-AWARE: parse, modify, validate, write. Never a text edit — the settings file
+    is JSON and JSON has no comments (enforcement.md § The machine-owned region).
+    """
+    edits, removed = [], []
+    by_file = {}
+    for h, verdict in rows:
+        if verdict == "REMOVABLE":
+            by_file.setdefault(h["settings"], []).append(h)
+
+    for rel, hooks in sorted(by_file.items()):
+        path = os.path.join(root, rel)
+        try:
+            data = json.loads(read(path))
+        except (json.JSONDecodeError, ValueError):
+            edits.append((rel, "UNPARSEABLE — refusing to touch it", None))
+            continue
+        targets = {(h["event"], h.get("matcher"), h["command"]) for h in hooks}
+        blocks = data.get("hooks", {})
+        for event in list(blocks):
+            groups = blocks[event]
+            for grp in list(groups):
+                kept = [e for e in grp.get("hooks", [])
+                        if (event, grp.get("matcher"), e.get("command")) not in targets]
+                gone = [e for e in grp.get("hooks", []) if e not in kept]
+                for e in gone:
+                    removed.append({"event": event, "matcher": grp.get("matcher"),
+                                    "command": e.get("command"), "settings": rel})
+                    edits.append((rel, f"{event} · {grp.get('matcher')}", e.get("command")))
+                if kept:
+                    grp["hooks"] = kept
+                else:
+                    groups.remove(grp)          # no hooks left in this matcher
+            if not groups:
+                del blocks[event]               # no matchers left for this event
+        if execute and removed:
+            # REVERSAL FIRST. The sidecar is written before the settings file, so a
+            # crash between them leaves a restorable record rather than a silent
+            # deletion. `env_removed` set this precedent: store the prior VALUE, not
+            # the name, because a sidecar that can only express additions makes a
+            # removal irreversible — the one thing this project will not do to a
+            # user's settings file.
+            side = os.path.join(root, SIDECAR)
+            os.makedirs(os.path.dirname(side), exist_ok=True)
+            try:
+                sc = json.loads(read(side)) if os.path.exists(side) else {}
+            except (json.JSONDecodeError, ValueError):
+                sc = {}
+            sc.setdefault("hooks_removed", []).extend(removed)
+            with open(side, "w", encoding="utf-8") as fh:
+                json.dump(sc, fh, indent=2)
+                fh.write("\n")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2)
+                fh.write("\n")
+    return edits
+
+
+# ── PASS-STALE-CANARY ────────────────────────────────────────────────────────
+# A tier canary WORKFORCE ITSELF wrote, whose fact is already measured. Its own
+# frontmatter says so: "Throwaway fixture written by /workforce audit. Not an
+# employee. Safe to delete once .claude/workforce/platform-local.md records a
+# measurement." It then collides with the SHIPPED canary of the same name in personal
+# scope, and a collision BLOCKS — so workforce's own residue stops the census it needs.
+#
+# THREE CONDITIONS, all required, which is what makes precision a property rather than
+# a sample: the name is a canary/probe name, the file does NOT carry `measures-fact:`
+# (that marks a shipped canary, whose job RECURS per host and per harness version and
+# which is never residue), and platform-local.md actually records the measurement. Any
+# one missing and the file is left alone.
+#
+# ON DELETION. `discharge.md` reserves deleting to `sweep`, and that rule governs a
+# USER's skills — the conversion sweep, with its own preconditions and its `.orig`
+# undo. This population is different and the difference is the whole justification:
+# these are workforce's OWN emissions, carrying workforce's OWN expiry condition, and
+# `sweep` does not cover a host's canaries at all (bin/check's fixture-lifecycle rule
+# is repo-side only). Leaving them is the residue the second user directive forbids.
+# The boundary is stated in references/passes.md so it can be overruled deliberately.
+CANARY_RX = re.compile(r"^wf-(canary-[a-z]|ceiling-probe|reload-probe)\.md$")
+
+
+def detect_stale_canaries(root):
+    local = read(os.path.join(root, ".claude", "workforce", "platform-local.md"))
+    measured = "TIER-LIMIT:" in local
+    out = []
+    for p in sorted(glob.glob(os.path.join(root, ".claude", "agents", "wf-*.md"))):
+        if not CANARY_RX.match(os.path.basename(p)):
+            continue
+        body = read(p)
+        if "measures-fact:" in body:
+            continue                      # SHIPPED: its job recurs, never residue
+        out.append((p, "REMOVABLE" if measured else "REFUSED"))
+    return out
+
+
+def apply_stale_canaries(root, rows, execute):
+    edits, removed = [], []
+    for path, verdict in rows:
+        if verdict != "REMOVABLE":
+            continue
+        rel = os.path.relpath(path, root)
+        edits.append((rel, "throwaway canary, fact measured", None))
+        removed.append({"path": rel, "content": read(path)})
+    if execute and removed:
+        # REVERSAL FIRST, and it stores the whole FILE — a path alone could not put a
+        # deleted fixture back. Same asymmetry as env_removed: a sidecar that can only
+        # express additions makes a removal irreversible.
+        side = os.path.join(root, SIDECAR)
+        os.makedirs(os.path.dirname(side), exist_ok=True)
+        try:
+            sc = json.loads(read(side)) if os.path.exists(side) else {}
+        except (json.JSONDecodeError, ValueError):
+            sc = {}
+        sc.setdefault("files_removed", []).extend(removed)
+        with open(side, "w", encoding="utf-8") as fh:
+            json.dump(sc, fh, indent=2)
+            fh.write("\n")
+        for r in removed:
+            os.remove(os.path.join(root, r["path"]))
+    return edits
+
+
+# ── PASS-DEAD-SCRIPT ─────────────────────────────────────────────────────────
+def detect_dead_scripts(root):
+    return [(r, "REPORT") for r in _load("wf-remainder").dead_scripts(root)]
+
+
+PASSES = [
+    {
+        "token": "PASS-DEAD-HOOK",
+        "verdict": "AUTO",
+        "legality": "MECHANICAL — the command resolves to no file on disk",
+        "safe": "no sacred span involved; ownership is not a precondition during audit "
+                "and the backup is the authorization (SKILL.md 2026-08-05)",
+        "reversal": ".claude/workforce/.settings-owned.json § hooks_removed",
+        "precision": "1.00 — wf-census separates DEAD from UNDECIDABLE, and only "
+                     "exists is False is taken (3 of 3 on odyssey-alive, hand-verified)",
+        "detect": detect_dead_hooks,
+        "apply": apply_dead_hooks,
+    },
+    {
+        "token": "PASS-STALE-CANARY",
+        "verdict": "AUTO",
+        "legality": "MECHANICAL — canary name, no `measures-fact:`, and "
+                    "platform-local.md records the measurement. All three required",
+        "safe": "workforce's own emission, carrying workforce's own expiry condition; "
+                "no sacred span involved",
+        "reversal": ".claude/workforce/.settings-owned.json § files_removed (whole file)",
+        "precision": "1.00 — three independent conditions must hold; a SHIPPED canary "
+                     "carries measures-fact: and is never touched (4 of 4 on "
+                     "apps-odyssey-alive, hand-verified against platform-local.md)",
+        "detect": detect_stale_canaries,
+        "apply": apply_stale_canaries,
+    },
+    {
+        "token": "PASS-DEAD-SCRIPT",
+        "verdict": "REPORT",
+        # REPORT IS A MEASURED VERDICT, NEVER A DEFAULT (passes.md § Directives).
+        "precision": "0.50 — 1 true of 2 unique references on odyssey-alive "
+                     "2026-08-05; the false one, src/stealth.ts, names a real file "
+                     "inside the playwright-mcp SERVER. Rewriting on that evidence "
+                     "edits a correct sentence, which re-running cannot undo",
+        "detect": detect_dead_scripts,
+        "apply": None,
+    },
+]
+
+
+def main(argv):
+    root, execute = ".", "--execute" in argv
+    if len(argv) >= 3 and argv[1] == "--root":
+        root = argv[2]
+    applied = reported = refused = 0
+
+    for p in PASSES:
+        rows = p["detect"](root)
+        if p["verdict"] == "AUTO":
+            removable = [r for r in rows if r[1] == "REMOVABLE"]
+            refusals = [r for r in rows if r[1] == "REFUSED"]
+            edits = p["apply"](root, rows, execute) if removable else []
+            applied += len(edits) if execute else 0
+            refused += len(refusals)
+            verb = "applied" if execute else "would apply"
+            print(f"{p['token']:<18} {verb} {len(edits)} · {len(refusals)} refused "
+                  f"· precision {p['precision'].split(' —')[0]}")
+            for rel, where, cmd in edits:
+                print(f"  {'-' if execute else '~'} {rel}  {where}")
+                if cmd:
+                    print(f"      {cmd}")
+            for h, _v in refusals:
+                print(f"  REFUSED  {h['skill']} is under declared succession — "
+                      f"workforce owes this capability, so removing the registration "
+                      f"would close the finding by breaching the floor (hooks.md)")
+            if edits and not execute:
+                print(f"  reversal: {p['reversal']}")
+                print("  apply with: --execute")
+        else:
+            reported += len(rows)
+            print(f"{p['token']:<18} {len(rows)} reported, none applied")
+            print(f"  REPORT because precision {p['precision']}")
+
+    print(f"\npasses          {applied} applied · {reported} reported · {refused} refused")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

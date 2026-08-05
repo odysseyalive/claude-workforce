@@ -3038,6 +3038,55 @@ check(
     "'nothing got worse' and 'nothing was compared' are different results",
 )
 
+# ── A detector ships with its fix (user directive, 2026-08-05) ───────────────
+# The catalog shipped six AUTO preconditions written and NONE implemented. Detection
+# was wired into audit, every finding was handed back, and the closing report named
+# "no pass has ever auto-applied" as a status rather than a defect. That is this
+# project's dominant failure one level up: there, doctrine with no enforcement; here,
+# enforcement with no remedy. Both feel complete and neither is.
+#
+# TWO ASSERTIONS, because either alone leaves the directive half-true. The mechanism
+# must EXIST — a catalog with no applier can only ever hand work back. And REPORT must
+# be a MEASURED verdict: declining to auto-apply is often correct, but "it might be
+# wrong" is not a reason, and a REPORT row with no precision figure is an unfinished
+# pass wearing a cautious one.
+_apply = read("workforce/bin/wf-apply")
+check(
+    "passes: the auto-apply mechanism exists and display is its default",
+    _apply
+    and '"--execute" in argv' in _apply
+    # The reversal WRITE, not the word. `hooks_removed` also names the declared
+    # reversal path, so asserting the string matched a label while the mechanism
+    # was gone — VACUOUS on its first bin/prove run, the third time in this change
+    # that a check tested vocabulary instead of behaviour.
+    and 'sc.setdefault("hooks_removed", []).extend(removed)' in _apply
+    and "OWNERSHIP IS NOT A" in _apply
+    and "REFUSED" in _apply
+    and "wf-apply" in read("workforce/references/procedures/audit.md"),
+    "a detector that only reports is a flag, and a flag is not a fix — every project "
+    "running audit re-derives the same findings and fixes them by hand or not at all. "
+    "The mechanism is built ALWAYS; each pass then declares its verdict against it. "
+    "Display must be the default and --execute the consent, the reversal must be named "
+    "before the edit, and a refusal must be reportable — otherwise 'apply' means "
+    "'overwrite whatever it found'",
+)
+
+# Every REPORT row owes a measured precision figure. The catalog table's verdict
+# column is the population; wf-apply's PASSES list is where the number lives.
+_report_toks = [m.group(1) for m in
+                re.finditer(r"^\|\s*`(PASS-[A-Z-]+)`\s*\|[^|]*\|[^|]*\|\s*REPORT\s*\|", _passes, re.M)]
+_unmeasured = [t for t in _report_toks
+               if not re.search(re.escape(t) + r'"[^}]*?"precision"', _apply, re.S)]
+check(
+    "passes: a REPORT verdict cites a measured precision, never a default",
+    not _unmeasured,
+    f"REPORT rows with no measured precision: {_unmeasured}. Declining to auto-apply "
+    "is legitimate and often correct — but only with a number and the tree it came "
+    "from, so someone can re-run it and disagree. 'It might be wrong' is not a reason; "
+    "'1 true of 2, and the false one names a file in another repository' is. Without "
+    "the figure, REPORT is the default the directive forbids",
+)
+
 check(
     "passes: every catalog row cites a defect that resolves and has a detector",
     _pass_rows and not _pass_bad,

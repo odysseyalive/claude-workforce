@@ -256,6 +256,27 @@ a correct sentence is not recoverable by re-running it.
 A finding is carried into the closing report and, if it needs work this run cannot do, into
 `deferred.md` with the rule that refused it. It never becomes an edit to a `SKILL.md` in this step.
 
+**Then APPLY what can be applied. A detector that only reports is a flag, and a flag is not a fix** —
+`passes.md` § Directives is a user directive on exactly this:
+
+```bash
+"$WF/bin/wf-apply" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute     # display without --execute
+```
+
+**Under `--review`, omit `--execute`** — it prints the exact edit by path and changes nothing, which is
+that mode's whole contract.
+
+Every `AUTO` pass applies here; every `REPORT` pass prints its findings **with the measured precision
+that made it REPORT**. A pass declining to auto-apply owes the reader that number, and a `REPORT`
+verdict with no measurement behind it is an unfinished pass, not a cautious one.
+
+**A refusal is reported by name with the rule that refused it** — `PASS-DEAD-HOOK` refuses a dead hook
+belonging to a skill under declared succession, because workforce **owes** that capability and removing
+the registration would close the finding by breaching the conversion floor while the report reads clean.
+
+Reversal artifacts are written **before** the edit, never after, so a crash between the two leaves a
+restorable record rather than a silent deletion.
+
 **Then ratchet the findings against the previous run:**
 
 ```bash
@@ -340,9 +361,21 @@ one that blocks destruction of billable or irreplaceable data — is **load-bear
 dead-wiring finding outranks every optimization finding in the report. Advisory dead wiring is ordinary
 cleanup. The distinction is what makes the finding actionable instead of a broken-path list.
 
-**Report, never rewire.** The one hook workforce ships is wired by `/workforce hooks`, never by this
-census — and a host's own hooks are not workforce's to manage. A hook it did not write is outside what
-`disband` may excise, which makes it outside what `audit` may touch.
+**Repair what is broken; record what you did.** The census reports; the passes it feeds
+(`references/passes.md`) apply. A hook workforce did not write is still `audit`'s to fix during an
+audit — **the backup is the authorization**, and no transaction begins without a verified one
+(Atomic-or-Absent gate, precondition (a)).
+
+*Amended 2026-08-05 by user directive (`SKILL.md` § Directives). This read "Report, never rewire… a
+host's own hooks are not workforce's to manage", and it was the reservation that left `verify.md`
+naming a remedy no step implemented, three dead registrations printing an error on every `Bash` call
+for days, and a pass having to argue its own legality from behaviour-neutrality. **"There should be no
+percieved reservations from making those changes during audit, period."** Ownership decides nothing
+here; the backup does.*
+
+Two things survive and are not reservations: a `<!-- origin: user | immutable: true -->` block is never
+reworded — the file around it may still be edited or deleted once the block is extracted — and every
+write reports what it changed, by path.
 
 ## Step 2 — Design the org (panel) — both modes
 

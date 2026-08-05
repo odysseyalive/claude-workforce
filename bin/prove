@@ -83,6 +83,7 @@ SKL = "workforce/SKILL.md"
 INV = "workforce/references/invariants.md"
 PAS = "workforce/references/passes.md"
 RAT = "workforce/bin/wf-ratchet"
+APL = "workforce/bin/wf-apply"
 AUD2 = "workforce/references/procedures/audit.md"
 MAN = "manifest.txt"
 STG2 = "workforce/references/staging.md"
@@ -450,6 +451,21 @@ CASES = [
     # adding a pass becomes the thing that turns the build red, so nobody adds one.
     ("ratchet: keyed on findings, with INHERITED distinguished from REGRESSION",
      RAT, "del", "    inherited = {k for k in new if k[0] not in known_then}\n"),
+    # ── a detector ships with its fix (user directive, 2026-08-05) ───────────
+    # Delete the reversal. The applier still detects, still displays, still removes
+    # the right registrations — it just cannot put them back, which turns --execute
+    # into a one-way edit to a user's settings file. That is the exact failure
+    # `env_removed` was added to prevent, and it is invisible until someone disbands.
+    # The sidecar WRITE, not the word — `hooks_removed` appears twice (the declared
+    # reversal path and the write itself) and `del` removes only the first, which
+    # would delete the label and leave the mechanism intact. Unique or it tests nothing.
+    ("passes: the auto-apply mechanism exists and display is its default",
+     APL, "del", 'sc.setdefault("hooks_removed", []).extend(removed)'),
+    # Strip the measured precision from the REPORT pass. The catalog still declares
+    # REPORT and the pass still runs — it just no longer says WHY it declines, which
+    # makes REPORT the silent default the directive forbids rather than a verdict.
+    ("passes: a REPORT verdict cites a measured precision, never a default",
+     APL, "del", '        "precision": "0.50'),
 ]
 
 

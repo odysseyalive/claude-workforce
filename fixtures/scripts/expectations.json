@@ -807,5 +807,58 @@
     "not": [
       "REGRESSION  PASS-DEAD-SCRIPT"
     ]
+  },
+  "apply-deadhook": {
+    "_why": "DISPLAY is the default and must change nothing. Three registrations are live, dead, and UNDECIDABLE (a bare `jq` resolved on PATH). Only the two dead ones are named; calling the undecidable one dead would invite deleting a working registration, which is the failure wf-census's DEAD/UNDECIDABLE split exists for. `would apply` rather than `applied` is the whole difference between the two modes.",
+    "script": "wf-apply",
+    "exit": 0,
+    "want": [
+      "PASS-DEAD-HOOK",
+      "would apply 2",
+      "vanished.sh",
+      "also-gone.sh",
+      "reversal:",
+      "apply with: --execute"
+    ],
+    "not": [
+      "applied 2",
+      "jq",
+      "real.sh"
+    ]
+  },
+  "apply-deadhook-execute": {
+    "_why": "--execute is the consent. Same tree as apply-deadhook; the only difference is the flag, and the verdict word changes from `would apply` to `applied`. Paired so a regression that makes display WRITE, or execute merely REPORT, fails one of them.",
+    "script": "wf-apply",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "PASS-DEAD-HOOK",
+      "applied 2",
+      "vanished.sh",
+      "also-gone.sh"
+    ],
+    "not": [
+      "would apply",
+      "jq",
+      "real.sh"
+    ]
+  },
+  "apply-stalecanary": {
+    "_why": "THREE populations in one tree and only one is residue: a throwaway canary (no measures-fact:), a SHIPPED canary (carries measures-fact:, its job recurs per host and per harness version, never residue), and a real employee. Precision is a property of the three required conditions rather than a sample, and this asserts all three by naming what must NOT appear.",
+    "script": "wf-apply",
+    "exit": 0,
+    "want": [
+      "PASS-STALE-CANARY",
+      "would apply 1",
+      "wf-canary-a.md",
+      "files_removed"
+    ],
+    "not": [
+      "wf-canary-b.md",
+      "real-employee.md",
+      "applied 1"
+    ]
   }
 }

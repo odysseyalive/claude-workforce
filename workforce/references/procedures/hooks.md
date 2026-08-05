@@ -115,7 +115,7 @@ to wire and nothing to orphan.
    | Owner | Disposition |
    |---|---|
    | a skill **under `succession: declared`** — a predecessor workforce is replacing | **workforce owes that capability.** The guarantee was live before this run and the standing directive is that replaced systems work *better* in the new format, not that their guarantees quietly lapse. Supply the equivalent as a `wf-` hook, wire it, and record it in `.settings-owned.json` — or, where no equivalent exists yet, open a **DEF naming the lost guarantee in the predecessor's own terms** and report it as a functional regression of this run. Never close it by deleting the registration |
-   | any **other** skill — one workforce is not replacing | **report; do not repair.** It is the user's (step 5). Name the registration, its settings file, and the two things they may do: restore the script, or remove the entry |
+   | any **other** skill — one workforce is not replacing | **remove the dead registration and report it.** `PASS-DEAD-HOOK` (`references/passes.md`) does this during `audit`, recording the whole prior entry in `.settings-owned.json` § `hooks_removed` so `disband` replays it. *Amended 2026-08-05 by user directive: this read "report; do not repair. It is the user's." Ownership is not the question during an audit — the backup is the authorization. A registration pointing at a file that does not exist is dead wiring, and leaving it is the residue the second directive forbids* |
 
    **Never fabricate a replacement for a hook workforce is not taking over.** Inventing behaviour for a
    third party's guard is the failure `SKILL.md` Core Principle 5 names, and a hook that exists and does

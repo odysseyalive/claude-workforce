@@ -194,12 +194,53 @@ are different results. **Its check was VACUOUS on the first `bin/prove` run**: i
 discriminating expression instead — the second time in this change that proof-by-breaking caught a
 check testing vocabulary rather than behaviour.
 
-**Open from this work.** **Step 6b consumes nothing** — detection and the ratchet are wired into Step
-1b, and a finding reaches the closing report and stops. **No pass has ever auto-applied**, so the six
-`AUTO` preconditions are unexercised. **The ratchet has one host-side pass feeding it**, so its shape is
-proven and its coverage is thin. And the remaining **instance defects** from the originating transaction
-are recorded in its record — the `/timesheet` Mechanicals rows, `verify.md:117` naming a remedy
-`hooks.md:167` cannot deliver, and `timesheet/agents/id-lookup` still being an agent that reads a table.
+**Closed 2026-08-05 (same day) — a detector ships with its fix, and the reservations that prevented
+it.** Record in `plan/dead-hook-apply-2026-08-05.md`. Two user directives, both captured verbatim.
+
+The catalog had shipped **six `AUTO` preconditions written and none implemented** — detection wired
+into `audit`, every finding handed back, and a closing report naming *"no pass has ever auto-applied"*
+as a status rather than a defect. That is this project's dominant failure **one level up**: there,
+doctrine with no enforcement; here, enforcement with no remedy. Both feel complete and neither is. The
+user's correction: *"You always have to produce the autoapply mechanism. Otherwise, we'd be dealing
+with going around and around, wasting tokens and time and confusing people who are applying workforce
+to their projects."*
+
+| | |
+|---|---|
+| **`wf-apply` — the mechanism** | display by default, `--execute` is the consent, reversal written **before** the edit. Six preconditions checked as **fields on the pass** rather than described, so a reader can audit the claim. Wired into `audit.md` Step 1b |
+| **`PASS-DEAD-HOOK`, the first AUTO pass** | removes a registration whose command resolves to nothing. Precision **1.00 as a property of the detector**, not a sample: `wf-census` already separates `DEAD` from `UNDECIDABLE`, and a bare `jq` on `PATH` is left alone. Measured on a copy of the real tree: 63 hooks → 60, JSON valid, sidecar records the whole prior entry, second run applies 0. **These are the three `code-evaluator` registrations the user reported in the first message of the session** |
+| **`PASS-STALE-CANARY`** | found by the sweep the user then asked for — *"make sure that there aren't other situations existing right now that are discovered and not applied."* `apps-odyssey-alive` carried **4 live collisions** that were workforce's OWN throwaway canaries, self-declared *"safe to delete once platform-local.md records a measurement"*, blocking the census, with nothing anywhere to remove them: `sweep` covers a user's skills and `bin/check`'s fixture-lifecycle rule is repo-side only. 4 → 0 |
+| **`REPORT` became a measured verdict** | declining to auto-apply is often correct, but only with a number and the tree it came from. `PASS-DEAD-SCRIPT` records `0.50 — 1 true of 2; the false one names a real file inside the playwright-mcp SERVER`. `bin/check` fails on a `REPORT` row with no measurement |
+
+**Then the second directive removed the reservations themselves** — *"If there are any directives that
+would get in the way of any sort of manipulation of claude's claude.md, skills, hooks, scripts, from
+being created, edited or deleted, those directives need removed. We have a backup system as part of
+audit. There should be no percieved reservations from making those changes during audit, period!"*
+
+Stated on being shown a pass that had to **argue its own legality** — `PASS-DEAD-HOOK` was written to
+justify deleting a line pointing at a file that does not exist, by proving the edit behaviour-neutral,
+because `audit.md` said *"Report, never rewire"* and `hooks.md` said *"report; do not repair. It is the
+user's."* **The backup is the authorization**, and it was already a precondition of the Atomic-or-Absent
+gate. Those two passages are amended, the `workforce-owned` precondition is gone, and `verify.md` now
+names a remedy that exists. Two things survive and are not reservations: a sacred block is never
+reworded (the file around it may be freely edited or deleted once extracted), and every write reports
+what it did.
+
+*Three checks in this change were **VACUOUS on their first `bin/prove` run** — they asserted a word that
+survived in a docstring while the mechanism was deleted. Each now asserts the discriminating expression.
+That is the second-order version of the same failure: a check that tests vocabulary rather than
+behaviour is doctrine wearing enforcement.*
+
+**Open from this work.** **Step 6b consumes nothing** — detection, apply and the ratchet all run in Step
+1b, and a `REPORT` finding reaches the closing report and stops there. **The ratchet counts only
+`PASS-DEAD-SCRIPT`** — the two AUTO passes fix their findings rather than carrying them, so the baseline
+has one pass feeding it and its coverage is thin. And four **detection** gaps remain, which are a
+different thing from the apply gaps this change closed — nothing discovers them at all: a `/command`
+reference to a deleted skill (`wf-conform` has the lookup and a bare `continue`), a `permissions.allow`
+path that is gone, a stranded `.settings-owned.json` entry, and a `## Mechanicals` row whose command is
+no longer on disk. Dangling agent symlinks **are** detected and have no remedy, but measured 0 on both
+real trees — so under the admission rule that pass has no recorded defect yet and is correctly absent.
+The remaining **instance defects** from the originating transaction are in its own record.
 
 **Closed 2026-08-05 — four defects from a real authoring run.** Record in
 `plan/authoring-run-defects-2026-08-05.md`. Each was verified absent before being fixed; none had any

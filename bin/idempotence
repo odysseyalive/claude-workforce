@@ -87,6 +87,17 @@ WRITERS = {
                  "fixtures/scripts/ratchet-regression", "--capture"],
         "watch": "fixtures/scripts/ratchet-regression",
     },
+    # wf-apply --execute rewrites TWO files that must agree: the settings file and
+    # the .settings-owned.json sidecar recording what was taken. The specific hazard
+    # is the sidecar: it APPENDS, so a second run that re-detected the same dead hook
+    # would append a duplicate `hooks_removed` entry and `disband` would then write
+    # the same registration back twice. The removal is what makes the second run find
+    # nothing — that property is the idempotence, and it is not obvious from reading.
+    "apply-deadhook": {
+        "argv": ["workforce/bin/wf-apply", "--root",
+                 "fixtures/scripts/apply-deadhook-execute", "--execute"],
+        "watch": "fixtures/scripts/apply-deadhook-execute",
+    },
 }
 
 
