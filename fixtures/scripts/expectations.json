@@ -424,6 +424,53 @@
       "0 failed"
     ]
   },
+  "permissions-apply": {
+    "script": "wf-permissions",
+    "args": [
+      "--apply"
+    ],
+    "exit": 0,
+    "want": [
+      "repaired  Write(//home/demo/**)  removed (redundant)",
+      "repaired  Write(//home/loadbearing/**)  -> Edit(//home/loadbearing/**)",
+      "left      Write(//home/handwritten/**)  (user-authored",
+      "left      NotebookEdit(//home/demo/**)  (unmeasured form",
+      "INV-PERMS  dead 3 \u00b7 repaired 2 \u00b7 left 2 \u00b7 suspect 1"
+    ]
+  },
+  "permissions-report": {
+    "script": "wf-permissions",
+    "args": [],
+    "exit": 0,
+    "want": [
+      "DEAD      Write(//home/demo/**)",
+      "workforce-owned",
+      "would remove (redundant)",
+      "would convert to Edit(//home/loadbearing/**)",
+      "Write(//home/handwritten/**)",
+      "reported, never modified",
+      "advisory  NotebookEdit(//home/demo/**)",
+      "INV-PERMS  dead 3 \u00b7 repairable 2 \u00b7 suspect 1"
+    ],
+    "not": [
+      "repaired  Write",
+      "left      Write"
+    ]
+  },
+  "permissions-user-authored": {
+    "script": "wf-permissions",
+    "args": [
+      "--apply"
+    ],
+    "exit": 0,
+    "want": [
+      "left      Write(//home/handwritten/**)  (user-authored",
+      "INV-PERMS  dead 1 \u00b7 repaired 0"
+    ],
+    "not": [
+      "repaired  Write"
+    ]
+  },
   "persona-badstdin": {
     "exit": 0,
     "script": "wf-unique-persona",

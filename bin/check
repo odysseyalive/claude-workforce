@@ -2809,6 +2809,76 @@ check(
 # it names can still run — f2-two-generators' failure reached from the other direction.
 # The window may stay open; it may NOT go unreported.
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# A FILE-PATH GRANT IS `Edit(path)`, NEVER `Write(path)`
+#
+# MEASURED 2026-08-04 from the harness's own warning, on a tree this project had just
+# granted: `Write(path)` "is not matched by file permission checks — only Edit(path)
+# rules are." Edit covers every file-editing tool, Write included. So a `Write(...)`
+# entry is accepted into settings, sits in permissions.allow looking like a grant, and
+# grants nothing — the signature defect this project refuses everywhere else, emitted
+# by the one step whose stated job is making sure the permissions "work right".
+#
+# Both forms were written for the same path, so the capability was never missing. That
+# is exactly why nothing else caught it, and why the assertion is on the DOCTRINE: no
+# shipped file may teach the dead form.
+# ─────────────────────────────────────────────────────────────────────────────
+_asu2 = read("workforce/references/audit-setup.md")
+_perm = read("workforce/bin/wf-permissions")
+_vfy3 = read("workforce/references/procedures/verify.md")
+check(
+    "permissions: a path grant is Edit(path), and Write(path) is named as inert",
+    "never `Write(path)`" in _asu2 and "Edit(path)` covers" in _asu2,
+    "a grant that reads as present and matches nothing is the failure the user's own "
+    "permissions directive is written against — an install that looks runnable and "
+    "is not. The harness warns about it on every session start",
+)
+# THE DOCTRINE IS NOT THE FIX. A sentence in a reference file is advisory, is not read
+# on the run that matters, and cannot repair what is already on disk — rules
+# concatenate, so a correct grant never retracts a dead one. These four assert the
+# MECHANISM exists, runs unasked, and repairs only what workforce owns.
+check(
+    "permissions: the repair is a shipped script, not a sentence",
+    "wf-permissions" in read("manifest.txt") and "def apply_repairs" in _perm,
+    "nothing shipped wrote permissions before this — the JSON was hand-composed every "
+    "run, which is how the dead form got in. Doctrine cannot repair an existing file",
+)
+check(
+    "permissions: audit RUNS the repair in-run, unasked",
+    "wf-permissions\" --root \"<project>\" --apply" in _asu2,
+    "a repair the user must remember to invoke is a flag, not a fix; the warning "
+    "recurs on every session start until something removes the line",
+)
+check(
+    "permissions: only workforce-owned entries are repaired",
+    # Keyed on the GUARD, not on the word "user-authored" — that string appears three
+    # times in the file, so a payload deleting it would hit the wrong copy and the
+    # case would report on a mutation that changed nothing.
+    'elif not f["owned"]:' in _perm and "user-authored" in _perm,
+    "the user's own directive: an exclusion they wrote is evidence of intent, never an "
+    "obstacle to route around. Repairing an unowned rule overwrites a preference",
+)
+check(
+    "permissions: a load-bearing grant is converted, never dropped",
+    '"remove" if target in edits else "convert"' in _perm,
+    "removing `Write(p)` where no `Edit(p)` exists revokes a real capability. The "
+    "repair is a removal ONLY when the working rule is already beside it",
+)
+check(
+    "permissions: the repair is sequenced by the ENTRY POINT, not only specified",
+    "wf-permissions --root <project> --apply`" in read("workforce/references/procedures/audit.md"),
+    "audit.md states it itself: any gate added to audit-setup.md must be added here "
+    "too, the entry point is the only thing that sequences them. Step 0.7 was absent "
+    "from this list while Steps 3 and 3a consumed its output, and a run following the "
+    "file literally never executed it",
+)
+check(
+    "permissions: verify reports inert grants without --apply",
+    "wf-permissions --root <project>`, no `--apply`" in _vfy3,
+    "repaired only during an audit means invisible between audits, which is most of "
+    "the time a project spends",
+)
+
 check(
     "succession: retired means REMOVED, never merely declared",
     "A declared succession retires nothing" in _ct2

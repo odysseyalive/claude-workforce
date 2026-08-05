@@ -66,6 +66,16 @@ WRITERS = {
                  "fixtures/scripts/checkrun-notpaths/report.json"],
         "watch": "fixtures/scripts/checkrun-notpaths",
     },
+    # wf-permissions --apply rewrites TWO files that must agree: settings.local.json
+    # and the .settings-owned.json sidecar. A second pass must find nothing left to
+    # repair. The specific hazard is the CONVERT branch — rewriting `Write(p)` to
+    # `Edit(p)` in settings while leaving `Write(p)` named in the sidecar would make
+    # every later run "repair" an entry that is already gone, and strand a `disband`.
+    "permissions-apply": {
+        "argv": ["workforce/bin/wf-permissions", "--root",
+                 "fixtures/scripts/permissions-apply", "--apply"],
+        "watch": "fixtures/scripts/permissions-apply",
+    },
 }
 
 

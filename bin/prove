@@ -96,6 +96,7 @@ CANA = "workforce/canary/wf-canary-a.md"
 CHK = "bin/check"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
+PRM = "workforce/bin/wf-permissions"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -303,6 +304,20 @@ CASES = [
      PS1, "append", "\n# a stray exit 1 in a comment is enough: the check bans the token\n# exit 1\n"),
     # NOT the heading text — it appears twice (heading + the rule 7 row's cross-
     # reference), which is the duplicate-payload vacuity bin/check now lints for.
+    ("permissions: the repair is a shipped script, not a sentence",
+     PRM, "del", "def apply_repairs"),
+    ("permissions: audit RUNS the repair in-run, unasked",
+     ASU, "del", 'wf-permissions" --root "<project>" --apply'),
+    ("permissions: only workforce-owned entries are repaired",
+     PRM, "del", 'elif not f["owned"]:'),
+    ("permissions: a load-bearing grant is converted, never dropped",
+     PRM, "del", '"remove" if target in edits else "convert"'),
+    ("permissions: the repair is sequenced by the ENTRY POINT, not only specified",
+     AUD, "del", "wf-permissions --root <project> --apply`"),
+    ("permissions: verify reports inert grants without --apply",
+     VFY, "del", "wf-permissions --root <project>`, no `--apply`"),
+    ("permissions: a path grant is Edit(path), and Write(path) is named as inert",
+     ASU, "del", "never `Write(path)`"),
     ("succession: retired means REMOVED, never merely declared",
      CT, "del", "records intent"),
     ("succession: the live-predecessor window is reported, not assumed shut",

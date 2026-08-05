@@ -27,8 +27,19 @@ consent and the backup (questions 1 and 2), the model and effort budgets (questi
 preflight, the canary fixtures, and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
 name collisions — the **settings review (Step 0.8)**, which resolves the permissions file, adds only
-what the designed org is missing, and removes nothing, and the **spawn capability preflight (Step
-0.9)**, which measures whether this host will spawn at all by attempting one throwaway spawn.
+what the designed org is missing, removes nothing the user wrote, and **runs
+`wf-permissions --root <project> --apply`** to repair inert path grants it owns, and the
+**spawn capability preflight (Step 0.9)**, which measures whether this host will spawn at all by
+attempting one throwaway spawn.
+
+**Step 0.8's repair is a script invocation, not a review instruction, and it is listed HERE for the
+reason the paragraph below states.** `Edit(path)` covers every file-editing tool; `Write(path)` is not
+matched by file permission checks at all, so it sits in `permissions.allow` reading as a grant and
+granting nothing — MEASURED 2026-08-04 from the harness's own startup warning, on a tree this project
+had just written. Nothing shipped wrote permissions before then, so the JSON was hand-composed on every
+run. **Doctrine could not fix it**: rules concatenate, so writing a correct grant never retracts a dead
+one, and the warning recurs on every session start until something removes the line. Its outcome is
+`INV-PERMS` — `dead · repaired · left · suspect` — reported last with the other permission findings.
 
 **Step 0.9 is the producer for a measurement three later steps consume.** Step 2's design panel, every
 Phase B cold probe, and Step 4b's tier canary are all spawns; until 2026-08-04 each of them read an

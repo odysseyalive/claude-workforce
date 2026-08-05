@@ -595,6 +595,60 @@ block anyone's run** (`platform.md` § DOCUMENTED).
 
 Bare `"Bash"` grants all Bash commands (equivalent to `"Bash(*)"`), so the grant to add is one token.
 
+### A FILE-PATH GRANT IS `Edit(path)` — never `Write(path)`
+
+**MEASURED 2026-08-04, from the harness's own warning on a real tree it had granted:**
+
+```
+Permission allow rule (.claude/settings.local.json): Write(//…/odyssey-alive/**) is not
+matched by file permission checks — only Edit(path) rules are.
+Use Edit(//…/odyssey-alive/**) instead (Edit rules cover all file-editing tools).
+```
+
+`Edit(path)` covers **every file-editing tool**, `Write` included. `Write(path)` matches nothing — it
+is accepted into the file, sits in `permissions.allow` looking like a grant, and grants nothing.
+
+**This section is exactly where that costs something.** The user's directive above is that people will
+run this who *"do not know much about permissions"* and that an install which cannot run is the failure
+it is written against. A grant that reads as present and is inert is the same failure wearing the
+evidence of its own fix — and it is this project's signature shape: **never claim a capability the
+runtime will not deliver.**
+
+**So a path grant is written once, as `Edit(…)`, and `Write(…)` is never emitted.** The pairing is not
+belt-and-braces: it is one working rule beside one that does nothing, and the dead half is what a
+session warns about on every start.
+
+*Found because the harness said so out loud, on the run that had just written it. Both forms were
+emitted for the same path, so the capability was never actually missing — which is precisely why
+nothing else would have caught it.*
+
+**AND THE RULE ABOVE IS NOT THE FIX — `wf-permissions` IS.** A sentence in a reference file is
+advisory, it is not read on the run that matters, and **it cannot repair what is already on disk.**
+Rules concatenate, so writing a correct grant never retracts a dead one: the warning recurs on every
+session start until something removes the line. **Nothing shipped wrote permissions at all** before
+this — the JSON was hand-composed on every run, which is the consumer-named/producer-assumed shape
+four other defects here have had.
+
+**So this step RUNS the repair, unasked, in-run:**
+
+```bash
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="<project>/.claude/skills/workforce"
+"$WF/bin/wf-permissions" --root "<project>" --apply
+```
+
+Print its `INV-PERMS` line — `dead · repaired · left · suspect` — with the permission findings
+reported **last, after the audit completes**, per the user directive above.
+
+| | |
+|---|---|
+| **workforce-owned** (named in `.settings-owned.json`) | **repaired.** Redundant beside a working `Edit(…)` → removed; load-bearing → converted, never dropped |
+| **user-authored** | **reported, never modified** — the directive's own words: an exclusion the user wrote is evidence of intent |
+| **the sidecar** | rewritten in the SAME gesture. A repaired rule left named there strands an entry `disband` would try to remove and never find |
+| **unmeasured forms** | reported as advisory. Removing a rule that does work is worse than leaving one that does not |
+
+`verify` runs the same script **without** `--apply`, so a dead grant is visible between audits rather
+than only during one.
+
 ### The design the second directive asks for, and the shape it actually takes
 
 The directive asks that agents carry their own permissions so the user's file need not be overwritten.

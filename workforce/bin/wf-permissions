@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""wf-permissions — a permission grant that does nothing is a defect, not a spare.
+
+    wf-permissions --root <dir>              report inert path grants, write nothing
+    wf-permissions --root <dir> --apply      repair the ones workforce owns
+
+WHY THIS EXISTS. MEASURED 2026-08-04, from the harness's own warning on a real tree
+this project had just granted:
+
+    Permission allow rule (.claude/settings.local.json):
+    Write(//…/odyssey-alive/**) is not matched by file permission checks — only
+    Edit(path) rules are. Use Edit(//…/odyssey-alive/**) instead
+    (Edit rules cover all file-editing tools).
+
+`Edit(path)` covers EVERY file-editing tool, `Write` included. `Write(path)` matches
+nothing: it is accepted into the file, sits in `permissions.allow` looking like a
+grant, and grants nothing. That is this project's signature defect — a capability
+claimed that the runtime will not deliver — emitted by the one step whose stated job
+is making sure the permissions work.
+
+NOTHING SHIPPED WROTE PERMISSIONS BEFORE THIS. `audit-setup.md` § Permissions told a
+run to review and update `permissions.allow`, and the JSON was composed by hand every
+time. A consumer named and a producer assumed, which is the shape four other defects
+here have had. Doctrine cannot fix it: a sentence in a reference file is advisory, it
+is not read on the run that matters, and IT CANNOT REPAIR WHAT IS ALREADY ON DISK.
+Rules concatenate, so adding a correct grant never retracts a dead one — the warning
+recurs on every session start until something removes the line.
+
+OWNERSHIP IS THE WHOLE SAFETY OF IT, and it comes from a user directive
+(`audit-setup.md` § Permissions, immutable block): *"we don't have to overwrite the
+user's preferences but maybe we should put up a warning flag if they're noticed."*
+
+    workforce-owned (named in .settings-owned.json)  ->  REPAIRED
+    anything the user wrote                          ->  REPORTED, never touched
+
+An exclusion the user wrote is evidence of intent, never an obstacle to route around.
+
+REPAIRABLE IS DELIBERATELY NARROW. `Write(path)` is the form the harness named, so it
+is the only one repaired. Other non-Edit file-tool path grants are REPORTED as
+advisory — this project does not act on documentation it has not measured, and
+removing a rule that does work is a worse failure than leaving one that does not.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+SETTINGS_FILES = ("settings.local.json", "settings.json")
+OWNED = os.path.join(".claude", "workforce", ".settings-owned.json")
+
+# MEASURED: the harness names this form as unmatched. It is the only one repaired.
+DEAD_PATH_GRANT_RX = re.compile(r"^Write\((.+)\)$")
+
+# DOCUMENTED, not measured — reported as advisory, never rewritten. Adding a name here
+# without a measurement makes this script delete grants on a guess, which is the one
+# outcome worse than the defect it fixes.
+SUSPECT_TOOLS = ("NotebookEdit", "MultiEdit")
+SUSPECT_RX = re.compile(r"^(%s)\((.+)\)$" % "|".join(SUSPECT_TOOLS))
+
+
+def _load(path):
+    """(data, error). A diagnostic must not die on the input it diagnoses."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh), None
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError) as exc:
+        return None, f"{path}: {exc}"
+
+
+def _allow(data):
+    perms = data.get("permissions") if isinstance(data, dict) else None
+    allow = perms.get("allow") if isinstance(perms, dict) else None
+    return allow if isinstance(allow, list) else None
+
+
+def classify(root):
+    """Every inert path grant found, with who owns it and what to do about it."""
+    owned_path = os.path.join(root, OWNED)
+    owned_data, owned_err = _load(owned_path)
+    owned = set()
+    if isinstance(owned_data, dict):
+        owned = {e for e in owned_data.get("permissions_allow_added", [])
+                 if isinstance(e, str)}
+
+    findings, errors = [], []
+    if owned_err:
+        errors.append(owned_err)
+
+    for name in SETTINGS_FILES:
+        spath = os.path.join(root, ".claude", name)
+        data, err = _load(spath)
+        if err:
+            errors.append(err)
+            continue
+        allow = _allow(data)
+        if allow is None:
+            continue
+
+        edits = {e for e in allow if isinstance(e, str) and e.startswith("Edit(")}
+        for entry in allow:
+            if not isinstance(entry, str):
+                continue
+            m = DEAD_PATH_GRANT_RX.match(entry)
+            if m:
+                target = f"Edit({m.group(1)})"
+                findings.append({
+                    "file": spath, "entry": entry, "kind": "dead",
+                    "owned": entry in owned,
+                    # Redundant when the working rule is already beside it: the repair
+                    # is a REMOVAL. Otherwise the grant is load-bearing and the repair
+                    # is a CONVERSION — dropping it would revoke a real capability.
+                    "action": "remove" if target in edits else "convert",
+                    "target": target,
+                })
+                continue
+            s = SUSPECT_RX.match(entry)
+            if s:
+                findings.append({
+                    "file": spath, "entry": entry, "kind": "suspect",
+                    "owned": entry in owned, "action": "report", "target": None,
+                })
+    return findings, errors, owned_path
+
+
+def apply_repairs(root, findings, owned_path):
+    """Rewrite settings and the sidecar together. Returns (repaired, skipped)."""
+    repaired, skipped = [], []
+    by_file = {}
+    for f in findings:
+        if f["kind"] != "dead":
+            skipped.append(f)
+        elif not f["owned"]:
+            skipped.append(f)
+        else:
+            by_file.setdefault(f["file"], []).append(f)
+
+    for spath, items in by_file.items():
+        data, err = _load(spath)
+        allow = _allow(data)
+        if err or allow is None:
+            skipped.extend(items)
+            continue
+        out = []
+        for entry in allow:
+            hit = next((i for i in items if i["entry"] == entry), None)
+            if hit is None:
+                out.append(entry)
+            elif hit["action"] == "convert":
+                out.append(hit["target"])
+            # "remove": the working rule is already present; drop this one.
+        data["permissions"]["allow"] = out
+        with open(spath, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+            fh.write("\n")
+        repaired.extend(items)
+
+    # The sidecar is rewritten in the SAME gesture. A repaired rule left named in
+    # .settings-owned.json strands an entry `disband` would then try to remove and
+    # never find — the sidecar's whole contract is that it names what is really there.
+    if repaired:
+        owned_data, _ = _load(owned_path)
+        if isinstance(owned_data, dict):
+            added = owned_data.get("permissions_allow_added")
+            if isinstance(added, list):
+                new = []
+                for e in added:
+                    hit = next((i for i in repaired if i["entry"] == e), None)
+                    if hit is None:
+                        new.append(e)
+                    elif hit["action"] == "convert" and hit["target"] not in added:
+                        new.append(hit["target"])
+                owned_data["permissions_allow_added"] = new
+                with open(owned_path, "w", encoding="utf-8") as fh:
+                    json.dump(owned_data, fh, indent=2)
+                    fh.write("\n")
+    return repaired, skipped
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="")
+    ap.add_argument("--apply", action="store_true",
+                    help="repair workforce-owned inert grants (default: report only)")
+    args = ap.parse_args(argv)
+
+    # ${CLAUDE_PROJECT_DIR} is unset outside a hook, so every shipped invocation block
+    # expands to --root "" and abspath("") is the CWD — a tree nobody named. Recorded
+    # across five scripts; this one carries the same guard rather than the same bug.
+    if not (args.root or "").strip():
+        print("wf-permissions: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside "
+              "a hook; pass an explicit path.", file=sys.stderr)
+        return 2
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-permissions: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    findings, errors, owned_path = classify(root)
+    for e in errors:
+        print(f"  ! unreadable  {e}")
+
+    dead = [f for f in findings if f["kind"] == "dead"]
+    suspect = [f for f in findings if f["kind"] == "suspect"]
+
+    if args.apply:
+        repaired, skipped = apply_repairs(root, findings, owned_path)
+        for f in repaired:
+            verb = "removed (redundant)" if f["action"] == "remove" else f"-> {f['target']}"
+            print(f"  repaired  {f['entry']}  {verb}")
+        for f in skipped:
+            # Kind is reported before ownership: an unmeasured form is left alone even
+            # when workforce owns it, and saying "user-authored" there would be false.
+            if f["kind"] == "suspect":
+                why = "unmeasured form — reported, not repaired"
+            else:
+                why = "user-authored — reported, never modified"
+            print(f"  left      {f['entry']}  ({why})")
+        print(f"\nINV-PERMS  dead {len(dead)} · repaired {len(repaired)} · "
+              f"left {len(skipped)} · suspect {len(suspect)}")
+        return 0
+
+    for f in dead:
+        who = "workforce-owned" if f["owned"] else "user-authored"
+        act = "would remove (redundant)" if f["action"] == "remove" else \
+              f"would convert to {f['target']}"
+        print(f"  DEAD      {f['entry']}  [{who}] "
+              f"{act if f['owned'] else '— reported, never modified'}")
+    for f in suspect:
+        print(f"  advisory  {f['entry']}  [unmeasured form — reported, not repaired]")
+
+    fixable = sum(1 for f in dead if f["owned"])
+    print(f"\nINV-PERMS  dead {len(dead)} · repairable {fixable} · suspect {len(suspect)}")
+    if fixable:
+        print("Re-run with --apply to repair the workforce-owned entries. A dead grant "
+              "is not spare capacity: it reads as present, matches nothing, and the "
+              "harness warns about it on every session start.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
