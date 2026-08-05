@@ -53,11 +53,23 @@ tree disagreed on the count:
 
 | Form | Counts as a block? |
 |---|---|
-| the marker **alone on its line** (leading whitespace allowed) | **yes** — this is the canonical form |
-| the marker inside a **fenced code example** | **yes** — a template ships its markers, and a sweep must see them |
+| the marker **alone on its line, at column 0** | **yes** — this is the canonical form |
+| the marker **indented** | **no** — in markdown an indented line is a code block, so it is documentation ABOUT the format. Reported as a MENTION, never silently dropped |
 | the marker quoted **inline in prose or inside a JSON string** | **no** — it is a mention, not a block |
 
-**The discriminator is "alone on its line", and it is the whole rule.** A line quoting a START marker inside a JSON string literal — as `enforcement.md` § The machine-owned
+**The discriminator is "alone on its line at column 0", and it is the whole rule.**
+
+*Corrected 2026-08-05, and this file was WRONG against every reader that ships.* It read "leading
+whitespace allowed" and listed a marker inside a fenced code example as counting — while `wf-census`,
+`wf-conform`, `wf-protect-directives` and both `bin/check` sites reject an indented marker, on the
+ruling that an indented line in markdown IS a code block. `bin/baseline` had established that and
+measured it: 68 naive against 37 anchored, 46% inflation, *"a marker quoted inside a sentence is
+documentation about the format, not a span opener."*
+
+**Found by a real `/workforce audit` on `odyssey-alive`** (`audit-20260805T222157Z`), which reproduced
+the contradiction against its untouched pre-audit sidecar and generated to the readers' rule while
+filing `DEF-2026-08-05-checksum-index-shift-indented-marker` upstream. The spec was the outlier, so the
+spec moved. A template that needs its markers seen ships them at column 0. A line quoting a START marker inside a JSON string literal — as `enforcement.md` § The machine-owned
 region does, to show why markers cannot live in JSON — documents a hazard. It does not open a region.
 
 *Written after a sweep's re-derivation took four attempts to agree with this command's own generator —
