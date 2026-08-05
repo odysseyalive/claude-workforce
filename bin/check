@@ -6063,6 +6063,28 @@ check(
     f"no opt-out, so every byte is paid on every spawn. The development record belongs "
     f"in DEVELOPMENT.md, which is injected nowhere",
 )
+# THE REGION DESCRIBES WHAT IS THERE, NEVER WHAT THE COMMAND IS FOR.
+# MEASURED 2026-08-05 against this repo: with zero employees the generator emitted
+# "**This project is staffed.**" over `employees —`, and named an org chart that does
+# not exist, a roster that returns nothing, and `/org <ask>` with nothing to dispatch
+# to. An overclaim in the ONE file injected into every subagent with no opt-out — and
+# it would hit any project audited before it is staffed, not just this one.
+_wcm = read("workforce/bin/wf-claude-md")
+check(
+    "claude-md: the region never claims staffing the census did not find",
+    "if n_emp:" in _wcm and "This project has no employees yet" in _wcm,
+    "zero employees is an ORDINARY state (Core Principle 7b) — a fresh project, an "
+    "`audit --review`, a self-excluded repo. Claiming staffing there is the overclaim "
+    "class this project refuses, printed where every spawn reads it",
+)
+check(
+    "claude-md: the unstaffed region names no artifact that does not exist",
+    "Until then there is no org" in _wcm,
+    "Core Principle 5 — absence is not a gap. Pointing an unstaffed project at an org "
+    "chart, a roster, and a dispatcher that have nothing behind them sends a reader to "
+    "three dead ends and reads as breakage rather than as a correct empty state",
+)
+
 check(
     "the development record exists and is not injected",
     os.path.exists("DEVELOPMENT.md") and "## Open, as of" in read("DEVELOPMENT.md"),
@@ -6074,10 +6096,22 @@ check(
 # calls "doctrine written correctly, and nothing making it true".
 check(
     "the standing cold-reader request stays in the INJECTED file",
-    "explicitly requests subagents for cold-read probes" in read("CLAUDE.md"),
+    # Keyed on the GENERATED region's literal, not on prose. Until 2026-08-05 this
+    # repo carried the request by hand; adding the wf-claude-md region made the two
+    # copies duplicate on every spawn, so the hand-written one went. The property
+    # under test is that the request REACHES the injected file — whichever half of
+    # the file provides it — so the assertion follows the carrier.
+    "this line is the asking" in read("CLAUDE.md"),
     "ambient policy permits spawning *unless the user asks*, so the request only "
     "functions where it is injected. In DEVELOPMENT.md it reads identically and does "
     "nothing, and every handbook a run registers is unprobed",
+)
+check(
+    "the generated region is present in this repo's own CLAUDE.md",
+    "WORKFORCE-CLAUDE-MD START" in read("CLAUDE.md"),
+    "the user's directive is that a CLAUDE.md is BUILT mechanically. This repo hand-"
+    "wrote its own for days while shipping the generator, so the one project "
+    "guaranteed to exercise `wf-claude-md` was the one project never running it",
 )
 check(
     "the source-first rule stays in the INJECTED file",

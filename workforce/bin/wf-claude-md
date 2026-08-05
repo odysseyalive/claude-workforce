@@ -158,24 +158,44 @@ def region(root):
                     and ORG_RECORD in (read(os.path.join(agents, f)) or ""))
     c = read(chart) or ""
     n_dep = len(set(re.findall(r"department:\s*([a-z-]+)", c)))
-    lines = [START,
-             "",
-             "**This project is staffed.** The org is the documentation: an employee's handbook states",
-             "its scope, its checks, and the directives that bind it. Do not restate them here — this",
-             "file is injected into every subagent with no opt-out, so anything duplicated is paid on",
-             "every spawn (`platform.md` fact 6).",
-             "",
-             f"| | |", "|---|---|",
-             f"| employees | {n_emp or '—'} |",
-             f"| departments | {n_dep or '—'} |",
-             "| org chart | `.claude/workforce/org-chart.md` |",
-             "| who does what | `/workforce roster` |",
-             "| how work is dispatched | `/org <ask>` |",
-             "",
-             STANDING_REQUEST,
-             "",
-             END, ""]
-    return "\n".join(lines)
+
+    # THE REGION DESCRIBES WHAT IS THERE, NEVER WHAT THE COMMAND IS FOR.
+    #
+    # MEASURED 2026-08-05 against claude-workforce itself: with zero employees this
+    # emitted "**This project is staffed.**" over `employees —` and `departments —`,
+    # and pointed at an org chart that does not exist, a `/workforce roster` that
+    # returns nothing, and `/org <ask>` with no chart to dispatch from. An overclaim,
+    # in the ONE file injected into every subagent with no opt-out.
+    #
+    # Zero employees is an ORDINARY state, not a degraded one (`SKILL.md` Core
+    # Principle 7b): a fresh project, an `audit --review`, or a self-excluded repo like
+    # this one. So the unstaffed branch names no artifact that does not exist yet —
+    # Core Principle 5, absence is not a gap.
+    common = [
+        "The org is the documentation: an employee's handbook states its scope, its checks,",
+        "and the directives that bind it. Do not restate them here — this file is injected",
+        "into every subagent with no opt-out, so anything duplicated is paid on every spawn",
+        "(`platform.md` fact 6).",
+    ]
+    if n_emp:
+        body = ["**This project is staffed.**"] + common + [
+            "",
+            "| | |", "|---|---|",
+            f"| employees | {n_emp} |",
+            f"| departments | {n_dep or '—'} |",
+            "| org chart | `.claude/workforce/org-chart.md` |",
+            "| who does what | `/workforce roster` |",
+            "| how work is dispatched | `/org <ask>` |",
+        ]
+    else:
+        body = ["**This project has no employees yet.**"] + common + [
+            "",
+            "`/workforce audit` surveys the project and staffs it. Until then there is no org",
+            "chart, `/workforce roster` has nothing to list, and `/org <ask>` has nothing to",
+            "dispatch to — so work runs in the main session, which is the correct behaviour",
+            "and not a fault to report.",
+        ]
+    return "\n".join([START, ""] + body + ["", STANDING_REQUEST, "", END, ""])
 
 
 ORG_RECORD = "ORG-RECORD START"
