@@ -63,9 +63,15 @@ before project (`verify.md` § Install and scope), so a personal install shadows
 builds. `bin/check` fails on the drift.
 
 **Always edit source, then `bin/sync --personal`.** Reverse order loses work: the runtime is deleted
-and rebuilt on every sync. `--personal` refreshes the shadowing copy too — **do not "re-run the
-installer" to fix drift**, because `install` fetches from GitHub and will overwrite your local changes
-with the published version while looking like a successful refresh.
+and rebuilt on every sync. `--personal` refreshes the shadowing copy too — **do not fix drift with a
+plain `./install`**, because it fetches from GitHub and will overwrite your local changes with the
+published version while looking like a successful refresh.
+
+**To exercise the installer itself**, point it at this checkout — the seam that makes it testable:
+
+```
+WORKFORCE_REPO_URL="file://$PWD" ./install --user
+```
 
 ## The loop
 

@@ -4936,9 +4936,12 @@ if os.path.isdir(_personal):
           not _drift and not _missing,
           f"{len(_drift)} drifted, {len(_missing)} absent of {len(declared)} shipped files "
           f"({_shown}) — `~/.claude/skills/workforce` resolves BEFORE "
-          "`.claude/skills/workforce`, so this is the copy a session loads and `bin/sync` "
-          "does not write it. Re-run the installer, or delete the personal install to let "
-          "the synced runtime resolve.")
+          "`.claude/skills/workforce`, so this is the copy a session loads. FIX: "
+          "`bin/sync --personal`. Do NOT plain `./install` — it fetches the PUBLISHED "
+          "tree and will overwrite local changes with older code while reporting a "
+          "successful refresh; `WORKFORCE_REPO_URL=\"file://$PWD\" ./install --user` is "
+          "the form that uses this checkout. Deleting the personal install also clears "
+          "the drift, but removes /workforce from every OTHER project on this machine.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The undo artifact is checked as an artifact
@@ -6064,6 +6067,35 @@ check(
     f"in DEVELOPMENT.md, which is injected nowhere",
 )
 _cen2 = read("workforce/bin/wf-census")
+# A REMEDY THAT INSTALLS STALE CODE IS NOT A REMEDY
+# The drift message named "re-run the installer" for days. MEASURED 2026-08-05: plain
+# `./install` fetches the PUBLISHED tree, so during development it overwrote local
+# changes with older code AND REPORTED SUCCESS (9,881 B over a 14,467 B source). The
+# message must name the form that works and warn off the one that does not.
+check(
+    "drift: the remedy names the working fix and warns off the destructive one",
+    "FIX: `bin/sync --personal`" in read("bin/check")
+    # Split literal: this file IS the target, so a contiguous copy here would be the
+    # second occurrence and bin/prove's payload would delete the wrong one.
+    and "Do NOT plain " "`./install`" in read("bin/check"),
+    "a named remedy is followed. Naming one that silently installs older code makes "
+    "the check worse than silent — the operator acts on it and loses work",
+)
+
+# THE DUPLICATE HAS A PRODUCER, AND IT NOW SAYS SO
+# Downgrading the census verdict stops the false halt; it does not stop the residue.
+# The installers are where cross-scope canary copies are created, and neither mentioned
+# the other scope. REPORTED, NEVER REMOVED — the other scope is not an install's to
+# edit, which is the "never overwrite the user's preferences" rule from § Permissions.
+check(
+    "install: a cross-scope canary duplicate is reported by BOTH installers",
+    "are also registered in" in read("install")
+    and "are also registered in" in read("install.ps1"),
+    "the census calls it a duplicate; the installer is what creates one. Reporting in "
+    "only one installer leaves every Windows install silently producing residue — the "
+    "port is the half that has lagged before",
+)
+
 # A TEST CORPUS IS NOT PROJECT CONTENT — AND THE EXCLUSION IS DECLARED AND COUNTED
 #
 # MEASURED 2026-08-05 by the first `dev audit`: BOTH "unpaired markers (sweep hazards)"

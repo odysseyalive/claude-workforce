@@ -17,7 +17,12 @@
 function Install-ClaudeWorkforce {
     $ErrorActionPreference = 'Stop'
 
-    $RepoUrl = 'https://raw.githubusercontent.com/odysseyalive/claude-workforce/main'
+    # Overridable so the installer can be tested against a local checkout -- it was
+    # hardcoded until 2026-08-05, which is why `install` always fetched the PUBLISHED
+    # tree and re-running it during development overwrote local changes with older code
+    # while looking like a successful refresh. Default unchanged; this is a test seam.
+    #   $env:WORKFORCE_REPO_URL = "file://$PWD"
+    $RepoUrl = if ($env:WORKFORCE_REPO_URL) { $env:WORKFORCE_REPO_URL } else { 'https://raw.githubusercontent.com/odysseyalive/claude-workforce/main' }
 
     $personalSkillDir = Join-Path $HOME '.claude/skills/workforce'
     $projectSkillDir  = Join-Path (Get-Location).Path '.claude/skills/workforce'
@@ -311,6 +316,33 @@ Begin with step 1 now.
             $script:VerifyFailed = $true
         } else {
             Write-Host "  Verified: $vTotal/$vTotal files present."
+        }
+
+        # Canary fixtures land in ONE scope's agents/ dir and nothing reconciled the
+        # other. Measured 2026-08-05: installing at both scopes over time left the four
+        # canaries in both, byte-identical, and wf-census reported 4 live collisions --
+        # precondition 1(b) of the Atomic-or-Absent gate -- halting a correctly
+        # installed tree. The census now calls an identical pair a DUPLICATE, but a
+        # duplicate is still residue under the user directive, and this is where it is
+        # produced. REPORTED, NEVER REMOVED: the other scope is not this install's to
+        # edit. Kept in step with the bash installer, which is the port that lags.
+        if ($scope -eq 'user') {
+            $otherAgents = Join-Path (Get-Location).Path '.claude/agents'
+        } else {
+            $otherAgents = Join-Path $HOME '.claude/agents'
+        }
+        if ((Test-Path $otherAgents) -and ($otherAgents -ne $agentsDir)) {
+            $dupN = 0
+            foreach ($f in Get-ChildItem -Path $agentsDir -Filter 'wf-*.md' -ErrorAction SilentlyContinue) {
+                if (Test-Path (Join-Path $otherAgents $f.Name)) { $dupN++ }
+            }
+            if ($dupN -gt 0) {
+                Write-Host ""
+                Write-Host "  NOTE: $dupN canary fixture(s) are also registered in $otherAgents."
+                Write-Host "  Harmless -- personal shadows project and the copies are identical, so"
+                Write-Host "  whichever resolves behaves the same. Remove the ones you do not want;"
+                Write-Host "  wf-census reports them as duplicates, not collisions."
+            }
         }
 
         # Configure the delegation contract and the permissions the org needs.

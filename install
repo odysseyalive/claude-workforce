@@ -20,7 +20,23 @@
 
 set -e
 
-REPO_URL="https://raw.githubusercontent.com/odysseyalive/claude-workforce/main"
+# OVERRIDABLE SO THE INSTALLER CAN BE TESTED AGAINST A LOCAL CHECKOUT.
+#
+# It was hardcoded until 2026-08-05, and that is the whole reason `install` could not be
+# used during development: it always fetched the PUBLISHED tree, so re-running it to fix
+# personal-install drift overwrote local changes with older code AND LOOKED LIKE A
+# SUCCESSFUL REFRESH (measured: 9,881 B installed over a 14,467 B source). `bin/check`
+# still names re-running the installer as a remedy for drift, and for a maintainer with
+# unpushed work that remedy was actively wrong.
+#
+# With this, a maintainer can point it at the working tree and actually exercise the
+# installer — the thing no test could reach before:
+#
+#   WORKFORCE_REPO_URL="file://$PWD" ./install --user
+#
+# The default is unchanged, so every documented curl-pipe invocation behaves exactly as
+# before. This is a test seam, not a new feature.
+REPO_URL="${WORKFORCE_REPO_URL:-https://raw.githubusercontent.com/odysseyalive/claude-workforce/main}"
 
 PERSONAL_SKILL_DIR="$HOME/.claude/skills/workforce"
 PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
@@ -396,6 +412,37 @@ install_to_scope() {
     done < "$MANIFEST_TMP"
 
     verify_scope "$skill_dir"
+
+    # CANARY FIXTURES LAND IN ONE SCOPE'S agents/ DIR, AND NOTHING RECONCILED THE OTHER.
+    #
+    # Measured 2026-08-05: installing at both scopes over time left the four canaries in
+    # ~/.claude/agents AND ./.claude/agents, byte-identical. wf-census reported 4 live
+    # collisions, which is precondition 1(b) of the Atomic-or-Absent gate, and the first
+    # `dev audit` halted on a correctly-installed tree. The census now classifies an
+    # identical pair as a DUPLICATE rather than a collision — but a duplicate is still
+    # residue under the user directive ("I don't want to leave any of the old system
+    # still there ... it will be confusing"), and this is where it is produced.
+    #
+    # REPORTED, NEVER REMOVED. The other scope is not this install's to edit; deleting
+    # there is exactly the "overwrite the user's preferences" move the permissions
+    # directive refuses. Name it, name the remedy, and let the operator choose.
+    if [ "$scope" = "user" ]; then other_agents="$(pwd)/.claude/agents"; else other_agents="$HOME/.claude/agents"; fi
+    if [ -d "$other_agents" ] && [ "$other_agents" != "$agents_dir" ]; then
+        dup_n=0
+        for f in "$agents_dir"/wf-*.md; do
+            [ -e "$f" ] || continue
+            if [ -e "$other_agents/$(basename "$f")" ]; then
+                dup_n=$((dup_n + 1))
+            fi
+        done
+        if [ "$dup_n" -gt 0 ]; then
+            echo
+            echo "  NOTE: $dup_n canary fixture(s) are also registered in $other_agents."
+            echo "  Harmless — personal shadows project and the copies are identical, so"
+            echo "  whichever resolves behaves the same. Remove the ones you do not want;"
+            echo "  \`wf-census\` reports them as duplicates, not collisions."
+        fi
+    fi
 
     # Configure the delegation contract and the permissions the org needs.
     #
