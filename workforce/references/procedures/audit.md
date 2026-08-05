@@ -66,6 +66,29 @@ receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
 
 ## Step 1 — Survey the project
 
+### `dev` mode — what it includes, and what it never does
+
+**`SKILL.md` § Self-Exclusion Rule declares `dev` the only escape, and until 2026-08-05 no procedure
+implemented it.** This file mentioned neither `dev` nor self-exclusion; `intent-router.md` only said
+never to synthesize the token. So `/workforce dev audit` — the documented way to point this tool at its
+own repository — **had no defined behaviour**, and running it meant inventing a procedure step, which
+Core Principle 5 forbids. The consumer-named/producer-assumed shape, in the escape hatch of the command
+that exists to find it.
+
+**The scope of the escape is derived from the reason for the rule, not widened past it.** Self-exclusion
+exists because *"converting the dispatcher into an agent creates a dispatch loop"* — and typing `dev`
+does not stop that from being true. So:
+
+| | |
+|---|---|
+| **`dev` INCLUDES `workforce` and `org`** | in the census, the survey, the disposition table, the conform pass, and every count the report prints. Without it they are invisible to the tool that measures everything else |
+| **`dev` NEVER converts them** | `workforce` and `org` are dispositioned **RETAIN, reason: dispatcher — conversion creates a dispatch loop (`SKILL.md` § Self-Exclusion Rule)**. This is a refusal of an ACT, cited, and the run continues |
+| **`dev` NEVER hires from them, retires them, reduces them, or marks them for the sweep** | T7b/T7c skip them for the same reason, and the Execution Summary says so per skill rather than omitting the rows |
+| **`dev` is user-typed only** | already blocking in `SKILL.md` and `intent-router.md`; nothing here relaxes it |
+
+**IF a run cannot state which of these applied, it is not in `dev` mode** — the mode is reported in the
+opening banner with the two names it added, never inferred from the presence of a token.
+
 **Run the census FIRST, and take every count in this run from it.**
 
 ```bash
