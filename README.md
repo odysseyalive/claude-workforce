@@ -175,6 +175,20 @@ Two rules, both borrowed, both mechanical here.
 
 That isn't manners. Blaming the agent produces no fix. The same handbook in a fresh context produces the same failure tomorrow.
 
+## Your CLAUDE.md Gets Deleted
+
+CLAUDE.md is injected once, at the head of the conversation, and that placement is the problem. Everything arriving afterward competes with it, so a rule sitting at the top of a long session is a rule that quietly stops applying. It is loudest at the start, before any work has happened, and faintest by the time the session is making the decisions that actually matter.
+
+So the audit empties it. Every line of direction moves to whichever component owns it. A rule about how one employee behaves becomes part of that employee's handbook, which arrives with the spawn that needs it. A procedure becomes a skill or a script, loaded at the moment it is invoked. Anything that has to fire on every tool call becomes a hook, which is the only always-on component there is. Routing rules and whatever fits nowhere else go into the org process. Directive blocks marked immutable are your own words, so they get extracted verbatim before anything else moves.
+
+Architecture notes and stack descriptions go nowhere, because they are already derivable. A directory listing or a restated build command can be read off the repository on demand, and copying one into a handbook only creates a second copy to keep current.
+
+Then the file is deleted.
+
+The safety here is mechanical. `wf-claude-md --evacuate` reports every directive line as either relocated or UNPLACED, and the deletion refuses while a single line is unplaced or a single immutable block is still sitting in the file. A line that arrived nowhere was not moved, it was lost, and preservation is the first directive this project has. Both real projects it has run against refuse today, at 70 and 191 unplaced lines. That is what those repositories currently look like, and the refusal is the tool working. An evacuation is finished when the lines have moved, not when the file is gone.
+
+One caveat, since the rest of this reads as a pitch. That early context loses influence as a session grows is a reason, not a measurement. Nothing here has measured it on a host, and this project's own rule is that an unmeasured fact never becomes a blocking check. What is enforced is the ledger, which is a property of files and can be verified.
+
 ## The Honest Parts
 
 Four things, stated without cushioning.

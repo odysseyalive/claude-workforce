@@ -142,52 +142,36 @@ function Install-ClaudeWorkforce {
         }
     }
 
-    # ── A NEW project install needs a CLAUDE.md ───────────────────────────────
+    # ── A project install BOOTSTRAPS .claude/ when it is absent ───────────────
     #
-    # A PROJECT install lands inside a repo, so that repo needs a CLAUDE.md. A
-    # PERSONAL install is machine-wide and tied to no repo, so it has no such
-    # precondition: install once here, then run /workforce audit inside whichever
-    # project you want an org for (and *that* project needs its CLAUDE.md then).
+    # IT USED TO DEMAND A CLAUDE.md, and offered to launch Claude Code to write one
+    # - bootstrap for a file the audit now EVACUATES and DELETES
+    # (workforce/SKILL.md - Directives, 2026-08-05). The installer was building the
+    # thing the tool removes, and a project with no CLAUDE.md is not unready: under
+    # that directive it is the GOAL STATE, reached early.
     #
-    # UPDATES ARE EXEMPT. Blocking an update because a CLAUDE.md went missing
-    # would strand an already-installed copy on an old release over a precondition
-    # that only governs where a NEW copy may be created.
-    if (($targets -contains 'project') -and (-not $haveProject) -and
-        (-not (Test-Path 'CLAUDE.md' -PathType Leaf))) {
-        $bootstrapPrompt = @'
-Goal: bootstrap a preliminary CLAUDE.md for this brand-new project, then install the workforce skill.
-
-First, create a durable task list with TaskCreate (so this work survives context compaction) covering the steps below, then work through them in order:
-
-1. Ask me, using AskUserQuestion, what this project is meant to accomplish: its purpose and the problem it solves.
-2. Based on my answer, ask focused follow-up questions (one batch at a time) about the language and stack, how to build / run / test it, the key directories, the conventions to follow, and any hard constraints or things to avoid. Keep the questions tight and ask only what you need to write a useful CLAUDE.md. Stop asking once you have enough.
-3. Write a preliminary CLAUDE.md at the project root capturing the purpose, stack, how to build / run / test, layout, and conventions from my answers. Keep it concise and accurate. Do not invent details I did not give you.
-   Keep it SHORT. CLAUDE.md is injected into every agent employee this tool creates, so its length is multiplied by your whole org. Aim well under 200 lines.
-4. As the final step, install the workforce skill by running this in a Bash tool:
-   powershell -NoProfile -Command "$env:WORKFORCE_SCOPE='project'; irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex"
-5. After it installs, tell me to restart Claude Code and run /workforce audit.
-
-Begin with step 1 now.
-'@
-        Write-Host 'A project install needs a CLAUDE.md at the repo root, and none was found.'
+    # IT DOES NOT DEMAND A SETTINGS FILE EITHER. Refusing on an absent .claude/
+    # would be the same mistake with a different filename - turning a thing the
+    # installer can simply CREATE into a precondition the user must satisfy first.
+    # claude-enforcer has always done it this way: create-or-merge, never refuse.
+    #
+    # {} is the honest starting content - audit Step 0.8 (wf-permissions --apply)
+    # and the Chain-of-Command deny layer populate it later, and inventing rules
+    # here would write policy the user never asked for into a file this installer
+    # does not own.
+    #
+    # NEVER CLOBBER AN EXISTING ONE, and kept in parity with `install`: the two
+    # installers are a sanctioned duplication point, so a change to one is a change
+    # to both.
+    $wantsProject = $Targets -contains 'project'
+    if ($wantsProject -and
+        (-not (Test-Path '.claude/settings.local.json' -PathType Leaf)) -and
+        (-not (Test-Path '.claude/settings.json' -PathType Leaf))) {
+        New-Item -ItemType Directory -Force -Path '.claude' | Out-Null
+        Set-Content -Path '.claude/settings.local.json' -Value '{}' -Encoding UTF8
+        Write-Host 'Created .claude/settings.local.json (empty) - this directory had no'
+        Write-Host 'Claude Code setup. Permissions are written later by /workforce audit.'
         Write-Host ''
-        Write-Host 'If this is an EXISTING project, the quickest path is:'
-        Write-Host ''
-        Write-Host '    claude /init'
-        Write-Host ''
-        Write-Host 'If this is a BRAND-NEW project, start Claude Code with this goal to'
-        Write-Host 'build a CLAUDE.md interactively, then re-run this installer. Run:'
-        Write-Host ''
-        Write-Host '    claude "<the prompt below>"'
-        Write-Host ''
-        Write-Host '----- bootstrap prompt -----'
-        Write-Host $bootstrapPrompt
-        Write-Host '----------------------------'
-        Write-Host ''
-        Write-Host 'Or install personally instead — no CLAUDE.md needed now:'
-        Write-Host ''
-        Write-Host "    `$env:WORKFORCE_SCOPE='user'; irm $RepoUrl/install.ps1 | iex"
-        return
     }
 
     # Warn about the precedence trap rather than silently shadowing. Skill
