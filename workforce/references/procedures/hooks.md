@@ -101,7 +101,7 @@ to wire and nothing to orphan.
 
    ```bash
    WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-   "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}"
+   "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
    ```
 
    **`exists: null` is UNDECIDABLE and is never reported as dead** — an inline `sh -c` pipeline, a bare

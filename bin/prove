@@ -46,6 +46,10 @@ CHK = "bin/check"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    ("wf-checkrun ships no executing path",
+     CKR, "append", "\n# --run\nimport subprocess\n"),
+    ("wf-checkrun states WHY the executing path is absent",
+     CKR, "del", "does not execute anything"),
     # ── the canary fixture lifecycle (2026-08-04) ────────────────────────────
     ("fixtures: every live fixture declares the fact it measures",
      CANA, "del", "measures-fact: 1"),
@@ -56,29 +60,36 @@ CASES = [
     # ── the handbook verification gap (2026-08-04) ───────────────────────────
     ("wf-checkrun is shipped in the manifest",
      MAN, "del", "exec workforce/bin/wf-checkrun\n"),
-    ("wf-checkrun names the VACUOUS state and what it means",
-     CKR, "del", "exit 0 on the input declared as violating"),
-    ("wf-checkrun prints resolution and falsification as separate counts",
-     CKR, "del", "discriminate \u00b7 "),
-    ("wf-checkrun says so when --run executed nothing",
-     CKR, "del", "NOTHING RAN"),
+    ("wf-checkrun locates the section on the masked view",
+     CKR, "del", "span = section_span(masked)"),
+    ("wf-checkrun reports ambiguous markup rather than silently masking to EOF",
+     CKR, "del", 'rep.add(name, "ambiguous-markup", "## (file)"'),
+    ("wf-checkrun never resolves a glob as a file",
+     CKR, "del", 'for ch in "*?[]"'),
+    ("wf-checkrun refuses an ambiguous --agent rather than executing every match",
+     CKR, "del", "matches {len(paths)} handbooks"),
+    # The PRINT literal, not the bare phrase: a comment added later carried the
+    # phrase too, and `del` removes only the first occurrence — so the case deleted
+    # the comment and reported VACUOUS. A payload must be unique or it tests nothing.
     ("wf-checkrun never reports an undecidable command as dead",
      CKR, "del", "never reported as dead"),
-    ("wf-checkrun runs nothing without --run or --prove",
-     CKR, "del", "if args.run:"),
     ("wf-checkrun excludes the Negative: line from path resolution",
      CKR, "del", "NEGATIVE_LINE_RX.sub"),
+    ("wf-conform and wf-checkrun share ONE heading grammar",
+     CFM, "del", r'[^\n]*'),
     ("both section readers match the heading line-anchored",
      CFM, "del", "re.escape(heading)"),
     ("wf-conform reports a missing negative case without failing the file",
      CFM, "del", 'not r.get("advisory")'),
     ("verification.md states that only a falsified check is a check",
      VER, "del", "Three states, and only the third is a check"),
-    # Deleting the resolve-only block promotes the --agent --run --prove block to
-    # first, which is exactly the shape that shipped by mistake. An `append` case
-    # would NOT fire: the assertion reads the FIRST block and appending adds a last.
-    ("verify.md's own wf-checkrun invocation is resolve-only",
-     VFY, "del", '```bash\n"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"\n```'),
+    # The class check scans EVERY bash block in EVERY read-only procedure, so an
+    # append fires — which the narrow first version did not. That is the point: the
+    # narrow one permitted an executing block anywhere but the first.
+    ("no read-only procedure shows an executing invocation",
+     VFY, "append", "\n```bash\nwf-checkrun --root . --run --prove\n```\n"),
+    ("the read-only list was actually parsed out of SKILL.md",
+     SKL, "del", "read-only commands run immediately:"),
     ("verify.md no longer calls the real-or-decoration question uncheckable",
      VFY, "append", "\nwhether a `## Verification` check is *real* or decoration\n"),
     ("the IC template ships the declared runnable form",

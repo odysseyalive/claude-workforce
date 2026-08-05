@@ -159,7 +159,14 @@ def section(body, heading):
 
     Returns None when the heading is absent — distinct from an empty section.
     """
-    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$(.*?)(?=^## |\Z)",
+    # Trailing text on the heading line is tolerated, for two reasons that are both
+    # measured. First, THIS FILE'S OWN presence check is `body.find("\n" + s)` — a
+    # substring match — so `## Verification (mechanical)` PASSES "every required
+    # section present" and then extracted nothing: the script reported the section
+    # present and examined none of it. Second, `wf-checkrun` reads the same section,
+    # and two readers of one artifact must share one grammar or they cannot both be
+    # right — the rule this file already states for the sidecar digest.
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*[^\n]*$(.*?)(?=^## |\Z)",
                   body, re.S | re.M)
     return m.group(1) if m else None
 
@@ -244,7 +251,11 @@ def check_handbook(path, body, res, ceiling):
     # It matters more than a wrong count: a check that always fails stops being read.
     expected = [
         s for s in SECTIONS
-        if not (tier == 2 and s == "## Procedure")
+        # tier 1 AND 2 are delegating; neither carries a `## Procedure`. Exempting
+        # only tier 2 failed the shipped CEO template against this very script —
+        # "a coordinator gets no script" is more true of the CEO, not less, and
+        # handbook-templates.md § CEO ships none.
+        if not (tier in (1, 2) and s == "## Procedure")
         and not (tier == 3 and s == "## Chain of Command")
     ]
     positions, missing = [], []
@@ -265,6 +276,17 @@ def check_handbook(path, body, res, ceiling):
     # the text. Runtime behavior is the canary's job, established once per host and
     # never inferred per handbook from the presence of a string.
     if tier == 3:
+        # THE OTHER HALF OF RULE 3, which had no mechanical enforcement anywhere.
+        # SKILL.md marks both lines BLOCKING; only the denylist was ever checked, so
+        # `/workforce verify` could not see half of a blocking rule. A named-teammate
+        # spawn discards `disallowedTools:` and honours `tools:` (fact 2d), so the
+        # unchecked half is the one that survives that spawn form.
+        _tools = (fm.get("tools") or "").strip()
+        res.add(bool(_tools) and "agent" not in {t.strip().lower() for t in _tools.split(",")},
+                f"{n}: IC carries a `tools:` allowlist omitting Agent",
+                "SKILL.md rule 3 refuses to register an IC without it (fact 2d): as a "
+                "named teammate its `disallowedTools:` is discarded and it receives "
+                "`Agent`. Neither line alone is a ceiling")
         res.add("disallowedTools: Agent" in body,
                 f"{n}: IC carries the literal `disallowedTools: Agent`",
                 "entry depth does not cap an IC (platform.md fact 2b); the ceiling "
@@ -291,8 +313,9 @@ def check_handbook(path, body, res, ceiling):
     #
     # "not empty" was the ENTIRE mechanical coverage of the highest-leverage section
     # in the file until 2026-08-04, and it is satisfied by the word "yes". The two
-    # rows below are still properties of the text — whether the check RESOLVES, RUNS,
-    # or can FAIL belongs to `wf-checkrun`, which stats and executes. Naming that
+    # rows below are still properties of the text — whether the check RESOLVES belongs to
+    # `wf-checkrun`; whether it RUNS or can FAIL belongs to no shipped tool and is
+    # established by hand at amendment time (procedures/amend.md Step 6). Naming that
     # owner here is deliberate: one defect, one verdict, or the counts disagree.
     seg = section(body, "## Verification")
     if seg is not None:
@@ -321,9 +344,9 @@ def check_handbook(path, body, res, ceiling):
                 f"{n}: Verification declares no negative case",
                 "no `Negative:` line — this check has never been observed failing, "
                 "so it is indistinguishable from one that cannot fail. Declare a "
-                "Negative: line naming a command expected to exit non-zero; "
-                "`wf-checkrun --prove` then runs it and reports VACUOUS if it "
-                "exits 0.",
+                "Negative: line naming a command expected to exit non-zero, and run it "
+                "by hand at amendment time (procedures/amend.md Step 6). No shipped "
+                "tool executes it.",
             )
 
     # BODY-vs-GRANT COHERENCE — the first check here that compares the text to the
@@ -667,6 +690,20 @@ def main():
                          "(they are exempt by default: workforce did not author them)")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so a
+    # is-it-a-directory guard passes and the tool examines a tree nobody named.
+    # Measured: `wf-conform --root ""` in an empty dir exited 0 reporting
+    # "0 governed · 0 failed" — a validator reporting health it never measured, which
+    # is the exact contract procedures/verify.md states five lines under the block
+    # that produces it.
+    if not (args.root or "").strip():
+        print("wf-conform: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
 
     root = os.path.abspath(args.root)
     if not os.path.isdir(root):

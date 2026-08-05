@@ -45,6 +45,8 @@ facts from  shipped baseline | project-local (<path>)
 canary      PASS | PASS (on record) | UNAVAILABLE | FAIL
 org         <n> employees / <n> departments      chart: <path>
 deferred    <n> open · <m> aged past the threshold · oldest: <id> (<age> invocations)
+            # threshold and age bands: `references/deferred.md` § The row nobody discharges
+            # read them there; this file states no number (Core Principle 9a)
 ```
 
 Three rules, each from a finding that was true and useless without it:
@@ -140,7 +142,7 @@ promise is kept.**
 - On `FAIL` → a finding of the first rank: employees are live on a host whose delegation semantics differ
   from the design's. Report it against the org, not against any one handbook.
 
-**This is the one place `verify` spawns anything, and it still writes nothing.** Spawning a canary is
+**This is the SECOND of the two spawns `verify` makes, and both write nothing.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
 observation; it does not touch the org. On `PASS`, print the exact `platform-local.md` row to record and
 name `/workforce amend` as what clears the `Tier ceiling: unverified this run` marks — **`verify` reports
 the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
@@ -168,7 +170,7 @@ agreeing against the third is a finding, not a tiebreak.
 
 ```bash
 WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-"$WF/bin/wf-conform" --root "${CLAUDE_PROJECT_DIR}"
+"$WF/bin/wf-conform" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
 ```
 
 Exit `0` all clear · `1` at least one check failed, each named · `2` the tree could not be read —
@@ -180,57 +182,82 @@ It covers: sections present and ordered; every IC carries the literal `disallowe
 non-empty and names at least one literal invocation; the length ceiling; the immutable-block sidecar
 digests.
 
-**Then run `wf-checkrun`, which stats and executes what `wf-conform` can only read.**
+**Then run `wf-checkrun`, which STATS what `wf-conform` can only read** — it resolves the file each
+`## Verification` names against disk. It executes nothing at all — its running and falsifying flags were removed
+(see that script's module docstring).
 
 ```bash
-"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}"
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
 ```
 
-**That is the whole of what `verify` runs, and `--run` / `--prove` are NEVER added to it.** `verify`
-is a read-only command (`SKILL.md` § Display vs. Execute) and those flags **execute shell drawn from
-handbooks** — one employee's check is one thing, but sweeping every check in the org, unattended and
+**That is the whole of what `verify` runs.** `verify` is a read-only command (`SKILL.md` § Display
+vs. Execute), and `wf-checkrun` no longer has executing flags at all — they were removed after six
+cold reads each found a way to make them **execute shell drawn from handbooks** — one employee's check is one thing, but sweeping every check in the org, unattended and
 outside any work order, is a different act with a different blast radius. Resolution answers the
 question this command owns: *is the named check even there?*
 
-**Falsifying them is a separate, explicit gesture**, and it belongs to whoever is amending a handbook:
-
-```bash
-"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR}" --agent <name> --run --prove
-```
+**Falsifying them is a separate, explicit gesture, and this file does not carry it.** It lives in
+`references/procedures/amend.md` § Step 6 — `amend` is a `--execute` command acting on one named
+employee, which is the right shape for running handbook-supplied shell. 
 
 *Added 2026-08-04, immediately after this section shipped with both invocations in one block. The
-prose already said "the bare pass runs nothing — `--run` is the gesture", and the code block handed a
+prose already said the bare pass runs nothing, and the code block handed a
 reader both lines anyway. **A caveat under a command block does not gate the command block.** That is
 this project's own dominant failure — correct doctrine with nothing making it true — reproduced by
 the change that added a gate to `## Verification`.*
 
+*Corrected again the same day. The first fix left the executing form **in this file**, one block
+lower, and asserted only that the FIRST block was clean — **a guard written to permit the thing it was
+meant to stop.** Fixing the instance and calling it the class is the failure this project names in
+`references/invariants.md`; the assertion now covers every read-only procedure, not this one line.*
+
 Three states, and **only the third is a check** (`references/verification.md` § Three states):
 
-| Row | Means | Blocking |
-|---|---|---|
-| `resolved` / `dead` | the named file is, or is not, on disk | **dead is blocking** — the analogue of dead wiring |
-| `ran` / `ran-nonzero` | the declared `Check:` executes and its exit code | non-zero is blocking |
-| `discriminates` / **`VACUOUS`** | the declared `Negative:` exits non-zero, or **exits 0** | **VACUOUS is blocking** |
-| `not-runnable` | the command carries an argument the handbook never binds | blocking |
-| `undecidable` | a PATH lookup or an env var this process cannot expand | **never** reported as dead |
-| `undeclared` / `unproven` / `suspect` | no `Check:` line; no `Negative:`; a heuristic "look here" | **never blocking** |
+**Every row the script can print is below**, plus an `unreadable` row for a handbook it could not decode. `wf-checkrun` executes nothing — its `--run`/`--prove`
+flags were removed (see its module docstring), so every row here is reachable from this pass.
+Falsifying a check is a human act at amendment time (`amend.md` § Step 6).
 
-**The bare pass runs nothing** — display-vs-execute, and `--run` is the gesture. Report every count
+| Row | This pass | Means | Blocking |
+|---|---|---|---|
+| `resolved` / `dead` | ✅ | the named file is, or is not, on disk | **depends on the source.** A `dead` row from a DECLARED command's own script blocks — that is the mechanical verdict. One from **prose or a fenced block** is HEURISTIC and does not: a path in prose may be an output, an example, or a file that does not exist yet (`discovery.md` § Reliability tiers) |
+| `undecidable` | ✅ | a path-shaped token carrying an env var or placeholder this process cannot expand | **never** reported as dead. A bare PATH name in a declared command produces no row at all |
+| `not-runnable` | ✅ | the command carries an argument the handbook never binds | blocking |
+| `undeclared` | ✅ | no `Check:` line, so nothing can run it | never blocking |
+| `unproven` | ✅ | a `Check:` with no `Negative:` — never observed failing | never blocking |
+| `suspect` | ✅ | HEURISTIC "look here" on an undeclared section | **never** blocking, by tier |
+| `no-section` | ✅ | `## Verification` absent or empty — `wf-conform` owns that verdict | never blocking; counted in the second summary line |
+| `declared-negative` | ✅ | a `Negative:` exists and was **not** run | never blocking |
+| `malformed-check` | ✅ | a `Check:` whose command is not in backticks — nothing can extract it | blocking **for a governed handbook, or one that declares**; reported otherwise |
+| `orphan-negative` | ✅ | a `Negative:` with no `Check:` — nothing for it to falsify | blocking **for a governed handbook, or one that declares**; reported otherwise |
+| `ambiguous-markup` | ✅ | an unclosed fence or comment, or two `## Verification` headings and no exact one — the markup cannot be resolved | **always blocking.** What the file declares cannot be read reliably |
+
+**So `verify` answers "is the named check even there?" and nothing more.** It cannot tell a real
+check from a decoration — that verdict belongs to the amendment that touched the check. **Never
+report a `resolved` or `declared-negative` row as a verified check**; `content-writer`'s three broken
+hooks were all on disk and all had commands.
+
+**Nothing is executed by any pass.** Report every count
 including the zeroes.
 
-**`VACUOUS` is the row this command exists for.** A check that exits 0 on the input declared as
-violating cannot fail, so every PASS it has ever returned proves nothing. Report it as a **functional
-regression of the employee**, never as a documentation nit.
+**`VACUOUS` is the row the FEATURE exists for, and `verify` cannot produce it.** A check that exits 0
+on the input declared as violating cannot fail, so every PASS it ever returned proves nothing — but
+establishing that requires executing the negative, which is `amend.md` § Step 6. Where a `VACUOUS`
+row is on record from an amendment, report it as a **functional regression of the employee**, never
+as a documentation nit.
 
-**Never report a `resolved` check as verified.** Resolution is the necessary half and nothing more:
-`content-writer`'s three broken hooks were all on disk.
+*Corrected 2026-08-04 by a cold read. This paragraph read "the row this command exists for" beside a
+table listing it blocking — for a row `verify` is structurally incapable of emitting, because it
+could not execute one. Three of the four blocking states named here were unreachable the same way,
+and the executing path has since been removed outright.
+**A verdict a command cannot reach is not a gate; it is a sentence.***
 
 **GOVERNED vs ADOPTED, and the script decides it by marker.** An agent carrying an `ORG-RECORD` block
 is under this contract; one without it was **never placed under it** — `conversion-taxonomy.md` ADOPT is
 *"censused into the chart, **zero bytes changed**."* Adopted agents are checked for genuine runtime
 hazards only (an `Agent(...)` allowlist is a bug in anyone's file), and those are **reported without
 setting the exit code**: forcing a verdict on a file workforce does not own is the overreach
-`evaluators.md` refuses when a catalog cannot be appended. `--strict-adopted` opts in. Both counts print,
+`evaluators.md` refuses when a catalog cannot be appended. `wf-conform --strict-adopted` opts in. Both counts print,
 including the zeroes.
 
 *Found by running the script against a real brownfield project: three hand-authored agents produced six
@@ -248,9 +275,7 @@ a script would only hide it better.
 *Corrected 2026-08-04. This list began **"whether a `## Verification` check is real or decoration"**,
 and that was the right call for `wf-conform` and the wrong conclusion about the question. "Is this
 check real?" is judgment; **"has it ever been observed to fail?"** is binary, and it is the same
-question. Splitting it that way is what `wf-checkrun --prove` runs, and it is the discipline this file
-already required one section down — a `mechanical` invariant must record a negative-test result,
-because a validator nobody ever saw reject anything is indistinguishable from `exit 0`. The rule was
+question. Splitting it that way is what an author runs by hand at amendment time. The rule was
 here the whole time, applied to invariants and never to the handbooks. A sentence declaring something
 uncheckable is worth re-reading whenever the neighbouring page checks it.*
 
@@ -371,6 +396,16 @@ no replacement is not reportable: without one it is an observation that a number
 
 ## Integrity sidecars
 
+**`checksums.md` names `verify` as its caller, and this is the call: `wf-conform`, already run under
+§ Handbook conformance above.** Its `check_sidecar` re-hashes every block against `.directives.sha`;
+there is no second command and none is invented here.
+
+**NOT `wf-protect-directives`.** That is a PostToolUse hook — it reads its payload on **stdin** and
+**always exits 0** by design (fail-open), so driven from a command line it cannot report anything.
+*Written down 2026-08-04 after this § was nearly given `wf-protect-directives --verify --root …` as
+its invocation: a flag it does not have, on a stdin hook that cannot fail — the `content-writer`
+defect, in the file that exists to catch it.*
+
 Re-hash immutable directive blocks against their recorded stamps.
 
 **Report coverage as a count — "N of N blocks examined" — never a bare "clean".** claude-enforcer's
@@ -427,8 +462,20 @@ line only where `.claude/` is itself tracked, since otherwise it is already cove
 is noise. Under no VCS there is nothing to check, and already-ignored is a one-line notice rather than a
 finding.
 
-**CLAUDE.md is measured here, by the same two scripts the survey uses** — `wf-context` for the
-IDENTITY bytes every spawn pays, and `wf-claude-md` for the `DUPLICATED` / `DERIVABLE` / `USER` split
+**CLAUDE.md is measured here, by the same two scripts the survey uses.** Run both; neither has a
+default this file may assume.
+
+```bash
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-context" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+```
+
+*Both were named as mandatory measurements with no invocation until 2026-08-04, while every other
+script in this file got a fenced block. `wf-context` had none anywhere in the files this one cites.*
+
+`wf-context` reports the
+IDENTITY bytes every spawn pays; `wf-claude-md` reports the `DUPLICATED` / `DERIVABLE` / `USER` split
 (`references/claude-md.md`). Report all three counts including the zeroes.
 **DUPLICATED above zero is a finding**: those lines exist verbatim in a handbook, so the org pays twice and
 `wf-claude-md --execute` removes exactly them. `DERIVABLE` is reported and never removed, and
@@ -455,7 +502,7 @@ still true, and flagging it would send the user to delete accurate documentation
 
 Opens with the provenance header (§ above). Then grouped by section, each finding naming the file and
 what would go wrong. Ends with a one-line verdict and, when the org is unreachable this session, the
-restart notice.
+restart notice — **whose wording is `platform.md` fact 3's, quoted from there and never composed here.** `"restart required"` is a RETRACTED claim: agents and skills register on a delay, so the notice says a restart loads them *now*, never that one is needed. It has crept back into four shipped files once already.
 
 **Every finding carries three things, and a finding missing any of them is incomplete:**
 
@@ -472,3 +519,8 @@ mutates cannot be run safely when you are unsure of the state — which is exact
 finding, and close with the single command that would apply them — `/doctor` pairs its report with
 "press `f` to have Claude fix reported issues", and the report is worth more when the next step is one
 gesture rather than a research project.
+
+*Corrected 2026-08-04 by a release-gate cold read. Three rows of this table called a verdict blocking
+that the command emits as a sentence — **`!` on screen beside `0 blocking finding(s)`**, which is the
+inversion of the failure this file condemns two paragraphs down. A table that overstates a gate is
+worse than one that understates it: the reader stops trusting the counts.*

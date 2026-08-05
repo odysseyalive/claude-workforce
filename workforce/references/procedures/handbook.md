@@ -68,16 +68,32 @@ instance and this file is the class.*
 - **Tier:** from the org chart. Determines which template applies.
 - **`model` / `effort`:** from `org-config.md`, resolved per
   `references/org-config.template.md` § Resolution. Never invented.
-- **IC → `disallowedTools: Agent`.** Mandatory, blocking (`platform.md` fact 2c).
-- **Delegating → `background: false`.** Set it; report if absent; never block on it (fact 2).
-- **No `tools:` field by default.** Omitting it gives the employee the full default grant —
-  `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus all configured MCP
-  servers deferred behind `ToolSearch` (fact 4). Listing even one tool costs every tool not listed
-  (fact 4b), so the only subtraction mechanism is `disallowedTools:`. An employee that needs a
-  specific MCP server loads it via `ToolSearch` as the first procedure step.
-  **Only add an explicit `tools:` when a handbook must be restricted below the default** — and when
-  you do, list everything the procedure needs, remembering that `Grep`, `Glob`, and `WebFetch` are
-  not in the default grant and cannot be assumed (fact 4). **Any MCP dependency must clear Step 2a.**
+- **IC → BOTH `disallowedTools: Agent` AND a `tools:` allowlist omitting `Agent`.** Mandatory,
+  blocking, both lines (`SKILL.md` rule 3; facts 2c and 2d). The two spawn forms discard different
+  halves, so neither line alone is a ceiling. **`SKILL.md` rule 3 refuses to register an IC without
+  the `tools:` line**, so an IC authored without one cannot go live.
+- **Delegating → no `tools:` field, and `background: false`.** CEO and Lead keep the full default
+  grant — `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus all configured
+  MCP servers deferred behind `ToolSearch` (fact 4). Set `background: false`; report if absent;
+  never block on it (fact 2).
+- **Writing the IC's `tools:` line — what it costs and what it must carry.** Listing even one tool
+  costs every tool not listed (fact 4b), and `Grep`, `Glob`, and `WebFetch` are absent from the
+  default grant either way (fact 4). Two things are routinely forgotten:
+  - **`Skill`**, if the IC invokes any skill — including the reduced and data skills that are *"the
+    only sanctioned path to its dataset"* (`handbook-templates.md`). Omit it and the employee cannot
+    reach its own data.
+  - **`mcp__<server>`, at server level**, for any MCP dependency — an explicit `tools:` is a hard
+    ceiling for MCP (fact 13), so a server not named there is unreachable. **Do NOT add `ToolSearch`
+    alongside it**: fact 13 measured that ToolSearch *defers* tools which arrive loaded without it.
+    **Any MCP dependency must clear Step 2a.**
+
+*Rewritten 2026-08-04. This bullet read "No `tools:` field by default" and told an author to load MCP
+servers "via `ToolSearch` as the first procedure step" — **so the canonical authoring procedure
+produced an IC that `SKILL.md` rule 3 refuses to register**, with the one pairing fact 13 measures as
+counter-productive. The ceiling landed 2026-08-03 and reached `verification.md` and
+`handbook-templates.md` but not this file — the PRIMARY authoring path. Core Principle 7c names this
+exact shape, and the correction note in `handbook-templates.md` cited 7c while the instance survived
+here. Found by a cold read.*
 - **No `memory:`.** Ever.
 
 ## Step 2a — MCP server preflight (blocking, and it may not touch the network)
@@ -117,6 +133,15 @@ question is *"is this name configured here"*, and that is answerable by reading.
   own config, and the handbook travels to all of them. Where a project genuinely depends on a server, the
   dependency belongs in a project-root `.mcp.json` so it travels with the repo — *documented, not
   measured here*; treat it as the recommended distribution path, not a guarantee.
+
+**Write the `## Verification` negative input before the handbook is released.** The section declares
+`- Negative: <a command against an input that MUST be rejected>`; that input lives at
+`.claude/workforce/negatives/<employee>.<ext>`, **outside the employee's scope paths** so the positive
+`Check:` never picks it up (`references/verification.md` § Where the negative input lives). A negative whose input is absent exits non-zero for the wrong reason, so it proves nothing.
+
+*Named here 2026-08-04. `verification.md` named this file and `amend.md` as the producers of that
+fixture and neither mentioned it — a consumer named and a producer assumed, which slipped the
+`PRODUCERS` map because the path ends in a directory placeholder.*
 
 ## Step 3 — Write it
 

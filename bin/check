@@ -577,7 +577,13 @@ for _fam in ("ORG-RECORD", "ORG-CHAIN"):
         "and runs a span to the next closer",
     )
 check("templates: no memory: field offered", not re.search(r"^\s*memory:\s*\w", tpl, re.M))
-check("templates: MCP granted at server level", "mcp__playwright-mcp__*" in tpl)
+# BOTH server-level forms, because fact 13 measured both resolving: `mcp__<server>`
+# and `mcp__<server>__*`. Testing only the wildcard failed a template that had been
+# corrected to the bare form — an assertion narrower than the fact it guards.
+check("templates: MCP granted at server level",
+      "mcp__playwright-mcp__*" in tpl or re.search(r"mcp__playwright-mcp\b", tpl) is not None,
+      "no server-level MCP grant in the templates — enumerating individual tool names "
+      "is the forward-mobility failure fact 13 names")
 
 required = re.findall(r"\| `## (\w[\w ]*)` \|", pfp)
 absent = [s for s in required if f"## {s}" not in tpl]
@@ -3187,7 +3193,7 @@ check(
 check(
     "hooks: a step produces the dead-wiring count its report declares",
     "dead wiring — command not on disk" in _hooks_md_early
-    and "--root \"${CLAUDE_PROJECT_DIR}\"" in _hooks_md_early
+    and '"$WF/bin/wf-census"' in _hooks_md_early
     and "never reported as dead" in _hooks_md_early,
     "procedures/hooks.md declares a dead-wiring row with no step computing it, or "
     "no longer states that an undecidable command is left alone",
@@ -5360,6 +5366,14 @@ check(
 # by a cold reader, because nothing mechanical could see it.
 # ─────────────────────────────────────────────────────────────────────────────
 _ckr = read("workforce/bin/wf-checkrun")
+
+
+def _safe_parse(_src):
+    try:
+        _a2.parse(_src)
+        return True
+    except SyntaxError:
+        return False
 _cfm = read("workforce/bin/wf-conform")
 
 check(
@@ -5368,39 +5382,271 @@ check(
     "a script absent from the manifest is not installed on any host, so the "
     "procedure that names it resolves to nothing — the absent-producer shape",
 )
+# ── defects a cold read found in files this change did not introduce ─────────
 check(
-    "wf-checkrun names the VACUOUS state and what it means",
-    "exit 0 on the input declared as violating" in _ckr,
-    "a check that exits 0 on the input declared as violating cannot fail, so every "
-    "PASS it ever returned proves nothing — the verdict has to say that, or it "
-    "reads as one more row",
+    "every --root script refuses an empty root",
+    all("AN EMPTY --root IS A CALLER ERROR" in read(f"workforce/bin/{_s}")
+        for _s in ("wf-census", "wf-checkrun", "wf-conform", "wf-context", "wf-claude-md")),
+    "`${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so every shipped block expands "
+    "to `--root \"\"`; abspath('') is the CWD, which passes an is-a-directory guard. "
+    "Measured: wf-conform exited 0 reporting `0 governed · 0 failed` on a tree nobody "
+    "named — a validator reporting health it never examined",
 )
 check(
-    "wf-checkrun prints resolution and falsification as separate counts",
-    "discriminate \u00b7 " in _ckr,
-    "resolution, execution and falsification are three different claims and the "
-    "summary must never collapse them: content-writer's hooks were all on disk, "
-    "all ran, and all passed",
+    "the web-facing IC template carries the tier-ceiling lines",
+    "mcp__playwright-mcp" in tpl
+    and "disallowedTools: Agent" in tpl.split("## Web-facing IC")[1][:900],
+    "the web-facing IC section said 'no `tools:` field', which SKILL.md rule 3 "
+    "refuses to register — the shipped template produced a handbook the shipped "
+    "gate rejects",
+)
+# SCAN THE COMMAND BLOCKS, NOT THE PROSE. Testing for any mention flagged the
+# retraction notes that quote the wrong invocation in order to forbid it — the
+# hazard RETRACTION_TOKEN exists for, met here by asking a narrower question: is
+# anyone INSTRUCTED to run it?
+_hook_invocations = []
+for _p in _shipped_md:
+    for _m in re.finditer(r"```bash\n(.*?)```", read(_p) or "", re.S):
+        for _ln in _m.group(1).splitlines():
+            if "wf-protect-directives" in _ln:
+                _hook_invocations.append(f"{_p}: {_ln.strip()[:70]}")
+check(
+    "no shipped command block invokes wf-protect-directives",
+    not _hook_invocations,
+    f"{_hook_invocations} — it is a PostToolUse hook: it reads stdin and ALWAYS "
+    "exits 0 by design, so a command-line invocation of it cannot fail. That is the "
+    "content-writer defect, in the files that exist to catch it",
+)
+# Asserted POSITIVELY. The wrong sentence legitimately survives inside the note that
+# retracts it, so testing for its absence tests the retraction, not the claim.
+check(
+    "verify.md states it spawns twice, not once",
+    "the SECOND of the two spawns" in vfy,
+    "verify makes two mandatory spawns — the ambient-policy probe and the canary — "
+    "and an executor believing the singular skips the probe whose absence cost an "
+    "entire odyssey-alive run",
 )
 check(
-    "wf-checkrun says so when --run executed nothing",
-    "NOTHING RAN" in _ckr,
-    "`0 VACUOUS` beside `0 ran` reads as a clean finding and means nothing was "
-    "executed — INV-BATCH one level down: a cost of zero is evidence the batch did "
-    "not run, never evidence it was cheap",
+    "verify.md gives an invocation for every script it calls mandatory",
+    all(f'"$WF/bin/{_s}"' in vfy for _s in ("wf-conform", "wf-checkrun", "wf-context", "wf-claude-md")),
+    "wf-context and wf-claude-md were named as required measurements with no fenced "
+    "block anywhere in the files this one cites, while every other script had one",
+)
+# THE EXECUTING PATH IS NOT SHIPPED, AND THAT IS A DECISION.
+# Six rounds of cold reads each found a fresh way to make `--run` execute a command
+# a human wrote as an illustration — the last ran `rm -rf` out of a <details> block
+# marked "DO NOT RUN" and reported the handbook RUNS *and* DISCRIMINATES at exit 0.
+# Deciding instruction-vs-illustration is markdown block parsing; a hand-rolled
+# scanner keeps losing to it and there is no stdlib CommonMark parser.
+# NO SHIPPED SCRIPT NAMES A FLAG IT DOES NOT HAVE. Two removed-flag strings survived
+# in wf-checkrun's own OUTPUT after the executing path was deleted — one telling the
+# operator "--run would execute every match", in the tool whose release claim is that
+# it executes nothing. Fixed at the instance twice; this is the class.
+_flag_lies = []
+for _s in ("wf-checkrun", "wf-conform", "wf-census", "wf-context", "wf-remainder",
+           "wf-claude-md"):
+    _src = read(f"workforce/bin/{_s}")
+    # argparse-based scripts only: `wf-remainder` parses argv by hand, so its real
+    # flags are not in add_argument() and every one of them would read as a lie.
+    if not _src or "add_argument(" not in _src:
+        continue
+    _have = set(re.findall(r'add_argument\("(--[a-z-]+)"', _src))
+    # EVERY string constant, via the AST — not a double-quote regex. The identical
+    # string in SINGLE quotes passed, and wf-conform alone holds ~291 constants, so
+    # that was a live gap rather than a theoretical one.
+    try:
+        _tree = _a2.parse(_src)
+        # The MODULE DOCSTRING is documentation, not operator output, and it is where
+        # a removed capability is legitimately explained. Excluding it is the whole
+        # difference between "records that --run was removed" and "tells the operator
+        # to pass --run".
+        _doc = _a2.get_docstring(_tree, clean=False)
+        for _n in _a2.walk(_tree):
+            if not (isinstance(_n, _a2.Constant) and isinstance(_n.value, str)):
+                continue
+            if _doc is not None and _n.value == _doc:
+                # The NARRATIVE half only. A `Usage` synopsis inside the module
+                # docstring is operator-facing, so exempting the whole docstring let
+                # a real lie hide there — proven: `[--execute]` added to the synopsis
+                # passed, while the identical string in a print() failed.
+                _tail = _doc.split("Usage", 1)[1] if "Usage" in _doc else ""
+                for _f in re.findall(r"(--[a-z][a-z-]{1,})", _tail):
+                    if _f not in _have:
+                        _flag_lies.append(f"{_s}: {_f} in the Usage synopsis")
+                continue
+            for _f in re.findall(r"(--[a-z][a-z-]{1,})", _n.value):
+                if _f not in _have:
+                    _flag_lies.append(f"{_s}: {_f} in {_n.value[:44]!r}")
+    except SyntaxError:
+        _flag_lies.append(f"{_s}: could not parse")
+check(
+    "no shipped script names a flag it does not have, in its own output",
+    not _flag_lies,
+    f"{_flag_lies} — a printed flag the parser rejects is a lie to the operator, and "
+    "after a capability is removed its name survives in the strings that described it",
+)
+check(
+    "wf-checkrun ships no executing path",
+    # THE WHOLE FILE, and every execution primitive — not `split('"""')[2]`, which
+    # covered only the ~100 lines between two docstrings. Proven vacuous by a cold
+    # read: `"--run" in _ckr` was True (three sites) while this assertion PASSED, so
+    # only the `subprocess` clause ever had reach, and that clause would not have
+    # caught os.system, os.popen, runpy or eval.
+    # AST, not text: a COMMENT recording the history mentions `shell=True`, and a
+    # text test cannot tell a record of a removed capability from the capability.
+    # A DIAGNOSTIC MUST NOT DIE ON THE INPUT IT DIAGNOSES — this file's own rule.
+    # Unguarded, a syntactically broken wf-checkrun made `ast.parse` raise and took
+    # the WHOLE of bin/check down: bin/prove reported the case VACUOUS with "0 other
+    # failures", because there were no failures — there was no output at all.
+    # An unparseable script is a failure of this check, not an absence of one.
+    (lambda: (lambda t: t is not None and not [
+        1 for _n in _a2.walk(t)
+        if (isinstance(_n, (_a2.Import, _a2.ImportFrom))
+            and any(getattr(_al, "name", "").split(".")[0] in ("subprocess", "runpy", "pty")
+                    for _al in _n.names))
+        or (isinstance(_n, _a2.Call)
+            and _a2.unparse(_n.func) in ("os.system", "os.popen", "eval", "exec",
+                                         "subprocess.run", "subprocess.Popen"))
+        or (isinstance(_n, _a2.Call) and _a2.unparse(_n.func).endswith("add_argument")
+            and any(isinstance(_a, _a2.Constant)
+                    and _a.value in ("--run", "--prove", "--timeout") for _a in _n.args))
+    ])((lambda: None if _ckr is None else _a2.parse(_ckr))()
+       if _ckr else None))()
+    if _ckr and _safe_parse(_ckr) else False,
+    "`--run`/`--prove` extract commands from prose and execute them; six cold reads "
+    "found six escapes, each a one-token variation on a shape already fixtured. The "
+    "executing half is withheld until commands live somewhere unambiguously parseable",
+)
+check(
+    "wf-checkrun states WHY the executing path is absent",
+    "does not execute anything" in _ckr and "structured sidecar" in _ckr,
+    "a capability withheld without its reason reads as an oversight, and the next "
+    "author re-adds it",
+)
+check(
+    "wf-checkrun requires a declaration to be a TOP-LEVEL list item",
+    'CHECK_RX = re.compile(r"^(?:[-*+]|\\d+[.)])' in _ckr,
+    "an optional list marker matched a prose paragraph beginning `Check:` and an "
+    "indented illustration — both executed. Requiring column 0 plus a marker makes "
+    "safety a matter of GRAMMAR rather than of parsing markdown correctly, which "
+    "four rounds of cold reads showed a hand-rolled scanner will not do",
+)
+check(
+    "the declaration grammar is identical in the matcher and the line-stripper",
+    _ckr.count(r"(?:[-*+]|\d+[.)])") >= 4,
+    "`\\d+\\.` in the stripper against `\\d+[.)]` in the matcher meant a `1)` "
+    "declaration was EXECUTED but never stripped before token resolution, restoring "
+    "two false-positive classes the code documents as fixed",
+)
+check(
+    "wf-checkrun treats a comment closer as closing only what opened before it",
+    "_c_after" in _ckr,
+    "order-blind substring tests let a line whose `-->` precedes its `<!--` pass "
+    "through unmasked, so a command a human had commented out was executed",
+)
+check(
+    "wf-checkrun refuses two prefix `## Verification` headings with no exact one",
+    'return "AMBIGUOUS"' in _ckr,
+    "`re.search` took the FIRST prefix match, so an `examples (do not run)` heading "
+    "above a real `## Verification (mechanical)` captured it — the illustration ran "
+    "and the genuine check was never read",
+)
+check(
+    "wf-checkrun gives the fence OPENER and CLOSER different grammars",
+    "fence_open = re.match" in _ckr and "fence_close = re.match" in _ckr,
+    "CommonMark allows spaces in an OPENING info string and none in a closer. "
+    "Requiring one token for both meant ```markdown title=\"x\" was not an opener, "
+    "its body stayed at column 0, and --run EXECUTED a line written as "
+    "'illustration only — do not run'. The previous assertion pinned that regex",
+)
+check(
+    "wf-checkrun masks tab-indented example blocks",
+    'body[:1] == "\\t"' in _ckr,
+    "a tab is a legal CommonMark code-block indent; masking only spaces left the "
+    "tab spelling of the illustration escape open, and it executed",
+)
+check(
+    "wf-checkrun masks fences, comments and indented blocks in ONE pass",
+    "in_comment" in _ckr and "prev_blank" in _ckr and "ambiguous" in _ckr,
+    "a comment regex run before a fence scanner lets each eat the other's "
+    "delimiters — measured executing a command in both directions — and a 4-space "
+    "indented block was not masked at all",
+)
+check(
+    "wf-checkrun requires a closing fence to carry no info string",
+    'fence_close = re.match(r"(`{3,}|~{3,})[ \\t]*$"' in _ckr,
+    "CommonMark: a closer may not have an info string, so ```bash inside ```markdown "
+    "is CONTENT. Treating it as a closer unmasked everything after it and executed "
+    "the illustration",
+)
+check(
+    "wf-checkrun strips quoted spans before looking for placeholders",
+    "'[^']*'" in _ckr,
+    "`grep -rq \"<script>\"` carries an HTML tag, not an unbound metavariable; "
+    "flagging it blocked a legitimate check AND skipped its execution",
+)
+check(
+    "wf-checkrun does not resolve tokens from declaration lines",
+    "CHECK_LINE_RX.sub" in _ckr,
+    "a declared command's arguments are its inputs AND OUTPUTS — "
+    "`npm run build && test -s dist/bundle.js` reported the build artifact as a "
+    "dead check, which is the most ordinary shape a real check takes",
+)
+check(
+    "wf-checkrun identifies a handbook by path, not basename",
+    "name = show(path, root)" in _ckr,
+    "two `lead.md` in different departments were indistinguishable in the report "
+    "and in --json, so the operator could not tell which file owned which finding",
+)
+check(
+    "the CEO template's declared pair is executable as written",
+    "<run-id>" not in "\n".join(
+        l for l in tpl.split("## CEO")[1].split("## Lead")[0].splitlines()
+        if re.match(r"\s*-\s*(Check|Negative):", l)),
+    "a placeholder the handbook cannot bind makes the check `not-runnable`, which "
+    "is blocking — every generated CEO handbook would be a finding",
+)
+check(
+    "wf-checkrun locates the section on the masked view",
+    "def section_span" in _ckr and "span = section_span(masked)" in _ckr,
+    "locating `## Verification` on the raw body let a FENCED example section win — "
+    "the illustration was executed and the real Check:/Negative: were never read",
+)
+check(
+    "wf-checkrun reports ambiguous markup rather than silently masking to EOF",
+    # Keyed on the SAME unique string bin/prove deletes. A broader key matched the
+    # second call site (the ambiguous-heading row), so the payload was unique and the
+    # assertion still was not falsifiable — the payload-uniqueness lint cannot see
+    # that; only bin/prove can, and it did.
+    'rep.add(name, "ambiguous-markup", "## (file)"' in _ckr,
+    "an unclosed fence or comment blanks everything after it, so checks below are "
+    "not read; safe, but silent unless it is reported — and it was measured exiting "
+    "0 with a dead script invisible",
+)
+check(
+    "wf-checkrun never resolves a glob as a file",
+    'for ch in "*?[]"' in _ckr,
+    "`npx stylelint \"src/**/*.css\"` — this project's own canonical example — "
+    "resolved to a path, reported `dead`, and made every handbook copied from the "
+    "shipped template exit 1 on a false positive",
+)
+check(
+    "wf-checkrun refuses an ambiguous --agent rather than executing every match",
+    "matches {len(paths)} handbooks" in _ckr,
+    "`--agent` promises ONE employee and `amend.md` ships --run --prove on that "
+    "promise; selecting two silently executed an unrelated file's shell",
+)
+check(
+    "wf-checkrun's placeholder guard is case-insensitive",
+    "A-Za-z" in _ckr.split("PLACEHOLDER_RX")[1][:80],
+    "`<DRAFT>` bypassed a lowercase-only guard and reached shell=True, where < and > "
+    "are redirections — it wrote a file and blamed the employee for the syntax error",
 )
 check(
     "wf-checkrun never reports an undecidable command as dead",
     "never reported as dead" in _ckr,
     "a false dead row invites someone to delete a working check, which is worse "
     "than the silence it replaces (wf-census's own rule, inherited)",
-)
-check(
-    "wf-checkrun runs nothing without --run or --prove",
-    "if args.run:" in _ckr and "if not args.prove:" in _ckr,
-    "display-vs-execute — the bare pass resolves and executes nothing, and a "
-    "verification pass that ran commands by default would be a writing command "
-    "wearing a read-only name",
 )
 check(
     "wf-checkrun treats an undeclared handbook as non-blocking",
@@ -5416,9 +5662,20 @@ check(
     "naming a deliberately absent path; resolving those reports the fixture's own "
     "design as a dead check and trains authors to weaken the negative case",
 )
+# ONE GRAMMAR, BYTE-FOR-BYTE. wf-conform and wf-checkrun both read `## Verification`;
+# they diverged for an hour (one byte-exact, one tolerant) and disagreed about
+# whether a decorated heading had a section at all.
+_grammar = r'r"^" + re.escape(heading) + r"[ \t]*[^\n]*$(.*?)(?=^## |\Z)"'
+check(
+    "wf-conform and wf-checkrun share ONE heading grammar",
+    _grammar in _cfm and _grammar in _ckr,
+    "two readers of one section with different heading rules cannot both be right — "
+    "measured disagreeing on `## Verification (mechanical)`, where one found the "
+    "declared check and the other reported no section",
+)
 check(
     "both section readers match the heading line-anchored",
-    _ckr.count('re.escape(heading)') == 1 and _cfm.count('re.escape(heading)') == 1
+    _ckr.count('re.escape(heading)') >= 1 and _cfm.count('re.escape(heading)') == 1
     and 'body.split("## Verification", 1)' not in _cfm.split("Fixed as a class")[-1],
     "a bare substring split matches a PROSE MENTION of the heading — measured on a "
     "real handbook, where every reader was handed the tail of `## Procedure` and the "
@@ -5439,19 +5696,45 @@ check(
     "handbooks; stating it here is what makes the wf-checkrun row doctrine rather "
     "than a script's opinion",
 )
-# verify is READ-ONLY (SKILL.md § Display vs. Execute). `--run`/`--prove` execute
-# shell drawn from handbooks, so the invocation verify.md hands a reader must not
-# carry them. Shipped wrong on the first pass: a caveat UNDER the command block
-# does not gate the command block.
-_vfy_block = re.search(r"```bash\n([^`]*?wf-checkrun[^`]*?)```", vfy, re.S)
+# NO READ-ONLY PROCEDURE MAY SHOW AN EXECUTING INVOCATION.
+#
+# `verify.md` shipped a block carrying `--run --prove` under a command SKILL.md
+# classifies read-only — a host following it would execute shell drawn from every
+# handbook in the org. The FIRST fix checked only the first block of that one file
+# and left the executing form one block lower: a guard written to permit the thing
+# it was meant to stop. This is the class.
+#
+# The read-only list is READ FROM SKILL.md, never restated here (Core Principle 9a).
+# Multi-word entries (`org index`, `org status`) are skipped deliberately: their
+# procedure file also serves `org embed`, which IS a --execute command, so the file
+# legitimately carries executing invocations and the command-to-file mapping is not
+# 1:1 there.
+_EXECUTING = ("--execute", "--run", "--prove", "--apply", "--remove", "--stamp")
+_ro_m = re.search(r"read-only commands run immediately:(.*?)\.\n", skill, re.S)
+_readonly = [c for c in re.findall(r"`([a-z][a-z ]*)`", _ro_m.group(1))] if _ro_m else []
+_ro_single = [c for c in _readonly if " " not in c]
+_ro_violations = []
+for _c in _ro_single:
+    _f = f"workforce/references/procedures/{_c}.md"
+    _body = read(_f)
+    if not _body:
+        continue
+    for _m in re.finditer(r"```bash\n(.*?)```", _body, re.S):
+        for _ln in _m.group(1).splitlines():
+            if any(_flag in _ln for _flag in _EXECUTING):
+                _ro_violations.append(f"{_c}.md: {_ln.strip()[:90]}")
 check(
-    "verify.md's own wf-checkrun invocation is resolve-only",
-    _vfy_block is not None
-    and "--run" not in _vfy_block.group(1)
-    and "--prove" not in _vfy_block.group(1),
-    "the FIRST wf-checkrun block in verify.md carries --run or --prove — verify is "
-    "classified read-only and those flags execute handbook-supplied shell across "
-    "the whole org, unattended and outside any work order",
+    "the read-only list was actually parsed out of SKILL.md",
+    len(_ro_single) >= 5,
+    f"parsed {_ro_single} — if the § Display vs. Execute sentence is reworded this "
+    "silently checks nothing, which is the vacuous-pass shape",
+)
+check(
+    "no read-only procedure shows an executing invocation",
+    not _ro_violations,
+    f"{_ro_violations} — SKILL.md classifies these commands read-only, run "
+    "immediately, no --execute required. A bash block carrying an executing flag "
+    "tells a host to run it; a caveat underneath does not gate a command block",
 )
 check(
     "verify.md no longer calls the real-or-decoration question uncheckable",
@@ -5466,6 +5749,55 @@ check(
     "the cheapest place to answer this is the template — verification.md's own "
     "lesson, learned when two generated handbooks were amended and the template "
     "was left to reproduce the defect on every later hire",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVERY bin/prove PAYLOAD MUST BE UNIQUE IN ITS TARGET
+#
+# `bin/prove` deletes the FIRST occurrence of a literal and asserts the named check
+# fires. If that literal appears twice, the deletion hits the wrong copy and the
+# check stays satisfied — the case reports PROVEN or VACUOUS while testing nothing.
+#
+# This happened FOUR times in one session: `NOTHING RAN` once in a comment and twice
+# in prints, `"ambiguous-markup"` and `"negative-unresolved"` each also in the glyph
+# map. `bin/prove` caught every one, but only after a full run. This catches them at
+# `bin/check` time, which is the difference between a minute and a quarter of an hour.
+# ─────────────────────────────────────────────────────────────────────────────
+_prove_src = read("bin/prove")
+_dupe_payloads = []
+try:
+    _pt = _a2.parse(_prove_src)
+    _pconst = {}
+    for _n in _a2.walk(_pt):
+        if isinstance(_n, _a2.Assign) and getattr(_n.targets[0], "id", "") and \
+                isinstance(_n.value, _a2.Constant) and isinstance(_n.value.value, str):
+            _pconst[_n.targets[0].id] = _n.value.value
+        if isinstance(_n, _a2.Assign) and getattr(_n.targets[0], "id", "") == "CASES":
+            for _case in getattr(_n.value, "elts", []):
+                _el = getattr(_case, "elts", [])
+                if len(_el) != 4:
+                    continue
+                _name = _el[0].value if isinstance(_el[0], _a2.Constant) else None
+                _fvar = getattr(_el[1], "id", None)
+                _mode = _el[2].value if isinstance(_el[2], _a2.Constant) else None
+                _pay = _el[3].value if isinstance(_el[3], _a2.Constant) else None
+                if _mode != "del" or not (_name and _fvar and _pay):
+                    continue
+                _target = _pconst.get(_fvar)
+                if not _target:
+                    continue
+                _body = read(_target)
+                if _body and _body.count(_pay) > 1:
+                    _dupe_payloads.append(f"{_name!r} -> {_pay[:40]!r} x{_body.count(_pay)}")
+except Exception as _e:  # a diagnostic must not die on the input it diagnoses
+    _dupe_payloads.append(f"could not parse bin/prove: {_e}")
+
+check(
+    "prove: every `del` payload occurs exactly once in its target",
+    not _dupe_payloads,
+    f"{_dupe_payloads} — bin/prove deletes the FIRST occurrence, so a payload that "
+    "appears twice hits the wrong copy and the assertion stays satisfied. The case "
+    "then reports on a mutation that changed nothing. Four instances in one session",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

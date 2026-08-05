@@ -77,6 +77,17 @@
       "1 unterminated"
     ]
   },
+  "checkrun-ambiguous": {
+    "_why": "`ambiguous-markup` is the only ALWAYS-blocking row and had no fixture, while being produced by the masker rewritten in four separate rounds. An UNCLOSED FENCE is the canonical trigger; an unclosed HTML wrapper deliberately is not -- with lookahead it is ignored rather than quarantining the file, which is right once nothing executes: masking less risks a reporting miss, never a run.",
+    "exit": 1,
+    "not": [
+      "~ no-section"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "! ambiguous-markup"
+    ]
+  },
   "checkrun-dead": {
     "_why": "A named check whose script is not on disk -- the analogue of dead wiring, and caught by RESOLUTION ALONE with no --run. A dead check reads as protection and enforces nothing.",
     "exit": 1,
@@ -90,29 +101,20 @@
       "check-citations.sh"
     ]
   },
-  "checkrun-discriminates": {
-    "_why": "The same handbook against a hook that actually reads the file it is given. Proves the VACUOUS verdict is about the check and not about the harness -- without this pair, a script that reported VACUOUS unconditionally would pass.",
-    "args": [
-      "--run",
-      "--prove"
-    ],
-    "exit": 0,
+  "checkrun-dead-also-in-prose": {
+    "_why": "THE MECHANICAL VERDICT MUST WIN. The prose/fence token pass ran first and claimed the path, so a script named BOTH in a sentence and in a declared Check: produced only the non-blocking heuristic row -- exit 0, `0 blocking finding(s)`, which is exactly the 'printed clean' outcome this whole change exists to end. No fixture reached it because every dead-check fixture had a ## Verification containing nothing but the Check: line: fixtures written by the same hand as the extractor. Both shapes here -- prose sentence AND an untagged fence, which the IC template invites a handbook to include.",
+    "exit": 1,
     "not": [
-      "! vacuous"
+      "heuristic"
     ],
     "script": "wf-checkrun",
     "want": [
-      "discriminates",
-      "exit 2 as declared",
-      "0 VACUOUS"
+      "! dead",
+      "1 blocking finding"
     ]
   },
   "checkrun-extensionless": {
     "_why": "The under-capture hole the SHARED resolver closes. `bash bin/verify` has no extension and no anchor, so the token pass correctly refuses to call it a file reference -- wf-census.resolve_hook_command unwraps the interpreter and answers it. Without the import this case is silently clean, which is the shape of every 'reported clean about something it never examined' defect in this repo.",
-    "args": [
-      "--run",
-      "--prove"
-    ],
     "exit": 1,
     "not": [],
     "script": "wf-checkrun",
@@ -122,20 +124,39 @@
       "not on disk"
     ]
   },
-  "checkrun-nothing-ran": {
-    "_why": "--run against a population that declares no `Check:` line. `0 VACUOUS` beside `0 ran` reads as 'no broken checks found' and means NOTHING WAS EXECUTED -- INV-BATCH's rule one level down: a cost of zero is evidence the batch did not run, never evidence it was cheap. Found by running the real project, where the summary looked clean.",
-    "args": [
-      "--run",
-      "--prove"
-    ],
+  "checkrun-glob": {
+    "_why": "`src/**/*.css` is this project's OWN canonical example. EXT_RX matched `.css`, so it resolved as a path and reported a blocking `dead` row -- every handbook copied from the shipped template failed. A glob is not a file. (The `want` clause was vacuous TWICE: `ran` matched 'qua-ran-tined', then `resolved` matched the always-printed summary '0 resolved'. It now keys on the ROW GLYPH, which appears only when a real row is emitted -- verified by deleting the Check: line and watching it fail.)",
     "exit": 0,
     "not": [
-      "! vacuous"
+      "! dead"
     ],
     "script": "wf-checkrun",
     "want": [
-      "NOTHING RAN",
-      "declare no `Check:` line"
+      ". declared-negative"
+    ]
+  },
+  "checkrun-indented-wrapper": {
+    "_why": "Branch ORDER alone cannot separate two cases the gate found in successive rounds: with HTML first, an indented <div> with no closer quarantined the file; with indent first, an INDENTED <details> whose body is DEDENTED went live and its illustration was read as a real declaration. Lookahead for the matching closer is what distinguishes them.",
+    "exit": 0,
+    "not": [
+      "INDENTED_WRAPPER_ESCAPED",
+      "! dead"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "~ undeclared"
+    ]
+  },
+  "checkrun-nested-decorated": {
+    "_why": "Two invisibility bugs at once: os.listdir missed .claude/agents/<dept>/, and a byte-exact heading match read `## Verification (mechanical)` as no-section so the check never ran. (The `not` matches the ROW glyph, not the bare word: `no-section` also appears in the summary counts, where a zero is the passing signal.)",
+    "exit": 1,
+    "not": [
+      "~ no-section"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "dead",
+      "absent.sh"
     ]
   },
   "checkrun-notpaths": {
@@ -151,12 +172,18 @@
       "text-tells.md"
     ]
   },
+  "checkrun-orphan-negative": {
+    "_why": "A Negative with no Check vanished from BOTH passes -- the falsify block returns early on no checks, and the resolver had already stripped the Negative line.",
+    "exit": 1,
+    "not": [],
+    "script": "wf-checkrun",
+    "want": [
+      "orphan-negative",
+      "nothing for it to falsify"
+    ]
+  },
   "checkrun-placeholder": {
     "_why": "content-writer's actual shape: `... <draft>`, an argument the handbook never binds. The hook EXISTS here, so `resolved` passes and the finding is solely that the command cannot be executed as written -- which is why no one ever ran it.",
-    "args": [
-      "--run",
-      "--prove"
-    ],
     "exit": 1,
     "not": [
       "! dead"
@@ -166,23 +193,6 @@
       "not-runnable",
       "<draft>",
       "never binds"
-    ]
-  },
-  "checkrun-vacuous": {
-    "_why": "The founding defect, mechanised. A hook that reads its payload on stdin and IGNORES its path argument exits 0 on the input declared as violating. Note the case also reports `ran exit 0` -- that row alone is what every instrument before this one called verified, and it is exactly what content-writer passed three times. Only --prove separates a check from a decoration.",
-    "args": [
-      "--run",
-      "--prove"
-    ],
-    "exit": 1,
-    "not": [
-      "+ discriminates"
-    ],
-    "script": "wf-checkrun",
-    "want": [
-      "VACUOUS",
-      "CANNOT FAIL",
-      "1 blocking finding"
     ]
   },
   "claudemd-absent": {

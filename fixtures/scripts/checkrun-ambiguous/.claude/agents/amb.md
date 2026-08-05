@@ -1,12 +1,15 @@
 ---
-name: legacy
+name: amb
 tools: Read, Bash
 disallowedTools: Agent
 ---
-
 <!-- ORG-RECORD START -->
 tier: 3
 <!-- ORG-RECORD END -->
 
+## Notes
+```text
+an unclosed fence
+
 ## Verification
-1. Run `test -s .claude/agents/legacy.md`. It must exit 0.
+- Check: `true` — expect exit 0

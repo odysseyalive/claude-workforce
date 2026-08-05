@@ -327,11 +327,209 @@ resolves only; falsification is `--agent <name> --run --prove`.
 (90/90), `bin/script-conformance` (55), `bin/idempotence` (5/5) and a mock audit against a real tree
 **all passed on a procedure that told a host to execute arbitrary handbook shell under a read-only
 command.** Every instrument here measures the scripts and the text; **none reads a procedure the way
-the model executing it will.** Unclosed.
+the model executing it will.**
 
-*Still open from this:* **no handbook anywhere declares a `Check:` line yet**, so `--run` and
-`--prove` are exercised only by fixtures — the resolve layer works on the real population today and
-the run layer waits on migration. Author-run, not cold-read.
+**Closed the same day — the cold-read round. Two readers, 32 findings, on a change that was green
+everywhere.** Asked to make a commit with nothing wrong in it, the honest move was to stop
+self-certifying: one reader executed `verify.md` as a procedure, one adversarially ran `wf-checkrun`
+against trees built to defeat it. **Seven findings were mine, seven were pre-existing, and all
+fourteen were fixed in the same change.**
+
+The four that matter most, each measured, none reachable by re-reading:
+
+| | |
+|---|---|
+| `--run` executed `Check:` lines inside **example fences** | a handbook *documenting the format* had its example run and a file created in the target tree |
+| `<DRAFT>` bypassed the placeholder guard | lowercase-only; `<`/`>` are shell **redirections**, so it wrote a file and blamed the employee for the syntax error |
+| **`--root ""` examined a tree nobody named** | `CLAUDE_PROJECT_DIR` is **unset** outside a hook, so every shipped block expands to `--root ""` and `abspath("")` is the CWD. `wf-conform` exited **0** reporting `0 governed · 0 failed`. Guarded in all five scripts |
+| the web-facing IC template was **unregisterable** | it said "no `tools:` field"; `SKILL.md` rule 3 refuses an IC without one. Identical text in `verification.md` — Core Principle **7c**, a ceiling added on one path and carried to none |
+
+*And three of my own fixes were caught mechanically rather than by me:* I nearly shipped a
+command-line invocation of **`wf-protect-directives`** — a stdin hook that always exits 0 — into the
+file that exists to catch exactly that; my grep then told me the bad edit had not landed **because the
+quoted path did not match my pattern**; and two assertions I wrote were **vacuous**, one because it
+tested a mention rather than an instruction, one because a comment carried the phrase it keyed on.
+`bin/prove` reported the vacuity, which is the whole reason it exists.
+
+*A fifteenth came from auditing the fixes themselves:* correcting `wf-checkrun`'s byte-exact heading
+left `wf-conform` strict, so **the two readers of one section disagreed about whether
+`## Verification (mechanical)` had a section at all.** And `wf-conform` was already contradicting
+itself — its presence check is `body.find`, a **substring** match that accepts the decorated heading,
+while its extraction was byte-exact, so **it reported the section present and examined none of it**,
+silently skipping every content check it owns. 9 checks before, 12 after. One grammar now, asserted
+identical in both scripts.
+
+**Round two — the fixes had defects of their own, and the two worst were mine.** A second pair of
+readers, aimed at what round one broke.
+
+**The empty-`--root` guard broke every shipped invocation.** `CLAUDE_PROJECT_DIR` is unset outside a
+hook, so every `--root "${CLAUDE_PROJECT_DIR}"` expanded to `--root ""` and the new guard refused it —
+**16 call sites across 9 files.** A fix at the instance, in a change about fixing classes.
+
+**And the fence fix was defeated five ways**, each executing a command: a nested fence, a
+four-backtick wrapper, an **unclosed** fence, ```` ```markdown ```` opening with ```` ```bash ````,
+and **an HTML-commented-out check.** A regex over delimiter PAIRS cannot see any of them; it is now
+one line scanner with fence state, applied once instead of at three points on three inputs. Two
+consequences of that same root: a **fenced example section won over the real one** (the illustration
+ran; the real `Check:` was never read), and an unclosed fence **declassified a governed handbook** —
+`! dead` printed with **exit 0**.
+
+**`handbook.md` — the PRIMARY authoring path — never got the `tools:` ceiling.** It still taught "No
+`tools:` field by default" and a `ToolSearch` load step, **so the canonical authoring procedure
+produced an IC `SKILL.md` rule 3 refuses to register.** Round one carried the ceiling to two files and
+not to the one that authors handbooks; the correction note I wrote cited Core Principle 7c by name
+while the instance survived one file away. Alongside it: **the `tools:` half of that BLOCKING rule had
+no enforcement anywhere**, 16 fixtures encoded the pre-ceiling shape, and the **shipped CEO template
+failed the shipped checker**.
+
+*Also fixed:* a glob (`src/**/*.css` — our own example) reported `dead`; `--agent` selected N
+handbooks and `--run` executed all of them; a `Negative:` failing because its **input was absent**
+counted as `discriminates`, which was the **default** for anyone following the contract.
+
+**730 assertions · 65 fixtures · 5/5 idempotent.** Records in
+`plan/handbook-verification-gap-2026-08-04.md` §§ The cold-read round, Round two.
+
+**The rule round two adds, and it is the sharpest one here:** *an assertion that greps for a literal
+proves the code contains a string, not that the behaviour holds.* `bin/check` asserted "declarations
+are read outside fences" by grepping for `decl = FENCE_RX.sub` — and all five escapes worked.
+**Only a fixture that runs the thing against a tree built to defeat it proves behaviour.**
+
+**Round three — the scanner still had three escapes, and two round-two fixes were false positives.**
+A third reader fuzzed 20,000 documents to prove offset preservation, then executed commands through
+a **closing fence carrying an info string** (CommonMark says closers carry none, so ` ```bash ` inside
+` ```markdown ` is content), through a `-->` landing on a fence-opener line (comment-blanking ran as
+a **separate pass before** the fence scanner, so each layer ate the other's delimiters), and through
+a **4-space indented block** — never masked at all. Now **one left-to-right pass** tracking both
+states, with an `ambiguous-markup` verdict that **refuses to execute declarations from markup it
+cannot resolve** rather than guessing.
+
+The two false positives mattered as much: **`<script>` in a quoted grep pattern** read as an unbound
+placeholder (blocking, *and* it skipped the real check), and **`npm run build && test -s
+dist/bundle.js`** reported the build artifact as a dead check — *the most ordinary shape a real check
+takes.* Prose- and fence-derived `dead` rows are now heuristic and non-blocking, per `discovery.md`'s
+tier rule, which this script had been ignoring. And the CEO template round two added carried
+`<run-id>`, making every generated CEO handbook a blocking finding.
+
+**`bin/prove` reported VACUOUS twice more, and was right both times.** An assertion keyed on
+`'"ambiguous-markup"'` also matched the glyph map, so deleting the `rep.add` left it satisfied.
+**A prove payload and its assertion must name a literal that appears ONCE** — three assertions in
+this work failed that, and `bin/prove` is the only thing that has ever caught it.
+
+**737 assertions · 103 prove cases · 65 fixtures · 5/5 idempotent. Three rounds, three cold readers,
+~70 findings, 40 defects fixed.**
+
+**Round four ended the approach rather than extending it.** A fourth reader's diagnosis: *"all five
+are one defect — `mask_regions` is a hand-rolled block-structure parser."* Three rounds had each
+patched that scanner and each found new escapes (list-item indent, fence opacity, inline code spans,
+delimiter order, tabs). A fourth patch would have been the fourth instance of one mistake.
+
+**So a declaration is now a TOP-LEVEL list item — column 0, `-` or `1.`.** An indented illustration,
+a tab-indented one, and a prose paragraph beginning `Check:` are excluded **by grammar**, not by
+parsing correctly. **Safety stopped depending on the scanner:** its remaining errors can HIDE a
+declaration (reported `undeclared` — the safe direction) but can no longer RUN one. Four genuine bugs
+went with it, including a comment closer that counted regardless of position — so a command a human
+had **commented out** executed.
+
+**The mistake I made four times, now linted.** `bin/prove` reported `VACUOUS` in three separate
+rounds and was right every time: a `del` payload appearing twice deletes the wrong copy, so the case
+reports on a mutation that changed nothing. `bin/check` now **parses `bin/prove`'s own CASES table**
+and fails any payload that is not unique in its target. Proven by duplicating one.
+
+**743 assertions · 67 fixtures · 5/5 idempotent. Four rounds, four cold readers, ~84 findings,
+52 defects fixed.**
+
+*Two things a future session should not have to rediscover.* The declared path — `Check:`,
+`Negative:`, `--run`, `--prove` — is **unexercised in production**: no handbook on any real tree
+declares one yet, and **every defect in rounds two, three and four lived on that path.** And
+`mask_regions` remains a hand-rolled parser that will still be wrong about some markdown; closing
+that properly means a real CommonMark parser (no stdlib one exists) or moving declarations out of
+prose into a structured sidecar. Neither is in this change.
+
+**Round five was a RELEASE GATE, and it said NOT SAFE TO COMMIT.** It was right. Round four's claim —
+*"safety no longer depends on parsing markdown correctly"* — had a hole: **the grammar is applied to
+the masker's OUTPUT**, so a masking bug still promotes an illustration to column 0. CommonMark allows
+spaces in an **opening** info string and none in a closer; the scanner required one token for both, so
+` ```markdown title="x" ` was not an opener and `--run` **executed a line written "illustration only —
+do not run."** One such fence trips `ambiguous` and blocks; **two close the parity and execute
+silently** — so consistent mkdocs-flavoured fences are the unsafe case, not sloppy ones. **`bin/check`
+was asserting the buggy regex**, so the fix had to rewrite the assertion too. Opener and closer now
+have different grammars, and the tension resolves toward masking: a permissive opener can only HIDE a
+declaration, never run one.
+
+Three more executions in the same category — a `## Verification examples` heading capturing the real
+section (prefix match + `re.search` took the first), a `- Check:` inside `<details>` (HTML blocks are
+literal content and nothing masked them), and `--quiet --prove` swallowing the `NOTHING RAN` verdict.
+Plus `verify.md` calling three rows blocking that the code emits as sentences — `!` on screen beside
+`0 blocking finding(s)`.
+
+**743 assertions · 103/103 proven · 70 fixtures · 5/5 idempotent. Five rounds, five cold readers,
+~93 findings, 61 defects fixed.**
+
+**The standing lesson:** an instrument written by the author of the thing it measures reports the
+author's understanding back to them. `CLAUDE.md` § Cold-reader agents is not a nicety — on this
+change it was the difference between **0 findings and 93**, across five rounds in which every
+instrument in the repo was green at the start of each one.
+
+**And the lesson round five adds:** round four's structural fix was right and its *claim* was too
+strong. **A claim that a class of defect is closed is itself a claim to be tested**, and nothing in
+this repo tests it — only a reader trying to break it did.
+
+**Rounds six and seven ended with the executing path WITHDRAWN, and that is the finding.** Round six
+produced the worst reproduction of the feature — a handbook stating it had **no automated check**,
+its contract shown inside a `<details>` marked *"illustration only — DO NOT RUN"*, **executed
+`rm -rf`** and was reported RUNS *and* DISCRIMINATES at exit 0. Round seven reproduced it verbatim
+with the trigger moved from a blank line to a `` `</details>` `` inside a code span, plus same-tag
+nesting and a `###` subsection.
+
+Three readers independently reached the same diagnosis: **deciding whether a line is an instruction or
+an illustration is markdown block parsing, and a hand-rolled scanner keeps losing to it.** There is no
+CommonMark parser in the stdlib.
+
+So `--run` and `--prove` are **removed**, on this measurement taken before deciding:
+
+```
+handbooks declaring a Check: on the real tree ... 0
+shipped invocations of --run/--prove ............ 1
+live blocking findings caused by my own masking . 1   (a false positive on a real handbook)
+```
+
+**The executing path was used nowhere, and my attempts to make it safe were breaking a real tree.**
+What survives is the half with a track record — resolution, which found real dead checks — plus
+declaration reporting. **The doctrine is unchanged**; the third state is now established by a person
+at amendment time, recorded in the `AMD`, and `amend.md` § Step 6 says so with the reason. The named
+next step is a **structured sidecar**: commands in a file whose parsing is unambiguous.
+
+18 fixtures and 11 assertions retired with it; two replaced them — *the executing path is absent* and
+*the reason is stated*, because a capability withheld without its reason reads as an oversight and the
+next author re-adds it.
+
+**736 assertions · 95/95 proven · 55 fixtures · 5/5 idempotent. Seven rounds, seven cold readers,
+~111 findings.**
+
+*The lesson worth carrying:* **"I can make this safe" is a claim, and six consecutive cold reads
+falsified it while every instrument in this repo stayed green.** The instruments never disagreed with
+me once.
+
+**Rounds eight to twelve — the debris of the removal, and the first SAFE verdict.** Withdrawing a
+capability leaves more wreckage than adding one, and it is all one kind: *text still describing the
+world before the removal.* Two printed flags in the tool's own output (one telling the operator
+`--run` would execute), a comment describing deleted code, six doc sites, four statements about an
+unreachable branch, a fixture whose note claimed a fix it never received.
+
+Three findings in that stretch are worth a future session's attention:
+
+| | |
+|---|---|
+| **naming your own gate in a sentence turned the gate off** | the heuristic prose pass claimed the path first, so the mechanical `dead` verdict was never printed — exit 0, `0 blocking`. The module docstring's own opening complaint, reinstated |
+| **no fixture reached it** | all nine dead-check fixtures had a `## Verification` containing *only* the `Check:` line — the one shape where the collision cannot occur. **A fixture written by the author of the extractor inherits the author's blind spot** |
+| **over-masking is worse than under-masking** | a wrapper swallowing a whole section gave `no-section … wf-conform owns this verdict` at exit 0 — and wf-conform *disagreed*. A false CLEAN beats a false finding only if you never read the report |
+
+**736 assertions · 95/95 proven · 58 fixtures · 5/5 idempotent. Twelve rounds, twelve cold readers,
+~170 findings, one SAFE verdict.**
+
+**The measurement that justifies the standing cold-reader request:** every instrument here was green
+at the start of every one of those twelve rounds, and they never disagreed with me once — on any of
+the ~170 findings.
 
 **Closed the same day — the canary lifecycle, and `bin/prove` ran for the first time.** The block was
 `fixtures: every live fixture declares the fact it measures`, failing before any of the above began.

@@ -81,7 +81,7 @@ owner. The hooks this step must relocate are exactly those whose `skill` equals 
 
 ```bash
 WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}" --json "${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/census.json"
+"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --json "${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/census.json"
 ```
 
 **Do not use the `in_skill_dir` flag for this.** It answers *"inside some skill, probably"* — it falls

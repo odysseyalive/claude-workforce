@@ -103,9 +103,9 @@ does the real classification once handbooks are in final position. `verify` repo
 
 ```bash
 WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}"                        # report
-"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}" --execute              # write
-"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR}" --ensure-region --execute
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}"                        # report
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute              # write
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --ensure-region --execute
 ```
 
 Exit `0` classified · `2` no readable CLAUDE.md. **Under `--review`, report and write nothing.**

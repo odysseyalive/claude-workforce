@@ -1,5 +1,6 @@
 ---
 name: lead
+tools: Read, Write, Bash
 disallowedTools: Agent
 ---
 <!-- ORG-RECORD START -->

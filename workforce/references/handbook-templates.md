@@ -6,7 +6,9 @@
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
 
 **Frontmatter facts that are load-bearing** (`platform.md`):
-- **No `tools:` field.** Omitting it gives every employee the full default grant —
+- **No `tools:` field — ON A DELEGATING TIER.** CEO and Lead carry none; **every IC carries one**
+  (next bullet but one, and `SKILL.md` rule 3, which refuses to register an IC without it).
+  Omitting it gives that employee the full default grant —
   `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` loaded, plus ~150 deferred behind
   `ToolSearch` including all configured MCP servers (fact 4). Listing even one tool costs you every
   tool you did not list (fact 4b). The only subtraction mechanism is `disallowedTools:`.
@@ -141,6 +143,8 @@ restated here.*
 everywhere else — and the marker's own "safe to replace" meant the generator always won.)*
 
 ## Verification
+- Check: `test -s .claude/workforce/org-chart.md` — expect exit 0
+- Negative: `test -s /dev/null` — expect nonzero
 Before returning: (1) every dispatched work order returned a verdict and an artifact path that
 exists on disk; (2) every returned verdict is PASS, or its FAIL is reported unmodified; (3) re-read
 the Strategic Objective and state in one sentence how this result conforms.
@@ -259,9 +263,15 @@ Never proceed on a directive you could not read.
 3. <…>
 
 ## Verification
-- Check: `<exact command>` — expect exit 0
+- Check: `<exact command>` — expect <exit 0 | the exact expected result>
 - Negative: `<the same command against an input that MUST be rejected>` — expect nonzero
-1. Run the Check above. It must <exact expected result>.
+*The negative's input file belongs outside this employee's scope — `references/verification.md`
+§ Where the negative input lives — and it must fail because the RULE was violated, not because the
+command got a bad argument (§ The negative must fail for the RIGHT REASON).*
+
+1. Run the Check above. **Its expected result is stated on the `Check:` line and nowhere else** — two
+   statements of one value drift, and a reader honors the first while the employee honors the
+   second.
 2. <Second check, if the first cannot cover the exit criteria.>
 3. **A work order that changed nothing passes on saying so.** Where a check tests for evidence of
    change — a non-empty `git diff --stat`, a new artifact, a modified file — it is satisfied EITHER by
@@ -275,11 +285,22 @@ Never proceed on a directive you could not read.
 5. On failure, fix and re-run — at most 2 attempts. On a third failure STOP and report
    `FAIL: <exact command output>`. NEVER report PASS on a check you did not run.
 
-**The `Check:` / `Negative:` pair is the runnable form, and it is what `wf-checkrun` executes.** The
+**Both lines sit at column 0 with a list marker** (`-`, `*`, `+`, `1.` or `1)`), never indented and never inside a fence — that is
+how the tooling tells a declaration from an illustration (`references/verification.md` § The runnable
+form is declared).
+
+**Both commands must be executable AS WRITTEN.** The CEO pair above deliberately names no `<run-id>`:
+a placeholder the handbook cannot bind makes the check `not-runnable`, which is blocking, so every
+generated CEO handbook would be a finding. And the negative is `test -s /dev/null` — a file that
+EXISTS and is empty — not a path that is absent: *"non-zero because the file is missing"* is the ❌
+  case (`references/verification.md` § The negative must fail for the RIGHT REASON).
+
+**The `Check:` / `Negative:` pair is the runnable form, and it is what `wf-checkrun` reads and reports on.** The
 numbered rows below state the employee's protocol; these two state the *commands*, in the one shape a
 script can find without guessing which backticked span in a section is a command and which is a
-filename. `--run` executes the Check; `--prove` executes the Negative and requires it to exit
-**non-zero**.
+filename. **No shipped tool executes them** — `wf-checkrun` resolves and reports only. Running the
+Check and the Negative is a human act at amendment time (`procedures/amend.md` § Step 6), and the
+Negative must exit **non-zero**.
 
 **`Negative:` is not optional decoration, and it is the row that would have caught the worst
 verification defect this project has recorded.** `content-writer` shipped three checks of the form
@@ -339,16 +360,32 @@ full path, so the gap was masked by the dispatch rather than closed by the text.
 
 ## Web-facing IC
 
-Identical frontmatter — no `tools:` field. The default grant already delivers every configured MCP
-server's tools in the deferred namespace, loadable via `ToolSearch` (fact 4). The handbook's
-`## Procedure` includes loading the server's tools as its first step:
+**It is an IC, so it carries both ceiling lines** — `SKILL.md` rule 3 refuses to register an IC
+without them — and because `tools:` is a hard ceiling for MCP (fact 13), the server it works through
+is named **at server level, inside that allowlist**:
 
-```markdown
-1. Load your browser tools: call `ToolSearch` for `mcp__playwright-mcp__*`.
+```yaml
+tools: Read, Write, Bash, mcp__playwright-mcp
+disallowedTools: Agent
 ```
+
+**No `ToolSearch`, and no load step.** A server named at server level in an explicit `tools:` arrives
+**loaded** — fact 13 measured that adding `ToolSearch` alongside it *defers* tools that would
+otherwise be present, buying a round trip for nothing. So the `## Procedure` opens on the work, not on
+a load.
+
+**Check the server is configured before granting it** (`verification.md` § When the server is absent):
+an absent server is dropped silently and the employee cannot tell (fact 13b).
 
 Its `## Verification` should be a scaffolded deterministic suite rather than a judgment
 (`verification.md`). MCP tools reach subagents; `Grep`/`Glob`/`WebFetch` do not.
+
+*Rewritten 2026-08-04 after a cold read. This section read "Identical frontmatter — no `tools:` field"
+and opened its Procedure with a `ToolSearch` call — **so the shipped template produced a handbook the
+shipped gate refuses to register**, and the one workaround it named was the one fact 13 measures as
+counter-productive. The `tools:` ceiling landed on 2026-08-03 and this section was never brought
+along; `SKILL.md` Core Principle 7c is exactly this failure — a rule added on one path and not the
+others.*
 
 ---
 

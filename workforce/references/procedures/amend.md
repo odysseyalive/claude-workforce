@@ -96,6 +96,31 @@ the result in the `AMD` § Re-Release Gate and in the employee's `EMP` file.
 **An amended-but-unprobed handbook may not be delegated to.** `org index` marks it, and `/org` will
 not dispatch to it.
 
+**If the amendment touched `## Verification`, write its negative input and RUN BOTH COMMANDS
+YOURSELF.** A `Negative:` naming a file that does not exist exits non-zero because the file is absent,
+which `references/verification.md` § The negative must fail for the RIGHT REASON lists as a ❌. Create
+it at `.claude/workforce/negatives/<employee>.<ext>`, outside the employee's scope paths.
+
+Then run the declared `Check:` and the declared `Negative:` **by hand**, and record both exit codes in
+the `AMD`. The Check must exit 0; **the Negative must exit non-zero.** A negative that exits 0 means
+the check cannot fail, so the amendment is not verified no matter what the Check reported
+(`verification.md` § Three states).
+
+**`wf-checkrun` does NOT run them, and that is deliberate.** It resolves and reports; its executing
+flags were removed on 2026-08-04 after six cold reads each found a fresh way to make it execute a
+command a human had written as an illustration — the last ran `rm -rf` out of a `<details>` block
+marked *"illustration only — DO NOT RUN"* and reported the handbook as RUNS *and* DISCRIMINATES. The
+falsification is still required; **it is a human's act until commands live somewhere unambiguously
+parseable** (see that script's module docstring).
+
+```bash
+WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --agent <name>
+```
+
+That reports whether the check RESOLVES and whether a `Negative:` is declared and paired. It does not
+tell you the check works — only running it does.
+
 ## Step 7 — Record
 
 Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`

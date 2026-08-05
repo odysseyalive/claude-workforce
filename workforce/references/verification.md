@@ -51,8 +51,17 @@ tier table above ranks what a check *is*; this ranks what is actually known abou
 | State | Means | Established by |
 |---|---|---|
 | **RESOLVED** | the thing it names is on disk | `wf-checkrun` — mechanical, every handbook |
-| **RUNS** | it executes and exits 0 on the real input | `wf-checkrun --run` |
-| **DISCRIMINATES** | it also exits **non-zero** on an input declared as violating | `wf-checkrun --prove` |
+| **RUNS** | it executes and exits 0 on the real input | **run by hand** — no shipped tool executes it |
+| **DISCRIMINATES** | it also exits **non-zero** on an input declared as violating | **run by hand at amendment time** (`procedures/amend.md` § Step 6) and recorded in the `AMD` |
+
+**The third state is established by a person, not by a script, and that is a deliberate retreat.**
+`wf-checkrun` had `--run` and `--prove`; they were removed on 2026-08-04 after six cold reads each
+found a fresh way to make the tool execute a command a human had written as an illustration — an
+indented example, a fenced one, a nested one, an HTML-commented one, a ` ```markdown title="x" `
+block, a `<details>`. The last ran `rm -rf` and reported the handbook RUNS *and* DISCRIMINATES.
+**Deciding whether a line is an instruction or an illustration is markdown block parsing**, and a
+hand-rolled scanner kept losing to it. The rule below is unchanged; only its mechanical enforcement
+is withheld, and the named next step is commands in a structured sidecar rather than in prose.
 
 **RUNS is what everyone already calls verified, and it is the state the worst verification defect in
 this project's record passed three times.** `content-writer` shipped three commands of the form
@@ -77,14 +86,51 @@ execute garbage. So the commands are declared, the same way `## Probe` declares 
 the shape of a correct result:
 
 ```markdown
-- Check: `npm test` — expect exit 0
-- Negative: `npm test -- --grep zzz-no-such-test` — expect nonzero
+- Check: `npx stylelint "src/**/*.css"` — expect exit 0
+- Negative: `npx stylelint .claude/workforce/negatives/<employee>.css` — expect nonzero
 ```
+
+**Both lines are TOP-LEVEL list items — column 0, with a list marker** (`-`, `*`, `+`, `1.` or `1)`). Not indented, not inside a fence,
+not a prose sentence beginning "Check:". That is a contract, and it is what lets a script tell an
+*instruction* from an *illustration* without having to parse markdown correctly — which four rounds
+of cold reads showed a hand-rolled scanner will not do. An indented or fenced `Check:` is read as an
+example and is never executed; if a real declaration is written that way it is reported `undeclared`,
+which is the safe direction.
 
 **Writing a `Negative:` is a design act, not paperwork.** It asks *what input must this reject?* — and
 a check whose author cannot name one has usually not written a check. Where the negative genuinely
 cannot be constructed, say so in the section and take the loss visibly, rather than leaving a blank
 that reads as proof.
+
+### The negative must fail for the RIGHT REASON
+
+**A non-zero exit is not a discrimination.** The command must fail *because the rule it enforces was
+violated* — not because it was handed a bad argument, an empty match set, or a missing file.
+
+| | |
+|---|---|
+| ✅ | `npx stylelint <a file containing a real violation>` — the linter applied its rules and rejected |
+| ❌ | `npm test -- --grep zzz-no-such-test` — non-zero because **nothing matched the filter.** The runner errored; the suite judged nothing. Under some runners it exits **0** and the row is `VACUOUS` outright |
+| ❌ | `<check> /nonexistent/path` — non-zero because the file is absent |
+
+*This table is here because the ❌ row was this file's own worked example until 2026-08-04, when a
+cold reader pointed out that it is the `content-writer` shape — a non-zero for a reason unrelated to
+the quality being checked — printed as the canonical pattern in the § whose entire purpose is
+rejecting that shape. Every author copying it would have written a decorative negative.*
+
+### Where the negative input lives
+
+`.claude/workforce/negatives/<employee>.<ext>`, written by whoever authors or amends the handbook
+(`procedures/handbook.md`, `procedures/amend.md` § Step 6).
+
+**It lives outside the check's own scope on purpose.** A deliberately-violating fixture dropped inside
+`src/` is picked up by the positive `Check:` and breaks it, so the author then narrows a glob or adds
+an ignore rule — and the negative has damaged the thing it was meant to prove. The employee's
+guardrails also forbid editing outside its scope paths, so the fixture cannot be the employee's to
+create.
+
+**Where a violating input cannot exist as a file** — the check reads stdin, or takes no input — the
+`Negative:` names the whole invocation that produces the violation, exactly as the positive does.
 
 **A handbook with no `Check:` line is UNDECLARED — reported, never failed.** Every handbook authored
 before this contract is in that state, and failing them all at once reproduces the run that taught
@@ -177,22 +223,31 @@ own browser in its own process, so a suite run of any size never touches these g
 suite over a fan-out of fetches** — that is the deterministic path anyway, and it is also the one with
 no budget.
 
-**Reaching it.** A web-facing employee uses the default grant (no `tools:` field), which delivers
-every configured MCP server's tools in the deferred namespace, loadable via `ToolSearch` (fact 4).
-The handbook's `## Procedure` loads the server as its first step:
+**Reaching it.** How depends on the TIER, and for an IC there is only one legal shape.
 
-```markdown
-1. Load your browser tools: call `ToolSearch` for `mcp__playwright-mcp__*`.
+| Tier | Grant | Why |
+|---|---|---|
+| CEO / Lead | **no `tools:` field** | absence inherits every configured server (fact 14), deferred behind `ToolSearch` (fact 4) |
+| **IC** | **`tools:` naming the server, plus `disallowedTools: Agent`** | `SKILL.md` rule 3 refuses to register an IC without both lines, and an explicit `tools:` is a hard ceiling for MCP (fact 13) — so the server must be named inside it |
+
+```yaml
+tools: Read, Write, Bash, mcp__playwright-mcp
+disallowedTools: Agent
 ```
 
 Server-level patterns (`mcp__<server>`, `mcp__<server>__*`) resolve to the server's whole tool set —
 **measured**, `platform.md` fact 13. That is the forward-mobility rule: the employee gets the server
 without enumerating tools that will be renamed between releases.
 
-**Only use an explicit `tools:` grant for MCP when the handbook must be restricted below the
-default.** When you do, never pair an MCP grant with `ToolSearch` — it *defers* tools that were
-loaded without it, buying a load step for nothing (fact 13). And an explicit `tools:` is a ceiling:
-a fixture holding `ToolSearch` could not load a tool from a server its grant never named.
+**Never pair an MCP grant with `ToolSearch`** — fact 13 measured that it *defers* tools which arrive
+**loaded** without it, buying a round trip for nothing. So an IC granted its server at server level
+needs **no load step**, and its `## Procedure` opens on the work.
+
+*Corrected 2026-08-04 by a cold read. This § said a web-facing employee "uses the default grant (no
+`tools:` field)" and opened its Procedure with a `ToolSearch` load — **describing a handbook the
+tier-ceiling gate refuses to register**, and prescribing the one pairing fact 13 measures as
+counter-productive. `handbook-templates.md` § Web-facing IC carried the identical text; both are the
+2026-08-03 `tools:` ceiling not being carried onto every path that describes a grant.*
 
 ### When the server is absent
 

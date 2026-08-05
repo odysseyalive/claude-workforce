@@ -107,7 +107,7 @@ hosts. A hardcoded project path does not degrade there; every scripted step of t
 WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 ```
 
-Then invoke through it — `"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR}"`.
+Then invoke through it — `"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}"`.
 
 **Personal first, then project, because that is the order the harness itself resolves skills** (the
 table above: enterprise > personal > project). A resolver that checked project first could hand back a

@@ -57,7 +57,7 @@ Three readings, and only the first is a finding:
 
 ```bash
 WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-"$WF/bin/wf-context" --root "${CLAUDE_PROJECT_DIR}"
+"$WF/bin/wf-context" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
 ```
 
 The two numbers above are aggregates: bytes paid every turn, and total handbook bytes. Neither answers

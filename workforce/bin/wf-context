@@ -202,6 +202,20 @@ def main():
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so a
+    # is-it-a-directory guard passes and the tool examines a tree nobody named.
+    # Measured: `wf-conform --root ""` in an empty dir exited 0 reporting
+    # "0 governed · 0 failed" — a validator reporting health it never measured, which
+    # is the exact contract procedures/verify.md states five lines under the block
+    # that produces it.
+    if not (args.root or "").strip():
+        print("wf-context: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
+
     root = os.path.abspath(args.root)
     if not os.path.isdir(root):
         print(f"wf-context: not a directory: {root}", file=sys.stderr)

@@ -1,63 +1,59 @@
 #!/usr/bin/env python3
-"""wf-checkrun — resolve, run, and falsify the check a handbook names.
+"""wf-checkrun — resolve the check a handbook names, and report what is declared.
 
 `## Verification` is the highest-leverage section of any handbook
-(`references/verification.md`) and until now the ONLY thing any instrument asserted
-about it was that it is not empty (`wf-conform`). So a handbook could name a check
-that did not exist, or one that could not fail, and every count printed clean.
+(`references/verification.md`) and until 2026-08-04 the ONLY thing any instrument
+asserted about it was that it is not empty (`wf-conform`). So a handbook could name
+a check that did not exist, or one that could not fail, and every count printed
+clean.
 
-Measured, and the reason this exists: `content-writer` on a real project shipped
-three `## Verification` commands of the form `bash <hook> <draft>` — "It must exit 0"
-— against hooks that read their JSON payload on **stdin** and ignore any path
-argument. All three exited 0 unconditionally, INCLUDING on a file of pure em-dashes.
-The employee whose entire job was prose quality had no working quality gate, and
-every PASS it had ever returned rested on three checks that could not fail. A cold
-reader found it; nothing mechanical could.
+WHAT THIS DOES
 
-THREE STATES, AND ONLY THE THIRD IS A CHECK:
+  RESOLVED / DEAD   the file a check names is, or is not, on disk. Mechanical.
+  DECLARED          a `Check:` / `Negative:` pair is present, paired, backticked,
+                    and free of unbound placeholders. Reported, never run.
 
-    RESOLVED      the thing it names is on disk. Necessary, nowhere near sufficient.
-    RUNS          it executes and exits 0 on the real input. THIS IS WHAT EVERYONE
-                  ALREADY CALLS VERIFIED, and content-writer passed it three times.
-    DISCRIMINATES it also exits NON-ZERO on a declared violating input.
+WHAT THIS DELIBERATELY DOES NOT DO, AND WHY
 
-The third is the whole point, and it is this project's own discipline applied one
-level down: `bin/prove` proves a `bin/check` assertion by breaking it, and
-`procedures/verify.md` already requires that every invariant classed `mechanical`
-record a negative-test result — "a validator nobody ever saw reject anything —
-indistinguishable from `exit 0`." That rule existed for invariants and had simply
-never reached the handbooks. This is that class fix, not a new idea.
+**It does not execute anything.** `--run` and `--prove` existed and were removed on
+2026-08-04, after SIX rounds of cold reads each found a fresh way to make the tool
+execute a command a human had written as an illustration. The last one ran `rm -rf`
+out of a `<details>` block marked "illustration only — DO NOT RUN" and reported the
+handbook as RUNS *and* DISCRIMINATES — the top state in `verification.md` — at exit
+0. Every escape was a one-token variation on a shape already fixtured:
 
-WHAT IS BLOCKING AND WHAT IS NOT
+    an indented example            a tab-indented one
+    a fenced one, and a nested one a four-backtick wrapper
+    an unclosed fence              an HTML-commented-out check
+    ```markdown title="x"         a `<details>` with a blank line
+    `</details>` inside a codespan a `<div>` nested in a `<div>`
+    a `### ` subsection            a `---` delimited block
 
-Resolution is MECHANICAL and applies to every governed handbook, whatever shape its
-section is written in: a path-like token that is not on disk is a DEAD CHECK, the
-exact analogue of `discovery.md` § Dead wiring, and it reads as protection while
-enforcing nothing.
+The diagnosis three separate readers reached independently: **deciding whether a
+line is an instruction or an illustration is markdown block parsing, and a
+hand-rolled scanner will keep losing to it.** There is no CommonMark parser in the
+stdlib, and vendoring one is not in this change.
 
-Running and falsifying need to know WHICH span is a command, and that is not
-decidable from prose. Inline backticks in a real `## Verification` hold exit codes,
-filenames, and section names as often as commands, so an extractor that ran them
-would execute garbage — over-capture here is not a bad report, it is a bad
-side effect. So the runnable form is DECLARED, exactly as `## Probe` declares a
-concrete task and the shape of a correct result:
+So the executing half is not shipped. **The doctrine it exists for is unchanged** —
+`verification.md` § Three states still holds that a check never observed failing is
+indistinguishable from one that cannot fail, `wf-conform` still reports a missing
+`Negative:`, and this script still reports one declared but unpaired. What is
+missing is the mechanical proof, and it is missing ON PURPOSE rather than by
+oversight.
 
-    - Check: `npm test` — expect exit 0
-    - Negative: `npm test -- --grep zzz-no-such-test` — expect nonzero
+**The named next step is a structured sidecar** — commands in a file whose parsing
+is unambiguous, referenced by the handbook rather than embedded in its prose. That
+removes the extraction problem entirely instead of patching it a seventh time.
 
-A handbook with no `Check:` line is UNDECLARED: reported, with the fix named, and it
-does NOT set the exit code. That is the GOVERNED-vs-ADOPTED precedent in `wf-conform`
-— holding a file to a contract it was never under produced 9 reported failures on a
-real org, every one of them false, and "a check that always fails stops being read."
+UNDECIDABLE IS NEVER REPORTED AS DEAD: a bare name found on PATH, an inline `sh -c`
+pipeline, a command carrying an env var this process cannot expand. A false dead row
+invites someone to delete a working check, which is worse than silence.
 
-UNDECIDABLE IS NEVER REPORTED AS DEAD. Inherited verbatim from `wf-census`, whose
-resolver this imports rather than restates: a bare name found on PATH, an inline
-`sh -c` pipeline, a command carrying an env var this process cannot expand. A false
-dead row invites someone to delete a working check, which is worse than silence.
+A `dead` row from PROSE or a fenced block is HEURISTIC and does not block; the
+MECHANICAL verdict is the census resolver's, on a DECLARED command's own script.
 
 Usage
-    wf-checkrun [--root DIR] [--agent NAME] [--run] [--prove]
-                [--timeout SEC] [--json PATH] [--quiet]
+    wf-checkrun [--root DIR] [--agent NAME] [--json PATH] [--quiet]
 
 Exit
     0  clean          1  at least one finding, each named
@@ -70,7 +66,6 @@ import importlib.util
 import json
 import os
 import re
-import subprocess
 import sys
 
 # `## Verification` is the section; the ORG-RECORD marker is what puts a handbook
@@ -79,21 +74,49 @@ import sys
 # said "No ORG-RECORD" classified as governed.
 ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
 
-FENCE_RX = re.compile(r"^[ \t]*```[a-zA-Z]*[ \t]*\n(.*?)^[ \t]*```", re.S | re.M)
+# Any info string (```bash title="x"), and ~~~ as well as backticks. The first
+# form failed the opener, so the CLOSING fence became the next opener and every
+# block after it was inverted — swallowing real commands and manufacturing rows
+# out of prose. Measured by a cold read against two handbooks differing by one
+# info string: 2 dead checks found in one, 0 in the other.
+FENCE_RX = re.compile(r"^[ \t]*(?:```|~~~)([^\n]*)\n(.*?)^[ \t]*(?:```|~~~)", re.S | re.M)
+# Fences that ILLUSTRATE rather than instruct. A handbook documenting the
+# `Check:` format — which verification.md actively invites — otherwise yields a
+# blocking "dead check" row for a path that was only ever an example.
+ILLUSTRATION = ("markdown", "md", "text", "txt", "yaml", "yml", "json", "toml")
 BACKTICK_RX = re.compile(r"`([^`\n]+)`")
 
 # The declared runnable form. Tolerant of list markers and numbering, strict about
 # the keyword, because the keyword is the thing that makes it decidable.
-CHECK_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Check:[ \t]*`([^`\n]+)`", re.M)
-NEGATIVE_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Negative:[ \t]*`([^`\n]+)`", re.M)
+CHECK_RX = re.compile(r"^(?:[-*+]|\d+[.)])[ \t]*\**Check:\**[ \t]*`([^`\n]+)`", re.M)
+NEGATIVE_RX = re.compile(r"^(?:[-*+]|\d+[.)])[ \t]*\**Negative:\**[ \t]*`([^`\n]+)`", re.M)
 # The whole `Negative:` line, for removal before path resolution — see check_handbook.
-NEGATIVE_LINE_RX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)?[ \t]*Negative:.*$", re.M)
+# Same marker grammar as CHECK_RX/NEGATIVE_RX. `\d+\.` here against `\d+[.)]`
+# there meant a `1)` declaration was EXECUTED but never stripped before token
+# resolution, restoring two false-positive classes the code documents as fixed.
+NEGATIVE_LINE_RX = re.compile(r"^(?:[-*+]|\d+[.)])[ \t]*\**Negative:.*$", re.M)
+CHECK_LINE_RX = re.compile(r"^(?:[-*+]|\d+[.)])[ \t]*\**Check:.*$", re.M)
 
 # An unbound placeholder is why a check cannot be run at all, and it is mechanical.
 # content-writer's three commands were `check no-em-dashes <draft>` — the argument
 # the handbook never binds. Reporting THAT is more useful than a resolution verdict,
 # because it names why no one could have run the check as written.
-PLACEHOLDER_RX = re.compile(r"<([a-z][a-z0-9 _./-]*)>")
+# CASE-INSENSITIVE. `<DRAFT>` and `<Draft>` bypassed the lowercase-only form and
+# reached `shell=True`, where `<` and `>` are REDIRECTIONS — measured writing a
+# file in the target tree and reporting the resulting syntax error as a blocking
+# finding against the employee. The guard designed to stop exactly this worked
+# only for the casing the founding defect happened to use.
+# A SMALL ALLOWLIST OF ILLUSTRATION WRAPPERS, closed by its own tag. Nothing here
+# carries safety weight any more — nothing is executed — so this exists only to stop
+# a handbook that SHOWS the contract inside a <details> from being reported as
+# declaring a broken check. A wider "any tag at line start" rule was tried and
+# produced a live false positive on a real handbook whose prose contained `<what>`.
+HTML_WRAP_RX = re.compile(r"<(details|summary|pre|div)\b", re.I)
+
+COMMENT_OPEN = "<" + "!--"     # lexer tokens, not marker patterns: a comment may
+COMMENT_CLOSE = "--" + ">"     # open or close mid-line, so these are not anchored
+
+PLACEHOLDER_RX = re.compile(r"<([A-Za-z][A-Za-z0-9 _./-]*)>")
 
 # Command-shaped: a leading word followed by at least one argument. Used ONLY on the
 # undeclared path, where it is heuristic evidence and never a verdict.
@@ -104,7 +127,7 @@ CMDISH_RX = re.compile(r"^[a-z][\w.-]*(?:\s+\S+)+$", re.I)
 # But "contains a slash" alone OVER-CAPTURES, and the first clean run against a real
 # tree showed all three ways it does:
 #
-#   `/text-eval`                      a SLASH COMMAND — a skill invocation, not a file
+#   `/text-eval`                      a SLASH COMMAND — one path part, rejected below
 #   `agents/interface-claim-auditor/` an unanchored prose fragment naming another
 #                                     skill's subdirectory, whose base this cannot know
 #   `.claude/`                        a bare prefix, quoted in a sentence about paths
@@ -115,17 +138,184 @@ CMDISH_RX = re.compile(r"^[a-z][\w.-]*(?:\s+\S+)+$", re.I)
 # references, and anything else is not a file reference at all rather than an
 # undecidable one — the UNDECIDABLE state is for things that ARE paths and cannot be
 # resolved (an unexpanded variable, an unbound placeholder), never for prose.
-PATHY_RX = re.compile(r"^[~$./A-Za-z0-9_-]*/[^\s'\"`]*$")
-SLASH_CMD_RX = re.compile(r"^/[a-z][a-z0-9-]*/?$")
+# `{`/`}` are in the class because `${CLAUDE_PROJECT_DIR}/x.sh` — the form this
+# project uses everywhere — did not match and was discarded before resolution.
+# A dead check written the canonical way was invisible.
+PATHY_RX = re.compile(r"^[~${}./A-Za-z0-9_-]*/[^\s'\"`]*$")
 EXT_RX = re.compile(r"\.[A-Za-z0-9]{1,6}$")
 ANCHORS = ("./", "../", "~", "$", ".claude/")
 
 SKIP_SCHEMES = ("http://", "https://", "mailto:", "git@")
 
 
+def _blank(text):
+    """Same length, same newlines, no content — so offsets and line numbers survive."""
+    return "".join("\n" if c == "\n" else " " for c in text)
+
+
+def mask_regions(text, illustration_only=False):
+    """Blank fenced blocks, HTML comments and indented code, preserving offsets.
+
+    ONE LEFT-TO-RIGHT PASS over the lines, tracking comment state and fence state
+    TOGETHER. Two separate layers — a comment regex run over the raw text, then a
+    fence scanner — can each eat the other's delimiters, in both directions, and a
+    cold read executed a command through each:
+
+        `--&gt;` landing on a fence-opener line blanked the opener; the fence body
+        became top-level and its `Check:` ran.
+        `&lt;!--` inside a fence paired with a later real `--&gt;`, blanking the CLOSING
+        fence, so a real section reported `no-section`.
+
+    Also handled here and nowhere before: a closing fence MAY NOT carry an info
+    string (CommonMark), so ```` ```bash ```` inside ```` ```markdown ```` is
+    CONTENT — treating it as a closer unmasked everything after it. And a 4-space
+    indented block is the other illustration mechanism; it was not masked at all.
+
+    Returns (masked, ambiguous). AMBIGUOUS means the markup could not be resolved
+    unambiguously — an unclosed fence or comment, or a line carrying both a
+    comment terminator and a fence marker. It is REPORTED, blocking, and the
+    document is still read: nothing executes any more, so withholding the read
+    bought no safety and cost a contradiction (two rows disagreeing about one file).
+    """
+    out, fence, in_comment, ambiguous, in_html = [], None, False, False, None
+    prev_blank = True
+    lines = text.splitlines(keepends=True)
+    for idx, line in enumerate(lines):
+        body = line.rstrip("\r\n")
+        stripped = body.lstrip()
+        # POSITIONS, NOT MEMBERSHIP. A closer only counts if it comes AFTER the
+        # opener it closes: a line whose `-->` precedes its `<!--` was read as
+        # self-contained, passed through unmasked, and the commented-out body below
+        # became live text — measured executing a command a human had disabled.
+        _o = body.find(COMMENT_OPEN)
+        _c_after = body.find(COMMENT_CLOSE, _o + len(COMMENT_OPEN)) if _o != -1 else -1
+        self_contained = _o != -1 and _c_after != -1
+        opens_c = _o != -1 and _c_after == -1
+        closes_c = COMMENT_CLOSE in body          # only consulted while in_comment
+        # OPENER AND CLOSER HAVE DIFFERENT GRAMMARS, and conflating them was the
+        # last execution escape. CommonMark: an OPENING info string may contain
+        # spaces (```markdown title="x"); a CLOSER may carry none. Requiring a
+        # single token for both meant ```markdown title="x" was not an opener, its
+        # body stayed at column 0, and the executing path ran a line written as
+        # "illustration only — do not run".
+        #
+        # The earlier strict form was chosen to stop `​```json is our format.` from
+        # opening a phantom fence. That tension is real and it is resolved toward
+        # MASKING: a permissive opener can only hide a declaration (reported
+        # `undeclared`, visible, safe) or leave a fence unclosed (`ambiguous-markup`,
+        # blocking). The strict form left EXECUTION open, which is the one outcome
+        # this script exists to prevent.
+        fence_open = re.match(r"(`{3,}|~{3,})[ \t]*(\S*)", stripped)
+        fence_close = re.match(r"(`{3,}|~{3,})[ \t]*$", stripped)
+        fence_m = fence_open
+
+        if in_comment:
+            out.append(_blank(line))
+            if closes_c:
+                in_comment = False
+                if fence_m:
+                    ambiguous = True     # a fence marker consumed by a comment
+            prev_blank = False
+            continue
+
+        if in_html:
+            # A `## ` HEADING ENDS THE BLOCK, whatever the closer says. Without this
+            # a wrapper spanning a section blanked the whole `## Verification` and
+            # the run reported `no-section … wf-conform owns this verdict` — which
+            # wf-conform then contradicted, because it reads the raw body. Both
+            # tools clean on a handbook whose declared check named a missing script.
+            # Over-masking produces a FALSE CLEAN; under-masking produces a visible
+            # false finding, and once nothing executes the second is the safer error.
+            if stripped.startswith("## "):
+                in_html = None
+                out.append(line)
+                prev_blank = False
+                continue
+            out.append(_blank(line))
+            if re.search(r"</" + re.escape(in_html) + r"\s*>", body, re.I):
+                in_html = None
+            prev_blank = False
+            continue
+
+        if fence is not None:
+            out.append(_blank(line) if hide else line)
+            # A CLOSER CARRIES NO INFO STRING. Without this, a nested ```bash inside
+            # a ```markdown block closed the outer fence.
+            if fence_close and fence_close.group(1)[0] == fence[0] \
+                    and len(fence_close.group(1)) >= len(fence):
+                fence = None
+            # No comment handling at all: a fence is opaque, and treating a `<!--`
+            # inside one as an opener quarantined valid files.
+            prev_blank = False
+            continue
+
+        if fence_m:
+            fence = fence_m.group(1)
+            # An UNTAGGED ``` fence is the common case in a handbook and usually
+            # holds a real command; blanking it blinded resolution to genuinely dead
+            # scripts, which is the opposite of this mode's purpose.
+            hide = (not illustration_only) or \
+                   (fence_m.group(2).lower() in ILLUSTRATION)
+            out.append(_blank(line) if hide else line)
+            prev_blank = False
+            continue
+
+        if self_contained:
+            out.append(re.sub(re.escape(COMMENT_OPEN) + ".*?" + re.escape(COMMENT_CLOSE),
+                              lambda m: _blank(m.group(0)), line))
+            prev_blank = False
+            continue
+        if opens_c:
+            in_comment = True
+            out.append(_blank(line))
+            prev_blank = False
+            continue
+
+
+        # A 4-space indented block after a blank line is CommonMark's other way of
+        # showing an example. Masked in both modes: nothing there is an instruction.
+        _indented = prev_blank and stripped and (body[:4] == "    " or body[:1] == "\t")
+
+        # WRAPPER DETECTION USES LOOKAHEAD, and runs for indented openers too.
+        # Branch ORDER alone cannot separate the two cases, and swapping it merely
+        # moved the false positive: with HTML first, an indented `<div>` with no
+        # closer quarantined the file; with indent first, an INDENTED `<details>`
+        # whose body is DEDENTED went live and its illustration was read as a real
+        # declaration. What distinguishes them is whether the closer exists ahead.
+        _w = HTML_WRAP_RX.match(stripped)
+        if _w and not re.search(r"</" + re.escape(_w.group(1)) + r"\s*>", body, re.I):
+            _close = re.compile(r"</" + re.escape(_w.group(1)) + r"\s*>", re.I)
+            if any(_close.search(_l) for _l in lines[idx + 1:]):
+                in_html = _w.group(1)
+                out.append(_blank(line))
+                prev_blank = False
+                continue
+            # No closer anywhere: the wrapper is IGNORED, indented or not. Once
+            # nothing executes, masking less risks a reporting miss and never a run,
+            # and quarantining a file for a stray `<div>` was a measured false
+            # positive on a real handbook.
+            if _indented:
+                out.append(_blank(line))
+                continue
+
+        if _indented:
+            out.append(_blank(line))
+            continue
+
+        out.append(line)
+        prev_blank = not stripped
+
+    if fence is not None or in_comment:
+        ambiguous = True
+    return "".join(out), ambiguous
+
+
 def is_file_reference(token):
     """Whether this token unambiguously names a file, and may therefore be resolved."""
-    if SLASH_CMD_RX.match(token):
+    # A GLOB IS NOT A FILE. `npx stylelint "src/**/*.css"` — this project's own
+    # canonical example — resolved to `src/**/*.css`, reported `dead`, and made every
+    # handbook copied from the shipped template exit 1 on a blocking false positive.
+    if any(ch in token for ch in "*?[]"):
         return False
     parts = [p for p in token.split("/") if p]
     if len(parts) < 2:
@@ -166,18 +356,34 @@ def load_census():
     return mod
 
 
-def section(body, heading="## Verification"):
-    """Text under a HEADING — line-anchored, never a bare substring search.
+def section_span(masked, heading="## Verification"):
+    """(start, end) of the section, located on the MASKED text.
 
-    Same rule and same reason as `wf-conform.section`: a prose line reading
-    "run the mechanical scan in `## Verification`" precedes the real heading in a
-    real handbook, and a substring split hands back the tail of `## Procedure`.
-    Both readers of this section must share one grammar or they cannot both be
-    right — the rule already stated for the sidecar digest.
+    Located on masked text so a `## Verification` shown INSIDE a fence cannot win:
+    measured, a handbook illustrating the contract above its real section had the
+    illustration executed while the real `Check:` and `Negative:` were never read.
+    Offsets are preserved by the masker, so the caller can slice either view.
     """
-    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$(.*?)(?=^## |\Z)",
-                  body, re.S | re.M)
-    return m.group(1) if m else None
+    # AN EXACT HEADING WINS. Prefix matching is deliberate (`## Verification
+    # (mechanical)` must match), but with `re.search` the FIRST candidate won — so
+    # `## Verification examples (do not run)` above the real section captured it and
+    # its illustration was executed.
+    exact = re.search(r"^" + re.escape(heading) + r"[ \t]*$(.*?)(?=^## |\Z)",
+                      masked, re.S | re.M)
+    if exact:
+        return (exact.start(1), exact.end(1))
+    # NO EXACT HEADING: a prefix match is trusted only when there is exactly ONE.
+    # `re.search` took the first, so `## Verification examples (do not run)` above a
+    # real `## Verification (mechanical)` captured it — the illustration ran and the
+    # genuine check was never read. Two candidates is an ambiguity, and ambiguity
+    # here quarantines rather than guesses.
+    ms = list(re.finditer(r"^" + re.escape(heading) + r"[ \t]*[^\n]*$(.*?)(?=^## |\Z)",
+                          masked, re.S | re.M))
+    if len(ms) == 1:
+        return (ms[0].start(1), ms[0].end(1))
+    if len(ms) > 1:
+        return "AMBIGUOUS"
+    return None
 
 
 def candidate_tokens(seg):
@@ -189,7 +395,7 @@ def candidate_tokens(seg):
     landed on — every non-blank, non-comment fenced line counts — is the rule here.
     """
     tokens = []
-    for block in FENCE_RX.findall(seg):
+    for _info, block in FENCE_RX.findall(seg):
         for line in block.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
@@ -198,6 +404,10 @@ def candidate_tokens(seg):
     for span in BACKTICK_RX.findall(FENCE_RX.sub("", seg)):
         tokens.extend(re.split(r"[\s|;()&]+", span))
 
+    return _filter_tokens(tokens)
+
+
+def _filter_tokens(tokens):
     out, seen = [], set()
     for t in tokens:
         # STRIP FROM THE RIGHT END ONLY. A single `strip("'\",.:")` also eats the
@@ -242,43 +452,6 @@ def resolve_token(token, root):
     return path, os.path.exists(path)
 
 
-def run_command(cmd, root, timeout):
-    """Execute one declared command. Returns (exit, output-tail, error-or-None).
-
-    `shell=True` IS THE REQUIREMENT, NOT AN OVERSIGHT, and the three things that
-    make it defensible are worth stating because a reader will flag it:
-
-    1. A real `## Verification` command is a pipeline. `verification.md` ranks "a
-       command with an exit code" tier 1 and the measured examples are
-       `npm test -- --grep zzz`, `tsc --noEmit`, and a `python3 -c … | bash <hook>`
-       that is the ONLY correct way to drive a stdin hook. Splitting those into
-       argv lists does not execute them, it changes them into something else.
-    2. NOTHING RUNS WITHOUT `--run` OR `--prove`. The default pass resolves paths
-       and executes nothing, which is the display-vs-execute rule SKILL.md applies
-       to every writing command.
-    3. The string comes from a governed handbook inside the tree being verified —
-       the same file, verbatim, that the employee executes every time it works.
-       Running it here grants no authority the org did not already have; declining
-       to run it would only mean nobody ever checks what the employee runs.
-
-    What it is NOT is a sandbox, and no report may describe it as one.
-    """
-    try:
-        # stdin is DEVNULL, never inherited. The founding defect was a hook that
-        # reads a JSON payload on stdin, so the very population this checks is full
-        # of commands that block forever on an inherited terminal — a hang that
-        # would present as `--timeout` expiring and read as a slow check.
-        p = subprocess.run(cmd, shell=True, cwd=root, timeout=timeout,
-                           stdin=subprocess.DEVNULL,
-                           capture_output=True, text=True)
-    except subprocess.TimeoutExpired:
-        return None, "", f"timed out after {timeout}s"
-    except OSError as exc:
-        return None, "", str(exc)
-    tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()
-    return p.returncode, (tail[-1][:160] if tail else ""), None
-
-
 class Report:
     def __init__(self):
         self.rows = []
@@ -295,11 +468,81 @@ class Report:
         return sum(1 for r in self.rows if r["kind"] == kind)
 
 
-def check_handbook(path, body, root, rep, resolver, args):
-    name = os.path.basename(path)
+def rep_add_unbackticked(rep_obj, name, raw, blocking):
+    """A `Check:` whose command carries no backticks — reported, never guessed at.
+
+    Blocking only for a GOVERNED handbook. Unconditional blocking failed a
+    third-party agent whose section read `- Check: none — this agent has no
+    automated check.`, printing a blocking row immediately followed by a
+    non-blocking `undeclared` row about the same section — two verdicts disagreeing
+    on whether the file is under the contract, which is the 9-false-failures
+    precedent this script cites and then reproduced.
+    """
+    rep_obj.add(name, "malformed-check", raw[:80],
+                "a `Check:` command must be in backticks or nothing can extract it; "
+                "nothing can extract it and the section reads as undeclared",
+                blocking=blocking)
+
+
+def show(p, root):
+    """Tree-relative when it is inside the tree, absolute when it is not.
+
+    `os.path.relpath` on an absolute path outside the root emitted
+    `../../../../../x` — unusable in the detail line that most needs to be read.
+    """
+    p = os.path.normpath(p)
+    return os.path.relpath(p, root) if p.startswith(os.path.normpath(root) + os.sep) else p
+
+
+def check_handbook(path, body, root, rep, resolver):
+    name = show(path, root)
     seen_dead = set()
+    heuristic_dead = []
+    masked, ambiguous = mask_regions(body)
+    # THE MARKER IS READ ON THE RAW BODY, DELIBERATELY. Reading it on masked text
+    # lets an UNCLOSED fence swallow the marker and DECLASSIFY a governed handbook —
+    # measured printing `! dead` and exiting 0, the worst outcome this tool has. The
+    # opposite error (a handbook that only ILLUSTRATES the marker is treated as
+    # governed) merely blocks more, so the tie is broken toward blocking.
     governed = bool(ORG_RECORD_RX.search(body))
-    seg = section(body)
+    # AMBIGUITY IS REPORTED, AND IT NO LONGER ZEROES THE DOCUMENT. Nothing is
+    # executed any more, so refusing to READ the declarations bought no safety and
+    # cost a contradiction: `ambiguous-markup` beside `undeclared: names no Check:
+    # line` about a handbook that declares one at column 0. Two rows disagreeing
+    # about one file is the precedent `rep_add_unbackticked` cites as one it must
+    # not reproduce.
+    if ambiguous:
+        # ALWAYS BLOCKING, never `governed`. The whole point is that the document
+        # could not be parsed, so `declares` is unknowable and `governed` may itself
+        # have been read off mis-masked bytes. Measured exiting 0 with `!` rows on
+        # screen and a real dead script invisible.
+        rep.add(name, "ambiguous-markup", "## (file)",
+                "an unclosed fence or comment, or a line carrying both a "
+                "comment terminator and a fence marker — so what this file declares "
+                "cannot be read reliably. Close it",
+                blocking=True)
+
+    span = section_span(masked)
+    if span == "AMBIGUOUS":
+        rep.add(name, "ambiguous-markup", "## Verification",
+                "more than one heading begins `## Verification` and none is exact, "
+                "so which section is the contract cannot be decided. Name the real "
+                "one `## Verification`", blocking=True)
+        span, ambiguous = None, True
+    seg = body[span[0]:span[1]] if span else None
+    # DECLARING OPTS IN, and that has to reach the `dead` rows too. They were still
+    # `blocking=governed`, so an unmarked handbook with a declared check and a missing
+    # script printed `! dead` and exited 0 — while a bin/check assertion titled
+    # "blocks regardless of the ORG-RECORD marker" guarded only the vacuous row.
+    declares = bool(seg and CHECK_RX.search(masked[span[0]:span[1]]))
+    enforced = governed or declares
+
+    if ambiguous and (seg is None or not seg.strip()):
+        # The ambiguity row already explains why nothing was read. Adding
+        # "absent or empty — wf-conform owns this verdict" on top of it asserts
+        # something false about a file whose section is present, and sends the
+        # operator to a tool that will disagree.
+        return
 
     if seg is None or not seg.strip():
         # wf-conform already owns "the section exists and is non-empty". Repeating
@@ -319,23 +562,72 @@ def check_handbook(path, body, root, rep, resolver, args):
     # Resolving those reports the fixture's own design as a dead check, which is a
     # false positive that would train an author to weaken the negative case to keep
     # the report clean. Found by writing the first fixture that declared one.
-    resolvable = NEGATIVE_LINE_RX.sub("", seg)
+    illus_masked, _ = mask_regions(body, illustration_only=True)
+    resolvable = illus_masked[span[0]:span[1]]
+    # BOTH declaration forms are removed before the token pass. A declared command's
+    # arguments are its inputs and OUTPUTS — `npm run build && test -s dist/bundle.js`
+    # reported the build artifact as a dead check, which is the most ordinary shape a
+    # real check takes. The command's own script is resolved by the census resolver
+    # below, which is the mechanical half; this pass is for prose and fenced blocks.
+    resolvable = NEGATIVE_LINE_RX.sub("", CHECK_LINE_RX.sub("", resolvable))
     for token in candidate_tokens(resolvable):
         resolved, exists = resolve_token(token, root)
         if resolved is None:
             rep.add(name, "undecidable", token,
                     "unexpanded variable or unbound placeholder — never reported as dead")
         elif exists:
-            rep.add(name, "resolved", token, os.path.relpath(resolved, root))
+            rep.add(name, "resolved", token, show(resolved, root))
         else:
-            seen_dead.add(resolved)
-            rep.add(name, "dead", token,
-                    f"names {os.path.relpath(resolved, root)} — not on disk",
-                    blocking=governed)
+            # DEFERRED, NOT EMITTED HERE. This pass ran first and wrote the path
+            # into `seen_dead`, so a script named BOTH in prose and in a declared
+            # `Check:` produced only the non-blocking heuristic row — the mechanical
+            # verdict was skipped and the tool exited 0. Naming your own gate in a
+            # sentence turned the gate off, and no fixture reached it because every
+            # dead-check fixture was written with a `## Verification` containing
+            # nothing but the `Check:` line.
+            heuristic_dead.append((token, resolved))
 
     # ── the declared runnable form ───────────────────────────────────────────
-    checks = CHECK_RX.findall(seg)
-    negatives = NEGATIVE_RX.findall(seg)
+    # DECLARATIONS ARE READ OUTSIDE FENCES. On `seg` this executed `Check:` lines
+    # sitting inside an EXAMPLE block — measured creating a file in the target tree
+    # from a handbook that merely documented the format, which `verification.md`
+    # actively invites a handbook to do. The heuristic pass below already stripped
+    # fences; the executing pass did not.
+    decl = masked[span[0]:span[1]]
+    checks = CHECK_RX.findall(decl)
+    negatives = NEGATIVE_RX.findall(decl)
+
+    # A `Check:` line whose command is not backticked matches nothing, and the report
+    # then says the handbook "names no `Check:` line" — false, and it tells the author
+    # nothing about the real error.
+    for _raw in re.findall(r"^(?:[-*+]|\d+[.)])[ \t]*\**Check:\**[ \t]*(.*)$", decl, re.M):
+        if not _raw.strip().startswith("`"):   # includes the empty case
+            rep_add_unbackticked(rep_obj=rep, name=name, raw=_raw.strip(),
+                                 blocking=enforced)
+
+    def flush_heuristic():
+        """Emit the deferred prose/fence rows for paths the mechanical pass did not
+        claim. Called on BOTH exits: hoisting it to one earlier point put it ahead
+        of the mechanical pass and reinstated the downgrade blocker; leaving it only
+        after that pass dropped every heuristic row for an UNDECLARED handbook,
+        which is the one population where this tier is all that is looking."""
+        for _tok, _res in heuristic_dead:
+            if _res in seen_dead:
+                continue             # the mechanical row already reported this file
+            seen_dead.add(_res)
+            # NON-BLOCKING: a path in prose or a fence may be an output, an example,
+            # or a file that does not exist yet.
+            rep.add(name, "dead", _tok,
+                    f"names {show(_res, root)} — not on disk (prose/fence "
+                    f"reference; heuristic)")
+
+
+    if not checks and negatives:
+        # Its path was stripped before resolution and the falsify pass is unreachable,
+        # so without this row the handbook is invisible to BOTH passes.
+        rep.add(name, "orphan-negative", "; ".join(negatives)[:110],
+                "a `Negative:` with no `Check:` — there is nothing for it to falsify, "
+                "and neither pass examines it", blocking=enforced)
 
     if not checks:
         # UNDECLARED is not a failure. Every handbook authored before this contract
@@ -368,6 +660,7 @@ def check_handbook(path, body, root, rep, resolver, args):
                     f"command-shaped, with an unbound placeholder <{ph[0]}> the "
                     f"handbook never binds — HEURISTIC, look here (undeclared, so "
                     f"nothing can confirm this is a check)")
+        flush_heuristic()
         return
 
     for cmd in checks:
@@ -379,74 +672,75 @@ def check_handbook(path, body, root, rep, resolver, args):
         # UNDECIDABLE rules that each cost a real defect to learn. Deduped against
         # the token pass by resolved path so one dead script is one row.
         script, script_exists = resolver.resolve_hook_command(cmd)
+        if script is not None and script_exists and script not in seen_dead:
+            seen_dead.add(script)
+            rep.add(name, "resolved", cmd, show(script, root))
         if script is not None and not script_exists and script not in seen_dead:
             seen_dead.add(script)
             rep.add(name, "dead", cmd,
-                    f"runs {os.path.relpath(script, root)} — not on disk",
-                    blocking=governed)
+                    f"runs {show(script, root)} — not on disk",
+                    blocking=enforced)
 
-        placeholders = PLACEHOLDER_RX.findall(cmd)
+        # Quoted spans are stripped first: `grep -rq "<script>" dist/` carries an
+        # HTML tag, not an unbound metavariable, and flagging it both blocked a
+        # legitimate check and suppressed its execution.
+        placeholders = PLACEHOLDER_RX.findall(
+            re.sub(r"'[^']*'|\"[^\"]*\"", "", cmd))
         if placeholders:
             # The content-writer shape. Mechanical, binary, and it names WHY the
             # check was never runnable rather than guessing at an argument.
             rep.add(name, "not-runnable", cmd,
                     f"unbound placeholder <{placeholders[0]}> — the handbook never "
                     f"binds it, so this command cannot be executed as written",
-                    blocking=governed)
+                    blocking=True)
             continue
 
-        if args.run:
-            code, tail, err = run_command(cmd, root, args.timeout)
-            if err:
-                rep.add(name, "run-error", cmd, err, blocking=governed)
-            elif code == 0:
-                rep.add(name, "ran", cmd, "exit 0")
-            else:
-                rep.add(name, "ran-nonzero", cmd, f"exit {code} — {tail}",
-                        blocking=governed)
 
-    # ── falsify ──────────────────────────────────────────────────────────────
-    # A check observed only passing is indistinguishable from `exit 0`. This is the
-    # row that would have caught content-writer.
+    flush_heuristic()
+
+    # PAIRED POSITIONALLY. A bare `if not negatives` let ONE negative certify every
+    # check in the section — and the founding defect was THREE commands, so declaring
+    # a negative for the first would have closed the row on all three and printed
+    # clean. Every check needs its own falsification.
+    for _i, _chk in enumerate(checks):
+        if _i >= len(negatives):
+            rep.add(name, "unproven", _chk[:110],
+                    f"no `Negative:` paired with this check ({len(checks)} checks, "
+                    f"{len(negatives)} negatives) — it has never been observed failing "
+                    f"and may be testing nothing", blocking=False)
     if not negatives:
-        rep.add(name, "unproven", "; ".join(checks)[:120],
-                "no `Negative:` declared — this check has never been observed "
-                "failing and may be testing nothing", blocking=False)
         return
 
     for neg in negatives:
-        if PLACEHOLDER_RX.search(neg):
+        if PLACEHOLDER_RX.search(re.sub(r"'[^']*'|\"[^\"]*\"", "", neg)):
             rep.add(name, "not-runnable", neg,
-                    "unbound placeholder in the negative case", blocking=governed)
+                    "unbound placeholder in the negative case", blocking=True)
             continue
-        if not args.prove:
-            rep.add(name, "declared-negative", neg, "not run (--prove to execute)")
-            continue
-        code, tail, err = run_command(neg, root, args.timeout)
-        if err:
-            rep.add(name, "run-error", neg, err, blocking=governed)
-        elif code == 0:
-            # The defect itself, caught mechanically for the first time.
-            rep.add(name, "vacuous", neg,
-                    "exit 0 on the input declared as violating — this check CANNOT "
-                    "FAIL, so every PASS it has returned proves nothing",
-                    blocking=governed)
-        else:
-            rep.add(name, "discriminates", neg, f"exit {code} as declared")
+        rep.add(name, "declared-negative", neg,
+                "declared; NOT executed — see the module docstring")
 
 
 def main():
     ap = argparse.ArgumentParser(prog="wf-checkrun")
     ap.add_argument("--root", default=".")
     ap.add_argument("--agent", help="limit to one handbook by name")
-    ap.add_argument("--run", action="store_true",
-                    help="execute each declared Check: command")
-    ap.add_argument("--prove", action="store_true",
-                    help="execute each declared Negative: and require a non-zero exit")
-    ap.add_argument("--timeout", type=int, default=60)
     ap.add_argument("--json", dest="json_path")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so a
+    # is-it-a-directory guard passes and the tool examines a tree nobody named.
+    # Measured: `wf-conform --root ""` in an empty dir exited 0 reporting
+    # "0 governed · 0 failed" — a validator reporting health it never measured, which
+    # is the exact contract procedures/verify.md states five lines under the block
+    # that produces it.
+    if not (args.root or "").strip():
+        print("wf-checkrun: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
 
     root = os.path.abspath(args.root)
     agents_dir = os.path.join(root, ".claude", "agents")
@@ -456,16 +750,55 @@ def main():
         print(f"wf-checkrun: no .claude/agents under {root}", file=sys.stderr)
         return 2
 
-    paths = sorted(
-        os.path.join(agents_dir, f)
-        for f in os.listdir(agents_dir)
-        if f.endswith(".md") and (not args.agent or f[:-3] == args.agent)
+    # os.walk, not listdir: a handbook under `.claude/agents/<dept>/` was invisible,
+    # while the resolver this imports walks the tree. PERSONAL scope is deliberately
+    # NOT read — these are the PROJECT's employees, and `wf-census` owns the
+    # cross-scope collision census.
+    all_paths = sorted(
+        os.path.join(dp, f)
+        for dp, _dn, fns in os.walk(agents_dir) for f in fns if f.endswith(".md")
     )
+    if args.agent:
+        # Identity is the frontmatter `name:`, with the filename accepted as a
+        # convenience. Matching only the filename made `--agent <real name>` look
+        # exactly like an unreadable tree.
+        paths = []
+        for _p in all_paths:
+            try:
+                _b = open(_p, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            _fm = re.search(r"\A---\n(.*?)\n---\n", _b, re.S)
+            # Quotes stripped and the whole value taken, matching wf-census's NAME_RX.
+            # `name: "code-evaluator"` captured the quotes and made the agent
+            # unreachable by its own name; `name: content writer` captured "content".
+            _nm = re.search(r"^name:[ \t]*(.+?)[ \t]*$", _fm.group(1), re.M) if _fm else None
+            _val = _nm.group(1).strip("\"'") if _nm else None
+            if os.path.basename(_p)[:-3] == args.agent or _val == args.agent:
+                paths.append(_p)
+        if len(paths) > 1:
+            # `--agent` promises ONE employee. Selecting two reported on a file the
+            # caller did not name. Ambiguity is refused, never resolved by read order.
+            print(f"wf-checkrun: {args.agent!r} matches {len(paths)} handbooks — "
+                  + ", ".join(show(_x, root) for _x in paths)
+                  + ". Refusing: --agent names ONE employee.", file=sys.stderr)
+            return 2
+        if not paths:
+            print(f"wf-checkrun: no handbook named {args.agent!r} under {agents_dir} "
+                  f"({len(all_paths)} present) — the tree was read; the name did not match",
+                  file=sys.stderr)
+            return 2
+    else:
+        paths = all_paths
     if not paths:
-        print(f"wf-checkrun: no handbooks matched under {agents_dir}", file=sys.stderr)
+        print(f"wf-checkrun: no handbooks under {agents_dir}", file=sys.stderr)
         return 2
 
-    resolver = load_census().Census(root)
+    try:
+        resolver = load_census().Census(root)
+    except Exception as exc:                       # noqa: BLE001 — any import failure
+        print(f"wf-checkrun: cannot load the wf-census resolver: {exc}", file=sys.stderr)
+        return 2
     for p in paths:
         try:
             with open(p, encoding="utf-8") as fh:
@@ -474,14 +807,14 @@ def main():
             # Quarantine is counted, never silent (discovery.md).
             rep.unreadable.append((p, str(exc)))
             continue
-        check_handbook(p, body, root, rep, resolver, args)
+        check_handbook(p, body, root, rep, resolver)
 
     if not args.quiet:
         glyph = {"resolved": "+", "dead": "!", "undecidable": "?",
-                 "not-runnable": "!", "ran": "+", "ran-nonzero": "!",
-                 "run-error": "!", "vacuous": "!", "discriminates": "+",
-                 "unproven": "~", "declared-negative": ".", "undeclared": "~",
-                 "no-section": "~"}
+                 "not-runnable": "!",                  "unproven": "~", "declared-negative": ".", "undeclared": "~",
+                 "ambiguous-markup": "!",
+                 "no-section": "~", "suspect": "?", "malformed-check": "!",
+                 "orphan-negative": "!"}
         current = None
         for r in rep.rows:
             if r["agent"] != current:
@@ -499,28 +832,40 @@ def main():
             f"{rep.count('undecidable')} undecidable · {rep.count('not-runnable')} not-runnable"
         )
         print(
-            f"  {rep.count('ran')} ran · {rep.count('ran-nonzero')} failed · "
-            f"{rep.count('discriminates')} discriminate · {rep.count('vacuous')} VACUOUS · "
-            f"{rep.count('unproven')} unproven · {rep.count('undeclared')} undeclared"
+            f"  {rep.count('unproven')} unproven · {rep.count('undeclared')} undeclared · "
+            f"{rep.count('declared-negative')} declared-negative · "
+            f"{rep.count('suspect')} suspect · {rep.count('no-section')} no-section · "
+            f"{rep.count('malformed-check')} malformed · "
+            f"{rep.count('orphan-negative')} orphan-negative"
         )
-        if not args.run:
-            print("  (resolution only — --run executes, --prove falsifies)")
-        elif rep.count("ran") == 0:
-            # `0 VACUOUS` beside `0 ran` reads as "no broken checks found". It means
-            # NOTHING WAS EXECUTED. This is INV-BATCH's rule one level down: a cost
-            # of zero is evidence the batch did not run, never evidence it was
-            # cheap. Found by running this against a real project, where all 13
-            # governed handbooks are undeclared and the summary looked clean.
-            print(f"  NOTHING RAN — 0 checks executed, so `0 VACUOUS` above is not "
-                  f"a finding about the checks. {rep.count('undeclared')} handbook(s) "
-                  f"declare no `Check:` line.")
+        print("  (resolution and declaration reporting only — nothing is executed)")
         print(f"  {len(rep.unreadable)} quarantined · {rep.findings} blocking finding(s)")
 
     if args.json_path:
-        with open(args.json_path, "w", encoding="utf-8") as fh:
-            json.dump({"root": root, "rows": rep.rows,
-                       "unreadable": rep.unreadable,
-                       "findings": rep.findings}, fh, indent=2, sort_keys=True)
+        try:
+            with open(args.json_path, "w", encoding="utf-8") as fh:
+                json.dump({"root": root, "rows": rep.rows,
+                           "unreadable": rep.unreadable,
+                           "findings": rep.findings,
+                           "exit": 2 if rep.unreadable else (1 if rep.findings else 0)},
+                          fh, indent=2, sort_keys=True)
+        except OSError as exc:
+            # Exit 1 means "findings, each named". A tool that could not write its
+            # report has not found anything; it failed to run.
+            print(f"wf-checkrun: cannot write {args.json_path}: {exc}", file=sys.stderr)
+            return 2
+
+    # --quiet is the CI shape, and it silenced the verdict entirely — measured as zero
+    # bytes of output. Blocking findings ALWAYS reach stderr; --quiet suppresses the
+    # report, never the verdict.
+    if args.quiet and rep.unreadable:
+        for _p, _exc in rep.unreadable:
+            print(f"wf-checkrun: unreadable: {_p}: {_exc}", file=sys.stderr)
+    if args.quiet and rep.findings:
+        for r in rep.rows:
+            if r["blocking"]:
+                print(f"wf-checkrun: {r['agent']}: {r['kind']}: {r['subject'][:80]}",
+                      file=sys.stderr)
 
     if rep.unreadable:
         return 2
