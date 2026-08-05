@@ -6063,6 +6063,59 @@ check(
     f"no opt-out, so every byte is paid on every spawn. The development record belongs "
     f"in DEVELOPMENT.md, which is injected nowhere",
 )
+_cen2 = read("workforce/bin/wf-census")
+# A TEST CORPUS IS NOT PROJECT CONTENT — AND THE EXCLUSION IS DECLARED AND COUNTED
+#
+# MEASURED 2026-08-05 by the first `dev audit`: BOTH "unpaired markers (sweep hazards)"
+# were fixtures/f9-half-migrated and fixtures/scripts/census-inverted — corpora BUILT TO
+# BE MALFORMED so this census can detect malformation. And of the files carrying sacred
+# blocks, 21 were in fixtures/ against 21 outside it: half the "user directives" in the
+# tree were test data. After declaring the corpus: markers 141 -> 26, unpaired 2 -> 0,
+# sacred blocks 41-in-31-files -> 18-in-12.
+#
+# THE DANGEROUS DIRECTION IS UNDER-REPORTING, so the mechanism is declared rather than
+# guessed, every exclusion is counted, and a pattern matching nothing is NAMED — a dead
+# pattern looks like coverage and is not, the same reason a dead check is reported.
+check(
+    "census: a corpus exclusion is DECLARED in a file, never guessed",
+    ".censusignore" in _cen2 and "def load_ignore" in _cen2,
+    "a heuristic here silently drops real project content — the census would report "
+    "health it did not measure, which is what its own exit codes were written against",
+)
+check(
+    "census: every exclusion is counted and dead patterns are named",
+    '"dead": [p for p in self.ignore_patterns if p not in self.ignore_hits]' in _cen2
+    and "DEAD pattern (matched nothing)" in _cen2,
+    "an uncounted exclusion is indistinguishable from a tree that had nothing there, "
+    "and a pattern matching nothing looks like coverage while providing none",
+)
+
+# A COLLISION IS A DISAGREEMENT, NOT A COUNT OF PATHS — THIRD INSTANCE
+#
+# MEASURED 2026-08-05 by the first `dev audit`: 4 "live collisions", all four the
+# shipped canary fixtures present in BOTH ~/.claude/agents/ and ./.claude/agents/
+# because install --user and install --project each place them in their own scope and
+# nothing reconciles the two. All four were byte-identical to each other AND to source.
+#
+# The gate exists because one entry "silently never loads" — the danger is that WHICH
+# ONE WINS IS INVISIBLE AND THEY DIFFER. Identical copies resolve to the same behaviour
+# whichever wins. Blocking on them halted a correctly-installed tree, which is the same
+# failure wf-census's own docstring already records twice (symlink aliases, then
+# in-skill templates). Third instance, same class.
+check(
+    "census: a collision is decided by CONTENT, not by counting paths",
+    "def duplicates" in _cen2 and "(duplicates if len(digests) == 1 else collisions)" in _cen2,
+    "two byte-identical copies of one shipped fixture are not a name conflict; "
+    "blocking on them halts a correctly-installed tree, which is the third time this "
+    "class of false positive has stopped an audit",
+)
+check(
+    "census: an unreadable copy falls to the BLOCKING side",
+    "Unreadable is NOT identical" in _cen2,
+    "a copy nobody can read is a copy nobody can prove harmless. Treating it as "
+    "identical would let an unreadable shadow downgrade itself to advisory",
+)
+
 # `dev` IS DECLARED IN SKILL.md AND MUST BE IMPLEMENTED BY THE PROCEDURE
 #
 # MEASURED 2026-08-05, on being asked to run it: `dev` appeared in SKILL.md (the command
@@ -6072,6 +6125,12 @@ check(
 # meant inventing a procedure step — which Core Principle 5 forbids. The
 # consumer-named/producer-assumed shape, in the escape hatch of the command that exists
 # to find it.
+check(
+    "census: the corpus exclusion is specified where the procedure reads it",
+    "### A declared test corpus is excluded, and the exclusion is counted" in _aud3,
+    "a mechanism in the script and nowhere in the procedure is a capability the "
+    "runner never learns exists — the producer/consumer shape, inverted",
+)
 check(
     "dev: the escape SKILL.md declares is implemented by the audit procedure",
     "### `dev` mode — what it includes, and what it never does" in _aud3,

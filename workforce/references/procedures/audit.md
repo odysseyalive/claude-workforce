@@ -89,6 +89,23 @@ does not stop that from being true. So:
 **IF a run cannot state which of these applied, it is not in `dev` mode** — the mode is reported in the
 opening banner with the two names it added, never inferred from the presence of a token.
 
+### A declared test corpus is excluded, and the exclusion is counted
+
+**A repository's own test fixtures are not project content.** MEASURED 2026-08-05 on this project:
+both reported "unpaired markers (sweep hazards)" were corpora **built to be malformed** so the census
+could detect malformation, and **half** the files carrying sacred blocks were fixture data. Extracting
+a fixture's sacred block as though it were the user's words, or freezing a deliberately-broken fixture
+as a sweep hazard, is the census reporting on itself.
+
+`wf-census` reads **`.censusignore`** at the project root — one glob per line, `#` comments. It is
+**declared, never inferred**: there is no `fixtures/` default and no guess from directory names, and a
+project that declares nothing has everything surveyed, which stays the normal case (Core Principle 5).
+
+**The dangerous direction is under-reporting**, so the census prints `excluded N file(s) by M declared
+pattern(s)`, lists every pattern, and **names any pattern that matched nothing** — a dead pattern looks
+like coverage and provides none. IF a run reports a count without the exclusion line beside it, the
+count is unqualified and the report says so.
+
 **Run the census FIRST, and take every count in this run from it.**
 
 ```bash
