@@ -6096,6 +6096,61 @@ check(
     "port is the half that has lagged before",
 )
 
+# THREE DEFECTS FROM A REAL AUTHORING RUN, 2026-08-05
+#
+# (1) `tools: All tools` is a DISPLAY string the harness generates when `tools:` is
+#     empty. Written literally it is a one-entry allowlist naming a tool that does not
+#     exist — the agent can call NOTHING while the frontmatter reads unrestricted.
+#     Caught because an authoring agent DECLINED the instruction and checked the
+#     harness. This project's own rule turned on the brief that instructed it.
+# (2) An author kept editing past T5, so a live employee had a second, never-probed,
+#     SHORTER draft in staging. T6 compares the two and passes; nothing looked again
+#     after T6. The shorter file is the one a later reader prefers, and it is wrong.
+# (3) The brief said "I will register it" and never said WHEN, so an agent that
+#     outlived the registration read its own run's output as spurious and tried to
+#     `rm` it. Attribution is the DOCUMENT by omission.
+_cfm2 = read("workforce/bin/wf-conform")
+check(
+    "conform: `tools: All tools` is refused on every tier",
+    'f"{n}: `tools:` is a real allowlist, not the display string"' in _cfm2,
+    "the display string written literally leaves an agent able to call nothing while "
+    "its frontmatter reads maximally permissive — the failure presents as its opposite",
+)
+check(
+    "conform: staging divergence after registration is detected",
+    "staged draft matches the registered bytes" in _cfm2,
+    "T6 compares staged to registered and passes; nothing looked again afterwards, so "
+    "a second unprobed version of a live employee was invisible",
+)
+check(
+    "conform: the registered bytes win, never the shorter draft",
+    "on the strength of being shorter" in _cfm2,
+    "the unprobed draft is the one a later reader prefers — shorter and under the "
+    "ceiling. Verification that has been watched failing beats a line count",
+)
+check(
+    "verify: a failure is not discounted by naming an uncited class",
+    "a failure is not discounted by naming a class" in _vfy3
+    and "or the failures stand" in _vfy3,
+    "a run closed with '22 the documented false-positive class' and NO shipped file "
+    "defines one — the uncited-refusal shape moved from the queue onto the failure "
+    "count. A number discounted by a citation that does not resolve",
+)
+check(
+    "verify: the remedy for a false-positive class is the advisory CHANNEL",
+    "advise()` channel, where it is *testable*" in _vfy3,
+    "knowledge written into a report is an assertion nobody can check; the same "
+    "knowledge in the tool is a row a fixture can prove fires on the right population",
+)
+check(
+    "authoring: the brief states WHEN registration happens",
+    "while you may still be working" in _aud3
+    and "NEVER delete or edit anything under" in _aud3,
+    "an agent that outlives its own T5 registration finds a file it cannot account "
+    "for; without this line it has no way to read that as the expected result, and "
+    "the one recorded attempt to delete it was stopped by a layer outside this project",
+)
+
 # A TEST CORPUS IS NOT PROJECT CONTENT — AND THE EXCLUSION IS DECLARED AND COUNTED
 #
 # MEASURED 2026-08-05 by the first `dev audit`: BOTH "unpaired markers (sweep hazards)"

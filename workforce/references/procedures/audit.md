@@ -693,6 +693,29 @@ an intent; the report is where the user sees what that turned out to mean — wh
 which still refused and under which rule, how many immutable blocks were extracted against how many
 censused, and that `disband` reverses it.
 
+### The dispatch brief states WHEN registration happens, and what the author may not touch
+
+**BLOCKING — every authoring brief carries these three lines verbatim.** Reported 2026-08-05, and the
+attribution was the brief rather than the agent:
+
+> Your draft is registered to `.claude/agents/<name>.md` at T5, **while you may still be working**.
+> That file appearing is the EXPECTED result of this run — it is not spurious, and it is not yours to
+> remove. **NEVER delete or edit anything under `.claude/agents/`.** When you have returned your draft,
+> stop editing: the registered bytes are the released ones.
+
+**What happened without them.** An authoring agent outlived its own T5 registration, found
+`.claude/agents/platform-lead.md` on disk, could not account for it, concluded it was spurious, and
+**attempted to `rm` it**. The permission classifier refused and the file was intact and hash-verified —
+so nothing was lost, and the only reason nothing was lost is that a layer outside this project said no.
+
+**The brief said "I will register it" and never said WHEN.** An agent that outlives the registration
+then has no way to recognise the result as expected. `SKILL.md` § Sacred-Directive Enforcement Gates, Failure-Attribution, is explicit
+that the default subject is the document: the responsible lines could not be located in the brief, so the
+attribution is DOCUMENT **by omission** and the cure is these lines, not a note about the agent.
+
+**And the same omission produced the divergence below**: an author still editing after T5 is an author
+who was never told that T5 had happened.
+
 **Then author — BY DISPATCH, never inline.** One subagent authors one handbook and returns it, through
 `handbook.md`, under the transaction order in `hire.md` § Transaction Order. Greenfield authors the whole
 roster as a batch (`hire.md` § Initial roster); brownfield authors conversions and new hires together.

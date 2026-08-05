@@ -115,6 +115,19 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-05
 
+**Closed 2026-08-05 (latest) — four defects from a real authoring run.** Record in
+`plan/authoring-run-defects-2026-08-05.md`. Each was verified absent before being fixed; none had any
+mechanical guard.
+
+| | |
+|---|---|
+| **`tools: All tools`** | a DISPLAY string the harness generates when `tools:` is empty. Written literally it is a one-entry allowlist naming a tool that does not exist — **the agent can call nothing while its frontmatter reads maximally permissive.** Refused on every tier. `platform.md` fact 20. **Caught because an authoring agent declined the instruction and checked the harness** |
+| **staging diverged after T5** | an author outlived its own registration and produced a second, never-probed, SHORTER draft of a live employee. T6 compares and passes; **nothing looked again after T6.** The unprobed draft is the one a later reader prefers — 149 lines against 171, under the ceiling. Verification that has been watched failing beats a line count |
+| **the brief never said WHEN** | an agent found this run's own T5 registration, could not account for it, and **tried to `rm` it**; a permission classifier refused. Attribution is the DOCUMENT by omission. **One missing sentence produced two of these findings** |
+| **22 failures discounted by a class that does not exist** | *"the documented false-positive class"* — grepped, zero hits in the distribution. The uncited-refusal shape moved onto the failure count. The remedy is `wf-conform.advise()`, where the knowledge is testable, not prose at report time |
+
+
+
 **Closed 2026-08-05 (later) — the first `dev audit`, and everything it found.** Records in
 `plan/dev-audit-2026-08-05.md`. Asked to run the audit against this repository, three blockers
 surfaced, none of which any instrument here could have reported:

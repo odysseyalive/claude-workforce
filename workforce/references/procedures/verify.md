@@ -182,7 +182,30 @@ reports health it did not measure.
 It covers: sections present and ordered; every IC carries the literal `disallowedTools: Agent`; no
 `Agent(` allowlist anywhere; `## Directives` resolves or declares `(none bound)`; `## Verification` is
 non-empty and names at least one literal invocation; the length ceiling; the immutable-block sidecar
-digests.
+digests; `tools:` is a real allowlist rather than the display string; and the staged draft still
+matches the registered bytes.
+
+### BLOCKING — a failure is not discounted by naming a class
+
+**A report may NOT reclassify a failure as a known false positive.** Either `wf-conform` marks the row
+**advisory** — the channel that already exists for exactly this, reported without setting the exit code
+— or the row is a failure and is counted as one. There is no third disposition, and prose at report
+time is not one of the two.
+
+**Reported 2026-08-05:** a run closed with *"36 failed (14 structural, 22 the documented
+false-positive class)"* — **and no shipped file defines any such class.** Grepped: zero hits. That is
+the uncited-refusal shape from `discharge.md` § Classification, moved from the queue onto the failure
+count: **a number discounted by a citation that does not resolve.**
+
+**The remedy is mechanical, not editorial.** If a class of failure is genuinely inapplicable — a
+contract that post-dates the files under it is the recorded case — that knowledge belongs in
+`wf-conform`'s `advise()` channel, where it is *testable* and where a fixture can prove it fires on the
+right population. Written into a report instead, it is an assertion nobody can check, applied to a
+count nobody can reproduce.
+
+**IF a run states a false-positive class, it cites the shipped rule at `path:line` that establishes it,
+verbatim — or the failures stand.** A check that always fails stops being read; a check discounted in
+prose stops being a check.
 
 **Then run `wf-checkrun`, which STATS what `wf-conform` can only read** — it resolves the file each
 `## Verification` names against disk. It executes nothing at all — its running and falsifying flags were removed

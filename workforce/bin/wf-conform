@@ -180,6 +180,15 @@ def read(path, res):
         return None
 
 
+def _digest(path):
+    """sha256 of a file, or None if unreadable. Unreadable is not 'equal'."""
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
 def frontmatter(body):
     m = FM_RX.match(body or "")
     if not m:
@@ -275,6 +284,32 @@ def check_handbook(path, body, res, ceiling):
     # The tier ceiling. What this verifies is PRESENCE OF THE LINE — a property of
     # the text. Runtime behavior is the canary's job, established once per host and
     # never inferred per handbook from the presence of a string.
+    # `tools: All tools` IS A DISPLAY STRING, NOT A VALUE — AND IT CRIPPLES THE AGENT.
+    #
+    # Reported 2026-08-05 by an authoring agent that DECLINED the instruction: told to
+    # write `tools: All tools`, it checked the harness and refused, because that phrase
+    # is what the harness GENERATES FOR DISPLAY when `tools:` is empty. Written back
+    # literally it is parsed as a one-entry allowlist naming a tool that does not exist,
+    # so the agent can call NOTHING — while the frontmatter reads as maximally
+    # permissive. The failure presents as the opposite of what it is.
+    #
+    # Checked on EVERY tier, not just tier 3. A delegating tier carries no `tools:` line
+    # at all (SKILL.md rule 6), so the string is wrong there too — and it is precisely
+    # the tiers with no allowlist whose display output says "All tools", which is where
+    # a round-trip through a human or an agent picks the phrase up.
+    #
+    # This project's own rule, turned on the brief that instructed it: never claim a
+    # capability the runtime will not deliver.
+    _tools_raw = (fm.get("tools") or "").strip()
+    if _tools_raw:
+        _toks = {t.strip().lower() for t in _tools_raw.split(",") if t.strip()}
+        res.add(_toks != {"all tools"} and "all tools" not in _toks,
+                f"{n}: `tools:` is a real allowlist, not the display string",
+                "`All tools` is what the harness PRINTS when `tools:` is empty. Written "
+                "literally it is a one-entry allowlist naming a tool that does not "
+                "exist, so this agent can call nothing while reading as unrestricted. "
+                "Omit the field to inherit the default grant")
+
     if tier == 3:
         # THE OTHER HALF OF RULE 3, which had no mechanical enforcement anywhere.
         # SKILL.md marks both lines BLOCKING; only the denylist was ever checked, so
@@ -730,6 +765,41 @@ def main():
             check_handbook(p, body, res, args.ceiling)
         else:
             check_adopted(p, body, res)
+
+    # STAGING IS FROZEN AT REGISTRATION, AND THE REGISTERED BYTES ARE THE TRUTH.
+    #
+    # Reported 2026-08-05. An authoring agent OUTLIVED its own T5 registration and kept
+    # editing the staged draft, producing a second version of a live employee:
+    #
+    #     live, registered   171 lines   probed PASS x2, FAIL x1   negative fixture: yes
+    #     staging draft      149 lines   never probed              none — "ships none"
+    #
+    # T6 compares the two and passes; nothing looked again AFTER T6, so the divergence
+    # was invisible. And the unprobed draft is the one a later reader PREFERS — it is
+    # shorter, under the length ceiling, and reads cleaner. The released file is 21
+    # lines over. **Verification that has been watched failing beats a line count**, so
+    # the registered bytes win and the draft is preserved for inspection rather than
+    # deleted.
+    #
+    # REPORTED, NEVER REPAIRED — same rule as every other finding here. Overwriting
+    # staging is a decision with a preferred direction, and this script does not make
+    # decisions; `audit` Step 6 does, with the divergence named.
+    staging = os.path.join(root, ".claude", "workforce", "staging", "agents")
+    if os.path.isdir(staging):
+        for p in sorted(handbooks):
+            staged = os.path.join(staging, os.path.basename(p))
+            if not os.path.isfile(staged):
+                continue
+            live_b, staged_b = _digest(p), _digest(staged)
+            if live_b is None or staged_b is None:
+                continue
+            res.add(live_b == staged_b,
+                    f"{os.path.basename(p)}: staged draft matches the registered bytes",
+                    "staging diverged AFTER registration, so a second unprobed version "
+                    "of a live employee exists. The REGISTERED file is the one that was "
+                    "probed and is authoritative; keep the draft under a distinct name "
+                    "if it is worth inspecting, and never let it overwrite the released "
+                    "bytes on the strength of being shorter")
 
     skills = os.path.join(root, ".claude", "skills")
     if os.path.isdir(skills):
