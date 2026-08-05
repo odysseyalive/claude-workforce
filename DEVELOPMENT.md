@@ -131,8 +131,14 @@ so the installer is testable at all (**and it then ran end to end for the first 
 the new NOTE firing); and `bin/check`'s drift remedy stopped naming the action that silently installs
 older code.
 
-*Still open from this:* Step 2 onward — designing an org for claude-workforce itself — has not run.
-Not blocked; a design question whose evidence points at a small answer.
+**Step 2 onward is DECIDED, not deferred: claude-workforce is not staffed.** Leaving it as "a design
+question" would have been the exact defect this session added enforcement against three commits
+earlier. The evidence: the census finds **1 skill** (`workforce` itself, RETAIN); verification here is
+already mechanical and comprehensive; fact 6 injects every registered handbook into every spawn **in
+the repository that spawns most**, and this session spent four commits cutting that cost 88%. Core
+Principle 7 — an agent is not the goal. Reversible by running Step 2 whenever work here stops being
+verifiable mechanically; what is recorded is the reason, so the next run reaches a determinate answer
+instead of re-opening it.
 
 
 **Closed 2026-08-05 — four defects, and three of them were invisible to every instrument here.**

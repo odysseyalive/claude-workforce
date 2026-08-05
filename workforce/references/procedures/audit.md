@@ -81,7 +81,7 @@ does not stop that from being true. So:
 
 | | |
 |---|---|
-| **`dev` INCLUDES `workforce` and `org`** | in the census, the survey, the disposition table, the conform pass, and every count the report prints. Without it they are invisible to the tool that measures everything else |
+| **`dev` RETAINS `workforce` and `org`** | in the survey, the disposition table, the conform pass, and every count the report prints. **`wf-census` is a raw counter and always sees them** — it has no `dev` flag and needs none; what `dev` changes is whether the procedure filters them back out afterwards. Stating it the other way round would credit the census with a behaviour it does not have |
 | **`dev` NEVER converts them** | `workforce` and `org` are dispositioned **RETAIN, reason: dispatcher — conversion creates a dispatch loop (`SKILL.md` § Self-Exclusion Rule)**. This is a refusal of an ACT, cited, and the run continues |
 | **`dev` NEVER hires from them, retires them, reduces them, or marks them for the sweep** | T7b/T7c skip them for the same reason, and the Execution Summary says so per skill rather than omitting the rows |
 | **`dev` is user-typed only** | already blocking in `SKILL.md` and `intent-router.md`; nothing here relaxes it |
