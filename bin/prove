@@ -97,6 +97,8 @@ CHK = "bin/check"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
 PRM = "workforce/bin/wf-permissions"
+CMD = "CLAUDE.md"
+DEV = "DEVELOPMENT.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -312,6 +314,17 @@ CASES = [
      PRM, "del", 'elif not f["owned"]:'),
     ("permissions: a load-bearing grant is converted, never dropped",
      PRM, "del", '"remove" if target in edits else "convert"'),
+    # A computed payload: breaking a BYTE CEILING needs ~8 KB, which would be absurd
+    # written out. "append" mode never consults the uniqueness lint (that reads `del`
+    # payloads only), so a BinOp here is safe where a literal would be unreadable.
+    ("CLAUDE.md stays sparse — it is injected into every spawn",
+     CMD, "append", "\n" + "bloat " * 1400),
+    ("the standing cold-reader request stays in the INJECTED file",
+     CMD, "del", "explicitly requests subagents for cold-read probes"),
+    ("the source-first rule stays in the INJECTED file",
+     CMD, "del", "Always edit source, then `bin/sync --personal`"),
+    ("the development record exists and is not injected",
+     DEV, "del", "## Open, as of"),
     ("close: the report carries no 'what I did not do' section",
      AUD, "del", 'NO "what I did not do" section'),
     ("close: an org-shape proposal can never be QUEUED",

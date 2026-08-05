@@ -4778,25 +4778,32 @@ for p in declared:
 if not os.path.exists("CLAUDE.md"):
     warn("no CLAUDE.md at the repo root", "a fresh session here has no orientation")
 else:
-    # CLAUDE.md is the index and the ONLY store that goes stale silently — the
-    # others are append-only. It spent two days and nineteen commits telling every
-    # fresh session that "every writing step remains unexecuted", by then false in
-    # four of five particulars.
+    # THE RECORD MOVED, SO THE CHECK MOVED WITH IT (2026-08-05). CLAUDE.md is injected
+    # into every non-fork subagent with no opt-out, so its 70,690 bytes were paid on
+    # every spawn in the repo that spawns most — against a user directive saying a
+    # CLAUDE.md should be "very sparce or next to nothing". The development record
+    # now lives in DEVELOPMENT.md, which is injected nowhere.
+    #
+    # The staleness question follows the record, not the filename. It is still the
+    # ONLY store that goes stale silently — the others are append-only. It spent two
+    # days and nineteen commits telling every fresh session that "every writing step
+    # remains unexecuted", by then false in four of five particulars.
     #
     # REPORTED, NOT BLOCKED, and no threshold is invented: the numbers are printed
     # and the judgment is the reader's. A count that fires at one commit is noise;
     # a count nobody prints is how this went stale in the first place.
-    _m_open = re.search(r"^## Open, as of (\d{4}-\d{2}-\d{2})", read("CLAUDE.md"), re.M)
+    _rec = "DEVELOPMENT.md" if os.path.exists("DEVELOPMENT.md") else "CLAUDE.md"
+    _m_open = re.search(r"^## Open, as of (\d{4}-\d{2}-\d{2})", read(_rec), re.M)
     if not _m_open:
-        warn("CLAUDE.md states no 'Open, as of <date>'",
-             "the index has no date, so its staleness cannot be measured")
+        warn(f"{_rec} states no 'Open, as of <date>'",
+             "the record has no date, so its staleness cannot be measured")
     else:
         _since = subprocess.run(
             ["git", "log", "--oneline", f"--since={_m_open.group(1)}", "--", "workforce/", "bin/"],
             capture_output=True, text=True).stdout.strip()
         _n = len(_since.splitlines()) if _since else 0
         if _n:
-            warn(f"CLAUDE.md open list is dated {_m_open.group(1)} — {_n} commit(s) to "
+            warn(f"{_rec} open list is dated {_m_open.group(1)} — {_n} commit(s) to "
                  f"workforce/ or bin/ since",
                  "update the open list in the change that closes an item, or a later "
                  "session is oriented by a snapshot of a day that has passed")
@@ -6032,6 +6039,52 @@ check(
     "signal.SIGTERM, signal.SIGHUP" in _prove_src,
     "TemporaryDirectory cleans up on normal unwind and on SIGINT, but not on a "
     "default-disposition SIGTERM — which is what a session teardown sends",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLAUDE.md IS SPARSE, AND THE THINGS THAT ONLY WORK BECAUSE IT IS INJECTED STAY IN IT
+#
+# Split 2026-08-05, 70,690 -> ~8 KB. CLAUDE.md is injected into every non-fork subagent
+# with no per-agent opt-out (platform.md fact 6), so its length is multiplied by fan-out
+# in the repository that spawns most — against this project's own user directive that a
+# CLAUDE.md be "very sparce or next to nothing". It was the worst offender against its
+# own rule, and `wf-claude-md` generates and replaces a marked region inside it, so
+# `/workforce dev audit` pointed a duplication-removal pass at the development record.
+#
+# The ceiling is a REPORTED number rather than a guess dressed as a limit: 16 KB is
+# twice the size the split produced, so ordinary growth is fine and a return to a
+# 70 KB history is not.
+# ─────────────────────────────────────────────────────────────────────────────
+_cmd_bytes = len(read("CLAUDE.md").encode("utf-8"))
+check(
+    "CLAUDE.md stays sparse — it is injected into every spawn",
+    _cmd_bytes <= 16384,
+    f"CLAUDE.md is {_cmd_bytes} B. Fact 6 injects it into every non-fork subagent with "
+    f"no opt-out, so every byte is paid on every spawn. The development record belongs "
+    f"in DEVELOPMENT.md, which is injected nowhere",
+)
+check(
+    "the development record exists and is not injected",
+    os.path.exists("DEVELOPMENT.md") and "## Open, as of" in read("DEVELOPMENT.md"),
+    "the split moves the record rather than deleting it; without DEVELOPMENT.md the "
+    "history is gone and the staleness check has nothing to measure",
+)
+# THESE TWO ONLY WORK BECAUSE CLAUDE.md IS INJECTED. Moving either into DEVELOPMENT.md
+# would leave the text intact and the mechanism dead — the exact failure this project
+# calls "doctrine written correctly, and nothing making it true".
+check(
+    "the standing cold-reader request stays in the INJECTED file",
+    "explicitly requests subagents for cold-read probes" in read("CLAUDE.md"),
+    "ambient policy permits spawning *unless the user asks*, so the request only "
+    "functions where it is injected. In DEVELOPMENT.md it reads identically and does "
+    "nothing, and every handbook a run registers is unprobed",
+)
+check(
+    "the source-first rule stays in the INJECTED file",
+    "Always edit source, then `bin/sync --personal`" in read("CLAUDE.md"),
+    "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
+    "destroyed rather than merged. A session that never reads this loses work, which "
+    "is why it survives the split and the history did not",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
