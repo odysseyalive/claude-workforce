@@ -231,6 +231,39 @@ survived in a docstring while the mechanism was deleted. Each now asserts the di
 That is the second-order version of the same failure: a check that tests vocabulary rather than
 behaviour is doctrine wearing enforcement.*
 
+**Closed 2026-08-05 (latest) — the three places that still CREATED the file it deletes.** The
+evacuation directive landed with `wf-apply` deleting `CLAUDE.md`, and **three producers were still
+writing one**, which nothing noticed because each read sensibly on its own:
+
+| | |
+|---|---|
+| both **installers** | refused a project install without a `CLAUDE.md`, and `install` carried 80 lines of bootstrap that launched Claude Code to interview the user and write one. The precondition was worth keeping — refusing to scatter an install into a non-project directory is real — but the PROXY was wrong. Now both **bootstrap `.claude/settings.local.json` with `{}`** when neither settings file exists. **Create-or-merge, never refuse**, which is how claude-enforcer has always done it; refusing on an absent `.claude/` would be the same mistake with a different filename |
+| `wf-claude-md` **--execute** | CREATED a `CLAUDE.md` containing the generated region when absent. Under the new directive that has one audit writing the file it then evacuates, and **putting it back on every later run of an already-evacuated project** |
+| `audit.md` **Step 1a** | *"Write `CLAUDE.md` if absent — the project needs one regardless."* The charter holds those answers; nothing downstream needs the file |
+
+**The load-bearing case was the standing cold-reader request**, and it is the one piece of `CLAUDE.md`
+content that genuinely needed always-on presence. § Off-the-Street Release Gate rule 3b depends on it:
+without the asking, spawning goes `UNAVAILABLE`, every handbook registers unprobed, and **nothing says
+so**, because `UNAVAILABLE` is neither pass nor fail. Deleting `CLAUDE.md` would have removed it
+silently.
+
+It moved to **`wf-standing-request`, a `UserPromptSubmit` hook** — and it is strictly better there.
+`CLAUDE.md` is injected once at the head of a conversation, so the request was faintest exactly when a
+long audit was doing its spawning; the hook re-injects every turn. **The directive's own reasoning is
+the argument for the file.** The text is stated once and `wf-claude-md` imports it; two canonical
+askings would drift, and the drift would be invisible until a run degraded for no visible reason.
+
+*Two assertions and one fixture encoded the superseded behaviour and were **inverted rather than
+deleted** — `wf-claude-md creates CLAUDE.md when absent`, `the cold-reader remedy has a producer in the
+region generator`, and `claudemd-absent`. The old behaviour is exactly what a future edit drifts back
+into, because its own justifying comment reads well and the directive superseding it lives in another
+file.* One check was **VACUOUS on its first prove run** for the fourth time this session: it asserted
+`ABSENT IS THE GOAL STATE`, which `--evacuate` also says about an already-emptied tree, so the creating
+code could be restored with the check still green. It now asserts the full banner.
+
+*And `__pycache__` leaked into `workforce/bin/` a second time — same cause as `wf-apply`, importing a
+sibling to avoid restating a constant. Fixed at the cause in both.*
+
 **Closed 2026-08-05 — CLAUDE.md is evacuated, then deleted.** Record in
 `plan/claude-md-evacuation-2026-08-05.md`. A third user directive the same day, and it **supersedes the
 2026-08-03 one rather than restating it**: that said "very sparce or next to nothing" and produced the

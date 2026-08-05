@@ -5535,9 +5535,27 @@ check("artifacts: every named producer actually mentions its artifact",
 # The third is doctrine written the same hour as its own contradiction.
 
 _cmd = read("workforce/bin/wf-claude-md")
-check("wf-claude-md creates CLAUDE.md when absent",
-      "ABSENT IS THE SPARSEST CASE" in _cmd,
-      "refusing on an absent file declines the case the directive most clearly covers")
+# SUPERSEDED 2026-08-05, and inverted rather than deleted. This asserted
+# "ABSENT IS THE SPARSEST CASE" — that a project with no CLAUDE.md should have one
+# CREATED, which was correct under the 2026-08-03 directive ("very sparce or next to
+# nothing"). The new directive evacuates the file and DELETES it, so creating one
+# would have a single audit writing the file it then removes, and re-creating it on
+# every later run of an already-evacuated project.
+#
+# The check is kept pointing the other way because the old behaviour is exactly what
+# a future edit would drift back into: the comment justifying it is persuasive and
+# the directive superseding it lives in a different file.
+check("wf-claude-md treats an absent CLAUDE.md as the goal state, creating nothing",
+      # The FULL banner, not the bare phrase. `--evacuate` also says "ABSENT IS THE
+      # GOAL STATE" about a tree that has already been emptied, so asserting the
+      # phrase alone matched a different branch and the check stayed green with the
+      # creating code restored — VACUOUS on its first bin/prove run.
+      "ABSENT IS THE GOAL STATE, AND NOTHING IS CREATED." in _cmd
+      and "Nothing created." in _cmd
+      and "ABSENT IS THE SPARSEST CASE" not in _cmd,
+      "creating a CLAUDE.md makes one audit write the file it then evacuates and "
+      "deletes, and puts the file back on every run of a project that had already "
+      "been evacuated (SKILL.md § Directives, 2026-08-05)")
 
 check("audit's survey measures the per-spawn cost with wf-context",
       "wf-context" in aud,
@@ -5714,11 +5732,29 @@ check("INV-SPAWN prints an attempt count, not a bare verdict",
       "a run that printed UNAVAILABLE with zero attempts measured nothing, and is otherwise "
       "indistinguishable from one that tried")
 
-check("the cold-reader remedy has a producer in the region generator",
-      "Cold-reader agents are requested, standing." in _cmd
-      and "STANDING_REQUEST" in _cmd and "unless the user asks" in _cmd,
-      "named in SKILL.md 3b, enforcement.md and staging.md and emitted by nothing for a day; "
-      "it must live in CLAUDE.md because the blocking instruction binds the CALLER")
+# RE-HOMED 2026-08-05, and this is the load-bearing case of the whole evacuation.
+# The request used to live in CLAUDE.md's generated region. That file is now deleted,
+# so the one piece of its content that must be present on EVERY turn moved to a
+# UserPromptSubmit hook — and it is strictly better there, because CLAUDE.md is
+# injected once at the head and was faintest exactly when a long audit was spawning.
+#
+# STATED ONCE. wf-claude-md IMPORTS the text for projects that still carry a region;
+# a second copy would be two canonical askings that drift, and the drift would be
+# invisible until a run degraded to UNAVAILABLE for no visible reason.
+_srq = read("workforce/bin/wf-standing-request")
+check("the cold-reader remedy has a producer, and the text is stated once",
+      "Cold-reader agents are requested, standing." in _srq
+      and "unless the user asks" in _srq
+      and "UserPromptSubmit" in _srq and "additionalContext" in _srq
+      and "hook workforce/bin/wf-standing-request" in read("manifest.txt")
+      and "wf-standing-request" in read("workforce/references/procedures/hooks.md")
+      # wf-claude-md imports it and keeps NO literal copy of its own.
+      and "_standing_request()" in _cmd
+      and "Cold-reader agents are requested, standing." not in _cmd,
+      "SKILL.md 3b, enforcement.md and staging.md all name this remedy, and without a "
+      "producer spawning goes UNAVAILABLE and every handbook registers unprobed — "
+      "quietly, because UNAVAILABLE is neither pass nor fail. A hook is the only "
+      "always-on component, which is why it lives there once CLAUDE.md is deleted")
 
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,

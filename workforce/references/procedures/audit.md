@@ -186,8 +186,12 @@ is a project whose work has not been written down yet.
    like a brand-new project."
 2. **Run `charter`** (`charter.md` § Brand-new project). Its interview establishes what the project is
    going to be. This is the one additional question a charter-first audit asks beyond the budgets.
-3. **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and
-   everything downstream reads it.
+3. **Write nothing to `CLAUDE.md`.** The charter from step 2 is where those answers live, and
+   everything downstream reads *it*. *Amended 2026-08-05 by user directive: this step read "Write
+   `CLAUDE.md` if absent — the project needs one regardless", which would have this run creating the
+   file the same run evacuates and deletes, and re-creating it on every subsequent audit of an
+   already-evacuated project.* The standing cold-reader request that used to justify the file lives in
+   the `wf-standing-request` hook, which re-injects it every turn.
 4. **Design the org from the charter.** A stated intent *is* evidence: "a Next.js marketing site with a
    blog" implies engineering and content before a single file exists.
 5. **Hire the minimum, with provisional verification** where the real check does not exist yet

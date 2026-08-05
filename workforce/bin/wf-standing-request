@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""wf-standing-request — re-inject the cold-reader request on every turn.
+
+A `UserPromptSubmit` hook. Emits `additionalContext` carrying the standing request
+that `/workforce` audit, verify, and review depend on.
+
+WHY THIS EXISTS AS A HOOK, and it is the load-bearing case for the whole evacuation.
+
+`SKILL.md` § Off-the-Street Release Gate rule 3b holds that ambient policy commonly
+permits subagent spawning *unless the user asks*, and that the standing request is the
+asking. Without it, spawning goes UNAVAILABLE, every handbook registers unprobed, and
+the run degrades — quietly, because UNAVAILABLE is neither pass nor fail.
+
+That request used to live in CLAUDE.md's generated region. The 2026-08-05 user
+directive deletes CLAUDE.md, so it had to go somewhere, and this is the one piece of
+CLAUDE.md content that genuinely needs to be present on EVERY turn rather than when
+some component happens to load. `references/claude-md.md` § Evacuation names the rule:
+"something that must fire on every tool call becomes a hook, the only always-on
+component there is."
+
+IT IS STRICTLY BETTER HERE THAN IT WAS IN CLAUDE.md. CLAUDE.md is injected once, at
+the head of the conversation, so the request was faintest exactly when a long audit
+was doing its spawning. `UserPromptSubmit` fires every turn, so the request arrives
+adjacent to the work instead of thousands of tokens behind it. The directive's own
+reasoning — "CLAUDE.md is only effective for the first part of the conversation" —
+is the argument for this file.
+
+THE TEXT LIVES HERE AND NOWHERE ELSE. `wf-claude-md` imports it for the projects that
+still carry a generated region; it does not keep a second copy. Constants are stated
+once (`SKILL.md` Core Principle 9a), and a request that drifted between two files
+would leave one of them asking for something subtly different.
+
+EXITS 0 ALWAYS. A hook that fails a turn because it could not phrase a request is a
+hook that breaks the session it exists to help. Detection where prevention is
+impossible; this one does not even detect, it only asks.
+"""
+
+import json
+import sys
+
+# The asking. Ambient policy permits spawning *unless the user asks* — this is the
+# user asking, standing, on every turn.
+STANDING_REQUEST = "\n".join([
+    "**Cold-reader agents are requested, standing.** `/workforce` audit, verify, and review",
+    "spawn throwaway subagents to cold-read handbooks and to measure this host's tier ceiling.",
+    "Ambient policy commonly permits spawning *unless the user asks* — this line is the asking.",
+])
+
+
+def main():
+    # Drain stdin so the harness never blocks on an unread pipe. The payload is not
+    # needed: this hook adds context unconditionally and inspects nothing.
+    try:
+        sys.stdin.read()
+    except Exception:
+        pass
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": STANDING_REQUEST,
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -71,11 +71,31 @@ END = "<!-- WORKFORCE-CLAUDE-MD END -->"
 # than hidden: ~260 B against a measured 15,459 B IDENTITY (1.7%) buys the tier canary and
 # every cold-read probe. A run without it registers every handbook unprobed, which is the
 # one gate whose whole job is catching what the author cannot see in their own work.
-STANDING_REQUEST = "\n".join([
-    "**Cold-reader agents are requested, standing.** `/workforce` audit, verify, and review",
-    "spawn throwaway subagents to cold-read handbooks and to measure this host's tier ceiling.",
-    "Ambient policy commonly permits spawning *unless the user asks* — this line is the asking.",
-])
+# IMPORTED, never restated. `wf-standing-request` owns this text because it is the
+# hook that re-injects it every turn once CLAUDE.md is gone (2026-08-05 evacuation
+# directive). A second copy here would be two canonical askings that could drift
+# apart, which Core Principle 9a refuses. Falls back to an empty region section
+# rather than dying: this script must still classify a CLAUDE.md on a tree where the
+# hook was never installed.
+def _standing_request():
+    import importlib.util
+    from importlib.machinery import SourceFileLoader
+    # Never leave a __pycache__ beside a shipped script — residue in a directory the
+    # installer owns. Second instance of this defect: wf-apply had it first, and both
+    # arrived the same way, by importing a sibling to avoid restating a constant.
+    sys.dont_write_bytecode = True
+    _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-standing-request")
+    try:
+        _s = importlib.util.spec_from_loader(
+            "wf_standing_request", SourceFileLoader("wf_standing_request", _p))
+        _m = importlib.util.module_from_spec(_s)
+        _s.loader.exec_module(_m)
+        return _m.STANDING_REQUEST
+    except Exception:
+        return ""
+
+
+STANDING_REQUEST = _standing_request()
 REGION_RX = re.compile(
     r"^<!--\s*WORKFORCE-CLAUDE-MD START.*?^<!--\s*WORKFORCE-CLAUDE-MD END\s*-->\s*$\n?",
     re.S | re.M)
@@ -379,27 +399,30 @@ def main():
 
     r = classify(root)
     if r is None:
-        # ABSENT IS THE SPARSEST CASE, NOT AN ERROR. The directive is that CLAUDE.md is
-        # "built mechanically for each project" and kept "very sparce or next to
-        # nothing" — a project with none is already there, and refusing to act was the
-        # script declining the one case the directive most clearly covers.
+        # ABSENT IS THE GOAL STATE, AND NOTHING IS CREATED.
         #
-        # Only CHARTER-FIRST writes a CLAUDE.md today (`audit.md` Step 1a); a GREENFIELD
-        # project with source and no CLAUDE.md got nothing at all, so the generated
-        # region never landed and the org had no front door.
+        # This branch used to CREATE a CLAUDE.md containing the generated region, on
+        # the 2026-08-03 reading that the file should be "very sparce or next to
+        # nothing" and a project with none had "no front door". The 2026-08-05
+        # directive supersedes that: the file is evacuated into components and
+        # DELETED. Creating one here would have `audit` writing the file the same run
+        # then deletes — and on a project that had already been evacuated, it would
+        # put the file BACK on every run.
+        #
+        # The front door is the org: `/workforce`, `/org`, the chart and the charter,
+        # which the harness surfaces from the skill listing with nothing at the repo
+        # root. The standing cold-reader request moved to `wf-standing-request`, a
+        # prompt-submit hook that re-injects it every turn — strictly better than a
+        # file read once at the head of the conversation.
         target = os.path.join(root, "CLAUDE.md")
         if os.path.exists(target):
             print(f"wf-claude-md: {target} exists but could not be read", file=sys.stderr)
             return 2
         print(f"wf-claude-md — {target}")
-        print("  ABSENT — nothing is injected per spawn today, which is the floor this "
-              "directive aims at")
-        if not args.execute:
-            print("  --execute would create it containing the generated region and nothing else")
-            return 0
-        with open(target, "w", encoding="utf-8") as fh:
-            fh.write(region(root))
-        print(f"  created {target} — {os.path.getsize(target):,} B, region only, no prose invented")
+        print("  ABSENT — this is the goal state (SKILL.md § Directives, 2026-08-05). "
+              "Nothing created.")
+        print("  The standing cold-reader request lives in the wf-standing-request hook; "
+              "check it is wired with `/workforce hooks`.")
         return 0
 
     saved = sum(len(l) + 1 for _, l in r["duplicated"])

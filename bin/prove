@@ -84,6 +84,7 @@ INV = "workforce/references/invariants.md"
 PAS = "workforce/references/passes.md"
 RAT = "workforce/bin/wf-ratchet"
 APL = "workforce/bin/wf-apply"
+SRQ = "workforce/bin/wf-standing-request"
 AUD2 = "workforce/references/procedures/audit.md"
 MAN = "manifest.txt"
 STG2 = "workforce/references/staging.md"
@@ -472,6 +473,18 @@ CASES = [
     # regression direction here is a silent loss, which is the one this cannot absorb.
     ("claude-md: evacuation proves relocation per line before the file may be deleted",
      WCM, "del", "        return 1 if n_u else 0"),
+    # Restore the superseded create-when-absent behaviour. It still runs, still reads
+    # persuasively in its own comment — and makes one audit write the CLAUDE.md it then
+    # evacuates and deletes, then put it back on every later run of an evacuated
+    # project. The directive superseding it lives in a different file, which is exactly
+    # why this drift is the likely one.
+    ("wf-claude-md treats an absent CLAUDE.md as the goal state, creating nothing",
+     WCM, "del", "ABSENT IS THE GOAL STATE, AND NOTHING IS CREATED."),
+    # Delete the hook's asking. Spawning then goes UNAVAILABLE, every handbook
+    # registers unprobed, and NOTHING SAYS SO — UNAVAILABLE is neither pass nor fail.
+    # The quietest failure in the project, so the check must be loud.
+    ("the cold-reader remedy has a producer, and the text is stated once",
+     SRQ, "del", "Cold-reader agents are requested, standing."),
 ]
 
 

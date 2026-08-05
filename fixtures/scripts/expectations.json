@@ -231,8 +231,14 @@
     "exit": 0,
     "script": "wf-claude-md",
     "want": [
-      "ABSENT",
-      "region and nothing else"
+      "ABSENT \u2014 this is the goal state",
+      "Nothing created.",
+      "wf-standing-request"
+    ],
+    "_why": "An absent CLAUDE.md is the GOAL STATE (SKILL.md - Directives, 2026-08-05), not a gap to fill. This fixture asserted the opposite until then -- it required the script to CREATE the file containing the generated region, which under the evacuation directive would have one audit writing the file it then deletes, and re-creating it on every later run of an already-evacuated project. Inverted rather than removed: the superseded behaviour is exactly the drift a future edit would reintroduce, because its own comment read well.",
+    "not": [
+      "region and nothing else",
+      "created "
     ]
   },
   "claudemd-duplicated": {
@@ -892,6 +898,23 @@
     ],
     "not": [
       "0 UNPLACED"
+    ]
+  },
+  "standing-request": {
+    "_why": "The hook that keeps spawning available once CLAUDE.md is deleted. It must emit valid UserPromptSubmit additionalContext carrying the asking, and it must exit 0 no matter what: a hook that fails a turn because it could not phrase a request breaks the session it exists to help. Without this producer, spawning goes UNAVAILABLE and every handbook registers unprobed -- quietly, because UNAVAILABLE is neither pass nor fail.",
+    "script": "wf-standing-request",
+    "stdin_raw": "{\"prompt\": \"anything\"}",
+    "exit": 0,
+    "want": [
+      "hookSpecificOutput",
+      "UserPromptSubmit",
+      "additionalContext",
+      "Cold-reader agents are requested, standing.",
+      "unless the user asks"
+    ],
+    "not": [
+      "Traceback",
+      "Error"
     ]
   }
 }

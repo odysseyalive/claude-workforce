@@ -35,6 +35,15 @@ detection at the next command, and the user's first directive is the thing it pr
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
+| `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
+
+**`wf-standing-request` is the one hook that adds context instead of checking something**, and it is
+there because the 2026-08-05 evacuation directive deletes `CLAUDE.md`. That request used to live in the
+generated region; it is the single piece of that file's content needing to be present on **every turn**
+rather than whenever some component loads. It is also strictly better off here — `CLAUDE.md` is injected
+once at the head of a conversation, so the request was faintest exactly when a long audit was doing its
+spawning. It exits `0` unconditionally: a hook that fails a turn because it could not phrase a request
+would break the session it exists to help.
 
 **`PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse` exit 2 cannot undo an edit
 that already happened, so this hook is **detection, not prevention** — `enforcement.md`'s table governs
