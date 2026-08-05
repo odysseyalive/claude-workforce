@@ -50,8 +50,12 @@ returning once there is something to describe.
 Then:
 
 - Write the charter into `operating-principles/SKILL.md`, verbatim from the user's own wording.
-- **Write `CLAUDE.md` if absent**, from the same answers — the project needs one regardless, and every
-  employee reads it. Keep it short: it is injected into every spawn.
+- **Write nothing to `CLAUDE.md`.** The charter above holds those answers and every employee reads
+  *it*. *Amended 2026-08-05 by user directive (`SKILL.md` § Directives): this read "Write `CLAUDE.md`
+  if absent — the project needs one regardless", which would have a charter-first run creating the file
+  the same audit evacuates and deletes. `audit.md` Step 1a carried the identical sentence and was fixed
+  first; this one survived a commit because fixing the caller is not fixing the shared path — Core
+  Principle 7c, in the change that was closing exactly this class.*
 - Hand the answers to `org-design.md`. Answer 2 is the department proposal; answers 3 and 4 are
   guardrails. Roles get **provisional verification** where no check exists yet.
 
