@@ -1038,6 +1038,40 @@ with the reason rather than being omitted.
 A missing row is indistinguishable from a gate that never ran, which is precisely how five rules in this
 project came to be written and unwired.
 
+### BLOCKING — the closing report carries NO "what I did not do" section
+
+**A finding that proposes a change IS a deferred row, and it is classified before it is printed.**
+`INV-CLOSE` classifies rows in the queue; a proposal narrated in the closing report was never a row, so
+**nothing classified it and no arithmetic counted it.** That is the fifth side of the defect rows 14–17
+exist for: `INV-DEFERRED` counts a queue correctly while a finding that never entered the queue walks
+past every gate in prose.
+
+**MEASURED 2026-08-04**, a real run closing under a section titled *"Two things I did not do"*:
+
+| What it said | Why it is not an outcome |
+|---|---|
+| *"Proposed, not hired"* — a fifth department | a real precondition was cited, which makes it **QUEUED with that precondition named** — not a paragraph |
+| *"shrinking a live org is transfer/retire, and **that's your call**"* | cites no shipped rule. `discharge.md` § Classification — three outcomes, and there is no fourth: **"a user decision" is no longer a queueable category** |
+
+**So every proposal this run generates is routed through the same three outcomes as a queue row**, and
+`INV-CLOSE` counts it:
+
+| Outcome | When |
+|---|---|
+| **DISCHARGED** | the default. The run does the work now |
+| **DECIDED** | it turns on a preference no evidence in the project can settle — put in the **one consolidated prompt**, then **applied in this run**. Never printed as a question the user must come back to |
+| **QUEUED** | **only** another repository, or a **measured host limit with its attempt count** |
+
+**A proposal about THIS project's own org shape can NEVER be QUEUED.** It is not another repository and
+it is not a host limit, so it is DISCHARGED or it is DECIDED. "That's your call", "proposed, not
+hired", "left to the user", and any section titled *what I did not do* are **none of the three**, and a
+report containing one is corrected before it is printed.
+
+*The user's own words on being handed that report: **"'Two things I did not do' is a 'deferred' action
+which I explicitly told you to optimize and find solutions for automatically without user input."** The
+rule they are invoking is already in this distribution — a gate may refuse an ACT, it may never defer a
+RUN — and it had been applied to the queue and never to the report that closes over it.*
+
 **Then the provenance header** (`verify.md` § Provenance header — specified there, not restated
 here). A closing report that starts with findings makes the reader supply the host context, and they
 cannot: whether the platform facts are stale, which scope is active, and whether the canary ran change

@@ -273,7 +273,30 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-04
+## Open, as of 2026-08-05
+
+**Closed 2026-08-05 — four defects, and three of them were invisible to every instrument here.**
+Records in `plan/prove-sigterm-restore-2026-08-04.md`, `plan/marker-integrity-and-succession-premise-2026-08-04.md`,
+`plan/inert-permission-grants-2026-08-04.md`, `plan/closing-report-deferrals-2026-08-05.md`.
+
+| | |
+|---|---|
+| **`bin/prove` could corrupt the tree** | it was the only script mutating the repo IN PLACE, 181 s sequential — longer than the 120 s Bash timeout, so it was habitually backgrounded, and SIGTERM does not run `finally`. Now breaks a **private copy per worker**: 60–88 s, parallel, and safety no longer depends on runtime. Found by the user noticing five orphaned waiter shells in an exit dialog |
+| **`A == B` cannot see a marker** | `wf-remainder` had ZERO marker awareness. A cut is a SECTION-shaped span; a marker block is a DIFFERENT span, so a heading drop swallowed a sacred block whole. Ten of 32 real reductions broke marker integrity while passing the manifest check |
+| **a declared succession retires nothing** | rule 7 stands down on *"a retired owner never runs again"* and nothing established it — `claude-enforcer` is live. The window between T7b and the sweep is now **reported**, not assumed shut |
+| **a permission grant that grants nothing** | `Write(path)` is not matched by file permission checks; only `Edit(path)` is. **Doctrine could not fix it** — rules concatenate, so a correct grant never retracts a dead one. `wf-permissions` is the mechanism; `audit` Step 0.8 runs `--apply` unasked |
+| **"Two things I did not do" is a deferral** | *the user's own correction.* A proposal narrated in the closing report was never a queue row, so `INV-CLOSE` never classified it and `INV-DEFERRED` never counted it — the run hands back work in prose while every invariant passes. **A proposal about the project's own org shape can never be QUEUED** |
+
+**`bin/sync --personal` now exists**, because the maintainer loop had no way to refresh the shadowing
+copy from local source: `install` fetches from GitHub (installing *stale* code during development, and
+looking like success), and deleting the personal install removes `/workforce` from every other project.
+The drift is a red baseline, and `bin/prove` refuses on one — so proof-by-breaking was blocked for the
+**second** recorded time, from a different cause.
+
+*The standing lesson, again: every instrument here was green at the start of all four.* Three were
+found by the user — an exit dialog, a startup warning, and a report that read wrong to them.
+
+## Superseded — open as of 2026-08-04
 
 **Closed 2026-08-04 (latest) — the handbook verification gap. A check is not a check until it has been
 seen to fail.** The entire mechanical coverage of `## Verification` — the section `verification.md`

@@ -72,8 +72,17 @@ change.)*
 | 14 | the conversion batch printed its arithmetic — cap, spent, headroom, cost — and ran in this run | `INV-BATCH` | references/conversion-taxonomy.md |
 | 15 | declared succession with eligible skills converted at least one, or named the refusing rule per skill | `INV-SUCCESSION` | references/conversion-taxonomy.md |
 | 16 | the tier canary was attempted twice before any run reported DEGRADED | `INV-CANARY` | references/staging.md |
-| 17 | every deferred row was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
+| 17 | every deferred row **and every proposal in the closing report** was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
+
+**Row 17 counts PROPOSALS, not only queue rows, and that is the half it was missing.** A finding
+narrated in the closing report was never a row, so the queue arithmetic could balance perfectly while
+the run handed back work in prose. **MEASURED 2026-08-05**: a run closed under a heading reading *"Two
+things I did not do"* — a fifth department *"proposed, not hired"* and an org reduction with *"that's
+your call"* — and every invariant passed, because neither had ever entered the queue. The candidate
+count in the summary line therefore includes **every proposal the run generated**; a proposal about the
+project's own org shape can never be `QUEUED` (`audit.md` § BLOCKING — the closing report carries NO
+"what I did not do" section), so it is DISCHARGED or DECIDED, and DECIDED is applied in the same run.
 
 **Rows 14, 15, and 16 exist because a run reported `0 of 37 converted` as success.** Each closes one
 leg of it: 14 forbids an unmeasured overage (the run compared 37 against nothing and called it a cap
