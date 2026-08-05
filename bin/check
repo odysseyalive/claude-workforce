@@ -2740,6 +2740,90 @@ check(
     "the interface is where the two layers meet; an employee left to infer the "
     "contract reintroduces the variance the mechanism layer exists to remove",
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# THE SECOND FLOOR UNDER A REDUCTION: `A == B` CANNOT SEE A MARKER
+#
+# MEASURED 2026-08-04 on a real 32-skill reduction: TEN cuts broke marker integrity
+# while passing the manifest check, and one removed an `origin: user | immutable: true`
+# block outright — the user's own words, whose retention is the FIRST directive here.
+# DEF-2026-08-04-heading-drop-eats-markers.
+#
+# The cause is structural. A cut is a SECTION-shaped span; a marker block is a
+# DIFFERENT span. Where the two boundaries cross, the cut takes an opener and leaves
+# its closer, or swallows a sacred block whole. Neither is invocable, so neither is
+# visible to a surface manifest — the check was not weak, it was aimed elsewhere.
+#
+# `wf-remainder` reuses bin/check's OWN marker regexes rather than re-deriving them.
+# Two readers of one marker that disagree about what a marker IS is this project's
+# recorded failure (wf-conform vs wf-checkrun on `## Verification (mechanical)`), so
+# the grammar is asserted identical in both files below.
+# ─────────────────────────────────────────────────────────────────────────────
+_rem = read("workforce/bin/wf-remainder")
+check(
+    "remainder: the cut refuses on a lost immutable block",
+    # NOT `"immutable block(s)"` — that phrase is split across an f-string
+    # concatenation in the source and matches nothing. The project's own hard-wrap
+    # hazard, reproduced inside the check written to close a marker defect.
+    "lost_sacred" in _rem and "lost  <!-- origin: user | immutable: true -->" in _rem,
+    "a sacred block sitting between a dropped heading and the next one is removed by "
+    "a section-shaped cut and is invisible to the surface manifest. Directive one "
+    "makes this the gravest loss a reduction can cause, and it passed silently",
+)
+check(
+    "remainder: the cut refuses on an unpaired marker",
+    "unpaired" in _rem and "origin-open" in _rem and "enforcement-open" in _rem,
+    "a cut crossing a marker boundary takes the opener and leaves the closer; the "
+    "sweep then reads a malformed region. Ten of 32 real reductions did exactly this",
+)
+check(
+    "remainder: the marker grammar is bin/check's, not a second one",
+    all(rx in _rem for rx in (r'r"^<!--\s*origin:.*-->\s*$"',
+                              r'r"^<!--\s*/origin\s*-->\s*$"')),
+    "wf-conform and wf-checkrun once disagreed about whether a decorated heading had "
+    "a section at all, so one reported it present and examined none of it. A second "
+    "marker grammar is that defect waiting on a different pair of files",
+)
+check(
+    "remainder: every refusal reason is printed, not just the first",
+    "refused = False" in _rem and "if refused:" in _rem,
+    "a cut that eats a sacred block usually also unbalances a marker. Returning on "
+    "the first reason turns one re-cut into a guessing loop, and the operator cannot "
+    "tell whether the second reason was absent or merely unreported",
+)
+check(
+    "remainder: the docstring states that A == B cannot see a marker",
+    "CANNOT SEE A MARKER" in _rem,
+    "the file already said what the manifest does not prove and omitted this one, "
+    "which is how ten reductions were accepted on a check that never covered them",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# "A RETIRED OWNER NEVER RUNS AGAIN" IS A MEASUREMENT, NOT A CONSEQUENCE OF DECLARING
+#
+# Rule 7 stands down under succession on that premise. MEASURED 2026-08-04: the
+# predecessor `~/lab/claude-enforcer` is live — newest commit dated 2026-08-03 — and
+# `/skill-builder update` overwrites local edits by design. Declaring succession
+# removes nothing; the generator stays invocable until the SWEEP unlinks it, and the
+# sweep is deliberately a separate command because removing `skill-builder` is a
+# four-part transaction. So a window exists in which rule 7 is stood down and the owner
+# it names can still run — f2-two-generators' failure reached from the other direction.
+# The window may stay open; it may NOT go unreported.
+# ─────────────────────────────────────────────────────────────────────────────
+check(
+    "succession: retired means REMOVED, never merely declared",
+    "A declared succession retires nothing" in _ct2
+    and "records intent" in _ct2,
+    "rule 7 stands down on 'a retired owner never runs again'. If declaring succession "
+    "were enough to satisfy that, the premise would be satisfied by saying so — which "
+    "is what it was doing on a tree whose predecessor had committed the day before",
+)
+check(
+    "succession: the live-predecessor window is reported, not assumed shut",
+    "reports the predecessor as LIVE until its sweep completes" in _ct2,
+    "a stood-down rule whose premise is not yet established is a risk the user carries "
+    "unknowingly; a blank where that verdict belongs reads as a retired predecessor",
+)
+
 check(
     "T-order: T7b reduces and T7c marks only on an empty remainder",
     "T7b" in _hire2 and "T7c" in _hire2

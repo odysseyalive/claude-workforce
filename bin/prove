@@ -95,6 +95,7 @@ TPL = "workforce/references/handbook-templates.md"
 CANA = "workforce/canary/wf-canary-a.md"
 CHK = "bin/check"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
+REM = "workforce/bin/wf-remainder"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -300,6 +301,22 @@ CASES = [
      PS1, "del", "SETTINGS NOT CONFIGURED"),
     ("install: install.ps1 never exits the user's console",
      PS1, "append", "\n# a stray exit 1 in a comment is enough: the check bans the token\n# exit 1\n"),
+    # NOT the heading text — it appears twice (heading + the rule 7 row's cross-
+    # reference), which is the duplicate-payload vacuity bin/check now lints for.
+    ("succession: retired means REMOVED, never merely declared",
+     CT, "del", "records intent"),
+    ("succession: the live-predecessor window is reported, not assumed shut",
+     CT, "del", "reports the predecessor as LIVE until its sweep completes"),
+    ("remainder: the cut refuses on a lost immutable block",
+     REM, "del", "lost  <!-- origin: user | immutable: true -->"),
+    ("remainder: the cut refuses on an unpaired marker",
+     REM, "del", '"enforcement-open"'),
+    ("remainder: the marker grammar is bin/check's, not a second one",
+     REM, "del", r'r"^<!--\s*origin:.*-->\s*$"'),
+    ("remainder: every refusal reason is printed, not just the first",
+     REM, "del", "refused = False"),
+    ("remainder: the docstring states that A == B cannot see a marker",
+     REM, "del", "CANNOT SEE A MARKER"),
     # THE ONLY SELF-TARGETING CASE, and it needs the split literal below to exist.
     # Every other case stores its payload here and deletes it from ANOTHER file, so
     # the payload occurs once in its target. This one's target IS this file, so a

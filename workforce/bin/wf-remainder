@@ -27,6 +27,26 @@ cannot prove the right prose moved — a section can be correctly retained and w
 classified. The partition is a judgment the audit makes per skill; this is the floor
 under that judgment, and the cold-read probe is what covers the rest.
 
+AND `A == B` CANNOT SEE A MARKER. Measured 2026-08-04 on a real 32-skill reduction:
+TEN cuts broke marker integrity while passing the manifest check, and one removed a
+`<!-- origin: user | immutable: true -->` block outright — the user's own words, whose
+retention is the FIRST directive of this project. All ten were restored from `.orig`,
+which is why `.orig` is taken first. Filed as DEF-2026-08-04-heading-drop-eats-markers.
+
+The cause is structural, not incidental: a cut is a SECTION-SHAPED span and a marker
+block is a DIFFERENT span, so a heading boundary crossing a marker boundary removes an
+opener while leaving its closer — or swallows a sacred block whole. Neither is visible
+to a surface manifest, because neither is invocable. So there is a SECOND floor under
+the same transform, checked in the same gesture and refusing on the same terms:
+
+    markers before  =  sacred blocks + pairing counts
+    reduce
+    markers after   =  the same sacred blocks, still paired
+    REQUIRE no sacred block lost AND no family left unpaired.
+
+The grammar is `bin/check`'s, deliberately: two readers of one marker that disagree
+about what a marker IS is this project's recorded failure, not a hypothetical.
+
 BIASED TOWARD OVER-CAPTURE, DELIBERATELY. A token captured that is not really an
 invocation causes a false abort: the skill is marked ✗ with its path:line and the
 batch continues (`SKILL.md` § Atomic-or-Absent, rule 7). A token MISSED means a
@@ -34,9 +54,23 @@ gutted skill that verifies clean. The failure modes are not symmetric, so ambigu
 resolves toward capturing.
 """
 
+import hashlib
 import os
 import re
 import sys
+
+# ── Marker integrity ──────────────────────────────────────────────────────────
+# These four patterns are COPIED FROM bin/check, not re-derived. A marker that one
+# reader treats as paired and another does not is how a section gets reported present
+# and examined not at all — recorded in CLAUDE.md against `wf-conform` and
+# `wf-checkrun`, which disagreed about `## Verification (mechanical)`. One grammar.
+ORIGIN_OPEN_RX = re.compile(r"^<!--\s*origin:.*-->\s*$", re.M)
+ORIGIN_CLOSE_RX = re.compile(r"^<!--\s*/origin\s*-->\s*$", re.M)
+SACRED_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true\s*-->$(.*?)^<!--\s*/origin\s*-->$",
+    re.S | re.M)
+ENF_OPEN = "<!-- ENFORCEMENT ANNOTATION"
+ENF_CLOSE = "<!-- END ENFORCEMENT ANNOTATION -->"
 
 # ── What counts as surface ────────────────────────────────────────────────────
 # Headings that CARRY mechanism. A reduction may not remove one; judgment headings
@@ -100,6 +134,30 @@ def apply_cut(text, drops):
         out = out[:start] + out[end:]
     out = re.sub(r"\n{4,}", "\n\n\n", out)
     return out, removed, missing
+
+
+def marker_state(text):
+    """(sacred, counts) — what a reduction must not disturb.
+
+    `sacred` is keyed by a digest of the WHOLE block including its delimiters, so a
+    block that survives with one word changed reads as lost rather than as present.
+    That is the conservative direction and it is chosen deliberately: this cut is not
+    supposed to edit a sacred block at all, so "changed" and "gone" deserve the same
+    refusal. The value is the block's first non-blank line, which is what a human
+    needs to find it again.
+    """
+    sacred = {}
+    for m in SACRED_RX.finditer(text):
+        digest = hashlib.sha256(m.group(0).encode("utf-8")).hexdigest()[:12]
+        first = next((ln.strip() for ln in m.group(1).splitlines() if ln.strip()), "(empty)")
+        sacred[digest] = first[:72]
+    counts = {
+        "origin-open": len(ORIGIN_OPEN_RX.findall(text)),
+        "origin-close": len(ORIGIN_CLOSE_RX.findall(text)),
+        "enforcement-open": text.count(ENF_OPEN),
+        "enforcement-close": text.count(ENF_CLOSE),
+    }
+    return sacred, counts
 
 
 def _connection_spans(text):
@@ -206,13 +264,41 @@ def main(argv):
         after, removed, missing = apply_cut(before, drops)
         ma, mb = manifest(before), manifest(after)
 
+        sac_b, _cnt_b = marker_state(before)
+        sac_a, cnt_a = marker_state(after)
+        lost_sacred = [v for k, v in sac_b.items() if k not in sac_a]
+        unpaired = [f"{fam}: {cnt_a[fam + '-open']} open vs {cnt_a[fam + '-close']} close"
+                    for fam in ("origin", "enforcement")
+                    if cnt_a[fam + "-open"] != cnt_a[fam + "-close"]]
+
         for h in missing:
             print(f"NOT FOUND  {h!r} — no such heading; nothing removed for it")
+
+        # EVERY reason is printed before returning, never the first one found. A cut
+        # that loses a sacred block usually also unbalances a marker, and reporting one
+        # reason per invocation turns a single re-cut into a guessing loop.
+        refused = False
         if set(ma) != set(mb):
+            refused = True
             print(f"REFUSED — reducing {path} would change its invocable surface:")
             _emit_diff(ma, mb, "before", "after")
-            print("\nNothing was written. The named sections carry mechanism, not judgment:\n"
-                  "re-cut with the sections that actually moved into the handbook.")
+            print("The named sections carry mechanism, not judgment.")
+        if lost_sacred:
+            refused = True
+            print(f"REFUSED — reducing {path} would remove {len(lost_sacred)} immutable "
+                  f"block(s). These are the user's own words and no regeneration "
+                  f"reconstructs them:")
+            for s in lost_sacred:
+                print(f"  lost  <!-- origin: user | immutable: true -->  {s}")
+        if unpaired:
+            refused = True
+            print(f"REFUSED — reducing {path} would leave an unpaired marker, which the "
+                  f"sweep reads as a malformed region:")
+            for u in unpaired:
+                print(f"  {u}")
+        if refused:
+            print("\nNothing was written. Re-cut with the sections that actually moved "
+                  "into the handbook — a refused cut is a re-cut, never a stop.")
             return 1
         if not removed:
             print(f"no-op — nothing removed from {path} ({len(ma)} token(s) unchanged)")

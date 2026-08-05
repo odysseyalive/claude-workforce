@@ -2,17 +2,40 @@
 """
 Mirror the source distribution into the runtime copy, exactly as the installers do.
 
-    python3 bin/sync            # or: bin/sync
+    python3 bin/sync            # or: bin/sync   -> the project runtime
+    bin/sync --personal        # ALSO refresh ~/.claude/skills/workforce
 
-claude-workforce has a dual tree:
+claude-workforce has a THREE-copy tree, and the third is the one that resolves:
 
     workforce/                     the SOURCE distribution — what ships
     .claude/skills/workforce/      the RUNTIME copy — what a session here loads
+    ~/.claude/skills/workforce/    the PERSONAL install — SHADOWS the runtime
 
 Edit source, run this, restart Claude Code. Never edit the runtime copy: it is
 overwritten every sync, and source-first is a directive inherited from
 claude-enforcer, where reverse-order edits repeatedly landed in the runtime and
 were lost.
+
+WHY `--personal` EXISTS, and why it is a flag rather than the default. Skills resolve
+personal before project, so the personal install shadows everything this script builds
+and goes stale the moment source changes. `bin/check` fails on that drift and names two
+remedies — and MEASURED 2026-08-04, in maintainer mode BOTH are wrong:
+
+  "re-run the installer"        `install` fetches from raw.githubusercontent.com/main.
+                                With unpushed local changes it overwrites the personal
+                                install with the PUBLISHED version — it looks like a
+                                successful refresh and installs stale code.
+  "delete the personal install" the project runtime only exists inside this repo, so
+                                deleting it removes `/workforce` from every OTHER
+                                project on the machine.
+
+The gap was blocking, not cosmetic: `bin/prove` refuses on a red baseline, and this
+drift IS a red baseline — so the project's proof-by-breaking discipline had no working
+tool behind it again, for the second recorded time, from a different cause.
+
+It stays a FLAG because CLAUDE.md is right that aiming a delete-then-rebuild outside
+the repo is not a default worth having. A deliberate gesture is exactly what the
+doctrine asked for; what was missing was any gesture at all.
 
 This reads manifest.txt, so it fails the same way an installer would if the
 manifest and the tree disagree — which is the point. `bin/check` asserts that
@@ -27,13 +50,30 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
 DEST_ROOT = ".claude/skills/workforce"
+PERSONAL_ROOT = os.path.expanduser("~/.claude/skills/workforce")
 PREFIX = "workforce/"
+
+argv = sys.argv[1:]
+personal = "--personal" in argv
+for a in argv:
+    if a != "--personal":
+        sys.exit(f"unknown argument {a!r}\nusage: bin/sync [--personal]")
 
 if not os.path.isfile("manifest.txt"):
     sys.exit("no manifest.txt — run from the repo root")
 
-if os.path.isdir(DEST_ROOT):
-    shutil.rmtree(DEST_ROOT)
+# REFUSE to delete-then-rebuild a path that is not a workforce install. This script
+# removes its target outright, and `--personal` is the one mode that aims that outside
+# the repo — so the target is identified before it is destroyed, never after.
+if personal and os.path.exists(PERSONAL_ROOT) and not os.path.isfile(
+        os.path.join(PERSONAL_ROOT, "SKILL.md")):
+    sys.exit(f"REFUSING — {PERSONAL_ROOT} exists but has no SKILL.md, so it is not a "
+             f"workforce install. Nothing was removed.")
+
+targets = [DEST_ROOT] + ([PERSONAL_ROOT] if personal else [])
+for t in targets:
+    if os.path.isdir(t):
+        shutil.rmtree(t)
 
 copied = 0
 missing = []
@@ -73,14 +113,16 @@ for line in open("manifest.txt", encoding="utf-8"):
         missing.append(f"{s} (declared, not on disk)")
         continue
 
-    dest = os.path.join(DEST_ROOT, s[len(PREFIX):])
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    shutil.copy2(s, dest)
-    if executable:
-        os.chmod(dest, os.stat(dest).st_mode | 0o111)
+    for target in targets:
+        dest = os.path.join(target, s[len(PREFIX):])
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(s, dest)
+        if executable:
+            os.chmod(dest, os.stat(dest).st_mode | 0o111)
     copied += 1
 
-print(f"synced {copied} files to {DEST_ROOT}")
+for t in targets:
+    print(f"synced {copied} files to {t}")
 
 if missing:
     print("\nmanifest problems:")

@@ -558,7 +558,34 @@ which system they are leaving, made silently, immediately before the only step t
 | Rule | Under succession | Why |
 |---|---|---|
 | **3** — hand-authored, no machine-owned region | **stands down** | The rule protects *authorship*, and succession is the author saying "take it over". It is not limited to another generator's output: a hand-written skill is as much part of the library as a generated one |
-| **7** — owned by another generator | **stands down** | Its whole reason is that the owner rewrites `SKILL.md` on the next run, producing two live copies. A retired owner never runs again, so the risk it names does not exist |
+| **7** — owned by another generator | **stands down** | Its whole reason is that the owner rewrites `SKILL.md` on the next run, producing two live copies. A retired owner never runs again — **and "retired" means REMOVED, never "succession was declared"** (§ A declared succession retires nothing) |
+
+### A declared succession retires nothing — the sweep does
+
+**MEASURED 2026-08-04, and it falsifies the premise as it was written.** `~/lab/claude-enforcer` is
+live: newest commit `4851b46`, dated 2026-08-03, installed and invocable. `/skill-builder update`
+overwrites local edits by design. So on the one tree this project has actually converted, the owner
+rule 7 protects against **can still run**.
+
+The error was not the premise but where it was applied. Declaring succession **records intent**; it
+removes nothing. The predecessor's generator stays installed and invocable until the sweep unlinks it —
+and the sweep is a separate command *deliberately*, because removing `skill-builder` is one transaction
+with four parts (relocating `model-lanes.md`, rewriting its hard paths, removing its emissions, and
+re-pointing its hook registrations, which otherwise fail with 127 on every `Edit` and `Write`).
+
+**So between T7b and the sweep there is a window in which rule 7 is stood down and the owner it names
+is live.** A `/skill-builder update` inside that window rewrites the converted skills — the
+two-canonical-texts failure rule 7 exists to prevent, reached *through* the rule that was supposed to
+prevent it. That is `f2-two-generators`' failure arrived at from the opposite direction: there, by
+naming the wrong owner; here, by assuming the named one had already stopped.
+
+**The window is not closed by widening the sweep.** A gate may refuse an ACT, and a four-part
+transaction is a real refusal (`SKILL.md` § Sacred-Directive Enforcement Gates, Atomic-or-Absent
+rule 7). What is forbidden is leaving the
+window *unstated*: the run **reports the predecessor as LIVE until its sweep completes**, because a
+stood-down rule whose premise has not been established yet is a risk the user is carrying without
+having been told. Absence of the line reads as a retired predecessor, and on this tree that reading was
+false for the entire run.
 
 ### What still refuses — and this list is the point
 
