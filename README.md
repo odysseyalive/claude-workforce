@@ -199,7 +199,7 @@ Four things, stated without cushioning.
 
 **Only the top-level summary returns to you.** Every employee writes its work to a file and returns a verdict plus a path. A lead that summarizes away its team's findings isn't something the system can prevent.
 
-**Cost scales with fan-out.** Each spawn pays for a fresh context plus your entire `CLAUDE.md`. Keeping that file small is the single highest-leverage thing you can do. The audit proposes specific cuts: what the model could derive from your codebase anyway, and what its own conversions made false.
+**Cost scales with fan-out.** Each spawn pays for a fresh context plus whatever the harness injects into it, with no per-agent opt-out. That is why `CLAUDE.md` gets evacuated rather than trimmed. Until the evacuation finishes, every line still in the file is paid on every spawn, multiplied by the width of your org.
 
 ## If Your Repo Has a Test Corpus
 
