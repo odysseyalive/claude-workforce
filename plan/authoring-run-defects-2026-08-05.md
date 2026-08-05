@@ -2,7 +2,8 @@
 
 A `dev audit` on a real target reported three findings and a failure count. All four are class defects
 in the shipped distribution, and none had any mechanical guard. Every one was **verified absent before
-being fixed** — grepped, zero hits.
+being fixed** — grepped, zero hits. **A fifth was found by running the second fix against a real tree,
+and it was mine** (§ 2).
 
 ## 1. `tools: All tools` — the failure that presents as its opposite
 
@@ -99,7 +100,7 @@ stand**.
 
 ## Verification
 
-**780 assertions · 139/139 proven by breaking · 70 script fixtures · 6/6 idempotent.**
+**781 assertions · 140/140 proven by breaking · 70 script fixtures · 6/6 idempotent.**
 
 Two fixtures for the runtime guards — `conform-alltools` and `conform-staging-diverged` — because an
 assertion that greps for a literal proves the code contains a string, not that the behaviour holds.
