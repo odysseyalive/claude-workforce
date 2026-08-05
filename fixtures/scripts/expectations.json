@@ -860,5 +860,38 @@
       "real-employee.md",
       "applied 1"
     ]
+  },
+  "claudemd-evacuated": {
+    "_why": "Every directive line reached a component \u2014 one a handbook, one the org charter \u2014 so the ledger is empty and CLAUDE.md may be deleted. DUPLICATED lines are counted as relocated because that is what duplicated MEANS; counting only the USER bucket made a two-rule fixture report one, understating the direction in the file.",
+    "script": "wf-claude-md",
+    "args": [
+      "--evacuate"
+    ],
+    "exit": 0,
+    "want": [
+      "2 directive line(s)",
+      "2 relocated",
+      "0 UNPLACED"
+    ],
+    "not": [
+      "UNPLACED  CLAUDE.md"
+    ]
+  },
+  "claudemd-unevacuated": {
+    "_why": "Same tree plus ONE rule that reached no component. Exit 1, the line is named, and the refusal says why: a line that arrived nowhere was not moved, it was lost. Paired with claudemd-evacuated so a regression that always-permits or always-refuses fails one.",
+    "script": "wf-claude-md",
+    "args": [
+      "--evacuate"
+    ],
+    "exit": 1,
+    "want": [
+      "1 UNPLACED",
+      "UNPLACED  CLAUDE.md",
+      "may NOT be deleted",
+      "destructive migration script"
+    ],
+    "not": [
+      "0 UNPLACED"
+    ]
   }
 }

@@ -231,6 +231,35 @@ survived in a docstring while the mechanism was deleted. Each now asserts the di
 That is the second-order version of the same failure: a check that tests vocabulary rather than
 behaviour is doctrine wearing enforcement.*
 
+**Closed 2026-08-05 — CLAUDE.md is evacuated, then deleted.** Record in
+`plan/claude-md-evacuation-2026-08-05.md`. A third user directive the same day, and it **supersedes the
+2026-08-03 one rather than restating it**: that said "very sparce or next to nothing" and produced the
+generated region; this says **zero**.
+
+**The rationale is ATTENTION, not bytes**, which is a different argument from the one the byte budget
+makes. `CLAUDE.md` is injected once at the head of a conversation, so as context grows it competes with
+everything newer — *"CLAUDE.md is only effective for the first part of the conversation."* A component
+does not decay that way: a handbook arrives with the spawn, a skill with the invocation, a hook on the
+call it guards. **Stated as a rationale and never as a blocking check**, because fact 6 is `DOCUMENTED`
+and `platform.md` already records that "the injection cost is not measured" — there is no measured fact
+about attention decay either, and `platform.md` § MEASURED vs DOCUMENTED bars one from gating.
+
+| | |
+|---|---|
+| **the split that makes it safe** | WHICH destination a line belongs to is **JUDGMENT**, decided during the audit — Core Principle 8 forbids a decision tree, the same reasoning that kept the mechanism/judgment cut out of a script. WHETHER it arrived is **MECHANICAL**: `wf-claude-md --evacuate`, a per-line ledger, exit 1 while any line is `UNPLACED` |
+| **it is T7b pointed at a different file** | the remainder test applied to `CLAUDE.md` — a transform with a verification, never a deletion with a rationale |
+| **`PASS-CLAUDE-MD-EVACUATED`** | `AUTO`, deletes only on a proven-empty ledger, stores the whole file in `files_removed` first. **Both real trees REFUSE today** — 70 and 191 unplaced. That is the honest state of those projects, not a defect in the pass |
+| **the straggler clause, honored literally** | `.claude/workforce/` is a destination, so a rule that fits no handbook, skill, script or hook lands in the org process |
+
+*One accounting flaw, found by the fixture rather than by reading: the first ledger counted only the
+`USER` bucket, so a two-rule fixture reported **one** directive line — the rule already living in a
+handbook had been classified `DUPLICATED` and stopped being visible. But `DUPLICATED` means already
+relocated; it is the success case, and omitting it made a completed evacuation look partial.*
+
+`bin/prove` breaks the **refusal** rather than the feature: the ledger still computes and still prints
+`UNPLACED`, it just stops exiting non-zero — so the gate would proceed to delete a file whose direction
+reached nothing. **The regression direction is a silent loss**, which is the one this cannot absorb.
+
 **The detection gaps were closed by measuring them, and the measurement is the finding.** All four were
 run against both real trees on this machine, and **every one has an empty defect population**:
 

@@ -163,6 +163,28 @@ still be freely edited or deleted once the block is extracted), and every write 
 did. Mechanics at `references/passes.md` § What a pass may do and `references/procedures/hooks.md`
 § Procedure step 6b.*
 
+> **"I would like to add a new directive to dev to create a process that completely removes the
+> CLAUDE.md file completely. Any additinoal direction in the current projects CLAUDE.md needs to be
+> translated into the given agents/skills/scripts/hooks componants. I imagine any stragler CLAUDE.md
+> directives could be placed inside the org process itself. The idea behind this is that CLAUDE.md is
+> only effective for the first part of the conversation. As the context grows, CLAUDE.md becomes less
+> and less irrevalant. So our audit would convert the current CLAUDE.md of the project into the
+> appropriate agents/skills/scripts/hooks elements, and afterward delete CLAUDE.md entirely."**
+
+*— Added 2026-08-05, source: user directive. **This supersedes the 2026-08-03 CLAUDE.md directive
+above rather than restating it**: that one said "very sparce or next to nothing" and produced a
+generated region; this one says zero, and the file is deleted. Both are kept — the block is never
+reordered or edited, and the earlier one records why the region exists for the runs that still have
+one. The rationale is about ATTENTION, not bytes: CLAUDE.md is injected once at the head of a
+conversation, so as context grows it competes with everything newer, and a rule nobody re-reads is a
+rule that stops firing. **A component does not decay that way** — a handbook arrives with the spawn
+that needs it, a skill with the invocation, a hook on the call it guards. Governs `audit`; mechanics at
+`references/claude-md.md` § Evacuation. The operational reading is — **every line of a project's
+CLAUDE.md is relocated to the component that owns it and the file is then deleted, with relocation
+PROVEN per line rather than asserted**, because directive one is retention and a line that reached no
+component was not relocated, it was lost. The "straggler" clause is honored literally: what no
+component owns goes into the `/org` dispatch process, which is loaded on every routed ask.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a

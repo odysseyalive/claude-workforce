@@ -99,6 +99,7 @@ sentence is not recoverable by re-running it.
 |---|---|---|---|---|---|---|
 | `PASS-DEAD-HOOK` | any project's settings | a registration whose command resolves to nothing | AUTO | STRUCTURAL | 1.0 | `plan/dead-hook-apply-2026-08-05.md` |
 | `PASS-STALE-CANARY` | any project's `.claude/agents/` | a throwaway canary whose fact is already measured | AUTO | STRUCTURAL | 1.0 | `plan/dead-hook-apply-2026-08-05.md` |
+| `PASS-CLAUDE-MD-EVACUATED` | any project's `CLAUDE.md` | the file, once every line is relocated | AUTO | STRUCTURAL | 1.0 | `plan/claude-md-evacuation-2026-08-05.md` |
 | `PASS-MARKER-GRAMMAR` | shipped scripts | `re.compile` patterns naming `origin:` + `immutable` | AUTO (repo-side) | STRUCTURAL | 1.0 | `plan/marker-grammar-2026-08-05.md` |
 | `PASS-DEAD-SCRIPT` | any project's skills | `script:` tokens in the invocation manifest | REPORT | STRUCTURAL | 1.0 | `plan/dead-script-2026-08-05.md` |
 

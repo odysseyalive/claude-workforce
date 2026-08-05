@@ -3077,6 +3077,35 @@ _report_toks = [m.group(1) for m in
                 re.finditer(r"^\|\s*`(PASS-[A-Z-]+)`\s*\|[^|]*\|[^|]*\|\s*REPORT\s*\|", _passes, re.M)]
 _unmeasured = [t for t in _report_toks
                if not re.search(re.escape(t) + r'"[^}]*?"precision"', _apply, re.S)]
+# ── CLAUDE.md evacuation (user directive, 2026-08-05) ────────────────────────
+# "our audit would convert the current CLAUDE.md of the project into the appropriate
+# agents/skills/scripts/hooks elements, and afterward delete CLAUDE.md entirely."
+#
+# The DESTINATION of a line is judgment and is decided during the audit. WHETHER it
+# arrived is mechanical, and it is the remainder test (T7b) applied to CLAUDE.md: a
+# transform with a verification, never a deletion with a rationale. The gate must
+# REFUSE while any line is unplaced — a deletion that loses direction is the failure
+# directive one calls the gravest available, and a warning here would be a flag.
+_wcm = read("workforce/bin/wf-claude-md")
+check(
+    "claude-md: evacuation proves relocation per line before the file may be deleted",
+    "def evacuate(" in _wcm
+    and "UNPLACED" in _wcm
+    and "EVAC_DESTINATIONS" in _wcm
+    # The four component kinds the directive names, plus the org process for
+    # stragglers. Missing one marks a correctly relocated line UNPLACED and stalls an
+    # evacuation that had actually succeeded.
+    and '(".claude", "skills")' in _wcm
+    and '(".claude", "workforce")' in _wcm
+    and "return 1 if n_u else 0" in _wcm
+    and "PASS-CLAUDE-MD-EVACUATED" in _apply,
+    "CLAUDE.md is injected once at the head of a conversation, so a rule in it competes "
+    "with everything newer as context grows. The directive is that it is emptied into "
+    "components and deleted — but a file whose direction reached no handbook, skill, "
+    "script, hook or the org process has not been evacuated, it has been LOST. The "
+    "ledger is what tells those apart, and the gate refuses rather than warns",
+)
+
 check(
     "passes: a REPORT verdict cites a measured precision, never a default",
     not _unmeasured,

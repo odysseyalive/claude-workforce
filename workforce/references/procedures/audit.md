@@ -256,6 +256,22 @@ a correct sentence is not recoverable by re-running it.
 A finding is carried into the closing report and, if it needs work this run cannot do, into
 `deferred.md` with the rule that refused it. It never becomes an edit to a `SKILL.md` in this step.
 
+**Then run the CLAUDE.md evacuation ledger** (`references/claude-md.md` § Evacuation). The user
+directive is that `CLAUDE.md` is emptied into components and **deleted** — so this reports what is
+still holding it open:
+
+```bash
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --evacuate
+```
+
+Every `UNPLACED` line is direction that has reached no handbook, skill, script, hook, or the org
+process, and **relocating it is work this run does** — Step 2 designs the org, Step 3 converts, and a
+line naming employee behavior belongs in that employee's handbook. Exit `1` means the file may not be
+deleted yet; that is a statement about the relocation, not about the file.
+
+**Which destination a line belongs to is JUDGMENT and is decided here**, per the table in
+`claude-md.md` § Evacuation. Whether it arrived is mechanical and is what the ledger computes.
+
 **Then APPLY what can be applied. A detector that only reports is a flag, and a flag is not a fix** —
 `passes.md` § Directives is a user directive on exactly this:
 

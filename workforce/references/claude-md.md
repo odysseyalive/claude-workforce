@@ -15,6 +15,62 @@ is the measurement behind the user directive at `SKILL.md` § Directives, and it
 project had held in two places — `audit.md` Step 1 and `verify.md` § The user's own files both read
 *"never edit it — it is the user's file, and this is a proposal."*
 
+---
+
+## Evacuation — the file is emptied, then deleted
+
+**Superseding directive, 2026-08-05** (`SKILL.md` § Directives). The 2026-08-03 rule was "very sparce
+or next to nothing" and produced a generated region. The new one is **zero**: every line is relocated
+into the component that owns it, and `CLAUDE.md` is deleted.
+
+**The reason is ATTENTION, not bytes.** `CLAUDE.md` is injected once at the head of a conversation, so
+as context grows it competes with everything newer — a rule nobody re-reads is a rule that stops
+firing. A component does not decay that way: a handbook arrives with the spawn that needs it, a skill
+with the invocation, a hook on the call it guards.
+
+**State that honestly and do not overclaim it.** Fact 6 is `DOCUMENTED`, and `platform.md` records that
+*"the injection cost is not measured"*. The decay of early context under growth is a property of
+attention that this project has **not** measured on a host, so it is a rationale and never a blocking
+check (`platform.md` § MEASURED vs DOCUMENTED).
+
+### Where a line goes
+
+The destination is **JUDGMENT** and is decided during the audit. Core Principle 8 forbids a decision
+tree here for the same reason the mechanism/judgment cut is not in a script.
+
+| the line states | destination |
+|---|---|
+| how one employee behaves | that handbook |
+| a procedure or a mechanism | a skill, or a script inside one |
+| something that must fire on a tool call, every time | a **hook** — the only always-on component |
+| routing, precedence, or a rule that fits nowhere else | the **org process** (`/org`, the chart, the charter) — the directive's "straggler" clause, honored literally |
+| a `<!-- origin: user | immutable: true -->` block | extracted verbatim to `.claude/workforce/directives/` (T2) |
+
+**Architecture and stack notes are DERIVABLE, not direction** — a directory listing or a restated build
+command is re-derived from the tree on demand and is not relocated anywhere. `wf-claude-md` already
+separates them.
+
+### Whether a line arrived is MECHANICAL
+
+```bash
+"$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --evacuate
+```
+
+A per-line ledger: every directive line is `relocated` or `UNPLACED`. Exit `1` while any line is
+unplaced. **This is the remainder test (T7b) applied to `CLAUDE.md`** — a transform with a
+verification, never a deletion with a rationale.
+
+**`PASS-CLAUDE-MD-EVACUATED` deletes the file, and only on a proven-empty ledger.** It refuses while a
+single line is `UNPLACED` or a single sacred block is still inline, and it stores the whole file in
+`.settings-owned.json` § `files_removed` before removing it.
+
+**Both real trees refuse today** — 70 unplaced and 191 unplaced. That is the honest current state of
+those projects, not a defect in the pass: their `CLAUDE.md` files still hold direction that has reached
+no component. An evacuation is finished when the audit has relocated them, not when the file is gone.
+
+**A line that arrived nowhere was not moved — it was lost.** Directive one is retention, and that is
+why the gate refuses rather than warns.
+
 ## What changed, and what did not
 
 **Workforce now generates a marked region and may remove proven duplication.** It still may not delete

@@ -128,6 +128,79 @@ def owned_lines(root):
     return out
 
 
+# ── Evacuation ───────────────────────────────────────────────────────────────
+# The 2026-08-05 user directive: CLAUDE.md is not trimmed, it is EMPTIED and deleted.
+# "Any additinoal direction in the current projects CLAUDE.md needs to be translated
+# into the given agents/skills/scripts/hooks componants… any stragler CLAUDE.md
+# directives could be placed inside the org process itself."
+#
+# WHICH destination a line belongs to is JUDGMENT and is decided during the audit —
+# Core Principle 8 forbids a decision tree here, and the same reasoning that kept the
+# mechanism/judgment cut out of a script keeps this out of one.
+#
+# WHETHER a line arrived is MECHANICAL, and that is what this computes. It is the
+# remainder test (T7b) applied to CLAUDE.md: a transform with a verification, never a
+# deletion with a rationale. A line still UNPLACED after relocation was not moved —
+# it was about to be lost, and directive one makes that the gravest failure there is.
+#
+# The destinations are every place a component can live, because the directive names
+# four and the org process for stragglers. Missing one would mark a correctly relocated
+# line UNPLACED and stall an evacuation that had actually succeeded.
+EVAC_DESTINATIONS = (
+    (".claude", "agents"),                    # handbooks
+    (".claude", "workforce", "directives"),   # extracted sacred blocks
+    (".claude", "skills"),                    # skills, their references AND their scripts
+    (".claude", "workforce"),                 # org chart, charter, principles — the org process
+)
+
+
+def relocated_lines(root):
+    """Every line any component states. The union of where a CLAUDE.md line may land."""
+    out = set()
+    for parts in EVAC_DESTINATIONS:
+        d = os.path.join(root, *parts)
+        if not os.path.isdir(d):
+            continue
+        for dp, _dn, fns in os.walk(d):
+            for fn in fns:
+                # Scripts and hooks count: a rule enforced by a hook has arrived at its
+                # destination even though the destination is not prose.
+                if not fn.endswith((".md", ".sh", ".py", ".js", ".json", ".ps1")):
+                    continue
+                body = read(os.path.join(dp, fn))
+                if body is None:
+                    continue
+                for line in body.splitlines():
+                    s = line.strip().lstrip("#").lstrip("*").lstrip("-").strip()
+                    if len(s) >= MIN_LEN:
+                        out.add(s)
+    return out
+
+
+def evacuate(root):
+    """Per-line relocation ledger. UNPLACED > 0 means CLAUDE.md may NOT be deleted."""
+    c = classify(root)
+    if c is None:
+        return None
+    placed_in = relocated_lines(root)
+    # A DUPLICATED line is BY DEFINITION already relocated — it appears verbatim in a
+    # handbook or an extracted directive. Counting only the USER bucket made the total
+    # understate the direction in the file: a fixture with two rules reported one,
+    # because the relocated one had stopped being visible to the ledger.
+    placed, unplaced = list(c["duplicated"]), []
+    for lineno, line in c["user"]:
+        s = line.strip()
+        # A heading or a comment carries no direction; it is scaffolding around the
+        # lines that do. Counting it UNPLACED would make every evacuation impossible
+        # for a reason that has nothing to do with losing a rule.
+        if s.startswith("#") or s.startswith("<!--") or len(s) < MIN_LEN:
+            continue
+        (placed if s.lstrip("*").lstrip("-").strip() in placed_in
+         else unplaced).append((lineno, s))
+    return {"classify": c, "placed": placed, "unplaced": unplaced,
+            "sacred": len(IMMUTABLE_RX.findall(c["body"]))}
+
+
 def classify(root):
     path = os.path.join(root, "CLAUDE.md")
     body = read(path)
@@ -256,6 +329,8 @@ def main():
     ap.add_argument("--execute", action="store_true")
     ap.add_argument("--ensure-region", action="store_true", dest="ensure_region",
                     help="write ONLY the generated region; classify nothing, remove nothing")
+    ap.add_argument("--evacuate", action="store_true",
+                    help="per-line relocation ledger; exit 1 while any line is UNPLACED")
     ap.add_argument("--json", dest="json_path")
     args = ap.parse_args()
 
@@ -277,6 +352,30 @@ def main():
 
     if args.ensure_region:
         return ensure_region(root, write=args.execute)
+
+    if args.evacuate:
+        ev = evacuate(root)
+        if ev is None:
+            # ABSENT IS THE GOAL STATE HERE, and it must not read as an error. An
+            # evacuated project has no CLAUDE.md; saying "0 unplaced" would be
+            # indistinguishable from a tree that has one and was fully relocated.
+            print("evacuation    no CLAUDE.md — already evacuated, or never had one")
+            return 0
+        n_p, n_u = len(ev["placed"]), len(ev["unplaced"])
+        print(f"evacuation    {n_p + n_u} directive line(s) · {n_p} relocated · "
+              f"{n_u} UNPLACED · {ev['sacred']} sacred block(s) to extract first")
+        for lineno, s in ev["unplaced"]:
+            print(f"  UNPLACED  CLAUDE.md:{lineno}  {s[:96]}")
+        if n_u:
+            print("\n  CLAUDE.md may NOT be deleted. Each line above states direction "
+                  "that reached no\n  handbook, skill, script, hook, or the org process. "
+                  "Relocate it, then re-run.\n  Directive one is retention: a line that "
+                  "arrived nowhere was not moved, it was lost.")
+        elif ev["sacred"]:
+            print("\n  Sacred blocks must be extracted verbatim to "
+                  ".claude/workforce/directives/ before\n  deletion (T2). They are the "
+                  "user's own words and no regeneration reconstructs them.")
+        return 1 if n_u else 0
 
     r = classify(root)
     if r is None:

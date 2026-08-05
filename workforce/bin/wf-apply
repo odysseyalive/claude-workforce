@@ -236,6 +236,52 @@ def apply_stale_canaries(root, rows, execute):
     return edits
 
 
+# ── PASS-CLAUDE-MD-EVACUATED ─────────────────────────────────────────────────
+# The 2026-08-05 user directive: CLAUDE.md is emptied into components and DELETED.
+# The relocation is judgment and belongs to the audit; this pass performs only the
+# last step, and only once the relocation is PROVEN.
+#
+# THE GATE IS THE POINT. `wf-claude-md --evacuate` computes a per-line ledger, and
+# this refuses while a single line is UNPLACED or a single sacred block is still
+# inline. Deleting a file whose direction reached no component is not an evacuation,
+# it is a loss — and directive one makes that the gravest failure available. So on
+# every real tree today this REFUSES, loudly, with the count. That is the correct
+# reading of the current state, not a defect in the pass.
+def detect_claude_md(root):
+    if not os.path.exists(os.path.join(root, "CLAUDE.md")):
+        return []                       # already evacuated, or never had one
+    wcm = _load("wf-claude-md")
+    ev = wcm.evacuate(root)
+    if ev is None:
+        return []
+    blockers = len(ev["unplaced"]) + ev["sacred"]
+    return [((root, len(ev["unplaced"]), ev["sacred"]),
+             "REFUSED" if blockers else "REMOVABLE")]
+
+
+def apply_claude_md(root, rows, execute):
+    edits = []
+    for (_r, _u, _s), verdict in rows:
+        if verdict != "REMOVABLE":
+            continue
+        path = os.path.join(root, "CLAUDE.md")
+        edits.append(("CLAUDE.md", "fully relocated — 0 unplaced, 0 sacred inline", None))
+        if execute:
+            side = os.path.join(root, SIDECAR)
+            os.makedirs(os.path.dirname(side), exist_ok=True)
+            try:
+                sc = json.loads(read(side)) if os.path.exists(side) else {}
+            except (json.JSONDecodeError, ValueError):
+                sc = {}
+            sc.setdefault("files_removed", []).append(
+                {"path": "CLAUDE.md", "content": read(path)})
+            with open(side, "w", encoding="utf-8") as fh:
+                json.dump(sc, fh, indent=2)
+                fh.write("\n")
+            os.remove(path)
+    return edits
+
+
 # ── PASS-DEAD-SCRIPT ─────────────────────────────────────────────────────────
 def detect_dead_scripts(root):
     return [(r, "REPORT") for r in _load("wf-remainder").dead_scripts(root)]
@@ -251,6 +297,10 @@ PASSES = [
         "reversal": ".claude/workforce/.settings-owned.json § hooks_removed",
         "precision": "1.00 — wf-census separates DEAD from UNDECIDABLE, and only "
                      "exists is False is taken (3 of 3 on odyssey-alive, hand-verified)",
+        "refusal": lambda h: (
+            f"{h['skill']} is under declared succession — workforce OWES this "
+            f"capability, so removing the registration would close the finding by "
+            f"breaching the conversion floor (hooks.md § Procedure step 6b)"),
         "detect": detect_dead_hooks,
         "apply": apply_dead_hooks,
     },
@@ -265,8 +315,30 @@ PASSES = [
         "precision": "1.00 — three independent conditions must hold; a SHIPPED canary "
                      "carries measures-fact: and is never touched (4 of 4 on "
                      "apps-odyssey-alive, hand-verified against platform-local.md)",
+        "refusal": lambda r: (
+            f"{os.path.basename(r[0])} — platform-local.md records no measurement, so "
+            f"the canary's own expiry condition is not met and it is not yet residue"),
         "detect": detect_stale_canaries,
         "apply": apply_stale_canaries,
+    },
+    {
+        "token": "PASS-CLAUDE-MD-EVACUATED",
+        "verdict": "AUTO",
+        "legality": "MECHANICAL — the per-line ledger reports 0 UNPLACED and 0 sacred "
+                    "block still inline. Both are counted, neither is judged",
+        "safe": "the whole file is stored in the sidecar before deletion; sacred "
+                "blocks must already be extracted (T2) or the gate refuses",
+        "reversal": ".claude/workforce/.settings-owned.json § files_removed (whole file)",
+        "precision": "1.00 — it deletes only on a proven-empty ledger, and refuses "
+                     "otherwise. Measured: REFUSES on both real trees today "
+                     "(70 unplaced / 191 unplaced), which is the honest state",
+        "refusal": lambda r: (
+            f"CLAUDE.md — {r[1]} line(s) UNPLACED, {r[2]} sacred block(s) still inline. "
+            f"Each states direction that reached no handbook, skill, script, hook or the "
+            f"org process. Relocate them first; deleting now would LOSE them, and "
+            f"directive one is retention"),
+        "detect": detect_claude_md,
+        "apply": apply_claude_md,
     },
     {
         "token": "PASS-DEAD-SCRIPT",
@@ -303,10 +375,11 @@ def main(argv):
                 print(f"  {'-' if execute else '~'} {rel}  {where}")
                 if cmd:
                     print(f"      {cmd}")
-            for h, _v in refusals:
-                print(f"  REFUSED  {h['skill']} is under declared succession — "
-                      f"workforce owes this capability, so removing the registration "
-                      f"would close the finding by breaching the floor (hooks.md)")
+            # Each pass formats its OWN refusal. A shared message assumed a hook dict
+            # and would raise on any other row shape — a refusal that crashes the run
+            # is worse than the finding it declined.
+            for row, _v in refusals:
+                print("  REFUSED  " + p["refusal"](row))
             if edits and not execute:
                 print(f"  reversal: {p['reversal']}")
                 print("  apply with: --execute")
