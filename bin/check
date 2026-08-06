@@ -5235,24 +5235,36 @@ for p in declared:
         if n > 260:
             warn(f"{os.path.basename(p)} is {n} lines", "long reference; candidate for a split or ablation")
 
-if not os.path.exists("CLAUDE.md"):
-    warn("no CLAUDE.md at the repo root", "a fresh session here has no orientation")
-else:
-    # THE RECORD MOVED, SO THE CHECK MOVED WITH IT (2026-08-05). CLAUDE.md is injected
-    # into every non-fork subagent with no opt-out, so its 70,690 bytes were paid on
-    # every spawn in the repo that spawns most — against a user directive saying a
-    # CLAUDE.md should be "very sparce or next to nothing". The development record
-    # now lives in DEVELOPMENT.md, which is injected nowhere.
-    #
-    # The staleness question follows the record, not the filename. It is still the
-    # ONLY store that goes stale silently — the others are append-only. It spent two
-    # days and nineteen commits telling every fresh session that "every writing step
-    # remains unexecuted", by then false in four of five particulars.
-    #
-    # REPORTED, NOT BLOCKED, and no threshold is invented: the numbers are printed
-    # and the judgment is the reader's. A count that fires at one commit is noise;
-    # a count nobody prints is how this went stale in the first place.
-    _rec = "DEVELOPMENT.md" if os.path.exists("DEVELOPMENT.md") else "CLAUDE.md"
+# NO "no CLAUDE.md" WARNING: absence is the finished state, not a gap (2026-08-06).
+# The old warning said a fresh session "has no orientation" without CLAUDE.md. That
+# premise died with the evacuation: orientation lives in operating-principles/SKILL.md,
+# injected into every non-fork spawn. And the direction is backwards — the blocking
+# check "this repo has no CLAUDE.md — it was evacuated, not merely trimmed" (below)
+# already asserts absence and FAILS on re-accumulation, so a warning firing on the
+# enforced success state was noise pointing opposite a MUST. Deleted, not inverted:
+# an inverted warn() would only weakly duplicate that check.
+
+# THE RECORD MOVED, SO THE CHECK MOVED WITH IT (2026-08-05), AND ITS GUARD MOVED TOO
+# (2026-08-06). CLAUDE.md was injected into every non-fork subagent with no opt-out,
+# so its 70,690 bytes were paid on every spawn in the repo that spawns most — against
+# a user directive saying a CLAUDE.md should be "very sparce or next to nothing". The
+# development record now lives in DEVELOPMENT.md, injected nowhere, and CLAUDE.md was
+# deleted. This block used to hang off `if os.path.exists("CLAUDE.md"): ... else:`, so
+# the deletion made it unreachable — written-then-unwired, inside the file that exists
+# to catch written-then-unwired. It escaped notice only because DEVELOPMENT.md was
+# current, i.e. it would have stayed silent right up to the moment it was meant to
+# speak. It now keys on the record directly and fires regardless of CLAUDE.md.
+#
+# The staleness question follows the record, not the filename. That record is still the
+# ONLY store that goes stale silently — the others are append-only. It spent two days
+# and nineteen commits telling every fresh session that "every writing step remains
+# unexecuted", by then false in four of five particulars.
+#
+# REPORTED, NOT BLOCKED, and no threshold is invented: the numbers are printed and the
+# judgment is the reader's. A count that fires at one commit is noise; a count nobody
+# prints is how this went stale in the first place.
+if os.path.exists("DEVELOPMENT.md"):
+    _rec = "DEVELOPMENT.md"
     _m_open = re.search(r"^## Open, as of (\d{4}-\d{2}-\d{2})", read(_rec), re.M)
     if not _m_open:
         warn(f"{_rec} states no 'Open, as of <date>'",
