@@ -23,7 +23,7 @@ Claude Workforce takes that insight and builds on it. Instead of one assistant d
 
 This project grew out of [claude-enforcer](https://github.com/odysseyalive/claude-enforcer), which solved a real problem.
 
-Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Researchers call it "lost in the middle." You've probably just called it Tuesday.
+Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Nelson Liu's group at Stanford [measured that and named it "lost in the middle"](https://aclanthology.org/2024.tacl-1.9/). A model retrieves worst from the middle of a long input and best from its edges.
 
 The enforcer built layers to resist that: hardened skills, mechanical hooks, fresh-context validators that fire in their own isolated context where the conversation's noise can't reach them. And it worked. Skills stopped drifting. But the longer the system ran, the clearer a different problem became.
 
@@ -189,7 +189,7 @@ The safety here is mechanical. `wf-claude-md --evacuate` reports every directive
 
 The third is this repository, which ran the audit on itself on 2026-08-06. Its own CLAUDE.md is gone: 83 directive lines proven relocated first, the whole 168-line file stored in `.claude/workforce/.settings-owned.json` before the delete, and in git history besides. The Non-negotiables that had sat at the top of that file are now the `## Guardrails` of the one employee they constrain, and arrive with the spawn that has to obey them. The stack description moved nowhere and was dropped.
 
-Emptying the file also turned up a rule that had no other home. A dated, attributed user directive — *a detector ships with its fix* — existed only in CLAUDE.md, and the shipped references carried a paraphrase of it and nothing more. No gate could have caught that, because every gate counts directives wrapped in immutable spans and this one never was. It survived exactly as long as someone kept reading the top of the file. That is the failure the deletion is for: a file can be the only place a rule lives while steadily losing the attention that makes it a rule.
+Emptying the file also turned up a rule that had no other home. A dated, attributed user directive, *a detector ships with its fix*, existed only in CLAUDE.md, and the shipped references carried a paraphrase of it and nothing more. No gate could have caught that, because every gate counts directives wrapped in immutable spans and this one never was. It survived exactly as long as someone kept reading the top of the file. That is the failure the deletion is for: a file can be the only place a rule lives while steadily losing the attention that makes it a rule.
 
 One caveat, since the rest of this reads as a pitch. That early context loses influence as a session grows is a reason, not a measurement. Nothing here has measured it on a host, and this project's own rule is that an unmeasured fact never becomes a blocking check. What is enforced is the ledger, which is a property of files and can be verified.
 
