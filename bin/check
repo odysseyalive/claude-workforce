@@ -1069,6 +1069,64 @@ check(
     "projects seeded from one predecessor, one reconciled to v2 with 24 mechanisms, "
     "the other never reconciled and carrying no anchor at all",
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# The third catalog slot, landed 2026-08-06.
+#
+# Two slots existed and neither could take an entry authored HERE. The vendored
+# corpus must stay byte-identical to claude-enforcer or the reconcile above cannot
+# compute a difference; a project's catalog under `.claude/skills/<evaluator>/` is
+# gitignored and does not ship. So evaluators.md § Seeding called growing the seed
+# "a release task" while the paragraph above it forbade the only edit that would
+# have done it, and this project's own catalog work reached no end user.
+#
+# The failure this guards is silent: additions that ship in manifest.txt but that
+# no seeding step reads are dead weight on every install — written, unwired, in the
+# machinery whose whole job is catching written-and-unwired.
+# ─────────────────────────────────────────────────────────────────────────────
+_ADDITIONS = [
+    "workforce/references/evaluator-additions/text-tells.md",
+    "workforce/references/evaluator-additions/code-eval.md",
+]
+check(
+    "additions: declared, present, and OUTSIDE the vendored set",
+    all(p_ in declared and os.path.exists(p_) and p_ not in VENDORED for p_ in _ADDITIONS),
+    f"the authored slot must ship and must not be vendored; VENDORED is keyed on the "
+    f"`workforce/references/catalogs/` prefix, so a path placed under it would inherit "
+    f"the read-only contract it exists to escape. missing/misfiled: "
+    f"{[p_ for p_ in _ADDITIONS if p_ not in declared or not os.path.exists(p_) or p_ in VENDORED]}",
+)
+check(
+    "additions: each carries its own anchor and declares workforce as author",
+    all(
+        read(p_).splitlines()[0].startswith("<!--")
+        and "additions-version:" in read(p_).splitlines()[0]
+        # NOT a fixed line index: `bin/coverage --stamp` inserts its Enforcement
+        # header at line 2, so pinning `origin:` to splitlines()[1] fails the moment
+        # coverage runs — a check that passes only until the next stamping pass.
+        and "origin: workforce" in "\n".join(read(p_).splitlines()[:6])
+        for p_ in _ADDITIONS if os.path.exists(p_)
+    ),
+    "without its own anchor an additions file cannot be propagated separately from "
+    "the vendored corpus, and a reconcile would have to re-derive which rows are ours "
+    "by reading prose — the check that quietly stops happening",
+)
+_ev_seed = read("workforce/references/evaluators.md")
+check(
+    "additions: the seeding step names both files BY PATH",
+    all(p_.replace("workforce/", "") in _ev_seed for p_ in _ADDITIONS)
+    and "vendored first, additions second" in _ev_seed,
+    "a shipped file no procedure reads is dead weight on every install. Path, not "
+    "name: a step that mentions 'the additions' without telling the caller what to "
+    "open is the same bug as an agent definition convened by nothing",
+)
+check(
+    "additions: manifest states the authored-vs-vendored distinction where it ships them",
+    "AUTHORED HERE, NOT VENDORED" in read("manifest.txt")
+    and "only sanctioned place to GROW" in read("manifest.txt"),
+    "the vendored block already carries VENDORED, NOT AUTHORED; without its "
+    "counterpart the next reader sees two catalog blocks with one rule between them "
+    "and applies the read-only rule to both, which closes the slot again",
+)
 check(
     "records: a predecessor's knowledge base converts its ownership, not its record types",
     "converted, never re-typed" in ds

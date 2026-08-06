@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 30 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -242,6 +242,13 @@ Seeding, in order:
    `references/catalogs/code/` carry the portable corpora **verbatim**, each with its own version anchor
    on line 1 (`creative-scrub-ref-version`, `code-eval-ref-version`). No predecessor needs to be
    installed and no machine-dependent branch decides what a project gets.
+
+   1b. **Then append this project's own additions.** `references/evaluator-additions/text-tells.md`
+   and `references/evaluator-additions/code-eval.md` are **authored here, not vendored**, each with
+   its own anchor (`text-additions-version`, `code-additions-version`). A seeded catalog is the
+   concatenation: vendored first, additions second. **Record both provenances separately in the
+   anchor** — a later reconcile has to tell an upstream row from one of ours, and a merged file it
+   cannot decompose is a reconcile that has to be redone by hand.
 2. **claude-enforcer also present, and newer?** Reconcile against it and append the difference
    (§ Forcible propagation). It is the same comparison run against any newer source; the shipped copy is
    simply the floor.
@@ -271,8 +278,18 @@ is the same shape claude-enforcer already ships and this file already describes 
 never happen is workforce **editing** a vendored file to suit itself: that forks a corpus with one
 origin, and `manifest.txt` § Vendored evaluator catalogs says so at the top of the list.
 
+**So growth goes to `references/evaluator-additions/`, and that is the whole reason it exists.**
+Until 2026-08-06 there were two slots and neither could take a new entry authored here: the vendored
+corpus may not be edited, and a project's own catalog under `.claude/skills/<evaluator>/` does not
+ship. The paragraph below called growing the seed a release task while the paragraph above forbade
+the only edit that would have accomplished it. **A third slot resolves it without weakening either
+rule** — the vendored copy stays byte-identical to its origin, and workforce's contributions are
+tracked, shipped, and attributable to this project rather than to a predecessor that never wrote
+them.
+
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
-carry more of the weight. Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
+carry more of the weight — **which now means adding to `references/evaluator-additions/`, never to
+`references/catalogs/`.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
 was, and that checklist has five items and has never carried one for the seed, and the honest signal
 is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
 corpus.

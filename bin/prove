@@ -111,11 +111,26 @@ WSR  = "workforce/bin/wf-standing-request"
 RTL  = ".claude/agents/runtime-lead.md"
 DAU  = ".claude/agents/doctrine-author.md"
 CEN2 = "workforce/bin/wf-census"
+EVL  = "workforce/references/evaluators.md"
+ADDT = "workforce/references/evaluator-additions/text-tells.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── the third catalog slot (2026-08-06) ──────────────────────────────────
+    # Each of the four breaks a DIFFERENT way the slot can silently close, because
+    # the failure mode is not "the file is wrong" but "the file ships and nothing
+    # reads it". Deleting the manifest row and deleting the seeding path both leave
+    # a perfectly valid additions file on disk that reaches no installed catalog.
+    ("additions: declared, present, and OUTSIDE the vendored set",
+     MAN, "del", "workforce/references/evaluator-additions/text-tells.md\n"),
+    ("additions: each carries its own anchor and declares workforce as author",
+     ADDT, "del", "text-additions-version: 1"),
+    ("additions: the seeding step names both files BY PATH",
+     EVL, "del", "`references/evaluator-additions/text-tells.md`"),
+    ("additions: manifest states the authored-vs-vendored distinction where it ships them",
+     MAN, "del", "AUTHORED HERE, NOT VENDORED"),
     ("wf-checkrun ships no executing path",
      CKR, "append", "\n# --run\nimport subprocess\n"),
     ("wf-checkrun states WHY the executing path is absent",
