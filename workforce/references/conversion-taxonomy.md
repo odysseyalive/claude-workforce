@@ -635,6 +635,38 @@ category, never by authorship** (`legacy-markers.md`):
 | **data** it maintained — a ledger, an index | migrated, enumerated from the filesystem and never from that artifact's own index |
 | anything generated-looking that matches no marker | quarantined to the report, untouched |
 
+**EVERY `removed` ROW IN THAT TABLE IS STAGED INTO THE CONVERSION JOURNAL AT `T7s`, OR IT IS NOT IN THE
+REMOVAL SET.** Deciding a removal and performing one are two acts with one producer between them, and
+this file specified the first and never named the second: `sweep.md` § Procedure step 3 derives the removal set *"from
+the journal, never from `dispositions.md` prose"* — correctly, because the journal records what was
+actually staged — and **nothing here wrote a journal row.** Until 2026-08-06 this file contained the
+string `journal` zero times.
+
+*Measured on `odyssey-alive` across three consecutive audits: `skill-builder` dispositioned* **SUPERSEDED
+GENERATOR · removed entirely** *in `dispositions.md`, `.claude/skills/skill-builder/` on disk the whole
+time, and* **zero journal rows naming it** *— so every run printed `INV-SUCCESSION  sweep NOT executed —
+removal set is empty  NOT UPHELD` and every run was right about the journal and silent about why.
+`sweep.md`'s own reporting exemplar has shown `+ skill-builder  removed (SUPERSEDED-GENERATOR)` as its
+worked example the entire time. This is the project's named dominant failure mode — doctrine written
+correctly with nothing making it true — landing on the one command that deletes.*
+
+The step is `procedures/hire.md` § A removal target stages too, and it is short because it reuses the
+conversion machinery rather than paralleling it: **T2 extract (blocking, unchanged) → T7s copy the whole
+target directory to staging and hash its `SKILL.md` into the journal → T7c write the mark row → T8
+COMMITTED.** Nothing is unlinked; the sweep still does that, still once, still after the whole org
+verifies.
+
+**What authorizes it is the org, never a per-skill replacement.** A conversion may not retire a skill
+without a verified live employee (T7's rule). A superseded generator has no such counterpart, because
+what replaces it is workforce itself — so the authorization is `INV-VERIFY` and the Step 6c
+preconditions, which are org-level and already gate the sweep. **A run that reads T7's rule as
+unsatisfiable here and therefore stages nothing has found the gap this paragraph closes**, and the
+honest report of that state was never "the removal set is empty."
+
+**An empty removal set under `succession: declared` is a finding about this step, not a description of
+the tree.** `INV-SUCCESSION` prints the staged count against the dispositioned count and names every
+target that has one and not the other; `wf-conform` fails the run on the difference.
+
 **The extraction gate is blocking, and it precedes every deletion in the run.** Before the first file is
 removed, every `origin: user | immutable: true` span in the tree is extracted verbatim and byte-exact
 with its source `file:line`, and the extracted count is asserted against the census: **N of N, or the

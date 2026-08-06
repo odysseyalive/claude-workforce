@@ -51,16 +51,33 @@ deletion is how a sweep quietly becomes a conversion.
 **2. Assert the journal is finished.** Every row is `COMMITTED` or `✗`. **A row still at
 `WRITE-INTENT` → STOP** and name it — an unfinished transaction is rolled back, never swept over.
 
-**3. Re-derive the removal set from the journal, never from `dispositions.md` prose.** The journal
-records what was *actually* registered and marked at T7. The disposition table records what was
-*decided*. Where they disagree the journal is right, and the disagreement is a finding worth printing.
+**3. Re-derive the removal set from the journal, never from `dispositions.md` prose.**
+
+**THE REMOVAL SET IS EVERY COMMITTED `T7c` ROW, AND NOTHING ELSE.** One step, one action (`mark`), one
+reader. A `T7` row is the conversion's undo copy and a `T7s` row is a removal target's undo copy;
+**neither is a mark**, and a journal full of them with no `T7c` row has marked nothing
+(`procedures/hire.md` § The journal).
+
+*This step read "registered and marked at T7" until 2026-08-06, and by then T7 had not been the mark
+for two days — `T7c` was inserted 2026-08-04 and no row was ever defined for it. Measured on
+`odyssey-alive`: **32 `T7` rows, 32 `.orig` files, zero `T7c` rows.** Taken literally this step would
+have swept 32 reduced, still-invocable skills; taken as the run took it, the set was empty and the sweep
+has never once fired. **Both readings were available from the shipped text and they differ by the whole
+library.***
+
+The journal records what was *actually* staged and marked. The disposition table records what was
+*decided*. Where they disagree the journal is right, **and the disagreement is a blocking finding rather
+than a printable one**: a target `dispositions.md` names for removal with no COMMITTED `T7c` row was
+never staged, and the honest report is its name and the missing step — never an empty set. Print it as
+`dispositioned N · staged N · marked N`, always all three, and **refuse the run when they do not
+balance** rather than sweeping the intersection.
 
 **4. Re-run every precondition. All of them, now — not as recorded by the earlier run.**
 
 | Precondition | Why re-checked rather than trusted |
 |---|---|
 | the backup exists and verifies | it may have been deleted, moved, or superseded since |
-| **every T7 `.orig` exists on disk and matches its `prior-sha`** | **the single-file undo for the act this command performs.** `wf-conform` decides it against the filesystem. **Absent → STOP**: deleting a skill whose `.orig` was never written makes the backup the only path back, and this command's whole reason for existing is that it is reached long after the run that took the backup. *Omitted from this table when it was written 2026-08-03, then found missing for real on `apps-odyssey-alive` the same day — the sweep would have deleted `skill-builder` with no `.orig` behind it* |
+| **every T7 and T7s `.orig` exists on disk and matches its `prior-sha`** | **the single-file undo for the act this command performs.** A `T7s` target's undo is the whole staged **directory**, because the whole directory is what goes; `wf-conform` decides it against the filesystem. **Absent → STOP**: deleting a skill whose `.orig` was never written makes the backup the only path back, and this command's whole reason for existing is that it is reached long after the run that took the backup. *Omitted from this table when it was written 2026-08-03, then found missing for real on `apps-odyssey-alive` the same day — the sweep would have deleted `skill-builder` with no `.orig` behind it* |
 | **every Run Invariant** (`invariants.md`) | `INV-VERIFY` is the one that deferred this sweep; it must pass *now*, not have passed once |
 | marker pairing (`INV-MARKERS`) | a file edited since the audit may have become an extraction hazard |
 | `INV-DIRECTIVES` / `INV-EMBEDDED` — `N of N` | **the sacred-block gate. Short by one → STOP.** Extraction completeness is asserted against the tree as it stands today |

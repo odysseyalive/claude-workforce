@@ -433,8 +433,9 @@ class Census:
                 # span is where extraction takes the wrong bytes. A generator's
                 # annotation is not a hazard and is not counted as one.
                 sacred = unterminated = mentions = 0
+                sacred_lines = []
                 pending = False
-                for line in body.splitlines():
+                for lineno, line in enumerate(body.splitlines(), 1):
                     ls = line.strip()
                     if ORIGIN_CLOSE.match(line):
                         pending = False
@@ -447,12 +448,18 @@ class Census:
                             unterminated += 1      # a sacred open, then another open
                         is_sacred = bool(IMMUTABLE_OPEN.match(line))
                         sacred += is_sacred
+                        # The LINE, not just the count. An extraction record cites
+                        # `file:line`, so a coverage check that has only a total can
+                        # compare two numbers and never tell WHICH span is missing.
+                        if is_sacred:
+                            sacred_lines.append(lineno)
                         pending = is_sacred
                 if pending:
                     unterminated += 1              # sacred open, EOF, no close
                 if sacred or unterminated or mentions:
                     self.immutable_blocks.append(
-                        {"file": p, "sacred": sacred, "mentions": mentions,
+                        {"file": p, "sacred": sacred, "lines": sacred_lines,
+                         "mentions": mentions,
                          "unterminated": unterminated, "paired": unterminated == 0}
                     )
 
@@ -600,6 +607,22 @@ class Census:
                 "mentions": sum(b.get("mentions", 0) for b in self.immutable_blocks),
                 "unterminated": sum(b["unterminated"] for b in self.immutable_blocks),
                 "unpaired": [b for b in self.immutable_blocks if not b["paired"]],
+                # PER-FILE, WITH LINE NUMBERS, BECAUSE THE AGGREGATE ANSWERS THE WRONG
+                # QUESTION. The extraction gate is tree-wide (`N of N spans`) and one
+                # consumer is not: T2 for a removal target asks whether every sacred
+                # span INSIDE ONE DIRECTORY was extracted before that directory is
+                # unlinked. These records existed and were discarded here, so the only
+                # way to scope the count was a hand grep — which over-counted
+                # `skill-builder` 37 against the true 6 by matching indented examples
+                # and markers quoted mid-line, and left a real gate unsettled for a
+                # day. A census whose scope cannot be narrowed is re-derived by hand,
+                # and `bin/baseline`'s own docstring says what hand counts are worth.
+                "by_file": sorted(
+                    ({"file": b["file"], "sacred": b["sacred"],
+                      "lines": b.get("lines", []), "mentions": b["mentions"],
+                      "unterminated": b["unterminated"]}
+                     for b in self.immutable_blocks if b["sacred"]),
+                    key=lambda b: b["file"]),
             },
             "hooks": self.hooks,
             "unreadable": self.unreadable,

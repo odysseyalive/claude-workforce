@@ -855,7 +855,7 @@ defers a run.*
 
 ## Step 6 — Execute
 
-Order: **conversions (each reduced at T7b) → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
+Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → the Constitution Gate → model rewrite → `org index` → `org embed` →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.**
 
@@ -897,6 +897,42 @@ exists: the reduction has been specified since the beginning, no run ever perfor
 counted it** — so a run reducing zero looked exactly like a run reducing everything.
 
 **Under `--review`: print the cut per skill and the manifest token counts, apply nothing.**
+
+### Step 6-S — Stage the removal set (the step the sweep was reading and nobody was writing)
+
+**Every target the dispositions decided to remove WHOLE is staged here, in this run, unasked.** That is
+the superseded generator under `succession: declared`, plus anything else the succession branch
+dispositioned `removed entirely` (`conversion-taxonomy.md` § What succession removes). A converted skill
+is not in this population — it was marked, or not, by its own T7c at conversion time.
+
+Per target, and it is the conversion machinery reused rather than a second system:
+
+```
+T2   extract every immutable span, byte-exact, read back      ← BLOCKING. Short by one → ✗, no mark
+     the count is `wf-census --json` → immutable_blocks.by_file, scoped to the target
+     directory and joined on `file:line` against .claude/workforce/directives/.
+     NEVER a grep: an unanchored one read 37 spans in `skill-builder` against 6.
+T7s  staging/<name>/SKILL.md.orig  ← hashed single-file undo, same name and contract as T7's
+     staging/<name>/tree/          ← the WHOLE directory, which is what the sweep unlinks
+     prior-sha = SKILL.md's digest, 64 hex, never a pointer
+T7c  write the mark row — action `mark`
+T8   COMMITTED
+```
+
+**Nothing is unlinked here.** Step 6c still performs the only deletion in the run, still once, still
+after `verify`. This step makes the deletion *reachable*: `sweep.md` § Procedure and Step 6c below both
+enumerate the removal set from COMMITTED `T7c` rows, and before this step existed nothing wrote one for
+a removal target.
+
+*Added 2026-08-06. `conversion-taxonomy.md` decided the removals and never named the journal; this
+Order line never named a step that wrote one. Measured on `odyssey-alive` over three consecutive
+audits: `skill-builder` dispositioned* **removed entirely**, *`.claude/skills/skill-builder/` on disk,
+**zero journal rows naming it**, and `INV-SUCCESSION  sweep NOT executed — removal set is empty  NOT
+UPHELD` printed every run. The gap was invisible from either end — the disposition was right, the sweep
+was right to refuse an unstaged deletion, and no file owned the space between them.*
+
+**Under `--review`: print the targets, the rule that put each one there, and the tree each would stage.
+Copy nothing, journal nothing.**
 
 **The canary re-attempt sits third for a reason**: it may restamp every handbook's `Tier ceiling:` line,
 and that must land *before* `org index`, `org embed`, `wf-claude-md`, and `checksums` read or hash them.
@@ -1054,8 +1090,13 @@ precondition here refuses — and refusing is the gate working — everything ab
 not be discarded to retry one step. `procedures/sweep.md` re-asserts every precondition against the
 tree as it stands *then*, and finishes the one act. Queue `DEF-Q` rows against `/workforce sweep`.
 
-Every conversion marked its skill at T7; nothing has been unlinked. This step does it, once, after the
-whole org has verified.
+**The removal set is every COMMITTED `T7c` row and nothing else** (`procedures/hire.md` § The journal).
+A conversion wrote one only if its remainder came out empty (T7c); a removal target got one from
+Step 6-S. Nothing has been unlinked. This step does it, once, after the whole org has verified.
+
+**Print `dispositioned N · staged N · marked N` and refuse the sweep when they do not balance.** A
+target the dispositions named and Step 6-S did not stage is reported by name with the step it is
+missing — never folded into an empty set, and never swept on the strength of the disposition alone.
 
 **Compute every Run Invariant FIRST** (`references/invariants.md` — that file owns the count; it is not
 restated here, which is how this line came to say "ten" while the table held twelve). Every row,
@@ -1101,7 +1142,9 @@ already warns what that produces: "five surfaces each carrying their own copy of
 copies that drift apart." A reader comparing them could only conclude one was missing a check.*
 
 4. **Every marked skill's `.orig` EXISTS ON DISK and hashes to its recorded `prior-sha`** — checked
-   against the filesystem by `wf-conform`, never against the journal alone.
+   against the filesystem by `wf-conform`, never against the journal alone. **"Marked" is the `T7c`
+   row; the `.orig` it is checked against comes from that target's `T7` (a conversion) or `T7s` (a
+   removal), and for a `T7s` target the staged artifact is the whole directory.**
 
    *This read "recorded and hashed **in the journal**" until 2026-08-03, which is a gate reading the
    journal to check a claim the journal makes about itself. Measured the same day on
@@ -1121,7 +1164,7 @@ Then, in order:
 |---|---|---|
 | marked skills | **only the blocks that moved** — every `RULE` and `DIRECTIVE-STATEMENT` span now living in a handbook | the `SKILL.md` itself, carrying its `MECHANISM` blocks; plus `references/`, `scripts/`, `hooks/`, and every dataset — **untouched, paths unchanged** |
 | predecessor scaffolding | marker-matched embeds, annotations, gates, sidecars, sentinels | anything matching no marker → **quarantined to the report** |
-| the superseded generator | itself | the working machinery it wrote |
+| the superseded generator | itself — **staged at Step 6-S, marked at T7c, or it is not in this table at runtime** | the working machinery it wrote, relocated first (`sweep.md` § Procedure step 5) |
 
 **The sweep REDUCES a converted skill; it deletes one only when nothing invocable remains**
 (`conversion-taxonomy.md` § The remainder test). Removing the `SKILL.md` wholesale destroys the one-off

@@ -73,6 +73,16 @@ AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
 # `\b` terminator, and `\b` matches at a hyphen — it read `mcp__playwright-mcp` as
 # the server `playwright`, then reported it missing from a grant that contained it.
 MCP_TOOL_RX = re.compile(r"mcp__([A-Za-z0-9-]+)")
+# LINE-ANCHORED AT COLUMN 0, byte-identical to `wf-census`'s IMMUTABLE_OPEN and to
+# every other counter in this distribution — an indented marker is a markdown code
+# block and therefore documentation ABOUT the format, never a span opener.
+# `bin/check` § grammar harvests this pattern and cross-tests it against the other
+# readers, so a divergence here fails the build rather than producing a second
+# opinion. Measured 2026-08-06: an UNANCHORED hand grep counted 37 sacred spans in
+# `skill-builder` against the true 6, which left a blocking gate unsettled for a day.
+IMMUTABLE_OPEN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
+EXTRACT_CITE_RX = re.compile(r"\.claude/skills/([^/`\s]+)/([^`\s:]+):(\d+)")
 MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
 # A server named only to FORBID it is not a dependency. `procedure-for-procedures.md`
 # requires guardrails to carry a literal NEVER / MUST NOT / STOP, so keying off that
@@ -80,6 +90,26 @@ MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
 # Without this, `- NEVER use any mcp__claude-in-chrome__* tool` reads as a dependency
 # on claude-in-chrome — measured against a real handbook, where it did exactly that.
 PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't\b|\bforbidden\b", re.I)
+# ROUTING IS NOT INVOCATION — the third case of mention-is-not-use, and the one this
+# script was blind to for the first four days it shipped.
+#
+# The spawning-skill check below names re-homing to a delegating tier as its FIRST
+# remedy. An org that applies that remedy writes `ESCALATE: business-lead run /quo …`
+# — the skill is named in order to route it AWAY, which is the exact opposite of
+# invoking it, and it carries no prohibition keyword because it is an instruction
+# rather than a ban. So the check reported the remedy it recommends as the violation
+# it recommends the remedy for.
+#
+# MEASURED 2026-08-05 on odyssey-alive: 22 of 22 `invokes only skills that spawn
+# nothing` failures were correctly re-homed steps. Not one was an IC reaching past
+# its ceiling. The org had discharged the finding in full and the checker still held
+# `INV-VERIFY` red, which deferred the succession sweep it gates.
+#
+# Generous matching is deliberate and the risk is one-sided: the true positives this
+# check has earned (30 of them, DEF-2026-08-05-mechanism-partition-ic-tier) came from
+# handbooks that absorbed the mechanism BY HAND and say nothing about escalating it.
+# A handbook using this vocabulary about a skill has documented that it routes it up.
+ROUTING_RX = re.compile(r"\bESCALATE\b|\bis run by\b|\bnot yours to run\b|\bescalates?\b", re.I)
 # Harness slash-commands: real invocations that are not project files and never will
 # be. Naming one is correct, so an unresolved-command check that does not know them
 # reports every handbook that says `/compact` as broken.
@@ -348,9 +378,22 @@ def check_handbook(path, body, res, ceiling):
                 f"{n}: Directives section resolves or declares none",
                 "a blank Directives section reads as 'none bound' and is not")
 
+    # ADVISORY, and the message has said so since it was written. `delegation-budget.md`
+    # § The handbook length ceiling: "over the ceiling is a structural finding proposing
+    # a split, never a refusal. A number nobody measured may not block anyone's work
+    # (platform.md § DOCUMENTED)." It was wired to the blocking channel anyway, two
+    # functions above the advisory channel that exists for exactly this — so a row
+    # declaring itself never a refusal set a non-zero exit, and `INV-VERIFY` reads that
+    # exit. MEASURED 2026-08-05 on odyssey-alive: 14 such rows, gating a sweep.
+    #
+    # The ceiling is a CHOSEN budget (~2.5× a filled IC template), not a measurement,
+    # and this project bars a DOCUMENTED fact from becoming a blocking check.
     body_lines = len(body.splitlines())
-    res.add(body_lines <= ceiling, f"{n}: within the {ceiling}-line ceiling",
-            f"{body_lines} lines — a structural finding proposing a split, never a refusal")
+    if body_lines <= ceiling:
+        res.add(True, f"{n}: within the {ceiling}-line ceiling")
+    else:
+        res.advise(f"{n}: within the {ceiling}-line ceiling",
+                   f"{body_lines} lines — a structural finding proposing a split, never a refusal")
 
     # A handbook that cannot say how to verify itself is not releasable.
     #
@@ -433,12 +476,44 @@ def check_handbook(path, body, res, ceiling):
     #   a prohibition — "Do NOT invoke `/copy-truth`" names one to forbid it.
     # Only `## Procedure` and `## Verification` say what the employee DOES, and within
     # them a line carrying NEVER / MUST NOT / STOP / do not is a guardrail, not a step.
-    _acts = ""
+    _acts_raw = ""
     for _sec in ("## Procedure", "## Verification"):
-        _acts += (section(body, _sec) or "") + "\n"
-    _acts = "\n".join(l for l in _acts.splitlines() if not PROHIBITION_RX.search(l))
+        _acts_raw += (section(body, _sec) or "") + "\n"
+    _acts = "\n".join(l for l in _acts_raw.splitlines() if not PROHIBITION_RX.search(l))
+    # ROUTED SKILLS — collected from the RAW text, per numbered step, before the
+    # prohibition filter runs. Two orderings had to be got right and neither is obvious:
+    #
+    #   RAW, not filtered. The strongest routing evidence a handbook writes is commonly
+    #   a prohibition — "**Any change to existing prose → `ESCALATE: /edit <file>`**,
+    #   never after" and "You never invoke `/focus` or `/edit` yourself: both spawn, and
+    #   you cannot." Filtering prohibitions first DELETES the sentence that proves the
+    #   step was re-homed, leaving only the narrative mention that names the skill. The
+    #   check then reports the one handbook that stated the ceiling most explicitly.
+    #
+    #   PER STEP, not per line. The marker and the skill name are routinely a line or
+    #   two apart inside one numbered step — "The skill runs one tier up; the work stays
+    #   here. `/promote`, `/linkedin-promote`, … each spawn a helper agent … Send
+    #   `content-lead` one line — `ESCALATE: run <skill> <args> on my behalf`" names the
+    #   skills two lines above an ESCALATE that carries only a `<skill>` placeholder.
+    #   The numbered step is the unit of instruction, so it is the unit of scope.
+    #
+    # The resulting set is file-level: a skill routed in step 4 is routed in step 4a's
+    # cross-reference too, which is what "the invocation moves" means.
+    _routed, _step = set(), []
+    def _harvest(lines):
+        blob = "\n".join(lines)
+        if ROUTING_RX.search(blob) or PROHIBITION_RX.search(blob):
+            _routed.update(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", blob))
+    for _l in _acts_raw.splitlines():
+        if re.match(r"\s*\d+[a-z]?\.\s", _l) and _step:
+            _harvest(_step)
+            _step = []
+        _step.append(_l)
+    _harvest(_step)
     if tier == 3:
         for sk in sorted(set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", _acts))):
+            if sk in _routed:
+                continue
             sp = os.path.join(_root, ".claude", "skills", sk, "SKILL.md")
             if not os.path.isfile(sp):
                 # NOT a project skill. Three legitimate reasons before it is a defect,
@@ -557,8 +632,201 @@ def check_defects(root, res):
                 "a record nothing points at is one the next reader never finds")
 
 
+def check_removal_set(root, body, staging, res):
+    """The removal set has exactly one producer, and every decided removal reaches it.
+
+    THE MARK IS A COMMITTED `T7c` ROW. `procedures/hire.md` § The journal, and both
+    consumers — `audit.md` § Step 6c and `sweep.md` § 3 — enumerate the removal set
+    from those rows and nothing else.
+
+    This function exists because that row had a reader and no writer, twice over:
+
+      A  `T7c` was inserted into the T-order on 2026-08-04 and made the mark
+         conditional. The sentence defining the mark still said "the COMMITTED T7
+         journal row", and no row shape was defined for the step the mark moved to.
+      B  A skill removed by SUCCESSION is never converted, so it never enters the
+         T-order at all. `conversion-taxonomy.md` decided those removals and — until
+         2026-08-06 — contained the string "journal" zero times.
+
+    Measured on odyssey-alive across three consecutive audits: `skill-builder`
+    dispositioned SUPERSEDED GENERATOR / removed entirely, `.claude/skills/skill-builder/`
+    on disk the whole time, ZERO journal rows naming it, 32 `T7` rows and ZERO `T7c`
+    rows. Every run printed `INV-SUCCESSION  sweep NOT executed — removal set is empty`
+    and every run was reporting the arithmetic of a table nothing filled in.
+
+    Read literally instead, the old definition made the removal set all 32 T7 rows —
+    every one of them a reduced, still-invocable skill that directive one requires to
+    keep working. A gate in front of the only destructive command may not have two
+    readings that differ by the whole library, which is why this is a failure and not
+    an advisory.
+
+    Four findings, each a different missing half:
+      UNSTAGED   dispositioned for removal, no `T7c` row   -> the sweep cannot see it
+      UNMARKED   `T7s` staged, no `T7c` row                -> bytes copied for nothing
+      NO-UNDO    `T7c` row, no `T7` or `T7s` row           -> marked with no undo behind it
+      NO-TREE    `T7s` row, no staged `tree/`              -> the surgical undo covers
+                                                              SKILL.md and nothing else
+    """
+    marked, staged, undone, declined = set(), set(), set(), set()
+    for line in body.splitlines():
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
+        if len(cells) < 7:
+            continue
+        name, step, status = cells[1], cells[2], cells[6]
+        # A REFUSAL IS A FIRST-CLASS OUTCOME AND IT IS RECORDED, NOT MISSING.
+        # Failure containment (SKILL.md § Atomic-or-Absent rule 7) marks a target ✗
+        # and continues — a short extraction at T2 is the common case, and it is
+        # SUPPOSED to leave the target unmarked. Without this the run that correctly
+        # refused a removal would be failed for refusing it, on every later verify,
+        # with no edit that could ever clear it.
+        if status == "✗" and step in ("T2", "T7s", "T7c"):
+            declined.add(name)
+            continue
+        if status != "COMMITTED":
+            continue
+        if step == "T7c":
+            marked.add(name)
+        elif step == "T7s":
+            staged.add(name)
+            undone.add(name)
+        elif step == "T7":
+            undone.add(name)
+    staged -= declined
+
+    for name in sorted(marked - undone):
+        res.add(False, f"removal set: {name} marked at T7c has an undo row",
+                f"a COMMITTED T7c row marks {name} for the sweep and no T7 or T7s row "
+                "records an `.orig` for it. The mark is what the sweep reads and the "
+                "`.orig` is its only surgical undo; a mark without one authorizes a "
+                "deletion whose single-file reversal was never written.")
+    for name in sorted(staged - marked):
+        res.add(False, f"removal set: {name} staged at T7s reached its T7c mark",
+                f"{name} was staged for removal and never marked. `hire.md` § A removal "
+                "target stages too: T7s never appears without its T7c — either the mark "
+                "is missing, or a rule declined the removal and the run owes that rule "
+                "by name.")
+    for name in sorted(staged):
+        tree = os.path.join(staging, name, "tree")
+        res.add(os.path.isdir(tree), f"removal set: {name} staged its whole directory",
+                f"{tree} is absent. A T7s target is unlinked ENTIRELY — references/, "
+                "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
+                "an undo for the least of what the sweep removes.")
+
+    # THE DECIDED-BUT-UNSTAGED CASE. Keyed on the taxonomy's own category token so a
+    # renamed generator is still caught: `conversion-taxonomy.md` § ORCHESTRATOR names
+    # SUPERSEDED GENERATOR as the disposition that is "removed entirely — not retained,
+    # not converted, not stubbed", and dispositions.md writes it in the disposition cell.
+    dp = os.path.join(root, ".claude", "workforce", "dispositions.md")
+    if not os.path.exists(dp):
+        return
+    disp = read(dp, res)
+    if disp is None:
+        return
+    decided = set()
+    for line in disp.splitlines():
+        cells = [c.strip().strip("*").strip("`").strip() for c in
+                 line.strip().strip("|").split("|")]
+        if len(cells) < 3 or not cells[0]:
+            continue
+        blob = " ".join(cells[1:])
+        if "SUPERSEDED GENERATOR" in blob or "Removed entirely" in blob:
+            decided.add(cells[0].strip("*").strip("`").strip())
+    for name in sorted(decided & declined):
+        res.advise(f"removal set: {name} was dispositioned for removal and declined",
+                   "the journal records a ✗ against it, so the run refused the removal "
+                   "and said so. Reported, never enforced — refusing an act is the "
+                   "design; the finding is a run that neither stages nor refuses.")
+    for name in sorted(decided - marked - declined):
+        res.add(False, f"removal set: {name} was dispositioned for removal and staged",
+                f"dispositions.md decides {name} is removed entirely and the conversion "
+                "journal holds no COMMITTED T7c row for it, so the removal set the sweep "
+                "reads does not contain it. Run `/workforce audit` — Step 6-S stages it "
+                "(T2 extract, T7s copy, T7c mark) and Step 6c performs the deletion. An "
+                "empty removal set under a decided removal is a finding about the staging "
+                "step, never a description of the tree.")
+    if decided:
+        res.add(True, f"removal set: {len(decided)} dispositioned · "
+                      f"{len(staged)} staged · {len(marked)} marked")
+
+    for name in sorted(decided | staged):
+        check_removal_extraction(root, name, res)
+
+
+def check_removal_extraction(root, name, res):
+    """T2 for a removal target: every sacred span inside it is extracted first.
+
+    THIS IS THE ONE GATE STANDING BETWEEN A DIRECTORY DELETION AND THE USER'S OWN
+    WORDS. `conversion-taxonomy.md` § What succession removes: those spans "are the
+    only content in a managed tree that no regeneration can reconstruct", and the
+    gate is blocking BEFORE the first file is removed.
+
+    It was specified and it was not computable. `INV-DIRECTIVES` counts `N of N`
+    TREE-WIDE; T2 for a T7s target asks a DIRECTORY-scoped question, and `wf-census`
+    published only the aggregate. So the only way to answer it was a hand grep —
+    which, run unanchored on 2026-08-06, reported 37 sacred spans inside
+    `skill-builder` against the true 6, by matching indented examples and markers
+    quoted mid-line inside a file that DOCUMENTS the marker format. A gate answered
+    by a hand count is a gate whose verdict changes with who runs it.
+
+    `wf-census` now emits `immutable_blocks.by_file` with line numbers, and this
+    check uses the same line-anchored grammar `bin/check` cross-tests across every
+    reader. Coverage is joined on `file:line`, so a shortfall names the span rather
+    than the difference between two totals.
+
+    `.claude/workforce/directives/` is the extraction output and citations may live
+    in ANY file there — the run keys them by skill, and a run that keyed them
+    differently still cites the same `file:line`. Scanning the directory rather than
+    one filename is what makes this robust to that.
+    """
+    target = os.path.join(root, ".claude", "skills", name)
+    if not os.path.isdir(target):
+        return                          # already swept, or never a directory
+
+    spans = []
+    for dirpath, dirnames, filenames in os.walk(target):
+        dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules")]
+        for fn in sorted(filenames):
+            if not fn.endswith(".md"):
+                continue                # the census grammar is markdown-scoped
+            p = os.path.join(dirpath, fn)
+            try:
+                body = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            rel = os.path.relpath(p, root)
+            for lineno, line in enumerate(body.splitlines(), 1):
+                if IMMUTABLE_OPEN_RX.match(line):
+                    spans.append((rel, lineno))
+    if not spans:
+        res.add(True, f"removal set: {name} holds no sacred spans to extract")
+        return
+
+    ddir = os.path.join(root, ".claude", "workforce", "directives")
+    cited = set()
+    if os.path.isdir(ddir):
+        for dirpath, _dn, filenames in os.walk(ddir):
+            for fn in filenames:
+                try:
+                    blob = open(os.path.join(dirpath, fn),
+                                encoding="utf-8", errors="replace").read()
+                except OSError:
+                    continue
+                for skill, path, line in EXTRACT_CITE_RX.findall(blob):
+                    cited.add((f".claude/skills/{skill}/{path}", int(line)))
+
+    missing = [f"{f}:{n}" for f, n in spans if (f, n) not in cited]
+    res.add(not missing,
+            f"removal set: {name} extracted {len(spans) - len(missing)} of "
+            f"{len(spans)} sacred span(s) before deletion",
+            ("not extracted: " + ", ".join(missing[:6])
+             + (f" (+{len(missing) - 6} more)" if len(missing) > 6 else "")
+             + ". These are the user's own words and the sweep unlinks the directory "
+               "holding them. T2 is blocking: extract them verbatim with their source "
+               "`file:line`, or the target is marked ✗ and NOT swept."))
+
+
 def check_journal(root, res):
-    """Every T7 row's `.orig` exists on disk and hashes to its recorded prior-sha.
+    """Every T7 and T7s row's `.orig` exists on disk and hashes to its prior-sha.
 
     THE UNDO ARTIFACT, CHECKED AS AN ARTIFACT. `SKILL.md` § Atomic-or-Absent rule 6:
     "T7 IS COPY-THEN-MARK. Copy the live SKILL.md to `<staging>/<name>/SKILL.md.orig`
@@ -593,11 +861,13 @@ def check_journal(root, res):
         return
 
     staging = os.path.join(root, ".claude", "workforce", "staging")
+    check_removal_set(root, body, staging, res)
     rows = 0
     for line in body.splitlines():
         cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
-        if len(cells) < 7 or cells[2] != "T7":
+        if len(cells) < 7 or cells[2] not in ("T7", "T7s"):
             continue
+        step = cells[2]
         name, path_cell, prior, status = cells[1], cells[3], cells[5], cells[6]
         # N/A rows are printed deliberately (a hire has no predecessor to copy).
         if "N/A" in status or "N/A" in prior or status == "✗":
@@ -612,30 +882,30 @@ def check_journal(root, res):
         # defect as a genuinely missing undo. One finding was real and one was the
         # check misreading a row; reporting them identically devalues both.
         if not os.path.isdir(os.path.join(root, path_cell)):
-            res.add(True, f"journal: {name} T7 is an aggregate row (undo is the backup)")
+            res.add(True, f"journal: {name} {step} is an aggregate row (undo is the backup)")
             continue
 
         rows += 1
         orig = os.path.join(staging, name, "SKILL.md.orig")
         if not os.path.exists(orig):
-            res.add(False, f"journal: {name} T7 `.orig` exists on disk",
-                    f"row marks {name} at T7 with status {status}, and {orig} is absent. "
+            res.add(False, f"journal: {name} {step} `.orig` exists on disk",
+                    f"row stages {name} at {step} with status {status}, and {orig} is absent. "
                     "The sweep's single-file undo does not exist. Restore it from the "
                     "pre-run backup before any deletion.")
             continue
-        res.add(True, f"journal: {name} T7 `.orig` exists on disk")
+        res.add(True, f"journal: {name} {step} `.orig` exists on disk")
         if not re.fullmatch(r"[0-9a-f]{64}", prior or "", re.I):
-            res.add(False, f"journal: {name} T7 prior-sha is a sha",
+            res.add(False, f"journal: {name} {step} prior-sha is a sha",
                     f"prior-sha reads {prior!r}. The spec records a sha; a pointer "
                     "cannot be compared against anything, which is how a missing "
                     "`.orig` passed a gate that claimed to hash it.")
             continue
         got = hashlib.sha256(open(orig, "rb").read()).hexdigest()
-        res.add(got == prior.lower(), f"journal: {name} T7 `.orig` matches prior-sha",
+        res.add(got == prior.lower(), f"journal: {name} {step} `.orig` matches prior-sha",
                 f"recorded {prior[:16]}…, on disk {got[:16]}… — the undo artifact is "
                 "not the file that was recorded. Do not restore from it.")
     if rows:
-        res.add(True, f"journal: {rows} T7 row(s) checked against disk")
+        res.add(True, f"journal: {rows} T7/T7s row(s) checked against disk")
 
 
 def check_catalogs(root, res):

@@ -2369,7 +2369,7 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # a specific number; it is the rule that no row arrives without its report line.
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-              "eighteen": 18}
+              "eighteen": 18, "nineteen": 19, "twenty": 20}
 _inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 # bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
@@ -2916,9 +2916,9 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
                 f"{_path}:{_lineno} is a mask and stopped covering indented spans")
 check(
     "grammar: counters and guards reject an indented marker; the mask does not",
-    not _indent_bad and _indent_seen >= 7,
+    not _indent_bad and _indent_seen >= 8,
     (f"{_indent_bad}. " if _indent_bad else
-     f"only {_indent_seen} line-anchored readers examined, expected 7 — a reader "
+     f"only {_indent_seen} line-anchored readers examined, expected 8 — a reader "
      "vanished or its file stopped parsing, and this check reports clean on an empty "
      "set. That is the direction it fails silently in. ")
     + "An indented marker sits in a code block and is an example. A "
@@ -2930,10 +2930,11 @@ check(
 
 check(
     "grammar: every sacred-marker reader accepts the same blocks",
-    not _grammar_bad and _grammar_readers >= 8,
+    not _grammar_bad and _grammar_readers >= 9,
     (f"{_grammar_readers} readers tested; divergent: {_grammar_bad}. "
      if _grammar_bad else
-     f"only {_grammar_readers} marker readers found — the extractor stopped seeing "
+     f"only {_grammar_readers} marker readers found (expected 9) — the extractor "
+     "stopped seeing "
      "them, so this check would pass on any grammar. ")
     + "A reader that cannot see a sacred block will not checksum it, will not guard "
     "it, and will not refuse a cut that eats it — while the readers that can see it "
@@ -3598,11 +3599,46 @@ check(
     "T5 refuses a symlink" in _hire and "T5 SYMLINK REFUSAL" in skill,
     "writing through a symlink destroys a file the plan never named",
 )
+# THE MARK MOVED AND ITS DEFINITION DID NOT. T7c was inserted 2026-08-04 and made
+# the mark conditional; the sentence defining the mark still pointed at T7, and no
+# row shape was ever defined for T7c. Measured on odyssey-alive: 32 T7 rows, 32
+# `.orig` files, ZERO T7c rows — so the removal set read literally was all 32
+# reduced-and-surviving skills, and read as the run read it was empty. This check
+# now asserts the STEP as well as the existence of a definition, because the old
+# form passed for two days while naming the wrong one.
 check(
-    "T-order: the sweep mark has a defined representation",
-    "The mark IS the COMMITTED T7 journal row" in _hire,
-    "five files used the mark while nothing defined it; the sweep's input set was "
-    "specified nowhere",
+    "T-order: the sweep mark has a defined representation, and it is T7c",
+    "THE MARK IS A COMMITTED `T7c` ROW WHOSE ACTION IS `mark`" in _hire
+    and "A `T7` row is the undo artifact, not the mark" in _hire,
+    "five files used the mark while nothing defined it; then T7c took the mark and "
+    "the definition kept naming T7, which is a gate in front of the only destructive "
+    "command with two readings that differ by the whole library",
+)
+check(
+    "T-order: a succession removal is staged into the journal at T7s",
+    "T7s" in _hire and "A removal target stages too" in _hire
+    and "removed by succession is never converted" in _hire,
+    "`sweep.md` derives the removal set FROM THE JOURNAL and `conversion-taxonomy.md` "
+    "decided the removals while containing the string `journal` zero times, so the "
+    "superseded generator could not enter the set the sweep reads at all",
+)
+check(
+    "conversion-taxonomy sends every decided removal to the journal",
+    "STAGED INTO THE CONVERSION JOURNAL AT `T7s`, OR IT IS NOT IN THE\nREMOVAL SET" in _ct2,
+    "this file owned the decision and named no producer; odyssey-alive printed "
+    "`removal set is empty` on three consecutive audits with skill-builder on disk",
+)
+# ORDER IS THE WHOLE POINT HERE, so find() rather than `in` — a deleted phrase must
+# fail the check, not raise out of it, and `"Step 6-S" in aud` stays true off the
+# section heading alone while the Order line no longer names the step.
+_6s_at = aud.find("staging the removal set (Step 6-S)")
+_vfy_at = aud.find("`verify` \u2192")
+check(
+    "audit runs the staging step, and before verify",
+    _6s_at != -1 and _vfy_at != -1 and _6s_at < _vfy_at,
+    "Step 6-S must precede `verify` in the Order line, or the wf-conform check that "
+    "fails an unstaged removal fires in the same run that was about to stage it "
+    "\u2014 a deadlock where the gate blocks the step that clears it",
 )
 
 # The Constitution Gate shipped fully templated and no procedure wrote it —
@@ -5294,9 +5330,55 @@ check("hire forbids a prior-sha that is not a sha",
       "holds the 64-character digest and nothing" in _hire,
       "`see .orig` and `per-file` both read like records and hold no comparable value")
 
-check("wf-conform checks T7 .orig against disk",
-      "T7 `.orig` exists on disk" in _wfc,
-      "the enforcement behind the three doctrine changes above")
+check("wf-conform checks T7 and T7s .orig against disk",
+      '{step} `.orig` exists on disk' in _wfc and '("T7", "T7s")' in _wfc,
+      "the enforcement behind the three doctrine changes above. A T7s row reported "
+      "as `T7` sends the reader to the wrong procedure section")
+
+check("wf-conform enumerates the removal set from T7c rows alone",
+      "def check_removal_set" in _wfc
+      and 'if step == "T7c":' in _wfc
+      and "was dispositioned for removal and staged" in _wfc,
+      "the removal set had two consumers and no producer; this is the check that "
+      "names a decided-but-unstaged target instead of printing a balanced zero")
+
+check("wf-conform lets a REFUSED removal stand as refused",
+      'if status == "\u2717" and step in ("T2", "T7s", "T7c"):' in _wfc,
+      "failure containment marks a target \u2717 and continues \u2014 a short T2 extraction is "
+      "the common case. Without this the run that correctly refused a removal is "
+      "failed for refusing it on every later verify, with no edit that clears it")
+
+# T2 FOR A REMOVAL TARGET WAS SPECIFIED AND NOT COMPUTABLE. INV-DIRECTIVES counts
+# N of N TREE-WIDE; this asks a DIRECTORY-scoped question, and wf-census published
+# only the aggregate. So the only available answer was a hand grep — which, run
+# unanchored on 2026-08-06, read 37 sacred spans in skill-builder against the true 6
+# by matching indented examples inside the file that DOCUMENTS the marker format.
+_cen3 = read("workforce/bin/wf-census")
+check("wf-census publishes immutable spans per file, with line numbers",
+      '"by_file": sorted(' in _cen3 and '"lines": b.get("lines", [])' in _cen3
+      and "sacred_lines.append(lineno)" in _cen3,
+      "the records existed and were discarded at the JSON boundary, so a "
+      "directory-scoped gate had to be re-derived by hand; and a coverage check with "
+      "only a total can compare two numbers and never name the missing span")
+
+check("wf-conform computes T2 coverage for a removal target",
+      "def check_removal_extraction" in _wfc
+      and "EXTRACT_CITE_RX" in _wfc
+      and "sacred span(s) before deletion" in _wfc,
+      "these spans are the user's own words and the sweep unlinks the directory "
+      "holding them; the gate is blocking and was answerable only by a grep whose "
+      "verdict changed with who ran it")
+
+check("wf-conform reads sacred markers with the line-anchored grammar",
+      'IMMUTABLE_OPEN_RX = re.compile(\n    r"^<!--' in _wfc,
+      "an indented marker is a markdown code block and therefore documentation "
+      "ABOUT the format; an unanchored reader inflated one target 6x. bin/check "
+      "harvests this pattern and cross-tests it against every other reader")
+
+check("wf-conform requires the whole directory staged for a T7s target",
+      "staged its whole directory" in _wfc,
+      "a T7s target is unlinked ENTIRELY \u2014 references/, scripts/, hooks/, datasets \u2014 "
+      "so SKILL.md.orig is an undo for the least of what the sweep removes")
 
 check("wf-conform exempts aggregate journal rows",
       "aggregate row (undo is the backup)" in _wfc,
@@ -6257,6 +6339,37 @@ check(
     "the negative-test record post-dates every handbook under it; it is reported "
     "on its own channel and must not borrow the `adopted` key, which main() uses "
     "to derive the governed count",
+)
+# ROUTING IS NOT INVOCATION. The spawning-skill check names re-homing to a delegating
+# tier as its first remedy, then reported the applied remedy as the violation — 22 of 22
+# on odyssey-alive, holding INV-VERIFY red and deferring the succession sweep it gates.
+check(
+    "wf-conform tells an escalated skill from an invoked one",
+    "ROUTING_RX" in _cfm
+    and "ROUTING_RX.search(blob) or PROHIBITION_RX.search(blob)" in _cfm,
+    "an `ESCALATE: business-lead run /quo …` line names a skill in order to route it "
+    "AWAY and carries no prohibition keyword, so a checker keyed only to prohibitions "
+    "reads the re-homing it recommends as the ceiling breach it recommends it for",
+)
+check(
+    "the routed set is harvested per step, from the raw text",
+    "_acts_raw" in _cfm and 'if re.match(r"\\s*\\d+[a-z]?\\.\\s", _l) and _step:' in _cfm,
+    "the strongest routing evidence is usually itself a prohibition (\"you never invoke "
+    "`/edit` yourself: `content-lead` runs it\"), so filtering prohibitions first deletes "
+    "the proof; and the marker sits a line or two from the skill name inside one "
+    "numbered step, so a line-local scope clears the ESCALATE and still reports the "
+    "narrative mention above it",
+)
+# A CHOSEN BUDGET MAY NOT BLOCK. delegation-budget.md § The handbook length ceiling has
+# said "never a refusal" since it was written; the row was wired to the blocking channel
+# anyway, two functions above the advisory channel that exists for exactly this.
+check(
+    "the handbook line ceiling is advisory, not a refusal",
+    'res.advise(f"{n}: within the {ceiling}-line ceiling"' in _cfm,
+    "the ceiling is ~2.5x a filled IC template and nothing was measured to produce it, "
+    "so platform.md bars it from gating; on the blocking channel its 14 rows set a "
+    "non-zero exit and INV-VERIFY reads that exit, which is a DOCUMENTED fact "
+    "becoming a blocking check by wiring rather than by decision",
 )
 check(
     "verification.md states that only a falsified check is a check",

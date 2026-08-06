@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Eighteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Nineteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -52,7 +52,8 @@ Counting a backlog correctly is not the same as being allowed to have one. "Clos
 **no row is added without its report line**, never that the set is finished — a list that cannot grow
 stops describing the runs it governs, and the rule that matters is the pairing, not the count. Rows
 11, 12, and 13 were each added with their line, their owner, and their `bin/check` assertion in one
-change.)*
+change. **Row 19 landed 2026-08-06 and is the first row added for a reader with no writer** rather than
+for a run that stopped: the removal set was enumerated by two commands and produced by none.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -74,6 +75,17 @@ change.)*
 | 16 | the tier canary was attempted twice before any run reported DEGRADED | `INV-CANARY` | references/staging.md |
 | 17 | every deferred row **and every proposal in the closing report** was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
+| 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
+
+**Row 19 is the producer check for the only destructive command, and it exists because the removal set
+had a reader and no writer.** `sweep.md` § Procedure derives it from the journal; `conversion-taxonomy.md`
+decided the removals and never wrote a journal row; `T7c` was inserted as the mark on 2026-08-04 and no
+row shape was defined for it. Measured on `odyssey-alive`, three consecutive audits: **`skill-builder`
+dispositioned `removed entirely`, on disk throughout, zero journal rows naming it, 32 `T7` rows and
+zero `T7c` rows.** Every run printed an empty removal set and every run was reporting the arithmetic of
+a table nothing filled in. **`dispositioned N · staged N · marked N` — all three, always — and any
+imbalance is `NOT UPHELD`, which blocks the sweep.** An empty set under `succession: declared` is a
+finding about the staging step, never a description of the tree.
 
 **Row 17 counts PROPOSALS, not only queue rows, and that is the half it was missing.** A finding
 narrated in the closing report was never a row, so the queue arithmetic could balance perfectly while
@@ -133,6 +145,7 @@ Run Invariants
   INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped · 4 fixtures swept
   INV-CLOSE       6 candidates · 4 discharged · 2 decided · 0 queued · 0 uncited refusals
   INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
+  INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined
   …every remaining row, always all of them…
 ```
 

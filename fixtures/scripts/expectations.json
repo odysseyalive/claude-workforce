@@ -1,4 +1,57 @@
 {
+  "apply-deadhook": {
+    "_why": "DISPLAY is the default and must change nothing. Three registrations are live, dead, and UNDECIDABLE (a bare `jq` resolved on PATH). Only the two dead ones are named; calling the undecidable one dead would invite deleting a working registration, which is the failure wf-census's DEAD/UNDECIDABLE split exists for. `would apply` rather than `applied` is the whole difference between the two modes.",
+    "exit": 0,
+    "not": [
+      "applied 2",
+      "jq",
+      "real.sh"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "PASS-DEAD-HOOK",
+      "would apply 2",
+      "vanished.sh",
+      "also-gone.sh",
+      "reversal:",
+      "apply with: --execute"
+    ]
+  },
+  "apply-deadhook-execute": {
+    "_why": "--execute is the consent. Same tree as apply-deadhook; the only difference is the flag, and the verdict word changes from `would apply` to `applied`. Paired so a regression that makes display WRITE, or execute merely REPORT, fails one of them.",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "would apply",
+      "jq",
+      "real.sh"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "PASS-DEAD-HOOK",
+      "applied 2",
+      "vanished.sh",
+      "also-gone.sh"
+    ]
+  },
+  "apply-stalecanary": {
+    "_why": "THREE populations in one tree and only one is residue: a throwaway canary (no measures-fact:), a SHIPPED canary (carries measures-fact:, its job recurs per host and per harness version, never residue), and a real employee. Precision is a property of the three required conditions rather than a sample, and this asserts all three by naming what must NOT appear.",
+    "exit": 0,
+    "not": [
+      "wf-canary-b.md",
+      "real-employee.md",
+      "applied 1"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "PASS-STALE-CANARY",
+      "would apply 1",
+      "wf-canary-a.md",
+      "files_removed"
+    ]
+  },
   "census-badjson": {
     "exit": 2,
     "script": "wf-census",
@@ -41,35 +94,48 @@
     ]
   },
   "census-duplicate": {
-    "script": "wf-census",
     "exit": 0,
-    "want": [
-      "duplicates  1 name(s)",
-      "\u00b7 dup:",
-      "collisions  0 live"
-    ],
     "not": [
       "collisions  1 live"
+    ],
+    "script": "wf-census",
+    "want": [
+      "duplicates  1 name(s)",
+      "· dup:",
+      "collisions  0 live"
     ]
   },
   "census-ignore": {
-    "script": "wf-census",
     "exit": 0,
-    "want": [
-      "excluded    2 file(s) by 1 declared pattern(s)",
-      "\u00b7 corpus/",
-      "0 unpaired (sweep hazards)"
-    ],
     "not": [
       "! DEAD pattern",
       "unpaired BROKEN"
+    ],
+    "script": "wf-census",
+    "want": [
+      "excluded    2 file(s) by 1 declared pattern(s)",
+      "· corpus/",
+      "0 unpaired (sweep hazards)"
     ]
   },
   "census-ignore-dead": {
-    "script": "wf-census",
     "exit": 0,
+    "script": "wf-census",
     "want": [
       "! DEAD pattern (matched nothing): no-such-dir/"
+    ]
+  },
+  "census-indented-mention": {
+    "_why": "In markdown an indented line is a code block, so an indented sacred marker is documentation ABOUT the format and never a span opener. bin/baseline established this and measured 68 naive against 37 anchored -- 46% inflation -- and the other readers never got the ruling. Measured on odyssey-alive 2026-08-05: wf-census reported 118 sacred blocks and two were a template example carrying a literal YYYY-MM-DD, so a directive guard fired on a date format string. The mention is REPORTED, never silently dropped: a number that shrank without explanation is its own defect. Both halves are asserted -- the real block is counted, the indented one is not, and the mention count is printed.",
+    "exit": 0,
+    "not": [
+      "2 sacred blocks",
+      "0 indented mention(s)"
+    ],
+    "script": "wf-census",
+    "want": [
+      "1 sacred blocks in 1 files",
+      "1 indented mention(s) not counted"
     ]
   },
   "census-inverted": {
@@ -228,17 +294,17 @@
     ]
   },
   "claudemd-absent": {
-    "exit": 0,
-    "script": "wf-claude-md",
-    "want": [
-      "ABSENT \u2014 this is the goal state",
-      "Nothing created.",
-      "wf-standing-request"
-    ],
     "_why": "An absent CLAUDE.md is the GOAL STATE (SKILL.md - Directives, 2026-08-05), not a gap to fill. This fixture asserted the opposite until then -- it required the script to CREATE the file containing the generated region, which under the evacuation directive would have one audit writing the file it then deletes, and re-creating it on every later run of an already-evacuated project. Inverted rather than removed: the superseded behaviour is exactly the drift a future edit would reintroduce, because its own comment read well.",
+    "exit": 0,
     "not": [
       "region and nothing else",
       "created "
+    ],
+    "script": "wf-claude-md",
+    "want": [
+      "ABSENT — this is the goal state",
+      "Nothing created.",
+      "wf-standing-request"
     ]
   },
   "claudemd-duplicated": {
@@ -267,7 +333,7 @@
     ]
   },
   "claudemd-ensure-region-present": {
-    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent \u2014 bin/idempotence asserts the second run writes the same bytes.",
+    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent — bin/idempotence asserts the second run writes the same bytes.",
     "args": [
       "--ensure-region"
     ],
@@ -281,18 +347,51 @@
       "region replaced"
     ]
   },
-  "claudemd-unstaffed": {
+  "claudemd-evacuated": {
+    "_why": "Every directive line reached a component — one a handbook, one the org charter — so the ledger is empty and CLAUDE.md may be deleted. DUPLICATED lines are counted as relocated because that is what duplicated MEANS; counting only the USER bucket made a two-rule fixture report one, understating the direction in the file.",
+    "args": [
+      "--evacuate"
+    ],
+    "exit": 0,
+    "not": [
+      "UNPLACED  CLAUDE.md"
+    ],
     "script": "wf-claude-md",
+    "want": [
+      "2 directive line(s)",
+      "2 relocated",
+      "0 UNPLACED"
+    ]
+  },
+  "claudemd-unevacuated": {
+    "_why": "Same tree plus ONE rule that reached no component. Exit 1, the line is named, and the refusal says why: a line that arrived nowhere was not moved, it was lost. Paired with claudemd-evacuated so a regression that always-permits or always-refuses fails one.",
+    "args": [
+      "--evacuate"
+    ],
+    "exit": 1,
+    "not": [
+      "0 UNPLACED"
+    ],
+    "script": "wf-claude-md",
+    "want": [
+      "1 UNPLACED",
+      "UNPLACED  CLAUDE.md",
+      "may NOT be deleted",
+      "destructive migration script"
+    ]
+  },
+  "claudemd-unstaffed": {
     "args": [
       "--ensure-region",
       "--execute"
     ],
     "exit": 0,
-    "want": [
-      "region prepended"
-    ],
     "not": [
       "This project is staffed"
+    ],
+    "script": "wf-claude-md",
+    "want": [
+      "region prepended"
     ]
   },
   "claudemd-user-only": {
@@ -308,7 +407,7 @@
   "conform-adopted": {
     "exit": 0,
     "not": [
-      "\u2717 "
+      "✗ "
     ],
     "script": "wf-conform",
     "want": [
@@ -317,8 +416,8 @@
     ]
   },
   "conform-alltools": {
-    "script": "wf-conform",
     "exit": 1,
+    "script": "wf-conform",
     "want": [
       "`tools:` is a real allowlist, not the display string",
       "one-entry allowlist naming a tool that does not exist"
@@ -330,6 +429,14 @@
     "want": [
       "1 governed",
       "0 failed"
+    ]
+  },
+  "conform-invokes-spawner": {
+    "_why": "TRUE POSITIVE GUARD for the routing exemption added 2026-08-05. A tier-3 IC that plainly invokes a spawning skill, with no escalation vocabulary anywhere, MUST still fail. The exemption was added because 22 of 22 findings on a real org were re-homed steps; this is the case that proves the exemption narrowed the check rather than disabled it.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "invokes only skills that spawn nothing (/spawnyskill)"
     ]
   },
   "conform-mcp-forbidden": {
@@ -361,7 +468,7 @@
     "_why": "A governed handbook with a Check: and NO Negative:. The advisory row must fire and the exit code must stay 0 -- the contract post-dates every handbook under it, and failing them all reproduces the 9-false-failures run that taught this script 'a check that always fails stops being read'. The bin/check assertion can only see that the channel EXISTS; only this can see that it does not block.",
     "exit": 0,
     "not": [
-      "\u2717 "
+      "✗ "
     ],
     "script": "wf-conform",
     "want": [
@@ -370,11 +477,70 @@
       "0 failed"
     ]
   },
+  "conform-over-ceiling": {
+    "_why": "delegation-budget.md has always said over the ceiling is 'a structural finding proposing a split, never a refusal', but the row was wired to the blocking channel, so 14 of them set a non-zero exit and INV-VERIFY read that exit as the org failing to verify. A 350-line handbook must REPORT and must NOT fail.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "~ g.md: within the 150-line ceiling",
+      "0 failed"
+    ]
+  },
+  "conform-removal-staged": {
+    "_why": "The same tree with Step 6-S having run: T7s writes SKILL.md.orig and tree/, T7c writes the mark, and T2's extraction record exists for the one sacred span the target holds. MUST pass. Paired with conform-removal-unstaged (the mark is missing) and conform-removal-unextracted (the extraction is missing) so each half of Step 6-S has a fixture that fails without it. `tree/` is asserted because the sweep unlinks the WHOLE directory — references/, scripts/, hooks/, datasets — and SKILL.md.orig is an undo for the least of that.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ],
+    "not": [
+      "dispositioned for removal and staged",
+      "sacred span"
+    ]
+  },
+  "conform-removal-unextracted": {
+    "_why": "T2 IS THE ONE GATE BETWEEN A DIRECTORY DELETION AND THE USER'S OWN WORDS, and it was specified without being computable: INV-DIRECTIVES counts N of N TREE-WIDE while T2 for a removal target asks a DIRECTORY-scoped question, and wf-census published only the aggregate. The only way to answer it was a hand grep — which on 2026-08-06 reported 37 sacred spans in skill-builder against the true 6, by matching indented examples and markers quoted mid-line inside the file that DOCUMENTS the marker format. Staged, marked, undo on disk, and one span unextracted: the target must be named with its file:line, not with the difference between two totals.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "oldgen extracted 0 of 1 sacred span",
+      ".claude/skills/oldgen/SKILL.md:8",
+      "T2 is blocking"
+    ],
+    "not": [
+      "dispositioned for removal and staged"
+    ]
+  },
+  "conform-removal-unstaged": {
+    "_why": "THE REMOVAL SET HAD A READER AND NO WRITER. `sweep.md` derives it from the journal; `conversion-taxonomy.md` decided the removals and never wrote a journal row; `T7c` was inserted as the mark 2026-08-04 with no row shape defined for it. Measured on odyssey-alive over three audits: `skill-builder` dispositioned SUPERSEDED GENERATOR, on disk throughout, zero rows naming it, 32 T7 rows and zero T7c rows — every run printed an empty removal set and every run was right about the journal. The finding must name the target and the step it is missing, never print a balanced-looking zero.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "oldgen was dispositioned for removal and staged",
+      "Step 6-S"
+    ],
+    "not": [
+      "keeper"
+    ]
+  },
+  "conform-routed-escalation": {
+    "_why": "The same handbook with the step re-homed exactly as wf-conform's own message recommends. MUST pass. Deliberately built in the hard real-world shape measured on odyssey-alive: the skill is named on one line, the `ESCALATE:` marker sits two lines below carrying only a `<skill>` placeholder, and the sentence that proves the re-homing is inside the same numbered step. A line-local scope, or one that reads the prohibition-filtered text, reports this file.",
+    "exit": 0,
+    "not": [
+      "invokes only skills that spawn nothing"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ]
+  },
   "conform-section-mention": {
     "_why": "REGRESSION GUARD. `## Verification` is MENTIONED in prose at line 2 of ## Procedure before the real heading, so a substring split hands every reader the tail of ## Procedure and the real section is never examined. Found on a real handbook 2026-08-04: the old 'Verification is not empty' assertion PASSED on it, because the wrong segment is also non-empty. Both scripts now match the heading line-anchored; this asserts wf-conform reports no failure on the file.",
     "exit": 0,
     "not": [
-      "\u2717 "
+      "✗ "
     ],
     "script": "wf-conform",
     "want": [
@@ -383,15 +549,15 @@
     ]
   },
   "conform-staging-diverged": {
-    "script": "wf-conform",
     "exit": 0,
+    "not": [
+      "✗ eng-lead.md: staged draft differs"
+    ],
+    "script": "wf-conform",
     "want": [
       "staged draft differs from the registered bytes",
       "NORMAL after an amendment",
       "shorter or cleaner"
-    ],
-    "not": [
-      "\u2717 eng-lead.md: staged draft differs"
     ]
   },
   "conform-tier-sections": {
@@ -497,23 +663,27 @@
     ]
   },
   "permissions-apply": {
-    "script": "wf-permissions",
     "args": [
       "--apply"
     ],
     "exit": 0,
+    "script": "wf-permissions",
     "want": [
       "repaired  Write(//home/demo/**)  removed (redundant)",
       "repaired  Write(//home/loadbearing/**)  -> Edit(//home/loadbearing/**)",
       "left      Write(//home/handwritten/**)  (user-authored",
       "left      NotebookEdit(//home/demo/**)  (unmeasured form",
-      "INV-PERMS  dead 3 \u00b7 repaired 2 \u00b7 left 2 \u00b7 suspect 1"
+      "INV-PERMS  dead 3 · repaired 2 · left 2 · suspect 1"
     ]
   },
   "permissions-report": {
-    "script": "wf-permissions",
     "args": [],
     "exit": 0,
+    "not": [
+      "repaired  Write",
+      "left      Write"
+    ],
+    "script": "wf-permissions",
     "want": [
       "DEAD      Write(//home/demo/**)",
       "workforce-owned",
@@ -522,25 +692,21 @@
       "Write(//home/handwritten/**)",
       "reported, never modified",
       "advisory  NotebookEdit(//home/demo/**)",
-      "INV-PERMS  dead 3 \u00b7 repairable 2 \u00b7 suspect 1"
-    ],
-    "not": [
-      "repaired  Write",
-      "left      Write"
+      "INV-PERMS  dead 3 · repairable 2 · suspect 1"
     ]
   },
   "permissions-user-authored": {
-    "script": "wf-permissions",
     "args": [
       "--apply"
     ],
     "exit": 0,
-    "want": [
-      "left      Write(//home/handwritten/**)  (user-authored",
-      "INV-PERMS  dead 1 \u00b7 repaired 0"
-    ],
     "not": [
       "repaired  Write"
+    ],
+    "script": "wf-permissions",
+    "want": [
+      "left      Write(//home/handwritten/**)  (user-authored",
+      "INV-PERMS  dead 1 · repaired 0"
     ]
   },
   "persona-badstdin": {
@@ -577,6 +743,34 @@
     "script": "wf-unique-persona",
     "stdin_file": ".claude/agents/a.md"
   },
+  "ratchet-inherited": {
+    "_why": "Same tree and same finding as ratchet-regression, with an EMPTY captured-passes: the baseline predates the pass, so the finding is INHERITED and exits 0. A newly added pass flags artifacts that were already there; calling those regressions would make every catalog addition look like a decline.",
+    "exit": 0,
+    "not": [
+      "REGRESSION  PASS-DEAD-SCRIPT"
+    ],
+    "script": "wf-ratchet",
+    "want": [
+      "1 inherited",
+      "INHERITED   PASS-DEAD-SCRIPT",
+      "not a regression",
+      "0 REGRESSION(S)"
+    ]
+  },
+  "ratchet-regression": {
+    "_why": "A finding absent from the baseline whose pass WAS known at capture is the one case the ratchet fails on. Paired with ratchet-inherited: identical tree, identical finding, and the only difference is captured-passes. If both pass, the discrimination two integers cannot make is real.",
+    "exit": 1,
+    "not": [
+      "inherited\n",
+      "0 REGRESSION(S)"
+    ],
+    "script": "wf-ratchet",
+    "want": [
+      "1 REGRESSION(S)",
+      "REGRESSION  PASS-DEAD-SCRIPT",
+      "scripts/gone.sh"
+    ]
+  },
   "remainder-apply-good": {
     "args": [
       "--apply",
@@ -607,8 +801,26 @@
       "Nothing was written"
     ]
   },
-  "remainder-eats-sacred": {
+  "remainder-deadscript": {
+    "_why": "manifest() emits script: tokens and never stats one, so a SKILL.md naming a deleted script passes the blocking T7b reduction gate on both sides. Three behaviours are asserted together: a reference that resolves from its own skill is silent; a BARE FILENAME is a mention and is skipped (105 of 184 tokens on a real tree were this kind); and a token whose basename resolves elsewhere is MISROUTED (high confidence, the file is real and the path is wrong) while one that resolves nowhere is UNRESOLVED (it may name a file in another repository -- odyssey-alive's src/stealth.ts belongs to the playwright-mcp server). Collapsing the two verdicts would license rewriting a correct sentence.",
+    "args": [
+      "--dead-scripts"
+    ],
+    "exit": 0,
+    "not": [
+      "bare.py",
+      "alpha/SKILL.md  ->  scripts/live.sh"
+    ],
     "script": "wf-remainder",
+    "want": [
+      "2 unresolved",
+      "1 misrouted",
+      "UNRESOLVED .claude/skills/alpha/SKILL.md  ->  scripts/vanished.sh",
+      "MISROUTED  .claude/skills/beta/SKILL.md  ->  scripts/live.sh",
+      ".claude/skills/alpha/scripts/live.sh"
+    ]
+  },
+  "remainder-eats-sacred": {
     "args": [
       "--apply",
       "skill.md",
@@ -616,6 +828,7 @@
       "When to use"
     ],
     "exit": 1,
+    "script": "wf-remainder",
     "want": [
       "REFUSED",
       "immutable block(s)",
@@ -685,7 +898,6 @@
     ]
   },
   "remainder-marker-safe": {
-    "script": "wf-remainder",
     "args": [
       "--apply",
       "skill.md",
@@ -693,17 +905,17 @@
       "When to use"
     ],
     "exit": 0,
+    "not": [
+      "REFUSED"
+    ],
+    "script": "wf-remainder",
     "want": [
       "reduced",
       "surface identical",
       "dropped  When to use"
-    ],
-    "not": [
-      "REFUSED"
     ]
   },
   "remainder-unpairs-marker": {
-    "script": "wf-remainder",
     "args": [
       "--apply",
       "skill.md",
@@ -711,13 +923,14 @@
       "When to use"
     ],
     "exit": 1,
+    "not": [
+      "immutable block(s)"
+    ],
+    "script": "wf-remainder",
     "want": [
       "REFUSED",
       "unpaired marker",
       "origin: 1 open vs 0 close"
-    ],
-    "not": [
-      "immutable block(s)"
     ]
   },
   "sidecar-agree": {
@@ -754,167 +967,21 @@
       "never examined"
     ]
   },
-  "remainder-deadscript": {
-    "_why": "manifest() emits script: tokens and never stats one, so a SKILL.md naming a deleted script passes the blocking T7b reduction gate on both sides. Three behaviours are asserted together: a reference that resolves from its own skill is silent; a BARE FILENAME is a mention and is skipped (105 of 184 tokens on a real tree were this kind); and a token whose basename resolves elsewhere is MISROUTED (high confidence, the file is real and the path is wrong) while one that resolves nowhere is UNRESOLVED (it may name a file in another repository -- odyssey-alive's src/stealth.ts belongs to the playwright-mcp server). Collapsing the two verdicts would license rewriting a correct sentence.",
-    "script": "wf-remainder",
-    "args": [
-      "--dead-scripts"
-    ],
-    "exit": 0,
-    "want": [
-      "2 unresolved",
-      "1 misrouted",
-      "UNRESOLVED .claude/skills/alpha/SKILL.md  ->  scripts/vanished.sh",
-      "MISROUTED  .claude/skills/beta/SKILL.md  ->  scripts/live.sh",
-      ".claude/skills/alpha/scripts/live.sh"
-    ],
-    "not": [
-      "bare.py",
-      "alpha/SKILL.md  ->  scripts/live.sh"
-    ]
-  },
-  "census-indented-mention": {
-    "_why": "In markdown an indented line is a code block, so an indented sacred marker is documentation ABOUT the format and never a span opener. bin/baseline established this and measured 68 naive against 37 anchored -- 46% inflation -- and the other readers never got the ruling. Measured on odyssey-alive 2026-08-05: wf-census reported 118 sacred blocks and two were a template example carrying a literal YYYY-MM-DD, so a directive guard fired on a date format string. The mention is REPORTED, never silently dropped: a number that shrank without explanation is its own defect. Both halves are asserted -- the real block is counted, the indented one is not, and the mention count is printed.",
-    "script": "wf-census",
-    "exit": 0,
-    "want": [
-      "1 sacred blocks in 1 files",
-      "1 indented mention(s) not counted"
-    ],
-    "not": [
-      "2 sacred blocks",
-      "0 indented mention(s)"
-    ]
-  },
-  "ratchet-regression": {
-    "_why": "A finding absent from the baseline whose pass WAS known at capture is the one case the ratchet fails on. Paired with ratchet-inherited: identical tree, identical finding, and the only difference is captured-passes. If both pass, the discrimination two integers cannot make is real.",
-    "script": "wf-ratchet",
-    "exit": 1,
-    "want": [
-      "1 REGRESSION(S)",
-      "REGRESSION  PASS-DEAD-SCRIPT",
-      "scripts/gone.sh"
-    ],
-    "not": [
-      "inherited\n",
-      "0 REGRESSION(S)"
-    ]
-  },
-  "ratchet-inherited": {
-    "_why": "Same tree and same finding as ratchet-regression, with an EMPTY captured-passes: the baseline predates the pass, so the finding is INHERITED and exits 0. A newly added pass flags artifacts that were already there; calling those regressions would make every catalog addition look like a decline.",
-    "script": "wf-ratchet",
-    "exit": 0,
-    "want": [
-      "1 inherited",
-      "INHERITED   PASS-DEAD-SCRIPT",
-      "not a regression",
-      "0 REGRESSION(S)"
-    ],
-    "not": [
-      "REGRESSION  PASS-DEAD-SCRIPT"
-    ]
-  },
-  "apply-deadhook": {
-    "_why": "DISPLAY is the default and must change nothing. Three registrations are live, dead, and UNDECIDABLE (a bare `jq` resolved on PATH). Only the two dead ones are named; calling the undecidable one dead would invite deleting a working registration, which is the failure wf-census's DEAD/UNDECIDABLE split exists for. `would apply` rather than `applied` is the whole difference between the two modes.",
-    "script": "wf-apply",
-    "exit": 0,
-    "want": [
-      "PASS-DEAD-HOOK",
-      "would apply 2",
-      "vanished.sh",
-      "also-gone.sh",
-      "reversal:",
-      "apply with: --execute"
-    ],
-    "not": [
-      "applied 2",
-      "jq",
-      "real.sh"
-    ]
-  },
-  "apply-deadhook-execute": {
-    "_why": "--execute is the consent. Same tree as apply-deadhook; the only difference is the flag, and the verdict word changes from `would apply` to `applied`. Paired so a regression that makes display WRITE, or execute merely REPORT, fails one of them.",
-    "script": "wf-apply",
-    "args": [
-      "--execute"
-    ],
-    "exit": 0,
-    "want": [
-      "PASS-DEAD-HOOK",
-      "applied 2",
-      "vanished.sh",
-      "also-gone.sh"
-    ],
-    "not": [
-      "would apply",
-      "jq",
-      "real.sh"
-    ]
-  },
-  "apply-stalecanary": {
-    "_why": "THREE populations in one tree and only one is residue: a throwaway canary (no measures-fact:), a SHIPPED canary (carries measures-fact:, its job recurs per host and per harness version, never residue), and a real employee. Precision is a property of the three required conditions rather than a sample, and this asserts all three by naming what must NOT appear.",
-    "script": "wf-apply",
-    "exit": 0,
-    "want": [
-      "PASS-STALE-CANARY",
-      "would apply 1",
-      "wf-canary-a.md",
-      "files_removed"
-    ],
-    "not": [
-      "wf-canary-b.md",
-      "real-employee.md",
-      "applied 1"
-    ]
-  },
-  "claudemd-evacuated": {
-    "_why": "Every directive line reached a component \u2014 one a handbook, one the org charter \u2014 so the ledger is empty and CLAUDE.md may be deleted. DUPLICATED lines are counted as relocated because that is what duplicated MEANS; counting only the USER bucket made a two-rule fixture report one, understating the direction in the file.",
-    "script": "wf-claude-md",
-    "args": [
-      "--evacuate"
-    ],
-    "exit": 0,
-    "want": [
-      "2 directive line(s)",
-      "2 relocated",
-      "0 UNPLACED"
-    ],
-    "not": [
-      "UNPLACED  CLAUDE.md"
-    ]
-  },
-  "claudemd-unevacuated": {
-    "_why": "Same tree plus ONE rule that reached no component. Exit 1, the line is named, and the refusal says why: a line that arrived nowhere was not moved, it was lost. Paired with claudemd-evacuated so a regression that always-permits or always-refuses fails one.",
-    "script": "wf-claude-md",
-    "args": [
-      "--evacuate"
-    ],
-    "exit": 1,
-    "want": [
-      "1 UNPLACED",
-      "UNPLACED  CLAUDE.md",
-      "may NOT be deleted",
-      "destructive migration script"
-    ],
-    "not": [
-      "0 UNPLACED"
-    ]
-  },
   "standing-request": {
     "_why": "The hook that keeps spawning available once CLAUDE.md is deleted. It must emit valid UserPromptSubmit additionalContext carrying the asking, and it must exit 0 no matter what: a hook that fails a turn because it could not phrase a request breaks the session it exists to help. Without this producer, spawning goes UNAVAILABLE and every handbook registers unprobed -- quietly, because UNAVAILABLE is neither pass nor fail.",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "Error"
+    ],
     "script": "wf-standing-request",
     "stdin_raw": "{\"prompt\": \"anything\"}",
-    "exit": 0,
     "want": [
       "hookSpecificOutput",
       "UserPromptSubmit",
       "additionalContext",
       "Cold-reader agents are requested, standing.",
       "unless the user asks"
-    ],
-    "not": [
-      "Traceback",
-      "Error"
     ]
   }
 }

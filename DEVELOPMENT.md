@@ -113,9 +113,133 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-05
+## Open, as of 2026-08-06
 
-**Closed 2026-08-05 (latest) — the optimization pass catalog, and the class that refused to
+**Closed 2026-08-06 (latest) — the removal set had two consumers and no producer, so the only
+destructive command could never reach its target.** Fixtures `conform-removal-unstaged`,
+`conform-removal-staged`; `INV-STAGED` (invariants row 19); assertions *"T-order: the sweep mark has a
+defined representation, and it is T7c"*, *"T-order: a succession removal is staged into the journal at
+T7s"*, *"conversion-taxonomy sends every decided removal to the journal"*, *"audit runs the staging
+step, and before verify"*, and four on `wf-conform` — all eight proven by breaking. Run record at
+`plan/mock-audit-odyssey-alive-2026-08-06.md`.
+
+Origin: a user reported that repeated `audit` runs on `odyssey-alive` never removed the skills flagged
+for removal, and quoted the run's own `INV-SUCCESSION  sweep NOT executed — removal set is empty`.
+**The run was right about the journal and the journal was right about itself. Nothing wrote to it.**
+
+**Two producer gaps, both reaching the same symptom from different sides.**
+
+| | |
+|---|---|
+| **the mark moved and its definition did not** | `hire.md` said *"The mark IS the COMMITTED **T7** journal row"* and five files read it. `T7c` was inserted 2026-08-04, took the mark, made it conditional — and **defined no row for itself**. Measured: **32 `T7` rows, 32 `.orig` files, ZERO `T7c` rows.** Read literally the removal set was all 32 reduced-and-surviving skills; read as the run read it, empty. **A gate in front of the only destructive command with two readings that differ by the whole library**, and neither was reachable by argument because the row did not exist to be counted either way |
+| **a succession removal never entered the journal at all** | a superseded generator is *"removed entirely — not retained, not converted, not stubbed"*, so it never runs the T-order. `sweep.md` derives the removal set *"from the journal, never from `dispositions.md` prose"* — correct, and pointed at a table nothing filled in. `conversion-taxonomy.md` owned the decision and **contained the string `journal` zero times.** `sweep.md`'s own reporting exemplar has shown `+ skill-builder  removed (SUPERSEDED-GENERATOR)` as its worked example the whole time |
+
+**The fix is one producer and one reader.** `T7c` is the mark, its own row, action `mark`, and the
+removal set is exactly those rows. `T7s` stages a removal target the way `T7` stages a conversion —
+`SKILL.md.orig` under the same name and hash contract so one checker reads both populations, plus
+`tree/`, because **the target is unlinked entire and `SKILL.md.orig` is an undo for 1 file out of 73**
+on the real one. `audit.md` § Step 6-S runs it, unasked, in the same run.
+
+**The step's POSITION is the part a re-read would not have caught.** `wf-conform` failing an unstaged
+removal makes `INV-VERIFY` red, and `INV-VERIFY` gates the sweep — so Step 6-S placed after `verify`,
+which is where the other execution steps live, is a deadlock in which the gate blocks the step that
+clears it. It sits immediately after conversions, and the assertion checks the **order** of two tokens
+in the Order line. That assertion came back `VACUOUS` on its first `bin/prove` pass — `"Step 6-S" in
+aud` stayed true off the section heading after the Order-line phrase was deleted — and was rewritten
+before it counted. *The one thing in this patch that was tested by something other than its author was
+the test.*
+
+**Refusal survives as refusal.** A target whose T2 extraction comes up short is marked ✗ and the batch
+continues (containment rule 7), and the checker reads that ✗ as a decision rather than a gap.
+Without it, the run that correctly refused a removal would be failed for refusing it on every later
+`verify`, with no edit that could ever clear it.
+
+Measured on `odyssey-alive`: **384 checks · 1 failed · exit 1**, naming `skill-builder` and the step it
+is missing — **precision 1 of 1** against 47 skills and six disposition categories; `route`, which the
+closing report named as a second target, is filed under *"findings, never removals"* and is correctly
+not selected. After Step 6-S: **387 checks · 0 failed · exit 0**, `1 dispositioned · 1 staged ·
+1 marked`. The sweep's blocker is gone and the target is now reachable by it.
+
+**Settled the same day, and the instrument was right.** T2's completeness on that target was left
+open because a grep read **37** immutable-span openers inside `skill-builder` and the extraction
+records covered 12 files. Re-measured with the census's own line-anchored grammar: **6 sacred spans,
+all 6 extracted, `file:line` for `file:line`.** T2 passes and Step 6-S will stage the target. The 31
+extra were indented examples and markers quoted mid-line — over half of them inside
+`references/templates.md`, *the file that documents the marker format*. Mention is not use. The two
+markers in `protect-directives.sh` are a comment and a regex literal, so the census's markdown scope
+undercounts nothing.
+
+**But the reason it could not be settled by reading was a real gap, and that is what got fixed.** The
+gate was specified and **not computable**: `INV-DIRECTIVES` counts `N of N` **tree-wide**, T2 for a
+removal target asks a **directory-scoped** question, and `wf-census` published only the aggregate — the
+per-file records existed and were dropped at the JSON boundary. So the only available answer was a hand
+grep, **and a gate answered by a hand count is one whose verdict changes with who runs it.** `wf-census`
+now emits `immutable_blocks.by_file` with line numbers; `wf-conform` joins them against
+`.claude/workforce/directives/` on `file:line` and names the missing span rather than a difference
+between two totals. Fixtures `conform-removal-unextracted` (staged, marked, undo on disk, one span
+unextracted → must fail, naming `SKILL.md:8`) and `conform-removal-staged` (the same tree with the
+extraction record → must pass). Three more assertions, all proven by breaking.
+
+**Adding a reader raised a floor two other checks were resting on, and both went VACUOUS.** The grammar
+guards assert `_grammar_readers >= 8` and `_indent_seen >= 7` so they cannot pass on a shrunken corpus;
+`wf-conform`'s new line-anchored reader took the observed counts to 9 and 8, so `bin/prove` deleting a
+pattern left the set one *above* the floor and both checks passed while measuring nothing. Floors
+raised to the observed counts. **A tripwire that does not track the population it guards is a number
+that used to be a check** — and nothing but proof-by-breaking would have surfaced it, since both were
+green in `bin/check` throughout.
+
+**Closed 2026-08-05 — `wf-conform` reported the remedy it recommends as the violation, and a
+chosen budget was gating a deletion.** Fixtures `conform-routed-escalation`, `conform-invokes-spawner`,
+`conform-over-ceiling`; assertions *"wf-conform tells an escalated skill from an invoked one"*, *"the
+routed set is harvested per step, from the raw text"*, *"the handbook line ceiling is advisory, not a
+refusal"*, all three proven by breaking.
+
+Origin: a user asked why, on `odyssey-alive`, `CLAUDE.md` was deleted while `skill-builder` — the
+superseded generator the same audit dispositioned **SUPERSEDED GENERATOR / removed entirely** — was
+still on disk. **The two deletions are not one mechanism, and only one of them ran.** The evacuation is
+a pass inside `audit`, gated per line on proof of relocation: 71 of 71 proved, so it applied. Removing
+`skill-builder` is the succession **sweep**, gated org-wide on `INV-VERIFY`, which is `wf-conform`
+exiting 0. It exited 1, so the sweep deferred — for the third consecutive run.
+
+**All 36 failures holding it red were wrong as blockers, and they were wrong in two distinct ways.**
+
+| | |
+|---|---|
+| **22 — the checker could not recognize its own recommended remedy** | The spawning-skill check names re-homing to a delegating tier as its FIRST remedy. `DEF-2026-08-05-mechanism-partition-ic-tier` applied exactly that: ten IC handbooks re-homed, every skill preserved byte-for-byte. The check then reported all ten as ceiling breaches. `PROHIBITION_RX` drops guardrail lines, and the script's own comment says **"MENTION IS NOT USE"** — it handled the `## Scope` disclaimer and the explicit prohibition. **Routing is the third case**: `ESCALATE: business-lead run /quo lookup` names a skill in order to send it *away*, and carries no prohibition keyword because it is an instruction rather than a ban |
+| **14 — a row declaring itself "never a refusal" set a non-zero exit** | `delegation-budget.md` § The handbook length ceiling has always read *"over the ceiling is a structural finding proposing a split, never a refusal. A number nobody measured may not block anyone's work."* It was wired to the blocking channel anyway — **two functions above `res.advise()`, which exists for precisely this and is used by the sibling branch twenty lines below it.** `INV-VERIFY` reads the exit code, so a DOCUMENTED fact became a blocking check by wiring rather than by decision. This is the `platform.md` rule the project states everywhere and enforced nowhere in this file |
+
+**Two orderings inside the fix had to be got right, and neither is the one the defect record proposed.**
+`DEF-2026-08-05-conform-escalation-false-positive` proposed a line-local filter on escalation markers.
+Measured, that clears 29 of 36 and leaves 7 — because **the strongest routing evidence a handbook
+writes is itself a prohibition** (*"You never invoke `/focus` or `/edit` yourself: both spawn, and you
+cannot"*), so filtering prohibitions first deletes the sentence that proves the re-homing; and because
+**the marker and the skill name sit a line or two apart inside one numbered step** (`content-promoter`
+names five skills two lines above an `ESCALATE:` carrying only a `<skill>` placeholder). Collecting
+from the raw text, per numbered step, clears all 36. The numbered step is the unit of instruction, so
+it is the unit of scope.
+
+**The exemption narrows the check; it does not disable it, and that is asserted rather than claimed.**
+This check has earned 30 true positives — it is what measured the mechanism/judgment partition failure
+at the IC tier, wider than the cold read that opened it. `conform-invokes-spawner` is a tier-3 handbook
+that plainly invokes a spawning skill with no escalation vocabulary anywhere; it MUST still fail, and
+it is registered so it must keep failing. `conform-routed-escalation` is the same handbook with the
+step re-homed, built deliberately in the hard shape measured on the real tree.
+
+Result on `odyssey-alive`: **36 failures → 0, exit 1 → 0.** `INV-VERIFY` passes and the sweep's stated
+blocker is gone. Discharges that project's deferred row 3, which correctly named this repository as its
+home. **Not run:** the sweep itself is user-invoked and never auto-fired.
+
+**New finding, not fixed, and it gates nothing.** `bin/baseline` reports `operating-principles` as
+`1 openers / 0 closers — orphan opener`, a sweep hazard. **`wf-census` — the reader `INV-MARKERS`
+actually gates on — reports `0 unpaired`, and hand-verification says wf-census is right**: the file
+nests an `origin: user | immutable: true` block inside an `origin: workforce | modifiable: true` one,
+and `<!-- /origin -->` closes both families with textually identical bytes, so a family-keyed counter
+cannot attribute the closers. Two readers of one grammar disagreeing is the class this repo already
+holds an assertion against for `wf-conform`/`wf-checkrun`; `bin/baseline` is a maintainer tool and was
+never brought under it. Recorded rather than fixed because narrowing a counter changes a number on
+every tree already measured.
+
+**Closed 2026-08-05 — the optimization pass catalog, and the class that refused to
 generalize.** Records in `plan/transactions/2026-08-05-broom21-time.md`,
 `plan/marker-grammar-2026-08-05.md`, `plan/dead-script-2026-08-05.md`, and
 `plan/mock-audit-odyssey-alive-2026-08-05.md`.

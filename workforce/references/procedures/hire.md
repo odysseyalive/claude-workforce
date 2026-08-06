@@ -158,10 +158,17 @@ T5  register              →  .claude/agents/<name>.md          ← employee li
 T6  verify registration   →  regular file, parses, hash matches
 T6b journal WRITE-INTENT (T7)   ← rollback cannot tell "after T6" from "after T7" without it
 T7  retire the skill      →  copy SKILL.md to .orig, hash it into the journal  ← still two paths
+                             journal action `copy` — a T7 row is the UNDO, never the mark
 T7b reduce + verify       →  manifest A · reduce · manifest B · REQUIRE A == B
 T7c mark for the sweep    →  ONLY IF the remainder is empty
+                             journal action `mark` — ITS OWN ROW, and the only mark anything writes
 T8  journal COMMITTED
 ```
+
+**One step off this order exists, and it is a removal rather than a conversion: `T7s`, § A removal
+target stages too.** It writes the same `.orig`-then-`T7c` pair for a target the succession branch
+removes whole. It is listed there rather than here because nothing above it runs for such a target —
+there is no handbook, no registration, and no reduction.
 
 **T7b and T7c are an insertion, never a reorder** (added 2026-08-04). The T-order is this project's
 most safety-critical constant; nothing above moved, and T7 keeps doing exactly what it did minus the
@@ -209,7 +216,8 @@ source that does not exist, and the honest failure is that they invent one.
 | **T2** extract directives | blocking, byte-exact | **N/A** — no source. Report `T2 N/A (hire)`, never a silent skip |
 | **T6b / T7** retire the skill | required, copy-then-mark | **N/A** — nothing to retire. **T8 follows T6 directly** |
 | **T7b** reduce + verify manifest | blocking, `A == B` | **N/A** — no source to reduce. The split still applies, at authoring time: § Step 3 |
-| **T7c** mark for the sweep | only on an empty remainder | **N/A** — nothing to mark |
+| **T7c** mark for the sweep | only on an empty remainder, and it is **its own journal row** | **N/A** — nothing to mark |
+| **T7s** stage a removal | **N/A** — a converted skill is not a removal target | **N/A**. It runs only for a target the succession branch removes whole (§ A removal target stages too) |
 | **T4 / T5 / T6 / T8** journal, register, verify, commit | required | **required — identical.** A hire that writes no journal row cannot be disbanded |
 
 *T7b and T7c were added to the order on 2026-08-04 and were missing from this table for the rest of
@@ -224,12 +232,66 @@ there is nothing a crash could strand: before T5 the employee does not exist, af
 is indistinguishable from a conversion whose T7 was skipped — which is the one failure this order
 refuses. `T2 N/A (hire)` and `T7 N/A (hire)` cost two lines and remove the ambiguity.
 
-**The mark IS the COMMITTED T7 journal row.** It is not an annotation in the skill, not a sidecar, and
-not run-local state — `audit.md` § Step 6c enumerates the sweep's input set from those rows, and
-`disband` reverses from the same place. An audit found the mark's representation specified nowhere in
-the distribution while five files used it; the journal was the only candidate any consumer read, so it
-is now the definition rather than the inference. The exemplar's `action` for a T7 row is `mark`, never
-`replace` — nothing is written into the skill.
+**THE MARK IS A COMMITTED `T7c` ROW WHOSE ACTION IS `mark`, AND THAT IS THE WHOLE DEFINITION.** It is
+not an annotation in the skill, not a sidecar, and not run-local state — `audit.md` § Step 6c and
+`sweep.md` § Procedure both enumerate the removal set from those rows and nothing else, and `disband` reverses
+from the same place. **A `T7` row is the undo artifact, not the mark.** Nothing is written into the
+skill by either.
+
+*This paragraph read "the mark IS the COMMITTED **T7** journal row" until 2026-08-06, which was true
+when it was written and stopped being true on 2026-08-04, when T7c was inserted and made the mark
+conditional. **The insertion moved the mark and left its definition pointing at the step it moved off**,
+and defined no row for the step it moved to — so the removal set had two readings that differ by every
+converted skill in the run.* Measured on `odyssey-alive`, three consecutive audits: **32 `T7` rows, 32
+`.orig` files, ZERO `T7c` rows.** Read as written, the removal set was all 32 — every one of them
+reduced, still invocable, and required by directive one to keep working. Read as the run actually read
+it, the removal set was empty and the sweep it gates has never fired. **A definition whose two readings
+are "delete nothing" and "delete the library" is the one shape a gate in front of the only destructive
+command may never have**, and neither reading was reachable by argument: the T7c row did not exist to
+be counted either way.
+
+**So a run that writes T7 rows and no T7c rows has marked nothing, and that is a legal, common
+outcome** — most skills reduce and survive (§ T7c). It is `INV-REMAINDER`'s `deleted` column that says
+whether it was correct, never the absence of rows.
+
+### A removal target stages too — `T7s`
+
+**A skill removed by succession is never converted, so it never enters the T-order, so under the old
+text it could not enter the removal set at all** (`conversion-taxonomy.md` § What succession removes).
+That file names `the generator itself | removed` and — before this was written — contained the string
+`journal` zero times. `sweep.md` § Procedure step 3 derives the removal set *from the journal, never from
+`dispositions.md` prose*, which is the right rule pointed at a table nothing was writing into. The
+result on `odyssey-alive` was `INV-SUCCESSION  sweep NOT executed — removal set is empty  NOT UPHELD`,
+run after run, with `.claude/skills/skill-builder/` on disk the whole time and `sweep.md`'s own
+reporting exemplar showing `+ skill-builder  removed (SUPERSEDED-GENERATOR)` as its worked example.
+
+```
+T7s stage the removal   →  <staging>/<name>/SKILL.md.orig   the hashed single-file undo, identical
+                                                            in name and shape to T7's, so ONE reader
+                                                            checks both populations
+                           <staging>/<name>/tree/           the WHOLE directory, because the whole
+                                                            directory is what the sweep unlinks
+                           ← nothing is unlinked here; two paths still live
+T7c mark for the sweep  →  unconditional here: the disposition IS the remainder test
+T8  journal COMMITTED
+```
+
+| | |
+|---|---|
+| **What authorizes it** | **the org, not a per-skill replacement.** T7's rule — never retire a skill without a verified live employee — has no per-skill counterpart here, because what replaces a superseded generator is workforce itself. The authorization is `INV-VERIFY` plus the Step 6c preconditions, which are org-level and already gate the sweep. **State this rather than leaving T7's rule looking skipped** |
+| **What the undo is** | **two artifacts, because the target is removed entire.** `SKILL.md.orig` keeps the name and the hash contract T7 already has, so `wf-conform` checks both populations with one reader; `tree/` is the whole-directory copy, and it is what a restore actually reads. `SKILL.md.orig` alone is an undo for the least of what was deleted — `references/`, `scripts/`, `hooks/`, and every dataset go with the directory |
+| **T2 applies unchanged, and it is blocking** | a generator's files routinely hold the user's own `origin: user \| immutable: true` spans (§ What succession removes — the extraction gate). Short by one → mark the target ✗, write **no** `T7c` row, and continue |
+| **T2's count is `wf-census`'s, joined on `file:line` — NEVER a grep** | `INV-DIRECTIVES` counts `N of N` **tree-wide**; this is a **directory-scoped** question, and it is the join that answers it: every sacred span inside the target against the `file:line` citations in `.claude/workforce/directives/`. `wf-census --json` publishes `immutable_blocks.by_file` with line numbers for exactly this, and `wf-conform` computes it at every `verify`. **Measured 2026-08-06: an unanchored hand grep reported 37 spans inside `skill-builder` against the true 6** — it matched indented examples and markers quoted mid-line inside `references/templates.md`, the file that *documents the marker format*. Mention is not use, the line-anchored grammar knows the difference, and a gate answered by a hand count is one whose verdict changes with who runs it |
+| **Load-bearing machinery is NOT staged for removal** | hooks and maintainer scripts the predecessor wrote survive, re-owned, and `sweep.md` § Procedure relocates them before the unlink. Staging the directory does not decide their fate; it preserves the bytes |
+| **`--review` writes nothing** | it prints the removal set it *would* stage, per target, with the rule that put it there |
+
+**A target the dispositions name for removal and no `T7c` row names is NOT in the removal set, and the
+run says so by name rather than printing an empty set.**
+
+The run prints **`INV-STAGED`** — `dispositioned N · staged N · marked N · D declined`, all four,
+always (`references/invariants.md` row 19). An imbalance is `NOT UPHELD` and blocks the sweep;
+`wf-conform` fails the same tree at `verify`. **An empty removal set under declared succession is a
+finding about this step, never a description of the tree.**
 
 **T7 marks; it does not delete.** The unlink happens in a single sweep after the whole org verifies
 (`conversion-taxonomy.md` § Nothing is left behind). Skills reference one another, so deleting as the
@@ -269,7 +331,9 @@ preserves instead is the only content the deletion could destroy — every
 ### The journal
 
 `.claude/workforce/.conversion-journal.md`, append-only, written **before each mutation that leaves the
-staging area** — T5 and T7.
+staging area** — T5, T7, and T7s — **and at T7c, which mutates nothing and is journalled anyway**
+because the row *is* the mark (§ above). A step whose only product is a journal row is exactly the step
+a rule phrased around mutations drops.
 
 **BLOCKING — a HIRE writes T5 and T8 rows exactly as a conversion does.** T2, T7, T7b and T7c are the
 only N/A steps (§ On a HIRE); T4, T5, T6 and T8 are required on every path. **The `skill` column reads
@@ -293,9 +357,17 @@ backup: <path>   symlink-manifest: <path>   canary: PASS | PASS (on record) | UN
 |-----|-------|------|------|--------|-----------|--------|
 | 001 | copy-truth | T5 | .claude/agents/content-copy-truth.md | create | (absent) | COMMITTED |
 | 00x | (hire)     | T5 | .claude/agents/ops-lead.md | create | (absent) | COMMITTED |
-| 002 | copy-truth | T7 | .claude/skills/copy-truth/SKILL.md | mark | a3f1… | COMMITTED |
+| 002 | copy-truth | T7 | .claude/skills/copy-truth/SKILL.md | copy | a3f1… | COMMITTED |
+| 002b| copy-truth | T7c | .claude/skills/copy-truth/SKILL.md | mark | a3f1… | COMMITTED |
+| 00y | skill-builder | T7s | .claude/skills/skill-builder | copy-tree | b7e2… | COMMITTED |
+| 00z | skill-builder | T7c | .claude/skills/skill-builder | mark | b7e2… | COMMITTED |
 | 003 | analytics  | T5 | .claude/agents/data-analytics.md | create | (absent) | WRITE-INTENT |
 ```
+
+**Row 002 without row 002b is a reduced skill that survives, and that is the ordinary case.** The pair
+appears together only when the remainder came out empty. **`T7s` never appears without its `T7c`**: a
+staged target the run then declined to mark is a target whose bytes were copied for nothing, and the
+run reports the rule that declined it (`INV-SUCCESSION`).
 
 Any row still at `WRITE-INTENT` on the next run is an interrupted transaction. `rollback` replays it
 backward.
