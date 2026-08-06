@@ -96,6 +96,7 @@ CKR = "workforce/bin/wf-checkrun"
 CFM = "workforce/bin/wf-conform"
 VER = "workforce/references/verification.md"
 TPL = "workforce/references/handbook-templates.md"
+TPL2 = "workforce/references/templates.md"
 CANA = "workforce/canary/wf-canary-a.md"
 CHK = "bin/check"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
@@ -104,6 +105,11 @@ PRM = "workforce/bin/wf-permissions"
 CMD = "CLAUDE.md"
 DEV = "DEVELOPMENT.md"
 WCM = "workforce/bin/wf-claude-md"
+CLMD = "workforce/references/claude-md.md"
+OPR  = ".claude/skills/operating-principles/SKILL.md"
+WSR  = "workforce/bin/wf-standing-request"
+RTL  = ".claude/agents/runtime-lead.md"
+DAU  = ".claude/agents/doctrine-author.md"
 CEN2 = "workforce/bin/wf-census"
 
 # (check name, file, mode, payload)
@@ -161,6 +167,11 @@ CASES = [
      CFM, "del", 'if status == "\u2717" and step in ("T2", "T7s", "T7c"):'),
     ("wf-conform requires the whole directory staged for a T7s target",
      CFM, "del", "staged its whole directory"),
+    # ── the fifth and sixth CLAUDE.md producers (2026-08-06) ──
+    ("templates: the Constitution Gate is retracted, not merely unused",
+     TPL2, "del", "WORKFORCE WRITES NOTHING INTO `CLAUDE.md`"),
+    ("no shipped file instructs writing or creating CLAUDE.md",
+     CHK, "del", '"USED TO", "used to", "stops", "no longer",'),
     ("wf-census publishes immutable spans per file, with line numbers",
      CEN, "del", "sacred_lines.append(lineno)"),
     ("wf-conform computes T2 coverage for a removal target",
@@ -351,12 +362,19 @@ CASES = [
     # A computed payload: breaking a BYTE CEILING needs ~8 KB, which would be absurd
     # written out. "append" mode never consults the uniqueness lint (that reads `del`
     # payloads only), so a BinOp here is safe where a literal would be unreadable.
-    ("CLAUDE.md stays sparse — it is injected into every spawn",
-     CMD, "append", "\n" + "bloat " * 1400),
-    ("the standing cold-reader request stays in the INJECTED file",
-     CMD, "del", "this line is the asking"),
-    ("the generated region is present in this repo's own CLAUDE.md",
-     CMD, "del", "WORKFORCE-CLAUDE-MD START"),
+    # RE-POINTED 2026-08-06: CLAUDE.md was evacuated and deleted, and the property it
+    # carried — the always-injected surface stays small — moved to the preloaded
+    # constitution. A case targeting a deleted file crashes prove outright.
+    ("operating-principles stays sparse — it is preloaded into every employee",
+     OPR, "append", "\n" + "bloat " * 4000),   # must clear 16 KB from a ~5 KB file
+    ("doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
+     DAU, "del", "**Constants are stated once.**"),
+    ("the standing cold-reader request reaches an ALWAYS-ON carrier",
+     WSR, "del", "this line is the asking"),
+    # NOT PROVABLE BY MUTATION, and that is a property of the assertion rather than a
+    # gap: "this repo has no CLAUDE.md" is falsified by CREATING a file, and this
+    # harness only deletes from or appends to an existing one. The assertion is
+    # self-evidencing — it reads the filesystem directly and cannot pass vacuously.
     ("drift: the remedy names the working fix and warns off the destructive one",
      CHK, "del", "Do NOT plain `./install`"),
     ("install: a cross-scope canary duplicate is reported by BOTH installers",
@@ -397,8 +415,8 @@ CASES = [
      WCM, "del", "This project has no employees yet"),
     ("claude-md: the unstaffed region names no artifact that does not exist",
      WCM, "del", "Until then there is no org"),
-    ("the source-first rule stays in the INJECTED file",
-     CMD, "del", "Always edit source, then `bin/sync --personal`"),
+    ("the source-first rule reaches the employee that owns it",
+     RTL, "del", "Always edit source, then `bin/sync --personal`"),
     ("the development record exists and is not injected",
      DEV, "del", "## Open, as of"),
     ("close: the report carries no 'what I did not do' section",
@@ -506,6 +524,17 @@ CASES = [
     # evacuates and deletes, then put it back on every later run of an evacuated
     # project. The directive superseding it lives in a different file, which is exactly
     # why this drift is the likely one.
+    ("verification.md's marker list matches the regex wf-checkrun actually applies",
+     VER, "del", "`-`, `*`, `+`, `1.` or `1)`"),
+    # The executable bit is not a string in a file, so it cannot be broken by mutating
+    # one. It is verified directly against the filesystem and cannot pass vacuously —
+    # the same shape as "this repo has no CLAUDE.md".
+    ("claude-md.md requires the receiving component to be reconciled, not just copied into",
+     CLMD, "del", "Reconcile the receiving component"),
+    ("wf-claude-md counts extensionless scripts and hooks as evacuation destinations",
+     WCM, "del", 'if not fh.readline(2048).startswith(b"#!")'),
+    ("wf-claude-md's evacuation citations resolve to real CLAUDE.md lines",
+     WCM, "del", "REGION_RX.sub(_blank, body)"),
     ("wf-claude-md treats an absent CLAUDE.md as the goal state, creating nothing",
      WCM, "del", "ABSENT IS THE GOAL STATE, AND NOTHING IS CREATED."),
     # Delete the hook's asking. Spawning then goes UNAVAILABLE, every handbook

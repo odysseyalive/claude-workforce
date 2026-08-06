@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 34 assertion(s) in bin/check name this file; 67 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 88 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -856,7 +856,7 @@ defers a run.*
 ## Step 6 — Execute
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
-principles → the Constitution Gate → model rewrite → `org index` → `org embed` →
+principles → model rewrite → `org index` → `org embed` →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.**
 
 **Discharge sits between `verify` and the sweep** because it is the last step that may still change the
@@ -958,11 +958,13 @@ It runs **after** `org embed` and **before** `verify`: the immutable blocks must
 position before they are hashed, and `verify` must be able to report the sidecar it will then check.
 Under `--review`, print the row count and write nothing.
 
-**The Constitution Gate write is a named step because it had none.** `references/templates.md` specifies
-it in full — the marker pair, the ten lines, the insert-never-rewrite rule — and *no procedure wrote
-it*. `charter` refreshes it and `disband` removes it, both presupposing something created it. Write it
-here, between `<!-- WORKFORCE-CONSTITUTION START/END -->`, as an insert that leaves every byte outside
-the markers untouched. **Under `--review`, print it and write nothing.**
+**The Constitution Gate is RETRACTED and this step no longer exists** (`references/templates.md`
+§ The CLAUDE.md Constitution Gate — RETRACTED 2026-08-06). It was added here because the gate was
+templated and no procedure wrote it; the 2026-08-05 directive then made writing it wrong, and **this
+Order line kept naming it for a day** — so the step that evacuates `CLAUDE.md` sat eight tokens after
+the step that wrote ten lines into it, and on an already-evacuated project it would have put the file
+back on every run. The three rules it carried were already `operating-principles` items 1–4, which is
+preloaded into every employee. **Nothing replaces it in this order.**
 
 **The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
 first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.

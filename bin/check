@@ -2914,11 +2914,24 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
         if not _strict_expected and not _matched:
             _indent_bad.append(
                 f"{_path}:{_lineno} is a mask and stopped covering indented spans")
+# THE FLOORS ARE PAIRED TO THE READER POPULATION, AND THIS SLIPPED TWICE IN ONE DAY.
+# 2026-08-06, twice: wf-conform gained a sacred-marker reader (T2 coverage for a
+# removal target) and bin/check gained one (the sacred-span mask on the CLAUDE.md
+# producer check). Each time the floors kept their old values, so deleting a pattern
+# left the set one ABOVE the floor and BOTH grammar guards passed while measuring
+# nothing — green in bin/check throughout, VACUOUS only under bin/prove.
+#
+# RULE, and it is the pairing rather than the number: ADDING A LINE-ANCHORED SACRED
+# MARKER READER ANYWHERE UNDER workforce/bin/ OR IN bin/check RAISES BOTH FLOORS IN
+# THE SAME CHANGE, and `bin/prove` is what confirms it — bin/check cannot see this
+# failure by construction, because a floor that has stopped binding still passes.
+# Second occurrence, noted rather than mechanised (SKILL.md § anti-bloat counterweight);
+# a THIRD promotes it to an explicit reader inventory compared by equality, not by >=.
 check(
     "grammar: counters and guards reject an indented marker; the mask does not",
-    not _indent_bad and _indent_seen >= 8,
+    not _indent_bad and _indent_seen >= 9,
     (f"{_indent_bad}. " if _indent_bad else
-     f"only {_indent_seen} line-anchored readers examined, expected 8 — a reader "
+     f"only {_indent_seen} line-anchored readers examined, expected 9 — a reader "
      "vanished or its file stopped parsing, and this check reports clean on an empty "
      "set. That is the direction it fails silently in. ")
     + "An indented marker sits in a code block and is an example. A "
@@ -2930,10 +2943,10 @@ check(
 
 check(
     "grammar: every sacred-marker reader accepts the same blocks",
-    not _grammar_bad and _grammar_readers >= 9,
+    not _grammar_bad and _grammar_readers >= 10,
     (f"{_grammar_readers} readers tested; divergent: {_grammar_bad}. "
      if _grammar_bad else
-     f"only {_grammar_readers} marker readers found (expected 9) — the extractor "
+     f"only {_grammar_readers} marker readers found (expected 10) — the extractor "
      "stopped seeing "
      "them, so this check would pass on any grammar. ")
     + "A reader that cannot see a sacred block will not checksum it, will not guard "
@@ -3304,8 +3317,20 @@ check(
 # equally binding. The per-file header carries the ratio at the point of use —
 # and is GENERATED (`bin/coverage --stamp`), because a hand-maintained label
 # drifts from the assertion it describes, which is the defect being labelled.
+# THE PREFIX IS OPTIONAL BECAUSE IT WAS ADDED AFTER THIS PATTERN WAS WRITTEN.
+# `bin/coverage --stamp` grew a `(maintainer-facing; bin/ does not ship — on a host
+# this is `/workforce verify`)` clause, and this regex kept requiring the bare
+# `<!-- Enforcement:` form. MEASURED 2026-08-06: **0 of 72** references matched, 64
+# matched the current form — so `_hdr_stale` was always empty and the blocking check
+# below passed while examining nothing. Found by a cold reader whose own edit made a
+# header stale (19 → 20) with `bin/check` green.
+#
+# This is the vacuous-assertion class that `bin/prove` exists to catch, sitting inside
+# `bin/check` itself — and `bin/prove` could not catch it, because deleting the payload
+# from a check that already matches nothing changes no outcome.
 _HDR_RX = re.compile(
-    r"<!-- Enforcement: (\d+) assertion\(s\) in bin/check name this file; (\d+) normative"
+    r"<!-- Enforcement(?:\s*\([^)]*\))?: (\d+) assertion\(s\) in bin/check name this file; "
+    r"(\d+) normative"
 )
 _hdr_stale = []
 try:
@@ -3641,13 +3666,81 @@ check(
     "\u2014 a deadlock where the gate blocks the step that clears it",
 )
 
-# The Constitution Gate shipped fully templated and no procedure wrote it —
-# the same orphan defect the department had.
+# THE CONSTITUTION GATE IS RETRACTED, AND THIS ASSERTION USED TO REQUIRE IT.
+# It read "templates: a procedure actually writes the Constitution Gate" and passed
+# on `"WORKFORCE-CONSTITUTION" in aud` — correct when the gate was policy, and after
+# the 2026-08-05 evacuation directive it was enforcement holding a producer of the
+# file the same run deletes. Found 2026-08-06 by RUNNING `/workforce dev audit` on
+# this repository; four earlier commits closed four producers by grepping for the
+# sentence `Write \`CLAUDE.md\` if absent`, and templates.md said it in a table cell
+# (`no CLAUDE.md at all | create one`) while charter.md said it as "refresh".
+_tpl = read("workforce/references/templates.md")
 check(
-    "templates: a procedure actually writes the Constitution Gate",
-    "WORKFORCE-CONSTITUTION" in aud,
-    "templates.md specifies the gate in full; charter refreshes it and disband "
-    "removes it, both presupposing something created it",
+    "templates: the Constitution Gate is retracted, not merely unused",
+    "RETRACTED 2026-08-06" in _tpl
+    and "WORKFORCE WRITES NOTHING INTO `CLAUDE.md`" in _tpl
+    and "The belt was a copy of" in _tpl,
+    "a retracted mechanism that still reads as current is one the next run "
+    "reinstates; and the retraction has to name where the three rules went, or it "
+    "is a deletion with a rationale rather than a transform with a verification",
+)
+
+# THE CLASS, KEYED ON THE ACT RATHER THAN ON ANY WORDING. Four producers were closed
+# by three greps for three phrasings, and two more survived saying the same thing in
+# other words. This scans every shipped file for an instruction to CREATE or WRITE
+# that file, however phrased, and it is the check that would have caught all six.
+# TWO DIRECTIONS, because the producer that survived four fixes ran the other way.
+# Verb-then-file catches `Write \`CLAUDE.md\` if absent` and `Refresh CLAUDE.md's ...`;
+# it MISSES `| no \`CLAUDE.md\` at all | create one, ... |`, where the filename sits in
+# one table cell and the verb in the next. Measured 2026-08-06 against all six known
+# producers: the one-directional form scored 5 of 6, and the miss was the exact row
+# that had already outlived three greps. A class check validated only against the
+# cases that motivated it inherits their blind spot.
+_SACRED_SPAN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$.*?^<!--\s*/origin\s*-->$",
+    re.S | re.M)
+_CMD_VERBS = r"(?:creat|writ|append|refresh|regenerat|emit)\w*"
+_CMD_WRITE_RX = re.compile(
+    _CMD_VERBS + r"\s+(?:(?:a|an|the|one|it|them|this|that|new)\s+){0,3}"
+    r"[^.\n]{0,40}`?CLAUDE\.md`?"
+    r"|`?CLAUDE\.md`?[^.\n]{0,60}?" + _CMD_VERBS,
+    re.I)
+_claude_md_producers = []
+for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + [
+        "install", "install.ps1", "README.md"]:
+    try:
+        _b = open(_p, encoding="utf-8").read()
+    except OSError:
+        continue
+    # A SACRED BLOCK IS THE USER SPEAKING, NEVER A PROCEDURE STEP. The 2026-08-05
+    # directive itself contains "claude.md, skills, hooks, scripts, from being
+    # created" — quoting the act it authorises. Masking these is mandatory rather
+    # than convenient: the block may never be edited to satisfy a checker, so a
+    # match inside one is a finding nothing is permitted to close.
+    _b = _SACRED_SPAN_RX.sub("", _b)
+    for _m in _CMD_WRITE_RX.finditer(_b):
+        _frag = " ".join(_m.group(0).split())
+        _ctx = _b[max(0, _m.start() - 300):_m.start() + 300]
+        # A RETRACTION QUOTES THE THING IT RETRACTS, and a negation is not a producer.
+        # Past tense is the tell: "IT USED TO DEMAND A CLAUDE.md" is a history note
+        # that exists precisely BECAUSE the behaviour was removed, and deleting it
+        # would lose the record this project keeps deliberately.
+        if any(k in _ctx for k in ("RETRACTED", "Amended 2026-08-0", "never", "Never",
+                                   "NOTHING", "nothing", "not create", "no procedure",
+                                   "creating nothing", "already evacuated", "legacy",
+                                   "USED TO", "used to", "stops", "no longer",
+                                   "EVACUATES AND DELETES", "supersed")):
+            continue
+        _claude_md_producers.append(f"{_p}: {_frag[:70]}")
+check(
+    "no shipped file instructs writing or creating CLAUDE.md",
+    not _claude_md_producers,
+    f"{_claude_md_producers[:4]} — the 2026-08-05 directive evacuates CLAUDE.md and "
+    "DELETES it, so any instruction to create, write, append to, or refresh it makes "
+    "one audit produce the artifact the same audit removes, and puts the file back on "
+    "every run of an already-evacuated project. Six producers have now been found; "
+    "the first four were closed by grepping for their exact sentences, which is why "
+    "this check is keyed on the verb and the filename instead",
 )
 
 # The retracted "restart required" claim has returned FIVE times across nine
@@ -5627,6 +5720,62 @@ _cmd = read("workforce/bin/wf-claude-md")
 # The check is kept pointing the other way because the old behaviour is exactly what
 # a future edit would drift back into: the comment justifying it is persuasive and
 # the directive superseding it lives in a different file.
+# A LEDGER CITATION MUST RESOLVE TO THE LINE IT NAMES. `IMMUTABLE_RX` substituted the
+# newlines its match spanned, so numbering survived a sacred block; `REGION_RX.sub("")`
+# deleted the generated region outright and collapsed every line after it. MEASURED
+# 2026-08-06 on this repository: CLAUDE.md held 168 lines, the ledger enumerated 149,
+# and all 78 citations it printed were short by the region's height. The whole job of
+# this ledger is to send a reader to a specific line before that file is deleted.
+# THE COMMENT PROMISED HOOKS AND THE FILTER EXCLUDED THEM. `relocated_lines` says
+# "Scripts and hooks count: a rule enforced by a hook has arrived at its destination
+# even though the destination is not prose" — then selected by extension, and all 13
+# shipped scripts/hooks in this distribution are extensionless. MEASURED 2026-08-06:
+# four lines relocated verbatim into `wf-standing-request` stayed UNPLACED, so
+# CLAUDE.md could never be deleted for a rule that HAD reached the only always-on
+# component. The 2026-08-05 directive names scripts and hooks as destinations.
+# THE LEDGER PROVES ARRIVAL, NEVER COHERENCE. Eighteen lines relocated verbatim into
+# `runtime-lead` during this project's own audit took the ledger 32 -> 50 with every
+# gate green, and produced three duplications and two contradictions inside one
+# handbook. Retention is satisfied by a copy; the receiving component still has to be
+# reconciled, and nothing said so until 2026-08-06.
+_clmd = read("workforce/references/claude-md.md")
+# THE COVERAGE HEADERS HAD A PRODUCER AND NO VERIFIER. `bin/coverage --stamp` writes a
+# per-file `N assertion(s) in bin/check name this file` line into 71 shipped files; no
+# procedure ran it, `bin/check` never checked it, and the script was not even
+# executable (mode 644). MEASURED 2026-08-06 by a cold-read probe whose own new
+# assertion made a header stale the instant it landed: 20 of 71 headers were wrong.
+# A generated label that drifts from what it describes is the exact defect the label
+# was introduced to fix, one level up.
+check(
+    "bin/coverage is executable, so the headers it writes can be regenerated",
+    os.access("bin/coverage", os.X_OK),
+    "it shipped mode 644 — the one script in bin/ that could not be run — which is why "
+    "71 generated headers drifted with nothing noticing",
+)
+
+check("claude-md.md requires the receiving component to be reconciled, not just copied into",
+      "Reconcile the receiving component" in _clmd
+      and "A relocated rule its host forbids has not arrived" in _clmd
+      and "the user's words REPLACE the paraphrase" in _clmd.replace("**", ""),
+      "a verbatim copy passes the ledger while leaving two canonical texts, or a rule "
+      "its host's Scope forbids — both invisible to a proof that only asks whether the "
+      "line exists somewhere",
+)
+
+check("wf-claude-md counts extensionless scripts and hooks as evacuation destinations",
+      'if not fh.readline(2048).startswith(b"#!")' in _cmd,
+      "a shebang is what makes a file a script whatever it is called; an extension "
+      "list silently excluded every destination the directive names and the "
+      "function's own comment promises",
+)
+
+check("wf-claude-md's evacuation citations resolve to real CLAUDE.md lines",
+      'REGION_RX.sub(_blank, body)' in _cmd
+      and '_blank = lambda m: "\\n" * m.group(0).count("\\n")' in _cmd,
+      "the region must be newline-padded like the immutable blocks, not deleted — a "
+      "relocation ledger that sends a reader to the wrong line is worse than one that "
+      "refuses, because the reader relocates the wrong text and the gate still passes")
+
 check("wf-claude-md treats an absent CLAUDE.md as the goal state, creating nothing",
       # The FULL banner, not the bare phrase. `--evacuate` also says "ABSENT IS THE
       # GOAL STATE" about a tree that has already been emptied, so asserting the
@@ -6175,6 +6324,27 @@ check(
     "a capability withheld without its reason reads as an oversight, and the next "
     "author re-adds it",
 )
+# DOCTRINE AND ITS READER MUST AGREE ABOUT THE SAME MARKERS, and nothing paired them.
+# `verification.md` line 93 enumerates the accepted list markers in prose; `wf-checkrun`
+# encodes them in CHECK_RX. The assertion below constrains the READER only, so the
+# sentence could be edited to name a marker the regex rejects — or the regex tightened
+# past the sentence — and every check would stay green while an employee followed
+# doctrine into a declaration its own runner cannot see. Found 2026-08-06 by the
+# cold-read probe of `doctrine-lead`, which located this assertion, PASSED on it, and
+# then said plainly that it does not assert what the doctrine claims.
+_ckr = read("workforce/bin/wf-checkrun")
+_vfy_l93 = next((l for l in read("workforce/references/verification.md").splitlines()
+                 if "TOP-LEVEL list items" in l), "")
+_vfy_markers = set(re.findall(r"`([-*+]|\d+[.)])`", _vfy_l93))
+_rx_markers = {"-", "*", "+", "1.", "1)"} if r"^(?:[-*+]|\d+[.)])" in _ckr else set()
+check(
+    "verification.md's marker list matches the regex wf-checkrun actually applies",
+    _vfy_markers == _rx_markers and _vfy_markers,
+    f"doctrine names {sorted(_vfy_markers)}; CHECK_RX accepts {sorted(_rx_markers)}. "
+    "A reader constrained without its doctrine being constrained lets the two drift "
+    "silently, which is this project's dominant failure mode pointed at itself",
+)
+
 check(
     "wf-checkrun requires a declaration to be a TOP-LEVEL list item",
     'CHECK_RX = re.compile(r"^(?:[-*+]|\\d+[.)])' in _ckr,
@@ -6539,13 +6709,21 @@ check(
 # twice the size the split produced, so ordinary growth is fine and a return to a
 # 70 KB history is not.
 # ─────────────────────────────────────────────────────────────────────────────
-_cmd_bytes = len(read("CLAUDE.md").encode("utf-8"))
+# RE-POINTED 2026-08-06. This measured CLAUDE.md, which this repository's own
+# `/workforce dev audit` evacuated and deleted. The PROPERTY is not about that file —
+# it is that the surface paid on EVERY spawn stays small — and `operating-principles`
+# is what carries it now: preloaded into every employee, never able to set
+# `disable-model-invocation`. `templates.md` states its own ~120-line ceiling; 16 KB is
+# the byte form of the same limit and is deliberately generous against it.
+_opr_path = ".claude/skills/operating-principles/SKILL.md"
+_opr_bytes = len(read(_opr_path).encode("utf-8")) if os.path.exists(_opr_path) else 0
 check(
-    "CLAUDE.md stays sparse — it is injected into every spawn",
-    _cmd_bytes <= 16384,
-    f"CLAUDE.md is {_cmd_bytes} B. Fact 6 injects it into every non-fork subagent with "
-    f"no opt-out, so every byte is paid on every spawn. The development record belongs "
-    f"in DEVELOPMENT.md, which is injected nowhere",
+    "operating-principles stays sparse — it is preloaded into every employee",
+    _opr_bytes <= 16384,
+    f"operating-principles is {_opr_bytes} B. It is preloaded into every employee, so "
+    f"every byte is paid on every spawn — the cost CLAUDE.md used to carry, moved to a "
+    f"component that arrives with the spawn instead of decaying as context grows. The "
+    f"development record belongs in DEVELOPMENT.md, which is injected nowhere",
 )
 _cen2 = read("workforce/bin/wf-census")
 # A REMEDY THAT INSTALLS STALE CODE IS NOT A REMEDY
@@ -6761,34 +6939,79 @@ check(
     "the split moves the record rather than deleting it; without DEVELOPMENT.md the "
     "history is gone and the staleness check has nothing to measure",
 )
-# THESE TWO ONLY WORK BECAUSE CLAUDE.md IS INJECTED. Moving either into DEVELOPMENT.md
-# would leave the text intact and the mechanism dead — the exact failure this project
-# calls "doctrine written correctly, and nothing making it true".
+# THE PROPERTY SURVIVES; THE CARRIER MOVED. These three keyed on CLAUDE.md, which the
+# 2026-08-05 directive evacuates and DELETES — and this repository's own
+# `/workforce dev audit` did exactly that on 2026-08-06, at which point all three
+# failed BECAUSE THE EVACUATION SUCCEEDED. Their comment already said the right thing:
+# "the assertion follows the carrier." Deleting them would drop a real property; the
+# fix is to point each at the component that inherited it.
+# THE FENCE IS A STRUCTURAL CLAIM AND NOTHING CHECKED IT. `doctrine-author`'s
+# `## Guardrails` carries the project's Non-negotiables relocated verbatim out of the
+# deleted CLAUDE.md, between an explicit start/end fence, and the fence exists so the
+# span can be compared mechanically. MEASURED 2026-08-06 by a cold reader: three
+# handbook-authored lines had already drifted inside it, and `grep "start of the
+# user's" bin/check` returned zero hits. **CLAUDE.md no longer exists on disk**, so
+# that span is the only copy outside git history — which makes the fence load-bearing
+# rather than cosmetic.
+_da = ".claude/agents/doctrine-author.md"
+_fenced = _orig = None
+if os.path.exists(_da):
+    _hb = read(_da).splitlines()
+    try:
+        _i = next(n for n, l in enumerate(_hb) if l.startswith("**— start of the user's verbatim"))
+        _j = next(n for n, l in enumerate(_hb) if l.startswith("**— end of the user's verbatim"))
+        _fenced = [l for l in _hb[_i + 1:_j] if l.strip()]
+    except StopIteration:
+        _fenced = None
+    # RESOLVE THE LAST REVISION THAT STILL HAD THE FILE, never `HEAD:` — the commit
+    # that lands the evacuation DELETES CLAUDE.md, so `HEAD:CLAUDE.md` stops existing
+    # the moment this work is committed and the assertion would fail on its own
+    # landing. Found before committing, by asking what this check reads after it.
+    _rev = subprocess.run(["git", "rev-list", "-n", "1", "HEAD", "--", "CLAUDE.md"],
+                          capture_output=True, text=True).stdout.strip()
+    _old = []
+    for _ref in ([f"{_rev}:CLAUDE.md", f"{_rev}^:CLAUDE.md"] if _rev else []):
+        _r = subprocess.run(["git", "show", _ref], capture_output=True, text=True)
+        if _r.returncode == 0 and "## Non-negotiables" in _r.stdout:
+            _old = _r.stdout.splitlines()
+            break
+    try:
+        _a = next(n for n, l in enumerate(_old) if l.startswith("## Non-negotiables"))
+        _b = next(n for n, l in enumerate(_old) if l.startswith("## Naming hazards"))
+        _orig = [l for l in _old[_a + 1:_b] if l.strip()]
+    except StopIteration:
+        _orig = None
 check(
-    "the standing cold-reader request stays in the INJECTED file",
-    # Keyed on the GENERATED region's literal, not on prose. Until 2026-08-05 this
-    # repo carried the request by hand; adding the wf-claude-md region made the two
-    # copies duplicate on every spawn, so the hand-written one went. The property
-    # under test is that the request REACHES the injected file — whichever half of
-    # the file provides it — so the assertion follows the carrier.
-    "this line is the asking" in read("CLAUDE.md"),
+    "doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
+    _fenced is not None and _orig is not None and _fenced == _orig,
+    f"fenced {len(_fenced or [])} non-blank lines against {len(_orig or [])} in "
+    "HEAD:CLAUDE.md § Non-negotiables. The fence exists so this comparison can be made; "
+    "an unenforced fence drifts, and it already had. These are the user's own words and "
+    "the file they came from has been deleted",
+)
+
+check(
+    "the standing cold-reader request reaches an ALWAYS-ON carrier",
+    "this line is the asking" in read("workforce/bin/wf-standing-request"),
     "ambient policy permits spawning *unless the user asks*, so the request only "
-    "functions where it is injected. In DEVELOPMENT.md it reads identically and does "
-    "nothing, and every handbook a run registers is unprobed",
+    "functions where it is injected. It now lives in a UserPromptSubmit hook, which "
+    "re-injects it every turn — strictly better than a file read once at the head of "
+    "a conversation",
 )
 check(
-    "the generated region is present in this repo's own CLAUDE.md",
-    "WORKFORCE-CLAUDE-MD START" in read("CLAUDE.md"),
-    "the user's directive is that a CLAUDE.md is BUILT mechanically. This repo hand-"
-    "wrote its own for days while shipping the generator, so the one project "
-    "guaranteed to exercise `wf-claude-md` was the one project never running it",
+    "this repo has no CLAUDE.md — it was evacuated, not merely trimmed",
+    not os.path.exists("CLAUDE.md"),
+    "the 2026-08-05 directive is zero, not 'sparse': every line relocated to the "
+    "component that owns it and the file deleted. This repo ships the generator, so a "
+    "CLAUDE.md here means the one project guaranteed to exercise `wf-claude-md` is the "
+    "one project not living by its result",
 )
 check(
-    "the source-first rule stays in the INJECTED file",
-    "Always edit source, then `bin/sync --personal`" in read("CLAUDE.md"),
+    "the source-first rule reaches the employee that owns it",
+    "Always edit source, then `bin/sync --personal`" in read(".claude/agents/runtime-lead.md"),
     "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
-    "destroyed rather than merged. A session that never reads this loses work, which "
-    "is why it survives the split and the history did not",
+    "destroyed rather than merged. The rule now arrives with the spawn that needs it; "
+    "a handbook does not decay as context grows, which is the argument for the move",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -73,7 +73,11 @@ A charter is never authored without a human.
 3. **Write** into `operating-principles/SKILL.md` § Strategic Objective, inside
    `<!-- origin: user | immutable: true -->`. Captured **verbatim** from the user's own wording where
    they supplied it — never tidied, never paraphrased.
-4. **Refresh CLAUDE.md's Constitution Gate** if the pointer changed.
+4. **Write nothing to `CLAUDE.md`** — there is no Constitution Gate to refresh
+   (`references/templates.md` § The CLAUDE.md Constitution Gate — RETRACTED 2026-08-06). *This step
+   read "Refresh CLAUDE.md's Constitution Gate if the pointer changed" until 2026-08-06. The commit
+   that fixed this file's OTHER producer four lines above grepped for `Write \`CLAUDE.md\` if absent`
+   and this line survived it, because "refresh" is the same act under a different verb.*
 
 ## Refreshing
 

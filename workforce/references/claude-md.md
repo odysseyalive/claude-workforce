@@ -1,6 +1,6 @@
 # CLAUDE.md — the one context cost the org cannot control
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **`platform.md` fact 6: CLAUDE.md is injected into every non-fork subagent with no per-agent opt-out.**
 Its length is multiplied by fan-out. Measured on a real org, 2026-08-03:
 
@@ -70,6 +70,32 @@ no component. An evacuation is finished when the audit has relocated them, not w
 
 **A line that arrived nowhere was not moved — it was lost.** Directive one is retention, and that is
 why the gate refuses rather than warns.
+
+### Reconcile the receiving component — the ledger cannot, and it is not trying to
+
+**A verbatim copy satisfies retention and says nothing about coherence.** The ledger answers one
+question — *does this line exist in a component?* — and a component that already paraphrased the rule
+now states it twice, while a component whose Scope forbids what the rule requires now contradicts
+itself. **Both are invisible to the proof.** A run that trusts the ledger alone deletes `CLAUDE.md`
+having passed every gate and leaves the direction worse than it found it.
+
+So each receiving component gets three questions, in the same change as the relocation:
+
+1. **Does it already state this rule?** Then the user's words REPLACE the paraphrase. The original
+   wins and the paraphrase is deleted — keeping both is two canonical texts, which is the failure this
+   project refuses everywhere else.
+2. **Does the relocated rule contradict that component's `## Scope` or `## Guardrails`?** Amend them
+   here. **A relocated rule its host forbids has not arrived**, and the ledger will still count it.
+3. **Re-read the component WHOLE, not the diff.** Both failures are only visible when the new section
+   and the old ones are read together.
+
+*Added 2026-08-06, from `DEF-relocation-does-not-reconcile`. Eighteen lines were relocated verbatim into
+`runtime-lead` during this project's own audit; the ledger went 32 → 50 and every gate passed. The cold
+reader that **passed** that handbook then reported three duplications and two contradictions, quoting
+both sides of each — `### The loop` mandating `bin/baseline <real project>` against a `## Scope` OUT
+line reading "anything in another repository", and a mock-audit write-up path against a guardrail
+forbidding edits outside the reporting directory. **The relocation was correct and the result was
+incoherent**, which is the whole of why this section exists.*
 
 ## What changed, and what did not
 

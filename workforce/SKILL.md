@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 60 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
@@ -184,6 +184,24 @@ CLAUDE.md is relocated to the component that owns it and the file is then delete
 PROVEN per line rather than asserted**, because directive one is retention and a line that reached no
 component was not relocated, it was lost. The "straggler" clause is honored literally: what no
 component owns goes into the `/org` dispatch process, which is loaded on every routed ask.*
+
+> **"A DETECTOR SHIPS WITH ITS FIX. Detection alone is not a deliverable."**
+
+*— Added 2026-08-05, source: user directive, after this project shipped a pass catalog stating six
+`AUTO` preconditions and implementing none of them. **Relocated here verbatim 2026-08-06 from
+`CLAUDE.md`, which the evacuation deletes** (§ Directives, 2026-08-05 CLAUDE.md directive): the
+mechanics had reached `references/passes.md` and **the user's own words and their attribution had
+reached nothing that ships.** A paraphrase is not retention — directive one is that the user's verbiage
+is absolutely retained, so a directive living only in a file being deleted was one line away from being
+lost, and no gate would have reported it, because every gate counted `origin: user | immutable: true`
+spans and this was never wrapped in one. Found by running `/workforce dev audit` against this
+repository. The operational reading is — a check that finds a defect and hands it back is a flag, and
+**a flag is not a fix**: it sends every project that runs `audit` round the same loop, spending tokens
+and time to re-derive a finding nobody can act on, and it confuses people applying workforce to their
+own projects. Build the **auto-apply mechanism**, always — then let each pass declare its verdict
+against it. Mechanics at `references/passes.md` § What a pass may do; the companion rule that a
+`REPORT` verdict must cite a **measured** precision figure and where it was measured lives there too,
+and `bin/check` fails on a `REPORT` pass with no measurement.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

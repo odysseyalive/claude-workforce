@@ -1,6 +1,6 @@
 # disband — de-convert the project, keep its history
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive.** Display by default; `--execute` plus explicit confirmation. **Never auto-fired.**
 
 `/workforce disband --execute`
@@ -67,8 +67,18 @@ sidecar stores rather than merely re-created. `PASS-STALE-CANARY` removes throwa
 itself wrote once their fact is measured; a path alone could not put one back, which is why the sidecar
 carries the bytes.
 
-**6. Remove the Constitution Gate** from `CLAUDE.md`, between its markers only. Nothing else in that
-file is workforce's.
+**6. Remove the Constitution Gate** from `CLAUDE.md`, between its markers only — **on a legacy tree
+only, and no run writes one any more.** Nothing else in that file is workforce's.
+
+**This step is now maintenance, and that asymmetry is deliberate** (`references/templates.md` § The
+CLAUDE.md Constitution Gate — RETRACTED 2026-08-06). Removing a marker this project used to write is
+correct forever; writing a new one is what stopped. **A `CLAUDE.md` that is absent is the ordinary case
+after an evacuation — skip this step silently rather than reporting a missing file as a fault**, and
+never re-create the file in order to have somewhere to remove a marker from.
+
+**Restoring an evacuated `CLAUDE.md` is `restore`'s job, not this step's.** The backup holds it and
+`.settings-owned.json` § `files_removed` holds its bytes; `disband` reverses the org, and the file's
+deletion was a pass rather than an org change.
 
 **6b. Remove what this project's run CREATED, not only what it demoted.** Steps 2 and 3 reverse
 *conversions*; a run also **creates** artifacts that existed nowhere before — data skills authored at

@@ -1,12 +1,14 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
 Two skills are created in the project on first audit. Both are **host-generated**: this file holds
-what to write, not files that ship. The Constitution Gate and the extracted-directives file below are the
-same kind of artifact — canonical text written into a file workforce does not own.
+what to write, not files that ship. The extracted-directives file below is the same kind of artifact —
+canonical text written into a file workforce does not own. *The Constitution Gate was a third until
+2026-08-06 and is retracted (§ below): it wrote into `CLAUDE.md`, which `audit` now evacuates and
+deletes.*
 
 **Scope:** `/org` is created alongside `workforce` (same scope — personal or project).
 `operating-principles` is **always a project skill**, in every scope, because a Strategic Objective is
@@ -100,37 +102,48 @@ never inside the immutable block.
 
 ---
 
-## The CLAUDE.md Constitution Gate
+## The CLAUDE.md Constitution Gate — RETRACTED 2026-08-06
 
-The only thing workforce writes into the user's `CLAUDE.md` — about ten lines, between
-`<!-- WORKFORCE-CONSTITUTION START/END -->` markers.
+**WORKFORCE WRITES NOTHING INTO `CLAUDE.md`. THERE IS NO CONSTITUTION GATE, AND NO PROCEDURE MAY
+CREATE, APPEND TO, OR REFRESH THAT FILE.** The 2026-08-05 user directive (`SKILL.md` § Directives)
+evacuates every line into the component that owns it and then **deletes the file**. A gate that writes
+ten lines into it is a producer of the artifact the same run removes — and on a project already
+evacuated, it puts the file **back on every run**.
 
-It is the belt to the `skills:` preload's suspenders: it survives when a preload is dropped, and it
-carries the three rules that must never be missing — conform upward, do not invent a procedure for an
-uncovered case, and a question is a defect.
+*This section specified the gate in full — the marker pair, the ten lines, the insert-never-rewrite
+rule, and a table whose first row read* `no CLAUDE.md at all | create one`. *It was the **fifth**
+producer of that file, and it survived the four commits that closed the others because those were
+found by grepping for a **sentence** —* `Write \`CLAUDE.md\` if absent`, `needs a CLAUDE.md`,
+`would create it` *— and this one says the same thing in a table cell using none of those words.*
+**A grep keyed on wording cannot close a class defined by behaviour.** *`bin/check` made it worse
+rather than catching it: the assertion* `templates: a procedure actually writes the Constitution Gate`
+*positively required the write, so the enforcement was holding a retracted producer in place. Found
+2026-08-06 by running `/workforce dev audit` against this repository — by executing the procedure, not
+by reading it.*
 
-**Nothing else goes in CLAUDE.md.** It is injected into every subagent *and* every main-loop turn
-with no opt-out, so its length is multiplied by fan-out. `audit` reports its size against a budget and
-flags content that belongs in a handbook or in the principles instead.
+**The three rules it carried are not lost, and checking that is what made the retraction safe.** They
+were already in `operating-principles` before this section was written:
 
-### Insert between the markers. Never rewrite the file.
-
-**`CLAUDE.md` is the user's document and workforce is a guest in ten lines of it.** The write is an
-insert, and every byte outside the marker pair survives it — order, wording, comments, trailing
-whitespace, the lot. This is the same discipline `disband` already applies in reverse ("between its
-markers only"), stated on the write side so the two cannot drift.
-
-| Situation | What happens |
+| The gate's rule | Where it lives |
 |---|---|
-| no `CLAUDE.md` at all | create one, from the survey's own answers (`procedures/audit.md` Step 1) |
-| exists, no markers | **append** the block at the end. Nothing above it is read, reordered, or "tidied" |
-| exists, markers present | replace **only** what lies between them |
-| exists, and the user has edited *inside* the markers | replace it, and **report that an edit was overwritten** — a managed region silently reclaimed is how a user learns not to trust the tool |
+| conform upward | § General Operating Principles item 1 |
+| do not invent a procedure for an uncovered case | items 2 and 3 |
+| a question is a defect | item 4 |
 
-**Everything else workforce has to say about a `CLAUDE.md` is a proposal, printed and not applied**
-(`procedures/verify.md` § The user's own files). Two size-and-staleness lists exist; neither is ever
-written. A run that edits the user's document to improve its own report has changed the thing it was
-measuring.
+`operating-principles` is preloaded into **every** employee (§ above, and it may never set
+`disable-model-invocation`), which is strictly better than the file it duplicated: a preload arrives
+with the spawn, while `CLAUDE.md` was read once at the head of a conversation. **The belt was a copy of
+the suspenders.**
+
+**Reading `CLAUDE.md` is untouched.** `wf-claude-md --evacuate` reads it to prove relocation per line
+before deleting it, and `procedures/verify.md` § The user's own files still reports on one that exists.
+Everything workforce has to say about a `CLAUDE.md` short of evacuation is a proposal, printed and not
+applied. **A run that edits the user's document to improve its own report has changed the thing it was
+measuring** — and that sentence now has no exception.
+
+**Legacy trees keep their reader.** `legacy-markers.md` still recognises `WORKFORCE-CONSTITUTION` and
+`disband` still removes it where a prior run left one. Removing a marker this project used to write is
+maintenance; writing a new one is the thing that stopped.
 
 ---
 

@@ -185,9 +185,28 @@ def relocated_lines(root):
             for fn in fns:
                 # Scripts and hooks count: a rule enforced by a hook has arrived at its
                 # destination even though the destination is not prose.
+                #
+                # AND THEY HAVE NO EXTENSION, which is what this filter used to miss.
+                # Every shipped script and hook in this distribution is extensionless —
+                # `wf-census`, `wf-conform`, `wf-standing-request`, twelve of them — so
+                # the extension list excluded the exact destinations the comment above
+                # promises to include, and the 2026-08-05 directive names explicitly
+                # ("agents/skills/scripts/hooks componants"). MEASURED 2026-08-06: four
+                # lines relocated verbatim into `wf-standing-request` stayed UNPLACED,
+                # so CLAUDE.md could never have been deleted for a rule that had in
+                # fact arrived at the only always-on component there is.
+                #
+                # A shebang is the test, because that is what makes a file a script
+                # whatever it is called. Read the first line before deciding.
+                fp = os.path.join(dp, fn)
                 if not fn.endswith((".md", ".sh", ".py", ".js", ".json", ".ps1")):
-                    continue
-                body = read(os.path.join(dp, fn))
+                    try:
+                        with open(fp, "rb") as fh:
+                            if not fh.readline(2048).startswith(b"#!"):
+                                continue
+                    except OSError:
+                        continue
+                body = read(fp)
                 if body is None:
                     continue
                 for line in body.splitlines():
@@ -228,7 +247,20 @@ def classify(root):
         return None
 
     # The generated region and every immutable block are out of scope entirely.
-    scope = IMMUTABLE_RX.sub(lambda m: "\n" * m.group(0).count("\n"), REGION_RX.sub("", body))
+    # BOTH SUBSTITUTIONS PRESERVE LINE COUNT, and only one of them used to.
+    #
+    # The ledger cites `CLAUDE.md:<n>` and a user follows that citation to the line.
+    # `IMMUTABLE_RX` already replaced its match with the newlines it spanned, so
+    # numbering survived a sacred block; `REGION_RX.sub("", ...)` deleted the generated
+    # region outright and collapsed every line after it. MEASURED 2026-08-06 on this
+    # repository: CLAUDE.md holds 168 lines and the ledger enumerated 149, so EVERY
+    # citation it printed was short by the region's height — `CLAUDE.md:3` named a line
+    # nineteen rows below the one it meant.
+    #
+    # A relocation ledger whose whole job is to send a reader to a specific line may
+    # not send them to a different one. The fix is that both blanks are newline-padded.
+    _blank = lambda m: "\n" * m.group(0).count("\n")
+    scope = IMMUTABLE_RX.sub(_blank, REGION_RX.sub(_blank, body))
     owned = owned_lines(root)
 
     dup, der, usr = [], [], []

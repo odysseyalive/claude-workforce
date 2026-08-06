@@ -1,6 +1,6 @@
 # sweep — complete a deferred deletion, and nothing else
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive.** Display by default; `--execute` writes. **Never auto-fired**, and never reached from
 `audit` — `audit` runs its own Step 6c inline.
 

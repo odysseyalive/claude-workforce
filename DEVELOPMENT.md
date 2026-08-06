@@ -115,6 +115,74 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-06
 
+**Closed 2026-08-06 — `/workforce dev audit` was run against this repository, and running it found
+what reading it never had.** Org at `.claude/workforce/org-chart.md`; five DEF records under
+`.claude/workforce/personnel/`; `CLAUDE.md` evacuated and deleted.
+
+**The audit staffed the project**: 2 departments, 2 Leads, 3 ICs. The headcount skeptic cut a proposed
+9 to 5 and all four cuts were taken. The sharpest: splitting the author of a rule from the author of
+its enforcement — or a script from its fixture — **encodes this project's named failure mode into the
+org chart**, so `doctrine-author` and `script-author` each own both halves. A third department died on
+a measurement: `bin/prove` shells out to `./bin/check` and refuses to start unless it is green, so an
+`enforcement` department had no independent way of being wrong.
+
+**Six defects in the shipped distribution, none found by a static check.**
+
+| | |
+|---|---|
+| **a fifth and sixth CLAUDE.md producer** | `templates.md` said `no CLAUDE.md at all → create one` in a table cell; `charter.md` said "Refresh". The four earlier fixes grepped for a *phrasing* and both survived it. **`bin/check` positively required one of them.** Replaced with a check keyed on the ACT, validated against all six known producers — and the first draft scored 5 of 6, missing exactly the one that had already outlived three greps |
+| **a user directive living only in the file being deleted** | *"A DETECTOR SHIPS WITH ITS FIX."* — dated, attributed, and nowhere in the shipped tree; `passes.md` carried a paraphrase. No gate would have caught it: every gate counts `origin: user \| immutable: true` spans and this was never wrapped in one |
+| **`wf-claude-md` cited line numbers that resolve to the wrong text** | `REGION_RX.sub("")` deleted the generated region and collapsed every line after it. CLAUDE.md held 168 lines; the ledger enumerated 149, so **all 78 citations were short by the region's height** |
+| **`wf-claude-md` excluded hooks and scripts from relocation proof** | its own comment promised to include them; the filter selected by extension and **all 13 shipped scripts are extensionless**. Four lines relocated into `wf-standing-request` stayed UNPLACED |
+| **evacuation had no reconciliation step** | 18 lines relocated verbatim into `runtime-lead` took the ledger 32 → 50 with every gate green, and produced three duplications and two contradictions inside one handbook. `claude-md.md` § Reconcile the receiving component now closes it |
+| **enforcement outlived its subject** | four `bin/check` assertions and four `bin/prove` cases keyed on `CLAUDE.md` failed, then crashed `prove`, **because the evacuation succeeded**. Each was re-pointed at the component that inherited its property rather than deleted |
+
+**The evacuation.** 83 directive lines, all 83 relocated and proven per line before the file was
+removed; 9,792 bytes stored in `.settings-owned.json` § `files_removed`. **The first relocation was
+truncated** — 33 fragments against 47 lines, because the ledger reports UNPLACED lines individually and
+a hard-wrapped sentence spans two or three of them, some already matched elsewhere. Three rules lost
+their closing line mid-sentence. Recovered complete from the stored file. *Directive one is retention,
+and half a sentence is not retained.*
+
+**Every one of the five DEFs was raised by an agent doing real work** — four by cold readers, one by an
+authoring agent reporting that the brief it had been given contradicted the shipped template. The
+authoring brief was the defect twice. **Nothing asserts that a dispatch brief agrees with the template
+it briefs against**, and that is the largest gap this run leaves open.
+
+**`doctrine-author` took twelve cold reads to release, and every one found something real.** Not
+churn — a convergence. The first three failed on executability (an unobtainable proof step, a sync
+deadlock, an unanswerable run-id). The next five failed on **claims the file falsified about itself**:
+four successive exclusivity claims — *"the single statement of each rule"*, *"a step may not restate a
+rule"*, *"stated on its own `Check:` line, nowhere else"* — each retracted after a reader quoted the
+step that broke it two lines later. **The lesson is in the shape, not the count: a handbook whose steps
+must be followable cannot also promise that no idea appears twice. What it can promise is which text
+governs**, which is what it now says.
+
+The last four found things no static check could: `## Exit criteria` demanding artifacts that only one
+of three classification arms produces, so procedural and advisory rules could not complete by any
+route; a start-fence missing from the block whose end-fence was present, putting handbook prose inside
+a span labelled "the user's own words"; and a probe task that filed handbook doctrine in
+`scopes.md`, which documents *install* scopes.
+
+**A vacuous blocking check inside `bin/check` itself.** `_HDR_RX` required `<!-- Enforcement:` while
+`bin/coverage --stamp` had grown a parenthesized clause: **0 of 72 references matched**, so
+`_hdr_stale` was always empty and the check passed having examined nothing. **`bin/prove` cannot catch
+this class** — deleting a payload from a check that already matches nothing changes no outcome — and it
+was found by a cold reader whose own edit made a header stale with `bin/check` green. Repaired to
+tolerate both forms: 0 → 71 files examined, negative-tested, and it names the file.
+
+**`bin/coverage` shipped mode 644** — the one script in `bin/` that could not be run — which is why 20
+of 71 generated coverage headers had drifted with nothing noticing.
+
+**Caught before committing, not after:** the fence assertion read `git show HEAD:CLAUDE.md`, and this
+commit deletes that file — so it would have failed on its own landing. It now resolves the last
+revision that still had the file.
+
+`bin/check` 810 · `bin/prove` **168 of 168 proven by breaking, zero VACUOUS** · `wf-conform` exit 0 ·
+`script-conformance` 86/0 · `conformance` 17 fixtures / 85 assertions · `idempotence` 8/8 ·
+personnel index 7 records.
+
+
 **Closed 2026-08-06 (latest) — the removal set had two consumers and no producer, so the only
 destructive command could never reach its target.** Fixtures `conform-removal-unstaged`,
 `conform-removal-staged`; `INV-STAGED` (invariants row 19); assertions *"T-order: the sweep mark has a
