@@ -1,10 +1,15 @@
 # sweep — complete a deferred deletion, and nothing else
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
-**Destructive.** Display by default; `--execute` writes. **Never auto-fired**, and never reached from
-`audit` — `audit` runs its own Step 6c inline.
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+**Destructive, and it executes on invocation.** Typing the command is the consent — the same rule
+`audit` runs on, for the same reason. `--review` is the zero-write escape.
 
-`/workforce sweep [--execute]`
+**Still never auto-fired**, and still never reached from `audit` — `audit` runs its own Step 6c inline,
+and no command, hook, or dispatch starts this one. Consent-on-invocation and auto-firing are different
+claims: nothing but a human typing `/workforce sweep` begins a sweep, and when a human has typed it the
+run does the work.
+
+`/workforce sweep [--review]`
 
 ---
 
@@ -31,6 +36,40 @@ repeating all of it.*
 
 ---
 
+## Why there is no `--execute`
+
+**This command carried two display modes and one execute path, and the execute path took a third
+gesture to reach.** Display-by-default printed a plan; `--review` — documented below as *"the only
+preview of a deletion this project offers"* — printed the same plan; and the deletion needed
+`--execute` on top of both. The chain a user actually walked was `audit` defers → `/workforce sweep`
+prints → `/workforce sweep --execute` acts. **Three gestures for one act that a prior `audit` had
+already decided, gated, and staged.**
+
+*Measured 2026-08-06 on this repository, and reported by the user in the same session: a completed
+`audit` deferred one deletion with both removal targets staged and their hashed undos written, and
+`/workforce sweep` answered by re-reading the procedure and printing. Nothing was wrong with that run.
+The gesture was the whole outcome.*
+
+**The gates are the safety here, not the flag, and this is not the usual case for `--execute`.** The
+commands that default to display are the ones that *decide* something as they run — `hire` authors,
+`ablate` chooses what to strip, `discharge` classifies. Previewing them shows the user a judgment they
+have not seen yet. **This command decides nothing** (§ What it does NOT do): the removal set came from
+COMMITTED `T7c` rows a prior run wrote, and step 4 re-asserts every precondition against the tree as it
+stands now. There is no new judgment for a preview to disclose — only the same set, re-verified.
+
+**What did NOT change, and none of it may be relaxed to compensate:** step 4 still re-runs every
+precondition rather than trusting the audit's record; `INV-VERIFY`, `INV-DIRECTIVES`, `INV-EMBEDDED`,
+marker pairing, the `.orig` existence check and the live-registration backstop all still stop the run;
+a refusal is still a first-class outcome that prints its reason; step 5 still relocates before it
+removes. **A deletion this command performs is authorized by those gates passing, and by nothing else.**
+Consent-on-invocation removes a keystroke, not a check — and if that trade ever looks like it bought
+speed at the cost of safety, the honest fix is a gate this command is missing, never the flag back.
+
+**`--execute` is accepted and ignored**, because it appears in prose, in prior reports, and in muscle
+memory. It is a no-op alias, reported as one: a run invoked with it prints `--execute is redundant;
+sweep executes on invocation` and proceeds identically. It is never silently swallowed — a flag that
+looks like it did something is how a user learns a mode that does not exist.
+
 ## What it does NOT do
 
 **It designs nothing, authors nothing, and converts nothing.** It reads what a prior `audit` already
@@ -44,6 +83,11 @@ deletion is how a sweep quietly becomes a conversion.
 ---
 
 ## Procedure
+
+**0. Read the invocation.** `--review` runs everything below and writes nothing. **`--execute` is a
+no-op alias**: print `--execute is redundant; sweep executes on invocation` and continue. Bare
+`/workforce sweep` executes. Any other flag → STOP and name it rather than guessing a mode; a
+misread flag on the only destructive command is not recoverable by apology.
 
 **1. Load the run.** Read `.claude/workforce/.current-run`, the conversion journal, and
 `dispositions.md`. **Any missing → STOP**: "No completed audit to sweep. Run `/workforce audit` first."
@@ -164,3 +208,9 @@ the first place.
 **Computes everything, writes nothing, deletes nothing.** Prints the removal set, every precondition
 with its verdict, and the relocation plan. This is the mode to run first on any tree you care about,
 and it is the only preview of a deletion this project offers.
+
+**It is now the only mode of this command that writes nothing, which is what makes it a real escape.**
+While display was also the default, `--review` was the second of two previews and named nothing the
+bare command did not already do — a flag that distinguishes nothing is not an escape hatch, it is
+decoration. It closes by naming the one command that would apply exactly what it displayed:
+`/workforce sweep`.

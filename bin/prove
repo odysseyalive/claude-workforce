@@ -99,6 +99,7 @@ TPL = "workforce/references/handbook-templates.md"
 TPL2 = "workforce/references/templates.md"
 CANA = "workforce/canary/wf-canary-a.md"
 CHK = "bin/check"
+COV = "bin/coverage"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
 PRM = "workforce/bin/wf-permissions"
@@ -319,6 +320,27 @@ CASES = [
      SWP, "del", "no live registration still resolves inside a target"),
     ("sweep: the relocation input set is computed, not eyeballed",
      SWP, "del", "Do not use the `in_skill_dir` flag for this"),
+    # Consent-on-invocation (2026-08-06). Three breaks, because the change can decay
+    # three separate ways: the flag comes back, the gates get relaxed to pay for the
+    # missing flag, or "no confirmation" gets read as "something else may fire it".
+    ("sweep: running the command is the consent; it executes on invocation",
+     SWP, "del", "## Why there is no `--execute`"),
+    ("sweep: dropping the flag relaxed no gate, and may not be used to",
+     SWP, "del", "authorized by those gates passing, and by nothing else"),
+    ("sweep: consent-on-invocation is NOT auto-firing, and the two are distinguished",
+     SWP, "del", "Consent-on-invocation and auto-firing are different"),
+    ("sweep: --review is the zero-write escape and --execute is a REPORTED no-op",
+     SWP, "del", "--execute is redundant; sweep executes on invocation"),
+    # The attribution guard that was vacuous for an unknown number of runs. Break it
+    # the way it was broken for real: point the parse at something that is not
+    # `bin/check`, and the check must notice it collected nothing.
+    # Reproduce the original bug exactly: rebind the name that holds this file's AST
+    # to some other parse. Deleting the parse line instead would raise NameError, and
+    # a crash is not the failure this guards — the failure is a green run.
+    ("coverage: no AST-of-bin/check variable is rebound to another parse",
+     CHK, "append", '\n_chk_tree = _ast.parse(read("workforce/SKILL.md"))\n'),
+    ("coverage: the variable→file map is derived, not restated in either tool",
+     COV, "append", "\nVAR_TO_FILE = {}\n"),
     ("conversion: the hooks-do-not-move rule states the fate it is scoped to",
      CT, "del", '**"They do not move" is scoped to SPLIT, where the skill survives'),
     ("succession: is declared and reported, never asked",

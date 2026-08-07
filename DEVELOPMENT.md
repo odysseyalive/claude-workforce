@@ -183,7 +183,7 @@ revision that still had the file.
 personnel index 7 records.
 
 
-**Closed 2026-08-06 (latest) — the removal set had two consumers and no producer, so the only
+**Closed 2026-08-06 — the removal set had two consumers and no producer, so the only
 destructive command could never reach its target.** Fixtures `conform-removal-unstaged`,
 `conform-removal-staged`; `INV-STAGED` (invariants row 19); assertions *"T-order: the sweep mark has a
 defined representation, and it is T7c"*, *"T-order: a succession removal is staged into the journal at
@@ -422,6 +422,62 @@ what it did.
 survived in a docstring while the mechanism was deleted. Each now asserts the discriminating expression.
 That is the second-order version of the same failure: a check that tests vocabulary rather than
 behaviour is doctrine wearing enforcement.*
+
+**Closed 2026-08-06 (latest) — the only destructive command asked for consent three times, and the
+tool that measures enforcement was undercounting itself by half.** User directive: *"the sweep should
+happen automatically without confirmation."*
+
+**`sweep` is now consent-on-invocation, like `audit`.** It carried *two* display modes and one execute
+path: display-by-default printed a plan, `--review` printed the same plan while calling itself *"the
+only preview of a deletion this project offers"*, and the deletion then needed `--execute` on top of
+both. The chain a user actually walked was **`audit` defers → `/workforce sweep` prints →
+`/workforce sweep --execute` acts** — three gestures for one act a prior `audit` had already decided,
+gated and staged.
+
+The distinction that makes this safe rather than convenient is now written down in both files: **display
+mode is for commands that DECIDE as they run** — `hire` authors, `ablate` chooses, `discharge`
+classifies — and a preview shows the user a judgment they have not seen. **`sweep` decides nothing.**
+Its removal set is every COMMITTED `T7c` row a prior run wrote, and step 4 re-asserts every precondition
+against the tree as it stands now. **No gate was relaxed to pay for the missing flag**, and the text
+says so in the terms a future edit would have to break: *"A deletion this command performs is authorized
+by those gates passing, and by nothing else"* and *"the honest fix is a gate this command is missing,
+never the flag back"*. `--execute` survives as a **reported** no-op — a flag that looks like it did
+something is how a user learns a mode that does not exist. Consent-on-invocation is also distinguished
+from auto-firing in three places, because "no confirmation" is one edit away from "something else may
+start it": nothing but a human typing the command begins a sweep.
+
+**Then the enforcement measurement turned out to be measuring half the tree.** `bin/coverage`'s
+`VAR_TO_FILE` — the map from a `bin/check` variable to the file it reads — was hand-written, and
+`bin/check` carried `_VARMAP`, a second hand-written copy, with a drift check comparing the two *to each
+other*. **43 entries against 90 real `read()` bindings.** `sweep.md`, `SKILL.md`, every `wf-*` script,
+both installers and 42 more were invisible to it, so each stamped itself `0 assertion(s) in bin/check
+name this file` while assertions named it. Measured: **304 attributed assertions → 367; 38 zero-assertion
+files → 31.** Both maps now DERIVE from `bin/check`'s own `x = read("path")` assignments — the constant
+is stated once, in the assignments, and the drift the old check watched for cannot be expressed. The
+derivation refuses ambiguity rather than resolving it: a variable bound to two different files exits
+with the conflict named. *The hand-written 43 contained zero entries the derivation does not produce and
+zero that disagree with it — it was pure duplication of a fact stated a file away.*
+
+**The guard against exactly this had been vacuous for an unknown number of runs.** `bin/check` already
+asserted *"every shipped-file variable used in an assertion is attributed"*, and its comment correctly
+described the failure it prevents. It walked `_tree` — **and the marker-anchor lint 100 lines above it
+rebinds `_tree` to each shipped hook script's AST.** By the time the guard ran, `_tree` held the last
+hook script, a file with zero `check()` calls, so the set of names it collected was **empty**: every
+membership test was against nothing and 23 unattributed shipped files passed. MEASURED: 0 names
+collected against 90 bindings.
+
+This is the second vacuous blocking check found inside `bin/check` in two days, reached a different
+way — `_HDR_RX` was a pattern matching nothing; this was **a name overwritten between the parse and the
+read**. The fix is a dedicated `_chk_tree`; the *guard* is a static scan over this file's own AST for
+any name bound to a parse of `bin/check` and also bound to some other parse, wherever the two sit — the
+original had 140 lines between them. **It had to be static**, because the runtime symptom of this bug is
+a green run, which is why nothing that only fails loudly would ever have caught it. Its `bin/prove` case
+reproduces the original bug rather than deleting the fix: append a rebinding, and the guard fires.
+
+Six new assertions, **all six proven by breaking**, and `bin/prove` is 188 of 188 with zero VACUOUS.
+`bin/check` 836 · `conformance` 17 fixtures / 85 assertions · `script-conformance` 95/0 ·
+`idempotence` 8/8 · `baseline` unchanged (the one unpaired-marker hazard is pre-existing, in
+`operating-principles`).
 
 **Closed 2026-08-05 (latest) — the three places that still CREATED the file it deletes.** The
 evacuation directive landed with `wf-apply` deleting `CLAUDE.md`, and **three producers were still

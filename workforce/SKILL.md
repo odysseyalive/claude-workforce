@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 60 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 62 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
@@ -30,7 +30,7 @@ hooks:
 | `/workforce hire [role]` | HR: add an employee and author its handbook |
 | `/workforce review [employee]` | Performance review: cold-read + evals + contract drift |
 | `/workforce discharge [--execute]` | Drain the deferred queue by doing the work — deletes nothing |
-| `/workforce sweep [--execute]` | Complete a deferred deletion — the only destructive act, resumable on its own |
+| `/workforce sweep [--review]` | Complete a deferred deletion — the only destructive act, resumable on its own; executes on invocation |
 | `/workforce hooks [--execute]` | Wire, report, or unwire the shipped hooks; `verify` reports dormancy |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
 <!-- /origin -->
@@ -203,6 +203,23 @@ against it. Mechanics at `references/passes.md` § What a pass may do; the compa
 `REPORT` verdict must cite a **measured** precision figure and where it was measured lives there too,
 and `bin/check` fails on a `REPORT` pass with no measurement.*
 
+> **"the sweep should happen automatically without confirmation"**
+
+*— Added 2026-08-06, source: user directive, stated on watching `/workforce sweep` answer a completed
+audit by re-reading its own procedure and printing a plan. **This is a rule about which commands may ask
+and it is narrower than it looks**: display mode exists to show a user a judgment they have not seen
+yet, and `sweep` produces none — its removal set is every COMMITTED `T7c` row a prior `audit` already
+decided, gated and staged. The command carried **two** display modes and one execute path, so the chain
+a user walked was `audit` defers → `sweep` prints → `sweep --execute` acts: three gestures for one act.
+Mechanics at `references/procedures/sweep.md` § Why there is no `--execute` and § Procedure step 0; the
+operational reading is — **running the command is the consent, and nothing was relaxed to pay for the
+dropped keystroke.** Step 4 still re-asserts every precondition against the tree as it stands now, a
+refusal is still a first-class outcome, and a deletion is authorized by those gates passing and by
+nothing else; if that ever looks unsafe the fix is a gate this command is missing, never the flag back.
+Two things this directive does NOT say: `--review` remains the zero-write escape, and
+consent-on-invocation **is not auto-firing** — no command, hook, or dispatch starts a sweep, and `audit`
+still runs its own Step 6c inline.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
@@ -334,9 +351,19 @@ High-risk commands default to **display mode** and require `--execute`: `hire`, 
 `disband`, `rollback`, `discharge`. Low-risk and read-only commands run immediately: `roster`, `budget`,
 `org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`.
 
-`audit` is the exception: running the command is the consent (`references/audit-setup.md`), and it
-auto-executes. `audit --review` is the zero-write escape, and it closes by naming the one command
-that would apply exactly what it displayed — report first, apply on a separate gesture.
+`audit` and `sweep` are the exceptions: **running the command is the consent**, and both auto-execute.
+`--review` is the zero-write escape on each, and `audit --review` closes by naming the one command that
+would apply exactly what it displayed — report first, apply on a separate gesture.
+
+**The line between the two lists is whether the command DECIDES anything as it runs.** Display mode
+exists to show a user a judgment they have not seen yet — what `hire` will author, what `ablate` will
+strip, how `discharge` classified a row. `audit` is consent-on-invocation because the setup questions
+are the consent; **`sweep` is, because it decides nothing at all** — its removal set comes from
+COMMITTED `T7c` rows a prior `audit` wrote and gated, and every precondition is re-asserted against the
+tree as it stands now (`references/procedures/sweep.md` § Why there is no `--execute`). A preview of a
+decision already made and already displayed is a third gesture for one act, not a safeguard. `sweep`
+still accepts `--execute` as a reported no-op, and **consent-on-invocation is not auto-firing**: no
+command, hook, or dispatch starts a sweep, and `audit` never reaches it.
 
 ## Core Principles
 

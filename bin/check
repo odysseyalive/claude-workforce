@@ -1256,6 +1256,55 @@ check(
     "real target; deleting before relocating produces dead wiring, which outranks "
     "every other finding in the report",
 )
+# The only destructive command carried TWO display modes and one execute path.
+# Display-by-default printed a plan; `--review` printed the same plan and called
+# itself "the only preview of a deletion this project offers"; and the deletion
+# then needed `--execute` on top of both. The chain a user walked was: audit
+# defers -> `/workforce sweep` prints -> `/workforce sweep --execute` acts. Three
+# gestures for one act a prior audit had already decided, gated and staged.
+# Display mode is for commands that DECIDE as they run — hire authors, ablate
+# chooses, discharge classifies — and this one decides nothing: its removal set is
+# every COMMITTED T7c row and step 4 re-asserts every precondition NOW. Measured
+# 2026-08-06 on this repository, reported by the user in the same session.
+check(
+    "sweep: running the command is the consent; it executes on invocation",
+    "executes on invocation" in _swp
+    and "## Why there is no `--execute`" in _swp
+    and "`/workforce sweep [--review]`" in _swp
+    and "`audit` and `sweep` are the exceptions" in _org_sk
+    and "sweep" not in _org_sk.split("High-risk commands default to")[1].split(".")[0],
+    "the removal set came from a prior run's COMMITTED T7c rows and the gates "
+    "re-run in full; a preview of a decision already made is a third gesture, "
+    "not a safeguard",
+)
+check(
+    "sweep: --review is the zero-write escape and --execute is a REPORTED no-op",
+    "--execute is redundant; sweep executes on invocation" in _swp
+    and "no-op alias" in _swp
+    and "the only mode of this command that writes nothing" in _swp,
+    "`--execute` survives in prose, in prior reports and in muscle memory, so it is "
+    "accepted — but a flag that looks like it did something is how a user learns a "
+    "mode that does not exist. And `--review` is an escape only once it is the one "
+    "mode that writes nothing; as the second of two previews it distinguished nothing",
+)
+check(
+    "sweep: consent-on-invocation is NOT auto-firing, and the two are distinguished",
+    "Still never auto-fired" in _swp
+    and "Consent-on-invocation and auto-firing are different" in _swp
+    and "consent-on-invocation is not auto-firing" in _org_sk,
+    "dropping the flag must not be read as licence for a command, hook or dispatch "
+    "to start a deletion; audit still runs its own Step 6c inline and still never "
+    "reaches this command",
+)
+check(
+    "sweep: dropping the flag relaxed no gate, and may not be used to",
+    "What did NOT change, and none of it may be relaxed to compensate" in _swp
+    and "authorized by those gates passing, and by nothing else" in _swp
+    and "the honest fix is a gate this command is missing, never the flag back" in _swp,
+    "consent-on-invocation removes a keystroke, not a check; a sweep is authorized "
+    "by step 4 passing, and a future safety problem here is a missing gate rather "
+    "than a restored confirmation",
+)
 check(
     "close: the run report is written to disk, not only printed",
     "WRITE THE REPORT, then print it" in aud
@@ -3504,59 +3553,38 @@ _hdr_stale = []
 try:
     import ast as _ast
 
-    _tree = _ast.parse(read("bin/check"))
-    _VARMAP = {
-        "lm": "workforce/references/legacy-markers.md",
-        "ct": "workforce/references/conversion-taxonomy.md",
-        "aud": "workforce/references/procedures/audit.md",
-        "inv": "workforce/references/invariants.md",
-        "cd_": "workforce/references/conversion-department.md",
-        "disc": "workforce/references/discovery.md",
-        "stg": "workforce/references/staging.md",
-        "ds": "workforce/references/data-skills.md",
-        "hbt_": "workforce/references/handbook-templates.md",
-        "ocf_": "workforce/references/org-chart-format.md",
-        "vfy": "workforce/references/procedures/verify.md",
-        "_asu": "workforce/references/audit-setup.md",
-        "_od": "workforce/references/org-design.md",
-        "_stg": "workforce/references/staging.md",
-        "_hire2": "workforce/references/procedures/hire.md",
-        "_bl": "bin/baseline",
-        "_pt": "workforce/references/personnel-templates.md",
-        "_ev": "workforce/references/evaluators.md",
-        "_vfy2": "workforce/references/procedures/verify.md",
-        "_org": "workforce/references/procedures/org.md",
-        "_ocf": "workforce/references/org-chart-format.md",
-        "_pfp2": "workforce/references/procedure-for-procedures.md",
-        "pfp": "workforce/references/procedure-for-procedures.md",
-        "enf": "workforce/references/enforcement.md",
-        "plat": "workforce/references/platform.md",
-        "_plat": "workforce/references/platform.md",
-        "skill": "workforce/SKILL.md",
-        "_hire": "workforce/references/procedures/hire.md",
-        "pa_": "workforce/agents/provenance-analyst/AGENT.md",
-        "cc_": "workforce/agents/content-classifier/AGENT.md",
-        "da": "workforce/agents/doctrine-auditor/AGENT.md",
-        "abl": "workforce/references/ablation.md",
-        "_abl2": "workforce/references/procedures/ablate.md",
-        "rev": "workforce/references/procedures/review.md",
-        # `tpl` has been read since the first version of this file and used by the
-        # section-7 template assertions, but it was never in the map — so coverage
-        # reported handbook-templates.md at zero while four assertions named it.
-        # An attribution map that omits a live variable undercounts silently, which
-        # is the same defect class the coverage tool exists to report.
-        "tpl": "workforce/references/handbook-templates.md",
-        "dbg": "workforce/references/delegation-budget.md",
-        "_bud": "workforce/references/procedures/budget.md",
-        "_amd": "workforce/references/procedures/amend.md",
-        "_ocfg": "workforce/references/org-config.template.md",
-        "dfr": "workforce/references/deferred.md",
-        "upd": "workforce/references/procedures/update.md",
-        "_hb": "workforce/references/procedures/handbook.md",
-        "_vf": "workforce/references/verification.md",
-    }
+    _chk_tree = _ast.parse(read("bin/check"))
+    # DERIVED from this file's own `x = read("path")` assignments, never restated.
+    # `bin/coverage` derives the same map the same way from the same source, so the
+    # two agree BY CONSTRUCTION — which is why the drift check that used to compare
+    # two hand-written copies is gone rather than relaxed. Deriving is not importing:
+    # each tool parses `bin/check`, so a diagnostic still does not load the thing it
+    # diagnoses.
+    #
+    # The hand-written form carried 44 entries against 90 real bindings. `tpl`
+    # (handbook-templates.md) had been missing since the first version and was
+    # patched by hand; `_swp` (sweep.md), `_org_sk` (SKILL.md), `_aud`, `_inv`,
+    # `_hk`, `_dsc` and 17 more shipped-file variables were still missing on
+    # 2026-08-06, each stamping its file `0 assertion(s)` while assertions named it.
+    # The guard below that exists to catch exactly that had been vacuous since
+    # `_tree` was clobbered (see its own comment), so nothing reported any of it.
+    _VARMAP = {}
+    for _n in _ast.walk(_chk_tree):
+        if (isinstance(_n, _ast.Assign) and len(_n.targets) == 1
+                and isinstance(_n.targets[0], _ast.Name)
+                and isinstance(_n.value, _ast.Call)
+                and getattr(_n.value.func, "id", "") == "read"
+                and _n.value.args and isinstance(_n.value.args[0], _ast.Constant)
+                and isinstance(_n.value.args[0].value, str)):
+            _VARMAP[_n.targets[0].id] = _n.value.args[0].value
+    # bin/coverage keeps an OVERRIDES escape for a binding the parse cannot see.
+    # Read it rather than assume it is empty, or the two maps diverge the first
+    # time somebody uses it.
+    _ovr = re.search(r"OVERRIDES = \{(.*?)\}", _cov_src, re.S)
+    if _ovr:
+        _VARMAP.update(dict(re.findall(r'"([^"]+)":\s*"([^"]+)"', _ovr.group(1))))
     _live = {}
-    for _n in _ast.walk(_tree):
+    for _n in _ast.walk(_chk_tree):
         if isinstance(_n, _ast.Call) and getattr(_n.func, "id", "") == "check" and len(_n.args) > 1:
             _nm = _n.args[0].value if isinstance(_n.args[0], _ast.Constant) else "<computed>"
             _reads = {x.id for x in _ast.walk(_n.args[1]) if isinstance(x, _ast.Name)}
@@ -3712,31 +3740,65 @@ check(
     "from its mechanism is the defect the labelling pass exists to remove",
 )
 
-# `_VARMAP` above and `VAR_TO_FILE` in bin/coverage are the SAME constant, restated
-# in two files — the thing this project fails a run over everywhere else. They stay
-# separate because a diagnostic must not import the tool it diagnoses, so the
-# duplication is deliberate and the drift is what needs catching. Adding `vfy` to
-# one copy and not the other produced exactly that: coverage stamped a header that
-# check then called stale, and neither tool was wrong about its own map.
-_cov_map = re.search(r"VAR_TO_FILE\s*=\s*\{(.*?)\n\}", _cov_src, re.S)
-_cov_pairs = set(re.findall(r'"([^"]+)":\s*"([^"]+)"', _cov_map.group(1))) if _cov_map else set()
+# The two maps were hand-written copies of one constant and a drift check compared
+# them to each other. Both now DERIVE from `bin/check`'s own `read()` assignments,
+# so the constant is stated once — in the assignments themselves — and the drift
+# the old check watched for cannot be expressed. What replaces it is the assertion
+# that neither tool has gone back to restating it.
 check(
-    "coverage: bin/check and bin/coverage agree on the variable→file map",
-    _cov_pairs == set(_VARMAP.items()),
-    f"only in check: {sorted(set(_VARMAP.items()) - _cov_pairs)}; "
-    f"only in coverage: {sorted(_cov_pairs - set(_VARMAP.items()))}",
+    "coverage: the variable→file map is derived, not restated in either tool",
+    "VAR_TO_FILE" not in _cov_src
+    and 'getattr(node.value.func, "id", "") != "read"' in _cov_src
+    and "OVERRIDES = {}" in _cov_src,
+    "bin/coverage restates the map again, or stopped deriving it. Two hand-written "
+    "copies of one constant is the failure this project fails a run over everywhere "
+    "else; the 43-entry copy that lived here missed 47 of 90 real bindings",
 )
 
-# The drift check above compares the two maps to EACH OTHER. It cannot see a
-# variable missing from BOTH — which is silent, because the file then stamps
-# "0 assertion(s) name this file" while assertions name it. That is how `tpl`
-# survived (see its comment in `_VARMAP`), and adding `upd` reproduced it in one
-# edit. Derived from `read()` assignments, so a new file variable is attributed
-# by default and forgetting the map is what fails.
+# THIS GUARD WAS VACUOUS AND IS THE REASON THE MAP DECAYED UNSEEN. It walked
+# `_tree`, and the marker-anchor lint below rebinds `_tree` to each shipped hook
+# script's AST. By the time this ran, `_tree` held the LAST hook script — a file
+# with zero `check()` calls — so `_used_in_conds` was empty, every membership test
+# was against nothing, and 23 unattributed shipped-file variables passed.
+# MEASURED 2026-08-06: 0 names collected against 90 read() bindings.
+#
+# Same class as `_HDR_RX` above — a guard examining nothing — reached a different
+# way: not a pattern that matches nothing, but a name overwritten between the parse
+# and the read. The fix is a dedicated name (`_chk_tree`, bound once above); the
+# GUARD is the static scan below, because the runtime symptom of this bug is a
+# green run, and nothing that only fails loudly would have caught it.
 _used_in_conds = set()
-for _n in _ast.walk(_tree):
+for _n in _ast.walk(_chk_tree):
     if isinstance(_n, _ast.Call) and getattr(_n.func, "id", "") == "check" and len(_n.args) > 1:
         _used_in_conds |= {x.id for x in _ast.walk(_n.args[1]) if isinstance(x, _ast.Name)}
+
+# The clobber is caught STATICALLY, over this file's own AST, because the runtime
+# symptom is invisible: an emptied set makes every membership test below vacuously
+# true and nothing fails. Any name bound to a parse of `bin/check` and ALSO bound
+# to some other parse anywhere in the file is the bug, wherever the two sit — the
+# original had 3,000 lines between them.
+_parse_binds = {}
+for _n in _ast.walk(_chk_tree):
+    if not (isinstance(_n, _ast.Assign) and isinstance(_n.value, _ast.Call)):
+        continue
+    if getattr(_n.value.func, "attr", "") != "parse":
+        continue
+    _src_txt = _ast.unparse(_n.value.args[0]) if _n.value.args else ""
+    for _t in _n.targets:
+        if isinstance(_t, _ast.Name):
+            _parse_binds.setdefault(_t.id, set()).add(_src_txt)
+_clobbered = sorted(
+    v for v, srcs in _parse_binds.items()
+    if any('"bin/check"' in s or "'bin/check'" in s for s in srcs) and len(srcs) > 1
+)
+check(
+    "coverage: no AST-of-bin/check variable is rebound to another parse",
+    not _clobbered and len(_used_in_conds) > 100,
+    f"{_clobbered or 'no rebinding'}; {len(_used_in_conds)} names collected from "
+    "assertion conditions — a name holding this file's AST is reused for another "
+    "file's, so every check reading it tests nothing and PASSES. That was true of "
+    "`_tree` for an unknown number of runs and hid 23 unattributed shipped files",
+)
 _unattributed = sorted(
     v for v, p in _readmap.items()
     if v in _used_in_conds and p.endswith(".md") and p in declared and v not in _VARMAP
@@ -3744,8 +3806,8 @@ _unattributed = sorted(
 check(
     "coverage: every shipped-file variable used in an assertion is attributed",
     not _unattributed,
-    f"read() into {_unattributed} and asserted on, but absent from both maps — "
-    "coverage will stamp those files at zero while assertions name them",
+    f"read() into {_unattributed} and asserted on, but the derived map does not "
+    "carry them — coverage will stamp those files at zero while assertions name them",
 )
 
 # The T-order is this project's most safety-critical constant and is restated in

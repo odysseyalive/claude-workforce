@@ -34,55 +34,25 @@ os.chdir(ROOT)
 # condition expression: an earlier form scanned the whole call and attributed
 # assertions by their failure-message text, which credited files that were only
 # mentioned in prose.
-VAR_TO_FILE = {
-    "lm": "workforce/references/legacy-markers.md",
-    "ct": "workforce/references/conversion-taxonomy.md",
-    "aud": "workforce/references/procedures/audit.md",
-    "inv": "workforce/references/invariants.md",
-    "cd_": "workforce/references/conversion-department.md",
-    "disc": "workforce/references/discovery.md",
-    "stg": "workforce/references/staging.md",
-    "ds": "workforce/references/data-skills.md",
-    "hbt_": "workforce/references/handbook-templates.md",
-    "ocf_": "workforce/references/org-chart-format.md",
-    "vfy": "workforce/references/procedures/verify.md",
-    "upd": "workforce/references/procedures/update.md",
-    "_hb": "workforce/references/procedures/handbook.md",
-    "_vf": "workforce/references/verification.md",
-    "_asu": "workforce/references/audit-setup.md",
-    "_od": "workforce/references/org-design.md",
-    "_stg": "workforce/references/staging.md",
-    "_hire2": "workforce/references/procedures/hire.md",
-    "_bl": "bin/baseline",
-    "_pt": "workforce/references/personnel-templates.md",
-    "_ev": "workforce/references/evaluators.md",
-    "_vfy2": "workforce/references/procedures/verify.md",
-    "_org": "workforce/references/procedures/org.md",
-    "_ocf": "workforce/references/org-chart-format.md",
-    "_pfp2": "workforce/references/procedure-for-procedures.md",
-    "pfp": "workforce/references/procedure-for-procedures.md",
-    "enf": "workforce/references/enforcement.md",
-    "plat": "workforce/references/platform.md",
-    "_plat": "workforce/references/platform.md",
-    "skill": "workforce/SKILL.md",
-    "_hire": "workforce/references/procedures/hire.md",
-    "pa_": "workforce/agents/provenance-analyst/AGENT.md",
-    "cc_": "workforce/agents/content-classifier/AGENT.md",
-    "da": "workforce/agents/doctrine-auditor/AGENT.md",
-    "abl": "workforce/references/ablation.md",
-    "_abl2": "workforce/references/procedures/ablate.md",
-    "rev": "workforce/references/procedures/review.md",
-    "tpl": "workforce/references/handbook-templates.md",
-    "dbg": "workforce/references/delegation-budget.md",
-    "_bud": "workforce/references/procedures/budget.md",
-    "_amd": "workforce/references/procedures/amend.md",
-    "_ocfg": "workforce/references/org-config.template.md",
-    "dfr": "workforce/references/deferred.md",
-}
+#
+# DERIVED FROM `bin/check` ITSELF, never hand-maintained. Every entry comes from an
+# `x = read("path")` assignment in that file, which is the only place the binding
+# is authored. A hand-written copy of it was carried here until 2026-08-06 and had
+# reached 43 entries against 90 real ones: `_swp` (sweep.md), `_org_sk` (SKILL.md),
+# every `wf-*` script, both installers, README.md and 40 more were invisible, so
+# every assertion naming them was attributed to nothing and the files they guard
+# stamped themselves `0 assertion(s)`. **The 43 that were listed contained zero
+# entries the derivation does not produce and zero that disagree with it** — the
+# map was pure duplication of a fact stated a file away, which is exactly the
+# undercount-your-own-floor defect this tool exists to report, committed by the
+# tool. OVERRIDES stays for a binding the parse genuinely cannot see; it is empty,
+# and an entry added here must say why it is not derivable.
+OVERRIDES = {}
+
 
 # Assertions whose condition iterates `declared` or a glob rather than naming a
-# file variable. They guard EVERY shipped file, and VAR_TO_FILE structurally
-# cannot see them — so a file reported at 0 below is covered by these.
+# file variable. They guard EVERY shipped file, and the derived binding map
+# structurally cannot see them — so a file reported at 0 below is covered by these.
 GENERIC = [
     "manifest: every declared file exists",
     "manifest: no shipped file is undeclared",
@@ -111,6 +81,32 @@ def guarded():
 
     src = open("bin/check", encoding="utf-8").read()
     tree = ast.parse(src)
+
+    # The binding map, read off the assignments rather than restated. A var bound
+    # twice to two different files would be ambiguous — assert it never happens
+    # rather than silently taking the last one, because taking the last one is how
+    # an assertion gets credited to a file it does not read.
+    var_to_file = {}
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)):
+            continue
+        if getattr(node.value.func, "id", "") != "read" or not node.value.args:
+            continue
+        arg = node.value.args[0]
+        if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+            continue
+        for t in node.targets:
+            if not isinstance(t, ast.Name):
+                continue
+            if var_to_file.get(t.id, arg.value) != arg.value:
+                raise SystemExit(
+                    f"bin/check binds `{t.id}` to two files "
+                    f"({var_to_file[t.id]} and {arg.value}); attribution is ambiguous. "
+                    "Rename one, or add an OVERRIDES entry saying which is meant."
+                )
+            var_to_file[t.id] = arg.value
+    var_to_file.update(OVERRIDES)
+
     out = {}
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "check"):
@@ -125,7 +121,7 @@ def guarded():
         names_read = {
             n.id for n in ast.walk(cond) if isinstance(n, ast.Name)
         }
-        for var, path in VAR_TO_FILE.items():
+        for var, path in var_to_file.items():
             if var in names_read:
                 out.setdefault(path, set()).add(name)
     return {k: sorted(v) for k, v in out.items()}
@@ -201,9 +197,14 @@ def main():
           f"has no assertion naming *it*.\n")
     print("> Two independent audits found the earlier version of this line misleading: it "
           "printed \"files with no assertion at all\", which was false. The generic loops "
-          "iterate `declared` and `glob`, so `VAR_TO_FILE` — which attributes only named "
+          "iterate `declared` and `glob`, so the binding map — which attributes only named "
           "variables — could never see them. A coverage tool that undercounts its own "
           "floor is the defect it exists to report.\n")
+    print("> The map itself did exactly that until 2026-08-06: hand-written, 43 entries "
+          "against 90 real `read()` bindings, so `sweep.md`, `SKILL.md`, every `wf-*` "
+          "script and 44 more stamped themselves at zero while assertions named them. "
+          "It is now derived from `bin/check`'s own assignments — 304 attributed "
+          "assertions became 367, and 38 zero-assertion files became 31.\n")
     print("| file | claims | assertions |")
     print("|---|---|---|")
     for p, c, a in rows:
