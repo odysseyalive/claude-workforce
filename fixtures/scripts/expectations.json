@@ -1,51 +1,6 @@
 {
-  "apply-emptyroot": {
-    "_why": "wf-apply's plain (non-record-canary) DISPLAY path on a minimal root. The tree carries exactly one throwaway canary, .claude/agents/wf-canary-a.md, so PASS-STALE-CANARY has one named target; DISPLAY is the default, so the target and the --execute consent gate are printed and nothing is applied. Without a row the fixture tree was on disk and unasserted — a detector with no proof.",
-    "args": [],
-    "exit": 0,
-    "script": "wf-apply",
-    "want": ["PASS-STALE-CANARY", ".claude/agents/wf-canary-a.md", "apply with: --execute"]
-  },
-  "census-order": {
-    "_why": "wf-census must name the tree BEFORE it counts anything in it. Commit 26ec383 appended the skills row above the title line, so every report opened with an orphan row above its header — a defect invisible in a diff because both lines are correct in isolation and only their ORDER is wrong. `want` asserts the title line is immediately followed by the skills row; `not` asserts the reverse (skills above a title) is absent, so a reversion fails this case.",
-    "args": [],
-    "exit": 0,
-    "script": "wf-census",
-    "want": ["census-order\n  skills"],
-    "not": ["installed\nwf-census"]
-  },
-  "conform-canary-mismatch": {
-    "_why": "NEGATIVE. org-config.md records INV-CANARY PASS on harness 2.1.223, but platform-local.md is stamped MEASURED-ON 2.1.100 — a record taken on a different harness cannot answer whether it matches the running one, so Step 4b would return `PASS (on record)` for a measurement made elsewhere. Asserts the DEFECT IS NAMED with both versions, not merely a non-zero exit.",
-    "args": [],
-    "exit": 1,
-    "script": "wf-conform",
-    "want": ["1 failed", "canary record: platform-local.md MEASURED-ON matches the recorded harness", "2.1.100", "2.1.223", "different harness"]
-  },
-  "conform-canary-recorded": {
-    "_why": "POSITIVE half of the mismatch pair. org-config.md records INV-CANARY PASS AND platform-local.md exists with MEASURED-ON 2.1.223 matching the harness org-config records — the reconciliation has its durable record, so wf-conform passes. `not` asserts the canary-record check did not fire a failure against a healthy record.",
-    "args": [],
-    "exit": 0,
-    "script": "wf-conform",
-    "want": ["2 checks · 0 failed"],
-    "not": ["✗ canary record"]
-  },
-  "conform-canary-unavailable": {
-    "_why": "POSITIVE half of the unrecorded pair, and the case that proves the check is not a blunt file-exists test. NO platform-local.md exists, yet wf-conform must NOT fail — because the INV-CANARY row records UNAVAILABLE, not PASS, and an unmeasured host owes no record. `not` asserts it did not wrongly flag the absent file.",
-    "args": [],
-    "exit": 0,
-    "script": "wf-conform",
-    "want": ["0 failed"],
-    "not": ["✗ canary record", "is ABSENT while org-config.md"]
-  },
-  "conform-canary-unrecorded": {
-    "_why": "NEGATIVE, and this project's signature failure made testable: org-config.md records INV-CANARY PASS while platform-local.md is ABSENT — the measurement was taken and never written down, exactly the state a real audit left on 2026-08-06. Asserts the DEFECT IS NAMED, not merely a non-zero exit.",
-    "args": [],
-    "exit": 1,
-    "script": "wf-conform",
-    "want": ["1 failed", "canary record: INV-CANARY records PASS and platform-local.md exists", "is ABSENT", "never written down"]
-  },
   "apply-canary-fail": {
-    "_why": "A canary FAIL is not a record of a measurement that passed. `staging.md` § The three outcomes aborts registration on FAIL, so writing the durable `platform-local.md` on that result would make `audit.md` Step 4b return `PASS (on record)` for a host whose delegation semantics measurably differ from the design's. Identical arguments to apply-canary-record except C2's verdict — the pair isolates the refusal to that one token, and `not` asserts that no part of the file body was emitted on the way out.",
+    "_why": "A canary FAIL is not a record of a measurement that passed. `staging.md` \u00a7 The three outcomes aborts registration on FAIL, so writing the durable `platform-local.md` on that result would make `audit.md` Step 4b return `PASS (on record)` for a host whose delegation semantics measurably differ from the design's. Identical arguments to apply-canary-record except C2's verdict \u2014 the pair isolates the refusal to that one token, and `not` asserts that no part of the file body was emitted on the way out.",
     "args": [
       "--record-canary",
       "--tier-limit",
@@ -73,7 +28,7 @@
     ]
   },
   "apply-canary-record": {
-    "_why": "THE PRODUCER FOR A FILE THAT HAD ONLY CONSUMERS. Four documents (`audit.md` Step 4b/6a/7, `verify.md`, `staging.md`, `platform.md`) read `.claude/workforce/platform-local.md` and nothing wrote it; measured 2026-08-06 on this repository, a run recorded `INV-CANARY … PASS` in org-config.md and left no such file. DISPLAY is the default here as everywhere in wf-apply: the exact bytes are printed and nothing is written, which is what `not` asserts. `--measured-on` is pinned so the case is host-independent; the `claude --version` path was exercised by hand on 2026-08-06 and emitted `MEASURED-ON:  Claude Code 2.1.223` unaided. The escaped `\\|` matters — canary evidence contains a pipe verbatim, and an unescaped one ends the table cell.",
+    "_why": "THE PRODUCER FOR A FILE THAT HAD ONLY CONSUMERS. Four documents (`audit.md` Step 4b/6a/7, `verify.md`, `staging.md`, `platform.md`) read `.claude/workforce/platform-local.md` and nothing wrote it; measured 2026-08-06 on this repository, a run recorded `INV-CANARY \u2026 PASS` in org-config.md and left no such file. DISPLAY is the default here as everywhere in wf-apply: the exact bytes are printed and nothing is written, which is what `not` asserts. `--measured-on` is pinned so the case is host-independent; the `claude --version` path was exercised by hand on 2026-08-06 and emitted `MEASURED-ON:  Claude Code 2.1.223` unaided. The escaped `\\|` matters \u2014 canary evidence contains a pipe verbatim, and an unescaped one ends the table cell.",
     "args": [
       "--record-canary",
       "--tier-limit",
@@ -102,7 +57,7 @@
     ]
   },
   "apply-canary-record-execute": {
-    "_why": "`--execute` is the consent, same as every other pass in this script. Same tree and same arguments as apply-canary-record; the flag is the only difference and the verb changes from `would write` to `wrote`. `verified on disk:` is asserted because the confirmation RE-READS the file rather than echoing the string that was passed to write() — the defect being closed is a write that was believed and never made, so a report quoting its own input would reproduce it.",
+    "_why": "`--execute` is the consent, same as every other pass in this script. Same tree and same arguments as apply-canary-record; the flag is the only difference and the verb changes from `would write` to `wrote`. `verified on disk:` is asserted because the confirmation RE-READS the file rather than echoing the string that was passed to write() \u2014 the defect being closed is a write that was believed and never made, so a report quoting its own input would reproduce it.",
     "args": [
       "--record-canary",
       "--tier-limit",
@@ -163,6 +118,17 @@
       "applied 2",
       "vanished.sh",
       "also-gone.sh"
+    ]
+  },
+  "apply-emptyroot": {
+    "_why": "wf-apply's plain (non-record-canary) DISPLAY path on a minimal root. The tree carries exactly one throwaway canary, .claude/agents/wf-canary-a.md, so PASS-STALE-CANARY has one named target; DISPLAY is the default, so the target and the --execute consent gate are printed and nothing is applied. Without a row the fixture tree was on disk and unasserted \u2014 a detector with no proof.",
+    "args": [],
+    "exit": 0,
+    "script": "wf-apply",
+    "want": [
+      "PASS-STALE-CANARY",
+      ".claude/agents/wf-canary-a.md",
+      "apply with: --execute"
     ]
   },
   "apply-stalecanary": {
@@ -230,7 +196,7 @@
     "script": "wf-census",
     "want": [
       "duplicates  1 name(s)",
-      "· dup:",
+      "\u00b7 dup:",
       "collisions  0 live"
     ]
   },
@@ -243,7 +209,7 @@
     "script": "wf-census",
     "want": [
       "excluded    2 file(s) by 1 declared pattern(s)",
-      "· corpus/",
+      "\u00b7 corpus/",
       "0 unpaired (sweep hazards)"
     ]
   },
@@ -280,6 +246,18 @@
     "want": [
       "namespace   1 in-skill",
       "collisions  0 live"
+    ]
+  },
+  "census-order": {
+    "_why": "wf-census must name the tree BEFORE it counts anything in it. Commit 26ec383 appended the skills row above the title line, so every report opened with an orphan row above its header \u2014 a defect invisible in a diff because both lines are correct in isolation and only their ORDER is wrong. `want` asserts the title line is immediately followed by the skills row; `not` asserts the reverse (skills above a title) is absent, so a reversion fails this case.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "installed\nwf-census"
+    ],
+    "script": "wf-census",
+    "want": [
+      "census-order\n  skills"
     ]
   },
   "census-prose-marker": {
@@ -431,7 +409,7 @@
     ],
     "script": "wf-claude-md",
     "want": [
-      "ABSENT — this is the goal state",
+      "ABSENT \u2014 this is the goal state",
       "Nothing created.",
       "wf-standing-request"
     ]
@@ -462,7 +440,7 @@
     ]
   },
   "claudemd-ensure-region-present": {
-    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent — bin/idempotence asserts the second run writes the same bytes.",
+    "_why": "A stale region from an older run is REPLACED, not doubled. The region regex strips any prior region before the new one is placed, which is what makes the mode idempotent \u2014 bin/idempotence asserts the second run writes the same bytes.",
     "args": [
       "--ensure-region"
     ],
@@ -477,7 +455,7 @@
     ]
   },
   "claudemd-evacuated": {
-    "_why": "Every directive line reached a component — one a handbook, one the org charter — so the ledger is empty and CLAUDE.md may be deleted. DUPLICATED lines are counted as relocated because that is what duplicated MEANS; counting only the USER bucket made a two-rule fixture report one, understating the direction in the file.",
+    "_why": "Every directive line reached a component \u2014 one a handbook, one the org charter \u2014 so the ledger is empty and CLAUDE.md may be deleted. DUPLICATED lines are counted as relocated because that is what duplicated MEANS; counting only the USER bucket made a two-rule fixture report one, understating the direction in the file.",
     "args": [
       "--evacuate"
     ],
@@ -536,7 +514,7 @@
   "conform-adopted": {
     "exit": 0,
     "not": [
-      "✗ "
+      "\u2717 "
     ],
     "script": "wf-conform",
     "want": [
@@ -550,6 +528,56 @@
     "want": [
       "`tools:` is a real allowlist, not the display string",
       "one-entry allowlist naming a tool that does not exist"
+    ]
+  },
+  "conform-canary-mismatch": {
+    "_why": "NEGATIVE. org-config.md records INV-CANARY PASS on harness 2.1.223, but platform-local.md is stamped MEASURED-ON 2.1.100 \u2014 a record taken on a different harness cannot answer whether it matches the running one, so Step 4b would return `PASS (on record)` for a measurement made elsewhere. Asserts the DEFECT IS NAMED with both versions, not merely a non-zero exit.",
+    "args": [],
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "1 failed",
+      "canary record: platform-local.md MEASURED-ON matches the recorded harness",
+      "2.1.100",
+      "2.1.223",
+      "different harness"
+    ]
+  },
+  "conform-canary-recorded": {
+    "_why": "POSITIVE half of the mismatch pair. org-config.md records INV-CANARY PASS AND platform-local.md exists with MEASURED-ON 2.1.223 matching the harness org-config records \u2014 the reconciliation has its durable record, so wf-conform passes. `not` asserts the canary-record check did not fire a failure against a healthy record.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "\u2717 canary record"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "2 checks \u00b7 0 failed"
+    ]
+  },
+  "conform-canary-unavailable": {
+    "_why": "POSITIVE half of the unrecorded pair, and the case that proves the check is not a blunt file-exists test. NO platform-local.md exists, yet wf-conform must NOT fail \u2014 because the INV-CANARY row records UNAVAILABLE, not PASS, and an unmeasured host owes no record. `not` asserts it did not wrongly flag the absent file.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "\u2717 canary record",
+      "is ABSENT while org-config.md"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "0 failed"
+    ]
+  },
+  "conform-canary-unrecorded": {
+    "_why": "NEGATIVE, and this project's signature failure made testable: org-config.md records INV-CANARY PASS while platform-local.md is ABSENT \u2014 the measurement was taken and never written down, exactly the state a real audit left on 2026-08-06. Asserts the DEFECT IS NAMED, not merely a non-zero exit.",
+    "args": [],
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "1 failed",
+      "canary record: INV-CANARY records PASS and platform-local.md exists",
+      "is ABSENT",
+      "never written down"
     ]
   },
   "conform-governed-ok": {
@@ -597,7 +625,7 @@
     "_why": "A governed handbook with a Check: and NO Negative:. The advisory row must fire and the exit code must stay 0 -- the contract post-dates every handbook under it, and failing them all reproduces the 9-false-failures run that taught this script 'a check that always fails stops being read'. The bin/check assertion can only see that the channel EXISTS; only this can see that it does not block.",
     "exit": 0,
     "not": [
-      "✗ "
+      "\u2717 "
     ],
     "script": "wf-conform",
     "want": [
@@ -616,41 +644,41 @@
     ]
   },
   "conform-removal-staged": {
-    "_why": "The same tree with Step 6-S having run: T7s writes SKILL.md.orig and tree/, T7c writes the mark, and T2's extraction record exists for the one sacred span the target holds. MUST pass. Paired with conform-removal-unstaged (the mark is missing) and conform-removal-unextracted (the extraction is missing) so each half of Step 6-S has a fixture that fails without it. `tree/` is asserted because the sweep unlinks the WHOLE directory — references/, scripts/, hooks/, datasets — and SKILL.md.orig is an undo for the least of that.",
+    "_why": "The same tree with Step 6-S having run: T7s writes SKILL.md.orig and tree/, T7c writes the mark, and T2's extraction record exists for the one sacred span the target holds. MUST pass. Paired with conform-removal-unstaged (the mark is missing) and conform-removal-unextracted (the extraction is missing) so each half of Step 6-S has a fixture that fails without it. `tree/` is asserted because the sweep unlinks the WHOLE directory \u2014 references/, scripts/, hooks/, datasets \u2014 and SKILL.md.orig is an undo for the least of that.",
     "exit": 0,
+    "not": [
+      "dispositioned for removal and staged",
+      "sacred span"
+    ],
     "script": "wf-conform",
     "want": [
       "1 governed",
       "0 failed"
-    ],
-    "not": [
-      "dispositioned for removal and staged",
-      "sacred span"
     ]
   },
   "conform-removal-unextracted": {
-    "_why": "T2 IS THE ONE GATE BETWEEN A DIRECTORY DELETION AND THE USER'S OWN WORDS, and it was specified without being computable: INV-DIRECTIVES counts N of N TREE-WIDE while T2 for a removal target asks a DIRECTORY-scoped question, and wf-census published only the aggregate. The only way to answer it was a hand grep — which on 2026-08-06 reported 37 sacred spans in skill-builder against the true 6, by matching indented examples and markers quoted mid-line inside the file that DOCUMENTS the marker format. Staged, marked, undo on disk, and one span unextracted: the target must be named with its file:line, not with the difference between two totals.",
+    "_why": "T2 IS THE ONE GATE BETWEEN A DIRECTORY DELETION AND THE USER'S OWN WORDS, and it was specified without being computable: INV-DIRECTIVES counts N of N TREE-WIDE while T2 for a removal target asks a DIRECTORY-scoped question, and wf-census published only the aggregate. The only way to answer it was a hand grep \u2014 which on 2026-08-06 reported 37 sacred spans in skill-builder against the true 6, by matching indented examples and markers quoted mid-line inside the file that DOCUMENTS the marker format. Staged, marked, undo on disk, and one span unextracted: the target must be named with its file:line, not with the difference between two totals.",
     "exit": 1,
+    "not": [
+      "dispositioned for removal and staged"
+    ],
     "script": "wf-conform",
     "want": [
       "oldgen extracted 0 of 1 sacred span",
       ".claude/skills/oldgen/SKILL.md:8",
       "T2 is blocking"
-    ],
-    "not": [
-      "dispositioned for removal and staged"
     ]
   },
   "conform-removal-unstaged": {
-    "_why": "THE REMOVAL SET HAD A READER AND NO WRITER. `sweep.md` derives it from the journal; `conversion-taxonomy.md` decided the removals and never wrote a journal row; `T7c` was inserted as the mark 2026-08-04 with no row shape defined for it. Measured on odyssey-alive over three audits: `skill-builder` dispositioned SUPERSEDED GENERATOR, on disk throughout, zero rows naming it, 32 T7 rows and zero T7c rows — every run printed an empty removal set and every run was right about the journal. The finding must name the target and the step it is missing, never print a balanced-looking zero.",
+    "_why": "THE REMOVAL SET HAD A READER AND NO WRITER. `sweep.md` derives it from the journal; `conversion-taxonomy.md` decided the removals and never wrote a journal row; `T7c` was inserted as the mark 2026-08-04 with no row shape defined for it. Measured on odyssey-alive over three audits: `skill-builder` dispositioned SUPERSEDED GENERATOR, on disk throughout, zero rows naming it, 32 T7 rows and zero T7c rows \u2014 every run printed an empty removal set and every run was right about the journal. The finding must name the target and the step it is missing, never print a balanced-looking zero.",
     "exit": 1,
+    "not": [
+      "keeper"
+    ],
     "script": "wf-conform",
     "want": [
       "oldgen was dispositioned for removal and staged",
       "Step 6-S"
-    ],
-    "not": [
-      "keeper"
     ]
   },
   "conform-routed-escalation": {
@@ -669,7 +697,7 @@
     "_why": "REGRESSION GUARD. `## Verification` is MENTIONED in prose at line 2 of ## Procedure before the real heading, so a substring split hands every reader the tail of ## Procedure and the real section is never examined. Found on a real handbook 2026-08-04: the old 'Verification is not empty' assertion PASSED on it, because the wrong segment is also non-empty. Both scripts now match the heading line-anchored; this asserts wf-conform reports no failure on the file.",
     "exit": 0,
     "not": [
-      "✗ "
+      "\u2717 "
     ],
     "script": "wf-conform",
     "want": [
@@ -680,7 +708,7 @@
   "conform-staging-diverged": {
     "exit": 0,
     "not": [
-      "✗ eng-lead.md: staged draft differs"
+      "\u2717 eng-lead.md: staged draft differs"
     ],
     "script": "wf-conform",
     "want": [
@@ -802,7 +830,7 @@
       "repaired  Write(//home/loadbearing/**)  -> Edit(//home/loadbearing/**)",
       "left      Write(//home/handwritten/**)  (user-authored",
       "left      NotebookEdit(//home/demo/**)  (unmeasured form",
-      "INV-PERMS  dead 3 · repaired 2 · left 2 · suspect 1"
+      "INV-PERMS  dead 3 \u00b7 repaired 2 \u00b7 left 2 \u00b7 suspect 1"
     ]
   },
   "permissions-report": {
@@ -821,7 +849,7 @@
       "Write(//home/handwritten/**)",
       "reported, never modified",
       "advisory  NotebookEdit(//home/demo/**)",
-      "INV-PERMS  dead 3 · repairable 2 · suspect 1"
+      "INV-PERMS  dead 3 \u00b7 repairable 2 \u00b7 suspect 1"
     ]
   },
   "permissions-user-authored": {
@@ -835,7 +863,7 @@
     "script": "wf-permissions",
     "want": [
       "left      Write(//home/handwritten/**)  (user-authored",
-      "INV-PERMS  dead 1 · repaired 0"
+      "INV-PERMS  dead 1 \u00b7 repaired 0"
     ]
   },
   "persona-badstdin": {
@@ -1094,6 +1122,15 @@
     "want": [
       "none parseable",
       "never examined"
+    ]
+  },
+  "sidecar-uncovered": {
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "every sacred block on disk is stamped",
+      "guarded by nothing",
+      "unstamped-record.md:directive:1"
     ]
   },
   "standing-request": {

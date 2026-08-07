@@ -6797,6 +6797,24 @@ check(
     "real handbook, where every reader was handed the tail of `## Procedure` and the "
     "old not-empty assertion passed on the wrong segment",
 )
+# THE SACRED-BLOCK GATE COUNTED ITS OWN DENOMINATOR. `check_sidecar` iterated the
+# rows the sidecar already holds, so it verified "do the stamped blocks still match?"
+# and never "is every block stamped?" A block the sidecar does not name is checked by
+# nothing — `wf-protect-directives` calls it UNPROTECTED — while wf-conform prints
+# `0 failed` and sweep.md step 4 reads its `N of N` as the gate that authorizes a
+# deletion. MEASURED 2026-08-07 by `/workforce dev sweep` on this repository: 13 blocks
+# on disk, 12 stamped, and the unstamped one was a cold reader's question quoted
+# verbatim in a DEF record. Same class as the `_tree` clobber above — a check that
+# verifies what it was told about rather than what exists — and green while wrong.
+check(
+    "sidecar: coverage is measured against the TREE, not the sidecar's own rows",
+    "every sacred block on disk is stamped" in _cfm
+    and "os.walk(claude_dir)" in _cfm
+    and "guarded by nothing" in _cfm,
+    "wf-conform verifies only rows the sidecar already names, so an unstamped "
+    "protected span is invisible to it and the gate that authorizes deletion reads "
+    "N of N while short. Fixture: sidecar-uncovered",
+)
 check(
     "wf-conform reports a missing negative case without failing the file",
     'not r.get("advisory")' in _cfm,

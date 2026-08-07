@@ -1014,6 +1014,48 @@ def check_sidecar(root, res):
             res.add(got == want, f"sidecar: {rel}:directive:{i} digest matches",
                     "a sacred block changed after it was stamped — flag, never repair")
 
+    # ── COVERAGE: the denominator comes from the TREE, never from the sidecar ──
+    # Everything above iterates `rows` — the blocks the sidecar already names — so it
+    # answers "do the stamped blocks still match?" and never "is every block stamped?"
+    # A block absent from the sidecar was checked by nothing and reported by nothing:
+    # `wf-protect-directives` would call it UNPROTECTED, and this file said `0 failed`.
+    #
+    # MEASURED 2026-08-07 by `/workforce dev sweep` on this repository. The tree held 13
+    # sacred blocks and the sidecar stamped 12. The unstamped one was a cold reader's
+    # question quoted verbatim inside an `origin: user | immutable: true` span at column
+    # 0 in a `DEF` record — a real protected span, guarded by nothing, while the gate
+    # `procedures/sweep.md` step 4 calls "the sacred-block gate, short by one → STOP"
+    # read N of N and let a destructive command proceed.
+    #
+    # Same shape as the vacuous attribution guard in `bin/check` fixed the day before: a
+    # check that verifies what it was TOLD about rather than what EXISTS. Both were green
+    # for as long as they were wrong, which is the property that makes the class dangerous.
+    #
+    # Scoped to `.claude/`: the sidecar's rows are project-tree paths, and a source
+    # distribution under `workforce/` carries its own stamp in `workforce/.immutable.sha`.
+    unstamped = []
+    claude_dir = os.path.join(root, ".claude")
+    for dirpath, dirnames, filenames in os.walk(claude_dir):
+        dirnames[:] = [d for d in dirnames if d != "fixtures"]
+        for fn in sorted(filenames):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(dirpath, fn)
+            rel = os.path.relpath(p, root)
+            try:
+                with open(p, encoding="utf-8") as fh:
+                    n = len(BLOCK_RX.findall(fh.read()))
+            except OSError:
+                continue
+            for i in range(1, n + 1):
+                if i not in rows.get(rel, {}):
+                    unstamped.append(f"{rel}:directive:{i}")
+    res.add(not unstamped,
+            f"sidecar: every sacred block on disk is stamped ({len(unstamped)} unstamped)",
+            f"{unstamped[:5]} — a block the sidecar does not name is guarded by nothing, and "
+            "coverage counted against the sidecar's own row set reports N of N while short. "
+            "Regenerate the sidecar with the `checksums` command")
+
 
 # ── the canary record ────────────────────────────────────────────────────────
 # A run's own report is not a record. Every INV-CANARY row that reads PASS is a claim
