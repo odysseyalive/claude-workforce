@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 53 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -777,6 +777,57 @@ Runs at the end of Step 0, after the backup and before any writing gate.
    removing the user's rule** — that rule is the evidence of an intent this run does not have.
 5. **Verify by re-reading**, and report `PERMISSIONS UNVERIFIED` if the re-read does not parse — never
    report a write that was not confirmed.
+
+### When a write is refused ABOVE the permissions layer
+
+**Step 0.8's write can be refused by a layer the permissions file does not reach, and this is
+the defined response — without it a cold reader at this step has none.** `wf-permissions --apply`
+edits the rules that constrain agents, which is self-modification by definition, and a
+self-modification classifier sits **above** `permissions.allow` and can refuse the write no matter
+what that file grants. MEASURED in a real run 2026-08-06: an agent already holding
+`Edit(<project>/**)` — a grant that covers the settings file exactly — had the write refused
+anyway, and escalating to the classifier's own allow-list was refused as the same category.
+**The block sits above the permissions layer**, so the response is not the ordinary one:
+
+1. **A permission rule cannot lift it**, so do not reach for one. Do not add a grant, do not
+   widen one, and do not re-run `wf-permissions` expecting a different result: the broad
+   `Edit(...)` already covering the path did not help, and another rule at the layer *below* the
+   block cannot reach it. Advising a permission rule here is the one wrong answer this response
+   exists to retract — the harness's own error text suggests it and is wrong on this class.
+2. **There is no in-band self-service path.** Escalating to the classifier's own allow-list is
+   itself refused as self-modification, so the run cannot clear its own block. **The only
+   resolution is a human running the write**, and the run's remaining job is to hand that human
+   the exact command.
+3. **STOP and hand over the operator command — never route around the refusal.** Never a heredoc,
+   an alternate tool, or a retry loop: routing around a self-modification refusal defeats its
+   intent rather than satisfying the task, and a run that reaches for one has turned the audit
+   into the thing the classifier exists to stop. Print the resumable command for the human to run
+   — the very same `wf-permissions --apply` invocation this step runs above (§ *So this step RUNS
+   the repair*), quoted there once and not re-emitted here — then name `/workforce verify` as the
+   confirmation once the human has run it.
+
+**This is a reported, resumable outcome, not a failed run.** It is reported last with the other
+permission findings, in the block below, as `REFUSED-ABOVE-PERMISSIONS` with the operator command
+beside it — the same shape the `env`-key deferral and a `deny` conflict already take. The org is
+reported as built with the one write a human must still run named, and the run continues; nothing
+about this refusal aborts the audit.
+
+**The classifier is not purely an obstacle, and this response is written to match that.** At
+`procedures/audit.md` § the dispatch brief, an authoring agent that outlived its own T5
+registration tried to `rm` a file it could not account for, and that same classifier's refusal is
+the only reason nothing was lost. One refusal blocks a write and one refused a deletion; both are
+the layer above this project saying no, and neither is a thing to defeat.
+
+**The same exposure exists wherever an audit writes agent-constraining state, and the same
+response governs.** The `env`-key removal above writes the same settings file; agent registration
+and the model rewrite write `.claude/agents/**` frontmatter (`procedures/audit.md` Steps 5 and 6).
+A refusal at any of them is reported with its own resumable operator command and never routed
+around — the command differs, the response does not.
+
+**No change to `wf-permissions` fixes this.** The script does its whole job the instant the write
+is allowed; the refusal is above it, so there is nothing for the program to catch or retry.
+Treating a refusal above the permissions layer as a script bug would send `script-author` chasing
+a defect that is not in the file.
 
 ### Where it is reported — last, and this is the directive
 

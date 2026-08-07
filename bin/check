@@ -3266,6 +3266,25 @@ check(
     "removing `Write(p)` where no `Edit(p)` exists revokes a real capability. The "
     "repair is a removal ONLY when the working rule is already beside it",
 )
+# A WRITE REFUSED ABOVE THE PERMISSIONS LAYER. The self-modification classifier sits
+# above permissions.allow and can refuse wf-permissions --apply even when a broad
+# Edit(path) already covers the settings file. Step 0.8 had no defined response, which
+# invited the two things the field report proves are wrong: adding a permission rule
+# (cannot reach a block above that layer) and routing around it (defeats the intent).
+# This is mechanical: the section, the retract-the-permission-rule fact, and the
+# never-route-around rule are all present or the check fails. The prove case deletes
+# the anti-routing-around line — the guardrail this order exists to hold.
+check(
+    "permissions: a write refused above the permissions layer is reported, not routed around",
+    "### When a write is refused ABOVE the permissions layer" in _asu2
+    and "A permission rule cannot lift it" in _asu2
+    and "never route around the refusal" in _asu2,
+    "a self-modification classifier above permissions.allow can refuse the Step 0.8 "
+    "write even under a broad Edit(path) grant. The two wrong responses are adding a "
+    "permission rule (the block is above that layer) and routing around it via a "
+    "heredoc or alternate tool (defeats the intent). The only fix is a human running "
+    "the printed command; the run reports it resumable and continues",
+)
 # ─────────────────────────────────────────────────────────────────────────────
 # A PROPOSAL IN THE CLOSING REPORT IS A DEFERRED ROW
 #
