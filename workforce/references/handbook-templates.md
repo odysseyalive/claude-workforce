@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 20 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 23 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -284,6 +284,14 @@ command got a bad argument (§ The negative must fail for the RIGHT REASON).*
    unrequested change, and the order did not authorize it.
 5. On failure, fix and re-run — at most 2 attempts. On a third failure STOP and report
    `FAIL: <exact command output>`. NEVER report PASS on a check you did not run.
+6. **A check that cannot SEE what you wrote is VACUOUS, and a vacuous pass is a FAIL.** Before
+   reporting green, ask what the check actually observed. `git diff`-shaped checks cannot see anything
+   under `.claude/` — `.gitignore` excludes it, and **your reporting directory and every probe
+   deliverable live there** — so a `git diff … | awk 'length > N'` lint returns empty and exits 0
+   **whatever you wrote**, on every probe run, by construction. **Run the check's direct form against
+   the files** (`awk 'length > N' <files>`) **and say which form you ran.** A check reporting green
+   because it observed nothing is the `VACUOUS` verdict `bin/prove` exists to name, arriving in a
+   handbook instead of in an assertion.
 
 **Both lines sit at column 0 with a list marker** (`-`, `*`, `+`, `1.` or `1)`), never indented and never inside a fence — that is
 how the tooling tells a declaration from an illustration (`references/verification.md` § The runnable
@@ -341,6 +349,40 @@ handbook is a defect in this handbook, not a failure of yours.
 ## Probe
 Task: <a small self-contained task exercising the Procedure end to end.>
 Correct result: <the artifact, and the Verification check passing.>
+
+**BLOCKING — A PROBE THAT SUBSTITUTES ITS CONTEXT ENUMERATES HOW EVERY OTHER SECTION READS UNDER THE
+SUBSTITUTION. It never disclaims clauses one at a time.** Where a probe works in a scratch directory,
+or forbids the writes the real procedure requires, or stands one artifact in for another, **the other
+sections were written for the real work order and do not automatically transfer.** Give the mapping as
+a table — section or clause on the left, *governs unchanged* / *satisfied by `<the substitute>`* /
+*does not apply, because `<its trigger>`* on the right — and close it with: **"No clause of any other
+section is left for you to interpret. If you find one that is, that is a `QUESTION`, and this table is
+what failed."** That last sentence is what makes a remaining gap self-reporting instead of a sixth
+probe cycle.
+
+*Added 2026-08-07 under Off-the-Street Release Gate rule 5. `doctrine-author`'s `## Exit criteria`
+accumulated **four** dated clause-level patches, each closing one collision a cold reader had just hit;
+a fifth disclaimer written that day named two clauses and left three, and **the very next cold read
+asked about exactly those three.*** **Clause-by-clause disclaiming does not converge** — each patch is
+evidence the executor is being asked to resolve a mapping the document owns, and the patch itself
+becomes the next gap. Rule 5 calls two consecutive fails on one pairing structural, and this is what
+the structural fix looks like: enumerate the whole mapping once.*
+
+**BLOCKING — IF `## Procedure` BRANCHES, THE PROBE NAMES THE ARM IT EXERCISES.** A probe that invites
+the executor to *choose* a classification, a mode, or a path, while `## Procedure` and `## Exit
+criteria` then command different things per choice, has handed the executor two correct sections that
+contradict each other **on the branch it invited them to take**. Either constrain the invitation to one
+arm, or state that the probe's steps run regardless and the choice is reported rather than routed.
+**Both fixes are one sentence; neither is optional, and the executor cannot supply either.**
+
+*Added 2026-08-07, and it cost a probe cycle. `doctrine-author`'s probe said "invent one: a naming,
+**ordering**, or pairing rule … classify it structural / procedural / advisory", then commanded the
+enforcement artifacts unconditionally — while `## Exit criteria` said a procedural or advisory rule
+"**is complete without them. Do not manufacture one**", and `## Verification` named `## Exit criteria`
+as the section governing doneness. **`invariants.md`'s canonical examples of the procedural kind are
+ordering rules**, so an executor taking the probe's own suggestion is simultaneously commanded and
+forbidden. The cold reader escaped only by inventing a pairing rule and reported the fork anyway —
+which is the gate working: **completing the task does not convert an ambiguity into a PASS.***
 
 ## Reporting
 Write your deliverable to `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`.

@@ -153,8 +153,56 @@ somebody tried it.
 The scan that exists to catch a restated invariant count had a hole at exactly the two values it was
 about to need.
 
-`bin/check` 843 · `bin/prove` **197 of 197 proven by breaking, zero VACUOUS** ·
-`script-conformance` 96/0 · `conformance` 17 fixtures / 85 assertions · `idempotence` 8/8.
+**A `discharged by` cell can be runnable-verbatim and still not reach the tree.** `deferred.md` required
+"a literal runnable command, never a category" — a test of **syntax**. `Q-2`'s cell read
+`/workforce hooks --execute, run by a human`: literal, runnable, correctly named, owned by the right
+procedure, **and its only act is the write the row records as refused.** `Q-3` named "the same human
+settings write", which no file had ever written down. **Three rows, one refused act, one cell that
+reached anything.** Now BLOCKING: a cell may never name a gesture the row's own `Measured` evidence
+already refuses, the remedy is the artifact that performs the act rather than the command that
+re-attempts it, and rows recording one act get **one** artifact. All three now point at
+`work/audit-20260807T002052Z/settings-remedy.md`, which carries the complete file.
+
+**Closed 2026-08-07 — `doctrine-author` was UNRELEASED behind a DEF that had been fixed and never
+closed.** Its amendment had been on disk since the 5th probe; the record still read `open`, so the
+ledger said unreleased while the handbook said released. Re-probed under Release Gate rule 6: three cold
+reads, `QUESTION` → `QUESTION` → **PASS**.
+
+Both `QUESTION`s were new defects in a released handbook — which is the gate working, not a regression;
+a probe is one sample and the 5th executor did not hit them:
+
+| | |
+|---|---|
+| the probe invited a choice its procedure routes on | *"invent one: a naming, **ordering**, or pairing rule … classify it structural / procedural / advisory"*, then commanded the enforcement artifacts unconditionally — while `## Exit criteria` said a procedural rule *"is complete without them. Do not manufacture one"*. `invariants.md`'s canonical **procedural** examples are ordering rules, so an executor taking the probe's own suggestion is commanded and forbidden at once |
+| the wrap lint was vacuous by construction | `git diff … \| awk 'length > N'` over a deliverable under `.claude/`, which `.gitignore` excludes — **exit 0 whatever was written**, on every probe run. The handbook had noticed the gitignore fact twice and filed it both times as a convenience |
+
+**Then rule 5 fired — two consecutive fails on one section pairing — and the escalation found the real
+defect.** `## Exit criteria` carried **four** dated clause-level patches, each closing one collision a
+cold reader had just hit; the fifth, written that day, named two clauses and left three, and **the very
+next cold read asked about exactly those three.** Clause-by-clause disclaiming cannot converge: naming
+some clauses certifies the rest by omission, at one probe cycle each. `## Probe` now **enumerates** the
+whole mapping — *governs unchanged* / *satisfied by `<substitute>`* / *does not apply, because
+`<trigger>`* — and closes with the sentence that makes any remaining gap self-reporting. Rule 5 said to
+escalate and proposed *"a split or scope reduction"*; **neither was the right fix here**, which
+`ORG-probe-context-substitution` records rather than works around.
+
+**Four class rules, not four instance fixes** — three in `handbook-templates.md`, one in
+`evaluators.md`, each with its `bin/check` assertion and `bin/prove` cases proven by breaking, so no
+future hire in any project reproduces them. The fourth came from the 8th probe's improvement
+observation: **a supersession register scoped by enumeration goes stale.** The em-dash standdown was
+justified by a claim about a **corpus** and scoped to three enumerated paths *"and nowhere else"*, so it
+missed the reporting directory every handbook *compels* its executor to write into — the rule fired at
+full strength on prose in that house style, by a reader who had just read the whole corpus, as the
+required deliverable of the run being judged. The tell is now stated: **a scope whose paths do not
+follow from its own reason is an enumeration standing in for a rule.**
+
+**The wrap-lint fix earned its keep on the first run after landing.** The 7th probe's executor found 10
+lines at 101–103 columns **in its own deliverable** using the direct `awk` form; the `git diff` form it
+replaced reported clean.
+
+`bin/check` 848 · `bin/prove` **208 of 208 proven by breaking, zero VACUOUS** ·
+`script-conformance` 96/0 · `conformance` 17 fixtures / 85 assertions · `idempotence` 8/8 ·
+`doctrine-author` released on an 8th-probe PASS · personnel index 18 records.
 
 
 **Closed 2026-08-06 — `/workforce dev audit` was run against this repository, and running it found

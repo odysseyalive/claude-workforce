@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -29,6 +29,26 @@ sessions in a system whose entire premise is that nobody does.
 **`discharged by` is a literal runnable command, never a category.** "Re-check this later" names
 nothing a reader can execute; `review eng-test` does. A row whose `discharged by` cell cannot be run
 verbatim is malformed, and a malformed row is a finding rather than a silent no-op.
+
+**BLOCKING — AND IT MUST REACH THE TREE. A cell may never name a gesture the row's own `Measured`
+evidence already refuses.** Runnable-verbatim is a test of *syntax*; this is the test of *reachability*,
+and a cell can pass the first perfectly while failing the second. IF the row records that some write,
+spawn, or call was refused, and the named command's only act is that same one → the cell is malformed.
+**The remedy is the artifact that performs the act by hand — the emitted block, the exact bytes — never
+the command that will re-attempt it.**
+
+*Added 2026-08-07, from this repository's own queue. `Q-2` — three shipped hooks wired in no settings
+scope — recorded a classifier refusal of a `.claude/settings.local.json` write, and its cell read
+`/workforce hooks --execute, run by a human`. That command is literal, runnable, correctly named, owned
+by the right procedure — **and its only act is the write the row records as refused.** A user running it
+gets the identical refusal, having spent a gesture to rediscover a measured fact. `Q-3` named "the same
+human settings write", which no file had ever written down. **Three rows, one refused act, and only one
+of the three cells reached anything.** The rule above was satisfied by all three: it tests whether a
+reader can type the cell, never whether typing it changes the tree.*
+
+**Where several rows record the SAME refused act, they get ONE artifact and every cell points at it.**
+Splitting one write into three gestures is the queue re-creating, at the remedy, the hand-back it exists
+to prevent — and the user has to notice they are the same write before the first one fails.
 
 **BLOCKING — a row may never be discharged by re-running the command that wrote it, unaided.** If the
 cell names the same command with no changed precondition, the row is not deferred work — **it is a run

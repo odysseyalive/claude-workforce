@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 33 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -196,6 +196,25 @@ would have been added, and write nothing.
 **Conversion never invents a row.** Each one cites the customization that supersedes it, by path. A row
 with no citation is a guess about the user's intent, and the register exists precisely so nobody has to
 guess twice.
+
+### A register scoped by enumeration goes stale
+
+**Where a row's REASON is about a corpus, its SCOPE names the corpus — never the list of paths that
+happened to exist the day it was written.** An enumerated scope is correct on the day and silently wrong
+afterwards: every path added later falls outside it, the row keeps reading as settled, and nothing
+reports the gap because a register records decisions rather than coverage.
+
+*Measured 2026-08-07 on this repository, raised by a cold-read probe as its improvement observation.*
+The em-dash standdown was justified by *"this corpus is 72 hand-authored technical references whose
+house style uses the em-dash as a structural connector throughout"* — a claim about a corpus — and
+scoped to three enumerated paths **"and nowhere else"**. It therefore did not cover
+`.claude/workforce/work/<run-id>/<employee>/`, **the reporting directory every handbook compels its
+executor to write into**. So the superseded rule fired at full strength on prose written in that house
+style, by a reader who had just read the whole corpus, as the required deliverable of the very run being
+judged. Personnel records were missing for the same reason.
+
+**The tell is a scope whose paths do not follow from its own reason.** Read the two together: if the
+reason would justify a path the scope excludes, the scope is an enumeration standing in for a rule.
 
 **Derive rows from STRUCTURE, never from a prose grep for "supersede".** Tried on the first run: a
 regex over that word returned exactly one row, and it was a fragment of an unrelated sentence about a
