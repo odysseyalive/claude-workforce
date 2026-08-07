@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -175,6 +175,18 @@ Two things make this real rather than theatre:
 - **`AMBIGUOUS:` is a FAIL and a defect in the document.** Capture the question verbatim as a `DEF`,
   route it to the author, do not release. **Never answer the question in the probe prompt and re-run**
   — that repairs the run and leaves the defect in the text for the next cold executor.
+
+**A probe task must be RE-RUNNABLE: running it a second time is as valid as the first.** Rule 6 above
+re-opens this gate on every amendment, so a probe is run again and again over a handbook's life. A task
+whose deliverable **mutates the shipped tree** — landing a rule, a fixture, or an assertion into
+`workforce/`, `bin/check`, or `bin/prove` — is **consumed the first time it succeeds**: the next
+executor finds the deliverable already present, cannot tell "I completed this" from "this was already
+done," and its verdict measures nothing. Point the probe's deliverable at a **run-scoped scratch path**
+the executor is given, or define the **already-done branch** explicitly — but a probe that only reads
+and reports proves nothing where the role's job is to produce, so keep the exercise real. Never let
+completing the probe destroy it. *Found 2026-08-06: `doctrine-author`'s and `script-author`'s probes
+each mutated the shipped tree, so the first executor to actually complete either task consumed it —
+invisible until then only because every earlier probe had failed before reaching the deliverable.*
 
 `FAIL:` → `DEF`, amend, re-probe. Two consecutive fails on the same section means the handbook is
 structurally unclear rather than locally wrong: escalate to an `ORG` record proposing a split.

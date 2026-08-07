@@ -1,4 +1,133 @@
 {
+  "apply-emptyroot": {
+    "_why": "wf-apply's plain (non-record-canary) DISPLAY path on a minimal root. The tree carries exactly one throwaway canary, .claude/agents/wf-canary-a.md, so PASS-STALE-CANARY has one named target; DISPLAY is the default, so the target and the --execute consent gate are printed and nothing is applied. Without a row the fixture tree was on disk and unasserted — a detector with no proof.",
+    "args": [],
+    "exit": 0,
+    "script": "wf-apply",
+    "want": ["PASS-STALE-CANARY", ".claude/agents/wf-canary-a.md", "apply with: --execute"]
+  },
+  "census-order": {
+    "_why": "wf-census must name the tree BEFORE it counts anything in it. Commit 26ec383 appended the skills row above the title line, so every report opened with an orphan row above its header — a defect invisible in a diff because both lines are correct in isolation and only their ORDER is wrong. `want` asserts the title line is immediately followed by the skills row; `not` asserts the reverse (skills above a title) is absent, so a reversion fails this case.",
+    "args": [],
+    "exit": 0,
+    "script": "wf-census",
+    "want": ["census-order\n  skills"],
+    "not": ["installed\nwf-census"]
+  },
+  "conform-canary-mismatch": {
+    "_why": "NEGATIVE. org-config.md records INV-CANARY PASS on harness 2.1.223, but platform-local.md is stamped MEASURED-ON 2.1.100 — a record taken on a different harness cannot answer whether it matches the running one, so Step 4b would return `PASS (on record)` for a measurement made elsewhere. Asserts the DEFECT IS NAMED with both versions, not merely a non-zero exit.",
+    "args": [],
+    "exit": 1,
+    "script": "wf-conform",
+    "want": ["1 failed", "canary record: platform-local.md MEASURED-ON matches the recorded harness", "2.1.100", "2.1.223", "different harness"]
+  },
+  "conform-canary-recorded": {
+    "_why": "POSITIVE half of the mismatch pair. org-config.md records INV-CANARY PASS AND platform-local.md exists with MEASURED-ON 2.1.223 matching the harness org-config records — the reconciliation has its durable record, so wf-conform passes. `not` asserts the canary-record check did not fire a failure against a healthy record.",
+    "args": [],
+    "exit": 0,
+    "script": "wf-conform",
+    "want": ["2 checks · 0 failed"],
+    "not": ["✗ canary record"]
+  },
+  "conform-canary-unavailable": {
+    "_why": "POSITIVE half of the unrecorded pair, and the case that proves the check is not a blunt file-exists test. NO platform-local.md exists, yet wf-conform must NOT fail — because the INV-CANARY row records UNAVAILABLE, not PASS, and an unmeasured host owes no record. `not` asserts it did not wrongly flag the absent file.",
+    "args": [],
+    "exit": 0,
+    "script": "wf-conform",
+    "want": ["0 failed"],
+    "not": ["✗ canary record", "is ABSENT while org-config.md"]
+  },
+  "conform-canary-unrecorded": {
+    "_why": "NEGATIVE, and this project's signature failure made testable: org-config.md records INV-CANARY PASS while platform-local.md is ABSENT — the measurement was taken and never written down, exactly the state a real audit left on 2026-08-06. Asserts the DEFECT IS NAMED, not merely a non-zero exit.",
+    "args": [],
+    "exit": 1,
+    "script": "wf-conform",
+    "want": ["1 failed", "canary record: INV-CANARY records PASS and platform-local.md exists", "is ABSENT", "never written down"]
+  },
+  "apply-canary-fail": {
+    "_why": "A canary FAIL is not a record of a measurement that passed. `staging.md` § The three outcomes aborts registration on FAIL, so writing the durable `platform-local.md` on that result would make `audit.md` Step 4b return `PASS (on record)` for a host whose delegation semantics measurably differ from the design's. Identical arguments to apply-canary-record except C2's verdict — the pair isolates the refusal to that one token, and `not` asserts that no part of the file body was emitted on the way out.",
+    "args": [
+      "--record-canary",
+      "--tier-limit",
+      "3",
+      "--c1",
+      "PASS: A=has-agent | B=has-agent | C=no-agent",
+      "--c2",
+      "FAIL: agent-granted",
+      "--by",
+      "`/workforce dev audit`, run `audit-fixture`",
+      "--measured-on",
+      "2.1.223"
+    ],
+    "exit": 2,
+    "not": [
+      "TIER-LIMIT:   3",
+      "would write",
+      "wrote .claude/workforce"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "refusing to record",
+      "C2 FAIL",
+      "staging.md"
+    ]
+  },
+  "apply-canary-record": {
+    "_why": "THE PRODUCER FOR A FILE THAT HAD ONLY CONSUMERS. Four documents (`audit.md` Step 4b/6a/7, `verify.md`, `staging.md`, `platform.md`) read `.claude/workforce/platform-local.md` and nothing wrote it; measured 2026-08-06 on this repository, a run recorded `INV-CANARY … PASS` in org-config.md and left no such file. DISPLAY is the default here as everywhere in wf-apply: the exact bytes are printed and nothing is written, which is what `not` asserts. `--measured-on` is pinned so the case is host-independent; the `claude --version` path was exercised by hand on 2026-08-06 and emitted `MEASURED-ON:  Claude Code 2.1.223` unaided. The escaped `\\|` matters — canary evidence contains a pipe verbatim, and an unescaped one ends the table cell.",
+    "args": [
+      "--record-canary",
+      "--tier-limit",
+      "3",
+      "--c1",
+      "PASS: A=has-agent | B=has-agent | C=no-agent",
+      "--c2",
+      "PASS: agent-withheld",
+      "--by",
+      "`/workforce dev audit`, run `audit-fixture`",
+      "--measured-on",
+      "2.1.223"
+    ],
+    "exit": 0,
+    "not": [
+      "wrote .claude/workforce",
+      "verified on disk"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "would write .claude/workforce/platform-local.md",
+      "MEASURED-ON:  Claude Code 2.1.223",
+      "TIER-LIMIT:   3",
+      "A=has-agent \\| B=has-agent \\| C=no-agent",
+      "write with: --execute"
+    ]
+  },
+  "apply-canary-record-execute": {
+    "_why": "`--execute` is the consent, same as every other pass in this script. Same tree and same arguments as apply-canary-record; the flag is the only difference and the verb changes from `would write` to `wrote`. `verified on disk:` is asserted because the confirmation RE-READS the file rather than echoing the string that was passed to write() — the defect being closed is a write that was believed and never made, so a report quoting its own input would reproduce it.",
+    "args": [
+      "--record-canary",
+      "--tier-limit",
+      "3",
+      "--c1",
+      "PASS: A=has-agent | B=has-agent | C=no-agent",
+      "--c2",
+      "PASS: agent-withheld",
+      "--by",
+      "`/workforce dev audit`, run `audit-fixture`",
+      "--measured-on",
+      "2.1.223",
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "would write"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "wrote .claude/workforce/platform-local.md",
+      "verified on disk: MEASURED-ON:  Claude Code 2.1.223",
+      "TIER-LIMIT 3"
+    ]
+  },
   "apply-deadhook": {
     "_why": "DISPLAY is the default and must change nothing. Three registrations are live, dead, and UNDECIDABLE (a bare `jq` resolved on PATH). Only the two dead ones are named; calling the undecidable one dead would invite deleting a working registration, which is the failure wf-census's DEAD/UNDECIDABLE split exists for. `would apply` rather than `applied` is the whole difference between the two modes.",
     "exit": 0,

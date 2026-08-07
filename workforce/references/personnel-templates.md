@@ -1,6 +1,6 @@
 # Personnel Record Templates
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the HR ledger's schema. `ledger`, `review`, `amend`, `defect` write these. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/` — project state.
@@ -8,13 +8,16 @@
 ```
 personnel/
   index.md                        By Department / By Employee / By Status / Statistics
-  EMP-<name>.md                   one per employee, living
-  incidents/PERF-YYYY-MM-DD-<slug>.md
-  defects/DEF-YYYY-MM-DD-<slug>.md
-  amendments/AMD-YYYY-MM-DD-<slug>.md
-  improvements/RFI-YYYY-MM-DD-<slug>.md
-  decisions/ORG-YYYY-MM-DD-<slug>.md
+  EMP-<name>.md                   one living file per employee — subject-keyed, never dated
+  PERF-<slug>.md                  performance incident
+  DEF-<slug>.md                   procedure defect from a question
+  AMD-<slug>.md                   handbook amendment
+  RFI-<slug>.md                   improvement recommendation
+  ORG-<slug>.md                   structural decision
 ```
+
+**The layout is flat — one file per record, no subdirectories.** `ledger` and the index regeneration
+both enumerate the flat directory (§ line below, and `INV-LEDGER`), and the live tree is flat.
 
 | Type | Purpose | Discipline |
 |---|---|---|
@@ -23,7 +26,14 @@ personnel/
 | **DEF** | procedure defect from a question | **a question IS a defect** |
 | **AMD** | handbook amendment | **dual-key sign-off** |
 | **RFI** | improvement recommendation | single-reviewer instant merge |
-| **ORG** | structural decision | |
+| **ORG** | structural decision | **ratified, never performance-driven** |
+
+**Record naming — two grammars, not interchangeable.** `EMP-<name>` is **subject-keyed and never
+dated**: one living file per employee at a stable, predictable path, because the employee's standing
+record must be findable by name. The event records — `PERF`, `DEF`, `AMD`, `RFI`, `ORG` — are
+`<TYPE>-<slug>`, the slug naming the event; a date is prepended (`<TYPE>-YYYY-MM-DD-<slug>`) **only to
+disambiguate a recurring subject** whose bare slug would otherwise collide. This is why the live
+`DEF-<slug>` records are well-formed and an employee file is never dated.
 
 ---
 
@@ -39,7 +49,7 @@ are below; this is the artifact that holds them.
 
 | Section | For the personnel dataset |
 |---|---|
-| `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`; types `EMP`, `PERF`, `DEF`, `ORG`, each shaped by its template below |
+| `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat (no subdirectories); types `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG`, each shaped by its template below |
 | `## Invariants` | the universal one, **plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`) |
 | `## Degradation` | absent → the org has no history and `review` says so rather than reporting a clean record; empty → same; stale → the index is rebuilt from the filesystem; corrupt → **stop, never rewrite** |
 | `## Owner` | HR. Exactly one Records Owner; its Lead is the second key |
@@ -142,7 +152,7 @@ is the user's words; this is the org's summary of the job. Where they disagree, 
 ## PERF — the document is the default subject
 
 ```markdown
-# PERF-YYYY-MM-DD-<slug>
+# PERF-<slug>              # or PERF-YYYY-MM-DD-<slug> to disambiguate a recurring subject
 
 **Status:** open | amended | closed-no-defect | escalated-to-principles
 **Employee:** <name>        ← identifies the executor, NOT the defendant
@@ -183,7 +193,7 @@ did not cover the case. Proceed straight to the amendment.
 ## DEF — a question is a bug report against the text
 
 ```markdown
-# DEF-YYYY-MM-DD-<slug>
+# DEF-<slug>               # or DEF-YYYY-MM-DD-<slug> to disambiguate a recurring subject
 
 **Status:** open | amended | closed-as-principle | closed-no-defect
 **Raised by:** <employee> | probe | human:<user>
@@ -246,7 +256,7 @@ with a check behind it.*
 ## AMD — dual key
 
 ```markdown
-# AMD-YYYY-MM-DD-<slug>
+# AMD-<slug>               # or AMD-YYYY-MM-DD-<slug> to disambiguate a recurring subject
 
 **Status:** proposed | signed | applied | reverted
 **Target:** `.claude/agents/<name>.md` § <n>
@@ -299,6 +309,51 @@ text, one-line rationale, single reviewer, merged/declined.
 
 **Deletions and simplifications count toward the quota equally with additions.** A volume quota is
 otherwise a bloat pump, and that is the one honest counterweight available (`org-doctrine.md`).
+
+---
+
+## ORG — structural decision
+
+The producer for the nine consumers that file one — `hire`, `retire`, `promote`, `transfer`,
+`reconcile` (a merge), `defect`/`principles` (a principle promoted into a handbook on its third
+firing), and `handbook`/`staging` (a split proposed after two consecutive section fails). Each is a
+change to the org's *shape*, not to a single handbook's text — that is an `AMD`.
+
+```markdown
+# ORG-<slug>
+
+**Status:** proposed | ratified | applied | reverted
+**Trigger:** hire | retire | promote | transfer | reconcile-merge | principle-promotion | split-proposal | audit
+**Blast radius:** LOCAL | DEPARTMENT | ORG-WIDE
+**Affects:** <employee(s) / department(s) named>
+
+## The Decision
+<One paragraph: the org shape before and after — a role added or removed, a tier
+changed, two roles merged, a principle promoted into a handbook and removed from
+the principles.>
+
+## Why
+<The structural rationale. NOT performance: speed, token savings, deduplication,
+and "cleaner" are barred as ORG rationales (`reconcile.md`).>
+
+## Ratification
+| Key | Role | Holder | Signed |
+|---|---|---|---|
+| KEY 1 | the command that made the change | | |
+| KEY 2 | the affected department's manager | | |
+
+A merge, a removal, or any `ORG-WIDE` change requires **the human as KEY 2** —
+a conflict is not consent (`reconcile.md`). Unratified → `proposed`, never `applied`.
+
+## Chart & Index
+- [ ] `org index` regenerated
+- [ ] `org embed` refreshed the affected handbooks' chain-of-command blocks
+- [ ] every affected `EMP` file updated in the SAME change
+```
+
+**An `ORG` record is filed in the same change as the structural act, never after.** `hire`, `promote`,
+and `transfer` each list it beside the `EMP` write and the `org index`/`org embed` refresh; a run that
+performed the act and skipped the record left the org's history unable to say why its shape changed.
 
 ---
 

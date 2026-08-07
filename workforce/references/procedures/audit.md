@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 88 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 34 assertion(s) in bin/check name this file; 89 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1026,7 +1026,7 @@ is shorter than a session, and a turn boundary is the leading trigger).
 
 | Second result | What this step does |
 |---|---|
-| `PASS` | **write `platform-local.md`, restamp every handbook's `Tier ceiling:` line in place, sweep the `wf-canary-*` and `wf-ceiling-probe` fixtures, and queue NOTHING.** The run is no longer degraded |
+| `PASS` | **record `platform-local.md` via `wf-apply … --record-canary --execute` (the PASS-on-record step below, which names the full command), restamp every handbook's `Tier ceiling:` line in place, sweep the `wf-canary-*` and `wf-ceiling-probe` fixtures, and queue NOTHING.** The run is no longer degraded |
 | `UNAVAILABLE` again | stay DEGRADED, keep the marks, and queue the three rows at Step 7 — **now with two recorded attempts, not zero** |
 | `FAIL` | the ceiling is measurably broken. Do NOT sweep. Report it against every registered handbook and queue the remediation |
 
@@ -1306,16 +1306,27 @@ Then the org, the fan-out budget, and the canary result **by state, with its con
 
 | Canary | Line to print |
 |---|---|
-| `PASS` | `tier ceiling: verified this run (canary PASS)` — **and WRITE `platform-local.md`** |
+| `PASS` | `tier ceiling: verified this run (canary PASS)` — **and RECORD `platform-local.md`** via `wf-apply … --record-canary --execute` (the PASS-on-record step below) |
 | `PASS (on record)` | `tier ceiling: verified — platform-local.md matches the running harness` |
 | `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
 
 A run that verified the host and a run that verified nothing must never print the same line.
 
-**On `PASS`, the measurement is RECORDED, not just printed.** Write
-`.claude/workforce/platform-local.md` with `MEASURED-ON` (the running `claude --version`),
-`MEASURED-AT`, `TIER-LIMIT`, and one line per canary assertion with its evidence. Under `--review`,
-print it and write nothing.
+**On `PASS`, the measurement is RECORDED by the producer, not composed by hand.** Run:
+
+```bash
+wf-apply --root <absolute path to project> --record-canary \
+  --tier-limit <C1's measured depth> \
+  --c1 'PASS: <C1 evidence verbatim>' --c2 'PASS: <C2 evidence verbatim>' \
+  --by '<command>, run <run-id>' --execute
+```
+
+and paste its `verified on disk:` line into the report. **`--root` takes an explicit absolute path —
+never `--root "${CLAUDE_PROJECT_DIR}"`**: that variable is unset in the Bash tool, so the script exits
+2 with a named error rather than retargeting its own CWD, and a step shipping the variable form fails
+every time. Under `--review`, run the same command **without** `--execute` — it prints the exact bytes
+and writes nothing. Hand-composing `platform-local.md` is what left it unwritten on every run before
+the producer existed.
 
 *Added 2026-08-03. The `PASS (on record)` row above requires that file, and **nothing in this project
 ever wrote it** — `verify` prints the row and says explicitly that it reports the fix rather than

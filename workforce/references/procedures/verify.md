@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 45 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 16 assertion(s) in bin/check name this file; 45 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -153,9 +153,10 @@ promise is kept.**
   from the design's. Report it against the org, not against any one handbook.
 
 **This is the SECOND of the two spawns `verify` makes, and both write nothing.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
-observation; it does not touch the org. On `PASS`, print the exact `platform-local.md` row to record and
-name `/workforce amend` as what clears the `Tier ceiling: unverified this run` marks — **`verify` reports
-the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
+observation; it does not touch the org. On `PASS`, print the exact `wf-apply … --record-canary
+--execute` command to run — with an explicit absolute `--root`, never `--root "${CLAUDE_PROJECT_DIR}"`
+(unset in the Bash tool; the script exits 2 on it) — and name `/workforce amend` as what clears the
+`Tier ceiling: unverified this run` marks — **`verify` reports the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
 report that no command fulfilled.
 
 ## Org integrity

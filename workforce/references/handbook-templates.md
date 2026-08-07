@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 19 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 20 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -354,6 +354,11 @@ the artifact path (`procedures/org.md` § Canonical Dispatch CHECKPOINT clause 6
 handbook: a cold executor given only the text has no way to form one, and the alternative to saying it
 is that it invents one. Found by a probe on 2026-07-31 that **passed** — the harness had supplied the
 full path, so the gap was masked by the dispatch rather than closed by the text.
+
+**A `## Scope` line that names a directory names the employee that owns it.**
+`OUT: workforce/bin/**` says what not to touch and leaves the handover unnamed, so a reader who
+asks whose it is has to guess. Write the owner into the line, IN and OUT alike. On an IN line that
+owner is this employee, and stating it is what makes every unlisted path someone else's.
 
 
 ---

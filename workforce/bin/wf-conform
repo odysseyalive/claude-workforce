@@ -1015,6 +1015,103 @@ def check_sidecar(root, res):
                     "a sacred block changed after it was stamped — flag, never repair")
 
 
+# ── the canary record ────────────────────────────────────────────────────────
+# A run's own report is not a record. Every INV-CANARY row that reads PASS is a claim
+# that this host was measured; `platform-local.md` is the only place that measurement
+# survives the run, and `audit.md` Step 4b returns `PASS (on record)` — skipping the
+# spawn — solely on the strength of it.
+#
+# MEASURED 2026-08-06 on this repository: `org-config.md` recorded
+# `INV-CANARY … attempt 1 PASS` and no `platform-local.md` existed anywhere in the
+# tree. Four documents instruct a run to write that file and nothing produced it, so
+# the measurement was taken, reported, and lost — and every later run has to re-take
+# it while reading a record that says it already passed.
+#
+# THIS CHECK LIVES IN A SHIPPED SCRIPT, NOT IN `bin/check`, and the reason is
+# mechanical: `.gitignore` ignores `/.claude/`, so a repo-side assertion about
+# `.claude/workforce/` passes VACUOUSLY on a fresh clone — it would be an enforcement
+# whose population is empty everywhere except the maintainer's own working tree. The
+# state being checked belongs to a live project, so the checker has to run against one.
+INV_CANARY_LINE_RX = re.compile(r"^.*INV-CANARY.*$", re.M)
+RECORDED_PASS_RX = re.compile(r"\bPASS\b")
+# `| harness | `claude --version` → **2.1.223** |` — the row an audit writes into
+# org-config.md. Both arrow forms, and the bold markers are optional.
+HARNESS_RX = re.compile(r"claude --version`?\s*(?:→|->)\s*\**([0-9]+(?:\.[0-9A-Za-z]+)+)")
+MEASURED_ON_RX = re.compile(r"^MEASURED-ON:.*$", re.M)
+VERSION_RX = re.compile(r"([0-9]+(?:\.[0-9A-Za-z]+)+)")
+RECORD_CMD = ("wf-apply --root <tree> --record-canary --tier-limit <N> "
+              "--c1 'PASS: …' --c2 'PASS: …' --by '<run>' --execute")
+
+
+def check_canary_record(root, res):
+    """A recorded canary PASS must have the durable record it licenses.
+
+    Three states are clean and each says so rather than returning silently — a check
+    that skips is indistinguishable from a check that passed, which is the failure
+    mode this whole script is written against.
+    """
+    cfg_path = os.path.join(root, ".claude", "workforce", "org-config.md")
+    if not os.path.exists(cfg_path):
+        res.add(True, "canary record: no org-config.md — nothing has been recorded yet",
+                "absent is a first-class state, not an error")
+        return
+    cfg = read(cfg_path, res)
+    if cfg is None:
+        return
+
+    rows = INV_CANARY_LINE_RX.findall(cfg)
+    if not rows:
+        res.add(True, "canary record: org-config.md records no INV-CANARY row",
+                "an unrun canary owes no record")
+        return
+    # Scoped to the INV-CANARY row's OWN text. A substring test over the whole file
+    # would read the word PASS out of any neighbouring prose — the mistake this
+    # project has made in three separate checkers.
+    if not any(RECORDED_PASS_RX.search(r) for r in rows):
+        res.add(True, "canary record: INV-CANARY records no PASS — nothing to reconcile",
+                "UNAVAILABLE and FAIL record no measurement, so neither owes a file")
+        return
+
+    local_path = os.path.join(root, ".claude", "workforce", "platform-local.md")
+    if not os.path.exists(local_path):
+        res.add(False, "canary record: INV-CANARY records PASS and platform-local.md exists",
+                f"`.claude/workforce/platform-local.md` is ABSENT while org-config.md "
+                f"records {rows[0].strip()[:90]!r}. The measurement was taken and never "
+                f"written down, so `audit.md` Step 4b can never return `PASS (on record)` "
+                f"and every future run re-measures a host that was already measured. "
+                f"Write it: {RECORD_CMD}")
+        return
+    local = read(local_path, res)
+    if local is None:
+        return
+
+    stamp = MEASURED_ON_RX.search(local)
+    if not stamp:
+        res.add(False, "canary record: platform-local.md carries a MEASURED-ON stamp",
+                "the record exists and names no harness version, so nothing can ever "
+                "decide whether it matches the running harness — the one question "
+                "`platform.md` § levels asks of it")
+        return
+
+    harness = HARNESS_RX.search(cfg)
+    if not harness:
+        res.add(True, "canary record: platform-local.md exists "
+                      "(org-config.md records no harness version to reconcile against)",
+                "the existence half is checked; the version half has no second reading "
+                "to compare with, and that boundary is stated rather than assumed")
+        return
+
+    got = VERSION_RX.search(stamp.group(0))
+    res.add(bool(got) and got.group(1) == harness.group(1),
+            f"canary record: platform-local.md MEASURED-ON matches the recorded harness "
+            f"({harness.group(1)})",
+            f"org-config.md records harness `{harness.group(1)}`; platform-local.md says "
+            f"`{stamp.group(0).strip()}`. A record stamped with a different harness than "
+            f"the run that took it cannot answer whether it matches the running one, so "
+            f"Step 4b would return `PASS (on record)` for a measurement made elsewhere. "
+            f"Re-record it: {RECORD_CMD}")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="wf-conform")
     ap.add_argument("--root", default=".")
@@ -1148,6 +1245,7 @@ def main():
                     check_data_skill(p, body, res)
 
     check_sidecar(root, res)
+    check_canary_record(root, res)
     check_journal(root, res)
     check_defects(root, res)
     check_catalogs(root, res)

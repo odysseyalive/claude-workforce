@@ -755,6 +755,26 @@ check(
     "applies: an `exec` must be invoked by a procedure, a `hook` must have a wiring "
     "command and a wired/orphaned report. An unflagged executable has neither",
 )
+# The COMPLEMENT of the check above, and the class behind a single instance. Both
+# installers alias `exec` to `hook` (install:250,319) and chmod +x on fetch, so an
+# `exec`/`hook` path is 755 in every INSTALLED copy regardless of its source mode.
+# That makes a non-executable SOURCE file invisible after install and live only for
+# a maintainer invoking it from the source tree — which is exactly what maintainer
+# mode instructs ("edit the source distribution FIRST"). Found 2026-08-06 by
+# `/workforce dev audit` (run audit-20260807T002052Z): `workforce/bin/wf-permissions`
+# was mode 100644, alone
+# among twelve siblings. `os.access` reads the working-tree bit, which git keeps in
+# sync with the recorded mode under core.filemode and applies on checkout, so this
+# is the mode a fresh clone gets — and bin/prove's copytree preserves it.
+_nonexec_src = sorted(p_ for p_ in _execs + _hooks if not os.access(p_, os.X_OK))
+check(
+    "shipped files: every `exec`/`hook` path is executable in the source tree",
+    not _nonexec_src,
+    f"declared executable but not +x in source: {_nonexec_src} — both installers "
+    "chmod +x on fetch, so this is 755 in every installed copy and silent after "
+    "install, but broken for a maintainer running it from source. Fix with "
+    "`git update-index --chmod=+x <path>` and `chmod 755` the working tree",
+)
 # A shipped file must not instruct a host to open a path the host does not have.
 # enforcement.md states the rule; nothing enforced it, and a retracted instruction
 # survived eight lines below its own retraction for a full commit. The cold reader
@@ -1655,6 +1675,40 @@ check(
     "the name appeared in exactly one place in the distribution — Step 0.3's "
     "install list — so a run had to install a skill it had no description of",
 )
+# ORG was a record type with NINE consumers filing one (hire/retire/promote/transfer/
+# reconcile/defect/principles/handbook/staging) and no template to write from — the
+# consumer-named/producer-assumed shape, with an empty Discipline cell as the tell.
+# This closes the class: a type in the table without a `## <TYPE>` section fails here.
+_pt_types = re.findall(r"^\|\s*\*\*([A-Z]+)\*\*\s*\|", _pt, re.M)
+_pt_missing = [t for t in _pt_types if f"## {t}" not in _pt]
+check(
+    "personnel-templates: every record type in the type table has a template section",
+    bool(_pt_types) and not _pt_missing,
+    f"types in the type table with no `## <TYPE>` template section: {_pt_missing} — "
+    "a consumer told to file one has nothing to write from (ORG had nine consumers "
+    "and no template)",
+)
+# The layout block once showed incidents/ defects/ amendments/ subdirectories while
+# § Schema and the live tree are flat — two grammars for one path. Flat wins: ledger
+# and the index regeneration both enumerate a flat directory.
+check(
+    "personnel-templates: the record layout is flat, not subdivided",
+    "The layout is flat" in _pt
+    and "incidents/PERF" not in _pt and "decisions/ORG" not in _pt,
+    "the layout block and § Schema disagreed on whether records live in per-type "
+    "subdirectories; the live tree and the ledger enumeration are flat",
+)
+# EMP is subject-keyed and never dated (a stable, findable standing record); the event
+# records are <TYPE>-<slug> with a date prepended only to disambiguate a recurrence.
+# The template headings once mandated a date the flat § Schema and the live DEF-<slug>
+# records contradicted.
+check(
+    "personnel-templates: the naming grammar distinguishes subject-keyed EMP from event records",
+    "Record naming — two grammars, not interchangeable." in _pt
+    and "disambiguate a recurring subject" in _pt,
+    "EMP-<name> is subject-keyed and never dated; event records are <TYPE>-<slug> with "
+    "an optional disambiguating date — the headings, § Schema, and the live tree agree",
+)
 check(
     "audit-setup: a customized companion converts, never overwritten or skipped",
     "Three states, not two" in _asu and "PRESENT, CUSTOMIZED" in _asu
@@ -1828,6 +1882,13 @@ check(
     "the template's own guardrail forbade the write its own Reporting section "
     "mandates, so every handbook authored from it inherited a contradiction",
 )
+
+check(
+    "handbook-templates: a scope line naming a directory names the employee that owns it",
+    "names the employee that owns it" in tpl and "Write the owner into the line" in tpl,
+    "a scope line that names a path and no owner tells the reader what not to touch "
+    "and not who to hand it to, so the handover is guessed at rather than written",
+)
 check(
     "staging: Phase A blocks a guardrail that forbids the reporting path",
     "No guardrail forbids the path `## Reporting` mandates" in _stg
@@ -1842,6 +1903,17 @@ check(
     and "not probed (spawning unavailable)" in _stg,
     "Phase C settled this argument for the canary; the release gate never got it, "
     "so a suppressed spawn had no outcome and could register as though probed",
+)
+# Rule 6 re-opens the gate on every amendment, so a probe runs repeatedly. A probe task
+# whose deliverable mutates the shipped tree is consumed the first time it succeeds — the
+# next executor finds it already done and measures nothing. doctrine-author's and
+# script-author's probes both had this shape; the general rule belongs in the contract.
+check(
+    "staging: a probe task must be re-runnable, because rule 6 re-opens the gate",
+    "A probe task must be RE-RUNNABLE" in _stg and "run-scoped scratch path" in _stg,
+    "a probe whose deliverable mutates the shipped tree is single-use, but rule 6 re-opens "
+    "the gate on every amendment; the next executor finds it already done and its verdict "
+    "measures nothing",
 )
 check(
     "staging: spawn suppression is measured, never read from a config key",
@@ -3284,6 +3356,25 @@ check(
     "permission rule (the block is above that layer) and routing around it via a "
     "heredoc or alternate tool (defeats the intent). The only fix is a human running "
     "the printed command; the run reports it resumable and continues",
+)
+# Step 0.8 makes TWO writes: the REPAIR (wf-permissions --apply, removes dead grants)
+# and the ADDITION (the run edits JSON to add the org's Agent/Bash/MCP grants — no
+# shipped script does it). Clause 3 used to hand a refused reader "the very same
+# wf-permissions --apply invocation", which exits 0 having removed zero dead grants
+# while every org Bash(...) grant stays absent — a remedy that reports success without
+# delivering the capability, this project's signature failure. The section must name the
+# two writes distinctly and, for a refused ADDITION, emit the computed grant lines rather
+# than re-quote the repair.
+check(
+    "permissions: the refusal section distinguishes the REPAIR write from the ADDITION write",
+    "Step 0.8 makes TWO distinct writes to the settings file" in _asu2
+    and "Re-running `wf-permissions --apply` is NOT the remedy for a refused ADDITION" in _asu2
+    and "ADDITION refused" in _asu2
+    and "no shipped script performs it" in _asu2,
+    "clause 3 re-quoting wf-permissions --apply as the remedy for a refused ADDITION "
+    "hands the reader a command that exits 0 having removed zero dead grants while every "
+    "org Bash(...) grant stays absent; the ADDITION has no shipped producer, so its "
+    "resumable remedy is the emitted grant lines the run computed at steps 2–3c",
 )
 # ─────────────────────────────────────────────────────────────────────────────
 # A PROPOSAL IN THE CLOSING REPORT IS A DEFERRED ROW
@@ -5252,8 +5343,29 @@ check(
 
 check(
     "permissions: every count prints, including the zeroes",
-    "always all five, including the zeroes" in _asu,
+    "always all four, including the zeroes" in _asu,
     "0 added is a measurement that the org's needs were already met; silence is not",
+)
+# GENERAL: an "all N" count claim on a summary line must match the ·-separated fields
+# on that same line. audit-setup.md said "all five" beside four fields — a miscount its
+# own adjacent sample contradicted, and the specific assertion above had PINNED the
+# wrong number. Keyed to same-line co-occurrence so prose uses of "all three" (no ·) do
+# not false-positive. Binds audit-setup.md, invariants.md, hire.md, and sweep.md at once.
+_countword = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8}
+_count_mismatch = []
+for _cf in sorted(glob.glob("workforce/references/**/*.md", recursive=True)):
+    for _cl in read(_cf).splitlines():
+        _cm = re.search(r"\ball (two|three|four|five|six|seven|eight)\b", _cl)
+        if _cm and "·" in _cl:
+            _nf = _cl.count("·") + 1
+            if _nf != _countword[_cm.group(1)]:
+                _count_mismatch.append(
+                    f"{_cf}: 'all {_cm.group(1)}' vs {_nf} ·-fields — {_cl.strip()[:70]}")
+check(
+    "references: an 'all N' count claim matches the ·-separated fields on its own line",
+    not _count_mismatch,
+    f"{_count_mismatch} — a summary line claiming 'all five' beside four fields miscounts "
+    "its own output; claim and sample move together",
 )
 check(
     "permissions: a conflict reports and does not fail the run",
@@ -5914,9 +6026,10 @@ check("audit says why checksums was missing",
       "because it was in no list" in aud,
       "a step added without its reason is one the next editor removes as redundant")
 
-check("a PASS canary writes platform-local.md",
-      "and WRITE `platform-local.md`" in aud,
-      "audit's own table reads that file on a later run; nothing created it")
+check("a PASS canary records platform-local.md via the producer",
+      "and RECORD `platform-local.md`" in aud and "--record-canary --execute" in aud,
+      "audit's own table reads that file on a later run; the hand-write instruction "
+      "left it uncreated on every run, so the report row points at wf-apply --record-canary")
 
 check("audit states the measured-not-written rule",
       "A fact measured and not written down" in aud,
@@ -5924,6 +6037,24 @@ check("audit states the measured-not-written rule",
 # Short literal deliberately: the full sentence wraps at column ~100 in audit.md, so
 # asserting it whole matches nothing. This project's own self-lint caught that here,
 # which is the fourth time that hazard has been found by the check rather than a human.
+
+# WIRE THE PROCEDURE TO THE PRODUCER. platform-local.md had no producer; the department
+# built `wf-apply --record-canary`, and wf-conform fires when org-config records a canary
+# PASS and the file is absent. But the procedures still instructed a hand-write, so a run
+# following them literally would compose the file by hand and never call the script. audit's
+# PASS-on-record step must name the producer, and it must carry the ${CLAUDE_PROJECT_DIR}
+# hazard: that variable is unset in the Bash tool, so a --root "${CLAUDE_PROJECT_DIR}" form
+# ships a step that exits 2 every run.
+check("audit wires the canary PASS to wf-apply --record-canary, not a hand-write",
+      "--record-canary" in aud and "verified on disk:" in aud
+      and "${CLAUDE_PROJECT_DIR}" in aud,
+      "the PASS-on-record step must run wf-apply --record-canary --execute with an explicit "
+      "absolute --root and state the ${CLAUDE_PROJECT_DIR}-is-unset hazard, or a run hand-"
+      "composes platform-local.md and the producer is never called")
+check("verify prints the wf-apply --record-canary command, with the absolute-path hazard",
+      "--record-canary" in vfy and "${CLAUDE_PROJECT_DIR}" in vfy,
+      "verify reports the fix and never applies it, so it prints the exact command to run; "
+      "shipping the ${CLAUDE_PROJECT_DIR} form prints a command that exits 2 every time")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixing the instance is not fixing the defect
@@ -6341,6 +6472,20 @@ for _s in ("wf-checkrun", "wf-conform", "wf-census", "wf-context", "wf-remainder
     if not _src or "add_argument(" not in _src:
         continue
     _have = set(re.findall(r'add_argument\("(--[a-z-]+)"', _src))
+    # A string that invokes ANOTHER command carries THAT command's flags, not this
+    # script's. A producer-remedy line — `wf-apply --root <tree> --record-canary …` —
+    # names wf-apply's real flags so the operator can run the fix, and a regex that
+    # matches `claude --version` names claude's flag; neither is this script claiming
+    # a flag it lacks. `wf-apply` parses argv by hand (no add_argument), so it cannot
+    # be cross-validated flag-by-flag — naming the command is the exemption. The class
+    # this check exists for is untouched: a script's OWN output naming its OWN removed
+    # flag invokes no other command, so it is still caught (proven below by hand).
+    _other_cmd = re.compile(r"\b(?:claude|wf-[a-z][a-z-]+)\b")
+
+    def _flag_lies_in(_text):
+        if set(_other_cmd.findall(_text)) - {_s}:
+            return []
+        return [f for f in re.findall(r"(--[a-z][a-z-]{1,})", _text) if f not in _have]
     # EVERY string constant, via the AST — not a double-quote regex. The identical
     # string in SINGLE quotes passed, and wf-conform alone holds ~291 constants, so
     # that was a live gap rather than a theoretical one.
@@ -6360,13 +6505,11 @@ for _s in ("wf-checkrun", "wf-conform", "wf-census", "wf-context", "wf-remainder
                 # a real lie hide there — proven: `[--execute]` added to the synopsis
                 # passed, while the identical string in a print() failed.
                 _tail = _doc.split("Usage", 1)[1] if "Usage" in _doc else ""
-                for _f in re.findall(r"(--[a-z][a-z-]{1,})", _tail):
-                    if _f not in _have:
-                        _flag_lies.append(f"{_s}: {_f} in the Usage synopsis")
+                for _f in _flag_lies_in(_tail):
+                    _flag_lies.append(f"{_s}: {_f} in the Usage synopsis")
                 continue
-            for _f in re.findall(r"(--[a-z][a-z-]{1,})", _n.value):
-                if _f not in _have:
-                    _flag_lies.append(f"{_s}: {_f} in {_n.value[:44]!r}")
+            for _f in _flag_lies_in(_n.value):
+                _flag_lies.append(f"{_s}: {_f} in {_n.value[:44]!r}")
     except SyntaxError:
         _flag_lies.append(f"{_s}: could not parse")
 check(

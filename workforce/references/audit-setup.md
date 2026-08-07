@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 56 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -787,7 +787,24 @@ self-modification classifier sits **above** `permissions.allow` and can refuse t
 what that file grants. MEASURED in a real run 2026-08-06: an agent already holding
 `Edit(<project>/**)` — a grant that covers the settings file exactly — had the write refused
 anyway, and escalating to the classifier's own allow-list was refused as the same category.
-**The block sits above the permissions layer**, so the response is not the ordinary one:
+Reproduced a second time 2026-08-06 (run `audit-20260807T002052Z`): the additive write below was
+blocked verbatim as *"denied by the Claude Code auto mode classifier … Blocked by classifier."* **The
+block sits above the permissions layer**, so the response is not the ordinary one.
+
+**Step 0.8 makes TWO distinct writes to the settings file, and a refusal must name which one it is —
+they have different resumable remedies and conflating them hands the reader a command that reports
+success without delivering the capability.**
+
+| write | what it does | who performs it | resumable remedy on refusal |
+|---|---|---|---|
+| **the REPAIR** | removes dead `Write(path)` grants that match nothing | `wf-permissions --root <project> --apply` (a shipped script) | re-run that exact command (§ *So this step RUNS the repair*) |
+| **the ADDITION** | adds the `Agent`, scoped `Bash(...)`, and MCP grants the designed org needs (steps 2–3c) | **the run itself, editing JSON — no shipped script performs it** | emit the exact grant lines to add, per the block below |
+
+**Re-running `wf-permissions --apply` is NOT the remedy for a refused ADDITION.** The repair exits 0
+having removed zero dead grants, so a reader handed it sees a clean line and concludes the block is
+cleared — while every `Bash(...)` the org needs is still absent. That is a remedy that reports success
+without delivering the capability, which is this project's named signature failure. The two writes are
+therefore handed over separately below.
 
 1. **A permission rule cannot lift it**, so do not reach for one. Do not add a grant, do not
    widen one, and do not re-run `wf-permissions` expecting a different result: the broad
@@ -798,13 +815,20 @@ anyway, and escalating to the classifier's own allow-list was refused as the sam
    itself refused as self-modification, so the run cannot clear its own block. **The only
    resolution is a human running the write**, and the run's remaining job is to hand that human
    the exact command.
-3. **STOP and hand over the operator command — never route around the refusal.** Never a heredoc,
-   an alternate tool, or a retry loop: routing around a self-modification refusal defeats its
-   intent rather than satisfying the task, and a run that reaches for one has turned the audit
-   into the thing the classifier exists to stop. Print the resumable command for the human to run
-   — the very same `wf-permissions --apply` invocation this step runs above (§ *So this step RUNS
-   the repair*), quoted there once and not re-emitted here — then name `/workforce verify` as the
-   confirmation once the human has run it.
+3. **STOP and hand over the resumable remedy for the refused write — never route around the refusal.**
+   Never a heredoc, an alternate tool, or a retry loop: routing around a self-modification
+   refusal defeats its intent rather than satisfying the task, and a run that reaches for one has
+   turned the audit into the thing the classifier exists to stop. **Hand over the remedy that
+   actually performs the refused write, chosen by which of the two writes it was:**
+   - **REPAIR refused** → print the `wf-permissions --root <project> --apply` invocation this step
+     runs above (§ *So this step RUNS the repair*) for the human to run.
+   - **ADDITION refused** → no shipped script performs it, so re-quoting the repair command clears
+     nothing. Instead emit the **exact grant lines the run computed at steps 2–3c** — each scoped
+     (`Bash(./bin/check:*)`, never bare `Bash` — rule 3b), the resolved settings file named, and the
+     matching `.settings-owned.json` ownership entries — as a copy-paste block the human applies. That
+     block IS the resumable remedy: applying it performs the write the classifier blocked.
+
+   Then name `/workforce verify` as the confirmation once the human has applied the remedy.
 
 **This is a reported, resumable outcome, not a failed run.** It is reported last with the other
 permission findings, in the block below, as `REFUSED-ABOVE-PERMISSIONS` with the operator command
@@ -824,10 +848,18 @@ and the model rewrite write `.claude/agents/**` frontmatter (`procedures/audit.m
 A refusal at any of them is reported with its own resumable operator command and never routed
 around — the command differs, the response does not.
 
-**No change to `wf-permissions` fixes this.** The script does its whole job the instant the write
-is allowed; the refusal is above it, so there is nothing for the program to catch or retry.
+**No change to `wf-permissions` fixes the REPAIR refusal.** The script does its whole job the instant
+the write is allowed; the refusal is above it, so there is nothing for the program to catch or retry.
 Treating a refusal above the permissions layer as a script bug would send `script-author` chasing
 a defect that is not in the file.
+
+**The ADDITION has no shipped producer at all — the run edits the JSON itself — so its remedy today is
+the emitted copy-paste block, and that is what makes clause 3 stand on its own.** A producer *could* be
+built (an additive mode taking the computed grant set and writing it plus the sidecar), which would
+reduce the human's step from pasting rules to running one command; it would not remove the human,
+because the same classifier sits above that producer too. Building it is `script-author`/`runtime-lead`
+work, not doctrine's, and clause 3 does not depend on it: the emitted block performs the write with or
+without such a script.
 
 ### Where it is reported — last, and this is the directive
 
@@ -837,13 +869,13 @@ the findings.** Not a question, not a mid-run stop, not an interleaved warning.
 ```
 PERMISSIONS  .claude/settings.local.json          ← resolved, not assumed
   + Agent                    added
-  + Bash                     added
+  + Bash(./bin/check:*)      added          ← scoped, never bare `Bash` (rule 3b)
   · Read                     already present
   ! Bash(rm:*) in deny       CONFLICT — left as-is; `records-ledger` verification may prompt
-  2 added · 1 present · 1 conflict · 0 removed    ← always all five, including the zeroes
+  2 added · 1 present · 1 conflict · 0 removed    ← always all four, including the zeroes
 ```
 
-**All five counts, always, including the zeros** — `0 added` is a measurement that the org's needs were
+**All four counts, always, including the zeros** — `0 added` is a measurement that the org's needs were
 already met; silence is not (`invariants.md`). **`0 removed` is printed on every run** because it is the
 guarantee the second directive asks for, and a guarantee nobody prints is a guarantee nobody can check.
 

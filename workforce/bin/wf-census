@@ -688,10 +688,16 @@ def main():
 
     if not args.quiet:
         ag = s["agents"]
-        print(f"  skills      {s['skills']['count']} installed")
+        # THE TITLE LINE FIRST, and every body row under it. A row printed above the
+        # header names no tree: `skills 4 installed` with the root on the NEXT line
+        # reads as a count of something the reader has not been told the scope of.
+        # Introduced by appending a row at the wrong offset (26ec383) and invisible in
+        # a diff, because both lines are correct in isolation and only their ORDER is
+        # wrong — the class of defect a fixture catches and a review does not.
+        print(f"wf-census — {s['root']}")
         # Always all counts, including the zeroes. A zero is a measurement;
         # silence is not.
-        print(f"wf-census — {s['root']}")
+        print(f"  skills      {s['skills']['count']} installed")
         print(
             f"  agents      {ag['project']} project · {ag['personal']} personal · "
             f"{ag['in_skill']} in-skill · {ag['symlinks']} symlinks · {ag['dangling']} dangling"

@@ -185,9 +185,21 @@ later that session and returned their measurements (`measurements/2026-07-29-mcp
 observation is not merely that a new definition gets *listed* — it becomes **usable**, on a delay,
 without a restart. This is the direct evidence the retracted "restart required" claim never had.
 
-**Scope it honestly: this measures ADDING a definition, not editing one.** All four fixtures were new
-files. Whether an *edit* to an already-registered agent is picked up in-session — and on what delay — is
-unmeasured. `wf-reload-probe` is the fixture to settle it with: change its returned string and spawn it.
+**ADDING a definition was measured first; EDITING one now is too — and it reloads the same way.** The
+four original fixtures were new files, so the add case was all fact 3 first covered. The edit case was
+settled this run with the instrument fact 3 named — `wf-reload-probe`: its returned string was changed
+and the fixture spawned twice. At ~0s (same assistant turn) it returned the OLD body; 13m07s later,
+several turn boundaries on, it returned the NEW one. **So an edit to an already-registered definition IS
+picked up in-session, on a delay, with no restart — the same shape as the add case.** Evidence:
+`measurements/2026-08-06-edit-reload.md`.
+
+Scope it as honestly as the result. **The trigger is still undetermined** — elapsed time and turn
+boundaries moved together across the two attempts, the same ambiguity the add case carries below — and
+**13m07s is not a latency**, only when the second attempt happened to be made. **The measurement is a
+body-text edit ONLY:** a changed `model:`, `tools:`, or `disallowedTools:` is not covered and remains
+unmeasured, which matters because the tier ceiling rests on `disallowedTools:` — so whether an *amended*
+ceiling takes effect in-session is a separate open branch, and one `wf-reload-probe` cannot settle,
+since settling it means editing frontmatter rather than body text.
 
 **So the trigger is still undetermined — but one candidate is now ahead.** What the two runs differ in
 is not duration: the 3m06s run crossed a **user-turn boundary** (the availability notice arrived as a

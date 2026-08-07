@@ -3,6 +3,8 @@
 
     wf-apply --root <tree>              DISPLAY: print the exact edit, change nothing
     wf-apply --root <tree> --execute    apply every AUTO pass, reversal written first
+    wf-apply --root <tree> --record-canary …    write `platform-local.md` from the
+                                        measured canary results (display by default)
 
 WHY THIS EXISTS, and it is a user directive (references/passes.md § Directives):
 
@@ -38,12 +40,26 @@ applies to every write it makes.
 
 REPORT PASSES ARE PRINTED, NEVER APPLIED, and their measured reason is printed with
 them. A pass that declines to auto-apply owes the reader the number.
+
+WHY THE CANARY RECORDER LIVES HERE, and not in a script of its own. PASS-STALE-CANARY
+already refuses to sweep a throwaway canary until `.claude/workforce/platform-local.md`
+records the measurement — this script is the file's only reader in the distribution.
+It had no writer anywhere: `audit.md` Step 6a and `verify.md` both instruct a run to
+WRITE that file on a canary PASS, and no script or step produced it, so it was
+hand-composed or silently skipped. Measured 2026-08-06 on this repository: a run
+recorded `INV-CANARY … PASS` in `org-config.md` and wrote no `platform-local.md` at
+all, which forces every future run to re-measure a host that was already measured.
+The sweep and the record are the same fact, and splitting them is how the record went
+unwritten. `--record-canary` is that missing producer, under this script's own consent
+model — display prints the exact bytes, `--execute` writes them.
 """
 
+import datetime
 import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 sys.dont_write_bytecode = True
@@ -354,10 +370,230 @@ PASSES = [
 ]
 
 
+# ── the canary recorder ──────────────────────────────────────────────────────
+# THE PRODUCER FOR A FILE THAT HAD ONLY CONSUMERS. `staging.md` § The three outcomes,
+# `passes.md` § PASS-STALE-CANARY, `platform.md` § levels and `audit.md` Step 4b all
+# READ `.claude/workforce/platform-local.md`; four documents told a run to write it and
+# nothing did. Every field below comes from an argument the canary returned or from
+# running `claude --version` — nothing here is composed, and a field that cannot be
+# obtained is exit 2 rather than a plausible default.
+LOCAL_REL = os.path.join(".claude", "workforce", "platform-local.md")
+
+C_ASSERTIONS = {
+    "c1": "three-link chain A → B → C spawned from the main conversation; the deepest "
+          "link lacks `Agent` and every link above it has it",
+    "c2": "an agent listing `Agent` in **both** `tools:` and `disallowedTools:` does "
+          "not receive it",
+}
+
+
+def _opt(argv, name):
+    """Value of `--name V`. LAST occurrence wins, as argparse does.
+
+    Returns None when absent and "" when the flag is present but unbound (`--c1`
+    with nothing after it, or followed by another flag). Those two are different
+    errors and the caller reports them differently — a flag written and left empty
+    is the shape that produced `--root ""` in the first place.
+    """
+    val = None
+    for i, tok in enumerate(argv):
+        if tok == name:
+            nxt = argv[i + 1] if i + 1 < len(argv) else None
+            val = "" if nxt is None or nxt.startswith("--") else nxt
+    return val
+
+
+def _split_result(raw):
+    """`PASS: evidence` → ("PASS", "evidence"). Anything else is unreadable.
+
+    The RESULT is not inferred from the evidence text: `agent-withheld` reads like a
+    pass and `C=has-agent` reads like a failure, and neither is this script's call to
+    make. The canary returns its verdict; this records it.
+    """
+    result, _, evidence = (raw or "").partition(":")
+    result = result.strip().upper()
+    if result not in ("PASS", "FAIL") or not evidence.strip():
+        return None, None
+    return result, evidence.strip()
+
+
+def measured_on(supplied):
+    """The running harness version. MEASURED, never asserted (Principle 13).
+
+    `--measured-on` exists because `claude` is not on PATH in every context a
+    procedure runs in (a CI, a hook, a container), and refusing to record a
+    measurement that was genuinely taken would be worse than accepting it. It is not
+    a hole: `wf-conform` reconciles this line against the harness version the same
+    run recorded in `org-config.md`, so a supplied value that does not match the run
+    that took it is a FAILED check on the next verify, not a quiet fiction.
+    """
+    if supplied:
+        return supplied.strip(), "supplied by the caller"
+    try:
+        out = subprocess.run(["claude", "--version"], capture_output=True, text=True,
+                             timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"`claude --version` could not be run ({exc.__class__.__name__})"
+    if out.returncode != 0:
+        return None, f"`claude --version` exited {out.returncode}"
+    m = re.search(r"([0-9]+(?:\.[0-9A-Za-z]+)+)", out.stdout or "")
+    if not m:
+        return None, f"`claude --version` printed no version: {(out.stdout or '').strip()[:60]!r}"
+    return m.group(1), "`claude --version`"
+
+
+def render_local(version, tier_limit, by, c1, c2, today):
+    """The exact bytes. Deterministic in every field except the date."""
+    def row(cid, result, evidence):
+        # `|` inside a cell ends the cell. The evidence is returned verbatim by a
+        # canary and routinely contains one (`A=has-agent | B=has-agent`), so it is
+        # escaped rather than trusted to be table-safe.
+        return (f"| {cid.upper()} | {C_ASSERTIONS[cid]} | **{result}** | "
+                f"`{evidence.replace('|', chr(92) + '|')}` |")
+
+    return f"""# platform-local — measured on THIS host
+
+MEASURED-ON:  Claude Code {version}
+MEASURED-AT:  {today}
+MEASURED-BY:  {by}
+TIER-LIMIT:   {tier_limit}
+
+**This file is the durable record of a canary that passed.** `references/procedures/audit.md`
+§ Step 4b reads it and returns `PASS (on record)` — skipping the spawn entirely — when its
+`MEASURED-ON` matches the running harness. Without it a canary can pass on every run forever and
+the next run still has to re-measure: a fact measured and not written down is a fact this project
+does not have.
+
+**It does not replace `references/platform.md`.** That file is the shipped baseline and carries the
+maintainer's stamp for the whole fact table. This one is local, is never shipped, and covers only
+the assertions the canary actually ran.
+
+**Written by `wf-apply --record-canary --execute`, never by hand.** Every field above came from an
+argument the canary returned or from running `claude --version`. A hand-composed record is a claim,
+and this project's rule is that platform behaviour is measured and never asserted.
+
+## Assertions run this run
+
+| ID | Assertion | Result | Evidence |
+|---|---|---|---|
+{row('c1', *c1)}
+{row('c2', *c2)}
+
+**C2 is the load-bearing one.** Every IC's tier ceiling rests on `disallowedTools:`, not on depth,
+because entry depth is not controllable (`platform.md` fact 2b). C1 gives the org's maximum shape;
+C2 says the shape holds when someone invokes a Lead directly.
+
+## What this does NOT cover
+
+The canary measures these two assertions and nothing else. Every other MEASURED fact keeps
+`references/platform.md`'s own stamp and its own staleness (`platform.md` § Staleness), so a run
+that reads `PASS (on record)` here has the tier ceiling verified and has re-measured nothing else.
+"""
+
+
+def record_canary(root, argv, execute):
+    """Write `platform-local.md` from the measured canary inputs. Exit code."""
+    missing = [f for f in ("--tier-limit", "--c1", "--c2", "--by")
+               if not (_opt(argv, f) or "").strip()]
+    if missing:
+        print(f"wf-apply --record-canary: missing or empty {', '.join(missing)}. "
+              "Every field is a measurement; none has a default, because a default "
+              "here is the hand-composed record this producer exists to replace.",
+              file=sys.stderr)
+        return 2
+
+    tier_raw = _opt(argv, "--tier-limit").strip()
+    if not tier_raw.isdigit() or int(tier_raw) < 1:
+        print(f"wf-apply --record-canary: --tier-limit {tier_raw!r} is not a positive "
+              "integer — C1 measures a depth and a depth is a number", file=sys.stderr)
+        return 2
+
+    results = {}
+    for flag, cid in (("--c1", "c1"), ("--c2", "c2")):
+        result, evidence = _split_result(_opt(argv, flag))
+        if result is None:
+            print(f"wf-apply --record-canary: {flag} must read `PASS: <evidence>` or "
+                  f"`FAIL: <evidence>` — got {_opt(argv, flag)!r}. The verdict is the "
+                  "canary's and is never inferred from the evidence text",
+                  file=sys.stderr)
+            return 2
+        results[cid] = (result, evidence)
+
+    # A FAIL IS NOT A RECORD OF A MEASUREMENT THAT PASSED. `staging.md` § The three
+    # outcomes: a canary FAIL aborts before any registration, because the host's
+    # delegation semantics differ from the design's. Writing the durable
+    # "canary that passed" file on that result would make Step 4b return
+    # `PASS (on record)` for a host that measurably failed.
+    failed = [cid.upper() for cid, (r, _e) in sorted(results.items()) if r == "FAIL"]
+    if failed:
+        print(f"wf-apply --record-canary: refusing to record — {', '.join(failed)} "
+              "FAIL. A canary that did not hold aborts registration (staging.md § The "
+              "three outcomes); it is not a record of a measurement that passed.",
+              file=sys.stderr)
+        return 2
+
+    version, source = measured_on(_opt(argv, "--measured-on"))
+    if version is None:
+        print(f"wf-apply --record-canary: MEASURED-ON could not be measured — {source}. "
+              "Pass --measured-on with the version this run actually observed; this "
+              "file never asserts a harness version nobody read.", file=sys.stderr)
+        return 2
+
+    body = render_local(version, tier_raw, _opt(argv, "--by").strip(),
+                        results["c1"], results["c2"],
+                        datetime.date.today().isoformat())
+    path = os.path.join(root, LOCAL_REL)
+
+    if not execute:
+        print(f"canary-record      would write {LOCAL_REL} · TIER-LIMIT {tier_raw} · "
+              f"C1 PASS · C2 PASS · MEASURED-ON from {source}")
+        print(f"  ~ {LOCAL_REL}  the exact bytes follow")
+        print("  " + "─" * 68)
+        for line in body.splitlines():
+            print(f"  | {line}")
+        print("  " + "─" * 68)
+        print("  write with: --execute")
+        return 0
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body)
+    # RE-READ WHAT LANDED. The whole defect this closes is a write that was believed
+    # and never made, so the confirmation quotes the file on disk rather than the
+    # string that was passed to write().
+    back = read(path)
+    stamp = next((l for l in back.splitlines() if l.startswith("MEASURED-ON:")), "")
+    print(f"canary-record      wrote {LOCAL_REL} · {len(back.encode('utf-8'))} bytes · "
+          f"TIER-LIMIT {tier_raw} · C1 PASS · C2 PASS")
+    print(f"  verified on disk: {stamp}")
+    return 0
+
+
 def main(argv):
-    root, execute = ".", "--execute" in argv
-    if len(argv) >= 3 and argv[1] == "--root":
-        root = argv[2]
+    execute = "--execute" in argv
+    root = _opt(argv, "--root")
+    if root is None:
+        root = "."
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so an
+    # is-it-a-directory guard passes and the tool operates on a tree nobody named.
+    # THIS SCRIPT WRITES AND DELETES, so the consequence is worse here than in the
+    # readers that already carry this guard: `--root ""` with `--execute` would sweep
+    # canaries and rewrite settings under whatever directory the process started in.
+    if not (root or "").strip():
+        print("wf-apply: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
+    if not os.path.isdir(root):
+        print(f"wf-apply: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    if "--record-canary" in argv:
+        return record_canary(root, argv, execute)
+
     applied = reported = refused = 0
 
     for p in PASSES:

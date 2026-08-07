@@ -113,6 +113,7 @@ DAU  = ".claude/agents/doctrine-author.md"
 CEN2 = "workforce/bin/wf-census"
 EVL  = "workforce/references/evaluators.md"
 ADDT = "workforce/references/evaluator-additions/text-tells.md"
+PTL  = "workforce/references/personnel-templates.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -131,6 +132,13 @@ CASES = [
      EVL, "del", "`references/evaluator-additions/text-tells.md`"),
     ("additions: manifest states the authored-vs-vendored distinction where it ships them",
      MAN, "del", "AUTHORED HERE, NOT VENDORED"),
+    # ── the source-tree executable bit (2026-08-07) ──────────────────────────
+    # A mode assertion cannot be broken with a chmod here — the disposable copy has
+    # no .git and copytree preserves the source bits — so break the INPUT instead:
+    # flag a shipped, non-executable file `exec` and the check must catch that it is
+    # not +x. workforce/SKILL.md exists in every copy and is a plain .md.
+    ("shipped files: every `exec`/`hook` path is executable in the source tree",
+     MAN, "append", "\nexec workforce/SKILL.md\n"),
     ("wf-checkrun ships no executing path",
      CKR, "append", "\n# --run\nimport subprocess\n"),
     ("wf-checkrun states WHY the executing path is absent",
@@ -212,6 +220,8 @@ CASES = [
      VFY, "append", "\nwhether a `## Verification` check is *real* or decoration\n"),
     ("the IC template ships the declared runnable form",
      TPL, "del", "- Check: `<exact command>`"),
+    ("handbook-templates: a scope line naming a directory names the employee that owns it",
+     TPL, "del", "Write the owner into the line"),
     ("conversion-taxonomy forbids splitting a run across sessions",
      CT, "del", "a run is never split across sessions, and no gate may defer one"),
     ("conversion-taxonomy states the backup is what makes the batch safe",
@@ -241,7 +251,34 @@ CASES = [
     # bare phrase "never route around the refusal" also appears only inside it, so this
     # payload cannot hit a decoy.
     ("permissions: a write refused above the permissions layer is reported, not routed around",
-     ASU, "del", "STOP and hand over the operator command — never route around the refusal."),
+     ASU, "del", "STOP and hand over the resumable remedy for the refused write — never route around the refusal."),
+    # The refusal section conflated Step 0.8's two writes (REPAIR vs ADDITION) and clause 3
+    # re-quoted the repair command as the remedy for a refused ADDITION — a command that
+    # exits 0 having removed zero dead grants while every org Bash(...) grant stays absent.
+    # Deleting the two-writes header drops the distinction the check requires.
+    ("permissions: the refusal section distinguishes the REPAIR write from the ADDITION write",
+     ASU, "del", "Step 0.8 makes TWO distinct writes to the settings file"),
+    # ORG had nine consumers filing an ORG record and no template — deleting the section
+    # heading makes ORG a type in the table with no `## <TYPE>` section, firing the check.
+    ("personnel-templates: every record type in the type table has a template section",
+     PTL, "del", "## ORG — structural decision"),
+    # The layout block once contradicted § Schema on flat-vs-subdirectories.
+    ("personnel-templates: the record layout is flat, not subdivided",
+     PTL, "del", "The layout is flat"),
+    # Drop one ·-field from the sample line so "all four" no longer matches its own
+    # field count — the same shape as the "all five" beside four fields that shipped.
+    ("references: an 'all N' count claim matches the ·-separated fields on its own line",
+     ASU, "del", " · 0 removed"),
+    # A probe task that mutates the shipped tree is single-use, but rule 6 re-opens the gate.
+    ("staging: a probe task must be re-runnable, because rule 6 re-opens the gate",
+     STG, "del", "A probe task must be RE-RUNNABLE"),
+    # The procedures instructed a hand-write of platform-local.md; a run following them
+    # never called the producer wf-apply --record-canary. Deleting the producer's own
+    # output line drops the conjunct the wiring check requires.
+    ("audit wires the canary PASS to wf-apply --record-canary, not a hand-write",
+     AUD, "del", "verified on disk:"),
+    ("verify prints the wf-apply --record-canary command, with the absolute-path hazard",
+     VFY, "del", "--record-canary"),
     ("the settings sidecar can express a removal, not only an addition",
      ENF, "del", '"env_removed"'),
     ("disband restores env_removed with its prior value",
