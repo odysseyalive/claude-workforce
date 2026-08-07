@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 89 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 93 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1092,6 +1092,33 @@ precondition here refuses — and refusing is the gate working — everything ab
 not be discarded to retry one step. `procedures/sweep.md` re-asserts every precondition against the
 tree as it stands *then*, and finishes the one act. Queue `DEF-Q` rows against `/workforce sweep`.
 
+**BLOCKING — that sentence begins "when a precondition here refuses", and a row may be written for no
+other reason.** A `DEF-Q` row naming `/workforce sweep` carries **the precondition that must change
+first**, in the cell, or it is malformed: this command's own gates and that command's are the same
+gates, so a row with nothing to change names a re-run that will refuse identically
+(`references/deferred.md` § Location and shape — *a row may never be discharged by re-running the
+command that wrote it*, whose measured note lists `/workforce sweep` by name among five malformed
+dischargers). **IF every
+precondition below passes, there is no row to write — there is a deletion to perform**, and this step
+performs it.
+
+**And the ask that started this run does not scope what it must finish** — the ask scopes what a run
+STARTS (`references/invariants.md` § When they are computed). A run invoked for a subset — "the
+conversions and the evacuation" — that reaches this step with a marked target has *created* the
+intermediate state, and finishing it is inside the ask that created it. **"You asked for something
+narrower" is not a precondition and never becomes one.**
+
+**Print `INV-SWEPT  staged N · removed N · refused N · K uncited refusals`** (`invariants.md` row 20,
+specified at `procedures/sweep.md` § Reporting). It is owed on **every** run that reaches this step,
+including the ones that delete nothing, and **`K > 0` is `NOT UPHELD` — which is a failure to repair in
+this run, never a legitimate exit.**
+
+*Added 2026-08-07. This step was gated at both ends and counted at neither: row 19 proved the removal
+set got written, the preconditions below proved a deletion would be safe, and **nothing counted whether
+one happened.** Measured that day — a run staged the superseded generator, hashed its undo, wrote "the
+sweep is now unblocked", and stopped, citing the invocation's wording. Every invariant it printed was
+UPHELD.*
+
 **The removal set is every COMMITTED `T7c` row and nothing else** (`procedures/hire.md` § The journal).
 A conversion wrote one only if its remainder came out empty (T7c); a removal target got one from
 Step 6-S. Nothing has been unlinked. This step does it, once, after the whole org has verified.
@@ -1291,6 +1318,16 @@ past every gate in prose.
 it is not a host limit, so it is DISCHARGED or it is DECIDED. "That's your call", "proposed, not
 hired", "left to the user", and any section titled *what I did not do* are **none of the three**, and a
 report containing one is corrected before it is printed.
+
+**AND IT NEED NOT BE A SECTION.** *"The sweep is now unblocked but I did not run it — it's a separate
+gesture and you asked for X"* is a closing sentence, phrased as a status note, naming a command for the
+user to type. It carries no heading for the rule above to catch and it is the same act. **IF this report
+is about to name a command for the user to run → STOP and run it**, unless a precondition refused, a
+row is `NOT UPHELD`, or this is `--review`. The ask scopes what a run STARTS, never what it finishes
+(`references/invariants.md` § When they are computed). Where the named command is `/workforce sweep`,
+`INV-SWEPT` is the number that makes the difference visible instead of readable.
+
+*Added 2026-08-07. The section rule was written against a heading, and the next run wrote a paragraph.*
 
 *The user's own words on being handed that report: **"'Two things I did not do' is a 'deferred' action
 which I explicitly told you to optimize and find solutions for automatically without user input."** The

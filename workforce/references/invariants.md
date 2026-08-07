@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Nineteen, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -53,7 +53,9 @@ Counting a backlog correctly is not the same as being allowed to have one. "Clos
 stops describing the runs it governs, and the rule that matters is the pairing, not the count. Rows
 11, 12, and 13 were each added with their line, their owner, and their `bin/check` assertion in one
 change. **Row 19 landed 2026-08-06 and is the first row added for a reader with no writer** rather than
-for a run that stopped: the removal set was enumerated by two commands and produced by none.)*
+for a run that stopped: the removal set was enumerated by two commands and produced by none. **Row 20
+landed 2026-08-07 and is row 19's other half** — the writer was built and nothing counted whether the
+set it wrote was ever emptied.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -76,6 +78,21 @@ for a run that stopped: the removal set was enumerated by two commands and produ
 | 17 | every deferred row **and every proposal in the closing report** was classified, and every refusal cited a shipped rule | `INV-CLOSE` | references/procedures/discharge.md |
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
+| 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
+
+**Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
+removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run
+could print `INV-STAGED  dispositioned 1 · staged 1 · marked 1` — fully UPHELD, the arithmetic exact,
+the hashed undo on disk — then delete nothing, and close with every invariant passing.
+
+**MEASURED 2026-08-07.** A run reduced 24 skills, relocated 48 of 48 `CLAUDE.md` lines and deleted the
+file, staged the superseded generator with its `.orig`, reported *"the sweep is now unblocked"* — and
+closed: *"but I did not run it — it's a separate gesture and you asked for conversions and
+evacuation."* **No gate had refused.** Under this row that run prints
+`INV-SWEPT  staged 1 · removed 0 · refused 1 · 1 uncited` and is `NOT UPHELD`; what it printed instead
+was no number at all, because none was owed. **`0 uncited refusals` is the figure that matters here for
+the same reason it is in row 17** — a refusal naming no precondition is a run that stopped wearing a
+gate's clothes, and it is indistinguishable from a gate holding until something counts it.
 
 **Row 19 is the producer check for the only destructive command, and it exists because the removal set
 had a reader and no writer.** `sweep.md` § Procedure derives it from the journal; `conversion-taxonomy.md`
@@ -146,6 +163,7 @@ Run Invariants
   INV-CLOSE       6 candidates · 4 discharged · 2 decided · 0 queued · 0 uncited refusals
   INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
   INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined
+  INV-SWEPT       staged 1 · removed 1 · refused 0 · 0 uncited refusals
   …every remaining row, always all of them…
 ```
 
@@ -173,6 +191,24 @@ permitted. A whole batch refused by no rule is a deferred RUN, which is not.
 stopped there" and told the user to start a new session. Not one of the 40 carried a refusing rule. The
 paragraph above already called that "not a plan" and the run printed it anyway — because saying a state
 is wrong is not the same as forbidding the exit that reaches it.*
+
+**AND THE ASK THAT STARTED A RUN DOES NOT SCOPE WHAT IT MUST FINISH.** A run may legitimately be asked
+for a subset of a command — *"do the conversions and the evacuation"* — and that scopes what it
+**starts**. It never scopes what it **finishes**: once a step has left the tree in an intermediate state
+— a staged removal, a two-paths-live conversion, a relocation whose old home still stands — completing
+that step is inside the ask that created it, and the user's phrasing is **not a rule that refuses**.
+**IF a run is about to close by naming a command for the user to type → STOP and type it.**
+
+Exactly three things may leave a staged act undone, and there is no fourth: **a named precondition, a
+`NOT UPHELD` row, or `--review`.** *"It is a separate gesture"* is none of them —
+`procedures/sweep.md` § Why there is no `--execute` governs what may **start** the standalone command
+and says nothing about a run that has already staged the deletion itself.
+
+*Added 2026-08-07, from the run measured at row 20. This is the sixth side of the defect rows 14–17,
+19, and 20 exist for, and it is the one that gets in underneath all of them: every earlier form
+invented a reason at close, and this one cited the **user's own sentence** as the reason. That is not
+reachable by tightening what counts as a rule, because the words were really said. What forbids it is
+the distinction between starting and finishing, and nothing had drawn it.*
 
 ---
 

@@ -1,6 +1,6 @@
 # sweep — complete a deferred deletion, and nothing else
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive, and it executes on invocation.** Typing the command is the consent — the same rule
 `audit` runs on, for the same reason. `--review` is the zero-write escape.
 
@@ -8,6 +8,18 @@
 and no command, hook, or dispatch starts this one. Consent-on-invocation and auto-firing are different
 claims: nothing but a human typing `/workforce sweep` begins a sweep, and when a human has typed it the
 run does the work.
+
+**READ THAT AS A RULE ABOUT WHAT MAY START THIS COMMAND, AND AS NOTHING ELSE.** It says a hook may not
+fire a deletion. **It does not say a run that has already staged one may leave it staged**, and citing
+*"the sweep is a separate gesture"* as the reason a marked target survived a run is citing this
+paragraph for a claim it does not make. `audit` Step 6c **is** the deletion, authorized by the `audit`
+invocation; this command exists for when a **gate there refused**, never for when the run did.
+`INV-SWEPT` (`references/invariants.md` row 20) is what makes the difference countable: a surviving
+target names the precondition that refused it, or the run is `NOT UPHELD`.
+
+*Added 2026-08-07, measured the same day. A run staged the superseded generator, hashed its undo,
+printed "the sweep is now unblocked", and closed by handing the user the command — quoting the sentence
+above as its authority. The sentence was written to stop a hook and it stopped a run.*
 
 `/workforce sweep [--review]`
 
@@ -194,12 +206,30 @@ SWEEP   run wf-20260803-151600 · 1 target · 1 removed · 0 refused · 0 skippe
         · protect-directives.sh            relocated -> .claude/workforce/maintainers/, registration rewritten
         · unique-persona.sh                relocated -> .claude/workforce/maintainers/, registration rewritten
         INV-DIRECTIVES  37 of 37 · INV-EMBEDDED 12 of 12 · INV-HOOKS 0 dead wiring
+        INV-SWEPT       staged 1 · removed 1 · refused 0 · 0 uncited refusals
         discharged: DEF-Q-004, DEF-Q-005
 ```
 
 **A refusal is a first-class outcome and prints its reason.** `0 removed · 1 refused` is a successful
 run of this command — it means a gate held, which is the behavior that makes forced succession safe in
 the first place.
+
+**`INV-SWEPT` is what separates that from a run that simply did not delete**, and it is owed by **both**
+entry points — this command and `audit` Step 6c — because the removal set is the same set and a run that
+stages one owes an account of it either way. Three counts and a citation check:
+
+| Cell | What it counts |
+|---|---|
+| `staged N` | COMMITTED `T7c` rows, the same set step 3 derives — never re-eyeballed here |
+| `removed N` | targets actually unlinked in this run |
+| `refused N` | targets that survived it |
+| `0 uncited refusals` | of those, how many name **no** precondition from step 4 |
+
+**Any uncited refusal is `NOT UPHELD`, and `NOT UPHELD` is a failure to repair in this run**
+(`references/invariants.md`). `staged 1 · removed 0 · refused 1` with the reason *"the user asked for
+something narrower"*, *"it is a separate gesture"*, or *"the sweep is now unblocked"* is one uncited
+refusal, not a gate holding. **A refusal is a precondition's name or it is not a refusal** — that is
+the same shape as `INV-CLOSE`'s uncited-refusal count, applied to the one act that deletes.
 
 ---
 

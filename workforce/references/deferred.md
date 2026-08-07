@@ -40,6 +40,23 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 | a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
 
+**BLOCKING — a host-limit row's attempt count is ≥ 1, and the attempt is of THIS row's own act.** A row
+reading `Attempts: 0 separately; blocked by the same refusal measured at <other row>` has inherited a
+verdict, and an inherited verdict is a **reading, not a measurement** — the identical rule `INV-SPAWN`
+(row 13) states about the spawn capability and `INV-CANARY` (row 16) about a DEGRADED tier ceiling.
+Two writes to one file are not one act: they differ in shape, in key, and in what a classifier sees.
+**Zero attempts → the row is malformed → attempt it.** The attempt is the cheap half; it either
+discharges the row or converts a plausible refusal into a measured one, and both outcomes beat a
+backlog resting on an analogy.
+
+*Added 2026-08-07, from this repository's own queue. `Q-2` — the three shipped hooks are wired in no
+settings scope — was categorised **measured host limit** on `Attempts: 0`, borrowed from `Q-1`'s
+permissions write. The consequence was live and not hypothetical: `wf-protect-directives`, the hook
+defending the user's first directive, and `wf-standing-request`, the sole carrier of the cold-reader
+request since the evacuation deleted `CLAUDE.md`, both sat unwired behind a refusal nobody had asked
+for. Every other rule on this page held — the category was real, the cell named a runnable command, the
+arithmetic balanced. **The row was well-formed in every respect except that its premise was untested.***
+
 **Two, and there used to be three.** *"A **user decision** this project has no standing to make"* was
 the third, and it is now the `DECIDED` outcome in `procedures/discharge.md` — put to the user as one
 consolidated prompt at the end of the run and acted on, never parked. The standing to make the decision

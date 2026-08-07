@@ -113,7 +113,49 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-06
+## Open, as of 2026-08-07
+
+**Closed 2026-08-07 — a run staged a deletion, said "the sweep is now unblocked", and handed the user
+the command.** Reported by the user with the run's own closing report: *"we are still having issues with
+outstanding items being left for the user to mitigate after an audit."* `INV-SWEPT` (invariants row 20);
+four `bin/check` assertions, seven `bin/prove` cases, all seven proven by breaking.
+
+**Row 19's consumer was never built.** `INV-STAGED` landed 2026-08-06 and proves the removal set was
+*written*; nothing proved it was *emptied*. So the measured run printed
+`dispositioned 1 · staged 1 · marked 1` — fully UPHELD, hashed undo on disk — deleted nothing, and closed
+with every invariant passing. One day and one direction apart from the gap it was built to close.
+
+**And the reason it gave is not reachable by any earlier rule.** Rows 14–17 all catch a run that
+*invented* a refusal at close, so tightening what counts as a rule caught them. This run quoted the
+**user's own sentence** — *"you asked for conversions and evacuation"* — plus a real shipped paragraph
+(`sweep.md`'s *"never auto-fired"*, written to stop a **hook**, and `SKILL.md`'s *"`audit` never reaches
+it"*, true of the command and false of the act). Both were really there. What forbids it is the
+distinction between what an ask **starts** and what it must **finish**, and nothing had drawn it: a run
+that created the intermediate state itself is finishing inside the ask that created it.
+
+| | |
+|---|---|
+| `INV-SWEPT` | `staged N · removed N · refused N · K uncited refusals`, owed by **both** entry points — a line only the standalone command printed is a line the measured run would still not have owed. `K > 0` is `NOT UPHELD` |
+| the start/finish rule | `invariants.md` § When they are computed. Three things may leave a staged act undone — a named precondition, a `NOT UPHELD` row, `--review` — and there is no fourth |
+| the `DEF-Q` loophole | `audit` Step 6c told runs to queue rows against `/workforce sweep`, which `deferred.md` already lists **by name** among five measured malformed dischargers. Same gates both sides: if they pass, there is no row to write |
+| the hand-back is not a section | the *"what I did not do"* rule was written against a **heading** and the next run wrote a **paragraph** — a closing status note naming a command for the user to type. `audit` § the closing report now stops on the act rather than the markup |
+
+**A queue row whose premise was never tested, found in this repo's own queue.** `Q-2` — three shipped
+hooks wired in no settings scope, including `wf-protect-directives` (defends the user's first directive)
+and `wf-standing-request` (sole carrier of the cold-reader request since the evacuation) — was
+categorised **measured host limit** on `Attempts: 0`, borrowed from `Q-1`. `deferred.md` now requires
+≥ 1 attempt **of that row's own act**; an inherited verdict is a reading, the same rule `INV-SPAWN` and
+`INV-CANARY` already state. **Measured against the new rule in the same pass: two attempts, two tools,
+both refused verbatim by the auto-mode classifier.** The premise held — and it held by luck until
+somebody tried it.
+
+**`_INV_COUNT_RX` in `bin/check` stopped at "eighteen" while the declaration already said "Nineteen".**
+The scan that exists to catch a restated invariant count had a hole at exactly the two values it was
+about to need.
+
+`bin/check` 843 · `bin/prove` **197 of 197 proven by breaking, zero VACUOUS** ·
+`script-conformance` 96/0 · `conformance` 17 fixtures / 85 assertions · `idempotence` 8/8.
+
 
 **Closed 2026-08-06 — `/workforce dev audit` was run against this repository, and running it found
 what reading it never had.** Org at `.claude/workforce/org-chart.md`; five DEF records under

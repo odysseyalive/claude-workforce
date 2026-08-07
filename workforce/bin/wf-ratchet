@@ -2,7 +2,8 @@
 """wf-ratchet — monotonic improvement across audit runs, without a count.
 
     wf-ratchet --root <tree>              compare findings to the baseline
-    wf-ratchet --root <tree> --capture    write the baseline from current findings
+    wf-ratchet --root <tree> --capture    write the baseline from current findings,
+                                          PRESERVING any hand-set `state` / `why`
 
 A ratchet permits motion one way. This one is keyed on FINDINGS, never on totals,
 because two integers cannot tell "fixed one, introduced one" from "nothing changed" —
@@ -97,9 +98,42 @@ def load_baseline(root):
     return known, [(m.group(1), m.group(2), m.group(3)) for m in ROW_RX.finditer(text)]
 
 
+def annotations(text):
+    """The `state` and `why` a human wrote into an existing baseline, keyed the same
+    way a finding is.
+
+    THE AFFORDANCE THE BASELINE DOCUMENTS HAD NO PRODUCER. Its own prose says "moving
+    one to ACCEPTED requires a `why` citing a shipped rule" — and `capture` hardcoded
+    every row `OPEN` with an empty `why`, so the next `--capture` destroyed the
+    annotation it told the reader to write. Consumer named, producer absent.
+
+    ONE PARSER, NOT TWO. `ROW_RX` already decides what a row is and where the key
+    ends; the annotation columns are the remainder of that same line, so this slices
+    from `m.end()` rather than adding a second regex that could disagree with the
+    first about which lines count. It also survives a row a hand-edit has truncated:
+    a stricter pattern that failed to match would silently discard the very
+    annotation this exists to preserve.
+    """
+    out = {}
+    for m in ROW_RX.finditer(text):
+        eol = text.find("\n", m.end())
+        cells = text[m.end():len(text) if eol == -1 else eol].split("|")
+        # verdict | state | why. The verdict is recomputed from this run's findings,
+        # so only the two columns a human owns are carried forward.
+        state = cells[1].strip() if len(cells) > 1 else ""
+        why = cells[2].strip() if len(cells) > 2 else ""
+        out[(m.group(1), m.group(2), m.group(3))] = (state or "OPEN", why)
+    return out
+
+
 def capture(root, found):
     path = os.path.join(root, BASELINE)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    # Read before write: the prior baseline is the only record of which findings a
+    # human ACCEPTED and why. A row whose finding has DISAPPEARED still drops out —
+    # the loop below iterates this run's findings, never the prior rows — so this
+    # preserves a judgment without resurrecting a fixed defect.
+    prior = annotations(read(path))
     lines = [
         "# Pass baseline",
         "",
@@ -108,13 +142,20 @@ def capture(root, found):
         "regression. Written by `wf-ratchet --capture`; a row is removed only by fixing the",
         "finding, and moving one to ACCEPTED requires a `why` citing a shipped rule.",
         "",
+        "`--capture` PRESERVES the `state` and `why` of any row still found, keyed on",
+        "(pass, artifact, locus); a new finding is written `OPEN` with an empty `why`, and a",
+        "row whose finding is gone is dropped. Edit those two columns here — nothing else,",
+        "because every other column is regenerated.",
+        "",
         "captured-passes: " + " ".join(KNOWN),
         "",
         "| pass | artifact | locus | verdict | state | why |",
         "|---|---|---|---|---|---|",
     ]
     for tok, art, loc, verdict in found:
-        lines.append(f"| `{tok}` | `{art}` | `{loc}` | {verdict} | OPEN | |")
+        state, why = prior.get((tok, art, loc), ("OPEN", ""))
+        lines.append(f"| `{tok}` | `{art}` | `{loc}` | {verdict} | {state} |"
+                     f"{' ' + why if why else ''} |")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     return path

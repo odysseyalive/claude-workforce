@@ -3231,6 +3231,34 @@ check(
     "'nothing got worse' and 'nothing was compared' are different results",
 )
 
+# THE BASELINE DOCUMENTED A STATE ITS OWN WRITER COULD NOT EXPRESS. The prose `capture`
+# emits says "a row is removed only by fixing the finding, and moving one to ACCEPTED
+# requires a `why` citing a shipped rule" — and every row was hardcoded
+# `f"... | {verdict} | OPEN | |"`, so the next `--capture` destroyed the annotation the
+# file had just instructed the reader to write. Consumer named, producer absent, in the
+# same forty lines. Fixed 2026-08-07.
+#
+# THE MECHANISM, NOT THE VOCABULARY. Asserting "PRESERV" matches the docstring and the
+# generated prose, both of which survive deleting the lookup — the same vacuity that
+# the INHERITED check above was proven to have on its first bin/prove run. This
+# fragment IS the preservation: without the `prior` lookup there is nothing to carry.
+check(
+    "ratchet: --capture preserves a hand-set state/why, and still drops a fixed finding",
+    "prior.get((tok, art, loc)" in _rat
+    and "prior = annotations(read(path))" in _rat
+    # Keyed on the finding, and built from the SAME parser that defines a row, so the
+    # key a row is stored under cannot drift from the key it is looked up by.
+    and "for m in ROW_RX.finditer(text)" in _rat
+    # Drop-out is structural: the writer iterates THIS run's findings, never the
+    # prior rows, so an ACCEPTED row whose defect was fixed cannot resurrect itself.
+    and "for tok, art, loc, verdict in found:" in _rat,
+    "an ACCEPTED verdict is the only place a human judgment about a finding lives, and "
+    "--capture runs on every live audit — so a hardcoded OPEN makes the affordance the "
+    "baseline documents unreachable, and silently reopens every accepted finding. The "
+    "reverse error is as bad: preserving rows instead of findings would keep a row "
+    "whose defect was fixed, which is a ratchet that no longer measures the tree",
+)
+
 # ── A detector ships with its fix (user directive, 2026-08-05) ───────────────
 # The catalog shipped six AUTO preconditions written and NONE implemented. Detection
 # was wired into audit, every finding was handed back, and the closing report named
@@ -3461,6 +3489,79 @@ check(
     "every proposal in the closing report" in _inv3,
     "the queue arithmetic can balance perfectly while the run defers in prose; the "
     "candidate count has to include what the run itself proposed",
+)
+
+# ── The sixth side: the run cited the USER'S OWN SENTENCE as its refusing rule ──
+# MEASURED 2026-08-07. A run reduced 24 skills, relocated 48 of 48 CLAUDE.md lines
+# and deleted the file, staged the superseded generator with its hashed undo, wrote
+# "the sweep is now unblocked" — and closed "but I did not run it — it's a separate
+# gesture and you asked for conversions and evacuation."
+#
+# Every invariant it printed was UPHELD, and correctly so: row 19 (INV-STAGED)
+# proves the removal set was WRITTEN, and nothing proved it was EMPTIED. Producer
+# built 2026-08-06, consumer never built — the same reader/writer gap, one day and
+# one direction apart.
+#
+# The rest of this project's anti-stopping rules do not reach it. Every earlier form
+# INVENTED a reason at close, so tightening what counts as a rule caught them; this
+# one quoted a sentence the user really said, plus a shipped paragraph
+# (sweep.md's "never auto-fired") that really exists. What forbids it is the
+# distinction between what an ask STARTS and what it must FINISH, and nothing had
+# drawn that line.
+_swp3 = read("workforce/references/procedures/sweep.md")
+check(
+    "close: the ask scopes what a run STARTS, never what it FINISHES",
+    "does not scope what it must finish" in _inv3.lower()
+    and "there is no fourth" in _inv3
+    # The three legitimate leave-behinds, named — without them the rule is a mood
+    # and any sentence can be argued into the gap.
+    and "a named precondition" in _inv3 and "--review" in _inv3
+    # And the operational half at the one step that stages a deletion.
+    and "is not a precondition and never becomes one" in _aud3,
+    "a run asked for a subset created the intermediate state itself, so finishing it "
+    "is inside the ask that created it. Without this line the user's own phrasing "
+    "becomes a refusing rule — which no check on what counts as a rule can catch, "
+    "because the words were really said",
+)
+check(
+    "sweep: INV-SWEPT counts the removal set being EMPTIED, not only staged",
+    "INV-SWEPT" in _swp3 and "INV-SWEPT" in _aud3
+    # Three counts and the citation check. `refused` alone would let a run print a
+    # gate-shaped number with no gate behind it, which is the measured failure.
+    and "uncited refusals" in _swp3
+    and "A refusal is a precondition's name or it is not a refusal" in _swp3
+    # Owed by BOTH entry points: audit Step 6c performs the same deletion, and a
+    # line only the standalone command prints is a line the measured run never owed.
+    and "owed by **both**" in _swp3,
+    "row 19 proves the removal set was written and nothing proved it was emptied, so "
+    "a run could print `dispositioned 1 · staged 1 · marked 1` fully UPHELD, delete "
+    "nothing, and close with every invariant passing",
+)
+check(
+    "sweep: 'never auto-fired' governs what STARTS the command, not what a run may skip",
+    "as a rule about what may start this command" in _swp3.lower()
+    and "may leave it staged" in _swp3
+    # SKILL.md carried the shorter form the run actually quoted.
+    and "performs the deletion itself" in read("workforce/SKILL.md"),
+    "SKILL.md read '`audit` never reaches it' — true of the command, false of the "
+    "act. A run quoted it to hand a staged deletion back. The rule bars a hook from "
+    "firing a deletion; it has never let a run decline one it staged itself",
+)
+check(
+    "close: the hand-back need not be a section — a closing SENTENCE is the same act",
+    "AND IT NEED NOT BE A SECTION" in _aud3
+    and "about to name a command for the user to run" in _aud3,
+    "the 'what I did not do' rule was written against a HEADING, and the next run "
+    "wrote a paragraph: a closing status note naming a command for the user to type. "
+    "Same act, no heading for the rule to catch",
+)
+check(
+    "sweep: a DEF-Q row against /workforce sweep carries the precondition that changed",
+    "there is no row to write — there is a deletion to perform" in _aud3
+    and "deferred.md` § Location and shape" in _aud3,
+    "audit's gates and sweep's gates are the same gates, so a row naming sweep with "
+    "nothing to change names a re-run that refuses identically — which deferred.md "
+    "already lists by name among five measured malformed dischargers",
 )
 
 check(
@@ -4703,8 +4804,13 @@ check(
 # By then three files carried three different counts (ten / eleven / twelve).
 # So the scan is now class-wide: no shipped file pairs a number-word with this
 # population, and invariants.md's declaration line is the single exemption.
+# The word list stopped at "eighteen" while the declaration already said "Nineteen",
+# so the scan that exists to catch a restated count had a hole at exactly the two
+# values it was about to need. Widened 2026-08-07 with row 20; a list of number-words
+# that lags the table is the same defect this check was written for, one level up.
 _INV_COUNT_RX = re.compile(
-    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen)\s+"
+    r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen"
+    r"|nineteen|twenty)\s+"
     r"(?:rows?|Run[- ]Invariants?)\b",
     re.I,
 )

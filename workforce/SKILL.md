@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 62 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 63 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
@@ -363,7 +363,11 @@ COMMITTED `T7c` rows a prior `audit` wrote and gated, and every precondition is 
 tree as it stands now (`references/procedures/sweep.md` § Why there is no `--execute`). A preview of a
 decision already made and already displayed is a third gesture for one act, not a safeguard. `sweep`
 still accepts `--execute` as a reported no-op, and **consent-on-invocation is not auto-firing**: no
-command, hook, or dispatch starts a sweep, and `audit` never reaches it.
+command, hook, or dispatch starts a sweep, and `audit` never reaches the standalone command — **it
+performs the deletion itself, at Step 6c, and that is not the same claim.** *Corrected 2026-08-07: this
+read "`audit` never reaches it", which is true of the command and false of the act, and a run cited it
+to leave a staged removal for the user to finish. The rule bars a hook from firing a deletion; it has
+never let a run decline one it staged (`references/invariants.md` row 20, `INV-SWEPT`).*
 
 ## Core Principles
 
