@@ -1,4 +1,4 @@
-<!-- text-additions-version: 2 -->
+<!-- text-additions-version: 4 -->
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- origin: workforce | modifiable: true -->
 # Text-tells additions — authored by workforce
@@ -73,6 +73,7 @@ Each row names the host section it belongs to.
 | Tier 3 — Compositional | Canned notability framing | Asserting importance by cataloguing the *kinds* of coverage a subject received: "independent coverage," "profiled in regional and trade publications," "maintains an active social media presence." Rose sharply in models released 2025 and later | Does the sentence describe the *sources* rather than the *subject*? Strike every clause about who covered it; if the claim of significance vanishes, it was asserted, never established |
 | Tier 3 — Compositional | Sit-inside-it invitation | "Sit inside it for a moment." "Let that land." "Stay with that for a second." The text instructs the reader to pause and absorb, as though the passage were profound enough to need a breathing exercise. Cousin of Explaining the point: rather than telling you why it matters, it tells you to *feel* that it matters. *Added 2026-08-07 at user direction.* | Delete the invitation. If the passage still lands, the instruction was only staging its own importance — the reader decides what to sit with. Fires on a single occurrence |
 | Tier 3 — Compositional | Begins-and-ends framing | A symmetrical "where X ends and Y begins" boundary that announces an epistemological transition instead of making it: "where the scholarship ends and my own reading begins," "where the data stops and the intuition starts." Sounds thoughtful; is a stalling move that describes the shift rather than performing it. *Added 2026-08-07 at user direction.* | Does the sentence describe a transition between modes of knowing rather than saying anything in either mode? If yes, cut it and let the register shift on its own |
+| Tier 3 — Compositional | Manufactured introspection | "I keep coming back to that." "I can't stop thinking about this." "That's the part I keep returning to." The text performs the *act* of reflection as a rhetorical move — announcing that something is worth dwelling on instead of dwelling on it. A genuinely preoccupied writer shows it through sustained engagement, not a declaration of preoccupation. *Ported from the odyssey-alive lexicon, 2026-08-07 — the one tell there this catalog lacked.* | Delete the introspection claim. If the surrounding sentences already carry the weight, it was scaffolding. Fires on a single occurrence. Distinct from Significance-frame repetition (which fires on the *repeated* signpost across a document), False vulnerability (which simulates self-awareness), and Self-posed revelation (which poses a rhetorical question) |
 
 ## Conversational register (passage-level; fires without a cluster)
 
@@ -100,8 +101,28 @@ or if it reads written-for-a-page. Where a documented voice profile exists it de
 spoken register is the target; absent one, the standard is "would anyone say this aloud" — the
 Unnatural-references test (Tier 3), raised from the sentence to the passage.
 
+**Grain — the sentence too, not only the passage.** The window test catches a formal *register*
+across paragraphs; this catches the lone offender. A single sentence no one would say aloud — a
+formal construction, a stiff transition, a clause order built for the page — flags on its own,
+**without** waiting for the 3+ cluster the Overbuilt-prose signals require. Overbuilt is
+architecture stacking; this is register, and one non-conversational sentence in otherwise-spoken
+prose is already off-key.
+
+**Scope — where a conversational voice is the target.** Sentence and passage alike, this applies at
+full strength to prose whose intended register is conversational: articles, posts, newsletters,
+marketing and body copy. It does **not** fire on formal technical or reference prose, where a formal
+register is correct — the same corpus the em-dash rule exempts (`workforce/references/**`,
+`.claude/agents/**`, `.claude/workforce/**`, handbooks, `DEVELOPMENT.md`, and run deliverables).
+That scope is what keeps the test sharp, not a softening of it. § Ineffective indicators bars
+treating formality as an AI tell *in general*, and that holds for formal genres; but in
+conversational-target content a non-conversational register is not "formality in general," it is the
+piece missing its own register, which is exactly the signal. The owning skill's content-type
+calibration names which targets are conversational; absent a signal, apply this to content and not
+to reference material.
+
 **Severity (this row states its own, per host catalog § How to apply rule 1).** A single
-failed window is **SHOULD FIX**. A piece that reads formal across most windows is **MUST FIX**
+non-conversational **sentence** in content prose is **SHOULD FIX**; a single failed three-paragraph
+window is **SHOULD FIX**. A piece that reads formal across most windows is **MUST FIX**
 — and it fires even when every individual tell passes and the human-presence markers score
 full, which is the entire case it exists for. It is **not cluster-gated**, and **voice
 protection does not demote it**: rule 3 demotes a pattern that *matches* a voice-profile
