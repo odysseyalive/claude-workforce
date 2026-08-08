@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""wf-preflight — find the settings that would stop an audit before it starts.
+
+    wf-preflight --root <tree>              human table of mission-blockers + remedies
+    wf-preflight --root <tree> --json       machine-readable, for the settings-scout agent
+    wf-preflight --root <tree> --needs <file|->   also diff a required grant set
+
+WHY THIS EXISTS. A workforce audit writes agent-constraining state — permission
+grants, hook registrations, agent-handbook frontmatter — and any of those writes can
+be REFUSED by a setting the run never inspected: a `deny` rule over `.claude/**`, an
+`ask` rule that stops an unattended run dead, an intercepting `PreToolUse` hook, or the
+auto-mode self-modification classifier that sits above the permissions layer. Hitting
+one of those in the middle of Step 6 is why a run ends by handing the user homework.
+
+The remedy is to LOOK FIRST. This script is the mechanism behind the settings-scout
+agent: it reads the four settings scopes and the wired hooks, reports every condition
+that would block the mission, and for each one that a human can clear it emits the
+EXACT one-command remedy — a `wf-settings-apply` invocation the human runs via the
+REPL `!` prefix (their own shell, which the classifier does not gate). A clean tree
+prints `0 blockers`, because a zero is a measurement and silence is not
+(references/invariants.md § The rule).
+
+This script only READS. It changes nothing — resolving a blocker is wf-settings-apply's
+job, run by the human. Discovery and repair are separated so discovery can run
+unattended and against a tree the run has no standing to write yet.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+# The four scopes, project-visible ones under <root>/.claude and the user scope. The
+# classifier reads autoMode only from user/managed settings (auto-mode-config docs),
+# but a deny/ask rule in ANY of these blocks a write, so all are scanned.
+PROJECT_SCOPES = ("settings.local.json", "settings.json")
+
+# Path fragments a workforce audit must be able to write. A deny/ask rule matching any
+# of these is a mission blocker.
+WORKFORCE_WRITE_TARGETS = (".claude", "settings.local.json", "settings.json",
+                           ".claude/agents", ".claude/skills", ".claude/workforce")
+
+
+def load(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh), None
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError) as exc:
+        return None, f"{path}: {exc}"
+
+
+def project_scope_paths(root):
+    """The project-visible settings files. The deny/ask/hook scan reads THESE — a
+    project-scope rule is the one an audit surprises itself with. A user-global deny is
+    a deliberate machine-wide choice the user already knows about, and reading it here
+    would make discovery depend on the host's own settings rather than the tree's."""
+    return [(os.path.join(root, ".claude", n), n) for n in PROJECT_SCOPES]
+
+
+def grant_union_paths(root):
+    """For the missing-grants diff only: grants concatenate across scopes (platform.md
+    fact 17), so a grant already in force in USER scope is not missing. This read spans
+    project + user; the deny/ask/hook scan above deliberately does not."""
+    paths = [os.path.join(root, ".claude", n) for n in PROJECT_SCOPES]
+    paths.append(os.path.join(os.path.expanduser("~"), ".claude", "settings.json"))
+    return paths
+
+
+def _rules(data, kind):
+    perms = data.get("permissions") if isinstance(data, dict) else None
+    r = perms.get(kind) if isinstance(perms, dict) else None
+    return [e for e in r if isinstance(e, str)] if isinstance(r, list) else []
+
+
+def _touches_workforce(rule):
+    """A permission rule string that names one of the audit's write targets. Rules are
+    `Tool(pattern)` or `Tool`; match on the pattern text."""
+    lowered = rule.lower()
+    return any(t in lowered for t in (".claude", "settings", "agents", "workforce"))
+
+
+def discover(root, needs):
+    blockers, errors = [], []
+
+    for spath, label in project_scope_paths(root):
+        data, err = load(spath)
+        if err:
+            errors.append(err)
+            continue
+        if data is None:
+            continue
+        # deny rules that would hard-block a workforce write, before the classifier.
+        for rule in _rules(data, "deny"):
+            if _touches_workforce(rule):
+                blockers.append({
+                    "id": "deny-rule",
+                    "severity": "high",
+                    "what_it_blocks": f"a deny rule in {label} blocks writing the audit's "
+                                      f"own config: {rule}",
+                    "remedy_note": f"a deny rule is the user's stated intent — it is "
+                                   f"reported, never auto-removed. Confirm whether {rule} "
+                                   f"is meant to cover workforce's own maintenance; if not, "
+                                   f"the user edits {spath} to scope it away from .claude/.",
+                    "run_via": None,
+                })
+        # ask rules that would interrupt an unattended run.
+        for rule in _rules(data, "ask"):
+            if _touches_workforce(rule):
+                blockers.append({
+                    "id": "ask-rule",
+                    "severity": "medium",
+                    "what_it_blocks": f"an ask rule in {label} will prompt mid-run for a "
+                                      f"workforce write: {rule}",
+                    "remedy_note": f"an ask rule forces a permission prompt even in auto "
+                                   f"mode. It is the user's intent; reported so the run "
+                                   f"knows it will pause, not removed.",
+                    "run_via": None,
+                })
+        # intercepting PreToolUse hooks over Edit/Write.
+        hooks = data.get("hooks") if isinstance(data, dict) else None
+        pre = hooks.get("PreToolUse") if isinstance(hooks, dict) else None
+        if isinstance(pre, list):
+            for e in pre:
+                matcher = e.get("matcher", "") if isinstance(e, dict) else ""
+                if any(t in str(matcher) for t in ("Edit", "Write", "*")):
+                    blockers.append({
+                        "id": "pretooluse-hook",
+                        "severity": "medium",
+                        "what_it_blocks": f"a PreToolUse hook in {label} (matcher "
+                                          f"{matcher!r}) can veto Edit/Write on .claude/**",
+                        "remedy_note": "a PreToolUse hook that exits non-zero blocks the "
+                                       "edit. Review the hook command; it is the user's, "
+                                       "reported not removed.",
+                        "run_via": None,
+                    })
+
+    # The auto-mode self-modification exposure. ALWAYS reported and ALWAYS advisory:
+    # whether it FIRES is measured at the write, not readable from config, so it is
+    # never a hard blocker at preflight time — it is the heads-up that a later settings
+    # write may be refused, carried with the recurrence-fix so a run knows it up front.
+    automode_active = probe_automode()
+    root_abs = os.path.abspath(root)
+    detected = ("auto mode detected ACTIVE" if automode_active
+                else "auto mode not detected"
+                if automode_active is False else "auto-mode state not probed (claude CLI absent)")
+    blockers.append({
+        "id": "self-modification-classifier",
+        "severity": "info",
+        "what_it_blocks": (f"{detected} — writes to .claude/settings*.json, "
+                           ".claude/agents/**, and hook registrations may be refused by "
+                           "the self-modification classifier, which sits ABOVE the "
+                           "permissions layer; whether it fires is measured at the write"),
+        "remedy_command": (f"wf-settings-apply --execute --automode"),
+        "remedy_note": ("adds autoMode.environment/allow to ~/.claude/settings.json "
+                        "(USER scope — the classifier ignores project settings) so it "
+                        "stops refusing routine workforce maintenance. Confirm with "
+                        "`claude auto-mode config`. If a specific write is still refused, "
+                        "run its wf-settings-apply remedy via `!` — the human's own shell "
+                        "is not gated by the classifier."),
+        "run_via": "!",
+    })
+
+    # Missing grants the designed org needs.
+    if needs is not None:
+        in_force = set()
+        for spath in grant_union_paths(root):
+            data, _ = load(spath)
+            in_force.update(_rules(data, "allow") if isinstance(data, dict) else [])
+        missing = [g for g in needs if g not in in_force]
+        if missing:
+            blockers.append({
+                "id": "missing-grants",
+                "severity": "high",
+                "what_it_blocks": f"the designed org needs {len(missing)} grant(s) absent "
+                                  f"from every scope: {missing}",
+                "remedy_command": (f"printf %s '{json.dumps(missing)}' | "
+                                   f"wf-settings-apply --root {root_abs} --execute --grants -"),
+                "remedy_note": "adds exactly the missing scoped grants + the ownership "
+                               "sidecar. Run via `!` if the classifier refuses the agent.",
+                "run_via": "!",
+            })
+
+    return blockers, errors
+
+
+def probe_automode():
+    """Best-effort: is auto mode active? Ask the CLI if present; never fail on absence.
+    Returns True/False/None (None = could not determine)."""
+    import shutil
+    import subprocess
+    if not shutil.which("claude"):
+        return None
+    try:
+        out = subprocess.run(["claude", "auto-mode", "config"],
+                             stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                             timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return "autoMode" in (out.stdout or "") or "auto mode" in (out.stdout or "").lower()
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--needs", metavar="FILE",
+                    help="JSON array of required grant strings, or -")
+    args = ap.parse_args(argv)
+
+    if not (args.root or "").strip():
+        print("wf-preflight: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-preflight: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    needs = None
+    if args.needs:
+        if args.needs == "-":
+            raw = sys.stdin.read()
+        elif args.needs.lstrip().startswith("["):
+            raw = args.needs
+        else:
+            raw = open(args.needs).read()
+        try:
+            needs = json.loads(raw)
+        except ValueError as exc:
+            print(f"wf-preflight: --needs is not valid JSON: {exc}", file=sys.stderr)
+            return 2
+        if not isinstance(needs, list):
+            print("wf-preflight: --needs must be a JSON array of grant strings.",
+                  file=sys.stderr)
+            return 2
+
+    blockers, errors = discover(root, needs)
+    # "info" rows are context, not blockers; count only what actually stops the mission.
+    hard = [b for b in blockers if b["severity"] in ("high", "medium")]
+
+    if args.json:
+        print(json.dumps({"root": root, "blockers": blockers, "errors": errors,
+                          "blocking_count": len(hard)}, indent=2))
+        return 0
+
+    for e in errors:
+        print(f"  ! unreadable  {e}")
+    for b in blockers:
+        print(f"  [{b['severity'].upper():6}] {b['id']}")
+        print(f"      {b['what_it_blocks']}")
+        if b.get("remedy_command"):
+            via = "  (run via `!`)" if b.get("run_via") == "!" else ""
+            print(f"      remedy: {b['remedy_command']}{via}")
+        if b.get("remedy_note"):
+            print(f"      note:   {b['remedy_note']}")
+    print(f"\nINV-PREFLIGHT  {len(hard)} blocker(s) · {len(blockers) - len(hard)} advisory "
+          f"· {len(errors)} unreadable")
+    if not hard:
+        print("  0 blockers — the tree will not refuse the audit's own writes.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

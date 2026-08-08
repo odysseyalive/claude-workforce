@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -103,6 +103,14 @@ to wire and nothing to orphan.
 6. **Read back and confirm** the settings file still parses as JSON and the registration is present
    exactly once. On failure, restore the pre-edit content and report. **Never report a write that was
    not confirmed by re-reading.**
+6a. **When the settings write is refused above the permissions layer**, the remedy is the human running
+   the producer, not a command that re-attempts the refused write. `wf-settings-apply --wire-hook <name>`
+   composes and writes exactly the registration this procedure would, plus the `.settings-owned.json`
+   sidecar, and re-reads to confirm — so hand over `! wf-settings-apply --root <abs> --execute
+   --wire-hook <name>` for the human to run in their own shell (`audit-setup.md` § When a write is
+   refused ABOVE the permissions layer). **Never emit the `hooks` JSON for the user to paste, and never
+   re-quote `/workforce hooks --execute` as the remedy** — its only act is the write that was refused, so
+   a reader who runs it gets the same refusal having spent a gesture (`deferred.md`, the remedy must reach the tree).
 6b. **Census EVERY registration, not only workforce's own, and resolve each command against disk.**
    `wf-census` emits `resolved` and `exists` per hook; the `! dead wiring` and `! orphaned` rows below
    are filled from it. A registration whose command is not on disk is **named with its resolved path**,

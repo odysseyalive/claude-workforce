@@ -1,6 +1,6 @@
 # The optimization pass catalog
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 An **optimization pass** recognises one defect class across any project's skills, scripts, hooks, and
 agents, and states what may be done about it. This file is the catalog. It grows.
 
@@ -204,6 +204,16 @@ Every pass declares its verdict against this mechanism, and the mechanism exists
 pass currently qualifies for `AUTO`**. That ordering is the directive above: build the remedy, then let
 the evidence decide which passes use it. A catalog with no applier is a catalog that can only ever hand
 work back.
+
+**Where an `AUTO` pass has a precondition that is a settings write the self-modification classifier
+refuses, the sub-write goes to `wf-settings-apply` and the pass still auto-applies the rest.**
+`PASS-CLAUDE-MD-EVACUATED` is the case: it deletes `CLAUDE.md` on a proven-empty ledger, but the ledger
+cannot empty until `wf-standing-request` is wired (`claude-md.md` § standing cold-reader request), and
+wiring it is a settings write the classifier blocks. That one write is performed by the human via
+`! wf-settings-apply --wire-hook wf-standing-request`, surfaced at the settings preflight
+(`audit-setup.md` § Step 0.05) so it is run at setup — after which the relocation and the deletion are
+the pass's ordinary AUTO work. **The classifier refusing one sub-write never demotes the pass to
+`REPORT`; it relocates that sub-write to the one command a human runs.**
 
 | the run prints | meaning |
 |---|---|

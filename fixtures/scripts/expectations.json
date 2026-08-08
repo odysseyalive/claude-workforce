@@ -147,6 +147,174 @@
       "files_removed"
     ]
   },
+  "preflight-clean": {
+    "_why": "A tree with no deny/ask rule, no intercepting hook, and no missing grant has ZERO hard blockers. The self-modification-classifier row is always advisory (whether it fires is measured at the write, not readable from config), so it never counts, and the run prints `0 blockers` deterministically regardless of the host's live auto-mode state. Paired with preflight-deny so a regression that always-flags or never-flags fails one.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "deny-rule",
+      "missing-grants"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "INV-PREFLIGHT  0 blocker",
+      "0 blockers"
+    ]
+  },
+  "preflight-deny": {
+    "_why": "A `deny` rule over `.claude/**` hard-blocks a workforce write BEFORE the classifier, so it is a HIGH mission-blocker. It is the user's stated intent, so it is reported with its remedy_note (never auto-removed) rather than a runnable command. Asserts the row is named with its rule text, not merely a nonzero count.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "0 blockers"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "deny-rule",
+      "HIGH",
+      "Edit(.claude/**)"
+    ]
+  },
+  "preflight-json": {
+    "_why": "The machine-readable form the settings-scout agent consumes. Same tree as preflight-deny; --json emits the blocker objects and a blocking_count instead of the human table, so INV-PREFLIGHT must NOT appear and the deny-rule id and blocking_count keys must.",
+    "args": [
+      "--json"
+    ],
+    "exit": 0,
+    "not": [
+      "INV-PREFLIGHT"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "\"id\": \"deny-rule\"",
+      "\"blocking_count\"",
+      "\"self-modification-classifier\""
+    ]
+  },
+  "preflight-needs": {
+    "_why": "With the org's required grant set passed as inline JSON, a grant absent from every scope is a HIGH missing-grants blocker whose remedy is a runnable `wf-settings-apply --grants` command — never a JSON block to paste (deferred.md reachability). Asserts the remedy is the runnable producer, run via `!`.",
+    "args": [
+      "--needs",
+      "[\"Bash(./bin/zzz-preflight-probe:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "0 blockers"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "missing-grants",
+      "wf-settings-apply",
+      "--grants -"
+    ]
+  },
+  "sa-grants-display": {
+    "_why": "DISPLAY is the default and writes nothing: the two absent grants read `would add`, the one already in force reads `already present` (grants concatenate across scopes, so a second copy is a redundant write into a file the user owns), and `0 removed` prints on every run because it is the guarantee. `not verified on disk` asserts nothing was written on the display path.",
+    "args": [
+      "--grants",
+      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\",\"Bash(pnpm lint:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "verified on disk"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "would add",
+      "zzz-alpha",
+      "already present",
+      "pnpm lint",
+      "0 removed",
+      "apply with: --execute"
+    ]
+  },
+  "sa-grants-execute": {
+    "_why": "--execute is the consent. Same tree as sa-grants-display minus the already-present grant; both absent grants are written and the confirmation RE-READS the file, so `verified on disk` quotes the tree rather than the string passed to write(). Paired with sa-grants-display so a regression making display WRITE or execute merely REPORT fails one.",
+    "args": [
+      "--execute",
+      "--grants",
+      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "would add"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "added",
+      "verified on disk",
+      "2 grant(s) present exactly once"
+    ]
+  },
+  "sa-grants-blanket": {
+    "_why": "A bare `Bash` grant supersedes the user's scoped rules, so it is refused with a named error and a nonzero exit rather than silently widening the permissions posture (audit-setup.md Step 0.8 rule 3b: not overwriting a preference is not the same as not defeating it).",
+    "args": [
+      "--grants",
+      "[\"Bash\"]"
+    ],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "blanket",
+      "refusing"
+    ]
+  },
+  "sa-hook-display": {
+    "_why": "The wire-hook mode in DISPLAY: it prints the registration it WOULD add for wf-standing-request on UserPromptSubmit and writes nothing. `not verified on disk` asserts the display path made no write.",
+    "args": [
+      "--wire-hook",
+      "wf-standing-request"
+    ],
+    "exit": 0,
+    "not": [
+      "verified on disk"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "would register",
+      "UserPromptSubmit",
+      "wf-standing-request"
+    ]
+  },
+  "sa-hook-execute": {
+    "_why": "--execute registers the hook and re-reads to confirm it is present exactly once. This is the producer the CLAUDE.md evacuation's precondition uses: wiring wf-standing-request is one `!` command, not a JSON block to paste (claude-md.md, hooks.md).",
+    "args": [
+      "--execute",
+      "--wire-hook",
+      "wf-standing-request"
+    ],
+    "exit": 0,
+    "not": [
+      "would register"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "registered",
+      "verified on disk",
+      "UserPromptSubmit"
+    ]
+  },
+  "sa-hook-unknown": {
+    "_why": "A name that is not a shipped hook is refused rather than registering dead wiring — a registration pointing at nothing reads as protection and enforces nothing.",
+    "args": [
+      "--wire-hook",
+      "bogus"
+    ],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "not a shipped hook"
+    ]
+  },
+  "sa-nomode": {
+    "_why": "Exactly one of --grants/--wire-hook/--automode is required; none is a caller error with a nonzero exit, never a silent no-op that reads as success.",
+    "args": [],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "exactly one of --grants"
+    ]
+  },
   "census-badjson": {
     "exit": 2,
     "script": "wf-census",

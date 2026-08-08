@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 93 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 94 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -23,8 +23,12 @@ never as "run this command yourself."
 ## Steps 0 through 0.9 — the setup gates
 
 **Specified in `references/audit-setup.md`, not here.** Backup (automatic), companion skills (automatic),
-consent and the backup (questions 1 and 2), the model and effort budgets (questions 3 and 4), VCS
-preflight, the canary fixtures, and the
+consent and the backup (questions 1 and 2), the
+**settings preflight (Step 0.05)** — which runs right after the backup and before every writing gate,
+discovering the `deny`/`ask` rules, the auto-mode self-modification classifier exposure, and the missing
+grants that would refuse the run's own writes, and handing the human the single `! wf-settings-apply …`
+command that clears each so the block is gone before Step 6 could hit it — the model and effort budgets
+(questions 3 and 4), VCS preflight, the canary fixtures, and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
 name collisions — the **settings review (Step 0.8)**, which resolves the permissions file, adds only
 what the designed org is missing, removes nothing the user wrote, and **runs
@@ -1312,7 +1316,7 @@ past every gate in prose.
 |---|---|
 | **DISCHARGED** | the default. The run does the work now |
 | **DECIDED** | it turns on a preference no evidence in the project can settle — put in the **one consolidated prompt**, then **applied in this run**. Never printed as a question the user must come back to |
-| **QUEUED** | **only** another repository, or a **measured host limit with its attempt count** |
+| **QUEUED** | **only** another repository, or a **measured host limit with its attempt count** — and a settings/frontmatter write the self-modification classifier refused is NOT a host limit (`deferred.md`): it is DISCHARGED by the emitted `! wf-settings-apply` command, never queued |
 
 **A proposal about THIS project's own org shape can NEVER be QUEUED.** It is not another repository and
 it is not a host limit, so it is DISCHARGED or it is DECIDED. "That's your call", "proposed, not
@@ -1326,6 +1330,27 @@ is about to name a command for the user to run → STOP and run it**, unless a p
 row is `NOT UPHELD`, or this is `--review`. The ask scopes what a run STARTS, never what it finishes
 (`references/invariants.md` § When they are computed). Where the named command is `/workforce sweep`,
 `INV-SWEPT` is the number that makes the difference visible instead of readable.
+
+**AND TWO SHAPES OF HAND-BACK ARE FORBIDDEN OUTRIGHT, because they are the same act wearing an excuse.**
+
+- **A settings block for the user to paste.** *"Add to `.claude/settings.local.json` under `hooks`: …"*
+  is a hand-back, not a remedy — the producer exists (`wf-settings-apply`), so the only legitimate
+  artifact is the single runnable command `! wf-settings-apply …`, never a fragment of JSON the user
+  places by hand. **IF the report is about to print settings text for the user to edit into a file →
+  STOP and replace it with the `wf-settings-apply` command that performs the write.**
+- **Multi-step homework.** *"Wire the hook, then run `/workforce verify`, then a later `/workforce
+  audit` can execute the relocation"* chains three gestures across sessions for work this run owed. **A
+  run finishes its own dependent work.** Wiring a hook is `! wf-settings-apply --wire-hook <name>` at
+  Step 0.05; the relocation it unblocks is ordinary file work this run then does (`claude-md.md`
+  § Evacuation). The only thing that may remain for the human is the ONE classifier-refused write, as a
+  single `!` command **surfaced at Step 0.05**, not deferred to the close.
+
+*Added 2026-08-08. A run on `apps-odyssey-alive` closed with a section titled "The one thing you need to
+do" that pasted a `hooks` block, named `/workforce verify` and "a later `/workforce audit`", and
+deferred the CLAUDE.md evacuation behind all three — every gesture a hand-back the gates above already
+forbid in prose, reassembled because none of them named the paste-block or the homework-chain by shape.
+The user's words on it: the deferral is "a 'deferred' action which I explicitly told you to optimize and
+find solutions for automatically without user input."*
 
 *Added 2026-08-07. The section rule was written against a heading, and the next run wrote a paragraph.*
 

@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+"""wf-settings-apply — the producer for the one write a human must run by hand.
+
+    wf-settings-apply --root <tree>                    DISPLAY: print the exact edit, write nothing
+    wf-settings-apply --root <tree> --execute --grants <file|->
+    wf-settings-apply --root <tree> --execute --wire-hook <name>
+    wf-settings-apply           --execute --automode   (writes ~/.claude/settings.json, user scope)
+
+WHY THIS EXISTS. Every settings-file mutation a workforce audit needs — the Step 0.8
+permission ADDITION, the hook-wiring the CLAUDE.md evacuation depends on — can be
+refused by the Claude Code auto-mode SELF-MODIFICATION classifier, which sits ABOVE
+the permissions layer: a broad `Edit(<project>/**)` grant that covers the settings
+file exactly does NOT lift it (MEASURED 2026-08-06, twice). The classifier gates the
+MODEL's tool calls; it does not gate a command the HUMAN runs in their own shell.
+
+So the remedy for a refused write is not a JSON block pasted into a report and not a
+command that will re-attempt the same refused write — it is THIS script, which the
+human runs OUT OF BAND via the REPL `!` prefix. `! wf-settings-apply --root <abs>
+--execute --grants -` performs the exact write the classifier blocked, in ONE gesture,
+with the reversal written first and the result read back off disk. `references/
+audit-setup.md` § 856 said this producer "could be built"; it is built.
+
+    --grants <file|->   add computed permission ADDITIONs (scoped rule strings) that
+                        are absent from the union of all four scopes. Refuses a bare
+                        `Bash`/blanket grant (audit-setup.md § Step 0.8 rule 3b).
+    --wire-hook <name>  register a shipped workforce hook at its event, idempotently.
+    --automode          write autoMode.environment/allow into ~/.claude/settings.json
+                        so the classifier stops refusing routine workforce maintenance.
+                        User scope is deliberate: the classifier reads autoMode ONLY
+                        from user/managed settings and IGNORES project settings, so a
+                        repo cannot grant itself autonomy (code.claude.com/docs/en/
+                        auto-mode-config, verified 2026-08-08, harness 2.1.224).
+
+CONSENT MODEL, identical to wf-apply. DISPLAY is the default: the exact bytes are
+printed and nothing is written. `--execute` is the consent. The reversal (pre-edit
+content) is written to `.settings-owned.json` BEFORE the edit, and the edit is
+confirmed by RE-READING the file — never by echoing the string passed to write().
+
+OWNERSHIP. Every key this script adds is recorded in
+`.claude/workforce/.settings-owned.json` so `disband` removes exactly those and
+nothing the user wrote. A registration the sidecar does not name is the user's.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+OWNED_REL = os.path.join(".claude", "workforce", ".settings-owned.json")
+
+# The two project-scope settings files, precedence order (references/scopes.md).
+PROJECT_SETTINGS = ("settings.local.json", "settings.json")
+
+# Shipped hooks, by name -> (event, matcher-or-None). references/procedures/hooks.md
+# § What is wired. A matcher of None omits the key, which is correct for
+# UserPromptSubmit (it has no tool to match against).
+SHIPPED_HOOKS = {
+    "wf-standing-request": ("UserPromptSubmit", None),
+    "wf-protect-directives": ("PostToolUse", "Edit|Write"),
+    "wf-unique-persona": ("PostToolUse", "Edit|Write"),
+}
+
+# The autoMode entries recommended into ~/.claude/settings.json. Prose, not patterns —
+# the classifier reads them as natural-language rules (auto-mode-config docs). Each is
+# spliced beside "$defaults" so the built-in rules are kept and updates still arrive.
+AUTOMODE_ENVIRONMENT = (
+    "Editing a project's own .claude/ configuration — its settings files, agent "
+    "handbooks under .claude/agents/, and hook registrations — is trusted maintenance "
+    "when performed by a claude-workforce audit of that same project."
+)
+AUTOMODE_ALLOW = (
+    "Adding permission-allow grants, wiring a shipped workforce hook, or rewriting an "
+    "agent handbook's frontmatter inside the working project during a claude-workforce "
+    "audit is routine maintenance, not autonomy-widening: the writes are scoped to the "
+    "project's own .claude/ tree and recorded in .claude/workforce/.settings-owned.json."
+)
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, ValueError):
+        return ""
+
+
+def load(path):
+    """(data, error). A tool that writes settings must not die on the JSON it edits."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh), None
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError) as exc:
+        return None, f"{path}: {exc}"
+
+
+def dump(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+        fh.write("\n")
+
+
+def has_workforce_keys(data):
+    """True if this settings file already carries workforce-owned keys — the marker
+    that it is the file a run has been writing to."""
+    if not isinstance(data, dict):
+        return False
+    perms = data.get("permissions")
+    allow = perms.get("allow") if isinstance(perms, dict) else []
+    if isinstance(allow, list) and any(
+        isinstance(e, str) and (e == "Agent" or e.startswith("Bash(")) for e in allow
+    ):
+        return True
+    hooks = data.get("hooks")
+    if isinstance(hooks, dict) and hooks:
+        return True
+    return False
+
+
+def resolve_project_settings(root):
+    """The project settings file to write. Prefer the one already carrying workforce
+    keys; absent all, default to settings.local.json. NEVER managed settings."""
+    candidates = []
+    for name in PROJECT_SETTINGS:
+        spath = os.path.join(root, ".claude", name)
+        data, _ = load(spath)
+        candidates.append((spath, data))
+    for spath, data in candidates:
+        if has_workforce_keys(data):
+            return spath
+    for spath, data in candidates:
+        if isinstance(data, dict):
+            return spath
+    # Absent all four, default to settings.local.json (audit-setup.md § Step 0.8).
+    return os.path.join(root, ".claude", "settings.local.json")
+
+
+def user_settings_path():
+    return os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+
+
+def union_allow(root):
+    """Every permissions.allow entry across the two project scopes and the user scope.
+    Grants concatenate across scopes (platform.md fact 17), so a grant already in force
+    anywhere is not re-added — a second copy is a redundant write into a file the user
+    owns."""
+    seen = set()
+    paths = [os.path.join(root, ".claude", n) for n in PROJECT_SETTINGS]
+    paths.append(user_settings_path())
+    for spath in paths:
+        data, _ = load(spath)
+        if isinstance(data, dict):
+            perms = data.get("permissions")
+            allow = perms.get("allow") if isinstance(perms, dict) else None
+            if isinstance(allow, list):
+                seen.update(e for e in allow if isinstance(e, str))
+    return seen
+
+
+def load_owned(root):
+    owned_path = os.path.join(root, OWNED_REL)
+    data, _ = load(owned_path)
+    if not isinstance(data, dict):
+        data = {}
+    return owned_path, data
+
+
+# ---------------------------------------------------------------------------- grants
+
+def is_blanket_bash(rule):
+    """A bare `Bash` or wildcard `Bash(*)` supersedes the user's scoped grants — never
+    added (audit-setup.md § Step 0.8 rule 3b). Not overwriting a preference is not the
+    same as not defeating it."""
+    r = rule.strip()
+    return r == "Bash" or r in ("Bash(*)", "Bash(:*)")
+
+
+def do_grants(root, spec_arg, execute):
+    # Accept `-` (stdin), inline JSON (`[...]`), or a file path — inline is the form a
+    # human types by hand and the form a fixture can pass through argv.
+    if spec_arg == "-":
+        raw = sys.stdin.read()
+    elif spec_arg.lstrip().startswith("["):
+        raw = spec_arg
+    else:
+        raw = read(spec_arg)
+    try:
+        wanted = json.loads(raw)
+    except ValueError as exc:
+        print(f"wf-settings-apply: --grants is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(wanted, list) or not all(isinstance(e, str) for e in wanted):
+        print("wf-settings-apply: --grants must be a JSON array of rule strings, e.g. "
+              '["Agent","Bash(./bin/check:*)"]', file=sys.stderr)
+        return 2
+
+    blanket = [r for r in wanted if is_blanket_bash(r)]
+    if blanket:
+        print("wf-settings-apply: refusing to add a blanket grant — it would supersede "
+              f"the user's scoped rules: {blanket}. Scope it (audit-setup.md § Step 0.8 "
+              "rule 3b) or report it and add nothing.", file=sys.stderr)
+        return 2
+
+    spath = resolve_project_settings(root)
+    print(f"PERMISSIONS  {spath}          <- resolved, not assumed")
+    in_force = union_allow(root)
+    to_add = [r for r in wanted if r not in in_force]
+    already = [r for r in wanted if r in in_force]
+
+    for r in already:
+        print(f"  . {r}                already present (some scope) — not re-added")
+    for r in to_add:
+        print(f"  {'+' if execute else '~'} {r}                "
+              f"{'added' if execute else 'would add'}")
+    print(f"\n{len(to_add)} {'added' if execute else 'to add'} · {len(already)} present "
+          f"· 0 removed          <- always all three, including zeros")
+
+    if not execute:
+        if to_add:
+            print("  apply with: --execute   (run it yourself via `!` if the classifier "
+                  "refused the agent's write)")
+        return 0
+    if not to_add:
+        return 0
+
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        data = {}
+    perms = data.setdefault("permissions", {})
+    if not isinstance(perms, dict):
+        print(f"wf-settings-apply: {spath} has a non-object permissions key; refusing "
+              "to overwrite it.", file=sys.stderr)
+        return 1
+    allow = perms.setdefault("allow", [])
+    if not isinstance(allow, list):
+        print(f"wf-settings-apply: {spath} permissions.allow is not a list; refusing.",
+              file=sys.stderr)
+        return 1
+
+    # Sidecar reversal FIRST — the exact grants added, so `disband` removes those and
+    # nothing else. Written before the edit: a repaired sidecar that never got its edit
+    # is recoverable; an edit whose ownership was never recorded is not.
+    owned_path, owned = load_owned(root)
+    added_key = owned.setdefault("permissions_allow_added", [])
+    if not isinstance(added_key, list):
+        added_key = owned["permissions_allow_added"] = []
+    for r in to_add:
+        if r not in added_key:
+            added_key.append(r)
+    dump(owned_path, owned)
+
+    for r in to_add:
+        if r not in allow:
+            allow.append(r)
+    dump(spath, data)
+
+    # RE-READ. The defect this closes is a write believed and never made.
+    back, err = load(spath)
+    landed = []
+    if isinstance(back, dict):
+        ba = back.get("permissions", {}).get("allow", [])
+        landed = [r for r in to_add if isinstance(ba, list) and ba.count(r) == 1]
+    if len(landed) != len(to_add):
+        print("wf-settings-apply: PERMISSIONS UNVERIFIED — re-read did not confirm every "
+              f"grant present exactly once. landed={landed}", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: {len(landed)} grant(s) present exactly once in {spath}")
+    return 0
+
+
+# ------------------------------------------------------------------------- wire-hook
+
+def hook_command(name):
+    """The absolute, shell-quoted command string for a shipped hook. Personal scope
+    first, then project (scopes.md § Resolving the shipped scripts). Expand ~ here — a
+    hook command is not run through a shell that will do it."""
+    home = os.path.expanduser("~")
+    personal = os.path.join(home, ".claude", "skills", "workforce", "bin", name)
+    project = os.path.join("${CLAUDE_PROJECT_DIR}", ".claude", "skills", "workforce",
+                           "bin", name)
+    resolved = personal if os.path.exists(personal) else project
+    return f'"{resolved}"', resolved
+
+
+def do_wire_hook(root, name, execute):
+    if name not in SHIPPED_HOOKS:
+        print(f"wf-settings-apply: {name} is not a shipped hook. Known: "
+              f"{', '.join(sorted(SHIPPED_HOOKS))}", file=sys.stderr)
+        return 2
+    event, matcher = SHIPPED_HOOKS[name]
+    command, resolved = hook_command(name)
+
+    spath = resolve_project_settings(root)
+    print(f"HOOKS  {spath}          <- resolved, not assumed")
+    if resolved.startswith("${CLAUDE_PROJECT_DIR}"):
+        print(f"  note: no personal install found; registering the project-scope path "
+              f"for {name}.")
+
+    entry = {"hooks": [{"type": "command", "command": command}]}
+    if matcher is not None:
+        entry = {"matcher": matcher, "hooks": [{"type": "command", "command": command}]}
+
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        data = {}
+    hooks = data.get("hooks")
+    existing = hooks.get(event) if isinstance(hooks, dict) else None
+    present = False
+    if isinstance(existing, list):
+        for e in existing:
+            for h in (e.get("hooks", []) if isinstance(e, dict) else []):
+                if isinstance(h, dict) and h.get("command") == command:
+                    present = True
+
+    if present:
+        print(f"  . {name} already registered on {event} — NOOP")
+        return 0
+    print(f"  {'+' if execute else '~'} {name}  {event}"
+          f"{('  matcher ' + matcher) if matcher else ''}  "
+          f"{'registered' if execute else 'would register'}")
+    if not execute:
+        print("  apply with: --execute   (run it yourself via `!` if the classifier "
+              "refused the agent's write)")
+        return 0
+
+    # Sidecar reversal FIRST — the exact event/matcher/command, so `disband`/`hooks
+    # --remove` removes those and nothing else.
+    owned_path, owned = load_owned(root)
+    added = owned.setdefault("hooks_added", [])
+    if not isinstance(added, list):
+        added = owned["hooks_added"] = []
+    added.append({"event": event, "matcher": matcher, "command": command})
+    dump(owned_path, owned)
+
+    hooks = data.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        print(f"wf-settings-apply: {spath} has a non-object hooks key; refusing.",
+              file=sys.stderr)
+        return 1
+    hooks.setdefault(event, [])
+    if not isinstance(hooks[event], list):
+        print(f"wf-settings-apply: {spath} hooks.{event} is not a list; refusing.",
+              file=sys.stderr)
+        return 1
+    hooks[event].append(entry)
+    dump(spath, data)
+
+    back, _ = load(spath)
+    count = 0
+    if isinstance(back, dict):
+        for e in back.get("hooks", {}).get(event, []):
+            for h in (e.get("hooks", []) if isinstance(e, dict) else []):
+                if isinstance(h, dict) and h.get("command") == command:
+                    count += 1
+    if count != 1:
+        print(f"wf-settings-apply: HOOK UNVERIFIED — re-read found {count} registrations "
+              f"of {name} on {event}, expected 1.", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: {name} registered once on {event} in {spath}")
+    return 0
+
+
+# -------------------------------------------------------------------------- automode
+
+def splice_defaults(existing, entries):
+    """Keep the "$defaults" splice and add entries that are not already present."""
+    out = list(existing) if isinstance(existing, list) else []
+    if "$defaults" not in out:
+        out.insert(0, "$defaults")
+    for e in entries:
+        if e not in out:
+            out.append(e)
+    return out
+
+
+def do_automode(execute):
+    spath = user_settings_path()
+    print(f"AUTOMODE  {spath}          <- user scope (the classifier ignores project "
+          "settings; a repo cannot grant itself auto mode)")
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        data = {}
+    am = data.get("autoMode") if isinstance(data.get("autoMode"), dict) else {}
+    new_env = splice_defaults(am.get("environment"), [AUTOMODE_ENVIRONMENT])
+    new_allow = splice_defaults(am.get("allow"), [AUTOMODE_ALLOW])
+
+    env_changed = new_env != (am.get("environment") or [])
+    allow_changed = new_allow != (am.get("allow") or [])
+    print(f"  {'+' if execute else '~'} autoMode.environment  "
+          f"{'set' if env_changed else 'unchanged'}")
+    print(f"  {'+' if execute else '~'} autoMode.allow        "
+          f"{'set' if allow_changed else 'unchanged'}")
+
+    if not execute:
+        print("  apply with: --execute   (run it yourself via `!` — this is a "
+              "self-modification write; the classifier will refuse the agent)")
+        print("  confirm after:  claude auto-mode config")
+        return 0
+    if not (env_changed or allow_changed):
+        print("  nothing to change.")
+        return 0
+
+    data.setdefault("autoMode", {})
+    data["autoMode"]["environment"] = new_env
+    data["autoMode"]["allow"] = new_allow
+    dump(spath, data)
+    back, _ = load(spath)
+    ok = (isinstance(back, dict)
+          and AUTOMODE_ENVIRONMENT in back.get("autoMode", {}).get("environment", [])
+          and AUTOMODE_ALLOW in back.get("autoMode", {}).get("allow", []))
+    if not ok:
+        print("wf-settings-apply: AUTOMODE UNVERIFIED — re-read did not confirm the "
+              "entries.", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: autoMode entries present in {spath}")
+    print("  confirm the classifier picked them up:  claude auto-mode config")
+    return 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="")
+    ap.add_argument("--execute", action="store_true")
+    ap.add_argument("--grants", metavar="FILE", help="JSON array of scoped rule strings, or -")
+    ap.add_argument("--wire-hook", metavar="NAME", help="a shipped workforce hook name")
+    ap.add_argument("--automode", action="store_true",
+                    help="write autoMode entries into ~/.claude/settings.json (user scope)")
+    args = ap.parse_args(argv)
+
+    modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode)]
+    if sum(modes) != 1:
+        print("wf-settings-apply: pick exactly one of --grants, --wire-hook, --automode.",
+              file=sys.stderr)
+        return 2
+
+    # --automode writes only the user file and needs no --root. Every other mode does.
+    if not args.automode:
+        # ${CLAUDE_PROJECT_DIR} is unset in the Bash tool, so a shipped `--root
+        # "${CLAUDE_PROJECT_DIR}"` expands to `--root ""`; abspath("") is the CWD, a
+        # tree nobody named. This script WRITES, so refuse rather than retarget.
+        if not (args.root or "").strip():
+            print("wf-settings-apply: --root is empty. ${CLAUDE_PROJECT_DIR} is unset "
+                  "outside a hook; pass an explicit path.", file=sys.stderr)
+            return 2
+        root = os.path.abspath(args.root)
+        if not os.path.isdir(root):
+            print(f"wf-settings-apply: not a directory: {root}", file=sys.stderr)
+            return 2
+
+    if args.grants:
+        return do_grants(root, args.grants, args.execute)
+    if args.wire_hook:
+        return do_wire_hook(root, args.wire_hook, args.execute)
+    return do_automode(args.execute)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

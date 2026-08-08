@@ -846,7 +846,12 @@ check(
     all(p_.startswith("workforce/bin/") for p_ in _execs)
     and not any(
         ev in read(p_)
+        # wf-settings-apply WIRES hooks and wf-preflight DETECTS them, so both name
+        # event strings as DATA, not because they are hooks. The string-match is a
+        # proxy for "a hook mis-flagged as exec"; these two are exec in the manifest
+        # and their job is hook management, so the proxy over-fires on them alone.
         for p_ in _execs
+        if p_ not in ("workforce/bin/wf-settings-apply", "workforce/bin/wf-preflight")
         for ev in ("PreToolUse", "PostToolUse", "SubagentStart", "SessionStart", "UserPromptSubmit")
     ),
     f"declared scripts: {_execs} — one naming a harness event is a hook wearing a "
@@ -3488,23 +3493,23 @@ check(
     "the printed command; the run reports it resumable and continues",
 )
 # Step 0.8 makes TWO writes: the REPAIR (wf-permissions --apply, removes dead grants)
-# and the ADDITION (the run edits JSON to add the org's Agent/Bash/MCP grants — no
-# shipped script does it). Clause 3 used to hand a refused reader "the very same
-# wf-permissions --apply invocation", which exits 0 having removed zero dead grants
-# while every org Bash(...) grant stays absent — a remedy that reports success without
-# delivering the capability, this project's signature failure. The section must name the
-# two writes distinctly and, for a refused ADDITION, emit the computed grant lines rather
-# than re-quote the repair.
+# and the ADDITION (the org's Agent/Bash/MCP grants). Re-quoting the REPAIR as the remedy
+# for a refused ADDITION hands the reader a command that exits 0 having removed zero dead
+# grants while every org Bash(...) grant stays absent — this project's signature failure.
+# The two must stay distinct; and since 2026-08-08 the ADDITION has a shipped producer
+# (wf-settings-apply --grants), so its remedy is that ONE command run via `!`, never a
+# copy-paste settings block. The check pins the producer and the anti-paste rule so a
+# revert to "emit the JSON block" fails here.
 check(
     "permissions: the refusal section distinguishes the REPAIR write from the ADDITION write",
     "Step 0.8 makes TWO distinct writes to the settings file" in _asu2
     and "Re-running `wf-permissions --apply` is NOT the remedy for a refused ADDITION" in _asu2
     and "ADDITION refused" in _asu2
-    and "no shipped script performs it" in _asu2,
-    "clause 3 re-quoting wf-permissions --apply as the remedy for a refused ADDITION "
-    "hands the reader a command that exits 0 having removed zero dead grants while every "
-    "org Bash(...) grant stays absent; the ADDITION has no shipped producer, so its "
-    "resumable remedy is the emitted grant lines the run computed at steps 2–3c",
+    and "wf-settings-apply --root <abs> --execute --grants -" in _asu2
+    and "NEVER emit a copy-paste settings block" in _asu2,
+    "clause 3 must distinguish the two writes AND route a refused ADDITION through the "
+    "shipped producer `wf-settings-apply --grants` run via `!` — never re-quote the repair "
+    "(exits 0, delivers nothing) and never emit a settings block for the user to paste",
 )
 # ─────────────────────────────────────────────────────────────────────────────
 # A PROPOSAL IN THE CLOSING REPORT IS A DEFERRED ROW

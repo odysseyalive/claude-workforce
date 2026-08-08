@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -88,6 +88,21 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 |---|---|
 | a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
+
+**BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
+a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no
+grant lifts it — but the write is not *unavailable*, it is only unavailable *to the agent*. A human runs
+it out of band in one gesture, and `wf-settings-apply` is the artifact that performs it:
+`! wf-settings-apply --root <abs> --execute --grants -` (or `--wire-hook <name>`, or `--automode`). So
+the row is **DISCHARGED** — the remedy is emitted, the human runs it via `!`, the run re-reads and
+proceeds — never held as a measured-limit row it re-hands every session. The only rows that survive as
+host limits are the ones no human command can clear this side of the tree, `canary UNAVAILABLE` being
+the type case. *Added 2026-08-08: three consecutive audits on `apps-odyssey-alive` categorised a
+classifier-refused `settings.local.json` write as a "measured host limit" and handed the user a
+copy-paste JSON block — the exact laundering this rule exists to stop. A refused write that a shipped
+producer performs is a discharge, not a limit; the producer is the whole difference, and until
+`wf-settings-apply` shipped there was none, which is why the analogy to `canary UNAVAILABLE` ever looked
+sound.*
 
 **BLOCKING — a host-limit row's attempt count is ≥ 1, and the attempt is of THIS row's own act.** A row
 reading `Attempts: 0 separately; blocked by the same refusal measured at <other row>` has inherited a

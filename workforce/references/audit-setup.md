@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 56 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -125,6 +125,48 @@ it does under `--review`, in its own section. This is the same coupling the setu
 `procedures/audit.md` already declares in the other direction — *any gate added to `audit-setup.md`
 must be added there too.* A gate is added to both, and it declares its `--review` behavior, or it is
 not added.
+
+## Step 0.05 — Settings preflight (runs before every writing gate)
+
+**Runs right after the backup and before anything that writes** — before the canary fixtures (0.6),
+the ownership preflight (0.7), the permissions review (0.8), agent registration, and the model rewrite.
+Its job is to find the settings that would refuse those writes *before* the run reaches them, so a
+refusal is cleared in one gesture at setup rather than met at Step 6 and handed back as homework.
+
+**Why it is first.** Every write the audit makes to `.claude/settings*.json`, `.claude/agents/**`, or a
+hook registration can be refused by the auto-mode self-modification classifier, which sits above the
+permissions layer (§ When a write is refused ABOVE the permissions layer). A `deny` rule, an `ask` rule,
+or an intercepting `PreToolUse` hook can refuse the same writes even sooner. **None of these is visible
+from inside the write that trips it** — the run learns about the block by being blocked, half-built. So
+the run looks first.
+
+**The mechanism, and the agent that reads it.** Spawn `wf-settings-scout` (a shipped agent), or where a
+spawn is unavailable run its mechanism directly: `wf-preflight --root <absolute path> --json`, passing
+`--needs <grant-set>` once the design panel has produced the org's required grants. `wf-preflight`
+reads the four scopes and the wired hooks and returns each mission-blocker with the exact one-command
+remedy. Never pass `--root "${CLAUDE_PROJECT_DIR}"` — unset in the Bash tool, the script exits 2.
+
+**What the run does with the verdict:**
+
+1. **A `deny` or `ask` row is the user's intent — reported, never cleared.** Name it, note that the run
+   will pause or be blocked there, and let the run decide; a rule the user wrote is evidence, not an
+   obstacle to route around.
+2. **A classifier-exposed or missing-grant row is DISCHARGED, not deferred.** Emit the single
+   `! wf-settings-apply …` command the scout returned and **ask the human to run it inline** — one
+   command, in their own shell, which the classifier does not gate. Where several rows share one refused
+   act they collapse to ONE command. Then **re-read to confirm the block cleared and proceed.** The run
+   does not stop here and it does not hand the command to the closing report — it is surfaced and run at
+   setup, which is the whole point of running first.
+3. **`0 blockers` is a measurement, printed.** A clean tree says so; silence would read as unchecked.
+
+**Under `--review`.** `wf-preflight` and `wf-settings-scout` only READ, so the preflight behaves
+identically under `--review` — it reports the blockers and the remedies it *would* have the human run,
+and changes nothing. This is the gate whose `--review` behavior is safest to state, because there is no
+write to withhold.
+
+**This gate is registered in `procedures/audit.md`'s setup-gate list, or it never runs** — the coupling
+§ Every writing gate declares its `--review` behavior states in the other direction. Step 0.7 was absent
+from that list for a full commit and no run ever executed it; this gate does not repeat that.
 
 ## How every question is worded — plain language, no exceptions
 
@@ -798,13 +840,13 @@ success without delivering the capability.**
 | write | what it does | who performs it | resumable remedy on refusal |
 |---|---|---|---|
 | **the REPAIR** | removes dead `Write(path)` grants that match nothing | `wf-permissions --root <project> --apply` (a shipped script) | re-run that exact command (§ *So this step RUNS the repair*) |
-| **the ADDITION** | adds the `Agent`, scoped `Bash(...)`, and MCP grants the designed org needs (steps 2–3c) | **the run itself, editing JSON — no shipped script performs it** | emit the exact grant lines to add, per the block below |
+| **the ADDITION** | adds the `Agent`, scoped `Bash(...)`, and MCP grants the designed org needs (steps 2–3c) | the run, or — when the classifier refuses it — the human, via `wf-settings-apply --grants` | `! wf-settings-apply --root <abs> --execute --grants -`, fed the computed scoped grant set (§ *ADDITION refused* below) |
 
 **Re-running `wf-permissions --apply` is NOT the remedy for a refused ADDITION.** The repair exits 0
 having removed zero dead grants, so a reader handed it sees a clean line and concludes the block is
 cleared — while every `Bash(...)` the org needs is still absent. That is a remedy that reports success
-without delivering the capability, which is this project's named signature failure. The two writes are
-therefore handed over separately below.
+without delivering the capability, which is this project's named signature failure. The ADDITION has its
+own producer — `wf-settings-apply --grants` — and the two writes are handed over separately below.
 
 1. **A permission rule cannot lift it**, so do not reach for one. Do not add a grant, do not
    widen one, and do not re-run `wf-permissions` expecting a different result: the broad
@@ -820,15 +862,20 @@ therefore handed over separately below.
    refusal defeats its intent rather than satisfying the task, and a run that reaches for one has
    turned the audit into the thing the classifier exists to stop. **Hand over the remedy that
    actually performs the refused write, chosen by which of the two writes it was:**
-   - **REPAIR refused** → print the `wf-permissions --root <project> --apply` invocation this step
-     runs above (§ *So this step RUNS the repair*) for the human to run.
-   - **ADDITION refused** → no shipped script performs it, so re-quoting the repair command clears
-     nothing. Instead emit the **exact grant lines the run computed at steps 2–3c** — each scoped
-     (`Bash(./bin/check:*)`, never bare `Bash` — rule 3b), the resolved settings file named, and the
-     matching `.settings-owned.json` ownership entries — as a copy-paste block the human applies. That
-     block IS the resumable remedy: applying it performs the write the classifier blocked.
+   - **REPAIR refused** → print the `! wf-permissions --root <project> --apply` invocation this step
+     runs above (§ *So this step RUNS the repair*) for the human to run via `!`.
+   - **ADDITION refused** → hand the human the ONE command that performs it:
+     `! wf-settings-apply --root <abs> --execute --grants -`, fed the exact scoped grant set the run
+     computed at steps 2–3c (each scoped — `Bash(./bin/check:*)`, never bare `Bash`, rule 3b). The
+     script resolves the settings file, adds only the absent grants, writes the `.settings-owned.json`
+     ownership entries, and re-reads to confirm — so the human runs one command in their own shell, not
+     a paste of JSON they must place by hand. **NEVER emit a copy-paste settings block; the producer
+     exists.** A block the user hand-edits is the failure this section was rewritten to end.
 
-   Then name `/workforce verify` as the confirmation once the human has applied the remedy.
+   Then name `/workforce verify` as the confirmation once the human has run the remedy. **And this
+   refused write should already have been surfaced at § Step 0.05 — the settings preflight runs before
+   any writing gate for exactly this reason** — so the human runs the one command at setup and the rest
+   of the audit proceeds unblocked, rather than meeting the refusal at Step 6 and stopping.
 
 **This is a reported, resumable outcome, not a failed run.** It is reported last with the other
 permission findings, in the block below, as `REFUSED-ABOVE-PERMISSIONS` with the operator command
@@ -853,13 +900,23 @@ the write is allowed; the refusal is above it, so there is nothing for the progr
 Treating a refusal above the permissions layer as a script bug would send `script-author` chasing
 a defect that is not in the file.
 
-**The ADDITION has no shipped producer at all — the run edits the JSON itself — so its remedy today is
-the emitted copy-paste block, and that is what makes clause 3 stand on its own.** A producer *could* be
-built (an additive mode taking the computed grant set and writing it plus the sidecar), which would
-reduce the human's step from pasting rules to running one command; it would not remove the human,
-because the same classifier sits above that producer too. Building it is `script-author`/`runtime-lead`
-work, not doctrine's, and clause 3 does not depend on it: the emitted block performs the write with or
-without such a script.
+**The ADDITION now has a shipped producer — `wf-settings-apply --grants` — and clause 3 hands over that
+command rather than a block of JSON.** The producer takes the computed grant set, adds only what is
+absent from the union of scopes, writes the `.settings-owned.json` sidecar, and re-reads to confirm. It
+does NOT remove the human: the same classifier sits above the producer, so an agent running it is
+refused exactly as the agent's direct edit was. What it removes is the *paste* — the human runs one
+command in their own shell (`!`) instead of placing rules into a file by hand. *This paragraph read "no
+shipped producer at all … its remedy today is the emitted copy-paste block" until 2026-08-08, when the
+producer was built (`bin/wf-settings-apply`) after three runs on `apps-odyssey-alive` closed by handing
+the user JSON. The punt named the fix and declined it; the fix is now the remedy.*
+
+**And the recurrence is addressed, not just the instance.** `wf-settings-apply --automode` writes
+`autoMode.environment`/`autoMode.allow` into `~/.claude/settings.json` (USER scope — the classifier
+reads `autoMode` only from user/managed settings and ignores project settings, so a repo cannot grant
+itself autonomy; verified against code.claude.com/docs/en/auto-mode-config, harness 2.1.224). Whether
+those entries clear the self-modification soft-block is measured with `claude auto-mode config`, not
+assumed — but where they take, the human runs one command *once* rather than one *per run*, and the
+preflight (§ Step 0.05) surfaces it the first time.
 
 ### Where it is reported — last, and this is the directive
 

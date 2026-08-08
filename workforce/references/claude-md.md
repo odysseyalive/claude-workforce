@@ -197,6 +197,16 @@ ships unwired enforces nothing and looks like it does.
 the evacuation, not an exemption from it.** Reading it as a reason to keep `CLAUDE.md` indefinitely
 reinstates the 89% that this whole file exists to measure.
 
+**And the whole order completes WITHIN the run — it is not a reason to defer the evacuation to a later
+audit.** Wiring the hook is one command, `! wf-settings-apply --wire-hook wf-standing-request`, surfaced
+by the settings preflight (`audit-setup.md` § Step 0.05) and run by the human at setup because the
+self-modification classifier refuses the agent's own settings write. Once it is registered — the run
+re-reads to confirm — the relocation and the deletion are ordinary file work this run then does. **The
+classifier refusing the agent one write is not the run declining the evacuation.** *Added 2026-08-08: a
+run closed by handing the user the `hooks` block to paste, `/workforce verify`, and "a later
+`/workforce audit` can execute the relocation" — three deferred gestures for a precondition that a
+single `!` command at setup discharges. The precondition was real; the deferral was not.*
+
 **For a whole day this remedy was named in three shipped files and written by nothing** (`SKILL.md`
 rule 3b, `enforcement.md`, `staging.md` § UNAVAILABLE). Consumer named, producer assumed — and unlike
 the earlier five of that shape, this one was invisible from the maintainer's own repo, whose `CLAUDE.md`
