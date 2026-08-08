@@ -2006,6 +2006,36 @@ check(
     "allow was checked and deny was not; and neither established that spawning "
     "works at all, which every gate in this design assumes",
 )
+# THE INERT-GRANT ROW HAD NO OPPOSITE. It catches a grant that is PRESENT and
+# matches nothing; nothing caught a grant that is NEEDED and is not there.
+# audit-setup.md Step 0.8 COMPUTES the required set and writes it, and no command
+# checked afterwards whether the write landed — so a refusal above the permissions
+# layer is invisible forever except as a row in a queue somebody has to open.
+# MEASURED on this repository 2026-08-07: eight scoped Bash(...) rules computed, the
+# write refused, three audits since, and not one of them reported their absence.
+# Producer and consumer again, at the one step whose output the run cannot verify
+# for itself — which is exactly when a standing detector is the only thing that can.
+check(
+    "verify: ABSENT required grants are reported, not only inert present ones",
+    "ABSENT grants a live handbook requires" in _vfy2
+    # Sourced from the handbooks, so the required set is derived rather than a
+    # second hand-maintained list that drifts from the org it describes.
+    and "named in a live handbook's `## Verification`" in _vfy2
+    # And printed as the scoped forms, because "8 grants missing" is a number
+    # nobody can act on — the same rule the dead-wiring row already follows.
+    and "as the scoped forms they should take" in _vfy2,
+    "Step 0.8 computes the grant set and writes it; without this row nothing ever "
+    "checks that the write landed, so a refusal is invisible between audits and "
+    "the only record is a queue row that ages",
+)
+check(
+    "verify: an advisorModel recorded in org-config but absent from settings is reported",
+    "absent from every settings scope" in _vfy2
+    and "the two records never disagree because only one of them exists" in _vfy2,
+    "Step 0.3 reads the SETTINGS key to pre-select the advisor; with the key absent "
+    "the pre-selection silently falls back and org-config.md still reads correct, "
+    "so a budget answer the user gave never reaches the picker it was given for",
+)
 
 # ── Phase A blocked the handbook its own templates produce ───────────────────
 # Found by RUNNING Phase A against a handbook authored straight from
@@ -4787,6 +4817,29 @@ check(
 # correctly named, owned by the right procedure, and its ONLY act is the write the
 # row records as refused. Q-3 named "the same human settings write", which no file
 # had ever written down. Three rows, ONE refused act, one cell that reached anything.
+# THE THIRD CLOSURE PATH, WITH THE GUARD THAT KEEPS IT FROM BEING AN ESCAPE HATCH.
+# A row is a REMEMBERED fact; a verify row is a COMPUTED one, printed every run with
+# its remedy, unable to go stale. Moving a condition from the first to the second is
+# the same preference invariants.md states everywhere else. What makes it a closure
+# rather than a dodge is clause 4: if the detector does not exist, BUILDING IT is the
+# discharge. MEASURED 2026-08-07 — reaching for this path on three rows revealed that
+# two of them had no detector at all, invisible across three consecutive audits.
+check(
+    "deferred: a row may discharge into a standing detector, and the guard is stated",
+    "DISCHARGED INTO A DETECTOR" in dfr
+    # Named, not gestured at — "verify probably covers this" is how a row is lost.
+    and "must be named in the closing note, by file and row" in dfr
+    # Fires every run including clean, and names the remedy: without either it has
+    # relocated the row rather than replaced it.
+    and "including when clean" in dfr and "must name the remedy" in dfr
+    # Clause 4 is the whole guard. Without it any row closes by pointing at nothing.
+    and "BUILD IT — and building it IS the discharge" in dfr
+    # And the honesty clause: closing changes where the fact lives, not whether it holds.
+    and "may still be true" in dfr,
+    "without the guard this closes any row by asserting some command covers it; with "
+    "it, reaching for the path reports what has not been built — which is how two "
+    "missing detectors were found after three audits had run past them",
+)
 check(
     "deferred: a discharged-by cell must REACH the tree, not merely be typeable",
     "test of *syntax*" in dfr and "reachability" in dfr

@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -49,6 +49,35 @@ reader can type the cell, never whether typing it changes the tree.*
 **Where several rows record the SAME refused act, they get ONE artifact and every cell points at it.**
 Splitting one write into three gestures is the queue re-creating, at the remedy, the hand-back it exists
 to prevent — and the user has to notice they are the same write before the first one fails.
+
+### DISCHARGED INTO A DETECTOR — the third closure path, and its guard
+
+**A row may be closed by moving its condition to a STANDING DETECTOR, and this is strictly better than
+holding the row.** A queue row is a *remembered* fact, read only by whoever opens this file, and it can
+outlive the thing it describes — which is why § The row nobody discharges has to exist at all. A
+`verify` row is a *computed* fact, printed to whoever runs the command, every time, with its remedy, and
+it cannot go stale because it is recomputed rather than recalled. This project prefers the counted line
+to the written one everywhere else (`invariants.md` § The rule); the queue is not an exception.
+
+**THE GUARD, and without it this is an escape hatch rather than a closure path:**
+
+1. **The detector must EXIST and must be named in the closing note, by file and row.** Not "verify
+   probably covers this."
+2. **It must report the condition on EVERY run, including when clean** — a zero is a measurement,
+   silence is not.
+3. **It must name the remedy.** A detector that reports a state nobody can act on has moved the row, not
+   discharged it.
+4. **IF the detector does not exist, BUILD IT — and building it IS the discharge.** With its
+   enforcement, in the same change.
+5. **Say plainly that the underlying condition may still be true.** Closing the row changes where the
+   fact lives, never whether it holds. A closing note that reads as "fixed" is a false report.
+
+*Added 2026-08-07. Three rows on this repository recorded one settings write refused above the
+permissions layer. **Attempting to close them is what revealed that two of the three had no detector at
+all** — `audit-setup.md` Step 0.8 computes the required grant set and writes it, and nothing ever
+checked that the write landed, so a refusal was invisible between audits for three consecutive runs.
+Only the hooks row was already covered, by `verify`'s `ORPHANED`. **The rule is written from the
+direction that found the gap: reach for this path and it will tell you what you have not built.***
 
 **BLOCKING — a row may never be discharged by re-running the command that wrote it, unaided.** If the
 cell names the same command with no changed precondition, the row is not deferred work — **it is a run

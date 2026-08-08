@@ -200,9 +200,41 @@ follow from its own reason is an enumeration standing in for a rule.**
 lines at 101–103 columns **in its own deliverable** using the direct `awk` form; the `git diff` form it
 replaced reported clean.
 
-`bin/check` 848 · `bin/prove` **208 of 208 proven by breaking, zero VACUOUS** ·
+**Closed 2026-08-07 — the deferred queue is empty, and emptying it is what found two missing
+detectors.** Three rows recorded one settings write refused above the permissions layer. Attempting the
+closure asked the obvious question — *what reports this condition if the row goes away?* — and the
+answer for two of the three was **nothing**:
+
+| Row | Detector |
+|---|---|
+| eight scoped `Bash(...)` grants absent | **did not exist.** `audit-setup.md` Step 0.8 computes the required set and writes it; nothing ever checked the write landed, so a refusal was invisible across three consecutive audits. Built: `verify` § Install and scope, *ABSENT grants a live handbook requires* — derived from the handbooks, printed as the scoped forms |
+| `advisorModel` absent from every scope | **did not exist.** Built, same pass |
+| three shipped hooks registered nowhere | already covered — `verify` § Hook wiring, `ORPHANED`, four counts including zeroes with the fix named |
+
+**`deferred.md` gained the third closure path with the guard that stops it being an escape hatch.** A
+row is a *remembered* fact; a `verify` row is a *computed* one, printed every run with its remedy,
+unable to go stale — the same preference `invariants.md` states everywhere else. The guard is five
+clauses, and clause 4 is the whole of it: **if the detector does not exist, building it IS the
+discharge.** Clause 5 keeps the closure honest — closing a row changes where the fact lives, never
+whether it holds, and two of these three conditions are still true in the tree.
+
+**Not done, and deliberately: the settings write itself.** Refused twice through two different tools —
+a JSON-aware `python3` merge and a direct `Edit`. An applier ships at
+`.claude/workforce/work/audit-20260807T002052Z/apply-settings-remedy.py` (merges, idempotent, validates
+before writing, reads back, records ownership) and is dry-run verified at 12 additions. **It was not
+run by an agent**: a third attempt of the same shape, differing only in the filename the classifier
+reads, is the retry loop `audit-setup.md` forbids, and the boundary governs which hooks fire
+automatically and what may run unprompted.
+
+**Also fixed, found by running the unwired hooks manually rather than reasoning about them:** the
+sidecar did not stamp the two DEF records written that session, each carrying a cold executor's question
+inside an `origin: user | immutable: true` span. **The least-protected sacred blocks in the tree were
+the ones added an hour earlier.** Regenerated with `wf-conform`'s own `BLOCK_RX` and `normalize`:
+12 → 15 blocks, `wf-conform` exit 0.
+
+`bin/check` 851 · `bin/prove` **213 of 213 proven by breaking, zero VACUOUS** ·
 `script-conformance` 96/0 · `conformance` 17 fixtures / 85 assertions · `idempotence` 8/8 ·
-`doctrine-author` released on an 8th-probe PASS · personnel index 18 records.
+`doctrine-author` released on an 8th-probe PASS · personnel index 18 records · deferred queue 0 open.
 
 
 **Closed 2026-08-06 — `/workforce dev audit` was run against this repository, and running it found
