@@ -1,4 +1,4 @@
-<!-- text-additions-version: 1 -->
+<!-- text-additions-version: 2 -->
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- origin: workforce | modifiable: true -->
 # Text-tells additions — authored by workforce
@@ -71,6 +71,47 @@ Each row names the host section it belongs to.
 | Rhetoric clustering | "X rather than Y" inversion | The third negative-parallelism subtype, most often missed because it carries no "not": "prioritizing consolidation of power rather than ideological purity." Reported as especially characteristic of Grok | Count with the other two subtypes (dedupe by mechanism). Test as contrastive negation: does the discarded half carry information, or exist only to give "X" something to beat? |
 | Tier 3 — Compositional | Generic-weekday familiarity stand-in | "You've probably just called it Tuesday" — a generic weekday used not as a date but as a stand-in for mundane recurrence, the "you already know this feeling, I just named it" move; any weekday would serve and none is meant literally (also "a random Tuesday," "just another Monday"). *User-identified, 2026-08-06, verbatim: "'You've probably just called it Tuesday,' needs to be added to the AI word whisker list. This use of Tuesday signifies it was written by AI."* | Swap the weekday for another (Tuesday→Thursday). If the sentence's force is unchanged, it is a familiarity gesture rather than a literal anchor, and it fires. Fires on a single document. Distinct from Manufactured temporal specificity, which simulates a *lived* anchor, and from Detail latch, which threads one token 3–5×: this names recurrence, threads nothing, and claims no lived event. **Not filed on the corpus-level Word-whiskers row, despite that being where it was first proposed** — that row's test is grep-across-siblings and cannot fire on the single occurrence that prompted it, and an inert rule is worse than none |
 | Tier 3 — Compositional | Canned notability framing | Asserting importance by cataloguing the *kinds* of coverage a subject received: "independent coverage," "profiled in regional and trade publications," "maintains an active social media presence." Rose sharply in models released 2025 and later | Does the sentence describe the *sources* rather than the *subject*? Strike every clause about who covered it; if the claim of significance vanishes, it was asserted, never established |
+| Tier 3 — Compositional | Sit-inside-it invitation | "Sit inside it for a moment." "Let that land." "Stay with that for a second." The text instructs the reader to pause and absorb, as though the passage were profound enough to need a breathing exercise. Cousin of Explaining the point: rather than telling you why it matters, it tells you to *feel* that it matters. *Added 2026-08-07 at user direction.* | Delete the invitation. If the passage still lands, the instruction was only staging its own importance — the reader decides what to sit with. Fires on a single occurrence |
+| Tier 3 — Compositional | Begins-and-ends framing | A symmetrical "where X ends and Y begins" boundary that announces an epistemological transition instead of making it: "where the scholarship ends and my own reading begins," "where the data stops and the intuition starts." Sounds thoughtful; is a stalling move that describes the shift rather than performing it. *Added 2026-08-07 at user direction.* | Does the sentence describe a transition between modes of knowing rather than saying anything in either mode? If yes, cut it and let the register shift on its own |
+
+## Conversational register (passage-level; fires without a cluster)
+
+*Added 2026-08-07 at user direction — enforce conversational-style prose.*
+
+The Overbuilt-prose signals in the host catalog are **cluster-scored**: three or more in a
+passage is the tell. That leaves a gap this test names directly — **prose can dodge every
+cataloged signal and still read like a term paper instead of a person talking.** Every
+sentence passes the read-aloud test, nothing clusters, the human-presence markers all check
+out, and the passage as a whole is still constructed, not spoken. Those markers count tokens —
+first person, contractions, texture words — and a piece can score all of them and still not
+sound like anyone talking. This test closes that gap without waiting for a cluster.
+
+**The coffee test.** Read any three consecutive paragraphs aloud. Would the author *say* this
+to someone over coffee — not *could* they, *would* they? If the passage sounds like prepared
+remarks rather than a person talking, it fires, whether or not any individual sentence trips a
+signal. The tell is register, not vocabulary: compound constructions, stacked subordinate
+clauses, formal transitions, paragraphs built like a page instead of spoken from a mind. A
+real voice connects ideas with plain conjunctions — "but," "and," "now," "so" — and talks
+rather than constructs.
+
+**Falsifiable test.** Take overlapping three-paragraph windows across the piece; read each as
+speech and apply the coffee test. A window fails if you would restructure a sentence mid-read,
+or if it reads written-for-a-page. Where a documented voice profile exists it defines whose
+spoken register is the target; absent one, the standard is "would anyone say this aloud" — the
+Unnatural-references test (Tier 3), raised from the sentence to the passage.
+
+**Severity (this row states its own, per host catalog § How to apply rule 1).** A single
+failed window is **SHOULD FIX**. A piece that reads formal across most windows is **MUST FIX**
+— and it fires even when every individual tell passes and the human-presence markers score
+full, which is the entire case it exists for. It is **not cluster-gated**, and **voice
+protection does not demote it**: rule 3 demotes a pattern that *matches* a voice-profile
+characteristic, and a formal register matches none — it is the *absence* of a spoken voice,
+not a protected trait of one, so a strong marker count is exactly the condition under which it
+slips through. The human-presence over-correction warning does not apply either: the remedy
+here is to make the prose *more* spoken, not to strip voice, so it carries none of the
+voice-stripping risk that warning guards. Unlike a **[hard]** row this is a judgment call, not
+a mechanical one — but within its class it is a gate, not an advisory: the pass is not clean
+while the piece reads formal.
 
 ## Expired and vintage-dependent tells
 
