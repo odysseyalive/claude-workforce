@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 60 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -156,7 +156,10 @@ remedy. Never pass `--root "${CLAUDE_PROJECT_DIR}"` — unset in the Bash tool, 
    command, in their own shell, which the classifier does not gate. Where several rows share one refused
    act they collapse to ONE command. Then **re-read to confirm the block cleared and proceed.** The run
    does not stop here and it does not hand the command to the closing report — it is surfaced and run at
-   setup, which is the whole point of running first.
+   setup, which is the whole point of running first. **The machine-level `--automode` grant is NOT
+   re-offered here every run** — it is written once by the installer (§ recurrence is addressed at
+   INSTALL); Step 0.05 surfaces it again only as a residual, when auto mode is measured active and a
+   write is still refused, which is the signature of a host that treats self-modification as a hard block.
 3. **`0 blockers` is a measurement, printed.** A clean tree says so; silence would read as unchecked.
 
 **Under `--review`.** `wf-preflight` and `wf-settings-scout` only READ, so the preflight behaves
@@ -910,13 +913,17 @@ shipped producer at all … its remedy today is the emitted copy-paste block" un
 producer was built (`bin/wf-settings-apply`) after three runs on `apps-odyssey-alive` closed by handing
 the user JSON. The punt named the fix and declined it; the fix is now the remedy.*
 
-**And the recurrence is addressed, not just the instance.** `wf-settings-apply --automode` writes
-`autoMode.environment`/`autoMode.allow` into `~/.claude/settings.json` (USER scope — the classifier
-reads `autoMode` only from user/managed settings and ignores project settings, so a repo cannot grant
-itself autonomy; verified against code.claude.com/docs/en/auto-mode-config, harness 2.1.224). Whether
-those entries clear the self-modification soft-block is measured with `claude auto-mode config`, not
-assumed — but where they take, the human runs one command *once* rather than one *per run*, and the
-preflight (§ Step 0.05) surfaces it the first time.
+**And the recurrence is addressed at INSTALL, not per run.** The installer runs in the human's own
+shell, which the classifier does not gate, so it writes `autoMode.environment`/`autoMode.allow` into
+`~/.claude/settings.json` (USER scope — the classifier reads `autoMode` only from user/managed settings
+and ignores project settings, so a repo cannot grant itself autonomy; verified against
+code.claude.com/docs/en/auto-mode-config, harness 2.1.224) by calling the same `wf-settings-apply
+--automode`. Where those entries clear the self-modification soft-block — measured with `claude
+auto-mode config`, never assumed — the *agent's own* writes pass thereafter and no `!` command is needed
+at all. So on a machine installed with this change, an audit does not surface `--automode`; Step 0.05
+offers it only as a residual, when auto mode is measured active AND a write is still refused (a host
+that treats self-modification as a *hard* block). The audit's job is the per-project grants and hooks,
+which are computed here and unknown at install time; the machine-level grant is the installer's.
 
 ### Where it is reported — last, and this is the directive
 

@@ -5619,6 +5619,20 @@ check(
     "a canary file copied into the skill tree registers no agent type at all — the "
     "harness reads agent definitions from .claude/agents/ and nowhere else",
 )
+# The auto-mode grant belongs at install because the installer's shell is not gated by
+# the classifier the grant is about (audit-setup.md § recurrence is addressed at INSTALL).
+# Both installers must run it through the shipped wf-settings-apply (ONE source for the
+# entry text) and both must offer the opt-out, or a Windows user silently loses the fix.
+check(
+    "install: both installers write the auto-mode grant via wf-settings-apply, with an opt-out",
+    all("wf-settings-apply" in read(f_) and "--automode" in read(f_)
+        and "no-automode" in read(f_).lower()
+        for f_ in ("install", "install.ps1")),
+    "the machine-level autoMode grant that lets an audit configure a project unprompted is "
+    "written at install (the only un-gated shell); dropping it from one installer leaves that "
+    "platform's users back on the per-write `!` remedy, and duplicating the entry text instead "
+    "of calling wf-settings-apply is the two-canonical-copies failure this project forbids",
+)
 check(
     "audit: handbooks are authored by dispatch, not in the caller's context",
     "**Then author — BY DISPATCH, never inline.**" in _aud
