@@ -30,6 +30,40 @@ import os
 import re
 import sys
 
+
+def _load_census():
+    """Import the sibling `wf-census` for its exclusion loader — one owner, never
+    a second copy.
+
+    `.censusignore` is a DECLARATION the project makes about what its corpus is,
+    and it had three readers and one producer: `wf-census` and `wf-apply` both
+    honoured it and this file did not. MEASURED 2026-08-10 by a project audit —
+    the walk below pruned a directory literally named `fixtures` and read nothing
+    else, so a declared exclusion was invisible here while binding everywhere else.
+    Two shipped checkers measuring one tree against two different denominators.
+
+    The hardcoded prune was also a heuristic `load_ignore` refuses BY NAME ("no
+    `fixtures/` default, no guess from directory names"), so this file was not
+    merely missing the rule — it was enforcing the rule's stated opposite.
+
+    NEVER leave bytecode behind: importing a sibling writes `__pycache__/` into the
+    SHIPPED bin/ directory, which `bin/check` correctly reports as an undeclared
+    file the installers would never fetch.
+    """
+    import importlib.machinery
+    import importlib.util
+    _prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
+    loader = importlib.machinery.SourceFileLoader("wf_census", path)
+    spec = importlib.util.spec_from_loader("wf_census", loader)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = _prev
+    return mod
+
 # Section order is fixed and asserted (procedure-for-procedures.md § File shape).
 # Leads carry no `## Procedure`; everyone else carries every row.
 SECTIONS = [
@@ -1033,14 +1067,24 @@ def check_sidecar(root, res):
     #
     # Scoped to `.claude/`: the sidecar's rows are project-tree paths, and a source
     # distribution under `workforce/` carries its own stamp in `workforce/.immutable.sha`.
+    #
+    # THE DENOMINATOR IS THE CENSUS'S, not this file's. `.censusignore` is read
+    # through `wf-census` so that what counts as project content is decided in one
+    # place; the directory-name prune this loop used to carry is gone, because it
+    # answered a question the project alone is allowed to answer (`_load_census`).
     unstamped = []
+    census = _load_census().Census(root)
+    census.load_ignore()
     claude_dir = os.path.join(root, ".claude")
     for dirpath, dirnames, filenames in os.walk(claude_dir):
-        dirnames[:] = [d for d in dirnames if d != "fixtures"]
+        dirnames[:] = [d for d in dirnames
+                       if not census.ignored(os.path.join(dirpath, d))]
         for fn in sorted(filenames):
             if not fn.endswith(".md"):
                 continue
             p = os.path.join(dirpath, fn)
+            if census.ignored(p):
+                continue
             rel = os.path.relpath(p, root)
             try:
                 with open(p, encoding="utf-8") as fh:

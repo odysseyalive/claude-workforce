@@ -192,7 +192,7 @@
     ]
   },
   "preflight-needs": {
-    "_why": "With the org's required grant set passed as inline JSON, a grant absent from every scope is a HIGH missing-grants blocker whose remedy is a runnable `wf-settings-apply --grants` command — never a JSON block to paste (deferred.md reachability). Asserts the remedy is the runnable producer, run via `!`.",
+    "_why": "With the org's required grant set passed as inline JSON, a grant absent from every scope is a HIGH missing-grants blocker whose remedy is a runnable `wf-settings-apply --grants` command \u2014 never a JSON block to paste (deferred.md reachability). Asserts the remedy is the runnable producer, run via `!`.",
     "args": [
       "--needs",
       "[\"Bash(./bin/zzz-preflight-probe:*)\"]"
@@ -295,7 +295,7 @@
     ]
   },
   "sa-hook-unknown": {
-    "_why": "A name that is not a shipped hook is refused rather than registering dead wiring — a registration pointing at nothing reads as protection and enforces nothing.",
+    "_why": "A name that is not a shipped hook is refused rather than registering dead wiring \u2014 a registration pointing at nothing reads as protection and enforces nothing.",
     "args": [
       "--wire-hook",
       "bogus"
@@ -1316,6 +1316,72 @@
       "additionalContext",
       "Cold-reader agents are requested, standing.",
       "unless the user asks"
+    ]
+  },
+  "checkrun-operator": {
+    "_why": "FALSE DEAD, the defect a project audit filed against this distribution from another repo on 2026-08-10 and could not fix from its own tree. `shlex.split` is a word splitter with no knowledge of shell operators, so `bash bin/real.sh; echo done` yielded the token `bin/real.sh;` -- semicolon fused on -- which is not a path on any disk. A live script was reported dead, and because a dead check is BLOCKING for a governed handbook the tool exited 1 on a handbook whose check was fine. `bin/real.sh` is present in the fixture tree, so `+ resolved` can only be reached by an operator-aware tokenizer; `not` asserts the false row is gone rather than merely outvoted.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "not on disk"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "bin/real.sh",
+      "1 resolved \u00b7 0 dead"
+    ]
+  },
+  "checkrun-operator-dead": {
+    "_why": "THE FALSIFICATION HALF of checkrun-operator, and the reason that case cannot pass vacuously. Identical shape, one token changed: `bin/gone.sh` is NOT in the tree. A fix that made the false positive disappear by resolving less -- or by skipping any command carrying a separator -- passes checkrun-operator and fails here. The detail line is asserted verbatim as `bin/gone.sh` with no trailing semicolon, because the pre-fix run reported the same file dead for the wrong reason and a report naming a path that was never on disk under that spelling teaches an author nothing.",
+    "exit": 1,
+    "not": [
+      "bin/gone.sh; \u2014 not on disk",
+      "+ resolved"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "! dead",
+      "runs bin/gone.sh \u2014 not on disk"
+    ]
+  },
+  "checkrun-subshell": {
+    "_why": "THE SILENT HALF of the same defect, found by writing the pair rather than by any report -- the audit that filed the false-dead row never saw this one. `cd \"$CLAUDE_PROJECT_DIR\" && bash bin/real.sh` put `cd` in first position: no slash, so UNDECIDABLE, so the real script behind `&&` was never examined and the tool exited 0 having checked nothing. Under-reporting is the direction wf-census.load_ignore is explicitly written against, and it is the direction that hurts. `0 resolved` is asserted absent because that -- not a wrong row -- is what the failure looked like.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "0 resolved"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "bin/real.sh",
+      "1 resolved"
+    ]
+  },
+  "checkrun-envprefix": {
+    "_why": "THE REGRESSION SEGMENT-WALKING INTRODUCED, caught the same hour by running the changed resolver against a real project rather than against its own fixtures. `printf '{...}' | CLAUDE_PROJECT_DIR=/home/... bash .claude/hooks/guard.sh` is the ordinary shape of a hook self-test. Walking to the second segment finally reached it -- and its first token is the ENVIRONMENT ASSIGNMENT, which carries a slash in its value, so it read as the path being run and a live hook was reported dead. The pre-fix code scored this silent, not correct: `printf` has no slash, so it stopped at segment one. Fixing the tokenizer without bringing the shell's command-prefix grammar along traded a silence for a false positive on a real tree.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "CLAUDE_PROJECT_DIR=/tmp \u2014 not on disk"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "1 resolved \u00b7 0 dead"
+    ]
+  },
+  "conform-ignored-corpus": {
+    "_why": "TWO CHECKERS, ONE TREE, TWO DENOMINATORS -- the row a project audit filed alongside checkrun-operator, and the one with teeth: it was the sole reason wf-conform exited 1, which holds INV-VERIFY at NOT UPHELD and aborts any future sweep. `.censusignore` had three readers and one producer; wf-census and wf-apply honoured the declaration and wf-conform's sacred-block walk pruned a directory literally named `fixtures` and read nothing else. The fixture declares `.claude/skills/thing/testdata/` -- deliberately NOT named `fixtures`, so only a reader of the declaration can exclude it -- and puts an unstamped sacred block inside. sidecar-uncovered is the falsification half and stays red: an UNDECLARED unstamped block must still fail, or this fix is just a disabled check.",
+    "exit": 0,
+    "not": [
+      "unstamped",
+      "guarded by nothing"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "0 failed"
     ]
   }
 }

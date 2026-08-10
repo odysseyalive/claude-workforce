@@ -2826,6 +2826,30 @@ check(
     "outcomes; a run does not hand its own unfinished refinements to the next "
     "invocation of itself, and drains the queue to fixpoint before it closes",
 )
+# THE ONE CATEGORY THAT LEAVES THE TREE, AND IT HAD NO PRODUCER (2026-08-10)
+# The other-repo carve-out legitimised a survivor row and consumed nothing: it required
+# a "citation" that no reader could execute, so the closing mechanism was a human
+# noticing a paragraph and opening a session by hand. A rule with a reader and no
+# producer, sitting in the one clause the queue keeps for rows it cannot drain itself.
+# Measured from a real audit whose row read "a fix upstream in the workforce
+# distribution" — true, unexecutable, and the fix it named took a hand-carried report.
+check(
+    "deferred: an other-repo survivor names the repository PATH and the upstream command",
+    "names the repository's PATH and the command that closes it" in dfr
+    and "/workforce dev <command>, run in <abs path>" in dfr,
+    "'upstream' and 'the workforce distribution' are descriptions of where work lives, "
+    "not gestures. The cell faces the same runnable-verbatim and reach-the-tree tests "
+    "every other cell passes — somewhere to go, and something to type when you get there",
+)
+check(
+    "deferred: the other-repo rule claims a row SHAPE, never a routing promise",
+    "This is a shape rule, not a routing promise" in dfr
+    and "closed by the downstream run that RE-RUNS its own reproduction" in dfr,
+    "nothing in this distribution reaches into another repository and nothing may imply "
+    "it does — Core Principle 6. The row closes when the downstream run re-executes its "
+    "own reproduction and watches it pass, never on an upstream report asserting the fix "
+    "shipped and never on last run's wording",
+)
 check(
     "invariants: INV-DEFERRED asserts the queue ended empty but for cited survivors",
     "Row 12 additionally asserts the queue ended EMPTY but for cited survivors" in inv,
@@ -7415,6 +7439,38 @@ check(
     f"development record belongs in DEVELOPMENT.md, which is injected nowhere",
 )
 _cen2 = read("workforce/bin/wf-census")
+# SHELL OPERATORS ARE NOT PART OF A PATH (2026-08-10)
+# `shlex.split` is a WORD splitter, not a shell parser: it fuses a trailing `;` onto
+# the preceding word. Both directions were measured, from one fixture pair.
+check(
+    "wf-census splits a shell line on its operators before resolving a path",
+    "lex.whitespace_split = True" in _cen2,
+    "`bash bin/real.sh; echo done` resolved to `bin/real.sh;` — semicolon included — "
+    "which is on no disk, so a live script was reported DEAD and a governed handbook "
+    "exited 1 on a check that was fine. Quote-aware because a regex over raw text "
+    "severs `bash -c \"a; b\"` mid-string, and that shape is the one the resolver "
+    "must keep whole in order to refuse it. Fixtures: checkrun-operator, and "
+    "checkrun-operator-dead so the fix cannot pass by resolving less",
+)
+check(
+    "wf-census strips an environment prefix before deciding what a command runs",
+    "ENV_ASSIGN_RX.match(tokens[0])" in _cen2,
+    "`FOO=bar cmd` runs cmd; the assignment is grammar in front of it. Its VALUE "
+    "usually holds a slash — `CLAUDE_PROJECT_DIR=/home/…` — so once segment-walking "
+    "reached the piped half of a real hook self-test, the assignment read as the path "
+    "and a LIVE hook was reported dead. Found by running the changed resolver against "
+    "a real project the same hour, not against its own fixtures. Fixture: "
+    "checkrun-envprefix",
+)
+check(
+    "wf-census resolves the first DECIDABLE segment, not merely the first",
+    "for tokens in self.shell_segments(raw):" in _cen2,
+    "the silent half, and the worse one: `cd \"$X\" && bash bin/real.sh` put `cd` "
+    "first — no slash, UNDECIDABLE — so the real script behind `&&` was never "
+    "examined and a dead registration in that shape reported as nothing at all. "
+    "Under-reporting is the direction load_ignore is written against. Fixture: "
+    "checkrun-subshell",
+)
 # A REMEDY THAT INSTALLS STALE CODE IS NOT A REMEDY
 # The drift message named "re-run the installer" for days. MEASURED 2026-08-05: plain
 # `./install` fetches the PUBLISHED tree, so during development it overwrote local
@@ -7458,6 +7514,24 @@ check(
 #     outlived the registration read its own run's output as spurious and tried to
 #     `rm` it. Attribution is the DOCUMENT by omission.
 _cfm2 = read("workforce/bin/wf-conform")
+# ONE TREE, ONE DENOMINATOR (2026-08-10)
+# `.censusignore` is the project's DECLARATION of what its corpus is. It had three
+# readers and one producer: wf-census and wf-apply honoured it, and wf-conform's
+# sacred-block walk pruned a directory literally named `fixtures` and read nothing
+# else. Filed from another repository by a project audit that could not fix it from
+# its own tree, and it was the load-bearing row: the sole reason wf-conform exited 1,
+# which holds INV-VERIFY at NOT UPHELD and aborts any future sweep that has something
+# to sweep. The prune was not merely a missing rule — `load_ignore` refuses that exact
+# heuristic BY NAME, so this file was enforcing the declared rule's opposite.
+check(
+    "conform: `.censusignore` is read through wf-census, not guessed from directory names",
+    "census.load_ignore()" in _cfm2 and 'd != "fixtures"' not in _cfm2,
+    "two shipped checkers measuring one tree against two different denominators. A "
+    "declared exclusion bound wf-census and wf-apply and was invisible here, so a "
+    "project's own test corpus reported as unstamped sacred blocks and held the "
+    "sweep shut. Fixture: conform-ignored-corpus; sidecar-uncovered is the "
+    "falsification half and must stay red",
+)
 check(
     "conform: `tools: All tools` is refused on every tier",
     'f"{n}: `tools:` is a real allowlist, not the display string"' in _cfm2,

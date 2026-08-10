@@ -72,6 +72,10 @@ IMMUTABLE_OPEN = re.compile(
 IMMUTABLE_MENTION = re.compile(
     r"^[ \t]+<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->[ \t]*$", re.M)
 NAME_RX = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
+# `FOO=bar cmd` — a command prefixed by environment assignments. The VALUE very often
+# contains a slash (`CLAUDE_PROJECT_DIR=/home/…`), which is exactly what makes an
+# assignment mistakable for the path being run. See Census._resolve_segment.
+ENV_ASSIGN_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 # Marker families are open-ended by design: a foreign generator invents its own.
 # Report unknown families rather than dropping them — four unknown families on the
@@ -368,8 +372,14 @@ class Census:
             if s:
                 self.ignore_patterns.append(s)
 
-    def _ignored(self, path):
-        """True if `path` matches a declared pattern. Records which pattern hit."""
+    def ignored(self, path):
+        """True if `path` matches a declared pattern. Records which pattern hit.
+
+        PUBLIC, because it has consumers outside this file. `wf-conform` reads the
+        same declaration through it so that "what counts as project content" is
+        answered once; when it was private, that file grew its own directory-name
+        guess instead and the two disagreed.
+        """
         if not self.ignore_patterns:
             return False
         rel = os.path.relpath(path, self.root).replace(os.sep, "/")
@@ -393,7 +403,7 @@ class Census:
                 if not fn.endswith(".md"):
                     continue
                 p = os.path.join(dirpath, fn)
-                if self._ignored(p):
+                if self.ignored(p):
                     self.ignored_files += 1
                     continue
                 body = self.read(p)
@@ -464,6 +474,54 @@ class Census:
                     )
 
     # ── hooks ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def shell_segments(raw):
+        """The commands in a shell line, in execution order, unwrapped.
+
+        ONE PRODUCER FOR THE OPERATOR GRAMMAR, and it exists because `shlex.split`
+        is a WORD splitter, not a shell parser. It knows nothing about `;`, `&&`,
+        `||`, `|` or `&`, so it fuses a trailing separator onto the preceding word.
+
+        MEASURED 2026-08-10, both directions, from one fixture pair:
+
+        - FALSE DEAD. `bash bin/real.sh; echo done` tokenized to `bin/real.sh;` —
+          semicolon included — which is not a path on any disk. `wf-checkrun`
+          reported a live script dead and exited 1 on a handbook whose check was
+          fine. Surfaced by a project audit that could not fix it from its own tree.
+        - SILENT MISS, and this is the worse half. `cd "$X" && bash bin/real.sh`
+          gave first token `cd`, no slash, UNDECIDABLE — so the real script was
+          never examined and a dead registration in that shape reports as nothing.
+          Under-reporting is the direction `load_ignore` is written against too.
+
+        `shlex.shlex(punctuation_chars=True)` is used rather than a regex split
+        because the separator must be recognised OUTSIDE quotes only: a regex over
+        the raw text severs `bash -c "a; b"` mid-string, and that inline-script
+        shape is the one `resolve_hook_command` must keep whole in order to refuse
+        it. Returns [] when the line does not lex — an unbalanced quote is
+        undecidable, never a guess.
+        """
+        lex = shlex.shlex(raw, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        try:
+            tokens = list(lex)
+        except ValueError:
+            return []
+        segments, current = [], []
+        for t in tokens:
+            if t in (";", "&", "&&", "|", "||", "\n"):
+                if current:
+                    segments.append(current)
+                current = []
+                continue
+            # Grouping and redirection are not commands. `(bash bin/y.sh)` put `(`
+            # in the first position, which carries no slash and so read UNDECIDABLE.
+            if t in ("(", ")", "{", "}", ">", ">>", "<", ">&", "<&"):
+                continue
+            current.append(t)
+        if current:
+            segments.append(current)
+        return segments
+
     def resolve_hook_command(self, cmd):
         """The script a hook command would run, and whether it is on disk.
 
@@ -482,36 +540,57 @@ class Census:
         raw = (cmd or "").strip()
         if not raw:
             return None, None
-        try:
-            tokens = shlex.split(raw)
-        except ValueError:
-            return None, None
-        if not tokens:
-            return None, None
 
+        # THE FIRST DECIDABLE SEGMENT WINS, and the loop is the point. A line's
+        # leading segment is very often a `cd`, a `test -f`, or a `mkdir -p` — bare
+        # names on PATH, undecidable by design — and stopping there is what made the
+        # real script behind `&&` invisible. Later segments were never examined
+        # before this loop existed, so nothing that used to resolve stops resolving.
+        for tokens in self.shell_segments(raw):
+            resolved = self._resolve_segment(tokens)
+            if resolved is not None:
+                return resolved, os.path.exists(resolved)
+        return None, None
+
+    def _resolve_segment(self, tokens):
+        """The one file a single command runs, or None when it cannot be decided.
+
+        AN ENVIRONMENT PREFIX IS NOT THE COMMAND. `FOO=bar cmd` and `env FOO=bar cmd`
+        both run `cmd`; the assignments are shell grammar sitting in front of it.
+        MEASURED 2026-08-10 against a real project the moment segment-walking landed:
+        `printf '%s' '{...}' | CLAUDE_PROJECT_DIR=/home/… bash .claude/…/hook.sh`
+        reached segment two, whose first token was the ASSIGNMENT — and it carries a
+        slash, so it read as a path, resolved to nothing, and reported a live hook
+        dead. The pre-existing behaviour hid this by never reaching segment two at
+        all, which is why walking the segments had to bring the grammar with it.
+        """
+        while tokens and (ENV_ASSIGN_RX.match(tokens[0])
+                          or (tokens[0] == "env" and len(tokens) > 1)):
+            tokens = tokens[1:]
+        if not tokens:
+            return None
         first = tokens[0]
         # An interpreter invocation runs its script argument, not itself.
         if os.path.basename(first) in ("sh", "bash", "zsh", "python", "python3", "node", "pwsh"):
             args = [t for t in tokens[1:] if not t.startswith("-")]
             if len(tokens) > 1 and tokens[1] in ("-c", "-Command"):
-                return None, None          # inline script: nothing to stat
+                return None                # inline script: nothing to stat
             if not args:
-                return None, None
+                return None
             first = args[0]
 
         if "/" not in first:
-            return None, None              # resolved via PATH; not ours to judge
+            return None                    # resolved via PATH; not ours to judge
 
         path = first
         for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
             path = path.replace(var, self.root)
         path = os.path.expandvars(os.path.expanduser(path))
         if "$" in path:
-            return None, None              # an env var this process cannot know
+            return None                    # an env var this process cannot know
         if not os.path.isabs(path):
             path = os.path.join(self.root, path)
-        path = os.path.normpath(path)
-        return path, os.path.exists(path)
+        return os.path.normpath(path)
 
     def owning_skill(self, resolved):
         """Which skill directory this hook's script lives in, exactly.

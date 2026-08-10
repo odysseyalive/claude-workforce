@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 16 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -86,7 +86,7 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 
 | Legitimate | Example |
 |---|---|
-| a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
+| a fix **in another repository** | *"`wf-conform` false positive — `.censusignore` unread. Discharged by:* `/workforce dev diagnose, run in /home/you/lab/claude-workforce`*"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
 
 **BLOCKING — a row about THIS project's own work may not survive to a next run.** The queue a run
@@ -98,6 +98,30 @@ park a preference as a standing *"kept"* state. Anything the run can perform is 
 anything it must decide is put to the user once and applied this run. A row that is neither another
 repository nor a measured host limit is not deferrable — it is work the run stopped short of, and it
 is drained to fixpoint before the run closes.
+
+**BLOCKING — an other-repository row names the repository's PATH and the command that closes it
+THERE.** Not "upstream", not "the workforce distribution", not a prose sentence a reader has to
+resolve: the absolute path of the repository that owns the defect, and the literal gesture run inside
+it. The cell reads `/workforce dev <command>, run in <abs path>` — the same runnable-verbatim and
+reach-the-tree tests every other cell passes, applied to the one category that leaves the tree.
+
+*Added 2026-08-10, from the row in the table above. That example is not hypothetical — it is the
+literal wording a real audit filed, and the rest of its report had to carry the repository path, the
+reproduction, and the fix in PROSE for a human to read and act on. **The carve-out legitimises the
+row and consumes nothing.** A citation nobody can execute is a description of where the work lives,
+and the closing mechanism was a person noticing the paragraph and opening a session by hand — which
+is a rule with a reader and no producer, in the one clause this queue keeps for the rows it cannot
+drain itself. The remedy is the smallest thing that makes the citation act like every other cell:
+somewhere to go, and something to type when you get there.*
+
+**This is a shape rule, not a routing promise, and the distinction is the honest part.** Nothing in
+this distribution reaches into another repository, and nothing here claims to: the upstream fix is
+made by a human running that command in that tree. What the rule buys is that the row says *where*
+and *what* rather than *roughly which project*, so the gesture is one paste instead of a
+reconstruction. **The row is closed by the downstream run that RE-RUNS its own reproduction and
+watches it pass** — never by an upstream report asserting the fix shipped, and never by a run
+re-reading last run's wording. A row whose `Measured` evidence cannot be re-executed is malformed for
+the same reason a bare flag is.
 
 **BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
 a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no
