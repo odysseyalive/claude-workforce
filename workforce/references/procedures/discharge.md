@@ -1,6 +1,6 @@
 # discharge — drain the deferred queue by doing the work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Medium risk (writes into the project, never deletes); **display by default**, `--execute` writes.
 `/workforce discharge [--execute] [<id>…]`
 
@@ -43,12 +43,20 @@ Reads `${CLAUDE_PROJECT_DIR}/.claude/workforce/deferred.md`, classifies every OP
 one either does the work or states which shipped rule forbids it. With no `<id>` arguments it processes
 the whole queue; with ids, only those rows.
 
+**The drain runs to FIXPOINT, not once.** Discharging a row surfaces new rows as often as not — a
+repair that exposes a stale contract, a conversion that leaves a dead reference, a reduction that
+orphans a hook — and each new row is added to the queue and discharged in **this same invocation**,
+never carried to a next run. The loop is: resolve every OPEN row, re-scan, resolve every row the
+last pass surfaced, repeat, and terminate only when a re-scan finds nothing OPEN but the two
+survivor categories below. A single pass that leaves freshly-surfaced rows OPEN is the deferment
+queue rebuilding itself one level down, which is the exact failure this command exists to end.
+
 ### Classification — three outcomes, and there is no fourth
 
 | Outcome | When | What happens |
 |---|---|---|
 | **DISCHARGED** | the default for everything | the work is done in this run, and the row is closed with the evidence |
-| **DECIDED** | the row turns on a preference no evidence in the project can settle | put to the user as **one consolidated prompt**, then applied — never left in the queue |
+| **DECIDED** | the row turns on a genuine either/or preference no evidence in the project can settle | put to the user as **one consolidated prompt**, then **applied in this run** — never parked as a standing "kept" refinement the user must come back to |
 | **QUEUED** | a fix in **another repository**, or a **measured host limit** with its attempt count | stays OPEN, and the cell carries the precondition |
 
 "A **user decision**" is no longer a queueable category. It is `DECIDED` — asked once at the end of the

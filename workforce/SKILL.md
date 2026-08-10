@@ -1,7 +1,7 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 63 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
-description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
+description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
 version: "1.0"
@@ -34,6 +34,7 @@ hooks:
 | `/workforce hooks [--execute]` | Wire, report, or unwire the shipped hooks; `verify` reports dormancy |
 | `/workforce preflight` | Discover the `.claude` settings that would refuse an audit's writes, and print the one command that clears each. Read-only; `audit` runs it first, at Step 0.05 |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
+| `/workforce dev diagnose` | Turn the audit inward: measure install/update/streamline, then drain every block to a fixpoint. Dev-only |
 <!-- /origin -->
 
 ---
@@ -221,6 +222,30 @@ Two things this directive does NOT say: `--review` remains the zero-write escape
 consent-on-invocation **is not auto-firing** — no command, hook, or dispatch starts a sweep, and `audit`
 still runs its own Step 6c inline.*
 
+> **"workforce is still creating a deferment queue. this is absolutely not acceptable! all items in the
+> deferement queue should be resolved one by one, addressing new items that arrive until the project has
+> been completely updated. NO EXCEPTIONS! NO BLOCKS! NO EXCUSES!"**
+
+*— Added 2026-08-10, source: user directive, stated on being shown a re-audit of the `university` project
+(run `audit-20260810T175857Z`) that reported `INV-DEFERRED carried 3 · decided-keep 2 · intentional 1`
+and closed by surfacing three "optional refinements" for the user to keep or resolve. The user notes it
+**recurs** — "still" — which is why it is captured rather than answered in the run. **This is the same
+disease "A DETECTOR SHIPS WITH ITS FIX" names, now stated for the queue itself: a deferred row IS a flag,
+and a standing queue is a flag pile.** The operational reading is — **no run leaves a deferment queue
+behind.** Every deferred row is resolved in the run that surfaces it: the work is done, not offered back
+as an optional keep-or-resolve choice. Resolving a row may surface new rows; they are added to the queue
+and resolved too, and the loop terminates only when the queue is **empty** and the project is fully
+updated. Nothing is carried forward to a next run — `carried 3` and `decided-keep 2` are precisely the
+outcomes this forbids for a project's own work. It collapses two dispositions: **DECIDED never means
+"kept as a standing optional refinement"** (a genuine either/or preference is still resolved this run by
+applying the answer, not by parking the row), and **a proposal about the project's own work is never
+QUEUED** — that was already true for org shape and is now true for every refinement the run can perform.
+The one row that legitimately survives is one whose resolution lies in **another repository** or past a
+**measured host limit**, and it is reported with that citation, never as "you chose to keep the stable
+state." Mechanics at `references/procedures/audit.md` § Step 7, `references/deferred.md`, and
+`references/procedures/discharge.md`; and `references/procedures/diagnose.md`, which drains to the same
+fixpoint against workforce's own three deliverables.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
@@ -329,6 +354,8 @@ employee — converting the dispatcher into an agent creates a dispatch loop.
 
 - Exclude `workforce` and `org` from every survey, conversion, and embed pass.
 - `dev` is the ONLY escape: `/workforce dev <command>` includes `workforce` itself.
+- `diagnose` is dev-only — it inspects `workforce` itself. `/workforce diagnose` without `dev`, or a
+  routed ask carrying the token, STOPs with the self-exclusion message (`references/procedures/diagnose.md`).
 - **`dev` is user-typed only.** Never synthesize the `dev` prefix, never pass one through from a
   routed ask. IF a dispatched ask carries `dev` → STOP and report: "Dev mode is reserved for manual
   invocation. Type `/workforce dev …` yourself." Stripping the token silently alters the ask.
@@ -349,7 +376,7 @@ a FAIL.
 
 High-risk commands default to **display mode** and require `--execute`: `hire`, `promote`,
 `transfer`, `retire`, `handbook`, `org embed`, `ablate`, `reconcile`, `vendor`, `restore`,
-`disband`, `rollback`, `discharge`. Low-risk and read-only commands run immediately: `roster`, `budget`,
+`disband`, `rollback`, `discharge`, `dev diagnose`. Low-risk and read-only commands run immediately: `roster`, `budget`,
 `org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`, `preflight`.
 
 `audit` and `sweep` are the exceptions: **running the command is the consent**, and both auto-execute.

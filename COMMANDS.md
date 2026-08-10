@@ -155,6 +155,7 @@ org produced.
 | `/workforce update [--user\|--project\|--all]` | low | Pull the latest release into a chosen scope |
 | `/workforce version [--check]` | read-only | Every copy by path, which is active, whether facts are current |
 | `/workforce dev <command>` | — | Run a command with `workforce` itself included |
+| `/workforce dev diagnose [--execute]` | high | Turn the audit inward on install/update/streamline, then drain every block to a fixpoint |
 
 ```
 /workforce vendor --execute

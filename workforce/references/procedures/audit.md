@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 94 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 47 assertion(s) in bin/check name this file; 94 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1061,6 +1061,16 @@ Rows 1, 2, and 3 of `odyssey-alive`'s `deferred.md` are all this one gap.*
 **Run `/workforce discharge --execute` (`references/procedures/discharge.md`) against the queue this
 run is about to close with.** Every OPEN row is classified into exactly three outcomes — DISCHARGED,
 DECIDED, or QUEUED — and a refusal that cites no shipped rule at `path:line` is not a refusal.
+
+**Discharge drains to FIXPOINT here, and "a refinement kept for later" is not one of its outcomes.**
+The loop resolves each row, re-scans for the rows its own repairs surfaced, resolves those too, and
+terminates only when the queue is EMPTY but for the two survivor categories — a fix in another
+repository, or a measured host limit with its attempt count. **There is no keep-the-stable-state
+disposition.** A close that hands the user a menu of "optional refinements" to keep or resolve —
+*"you chose to keep the stable state"* — has parked the project's own work as a standing choice,
+which is the deferment queue wearing a friendlier label. A refinement this run can perform is
+DISCHARGED; a preference it cannot settle is DECIDED and applied; both land in this run, and nothing
+about the project's own work is carried to the next.
 
 **It runs HERE, not at close, and the placement is the whole mechanism.** A `NOT UPHELD` invariant
 aborts the sweep, and discharge is what repairs one. Placed after Step 6c it would be repairing a gate

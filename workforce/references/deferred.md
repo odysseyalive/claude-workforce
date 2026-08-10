@@ -1,6 +1,6 @@
 # Deferred Work — the queue six writers already assumed existed
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every "queue a <command>" in this distribution resolves here. -->
 
 Six shipped files instruct a run to **"queue a `review`"**, and one to queue a per-handbook rewrite.
@@ -88,6 +88,16 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 |---|---|
 | a fix **in another repository** | *"`wf-conform` false positive — a fix upstream in the workforce distribution"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
+
+**BLOCKING — a row about THIS project's own work may not survive to a next run.** The queue a run
+closes with ends EMPTY but for those two survivor categories, and each survivor carries its citation
+in the cell — the other repository named, or the host limit measured with its attempt count.
+`carried N` and `decided-keep N` for the project's own work are the exact outcomes this forbids: a
+run does not hand its own unfinished refinements to the next invocation of itself, and it does not
+park a preference as a standing *"kept"* state. Anything the run can perform is performed this run;
+anything it must decide is put to the user once and applied this run. A row that is neither another
+repository nor a measured host limit is not deferrable — it is work the run stopped short of, and it
+is drained to fixpoint before the run closes.
 
 **BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
 a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no

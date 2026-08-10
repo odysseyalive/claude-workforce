@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -112,6 +112,15 @@ your call"* — and every invariant passed, because neither had ever entered the
 count in the summary line therefore includes **every proposal the run generated**; a proposal about the
 project's own org shape can never be `QUEUED` (`audit.md` § BLOCKING — the closing report carries NO
 "what I did not do" section), so it is DISCHARGED or DECIDED, and DECIDED is applied in the same run.
+
+**Row 12 additionally asserts the queue ended EMPTY but for cited survivors, and row 17 that the
+drain ran to FIXPOINT.** Counting a backlog correctly was never the same as being allowed to keep
+one. A run closes with `INV-DEFERRED` balanced AND with zero rows about its own work carried forward
+— the only OPEN rows are a fix in another repo or a measured host limit with its attempt count, each
+cited in its cell. A `carried N` or `decided-keep N` for the project's own refinements is `NOT
+UPHELD`, repaired by draining the queue to fixpoint in this run — resolve, re-scan, resolve what the
+last pass surfaced, until nothing OPEN remains but the cited survivors — never by reporting the
+arithmetic of a queue nobody was allowed to hold.
 
 **Rows 14, 15, and 16 exist because a run reported `0 of 37 converted` as success.** Each closes one
 leg of it: 14 forbids an unmeasured overage (the run compared 37 against nothing and called it a cap

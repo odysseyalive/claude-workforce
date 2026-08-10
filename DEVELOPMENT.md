@@ -113,7 +113,33 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-07
+## Open, as of 2026-08-10
+
+**Landed 2026-08-10 — no run may leave a deferment queue, and a `dev diagnose` that drains workforce's
+own blocks to a fixpoint.** Reported by the user against a `university` re-audit whose close read
+`INV-DEFERRED carried 3 · decided-keep 2 · intentional 1` and offered three "optional refinements" to
+keep or resolve: *"workforce is still creating a deferment queue. this is absolutely not acceptable! …
+NO EXCEPTIONS! NO BLOCKS! NO EXCUSES!"* Captured verbatim in `SKILL.md` § Directives (2026-08-10). Two
+parts, one directive:
+
+- **The class fix.** `discharge` drains to **fixpoint** (resolve → re-scan → resolve what surfaced,
+  until nothing OPEN remains but cited survivors); `audit`'s close loses the "keep the stable state"
+  menu; `DECIDED` is applied in the same run, never parked; a row about the project's **own** work is
+  never carried to a next run. Gates: `INV-DEFERRED` (row 12) now asserts the queue ended empty but for
+  cited survivors, `INV-CLOSE` (row 17) that the drain ran to fixpoint. Four `bin/check` assertions,
+  four `bin/prove` cases — `discharge.md`, `audit.md`, `deferred.md`, `invariants.md`.
+- **`diagnose`.** New dev-only command (`references/procedures/diagnose.md`): turns the audit inward on
+  the three deliverables — **install**, **update**, **streamline** — over a read-only composite
+  (`audit --review` self-run, `verify`, `preflight`), classifies each block by deliverable, and drains
+  it in-run: APPLY-NOW for mechanical, ROUTE-AND-IMPLEMENT (fix now, never a spec for later) for
+  judgment, looping until all three are clear. Seven `bin/check` assertions, seven `bin/prove` cases.
+  Wired into the frontmatter command enumeration (so the phantom-command gate passes), Quick Commands,
+  Display-vs-Execute, Self-Exclusion, `manifest.txt`, `COMMANDS.md`.
+
+**Still open from this:** `diagnose`'s runtime behavior (the composite orchestration and the ROUTE
+dispatch loop) is specified in the procedure but not yet exercised by a live `/workforce dev diagnose`
+run against this repo — the doctrine and its gates are proven by breaking; the end-to-end run is the
+next verification.
 
 **Closed 2026-08-07 — a run staged a deletion, said "the sweep is now unblocked", and handed the user
 the command.** Reported by the user with the run's own closing report: *"we are still having issues with

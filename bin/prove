@@ -115,6 +115,7 @@ CEN2 = "workforce/bin/wf-census"
 EVL  = "workforce/references/evaluators.md"
 ADDT = "workforce/references/evaluator-additions/text-tells.md"
 PTL  = "workforce/references/personnel-templates.md"
+DGN  = "workforce/references/procedures/diagnose.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -128,7 +129,7 @@ CASES = [
     ("additions: declared, present, and OUTSIDE the vendored set",
      MAN, "del", "workforce/references/evaluator-additions/text-tells.md\n"),
     ("additions: each carries its own anchor and declares workforce as author",
-     ADDT, "del", "text-additions-version: 1"),
+     ADDT, "del", "additions-version:"),
     ("additions: the seeding step names both files BY PATH",
      EVL, "del", "`references/evaluator-additions/text-tells.md`"),
     ("additions: manifest states the authored-vs-vendored distinction where it ships them",
@@ -374,6 +375,30 @@ CASES = [
      DFR, "del", "never discharged by this run's own ORG"),
     ("discharge: deletes nothing — the sweep stays the only destructive act",
      DSC, "del", "still the only destructive act"),
+    # ── no deferment queue left behind (user directive 2026-08-10) ───────────
+    ("discharge: the drain runs to fixpoint, not a single pass",
+     DSC, "del", "runs to FIXPOINT, not once"),
+    ("deferred: no keep-the-stable-state close for the project's own work",
+     AUD, "del", "There is no keep-the-stable-state"),
+    ("deferred: a row about the project's own work never survives to a next run",
+     DFR, "del", "a row about THIS project's own work may not survive to a next run"),
+    ("invariants: INV-DEFERRED asserts the queue ended empty but for cited survivors",
+     INV, "del", "Row 12 additionally asserts the queue ended EMPTY but for cited survivors"),
+    # ── diagnose: the audit turned inward, drained to the same fixpoint ───────
+    ("diagnose: it is dev-only and self-excludes when reached bare",
+     DGN, "del", "`diagnose` runs ONLY under `dev`"),
+    ("diagnose: it invents no new detection, only composes existing surfaces",
+     DGN, "del", "invents no new detection"),
+    ("diagnose: it drains findings to a fixpoint, not one pass",
+     DGN, "del", "drains to a fixpoint"),
+    ("diagnose: ROUTE implements the fix in-run, never records a spec for later",
+     DGN, "del", "never records a spec for a later run"),
+    ("diagnose: a routed fix ships with its bin/check assertion and bin/prove case",
+     DGN, "del", "every routed fix lands with its `bin/check` assertion"),
+    ("diagnose: no bare flag and no what-I-did-not-do section",
+     DGN, "del", 'never a bare flag, and never a "what I did not do" section'),
+    ("diagnose: a clear deliverable is reported by name, not by silence",
+     DGN, "del", "a zero is a measurement, and silence is"),
     # ── the mechanism layer: skills own mechanism, employees own judgment ────
     ("journal: a hire writes T5/T8 rows exactly as a conversion does",
      HIR, "del", "a HIRE writes T5 and T8 rows exactly as a conversion does"),

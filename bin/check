@@ -2799,6 +2799,92 @@ check(
     "hired employees are the same evasion one level down, and two of six measured "
     "rows read exactly that way",
 )
+# No run may leave a deferment queue behind (user directive 2026-08-10). A
+# `university` re-audit closed `INV-DEFERRED carried 3 · decided-keep 2 · intentional
+# 1` and offered three "optional refinements" for the user to keep or resolve — the
+# deferment queue wearing a friendlier label. Four claims land the tightening: the
+# drain runs to fixpoint, no keep-the-stable-state close, no cross-run carry for the
+# project's own work, and only cited external/host-limit rows survive.
+check(
+    "discharge: the drain runs to fixpoint, not a single pass",
+    "runs to FIXPOINT, not once" in _dsc,
+    "discharging a row surfaces new rows; a single pass that leaves them OPEN is the "
+    "deferment queue rebuilding one level down. The loop resolves, re-scans, resolves "
+    "what surfaced, until nothing OPEN remains but the cited survivors",
+)
+check(
+    "deferred: no keep-the-stable-state close for the project's own work",
+    "There is no keep-the-stable-state" in aud,
+    "a close offering the user a menu of 'optional refinements' to keep or resolve "
+    "('you chose to keep the stable state') has parked the project's own work as a "
+    "standing choice — DISCHARGED or DECIDED-and-applied, both in this run, is the rule",
+)
+check(
+    "deferred: a row about the project's own work never survives to a next run",
+    "a row about THIS project's own work may not survive to a next run" in dfr,
+    "`carried N` and `decided-keep N` for the project's own work are the forbidden "
+    "outcomes; a run does not hand its own unfinished refinements to the next "
+    "invocation of itself, and drains the queue to fixpoint before it closes",
+)
+check(
+    "invariants: INV-DEFERRED asserts the queue ended empty but for cited survivors",
+    "Row 12 additionally asserts the queue ended EMPTY but for cited survivors" in inv,
+    "counting a backlog correctly is not being allowed to keep one; the only OPEN "
+    "rows a run may close with are a fix in another repo or a measured host limit "
+    "with its attempt count, and a `carried`/`decided-keep` for own work is NOT UPHELD",
+)
+# ─────────────────────────────────────────────────────────────────────────────
+# diagnose — the audit turned inward on workforce's own three deliverables, and
+# drained to the same fixpoint the deferment directive requires everywhere. Each
+# assertion holds one way the command can silently stop being what it claims: a
+# self-exclusion gate that is not stated, a detector that quietly grows a new
+# mechanism, a ROUTE disposition that records a spec instead of fixing it, or a
+# clean deliverable that goes unreported and reads as unchecked.
+_dgn = read("workforce/references/procedures/diagnose.md")
+check(
+    "diagnose: it is dev-only and self-excludes when reached bare",
+    "`diagnose` runs ONLY under `dev`" in _dgn,
+    "diagnose inspects workforce itself; without the dev-only gate a routed ask or a "
+    "bare `/workforce diagnose` would audit the dispatcher and create the dispatch "
+    "loop the Self-Exclusion Rule exists to prevent",
+)
+check(
+    "diagnose: it invents no new detection, only composes existing surfaces",
+    "invents no new detection" in _dgn,
+    "the value is orchestration over audit --review, verify, and preflight; a private "
+    "detector here is a second copy of a rule that drifts from the surface it duplicates",
+)
+check(
+    "diagnose: it drains findings to a fixpoint, not one pass",
+    "drains to a fixpoint" in _dgn,
+    "the deferment directive is that no run leaves a queue; a diagnose that reports "
+    "blocks without looping until all three deliverables are clear is the flag pile "
+    "the directive forbids",
+)
+check(
+    "diagnose: ROUTE implements the fix in-run, never records a spec for later",
+    "never records a spec for a later run" in _dgn,
+    "routing a patch spec into a backlog IS a deferment queue by another name; the "
+    "maintainer employee implements in this run, or the block is not resolved",
+)
+check(
+    "diagnose: a routed fix ships with its bin/check assertion and bin/prove case",
+    "every routed fix lands with its `bin/check` assertion" in _dgn,
+    "'a detector ships with its fix' applies to diagnose's own output — a fix landed "
+    "without the assertion that catches its recurrence is a fix that comes back unseen",
+)
+check(
+    "diagnose: no bare flag and no what-I-did-not-do section",
+    'never a bare flag, and never a "what I did not do" section' in _dgn,
+    "the two shapes the directive kills: a finding reported without a resolution, and "
+    "a closing section listing work the run declined to do on the project's own source",
+)
+check(
+    "diagnose: a clear deliverable is reported by name, not by silence",
+    "a zero is a measurement, and silence is" in _dgn,
+    "a reader cannot tell a deliverable that passed from one that was never checked "
+    "unless the clear case is stated explicitly, the same rule the verify header sets",
+)
 # ─────────────────────────────────────────────────────────────────────────────
 # The mechanism layer — skills own mechanism, employees own judgment.
 #
