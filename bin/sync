@@ -4,6 +4,7 @@ Mirror the source distribution into the runtime copy, exactly as the installers 
 
     python3 bin/sync            # or: bin/sync   -> the project runtime
     bin/sync --personal        # ALSO refresh ~/.claude/skills/workforce
+    bin/sync --force           # discard runtime-first edits instead of refusing
 
 claude-workforce has a THREE-copy tree, and the third is the one that resolves:
 
@@ -56,8 +57,8 @@ PREFIX = "workforce/"
 argv = sys.argv[1:]
 personal = "--personal" in argv
 for a in argv:
-    if a != "--personal":
-        sys.exit(f"unknown argument {a!r}\nusage: bin/sync [--personal]")
+    if a not in ("--personal", "--force"):
+        sys.exit(f"unknown argument {a!r}\nusage: bin/sync [--personal] [--force]")
 
 if not os.path.isfile("manifest.txt"):
     sys.exit("no manifest.txt — run from the repo root")
@@ -71,51 +72,119 @@ if personal and os.path.exists(PERSONAL_ROOT) and not os.path.isfile(
              f"workforce install. Nothing was removed.")
 
 targets = [DEST_ROOT] + ([PERSONAL_ROOT] if personal else [])
+
+
+def manifest_entries():
+    """Every shipped source path, with its executable flag. Parsed BEFORE anything is
+    removed, because the runtime-first scan below has to read the copies this script
+    is about to delete."""
+    out, bad = [], []
+    for line in open("manifest.txt", encoding="utf-8"):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        executable = False
+        for flag in ("exec ", "hook "):
+            if s.startswith(flag):
+                s = s[len(flag):].strip()
+                executable = True
+                break
+        if s.startswith("canary "):
+            s = s[len("canary "):].strip()
+            if not os.path.isfile(s):
+                bad.append(f"{s} (declared canary, not on disk)")
+            continue
+        if not s.startswith(PREFIX):
+            bad.append(f"{s} (path does not start with {PREFIX!r})")
+            continue
+        if not os.path.isfile(s):
+            bad.append(f"{s} (declared, not on disk)")
+            continue
+        out.append((s, executable))
+    return out, bad
+
+
+ENTRIES, missing = manifest_entries()
+
+# ── REFUSE to destroy a runtime-first edit ───────────────────────────────────
+# This script is delete-then-rebuild, so every byte in a target that is not in source
+# is gone the moment it runs. The docstring says "never edit the runtime copy" — and a
+# directive is not a mechanism. MEASURED 2026-08-10: a session edited
+# `references/procedures/intent-router.md` in the personal install, source was never
+# updated, and a later sync deploying an unrelated fix would have deleted it. It
+# survived only because a human diffed the file by hand first, having no reason to
+# beyond suspicion.
+#
+# `bin/check` reported that file as "drifted" and could not say which side was newer,
+# so its output read IDENTICALLY whether a sync was about to deploy a fix or destroy
+# one. Detection that cannot tell those apart is not detection.
+#
+# MTIME IS THE SIGNAL AND IT IS SOUND HERE, because `shutil.copy2` below preserves it:
+# immediately after a sync a target file and its source share a timestamp exactly. A
+# target NEWER than its source therefore means the target was written after the last
+# sync — which is the definition of a runtime-first edit. Equal mtimes with differing
+# content cannot be ordered and are reported as UNDATED rather than guessed at.
+def runtime_first_edits():
+    out = []
+    for src, _x in ENTRIES:
+        rel = src[len(PREFIX):]
+        for target in targets:
+            dest = os.path.join(target, rel)
+            if not os.path.isfile(dest):
+                continue
+            try:
+                with open(dest, "rb") as fh:
+                    dest_bytes = fh.read()
+                with open(src, "rb") as fh:
+                    src_bytes = fh.read()
+                if dest_bytes == src_bytes:
+                    continue
+                dest_mtime = os.stat(dest).st_mtime
+                src_mtime = os.stat(src).st_mtime
+            except OSError:
+                continue
+            if dest_mtime > src_mtime:
+                out.append((dest, src, "NEWER than source"))
+            elif dest_mtime == src_mtime:
+                out.append((dest, src, "same mtime, different content — UNDATED"))
+    return out
+
+
+_ahead = runtime_first_edits()
+if _ahead and "--force" not in argv:
+    print("REFUSING — a runtime copy holds edits that are not in source.")
+    print("This script deletes each target and rebuilds it from the manifest, so these")
+    print("would be destroyed, not merged:\n")
+    for dest, src, why in _ahead:
+        print(f"  ✗ {dest}\n      {why}\n      source: {src}")
+    print("\nPromote each one into source first — `cp <runtime> <source>` — then re-run.")
+    print("That preserves the work and makes source the record, which is what")
+    print("source-first means. `--force` discards them, and is never the fix for a file")
+    print("you have not read.")
+    sys.exit(2)
+if _ahead:
+    print(f"--force: DISCARDING {len(_ahead)} runtime-first edit(s):")
+    for dest, _src, why in _ahead:
+        print(f"  ! {dest}  ({why})")
+    print()
+
 for t in targets:
     if os.path.isdir(t):
         shutil.rmtree(t)
 
 copied = 0
-missing = []
 
-for line in open("manifest.txt", encoding="utf-8"):
-    s = line.strip()
-    if not s or s.startswith("#"):
-        continue
-
-    # Strip the manifest flags the installers understand. `exec` and `hook` both
-    # mean chmod +x; copy2 preserves the source mode, so the bit carries over.
-    # manifest.txt says re-adding a flag means re-adding its handling to bin/check
-    # AND bin/sync in the same change — this half was missed on the first pass and
-    # sync silently reported every flagged line as a manifest problem.
-    executable = False
-    for flag in ("exec ", "hook "):
-        if s.startswith(flag):
-            s = s[len(flag):].strip()
-            executable = True
-            break
-
-    # `canary` files are agent DEFINITIONS. The installers place them in
-    # `.claude/agents/`, never inside the skill tree, so an agent type exists
-    # before the first audit runs. bin/sync mirrors the SKILL, so it skips them
-    # rather than copying a registerable agent into a directory where the
-    # harness will never look for one.
-    if s.startswith("canary "):
-        s = s[len("canary "):].strip()
-        if not os.path.isfile(s):
-            missing.append(f"{s} (declared canary, not on disk)")
-        continue
-
-    if not s.startswith(PREFIX):
-        missing.append(f"{s} (path does not start with {PREFIX!r})")
-        continue
-    if not os.path.isfile(s):
-        missing.append(f"{s} (declared, not on disk)")
-        continue
-
+# The manifest flags — `exec`, `hook`, `canary` — and the on-disk checks are handled
+# once, in `manifest_entries()` above, because the runtime-first scan needs the parsed
+# list before anything is deleted. manifest.txt says re-adding a flag means re-adding
+# its handling to bin/check AND bin/sync in the same change; that handling now has one
+# home in this file rather than being inlined in the copy loop.
+for s, executable in ENTRIES:
     for target in targets:
         dest = os.path.join(target, s[len(PREFIX):])
         os.makedirs(os.path.dirname(dest), exist_ok=True)
+        # copy2 preserves mtime, which is what makes the runtime-first scan above
+        # sound: a fresh copy and its source share a timestamp exactly.
         shutil.copy2(s, dest)
         if executable:
             os.chmod(dest, os.stat(dest).st_mode | 0o111)

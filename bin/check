@@ -6063,7 +6063,7 @@ if os.path.isdir(_personal):
     # whole doctrine change sat stale in the shadowing copy — the check was green and
     # the copy a session loads was a day behind. A sample cannot answer "is this copy
     # current"; only the whole manifest can.
-    _drift, _missing, _compared = [], [], 0
+    _drift, _ahead, _missing, _compared = [], [], [], 0
     # `canary` files install to `.claude/agents/`, never into the skill tree, so
     # they are legitimately absent from the personal SKILL copy and comparing
     # them there reports 4 permanent phantom absences.
@@ -6083,7 +6083,19 @@ if os.path.isdir(_personal):
         if not os.path.exists(_b):
             _missing.append(_rel)
         elif read(_src) != read(_b):
-            _drift.append(_rel)
+            # DIRECTION, not just difference. `bin/sync` is delete-then-rebuild, so a
+            # personal file NEWER than source is about to be destroyed by the very
+            # command this check recommends — while a personal file OLDER than source
+            # is the ordinary staleness that command exists to fix. Until 2026-08-10
+            # both printed as "drifted" and this row read IDENTICALLY whether syncing
+            # would deploy a fix or delete one. `shutil.copy2` preserves mtime, so a
+            # fresh copy and its source share a timestamp exactly and "newer" means
+            # "written after the last sync".
+            try:
+                _dm, _sm = os.stat(_b).st_mtime, os.stat(_src).st_mtime
+            except OSError:
+                _dm = _sm = 0
+            (_ahead if _dm > _sm else _drift).append(_rel)
 
     # The anti-vacuity guard. A comparison that compared nothing is not a pass.
     check("the personal-install drift check actually compared files",
@@ -6094,15 +6106,36 @@ if os.path.isdir(_personal):
     _n = len(_drift) + len(_missing)
     _shown = ", ".join((_drift + _missing)[:6]) + (" …" if _n > 6 else "")
     check("personal install matches source (it shadows the runtime)",
-          not _drift and not _missing,
-          f"{len(_drift)} drifted, {len(_missing)} absent of {len(declared)} shipped files "
-          f"({_shown}) — `~/.claude/skills/workforce` resolves BEFORE "
-          "`.claude/skills/workforce`, so this is the copy a session loads. FIX: "
-          "`bin/sync --personal`. Do NOT plain `./install` — it fetches the PUBLISHED "
-          "tree and will overwrite local changes with older code while reporting a "
-          "successful refresh; `WORKFORCE_REPO_URL=\"file://$PWD\" ./install --user` is "
-          "the form that uses this checkout. Deleting the personal install also clears "
-          "the drift, but removes /workforce from every OTHER project on this machine.")
+          not _drift and not _missing and not _ahead,
+          f"{len(_drift)} stale, {len(_ahead)} RUNTIME-FIRST, {len(_missing)} absent of "
+          f"{len(declared)} shipped files ({_shown}) — `~/.claude/skills/workforce` "
+          "resolves BEFORE `.claude/skills/workforce`, so this is the copy a session "
+          "loads. FIX for the stale and absent ones: `bin/sync --personal`. "
+          "Do NOT plain `./install` — it fetches the PUBLISHED tree and will overwrite "
+          "local changes "
+          "with older code while reporting a successful refresh; "
+          "`WORKFORCE_REPO_URL=\"file://$PWD\" ./install --user` is the form that uses "
+          "this checkout. Deleting the personal install also clears the drift, but "
+          "removes /workforce from every OTHER project on this machine."
+          + (f"  ⚠ RUNTIME-FIRST ({', '.join(_ahead)}): these are NEWER than source and "
+             "syncing DESTROYS them — `bin/sync` now refuses rather than doing it. "
+             "Promote each into source first, then sync." if _ahead else ""))
+
+    # ── The dangerous direction is named separately, and it is its own row ───
+    # A count of "drifted" cannot be acted on: half the answers are "run sync" and the
+    # other half are "syncing deletes your work". MEASURED 2026-08-10 —
+    # `references/procedures/intent-router.md` was edited in the personal install and
+    # was newer there; the row said "2 drifted" and named `bin/sync --personal` as the
+    # fix, which would have destroyed it. It survived because a human diffed it by hand,
+    # with no reason to beyond suspicion. This row exists so the next person needs none.
+    check("no runtime-first edit is waiting to be destroyed by a sync",
+          not _ahead,
+          f"{len(_ahead)} file(s) in the personal install are NEWER than source "
+          f"({', '.join(_ahead) or '—'}). `bin/sync` is delete-then-rebuild, so these "
+          "are edits that exist in no other copy. Promote each one — "
+          "`cp ~/.claude/skills/workforce/<rel> workforce/<rel>` — and commit it, which "
+          "is what source-first means. `bin/sync` refuses while any remain; `--force` "
+          "discards them and is never the fix for a file you have not read.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The undo artifact is checked as an artifact
@@ -7515,12 +7548,40 @@ check(
 # message must name the form that works and warn off the one that does not.
 check(
     "drift: the remedy names the working fix and warns off the destructive one",
-    "FIX: `bin/sync --personal`" in read("bin/check")
+    "FIX for the stale and absent " "ones: `bin/sync --personal`" in read("bin/check")
     # Split literal: this file IS the target, so a contiguous copy here would be the
     # second occurrence and bin/prove's payload would delete the wrong one.
     and "Do NOT plain " "`./install`" in read("bin/check"),
     "a named remedy is followed. Naming one that silently installs older code makes "
     "the check worse than silent — the operator acts on it and loses work",
+)
+
+# AND THE REMEDY IS SCOPED TO THE DIRECTION IT ACTUALLY FIXES
+# `bin/sync --personal` repairs a STALE personal file and DESTROYS a runtime-first one.
+# For as long as the row said only "N drifted" and named that one command, half its
+# advice was "run this" and the other half was "running this deletes your work" — with
+# nothing to tell a reader which they had. MEASURED 2026-08-10 on a real drift.
+# Asserting the qualifier is what stops the two collapsing back into one number.
+check(
+    "drift: the two directions are reported apart, not summed",
+    "RUNTIME-FIRST" in read("bin/check")
+    # The dangerous direction owns a row of its own, so it cannot be read as a footnote
+    # to the staleness one.
+    and "no runtime-first edit is waiting to be " "destroyed by a sync" in read("bin/check")
+    # And the report says what the tool now does about it, because a warning whose
+    # command still proceeds is a warning nobody has to obey.
+    and "refuses while any remain" in read("bin/check")
+    and "--force" in read("bin/sync")
+    # THE MECHANISM, not the vocabulary — and this clause was added because the rest of
+    # the check was PROVEN vacuous against the obvious revert. Deleting the ternary and
+    # leaving every message intact sends both directions back into `_drift`: the
+    # runtime-first row goes silent on a real runtime-first edit, and each string
+    # asserted above still matches. Measured by doing it, 2026-08-10.
+    and "(_ahead if _dm > " "_sm else _drift)" in read("bin/check"),
+    "a stale copy and a copy holding unsaved work are opposite emergencies with one "
+    "shared symptom — the bytes differ. Summing them into `N drifted` and naming the "
+    "sync as the fix is a check that hands the operator the destructive command in "
+    "exactly the case where it destroys something, and reads correct while doing it",
 )
 
 # THE DUPLICATE HAS A PRODUCER, AND IT NOW SAYS SO
