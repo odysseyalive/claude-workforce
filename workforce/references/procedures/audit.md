@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 47 assertion(s) in bin/check name this file; 94 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 49 assertion(s) in bin/check name this file; 102 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -831,6 +831,14 @@ roster as a batch (`hire.md` § Initial roster); brownfield authors conversions 
 Every handbook is cold-read before its task completes; a probe failure is fixed in the same run, never
 deferred.
 
+**During the authoring wave, a dispatched author's liveness is confirmed by the returned
+handbook, never by a reachability listing** — the rule is stated canonically in
+`references/staging.md` § Liveness is confirmed by the artifact. An empty or failed
+`ListAgents` while authors are still mid-flight is NOT death: absent artifact → still working,
+poll; present artifact → collect it, never re-dispatch. A re-dispatch needs the handbook
+confirmed absent AND a POSITIVE death signal — never an empty list, which on a run that reaps
+its own teammates (§ Step 6d) is teardown's EXPECTED result.
+
 **The authoring context is not a shared resource, and a run that treats it as one will stop.** Each
 subagent runs in **its own context window** and returns only its result
 (`platform.md` **fact 19 — MEASURED 2026-08-04**: four handbooks authored in one wave put
@@ -1265,6 +1273,39 @@ prevent — and removing the gateway while keeping the files is the quieter vers
 - **Report as counts**: skills swept, scaffolding blocks removed by marker class, blocks extracted
   against blocks censused, quarantined items. **Never a bare "clean"** — a sweep that cannot state its
   coverage is not evidence that anything was swept.
+
+## Step 6d — Reap this run's own teammates (hygiene, NEVER a gate)
+
+**Once their results are committed to disk, the run `TaskStop`s the teammates IT spawned this
+run** — the org-design panel, the handbook authors, and the cold-read probes — so it does not
+leave a roster of idle-but-addressable agents behind. Results first, teardown second: a panel
+brief on disk, a handbook returned and registered, a probe verdict written under
+`.claude/workforce/work/<run-id>/` — then, and only then, the spawn that produced it is reaped.
+
+**This is CLEANUP, and it is NEVER a gate, a precondition, or a blocking step. A run that
+cannot reap still succeeds.** A `TaskStop` that fails or is unavailable is reported and stepped
+past; nothing about the audit's outcome depends on it. IF reaping is ever the stated reason a
+run stops, defers, or reports DEGRADED → STOP: it is hygiene, and hygiene never blocks a run.
+
+**Reap ONLY teammates THIS run spawned** — the ones this run recorded in its own spawn ledger,
+the `.spawn` edge records written before every dispatch (`references/staging.md`). A pre-existing
+or adopted agent belongs to the user and is NEVER reaped by an audit that merely ran alongside it.
+
+**What it does NOT buy, stated so no later reader turns it into a landmine:**
+
+- **It does not refund the session cap.** `platform.md` fact 8 counts a subagent at creation;
+  reaping a completed one refunds nothing against the session's subagent total. Fact 8 is a
+  `REPEAT OFFENDER` that has twice become a blocking check, so this step MUST NEVER be wired to
+  a cap count — it frees no budget.
+- **It does not free a concurrent slot.** Whether a COMPLETED teammate still holds a concurrent
+  slot after finishing is UNMEASURED, and this step claims nothing about it. Never justify the
+  teardown by a slot it may not free.
+
+**The justification is exactly two things and no more:** removing idle-teammate clutter from
+the user's roster, and removing the ambiguity that produced the false-death misread § Step 5
+guards against — **a run that reaps its own teammates deliberately means a LATER empty listing
+is the EXPECTED consequence of teardown, not evidence that a mid-flight teammate died**
+(`references/staging.md` § Liveness is confirmed by the artifact).
 
 ## Step 7 — Close
 

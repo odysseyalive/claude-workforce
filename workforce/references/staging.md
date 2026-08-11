@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 25 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -268,6 +268,31 @@ count exists so the two runs cannot look alike.*
 
 **This is a detection, not a prevention** (`enforcement.md`). Workforce cannot lift a host constraint
 and must never describe itself as having done so.
+
+### Liveness is confirmed by the artifact, never by a reachability listing
+
+**An orchestrator MUST NEVER infer a dispatched teammate's death from an empty or failed
+`ListAgents` or reachability check.** Liveness of a dispatched teammate is confirmed by ONE
+thing only — the artifact it was told to return: a probe writes to
+`.claude/workforce/work/<run-id>/probe-<name>/`, a handbook author returns its handbook, a
+panel member writes its brief. **Absent artifact → treat the teammate as STILL WORKING** (wait
+and poll); **present artifact → collect it, and never re-spawn.** A re-dispatch is authorized
+ONLY when the artifact is confirmed absent AND the teammate is confirmed gone by a POSITIVE
+signal — never by an empty list.
+
+**An empty or failed listing is not a positive signal of death.** `ListAgents` returning
+`No reachable agents` while dispatched teammates are still mid-flight is a reachability
+artifact, not a death certificate — reading it as death and re-dispatching the wave is
+duplicate spawns, tokens spent twice against the session cap (`platform.md` fact 8), and the
+risk of double-writes. This is the same rule § UNAVAILABLE states for the spawn channel and
+`platform.md` states for every fact: measure the behaviour, never a description of it — and an
+empty channel is not a negative one.
+
+*Measured on a live install: a dispatch wave read `No reachable agents` while three org-design
+panel members were still running, inferred the panel dead, and re-dispatched the whole panel —
+duplicate spawns and wasted tokens, caught only because the user stopped them by hand.
+`procedures/audit.md` § Step 5 carries the same rule for the authoring wave, and § Step 6d is
+why a later empty listing is EXPECTED rather than evidence of death.*
 
 ---
 

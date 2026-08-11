@@ -5810,6 +5810,32 @@ check(
     "blocks the sweep, it does not license ending the run, and a batch refused by "
     "no per-item rule is a deferred RUN rather than a refused ACT",
 )
+# Confirm-death-by-artifact (finding 9). An orchestrator that reads an empty
+# ListAgents as death and re-dispatches a still-running wave produces duplicate
+# spawns and double-writes. staging.md states the rule canonically; audit.md Step 5
+# must cross-reference it, or the two files disagree and the rule rots on one side.
+check(
+    "dispatch: liveness is confirmed by the returned artifact, never by an empty reachability listing",
+    "MUST NEVER infer a dispatched teammate's death from an empty or failed" in _stg
+    and "never by a reachability" in _aud,
+    "staging.md § Liveness must state that an empty/failed ListAgents is not death "
+    "(absent artifact = still working; re-dispatch needs a POSITIVE death signal), and "
+    "audit.md Step 5 must cross-reference it — a mid-flight re-dispatch is duplicate spawns",
+)
+# End-of-run teardown (Rule B). Reap ONLY run-scoped teammates, AFTER their results
+# commit, as hygiene that NEVER gates a run — and never wired to fact 8's cap (REPEAT
+# OFFENDER) nor claiming a concurrent slot it has not measured freeing.
+check(
+    "audit: Step 6d reaps only its OWN teammates as hygiene, never a gate and never a cap refund",
+    "Reap this run's own teammates" in _aud
+    and "it is NEVER a gate, a precondition, or a blocking step" in _aud
+    and "does not refund the session cap" in _aud
+    and "It does not free a concurrent slot" in _aud
+    and "Reap ONLY teammates THIS run spawned" in _aud,
+    "audit.md Step 6d must TaskStop only run-scoped teammates after their results "
+    "commit, as non-blocking cleanup that refunds nothing on fact 8's 200-cap and "
+    "claims no freed concurrent slot — or the hygiene step becomes a landmine gate",
+)
 
 check(
     "succession: is declared and reported, never asked",
