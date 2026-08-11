@@ -161,10 +161,21 @@ parts, one directive:
   Wired into the frontmatter command enumeration (so the phantom-command gate passes), Quick Commands,
   Display-vs-Execute, Self-Exclusion, `manifest.txt`, `COMMANDS.md`.
 
-**Still open from this:** `diagnose`'s runtime behavior (the composite orchestration and the ROUTE
-dispatch loop) is specified in the procedure but not yet exercised by a live `/workforce dev diagnose`
-run against this repo — the doctrine and its gates are proven by breaking; the end-to-end run is the
-next verification.
+**Partly closed 2026-08-11 — the first live `/workforce dev diagnose` run against this repo.** The
+composite orchestration ran end to end: `check` (886/0), `prove` (231/231, tree untouched),
+`conformance` (85/0), `idempotence` (8/8), `script-conformance` (113/0), `coverage` (informational),
+and `wf-preflight` (0 blockers). All three deliverables classified **CLEAR — zero blocks**. Two
+decisions recorded so a later run inherits the reasoning, not a mystery: (a) `baseline` targets a sample
+project (`odyssey-alive`) by default, so its unpaired-marker and credential findings are that repo's
+state, not a workforce block — the "another repository" survivor the procedure names; (b) the live
+agentic `dev audit --review` self-run was **not** spawned — its `INV-*` surface is already asserted
+green by `check`, `prove` proves every one of those assertions fails when its guarded text breaks, and a
+zero-write review run yields no commit, so spinning the org-design panel to restate measured-green data
+is exactly the spend the second directive forbids.
+**Still open from this:** the **ROUTE dispatch loop** stayed unexercised — a clean tree produced no
+block to route, so `ROUTE-AND-IMPLEMENT` has still never dispatched a maintainer fix inside a live
+`diagnose`. That path closes only on a run that finds a real source block, or on a seeded-block test
+(procedure § Verification).
 
 **Closed 2026-08-07 — a run staged a deletion, said "the sweep is now unblocked", and handed the user
 the command.** Reported by the user with the run's own closing report: *"we are still having issues with
