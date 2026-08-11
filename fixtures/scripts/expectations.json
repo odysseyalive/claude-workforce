@@ -147,174 +147,6 @@
       "files_removed"
     ]
   },
-  "preflight-clean": {
-    "_why": "A tree with no deny/ask rule, no intercepting hook, and no missing grant has ZERO hard blockers. The self-modification-classifier row is always advisory (whether it fires is measured at the write, not readable from config), so it never counts, and the run prints `0 blockers` deterministically regardless of the host's live auto-mode state. Paired with preflight-deny so a regression that always-flags or never-flags fails one.",
-    "args": [],
-    "exit": 0,
-    "not": [
-      "deny-rule",
-      "missing-grants"
-    ],
-    "script": "wf-preflight",
-    "want": [
-      "INV-PREFLIGHT  0 blocker",
-      "0 blockers"
-    ]
-  },
-  "preflight-deny": {
-    "_why": "A `deny` rule over `.claude/**` hard-blocks a workforce write BEFORE the classifier, so it is a HIGH mission-blocker. It is the user's stated intent, so it is reported with its remedy_note (never auto-removed) rather than a runnable command. Asserts the row is named with its rule text, not merely a nonzero count.",
-    "args": [],
-    "exit": 0,
-    "not": [
-      "0 blockers"
-    ],
-    "script": "wf-preflight",
-    "want": [
-      "deny-rule",
-      "HIGH",
-      "Edit(.claude/**)"
-    ]
-  },
-  "preflight-json": {
-    "_why": "The machine-readable form the settings-scout agent consumes. Same tree as preflight-deny; --json emits the blocker objects and a blocking_count instead of the human table, so INV-PREFLIGHT must NOT appear and the deny-rule id and blocking_count keys must.",
-    "args": [
-      "--json"
-    ],
-    "exit": 0,
-    "not": [
-      "INV-PREFLIGHT"
-    ],
-    "script": "wf-preflight",
-    "want": [
-      "\"id\": \"deny-rule\"",
-      "\"blocking_count\"",
-      "\"self-modification-classifier\""
-    ]
-  },
-  "preflight-needs": {
-    "_why": "With the org's required grant set passed as inline JSON, a grant absent from every scope is a HIGH missing-grants blocker whose remedy is a runnable `wf-settings-apply --grants` command \u2014 never a JSON block to paste (deferred.md reachability). Asserts the remedy is the runnable producer, run via `!`.",
-    "args": [
-      "--needs",
-      "[\"Bash(./bin/zzz-preflight-probe:*)\"]"
-    ],
-    "exit": 0,
-    "not": [
-      "0 blockers"
-    ],
-    "script": "wf-preflight",
-    "want": [
-      "missing-grants",
-      "wf-settings-apply",
-      "--grants -"
-    ]
-  },
-  "sa-grants-display": {
-    "_why": "DISPLAY is the default and writes nothing: the two absent grants read `would add`, the one already in force reads `already present` (grants concatenate across scopes, so a second copy is a redundant write into a file the user owns), and `0 removed` prints on every run because it is the guarantee. `not verified on disk` asserts nothing was written on the display path.",
-    "args": [
-      "--grants",
-      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\",\"Bash(pnpm lint:*)\"]"
-    ],
-    "exit": 0,
-    "not": [
-      "verified on disk"
-    ],
-    "script": "wf-settings-apply",
-    "want": [
-      "would add",
-      "zzz-alpha",
-      "already present",
-      "pnpm lint",
-      "0 removed",
-      "apply with: --execute"
-    ]
-  },
-  "sa-grants-execute": {
-    "_why": "--execute is the consent. Same tree as sa-grants-display minus the already-present grant; both absent grants are written and the confirmation RE-READS the file, so `verified on disk` quotes the tree rather than the string passed to write(). Paired with sa-grants-display so a regression making display WRITE or execute merely REPORT fails one.",
-    "args": [
-      "--execute",
-      "--grants",
-      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\"]"
-    ],
-    "exit": 0,
-    "not": [
-      "would add"
-    ],
-    "script": "wf-settings-apply",
-    "want": [
-      "added",
-      "verified on disk",
-      "2 grant(s) present exactly once"
-    ]
-  },
-  "sa-grants-blanket": {
-    "_why": "A bare `Bash` grant supersedes the user's scoped rules, so it is refused with a named error and a nonzero exit rather than silently widening the permissions posture (audit-setup.md Step 0.8 rule 3b: not overwriting a preference is not the same as not defeating it).",
-    "args": [
-      "--grants",
-      "[\"Bash\"]"
-    ],
-    "exit": 2,
-    "script": "wf-settings-apply",
-    "want": [
-      "blanket",
-      "refusing"
-    ]
-  },
-  "sa-hook-display": {
-    "_why": "The wire-hook mode in DISPLAY: it prints the registration it WOULD add for wf-standing-request on UserPromptSubmit and writes nothing. `not verified on disk` asserts the display path made no write.",
-    "args": [
-      "--wire-hook",
-      "wf-standing-request"
-    ],
-    "exit": 0,
-    "not": [
-      "verified on disk"
-    ],
-    "script": "wf-settings-apply",
-    "want": [
-      "would register",
-      "UserPromptSubmit",
-      "wf-standing-request"
-    ]
-  },
-  "sa-hook-execute": {
-    "_why": "--execute registers the hook and re-reads to confirm it is present exactly once. This is the producer the CLAUDE.md evacuation's precondition uses: wiring wf-standing-request is one `!` command, not a JSON block to paste (claude-md.md, hooks.md).",
-    "args": [
-      "--execute",
-      "--wire-hook",
-      "wf-standing-request"
-    ],
-    "exit": 0,
-    "not": [
-      "would register"
-    ],
-    "script": "wf-settings-apply",
-    "want": [
-      "registered",
-      "verified on disk",
-      "UserPromptSubmit"
-    ]
-  },
-  "sa-hook-unknown": {
-    "_why": "A name that is not a shipped hook is refused rather than registering dead wiring \u2014 a registration pointing at nothing reads as protection and enforces nothing.",
-    "args": [
-      "--wire-hook",
-      "bogus"
-    ],
-    "exit": 2,
-    "script": "wf-settings-apply",
-    "want": [
-      "not a shipped hook"
-    ]
-  },
-  "sa-nomode": {
-    "_why": "Exactly one of --grants/--wire-hook/--automode is required; none is a caller error with a nonzero exit, never a silent no-op that reads as success.",
-    "args": [],
-    "exit": 2,
-    "script": "wf-settings-apply",
-    "want": [
-      "exactly one of --grants"
-    ]
-  },
   "census-badjson": {
     "exit": 2,
     "script": "wf-census",
@@ -486,6 +318,19 @@
       "1 blocking finding"
     ]
   },
+  "checkrun-envprefix": {
+    "_why": "THE REGRESSION SEGMENT-WALKING INTRODUCED, caught the same hour by running the changed resolver against a real project rather than against its own fixtures. `printf '{...}' | CLAUDE_PROJECT_DIR=/home/... bash .claude/hooks/guard.sh` is the ordinary shape of a hook self-test. Walking to the second segment finally reached it -- and its first token is the ENVIRONMENT ASSIGNMENT, which carries a slash in its value, so it read as the path being run and a live hook was reported dead. The pre-fix code scored this silent, not correct: `printf` has no slash, so it stopped at segment one. Fixing the tokenizer without bringing the shell's command-prefix grammar along traded a silence for a false positive on a real tree.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "CLAUDE_PROJECT_DIR=/tmp \u2014 not on disk"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "1 resolved \u00b7 0 dead"
+    ]
+  },
   "checkrun-extensionless": {
     "_why": "The under-capture hole the SHARED resolver closes. `bash bin/verify` has no extension and no anchor, so the token pass correctly refuses to call it a file reference -- wf-census.resolve_hook_command unwraps the interpreter and answers it. Without the import this case is silently clean, which is the shape of every 'reported clean about something it never examined' defect in this repo.",
     "exit": 1,
@@ -545,6 +390,33 @@
       "text-tells.md"
     ]
   },
+  "checkrun-operator": {
+    "_why": "FALSE DEAD, the defect a project audit filed against this distribution from another repo on 2026-08-10 and could not fix from its own tree. `shlex.split` is a word splitter with no knowledge of shell operators, so `bash bin/real.sh; echo done` yielded the token `bin/real.sh;` -- semicolon fused on -- which is not a path on any disk. A live script was reported dead, and because a dead check is BLOCKING for a governed handbook the tool exited 1 on a handbook whose check was fine. `bin/real.sh` is present in the fixture tree, so `+ resolved` can only be reached by an operator-aware tokenizer; `not` asserts the false row is gone rather than merely outvoted.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "not on disk"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "bin/real.sh",
+      "1 resolved \u00b7 0 dead"
+    ]
+  },
+  "checkrun-operator-dead": {
+    "_why": "THE FALSIFICATION HALF of checkrun-operator, and the reason that case cannot pass vacuously. Identical shape, one token changed: `bin/gone.sh` is NOT in the tree. A fix that made the false positive disappear by resolving less -- or by skipping any command carrying a separator -- passes checkrun-operator and fails here. The detail line is asserted verbatim as `bin/gone.sh` with no trailing semicolon, because the pre-fix run reported the same file dead for the wrong reason and a report naming a path that was never on disk under that spelling teaches an author nothing.",
+    "exit": 1,
+    "not": [
+      "bin/gone.sh; \u2014 not on disk",
+      "+ resolved"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "! dead",
+      "runs bin/gone.sh \u2014 not on disk"
+    ]
+  },
   "checkrun-orphan-negative": {
     "_why": "A Negative with no Check vanished from BOTH passes -- the falsify block returns early on no checks, and the resolver had already stripped the Negative line.",
     "exit": 1,
@@ -566,6 +438,20 @@
       "not-runnable",
       "<draft>",
       "never binds"
+    ]
+  },
+  "checkrun-subshell": {
+    "_why": "THE SILENT HALF of the same defect, found by writing the pair rather than by any report -- the audit that filed the false-dead row never saw this one. `cd \"$CLAUDE_PROJECT_DIR\" && bash bin/real.sh` put `cd` in first position: no slash, so UNDECIDABLE, so the real script behind `&&` was never examined and the tool exited 0 having checked nothing. Under-reporting is the direction wf-census.load_ignore is explicitly written against, and it is the direction that hurts. `0 resolved` is asserted absent because that -- not a wrong row -- is what the failure looked like.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "0 resolved"
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "bin/real.sh",
+      "1 resolved"
     ]
   },
   "claudemd-absent": {
@@ -753,6 +639,18 @@
     "script": "wf-conform",
     "want": [
       "1 governed",
+      "0 failed"
+    ]
+  },
+  "conform-ignored-corpus": {
+    "_why": "TWO CHECKERS, ONE TREE, TWO DENOMINATORS -- the row a project audit filed alongside checkrun-operator, and the one with teeth: it was the sole reason wf-conform exited 1, which holds INV-VERIFY at NOT UPHELD and aborts any future sweep. `.censusignore` had three readers and one producer; wf-census and wf-apply honoured the declaration and wf-conform's sacred-block walk pruned a directory literally named `fixtures` and read nothing else. The fixture declares `.claude/skills/thing/testdata/` -- deliberately NOT named `fixtures`, so only a reader of the declaration can exclude it -- and puts an unstamped sacred block inside. sidecar-uncovered is the falsification half and stays red: an UNDECLARED unstamped block must still fail, or this fix is just a disabled check.",
+    "exit": 0,
+    "not": [
+      "unstamped",
+      "guarded by nothing"
+    ],
+    "script": "wf-conform",
+    "want": [
       "0 failed"
     ]
   },
@@ -1068,6 +966,93 @@
     "script": "wf-unique-persona",
     "stdin_file": ".claude/agents/a.md"
   },
+  "preflight-clean": {
+    "_why": "A tree with no deny/ask rule, no intercepting hook, and no missing grant has ZERO hard blockers. The self-modification-classifier row is always advisory (whether it fires is measured at the write, not readable from config), so it never counts, and the run prints `0 blockers` deterministically regardless of the host's live auto-mode state. Paired with preflight-deny so a regression that always-flags or never-flags fails one.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "deny-rule",
+      "missing-grants"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "INV-PREFLIGHT  0 blocker",
+      "0 blockers"
+    ]
+  },
+  "preflight-deny": {
+    "_why": "A `deny` rule over `.claude/**` hard-blocks a workforce write BEFORE the classifier, so it is a HIGH mission-blocker. It is the user's stated intent, so it is reported with its remedy_note (never auto-removed) rather than a runnable command. Asserts the row is named with its rule text, not merely a nonzero count.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "0 blockers"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "deny-rule",
+      "HIGH",
+      "Edit(.claude/**)"
+    ]
+  },
+  "preflight-json": {
+    "_why": "The machine-readable form the settings-scout agent consumes. Same tree as preflight-deny; --json emits the blocker objects and a blocking_count instead of the human table, so INV-PREFLIGHT must NOT appear and the deny-rule id and blocking_count keys must.",
+    "args": [
+      "--json"
+    ],
+    "exit": 0,
+    "not": [
+      "INV-PREFLIGHT"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "\"id\": \"deny-rule\"",
+      "\"blocking_count\"",
+      "\"self-modification-classifier\""
+    ]
+  },
+  "preflight-needs": {
+    "_why": "With the org's required grant set passed as inline JSON, a grant absent from every scope is a HIGH missing-grants blocker whose remedy is a runnable `wf-settings-apply --grants` command \u2014 never a JSON block to paste (deferred.md reachability). Asserts the remedy is the runnable producer, run via `!`.",
+    "args": [
+      "--needs",
+      "[\"Bash(./bin/zzz-preflight-probe:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "0 blockers"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "missing-grants",
+      "wf-settings-apply",
+      "--grants -"
+    ]
+  },
+  "ratchet-escaped-pipe": {
+    "_why": "`--capture` is the only shipped script whose whole output is a one-line summary, so a value it destroys never reaches stdout. This fixture asserts the ARTIFACT: a `why` cell carrying markdown's escaped pipe survives the rewrite intact. Measured 2026-08-10 on apps-odyssey-alive, where a naive split on every `|` cut a 634-character annotation to 114 with exit 0. The `not` list is the load-bearing half: the truncated prefix is a PREFIX of the correct cell, so `want` alone passes on the broken output.",
+    "after": {
+      ".claude/workforce/pass-baseline.md": {
+        "not": [
+          "user \\|\n",
+          "| ACCEPTED |  |",
+          "| ACCEPTED | |",
+          "| OPEN |"
+        ],
+        "want": [
+          "| UNRESOLVED | ACCEPTED | Correct by rule, not a defect.",
+          "span, which is never reworded, and the tail after the escaped pipe is what a naive split discards. |",
+          "`<!-- origin: user \\| immutable: true -->`"
+        ]
+      }
+    },
+    "args": [
+      "--capture"
+    ],
+    "exit": 0,
+    "script": "wf-ratchet",
+    "want": [
+      "1 finding(s) captured"
+    ]
+  },
   "ratchet-inherited": {
     "_why": "Same tree and same finding as ratchet-regression, with an EMPTY captured-passes: the baseline predates the pass, so the finding is INHERITED and exits 0. A newly added pass flags artifacts that were already there; calling those regressions would make every catalog addition look like a decline.",
     "exit": 0,
@@ -1258,6 +1243,113 @@
       "origin: 1 open vs 0 close"
     ]
   },
+  "sa-grants-blanket": {
+    "_why": "A bare `Bash` grant supersedes the user's scoped rules, so it is refused with a named error and a nonzero exit rather than silently widening the permissions posture (audit-setup.md Step 0.8 rule 3b: not overwriting a preference is not the same as not defeating it).",
+    "args": [
+      "--grants",
+      "[\"Bash\"]"
+    ],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "blanket",
+      "refusing"
+    ]
+  },
+  "sa-grants-display": {
+    "_why": "DISPLAY is the default and writes nothing: the two absent grants read `would add`, the one already in force reads `already present` (grants concatenate across scopes, so a second copy is a redundant write into a file the user owns), and `0 removed` prints on every run because it is the guarantee. `not verified on disk` asserts nothing was written on the display path.",
+    "args": [
+      "--grants",
+      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\",\"Bash(pnpm lint:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "verified on disk"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "would add",
+      "zzz-alpha",
+      "already present",
+      "pnpm lint",
+      "0 removed",
+      "apply with: --execute"
+    ]
+  },
+  "sa-grants-execute": {
+    "_why": "--execute is the consent. Same tree as sa-grants-display minus the already-present grant; both absent grants are written and the confirmation RE-READS the file, so `verified on disk` quotes the tree rather than the string passed to write(). Paired with sa-grants-display so a regression making display WRITE or execute merely REPORT fails one.",
+    "args": [
+      "--execute",
+      "--grants",
+      "[\"Bash(./bin/zzz-alpha:*)\",\"Bash(./bin/zzz-beta:*)\"]"
+    ],
+    "exit": 0,
+    "not": [
+      "would add"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "added",
+      "verified on disk",
+      "2 grant(s) present exactly once"
+    ]
+  },
+  "sa-hook-display": {
+    "_why": "The wire-hook mode in DISPLAY: it prints the registration it WOULD add for wf-standing-request on UserPromptSubmit and writes nothing. `not verified on disk` asserts the display path made no write.",
+    "args": [
+      "--wire-hook",
+      "wf-standing-request"
+    ],
+    "exit": 0,
+    "not": [
+      "verified on disk"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "would register",
+      "UserPromptSubmit",
+      "wf-standing-request"
+    ]
+  },
+  "sa-hook-execute": {
+    "_why": "--execute registers the hook and re-reads to confirm it is present exactly once. This is the producer the CLAUDE.md evacuation's precondition uses: wiring wf-standing-request is one `!` command, not a JSON block to paste (claude-md.md, hooks.md).",
+    "args": [
+      "--execute",
+      "--wire-hook",
+      "wf-standing-request"
+    ],
+    "exit": 0,
+    "not": [
+      "would register"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "registered",
+      "verified on disk",
+      "UserPromptSubmit"
+    ]
+  },
+  "sa-hook-unknown": {
+    "_why": "A name that is not a shipped hook is refused rather than registering dead wiring \u2014 a registration pointing at nothing reads as protection and enforces nothing.",
+    "args": [
+      "--wire-hook",
+      "bogus"
+    ],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "not a shipped hook"
+    ]
+  },
+  "sa-nomode": {
+    "_why": "Exactly one of --grants/--wire-hook/--automode is required; none is a caller error with a nonzero exit, never a silent no-op that reads as success.",
+    "args": [],
+    "exit": 2,
+    "script": "wf-settings-apply",
+    "want": [
+      "exactly one of --grants"
+    ]
+  },
   "sidecar-agree": {
     "exit": 0,
     "not": [
@@ -1316,72 +1408,6 @@
       "additionalContext",
       "Cold-reader agents are requested, standing.",
       "unless the user asks"
-    ]
-  },
-  "checkrun-operator": {
-    "_why": "FALSE DEAD, the defect a project audit filed against this distribution from another repo on 2026-08-10 and could not fix from its own tree. `shlex.split` is a word splitter with no knowledge of shell operators, so `bash bin/real.sh; echo done` yielded the token `bin/real.sh;` -- semicolon fused on -- which is not a path on any disk. A live script was reported dead, and because a dead check is BLOCKING for a governed handbook the tool exited 1 on a handbook whose check was fine. `bin/real.sh` is present in the fixture tree, so `+ resolved` can only be reached by an operator-aware tokenizer; `not` asserts the false row is gone rather than merely outvoted.",
-    "exit": 0,
-    "not": [
-      "! dead",
-      "not on disk"
-    ],
-    "script": "wf-checkrun",
-    "want": [
-      "+ resolved",
-      "bin/real.sh",
-      "1 resolved \u00b7 0 dead"
-    ]
-  },
-  "checkrun-operator-dead": {
-    "_why": "THE FALSIFICATION HALF of checkrun-operator, and the reason that case cannot pass vacuously. Identical shape, one token changed: `bin/gone.sh` is NOT in the tree. A fix that made the false positive disappear by resolving less -- or by skipping any command carrying a separator -- passes checkrun-operator and fails here. The detail line is asserted verbatim as `bin/gone.sh` with no trailing semicolon, because the pre-fix run reported the same file dead for the wrong reason and a report naming a path that was never on disk under that spelling teaches an author nothing.",
-    "exit": 1,
-    "not": [
-      "bin/gone.sh; \u2014 not on disk",
-      "+ resolved"
-    ],
-    "script": "wf-checkrun",
-    "want": [
-      "! dead",
-      "runs bin/gone.sh \u2014 not on disk"
-    ]
-  },
-  "checkrun-subshell": {
-    "_why": "THE SILENT HALF of the same defect, found by writing the pair rather than by any report -- the audit that filed the false-dead row never saw this one. `cd \"$CLAUDE_PROJECT_DIR\" && bash bin/real.sh` put `cd` in first position: no slash, so UNDECIDABLE, so the real script behind `&&` was never examined and the tool exited 0 having checked nothing. Under-reporting is the direction wf-census.load_ignore is explicitly written against, and it is the direction that hurts. `0 resolved` is asserted absent because that -- not a wrong row -- is what the failure looked like.",
-    "exit": 0,
-    "not": [
-      "! dead",
-      "0 resolved"
-    ],
-    "script": "wf-checkrun",
-    "want": [
-      "+ resolved",
-      "bin/real.sh",
-      "1 resolved"
-    ]
-  },
-  "checkrun-envprefix": {
-    "_why": "THE REGRESSION SEGMENT-WALKING INTRODUCED, caught the same hour by running the changed resolver against a real project rather than against its own fixtures. `printf '{...}' | CLAUDE_PROJECT_DIR=/home/... bash .claude/hooks/guard.sh` is the ordinary shape of a hook self-test. Walking to the second segment finally reached it -- and its first token is the ENVIRONMENT ASSIGNMENT, which carries a slash in its value, so it read as the path being run and a live hook was reported dead. The pre-fix code scored this silent, not correct: `printf` has no slash, so it stopped at segment one. Fixing the tokenizer without bringing the shell's command-prefix grammar along traded a silence for a false positive on a real tree.",
-    "exit": 0,
-    "not": [
-      "! dead",
-      "CLAUDE_PROJECT_DIR=/tmp \u2014 not on disk"
-    ],
-    "script": "wf-checkrun",
-    "want": [
-      "+ resolved",
-      "1 resolved \u00b7 0 dead"
-    ]
-  },
-  "conform-ignored-corpus": {
-    "_why": "TWO CHECKERS, ONE TREE, TWO DENOMINATORS -- the row a project audit filed alongside checkrun-operator, and the one with teeth: it was the sole reason wf-conform exited 1, which holds INV-VERIFY at NOT UPHELD and aborts any future sweep. `.censusignore` had three readers and one producer; wf-census and wf-apply honoured the declaration and wf-conform's sacred-block walk pruned a directory literally named `fixtures` and read nothing else. The fixture declares `.claude/skills/thing/testdata/` -- deliberately NOT named `fixtures`, so only a reader of the declaration can exclude it -- and puts an unstamped sacred block inside. sidecar-uncovered is the falsification half and stays red: an UNDECLARED unstamped block must still fail, or this fix is just a disabled check.",
-    "exit": 0,
-    "not": [
-      "unstamped",
-      "guarded by nothing"
-    ],
-    "script": "wf-conform",
-    "want": [
-      "0 failed"
     ]
   }
 }

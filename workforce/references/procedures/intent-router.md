@@ -89,9 +89,21 @@ without requiring it.
 
 "Fix the pricing copy" is `/org`. "We need someone who owns pricing copy" is `/workforce hire`.
 
-When an ask arrives here that is plainly work rather than company management, say so and point at
-`/org` rather than doing the work — the whole value of the org is that the work runs inside an
-employee with its own guardrails and its own verification.
+When an ask arrives here that is plainly work rather than company management, say so and **hand it to
+`/org` in the same message, the user's words passed through verbatim** — never do the work here, and
+never merely point at `/org` and stop. Pointing makes the user retype what they already typed, and a
+handoff nobody performed is indistinguishable from a router that ignored the ask.
+
+**The handoff carries nothing but the ask.** Do not pre-select an employee, do not pre-decide that a
+skill or command applies, and do not summarize. `/org`'s dispatch ladder owns all of that: rung 2
+reads the chart's `## Mechanicals` table to see whether a command already does the job, 2f checks
+whether data in hand already answers it, and only then does rung 3 choose a node. Deciding any of it
+here runs the ladder twice with the second run holding less information than the first.
+
+**Skill-aware routing has one precondition, and it fails silently when unmet:** rung 2 can only fire
+if the chart has a populated `## Mechanicals` table with all seven columns. A chart missing that
+section still dispatches — every ask simply falls through to an agent, which reads as a working
+router. Before relying on the handoff, confirm the section exists; `/workforce org index` builds it.
 
 **The direct-dispatch form above is the deliberate exception**, and it is narrow: it fires only when the
 first token is an exact employee name. It exists because a converted skill's users typed a command for

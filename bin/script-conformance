@@ -80,6 +80,33 @@ def _run_in(tree, script, spec):
     for s in spec.get("not", []):
         if s in out:
             problems.append(f"present but forbidden: {s!r}")
+
+    # WHAT IT WROTE, not only what it said. The docstring above argues that "a script
+    # that exits correctly while reporting the wrong thing is the failure this project
+    # keeps finding" — and a script that WRITES the wrong thing while reporting fine is
+    # that same failure one step further, invisible to every check above.
+    #
+    # Added 2026-08-10 for `wf-ratchet --capture`, whose entire output is a one-line
+    # summary: on a real project it silently rewrote a 634-character annotation to 114
+    # and exited 0. No `want`/`not` on stdout could have caught it, because the value it
+    # destroyed never appears there.
+    #
+    # `after` maps a path INSIDE the fixture tree to `want`/`not` substring lists, so a
+    # writing script is asserted on its artifact the same way a talking one is on its
+    # stdout. An unreadable path is a FAILURE, never a skip — a missing file and a file
+    # whose contents are wrong must not report the same.
+    for rel, expect in spec.get("after", {}).items():
+        try:
+            body = open(os.path.join(tree, rel), encoding="utf-8").read()
+        except OSError as exc:
+            problems.append(f"after {rel}: unreadable ({exc.strerror})")
+            continue
+        for s in expect.get("want", []):
+            if s not in body:
+                problems.append(f"after {rel}: missing {s!r}")
+        for s in expect.get("not", []):
+            if s in body:
+                problems.append(f"after {rel}: present but forbidden: {s!r}")
     return (not problems), "; ".join(problems) or "ok"
 
 

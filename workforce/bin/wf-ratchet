@@ -98,6 +98,43 @@ def load_baseline(root):
     return known, [(m.group(1), m.group(2), m.group(3)) for m in ROW_RX.finditer(text)]
 
 
+# A markdown table cell ends at the first UNESCAPED pipe. `\|` is markdown's escape
+# for a literal one, and the two columns this file invites a human to hand-edit are
+# prose — so a `why` citing `<!-- origin: user \| immutable: true -->`, or any rule
+# whose text contains a pipe, is ordinary rather than exotic.
+#
+# MEASURED 2026-08-10 on apps-odyssey-alive, by the first run to exercise the
+# annotation-preserving `capture` against a real hand-written `why`: a 634-character
+# cell was rewritten to 114, SILENTLY, exit 0, dropping both rules it cited. The
+# affordance the baseline header advertises — "Edit those two columns here" — carried
+# an unstated character restriction, and violating it was data loss with no error.
+#
+# READER AND WRITER ARE ONE PAIR AND CHANGE TOGETHER. Reading unescapes, writing
+# escapes, so a value round-trips unchanged through any number of `--capture` runs.
+# Fixing only the reader would preserve a cell it could not then write back.
+#
+# The lookbehind treats a backslash as escaping whatever follows it, so a cell ending
+# in a literal backslash before a pipe is not represented. That is documented rather
+# than handled: these cells are prose, `\\|` has never appeared in one, and a parser
+# that guesses at it would be inventing a case to be wrong about.
+CELL_SPLIT_RX = re.compile(r"(?<!\\)\|")
+
+
+def split_cells(row_remainder):
+    """The cells of a table row, honouring `\\|` as a literal pipe."""
+    return CELL_SPLIT_RX.split(row_remainder)
+
+
+def unescape_cell(cell):
+    """Markdown `\\|` back to the literal pipe the human meant."""
+    return cell.strip().replace(r"\|", "|")
+
+
+def escape_cell(value):
+    """A literal pipe back to markdown `\\|`, so the row it is written into parses."""
+    return value.replace("|", r"\|")
+
+
 def annotations(text):
     """The `state` and `why` a human wrote into an existing baseline, keyed the same
     way a finding is.
@@ -117,11 +154,11 @@ def annotations(text):
     out = {}
     for m in ROW_RX.finditer(text):
         eol = text.find("\n", m.end())
-        cells = text[m.end():len(text) if eol == -1 else eol].split("|")
+        cells = split_cells(text[m.end():len(text) if eol == -1 else eol])
         # verdict | state | why. The verdict is recomputed from this run's findings,
         # so only the two columns a human owns are carried forward.
-        state = cells[1].strip() if len(cells) > 1 else ""
-        why = cells[2].strip() if len(cells) > 2 else ""
+        state = unescape_cell(cells[1]) if len(cells) > 1 else ""
+        why = unescape_cell(cells[2]) if len(cells) > 2 else ""
         out[(m.group(1), m.group(2), m.group(3))] = (state or "OPEN", why)
     return out
 
@@ -145,7 +182,13 @@ def capture(root, found):
         "`--capture` PRESERVES the `state` and `why` of any row still found, keyed on",
         "(pass, artifact, locus); a new finding is written `OPEN` with an empty `why`, and a",
         "row whose finding is gone is dropped. Edit those two columns here — nothing else,",
-        "because every other column is regenerated.",
+        "because every other column is regenerated. **A pipe is allowed in them:** write it",
+        "as `\\|`, markdown's escape, and it round-trips unchanged through every --capture.",
+        "",
+        "**Those two columns are the ONLY durable place in this file.** `--capture` rewrites",
+        "it whole from this header plus the findings, so a note added above or below the table",
+        "is discarded on the next run without being mentioned. Put a rationale in the `why`",
+        "cell it belongs to; put anything longer in a record that owns it.",
         "",
         "captured-passes: " + " ".join(KNOWN),
         "",
@@ -154,6 +197,9 @@ def capture(root, found):
     ]
     for tok, art, loc, verdict in found:
         state, why = prior.get((tok, art, loc), ("OPEN", ""))
+        # Escape on the way out, unescape on the way in (see CELL_SPLIT_RX): a `why`
+        # containing a pipe survives an arbitrary number of --capture runs unchanged.
+        state, why = escape_cell(state), escape_cell(why)
         lines.append(f"| `{tok}` | `{art}` | `{loc}` | {verdict} | {state} |"
                      f"{' ' + why if why else ''} |")
     with open(path, "w", encoding="utf-8") as fh:

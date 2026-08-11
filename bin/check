@@ -3427,6 +3427,43 @@ check(
     "whose defect was fixed, which is a ratchet that no longer measures the tree",
 )
 
+# ── A preserved annotation is preserved WHOLE ────────────────────────────────
+# The check above proves the annotation is CARRIED. It says nothing about whether it is
+# carried INTACT, and those two came apart on the first project to write a real one:
+# `capture` split the row on every `|`, so a `why` citing `<!-- origin: user \|
+# immutable: true -->` was rewritten from 634 characters to 114 — silently, exit 0,
+# dropping both rules it cited. `\|` is markdown's escape for a literal pipe, and the
+# two columns this file INVITES a human to hand-edit are prose, so the restriction was
+# unstated and violating it was data loss with no error. MEASURED 2026-08-10.
+#
+# CALL SITES, NOT DEFINITIONS — and that distinction was earned, not assumed. Reverting
+# the fix by deleting only the three call sites, leaving `split_cells`, `unescape_cell`
+# and `escape_cell` defined and documented in the file, reproduces the truncation
+# exactly while every grep for a helper NAME still passes. So this asserts the calls,
+# and asserts the naive split is GONE — the one fragment that cannot coexist with the fix.
+#
+# BOTH DIRECTIONS OR NEITHER. Reading unescapes and writing escapes; fixing only the
+# reader yields a cell that parses on the way in and corrupts on the way back out,
+# which is the same data loss one run later.
+check(
+    "ratchet: a preserved `why` survives WHOLE — escaped pipes both read and written",
+    "cells = split_cells(" in _rat
+    and "unescape_cell(cells[1])" in _rat
+    and "unescape_cell(cells[2])" in _rat
+    and "escape_cell(state), escape_cell(why)" in _rat
+    and '.split("|")' not in _rat
+    # The lookbehind IS the rule; helper names around a plain `|` split would satisfy
+    # every fragment above and still truncate.
+    and r"(?<!\\)\|" in _rat,
+    "the baseline header tells a human to hand-edit `state` and `why`, and a pipe in "
+    "prose is ordinary — a rule quoted from a marker, a table, an alternation. A parser "
+    "stopping at the first pipe truncates the citation that justified an ACCEPTED "
+    "verdict, which is the one thing in that file no other artifact records, and it "
+    "reports success while doing it. Behavioural guard: fixtures/scripts/"
+    "ratchet-escaped-pipe, which asserts the ARTIFACT rather than the one-line summary "
+    "--capture prints",
+)
+
 # ── A detector ships with its fix (user directive, 2026-08-05) ───────────────
 # The catalog shipped six AUTO preconditions written and NONE implemented. Detection
 # was wired into audit, every finding was handed back, and the closing report named
