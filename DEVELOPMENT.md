@@ -113,7 +113,32 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-10
+## Open, as of 2026-08-11
+
+**Landed 2026-08-11 — a dispatched teammate's death is proven by its artifact, not by an empty list;
+and a run reaps its own teammates.** Reported by the user against a real incident on another install:
+an `audit` left ~26 idle completed teammates addressable after they returned, and — earlier in the same
+run — `ListAgents` returned "No reachable agents" *while three panel members were still mid-flight*, so
+the orchestrator read the empty listing as death and **re-dispatched the entire panel**: duplicate
+spawns, wasted tokens, risk of double-writes. Two rules, one commit (`2833a67`):
+
+- **Rule A — confirm-death-by-artifact before re-dispatch.** An empty or failed `ListAgents`/reachability
+  check never proves a dispatched teammate is gone; liveness is confirmed only by the artifact it was told
+  to return (a probe writes to the work dir, an author returns a handbook, a panel member writes its brief).
+  Absent artifact → still working, never re-spawn. Stated canonically in `staging.md`'s dispatch wave and
+  cross-referenced from `audit.md` Step 5.
+- **Rule B — end-of-run teardown of the run's own teammates**, after their results COMMIT (`audit.md`
+  close). Cleanup only, and the prose says so: never a gate, never a precondition, no 200-cap refund
+  (fact 8 counts a spawn at creation), and **no unmeasured concurrent-slot benefit claimed** — the
+  justification is removing idle clutter and the ambiguity that produced Rule A's false-death misread.
+  Cites fact 8's "REPEAT OFFENDER" note as the reason this must never become a cap check. Reaps only
+  teammates this run spawned, never adopted/pre-existing agents.
+
+Each rule ships its `bin/check` anchor (two assertions added); `bin/check` green at 886/0.
+
+**Still open from this:** the teardown and the liveness rule are doctrine proven by their `bin/check`
+anchors, but neither has yet been exercised by a live `audit` on this host — the re-dispatch guard and
+the reap only run inside a real dispatch wave, and that end-to-end run is the next verification.
 
 **Landed 2026-08-10 — no run may leave a deferment queue, and a `dev diagnose` that drains workforce's
 own blocks to a fixpoint.** Reported by the user against a `university` re-audit whose close read
