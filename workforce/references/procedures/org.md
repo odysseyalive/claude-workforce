@@ -241,6 +241,14 @@ someone can read instead of re-derive.
    how it will be verified — plus the artifact path under `.claude/workforce/work/<run-id>/`. **Do not
    restate the employee's own steps.** Its handbook owns those.
 
+   6a. **One order, one `<run-id>`.** You assign the run-id, and each independent work order gets its
+   own. Never reuse one across two orders. Two orders under a shared run-id write the same
+   `<caller>-to-<callee>.spawn` edge and the same `<callee>/OUTPUT.md`, so the second silently
+   overwrites the first, and the durable report a `review` reads is gone before anyone opens it. Related
+   orders may share a descriptive stem for grouping (`agenda-01`, `agenda-02`), but the directory
+   segment naming the work must be unique per order. A **second order to the same employee** under one
+   run-id is the exact collision this prevents, and the one case where reusing a stem is most tempting.
+
 7. **Catch yourself skipping the dispatch.** If the next thing you do after announcing is an
    `Edit`, `Write`, or `Bash` call doing the routed work yourself → STOP, say "Dispatch announced but
    the agent was never started. Starting it now," and make the call. A command run under rung 2 is the
