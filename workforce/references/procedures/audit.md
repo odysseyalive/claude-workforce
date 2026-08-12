@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 49 assertion(s) in bin/check name this file; 102 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 51 assertion(s) in bin/check name this file; 104 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -869,7 +869,7 @@ defers a run.*
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → model rewrite → `org index` → `org embed` →
-`wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.**
+`wf-claude-md` → `checksums` → **the git pin-guard install (Step 6-G)** → `verify` → **discharge (Step 6b)** → the sweep.**
 
 **Discharge sits between `verify` and the sweep** because it is the last step that may still change the
 tree, and the sweep is the first that cannot be undone. A queue drained after the deletion is a queue
@@ -1025,6 +1025,31 @@ cell (`references/org-config.template.md` § The four lanes).
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+### Step 6-G — Wire the git pre-commit pin guard (installed WITH audit, alongside the hooks)
+
+**The commit-time pin-and-dependabot guard is installed here, in this run, when the target is a git
+repository.** This sits alongside the settings-hook wiring of the same run and follows the same
+make-before-break discipline: the guard is wired (make) before `verify` reports it and long before the
+sweep (break), so a `verify` row reporting it can only read the state this step just wrote. Its lifecycle
+home — wire, report, unwire — is `procedures/hooks.md` § The git pre-commit pin guard; this step is only
+where an `audit` performs the wiring.
+
+Per target:
+
+```bash
+wf-pin-check --install-hook --root <repo> --execute
+```
+
+It registers `core.hooksPath -> .claude/workforce/git-hooks`, chaining any prior hook, and records the
+prior git-config value in `.claude/workforce/.settings-owned.json` § `git_config` so the wiring is
+reversible by `disband` and `/workforce hooks --remove` exactly (`procedures/hooks.md`). Re-read to
+confirm; never report a git-config write the re-read did not confirm.
+
+**When the target is not a git repository, skip and report** — `GIT HOOK  not a git repository: <root> —
+nothing to wire`, exit `0`, wire nothing. That is a reported skip, never a silent no-op and never an
+error: a project with no `.git` has nothing for a commit-time guard to bind to, and saying so is the
+measurement. **Under `--review`: print the registration this step would write, and touch no git config.**
 
 ## Step 6a — Canary re-attempt (the step that keeps DEGRADED from leaving the run)
 

@@ -113,7 +113,55 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-11
+## Open, as of 2026-08-12
+
+**Landed 2026-08-12 — a commit-time guard that keeps dependencies pinned and Dependabot present,
+installed WITH audit.** Requested by the user (`/workforce dev`): *"a system installed with audit that
+when committing any code, add a new check to make sure that all packages are pinned and dependabot is
+added to the repo."* Two forks the user chose: the mechanism is a **git pre-commit hook** (fires on
+every `git commit` by anyone, not a Claude settings hook), and on violation it **auto-fixes then
+allows** the commit rather than blocking it — a detector ships with its fix (`SKILL.md` § Directives).
+
+- **`wf-pin-check`** (`workforce/bin/`, stdlib Python, ~1,050 lines): scans dependency manifests, flags
+  any spec not resolving to an exact version, and on `--execute`/at commit time pins the loose specs and
+  writes/merges `.github/dependabot.yml`. Auto-pin at launch covers **npm** (`package.json`; lockfile
+  version beats the range floor) and **Python** (`requirements*.txt`; pinned only from a lock, never
+  invented); every detected ecosystem gets Dependabot coverage (add-only, never clobbering an existing
+  entry). Anything it cannot deterministically pin — a wildcard with no lockfile, a bare `flask`, an
+  ecosystem without pin support yet — is reported `unpinnable`, a **measured limit, not a failure**
+  (precision is a property of the detector). Prints `INV-PINS  unpinned N · pinnable M · unpinnable K ·
+  dependabot MISSING|PARTIAL|PRESENT`.
+- **The hook is a copy of `wf-pin-check` itself**, not a separate shell wrapper. `--install-hook`
+  copies the script to `.claude/workforce/git-hooks/pre-commit`, chmods it, and points `core.hooksPath`
+  there; git runs it, it recognises the `pre-commit` argv name, auto-fixes against the repo root, then
+  chains any prior hook and returns *that* hook's exit code (a prior gate still blocks; only the guard's
+  own contribution is non-blocking). **The first design shipped a bash wrapper at
+  `workforce/git-hooks/pre-commit`; it collided with three checks at once** — shipped scripts confined
+  to `workforce/bin/`, every shipped script has a fixture, marker-lint AST-parses every shipped script
+  as Python — and the fix was to remove the foreign file, not to loosen three checks and exempt one from
+  the re-runnable-test invariant. One Python file, one behavior on both platforms (Core Principle 9).
+- **Installed WITH audit** at new **Step 6-G** (`wf-pin-check --install-hook --root <repo> --execute`,
+  skip-and-report on a non-git target), reported by **`verify`** (WIRED / UNWIRED / NOT A GIT REPO from
+  `core.hooksPath` + the `git_config` ownership sidecar), and wired/unwired by **`/workforce hooks`**
+  and `disband` — the same make/report/unwire lifecycle the settings hooks have, on git config instead
+  of `settings.json`. `INV-PINS` is invariants.md **row 21**, the first row a git hook prints rather
+  than an `audit` run.
+- Enforcement landed with the rule: **16 script fixtures** proven by breaking (npm report↔execute,
+  lockfile-beats-floor, clean, dependabot partial↔merge, python unpinnable↔locked, precommit
+  fixes↔fixes-nothing, install-hook-nongit, cargo measured-limit, json, bad-flags), **3 idempotence
+  writers**, and **5 `bin/check` assertions** (audit Step 6-G order + install command, verify wiring
+  row, hooks unwire path, the guard emits `INV-PINS`), each proven by breaking in `bin/prove`. Full
+  harness green: `check` 891/0 · `prove` 236/236 zero-vacuous · `script-conformance` 129/0 ·
+  `idempotence` 11/11 · `conformance` 85/0.
+
+**Still open from this:** (a) **argv0 dispatch has no fixture** — `bin/script-conformance` always
+invokes the script as `wf-pin-check`, and a fixture named `pre-commit` would run against the harness's
+own cwd (the live repo), so the git-hook *entry* is covered only by an out-of-harness live test on a
+throwaway repo, not by a re-runnable fixture; the `--pre-commit` *mode* is fixtured. (b) **A fixture
+cannot contain a `.git`**, so `staged` behavior at commit time is proven by the same live test, not by
+`conformance`. (c) `references/scopes.md`'s canonical resolver tests `[ -d "$WF" ]`, so a personal
+install predating a new script satisfies the directory test and dead-ends — resolving on the *script*
+would fix the class; noted by script-author, not chased here.
 
 **Landed 2026-08-11 — a dispatched teammate's death is proven by its artifact, not by an empty list;
 and a run reaps its own teammates.** Reported by the user against a real incident on another install:

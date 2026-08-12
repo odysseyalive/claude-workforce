@@ -966,6 +966,406 @@
     "script": "wf-unique-persona",
     "stdin_file": ".claude/agents/a.md"
   },
+  "pincheck-badflags": {
+    "_why": "A CONFLICT IS NAMED, NEVER SILENTLY RESOLVED. `--json` reports and writes nothing while `--execute` writes; a script that picked one would hand the caller a mode it did not ask for -- and in the losing direction it would write to a tree whose owner asked only to be told. Exit 2 marks it as a caller error, distinct from the 0 that every findings-bearing run returns, and `not` asserts nothing ran before the refusal.",
+    "args": [
+      "--json",
+      "--execute"
+    ],
+    "exit": 2,
+    "not": [
+      "PIN GUARD",
+      "INV-PINS",
+      "{"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "wf-pin-check: --json reports and writes nothing"
+    ]
+  },
+  "pincheck-cargo-unpinnable": {
+    "_why": "A MEASURED LIMIT REPORTED, NOT A SILENT GAP. Cargo is detected for dependabot coverage but not auto-pinned at launch, so its loose specs surface as UNPINNABLE naming the ecosystem and the reason instead of vanishing from a report that then reads clean. The precision assertion is in `not`: `[package]` carries `version = \"0.1.0\"` and `name = \"fixture\"`, which belong to the crate itself, and a scanner that regexes every `key = \"value\"` line would report `Cargo.toml: version 0.1.0` as an unpinned dependency -- a finding about a line it does not understand. `exact = \"=1.2.3\"` is already pinned by cargo's own grammar and must not be flagged either.",
+    "after": {
+      "Cargo.toml": {
+        "not": [],
+        "want": [
+          "serde = \"1.0\"",
+          "rand = { version = \"^0.8\""
+        ]
+      }
+    },
+    "args": [],
+    "exit": 0,
+    "not": [
+      "Cargo.toml: version",
+      "Cargo.toml: name",
+      "Cargo.toml: exact",
+      "+ pinned"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ unpinnable  cargo  Cargo.toml: serde 1.0  -> UNPINNABLE: ecosystem cargo pinning not supported yet",
+      "~ unpinnable  cargo  Cargo.toml: rand ^0.8  -> UNPINNABLE: ecosystem cargo pinning not supported yet",
+      "INV-PINS  unpinned 2 \u00b7 pinnable 0 \u00b7 unpinnable 2 \u00b7 dependabot MISSING"
+    ]
+  },
+  "pincheck-clean": {
+    "_why": "A ZERO IS A MEASUREMENT AND SILENCE IS NOT (references/invariants.md). Every spec is already one version and dependabot already covers the one ecosystem present, so the correct output is the INV-PINS line with three zeros and `dependabot PRESENT` -- not an empty run. `not` forbids every apply verb and both non-PRESENT statuses, which is what makes this the false-positive half of the set: a detector that reads `1.3.7` as loose, or one that calls a covered ecosystem PARTIAL, fails here while still passing every tree that does have findings.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "+ pinned",
+      "would",
+      "MISSING",
+      "PARTIAL",
+      "UNPINNABLE",
+      "apply with"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ dependabot  PRESENT",
+      "INV-PINS  unpinned 0 \u00b7 pinnable 0 \u00b7 unpinnable 0 \u00b7 dependabot PRESENT"
+    ]
+  },
+  "pincheck-dependabot-merge": {
+    "_why": "THE MERGE IS APPEND-ONLY, AND THAT IS ASSERTED ON THE FILE, NOT ON THE MESSAGE. The existing npm entry carries `open-pull-requests-limit: 3` and `interval: \"monthly\"` -- settings this script would never generate -- and the whole block is required back verbatim in `after`, so a merge that rewrote, re-indented or reordered the user's entry fails even though it reported success. `not` forbids the exact shape a regenerating merge produces (npm followed straight by `schedule:`, the limit line dropped). The appended pip entry is asserted present, so passing by writing nothing is not available either.",
+    "after": {
+      ".github/dependabot.yml": {
+        "not": [
+          "- package-ecosystem: \"npm\"\n    directory: \"/\"\n    schedule:"
+        ],
+        "want": [
+          "# hand written by the repo owner",
+          "  - package-ecosystem: \"npm\"\n    directory: \"/\"\n    open-pull-requests-limit: 3\n    schedule:\n      interval: \"monthly\"",
+          "  - package-ecosystem: \"pip\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\""
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "would merge",
+      "wrote .github/dependabot.yml"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "+ dependabot  merged .github/dependabot.yml (added: pip)",
+      "verified on disk"
+    ]
+  },
+  "pincheck-dependabot-partial": {
+    "_why": "PARTIAL is the status that needs a fixture, because MISSING and PRESENT are both reachable by a scan that never compares the two sets. The tree holds a package.json and a requirements.txt while .github/dependabot.yml covers npm only, so the answer is PARTIAL naming exactly the uncovered ecosystem. Display half of the pair with pincheck-dependabot-merge, on a byte-identical tree; `not` asserts nothing was merged and `after` re-reads the file to prove the user's hand-written entry is still the only one.",
+    "after": {
+      ".github/dependabot.yml": {
+        "not": [
+          "pip"
+        ],
+        "want": [
+          "package-ecosystem: \"npm\""
+        ]
+      }
+    },
+    "args": [],
+    "exit": 0,
+    "not": [
+      "+ dependabot",
+      "merged",
+      "MISSING",
+      "PRESENT"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ dependabot  PARTIAL (missing: pip)",
+      "would merge .github/dependabot.yml (add: pip)",
+      "INV-PINS  unpinned 0 \u00b7 pinnable 0 \u00b7 unpinnable 0 \u00b7 dependabot PARTIAL"
+    ]
+  },
+  "pincheck-emptyroot": {
+    "_why": "AN EMPTY --root IS A CALLER ERROR, never a silent retarget to the CWD. `${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`; `os.path.abspath(\"\")` is the CWD, which IS a real directory and passes a naive is-a-directory guard -- and this script WRITES, so the failure would be pinning specs in a tree nobody named. The harness passes `--root <tree>` itself, so the row appends a second, empty `--root` that argparse resolves last; `not` asserts no part of the report was emitted on the way out.",
+    "args": [
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "not": [
+      "PIN GUARD",
+      "INV-PINS"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "wf-pin-check: --root is empty",
+      "${CLAUDE_PROJECT_DIR} is unset outside a hook"
+    ]
+  },
+  "pincheck-execute": {
+    "_why": "--execute is the consent, and the write is asserted on the ARTIFACT. Same tree as pincheck-npm-report. The multi-line `after` block is verbatim on purpose: it pins key ORDER and FORMATTING as well as the values, because the pin is a targeted substring substitution rather than a json.dump of the parsed object -- a re-serialised package.json reformats a file the user owns and turns a one-token fix into a whole-file diff nobody reviews, which is fatal for something that runs on every commit. `sprintf-js` must still read `*`: the half it cannot pin is left alone, never guessed. dependabot.yml is asserted to carry github-actions as well as npm, which is the only case proving that any file under .github/workflows/ is detected as its own ecosystem at directory `/`.",
+    "after": {
+      ".github/dependabot.yml": {
+        "not": [
+          "package-ecosystem: \"pip\""
+        ],
+        "want": [
+          "version: 2",
+          "- package-ecosystem: \"npm\"",
+          "- package-ecosystem: \"github-actions\"",
+          "interval: \"weekly\""
+        ]
+      },
+      "package.json": {
+        "not": [
+          "\"left-pad\": \"^1.0.0\"",
+          "\"tape\": \"~4.2.1\""
+        ],
+        "want": [
+          "  \"dependencies\": {\n    \"left-pad\": \"1.0.0\",\n    \"sprintf-js\": \"*\",\n    \"exact-dep\": \"3.0.0\",\n    \"local-tool\": \"file:./tools/local-tool\"\n  },",
+          "\"tape\": \"4.2.1\"",
+          "\"build\": \"node build.js\"",
+          "\"private\": true,"
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "~ unpinned",
+      "would pin",
+      "would write",
+      "apply with: --execute",
+      "UNVERIFIED"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "+ pinned      npm  package.json: left-pad ^1.0.0 -> 1.0.0",
+      "+ pinned      npm  package.json: tape ~4.2.1 -> 4.2.1",
+      "+ dependabot  wrote .github/dependabot.yml (github-actions,npm)",
+      "verified on disk: 2 exact spec(s) in package.json",
+      "INV-PINS  unpinned 3 \u00b7 pinnable 2 \u00b7 unpinnable 1 \u00b7 dependabot MISSING"
+    ]
+  },
+  "pincheck-flagconflict": {
+    "_why": "The second half of the conflicting-flag guard, paired with pincheck-badflags on a different pair of flags so neither can pass by a special case. `--pre-commit` is the commit-time fix and `--install-hook` is the wiring; a run that quietly picked one would, in the losing direction, leave a repo believing it is guarded when nothing was ever wired -- dead wiring with a clean report on top, which is the failure the whole install/verify/unwire lifecycle exists to make impossible. Exit 2 marks it a caller error, distinct from the 0 that every findings-bearing run returns.",
+    "args": [
+      "--pre-commit",
+      "--install-hook"
+    ],
+    "exit": 2,
+    "not": [
+      "PIN GUARD",
+      "GIT HOOK",
+      "INV-PINS"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "wf-pin-check: --pre-commit is the commit-time fix; it does not wire or unwire the hook"
+    ]
+  },
+  "pincheck-install-hook-nongit": {
+    "_why": "A tree with no `.git` is REPORTED and exits 0, and nothing is wired. Two failures are being excluded at once: writing `core.hooksPath` into a directory git will never read (dead wiring, which is worse than none because `verify` would then report a guard that cannot fire), and exiting nonzero on a condition that is not a caller error -- exit 2 is reserved for an empty --root and conflicting flags, and an audit that calls this on a non-repo must not abort. `not` forbids both wiring verbs, so a run that reported the refusal and wired anyway fails.",
+    "args": [
+      "--install-hook"
+    ],
+    "exit": 0,
+    "not": [
+      "registered",
+      "would register",
+      "core.hooksPath ->",
+      "verified on disk"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "GIT HOOK  not a git repository",
+      "\u2014 nothing to wire"
+    ]
+  },
+  "pincheck-json": {
+    "_why": "The machine-readable half of the report, for a caller that must branch on the finding rather than read it. Same tree as pincheck-npm-report, so the two are cross-checkable: the human line `-> 1.0.0` and the JSON `\"target\": \"1.0.0\"` are the same measurement, and `pinnable` false carries the reason string rather than a null nobody can act on. `not` forbids the human lines entirely -- a --json mode that also prints the table emits invalid JSON on stdout and every consumer of it fails at parse time, which is the defect this asserts against.",
+    "args": [
+      "--json"
+    ],
+    "exit": 0,
+    "not": [
+      "INV-PINS",
+      "PIN GUARD",
+      "~ unpinned"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "\"status\": \"MISSING\"",
+      "\"target\": \"1.0.0\"",
+      "\"pinnable\": false",
+      "\"reason\": \"no lockfile; wildcard has no floor\"",
+      "\"unpinnable\": 1",
+      "\"pinnable\": true"
+    ]
+  },
+  "pincheck-npm-locked": {
+    "_why": "THE LOCKFILE BEATS THE FLOOR, and the versions are chosen so the two cannot be confused: `^1.0.0` resolves to 1.3.7 (the locked version), NOT 1.0.0 (the floor), and `~4.2.1` to 4.2.9, NOT 4.2.1. Byte-identical package.json to pincheck-npm-report -- package-lock.json is the only difference -- so a regression that ignores lockfiles still passes there and fails here with `-> 1.0.0`, which `not` forbids. It also proves the wildcard is UNPINNABLE only for want of a resolver: with the lock present `*` becomes pinnable at 1.1.2 and the count moves to `unpinnable 0`, so the earlier UNPINNABLE was a measured limit and not a blanket refusal.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "-> 1.0.0",
+      "-> 4.2.1",
+      "UNPINNABLE"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ unpinned    npm  package.json: left-pad ^1.0.0  -> 1.3.7",
+      "~ unpinned    npm  package.json: sprintf-js *  -> 1.1.2",
+      "~ unpinned    npm  package.json: tape ~4.2.1  -> 4.2.9",
+      "INV-PINS  unpinned 3 \u00b7 pinnable 3 \u00b7 unpinnable 0 \u00b7 dependabot MISSING"
+    ]
+  },
+  "pincheck-npm-report": {
+    "_why": "THE DISPLAY HALF, and the reference tree for the pair. Identical bytes to pincheck-execute; the `--execute` flag is the only difference, so a regression that makes the default WRITE fails here and one that makes --execute merely REPORT fails there. Three loose specs with three different fates in one manifest: `^1.0.0` and `~4.2.1` have a clean operator+semver floor and are pinnable, `*` has no floor and no lockfile so it is UNPINNABLE WITH THE REASON PRINTED rather than half-fixed. `exact-dep` (already 1 version) and `local-tool` (`file:` \u2014 not a registry range) are asserted ABSENT: a detector that flags them is claiming a finding about a line it does not understand, and precision is a property of the detector, not of a sample. `after` re-reads package.json to prove the report wrote nothing, which no assertion on stdout can show.",
+    "after": {
+      "package.json": {
+        "not": [
+          "\"left-pad\": \"1.0.0\"",
+          "\"tape\": \"4.2.1\""
+        ],
+        "want": [
+          "\"left-pad\": \"^1.0.0\"",
+          "\"tape\": \"~4.2.1\""
+        ]
+      }
+    },
+    "args": [],
+    "exit": 0,
+    "not": [
+      "+ pinned",
+      "wrote .github/dependabot.yml",
+      "verified on disk",
+      "exact-dep",
+      "local-tool"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "PIN GUARD",
+      "~ unpinned    npm  package.json: left-pad ^1.0.0  -> 1.0.0",
+      "~ unpinned    npm  package.json: tape ~4.2.1  -> 4.2.1",
+      "~ unpinnable  npm  package.json: sprintf-js *  -> UNPINNABLE: no lockfile; wildcard has no floor",
+      "~ dependabot  MISSING",
+      "would write .github/dependabot.yml",
+      "INV-PINS  unpinned 3 \u00b7 pinnable 2 \u00b7 unpinnable 1 \u00b7 dependabot MISSING",
+      "apply with: --execute"
+    ]
+  },
+  "pincheck-precommit": {
+    "_why": "THE COMMIT-TIME PATH, which writes WITHOUT --execute because installing the hook was the consent. It must ALWAYS exit 0 on its own account: a nonzero here aborts the user's commit, and the resolved mechanism is auto-fix-then-allow. TWO MEASURED LIMITS OF THIS FIXTURE, stated because they change what it proves. (1) A fixture tree cannot contain a real repository -- git refuses to track any path under a nested `.git`, so the harness would copy an empty one -- hence `staged 0 (not a git repository)` here. (2) The harness cannot set argv[0], and the git entry point dispatches on `os.path.basename(sys.argv[0]) == \"pre-commit\"`, so this row exercises the MODE and not the DISPATCH. Both were measured end to end by hand on 2026-08-12 against a throwaway repo: `--install-hook --execute` copied wf-pin-check to `.claude/workforce/git-hooks/pre-commit`, `git commit` ran that copy, it printed `auto-fixed 1, staged 2`, the COMMITTED package.json held `\"left-pad\": \"1.0.0\"`, and a prior hook exiting 7 still refused the commit. `after` proves the fix landed in the tree.",
+    "after": {
+      "package.json": {
+        "not": [
+          "\"left-pad\": \"^1.0.0\""
+        ],
+        "want": [
+          "\"left-pad\": \"1.0.0\""
+        ]
+      }
+    },
+    "args": [
+      "--pre-commit"
+    ],
+    "exit": 0,
+    "not": [
+      "UNPINNABLE",
+      "Traceback",
+      "apply with: --execute"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "+ pinned      npm  package.json: left-pad ^1.0.0 -> 1.0.0",
+      "PIN GUARD (pre-commit)  auto-fixed 1, staged 0 (not a git repository); 0 unpinnable left \u2014 commit allowed"
+    ]
+  },
+  "pincheck-precommit-unpinnable": {
+    "_why": "THE FALSIFICATION HALF of pincheck-precommit: the one dependency is `*`, which cannot be pinned without a lockfile, so the guard fixes NOTHING and must still exit 0 and still say so out loud. This is the case that separates `allowed the commit because everything was fine` from `allowed the commit because it never blocks` -- the two are indistinguishable from an exit code, which is why the count and the word UNPINNABLE are both asserted. `after` requires the spec back untouched: a guard that silently invented a version to make its own report clean would pass every other case in this set.",
+    "after": {
+      "package.json": {
+        "not": [
+          "\"sprintf-js\": \"1"
+        ],
+        "want": [
+          "\"sprintf-js\": \"*\""
+        ]
+      }
+    },
+    "args": [
+      "--pre-commit"
+    ],
+    "exit": 0,
+    "not": [
+      "+ pinned",
+      "Traceback"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ unpinnable  npm  package.json: sprintf-js *  -> UNPINNABLE: no lockfile; wildcard has no floor",
+      "PIN GUARD (pre-commit)  auto-fixed 0, staged 0 (not a git repository); 1 unpinnable left \u2014 commit allowed"
+    ]
+  },
+  "pincheck-py-locked": {
+    "_why": "THE FALSIFICATION HALF of pincheck-py-unpinnable: byte-identical requirements.txt, and the only difference is a requirements.lock stating the two exact versions. A regression that made the previous case pass by refusing to touch Python at all fails here, because both lines must now be rewritten to the LOCKED versions (2.0.1, 4.2.11 -- neither derivable from `>=4.0`). `after` also requires the comment line and the already-exact `requests` line back unchanged, including its inline comment: a line-based rewriter that drops comments destroys a requirements file's only documentation.",
+    "after": {
+      "requirements.txt": {
+        "not": [
+          "django>=4.0"
+        ],
+        "want": [
+          "# runtime deps",
+          "flask==2.0.1",
+          "django==4.2.11",
+          "requests==2.31.0  # already exact"
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "UNPINNABLE",
+      "cannot invent one"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "+ pinned      pip  requirements.txt: flask (no version) -> 2.0.1",
+      "+ pinned      pip  requirements.txt: django >=4.0 -> 4.2.11",
+      "verified on disk: 2 exact spec(s) in requirements.txt"
+    ]
+  },
+  "pincheck-py-unpinnable": {
+    "_why": "NEVER INVENT A VERSION. `flask` names no version at all and `django>=4.0` names a lower bound, and with no lock anywhere in the tree neither has a derivable exact version -- so both are UNPINNABLE with the reason, and `not` forbids `flask==` and `django==` in the output AND in the file afterwards. This is the case a plausible wrong fix fails: reading `>=4.0` as a floor the way npm's `>=1.2.3` is read would emit `django==4.0`, a version that may not exist on PyPI, into a file that then builds nothing. `requests==2.31.0` is already exact and must not appear as a finding.",
+    "after": {
+      "requirements.txt": {
+        "not": [
+          "flask==",
+          "django=="
+        ],
+        "want": [
+          "flask\n",
+          "django>=4.0"
+        ]
+      }
+    },
+    "args": [],
+    "exit": 0,
+    "not": [
+      "+ pinned",
+      "flask==",
+      "django==",
+      "requests"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ unpinnable  pip  requirements.txt: flask (no version)  -> UNPINNABLE: no locked version; cannot invent one",
+      "~ unpinnable  pip  requirements.txt: django >=4.0  -> UNPINNABLE: no locked version; cannot invent one",
+      "INV-PINS  unpinned 2 \u00b7 pinnable 0 \u00b7 unpinnable 2 \u00b7 dependabot MISSING"
+    ]
+  },
   "preflight-clean": {
     "_why": "A tree with no deny/ask rule, no intercepting hook, and no missing grant has ZERO hard blockers. The self-modification-classifier row is always advisory (whether it fires is measured at the write, not readable from config), so it never counts, and the run prints `0 blockers` deterministically regardless of the host's live auto-mode state. Paired with preflight-deny so a regression that always-flags or never-flags fails one.",
     "args": [],

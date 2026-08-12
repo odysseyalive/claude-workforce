@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 22 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 23 assertion(s) in bin/check name this file; 49 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -130,6 +130,22 @@ job is reporting whether hooks work. The producer now exists.*
 **Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`,
 `PRESENT` with a block count or `ABSENT`. Absent is not an error — it is the day-one state — but a hook
 reporting `UNPROTECTED` on every edit forever is, and the fix is `/workforce checksums --execute`.
+
+**And report whether the git pre-commit pin guard is wired.** It is a git hook, not a settings hook, so
+its wiring lives in git config rather than the settings file — this row reads `core.hooksPath` and the
+ownership sidecar `.claude/workforce/.settings-owned.json` § `git_config`, exactly as the guard's
+lifecycle home describes (`procedures/hooks.md` § The git pre-commit pin guard). Report the count in each
+state, including the zeroes:
+
+| State | Meaning |
+|---|---|
+| `WIRED` | `core.hooksPath` resolves to `.claude/workforce/git-hooks` and the sidecar records the prior value |
+| `UNWIRED` | no `core.hooksPath` names the workforce hooks dir — the guard is installed but not registered, the git-hook analogue of `ORPHANED` |
+| `NOT A GIT REPO` | the target has no `.git`, so there is nothing for a commit-time guard to bind to — reported, never an error |
+
+`UNWIRED` on a git repository → `/workforce hooks --execute`, whose Step 6-G equivalent runs
+`wf-pin-check --install-hook`. A guard that ships but is never wired is the dormancy this whole section
+exists to make visible; the count says whether it happened.
 
 ## Platform freshness
 

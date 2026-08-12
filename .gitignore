@@ -25,5 +25,12 @@ Thumbs.db
 *.swp
 *~
 
+# Python bytecode. `workforce/bin/` ships ~1,000-line stdlib scripts; a `py_compile`
+# or import drops a `__pycache__/*.pyc` there, and `bin/check`'s "no shipped file is
+# undeclared" gate goes red on it — worse, an uncaught .pyc could be committed and
+# then shipped-but-undeclared. Ignored everywhere; a .pyc is never source.
+__pycache__/
+*.pyc
+
 # fixture git histories are recreated by fixtures/init-git.sh, never committed
 fixtures/*/.git/

@@ -874,6 +874,49 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# The commit-time pin-and-dependabot guard (2026-08-12). A DETECTOR SHIPS WITH ITS
+# FIX (SKILL.md § Directives): the git pre-commit pin guard auto-fixes, and the
+# doctrine that keeps it from shipping dormant is prose in four files — audit
+# installs it, verify reports it, hooks owns its wire/unwire lifecycle, and the
+# script emits the invariant it promises. Prose regresses silently; these pin it.
+# ─────────────────────────────────────────────────────────────────────────────
+_aud_pg = read("workforce/references/procedures/audit.md")
+_vfy_pg = read("workforce/references/procedures/verify.md")
+_hk_pg = read("workforce/references/procedures/hooks.md")
+_wpc_pg = read("workforce/bin/wf-pin-check")
+check(
+    "pin guard: audit installs it, in the Step 6 execution order",
+    "the git pin-guard install (Step 6-G)" in _aud_pg,
+    "audit.md Step 6 order no longer names the git pin-guard install (Step 6-G) — a "
+    "guard installed WITH audit that the execution order never runs is dormant, the "
+    "exact failure enforcement.md § Hooks was written against",
+)
+check(
+    "pin guard: audit runs wf-pin-check --install-hook",
+    "wf-pin-check --install-hook --root <repo> --execute" in _aud_pg,
+    "Step 6-G no longer carries the wf-pin-check --install-hook command — the step "
+    "would describe an install it never performs",
+)
+check(
+    "pin guard: verify reports whether it is wired",
+    "git pre-commit pin guard is wired" in _vfy_pg,
+    "verify.md no longer reports the git pin guard's wiring — a hook that ships "
+    "unwired and unreported is dormancy that reads as protection",
+)
+check(
+    "pin guard: hooks.md documents the unwire path",
+    "wf-pin-check --uninstall-hook --root <repo> --execute" in _hk_pg,
+    "hooks.md no longer documents the guard's unwire path — a git-config registration "
+    "workforce makes but cannot reverse is the residue the second directive forbids",
+)
+check(
+    "pin guard: the guard actually emits INV-PINS",
+    "INV-PINS  unpinned" in _wpc_pg,
+    "wf-pin-check no longer prints the INV-PINS line invariants.md row 21 owes — a "
+    "row whose token the run never emits is the silence the invariant set forbids",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 9. Honesty rules — never claim enforcement the runtime will not deliver
 # ─────────────────────────────────────────────────────────────────────────────
 # The SANCTIONED honesty clause contains the word "enforced" by design —
@@ -2606,8 +2649,11 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # a specific number; it is the rule that no row arrives without its report line.
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-              "eighteen": 18, "nineteen": 19, "twenty": 20}
-_inv_decl = re.search(r"^(\w+), and the list is closed", inv, re.M)
+              "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21}
+# The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
+# is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
+# reporting 20 against a 21-row table and failing the count check on a correct file.
+_inv_decl = re.search(r"^([\w-]+), and the list is closed", inv, re.M)
 _inv_declared = _INV_WORDS.get(_inv_decl.group(1).lower()) if _inv_decl else None
 # bin/ IS NOT IN THE MANIFEST. 66 files ship, all under workforce/; the tooling
 # does not. So doctrine naming `bin/check` as THE structural mechanism sent an

@@ -33,6 +33,29 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# `wf-pin-check --install-hook --execute` is the one writer here that needs a REAL git
+# repository, and a fixture tree cannot carry one: git refuses to track any path under
+# a nested `.git`, so a committed fixture would arrive empty on every clone but the one
+# that made it (`fixtures/init-git.sh` records the same finding for f6). The repo is
+# therefore built inside the throwaway copy, on the first pass only — `git init` is
+# skipped on the second so that pass writes nothing but what the script writes.
+#
+# WHAT THE SECOND PASS PROVES, and it is not obvious: the writer touches THREE things
+# that must each settle — the copied hook (byte-identical, so no rewrite), the
+# `.settings-owned.json` sidecar (whose `prior` must still record the ORIGINAL value,
+# not the value we ourselves set on pass 1 — recording our own path as the prior is how
+# an uninstall becomes a no-op that leaves the guard wired forever), and `.git/config`,
+# which is watched here and would show a duplicated `core.hooksPath` line.
+PIN_HOOK_SETUP = """
+import os, subprocess, sys
+root = os.path.abspath(os.path.join('.idempotence-scratch', 'pin-hook-repo'))
+os.makedirs(root, exist_ok=True)
+if not os.path.isdir(os.path.join(root, '.git')):
+    subprocess.run(['git', 'init', '-q', root], check=True)
+sys.exit(subprocess.run([sys.executable, 'workforce/bin/wf-pin-check', '--root', root,
+                         '--install-hook', '--execute']).returncode)
+"""
+
 # Each writer: how to invoke it, and which subtree it is allowed to touch.
 WRITERS = {
     "coverage": {
@@ -97,6 +120,32 @@ WRITERS = {
         "argv": ["workforce/bin/wf-apply", "--root",
                  "fixtures/scripts/apply-deadhook-execute", "--execute"],
         "watch": "fixtures/scripts/apply-deadhook-execute",
+    },
+    # wf-pin-check --execute rewrites a manifest IN PLACE and writes dependabot.yml. The
+    # second pass finds nothing loose because the first pass pinned it — but the hazard
+    # is the rewrite itself: it is a targeted substring substitution, and one that
+    # matched its own output would pin `1.0.0` to `1.0.0` forever, or worse, a version
+    # containing a regex-significant character would corrupt the line on every commit.
+    # This writer runs on EVERY COMMIT in a guarded repo, so a non-idempotent version of
+    # it damages a file a little more each time anyone touches the project.
+    "pincheck-execute": {
+        "argv": ["workforce/bin/wf-pin-check", "--root",
+                 "fixtures/scripts/pincheck-execute", "--execute"],
+        "watch": "fixtures/scripts/pincheck-execute",
+    },
+    # The dependabot MERGE, which is the append-only path and therefore the exact shape
+    # `bin/coverage --stamp` got wrong: a merge whose "is this ecosystem already
+    # covered?" test stops matching its own output appends the same entry on every run,
+    # forever, silently. The second pass must find the file PRESENT and write nothing.
+    "pincheck-dependabot": {
+        "argv": ["workforce/bin/wf-pin-check", "--root",
+                 "fixtures/scripts/pincheck-dependabot-merge", "--execute"],
+        "watch": "fixtures/scripts/pincheck-dependabot-merge",
+    },
+    # The git wiring: see PIN_HOOK_SETUP above for why this one builds its own repo.
+    "pincheck-install-hook": {
+        "argv": ["-c", PIN_HOOK_SETUP],
+        "watch": ".idempotence-scratch",
     },
 }
 

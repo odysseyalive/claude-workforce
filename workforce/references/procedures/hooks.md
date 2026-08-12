@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -186,3 +186,100 @@ names, and nothing else. An absent sidecar means workforce owns nothing here: re
 `disband` does the same as part of its wider sweep. **The hook file itself is not deleted by either** —
 removing a registration is reversible; deleting the file the user installed is not, and `restore` has
 nothing to restore from if the sweep took it.
+
+---
+
+## The git pre-commit pin guard
+
+**This command is also the lifecycle home of the commit-time pin-and-dependabot guard**, and it lives
+here for the same reason the settings hooks do: a mechanism that ships unwired enforces nothing and
+looks like it does. The guard is a **git** hook, not a Claude settings hook — it fires on every
+`git commit` by anyone, so it is wired through git config rather than through the settings file, but the
+make/report/unwire discipline is identical. **It must not ship dormant**: it ships WITH the wiring path
+below, WITH a `verify` row that reports whether it is wired (`procedures/verify.md` § Hook wiring), and
+WITH the unwire path that restores the prior git config exactly.
+
+The detector itself is `wf-pin-check`; on violation it auto-fixes and allows the commit rather than
+blocking it (a detector ships with its fix, `SKILL.md` § Directives). What this command owns is not the
+detection but the **git-config registration** that makes `git` invoke it.
+
+### What is wired, and where
+
+The registration points the target repository's `core.hooksPath` at a workforce-owned hooks directory:
+
+```
+core.hooksPath -> .claude/workforce/git-hooks
+```
+
+`--install-hook` places a **self-contained copy of `wf-pin-check` itself** at
+`.claude/workforce/git-hooks/pre-commit` — one Python file, no separate shell wrapper (`SKILL.md`
+Core Principle 9 and `manifest.txt` § Hooks: one Python file is one behavior on both platforms). When
+`git` runs it, it recognises it was invoked as the `pre-commit` hook (by its own argv name), auto-fixes
+against the repo root, and then chains to any prior hook recorded at install time, returning that prior
+hook's exit code. The copy is frozen at install, so a later `update`/re-audit re-runs `--install-hook`
+to refresh it (idempotent — a byte-identical copy is a NOOP). **The guard never blocks a commit on its
+own contribution**: its pin-and-dependabot pass always exits `0`, so only a *prior* chained hook can
+fail a commit; if the detector errors, it warns and exits `0`, because a guard that blocks on its own
+bug is worse than the drift it guards.
+
+### Wire
+
+Run the detector's own install path — it performs the git-config write, records ownership, and re-reads
+to confirm. Display by default; `--execute` writes:
+
+```bash
+wf-pin-check --install-hook --root <repo> --execute
+```
+
+It reads the current `core.hooksPath` (which may be unset), sets it to `.claude/workforce/git-hooks`,
+and records the prior value in `.claude/workforce/.settings-owned.json` under a `git_config` section so
+the unwire path restores EXACTLY the prior value — unset if it was unset, and nothing else:
+
+```json
+"git_config": {"core.hooksPath": {"set_to": "...", "prior": "<path|null>"}}
+```
+
+**Never report a write the re-read did not confirm** — the same rule the settings-hook procedure holds
+at step 6. Display mode (no `--execute`) and the confirmed write print, verbatim:
+
+```
+GIT HOOK  would register core.hooksPath -> .claude/workforce/git-hooks  (prior: <path|unset>)
+GIT HOOK  core.hooksPath -> .claude/workforce/git-hooks  (prior: <path|unset>)  registered
+```
+
+**When the target is not a git repository, wire nothing and say so** — a report, never an error, and
+exit `0`:
+
+```
+GIT HOOK  not a git repository: <root> — nothing to wire
+```
+
+### Report
+
+The guard emits its own report, and it is that report which the `INV-PINS` invariant treats as the
+promise a run must print (`references/invariants.md` row 21). A bare scan writes nothing and prints the
+`PIN GUARD` display header and the `INV-PINS` summary line; at commit time the pre-commit path prints
+what it auto-fixed. The `INV-PINS` line names the guard and carries the counts the invariant checks for
+coherence, verbatim:
+
+```
+INV-PINS  unpinned <N> · pinnable <M> · unpinnable <K> · dependabot MISSING|PARTIAL|PRESENT
+PIN GUARD (pre-commit)  auto-fixed <n>, staged <files>; <k> unpinnable left — commit allowed
+```
+
+An `unpinnable` count is a **measured limit, not a failure**: a wildcard with no lockfile floor cannot
+be pinned to an invented version, so `unpinnable > 0` is reported and the commit still proceeds. What
+`INV-PINS` refuses is silence or incoherent arithmetic, never a repository that carries a legitimately
+unpinnable spec.
+
+### Unwire
+
+```bash
+wf-pin-check --uninstall-hook --root <repo> --execute
+```
+
+It restores the recorded prior `core.hooksPath` (or unsets it if it was unset), drops the `git_config`
+section from the sidecar, and touches nothing else. An absent ownership record means workforce owns no
+git config here: restore nothing, and say so. `disband` replays the same restoration as part of its
+wider sweep. **As with the settings hooks, the wrapper file itself is not deleted by unwiring** —
+dropping a registration is reversible; deleting the installed file is not.

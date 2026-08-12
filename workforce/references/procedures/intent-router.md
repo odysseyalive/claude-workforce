@@ -1,6 +1,6 @@
 # intent-router — freeform `/workforce <text>`
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 > **This runs in the main loop. It has no agent, deliberately — the definition was ablated 2026-08-03.**
 > Steps 1 and 1b are exact string matches against two enumerable sets: the command surface and the
 > roster. Spawning for that paid a fresh context and a full `CLAUDE.md` injection to re-read two files

@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty-one, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -55,7 +55,10 @@ stops describing the runs it governs, and the rule that matters is the pairing, 
 change. **Row 19 landed 2026-08-06 and is the first row added for a reader with no writer** rather than
 for a run that stopped: the removal set was enumerated by two commands and produced by none. **Row 20
 landed 2026-08-07 and is row 19's other half** — the writer was built and nothing counted whether the
-set it wrote was ever emptied.)*
+set it wrote was ever emptied. **Row 21 landed 2026-08-12 and is the first row a git pre-commit guard
+prints rather than an `audit` run**: the commit-time pin-and-dependabot guard emits `INV-PINS` on every
+commit, and `audit` and `verify` emit it too when they install and report the guard — a promise printed
+in three places, owed by the one procedure that owns the guard's lifecycle.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -79,6 +82,7 @@ set it wrote was ever emptied.)*
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
 | 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
+| 21 | the pin guard emitted its report, and its unpinned/pinnable/unpinnable counts and dependabot status are coherent | `INV-PINS` | references/procedures/hooks.md |
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run
@@ -93,6 +97,19 @@ evacuation."* **No gate had refused.** Under this row that run prints
 was no number at all, because none was owed. **`0 uncited refusals` is the figure that matters here for
 the same reason it is in row 17** — a refusal naming no precondition is a run that stopped wearing a
 gate's clothes, and it is indistinguishable from a gate holding until something counts it.
+
+**Row 21 is measured, not asserted, and it is the guard's own report treated as an invariant.** The
+commit-time pin guard (`procedures/hooks.md` § The git pre-commit pin guard) prints
+`INV-PINS  unpinned <N> · pinnable <M> · unpinnable <K> · dependabot MISSING|PARTIAL|PRESENT` — the
+same line whether it fires from `wf-pin-check --pre-commit` on a developer's commit, from
+`--install-hook` under `audit`, or from a bare `--root` scan under `verify`. **What the row asserts is
+coherence, not cleanliness**: a repository may legitimately carry an `unpinnable` count (a wildcard with
+no lockfile floor is a measured limit, `SKILL.md` § Directives — precision is a property of the
+detector), so `unpinnable > 0` is never `NOT UPHELD`. The row is `NOT UPHELD` only when the guard could
+not emit the line at all, or when its arithmetic does not close — `pinnable` and `unpinnable` must sum to
+`unpinned`, and a `dependabot` token outside `MISSING|PARTIAL|PRESENT` is incoherent. A missing line is
+the same silence rows 1–20 forbid: a guard that reports nothing is indistinguishable from one that never
+ran, and this guard runs on every commit where a run cannot watch it.
 
 **Row 19 is the producer check for the only destructive command, and it exists because the removal set
 had a reader and no writer.** `sweep.md` § Procedure derives it from the journal; `conversion-taxonomy.md`
@@ -173,6 +190,7 @@ Run Invariants
   INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
   INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined
   INV-SWEPT       staged 1 · removed 1 · refused 0 · 0 uncited refusals
+  INV-PINS        unpinned 3 · pinnable 2 · unpinnable 1 · dependabot PARTIAL
   …every remaining row, always all of them…
 ```
 

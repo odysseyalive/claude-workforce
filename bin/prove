@@ -116,6 +116,7 @@ EVL  = "workforce/references/evaluators.md"
 ADDT = "workforce/references/evaluator-additions/text-tells.md"
 PTL  = "workforce/references/personnel-templates.md"
 DGN  = "workforce/references/procedures/diagnose.md"
+WPC  = "workforce/bin/wf-pin-check"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -753,6 +754,20 @@ CASES = [
     # two clauses are never falsified apart is one assertion wearing two faces.
     ("conform: `.censusignore` is read through wf-census, not guessed from directory names",
      CFM, "append", '\n# reinstated guess: d != "fixtures"\n'),
+    # ── the commit-time pin-and-dependabot guard (2026-08-12) ──────────────────
+    # Five prose/script claims that keep the git pin guard from shipping dormant.
+    # Each payload is a unique literal in its file, so `del` alters exactly the
+    # checked condition and nothing else.
+    ("pin guard: audit installs it, in the Step 6 execution order",
+     AUD, "del", "the git pin-guard install (Step 6-G)"),
+    ("pin guard: audit runs wf-pin-check --install-hook",
+     AUD, "del", "wf-pin-check --install-hook --root <repo> --execute"),
+    ("pin guard: verify reports whether it is wired",
+     VFY, "del", "git pre-commit pin guard is wired"),
+    ("pin guard: hooks.md documents the unwire path",
+     HK, "del", "wf-pin-check --uninstall-hook --root <repo> --execute"),
+    ("pin guard: the guard actually emits INV-PINS",
+     WPC, "del", "INV-PINS  unpinned"),
 ]
 
 

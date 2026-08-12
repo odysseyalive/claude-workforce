@@ -35,6 +35,11 @@ hooks:
 | `/workforce preflight` | Discover the `.claude` settings that would refuse an audit's writes, and print the one command that clears each. Read-only; `audit` runs it first, at Step 0.05 |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
 | `/workforce dev diagnose` | Turn the audit inward: measure install/update/streamline, then drain every block to a fixpoint. Dev-only |
+
+*`hooks` also wires the commit-time git **pin guard** — a `core.hooksPath` pre-commit hook that keeps
+dependencies pinned and `dependabot.yml` present. It is folded into `hooks`, not a separate command:
+`audit` installs it (Step 6-G), `verify` reports whether it is wired, and it prints `INV-PINS`
+(`references/procedures/hooks.md` § The git pre-commit pin guard).*
 <!-- /origin -->
 
 ---

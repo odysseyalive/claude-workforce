@@ -1,0 +1,1161 @@
+#!/usr/bin/env python3
+"""wf-pin-check — pin every dependency spec that can be pinned, and make dependabot present.
+
+    wf-pin-check --root <tree>                        REPORT (default). Scans, prints, writes nothing.
+    wf-pin-check --root <tree> --json                 the same measurement, machine-readable
+    wf-pin-check --root <tree> --execute              APPLY: pin loose specs + write/merge dependabot.yml
+    wf-pin-check --pre-commit   --root <tree>         auto-fix, `git add` the fixes, ALWAYS exit 0
+    wf-pin-check --install-hook --root <tree> [--execute]    wire the git pre-commit guard
+    wf-pin-check --uninstall-hook --root <tree> [--execute]  restore the prior core.hooksPath
+
+THIS SCRIPT IS ALSO THE HOOK. `--install-hook` copies THIS FILE to
+`<repo>/.claude/workforce/git-hooks/pre-commit` and points `core.hooksPath` at that
+directory; when git runs it, `sys.argv[0]` ends in `pre-commit` and that is the entire
+dispatch — no second file, no shell wrapper, no argument git has to be taught to pass.
+One file means the guard cannot drift from the thing that installs it, and it means
+every shipped executable in this distribution is a Python file under `workforce/bin/`
+with fixtures behind it, which is the property three of this project's checks assert.
+
+WHY THIS EXISTS. A floating dependency spec (`^1.2.3`, `*`, `latest`) means the tree
+that built yesterday is not the tree that builds today, and the difference arrives
+with no commit and no author. The remedy is not a policy sentence in a README: it is a
+check that fires on EVERY commit, by anyone, and fixes what it finds.
+
+A DETECTOR SHIPS WITH ITS FIX (references/enforcement.md). Detection alone would hand
+the user homework, so this script pins the specs it can pin, writes or merges
+`.github/dependabot.yml`, stages the result into the commit in progress, and lets the
+commit through. It NEVER blocks a commit: the mechanism the user chose is auto-fix,
+then allow. Anything it genuinely cannot pin is reported LOUDLY as `UNPINNABLE` with
+the reason — a measured limit, named where the operator sees it, not a silent skip and
+not an invented version number.
+
+PRECISION IS A PROPERTY OF THE DETECTOR, not of a sample. This pins only where a
+deterministic exact version is derivable: a lockfile that resolves the name, or a clean
+operator-plus-semver spec whose floor IS a single version. `*` with no lockfile, a bare
+`flask` with no locked version, a compound range — all REPORT, none are half-fixed.
+The launch scope is npm and Python requirements files; other ecosystems are detected
+for dependabot coverage and their loose specs are reported as unpinnable with that
+reason, because a wrong pin is worse than an honest gap.
+
+CONSENT MODEL, identical to wf-apply and wf-settings-apply. DISPLAY is the default: the
+apply lines read `would pin` / `would write` / `would merge` and nothing is written.
+`--execute` is the consent. `--pre-commit` carries its own consent — the user installed
+the hook — and is the one mode that writes without the flag.
+
+OWNERSHIP. `--install-hook` records what it set in
+`.claude/workforce/.settings-owned.json` under `git_config`, including the EXACT prior
+value of `core.hooksPath` (or null when it was unset), so `--uninstall-hook` restores
+that and nothing else. A `core.hooksPath` the sidecar does not name is the user's.
+
+AN EMPTY --root IS A CALLER ERROR, never a silent retarget to the CWD:
+`${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so a shipped `--root
+"${CLAUDE_PROJECT_DIR}"` block expands to `--root ""`, and `os.path.abspath("")` is the
+CWD — a real directory, which a naive is-a-directory guard accepts. This script WRITES.
+It exits 2 and names the empty argument.
+
+Exit codes
+    0  the scan ran (findings are reported, never signalled by the exit code — a
+       nonzero here would break the commit or abort the audit that called it)
+    2  caller error: an empty/missing --root, or conflicting flags
+    *  run AS the git hook: whatever the CHAINED prior hook returned. This guard's own
+       contribution is always 0; a pre-existing hook's verdict is the repository's and
+       it still blocks.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+OWNED_REL = os.path.join(".claude", "workforce", ".settings-owned.json")
+
+# Where core.hooksPath is pointed, relative to the repo root. git resolves a relative
+# hooksPath against the repo root, so the value is portable across clones.
+HOOKS_DIR_REL = ".claude/workforce/git-hooks"
+
+# The prior hook to chain to, recorded as PLAIN TEXT beside the installed copy.
+# NOT the same fact as the sidecar's `prior`, which is the prior core.hooksPath — a
+# repo can have no hooksPath at all and still have a live `.git/hooks/pre-commit`, and
+# that script is what must keep running. It lives beside the copy that execs it so a
+# tree carrying the hook directory carries its chain; git executes only files named
+# after a hook, so a `prior-pre-commit` file sitting there is inert to git.
+CHAIN_REL = HOOKS_DIR_REL + "/prior-pre-commit"
+
+# The basename git invokes the installed copy under. `os.path.basename(sys.argv[0])`
+# is the whole dispatch: git runs `<core.hooksPath>/pre-commit` with no mode arguments
+# and the repository top-level as the working directory.
+HOOK_ENTRY_NAME = "pre-commit"
+
+# Never walked. `.git` and `node_modules` are not the user's source; `vendor`, `dist`
+# and `build` are checked-in or generated copies, and pinning a vendored manifest edits
+# a file whose upstream owns it.
+SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", "__pycache__"}
+
+NPM_SECTIONS = ("dependencies", "devDependencies", "optionalDependencies",
+                "peerDependencies")
+
+# A spec that is already ONE version. Prerelease and build metadata are part of the
+# version, so `1.2.3-rc.1` is exact.
+EXACT_SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
+
+# A clean operator plus ONE semver — the only loose npm shape with a derivable floor.
+NPM_FLOOR = re.compile(r"^\s*(?:\^|~|>=|>|<=|<|=|v)?\s*"
+                       r"(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\s*$")
+
+# Not a registry version: a protocol, an alias, or a path. NEVER flagged and never
+# rewritten — "unpinned" is a claim about a registry range, and none of these is one.
+NPM_SKIP_PREFIXES = ("git+", "git:", "github:", "file:", "link:", "workspace:", "npm:",
+                     "http:", "https:", "portal:", "catalog:", "patch:", "./", "../",
+                     "/", "gitlab:", "bitbucket:")
+
+# The tags and wildcards with no floor at all.
+NPM_NO_FLOOR_TOKENS = {"*", "", "x", "X", "latest", "next", "*.*.*"}
+
+REASON_NPM_WILDCARD = "no lockfile; wildcard has no floor"
+REASON_PY_NO_LOCK = "no locked version; cannot invent one"
+
+
+def eprint(msg):
+    print(msg, file=sys.stderr)
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def load_json(path):
+    """(data, error). A tool that rewrites manifests must not die on one it cannot parse."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh), None
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        return None, f"{path}: {exc}"
+
+
+def walk(root):
+    """(abs dir, posix rel dir, sorted filenames) for every directory worth reading.
+
+    Sorted at every level so two runs on the same tree emit rows in the same order — a
+    report whose order depends on the filesystem cannot be diffed against yesterday's.
+    """
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        rel = os.path.relpath(dirpath, root).replace(os.sep, "/")
+        yield dirpath, ("" if rel == "." else rel), sorted(filenames)
+
+
+def relpath(root, path):
+    return os.path.relpath(path, root).replace(os.sep, "/")
+
+
+def row(ecosystem, manifest, name, spec, target=None, reason=None):
+    return {"ecosystem": ecosystem, "manifest": manifest, "name": name, "spec": spec,
+            "target": target, "pinnable": target is not None, "reason": reason}
+
+
+# ------------------------------------------------------------------ npm lockfiles
+
+def _pnpm_yarn_version(text, name):
+    """The resolved version of `name` from a pnpm/yarn lockfile, by regex.
+
+    REGEX AND NOT A YAML PARSER, deliberately: this script is stdlib-only so it runs on
+    a host that installed nothing but Python, and `yarn.lock` is not YAML at all. Both
+    formats key a block by `<name>@<range>` (pnpm v5 uses `/<name>/<version>`), so the
+    version is read off the block header or the `version:` line inside it.
+    """
+    esc = re.escape(name)
+    # pnpm: `/left-pad/1.3.0:` or `left-pad@1.3.0:` (v6+), quoted or not.
+    m = re.search(r"(?m)^\s*['\"]?/?" + esc + r"[/@](\d[\w.\-+]*)['\"]?\s*:", text)
+    if m:
+        return m.group(1)
+    # yarn v1: a block header naming the package, then an indented `version "x"`.
+    m = re.search(r"(?m)^\"?" + esc + r"@[^\n]*:\n(?:[ \t]+[^\n]*\n)*?[ \t]+version "
+                  r"[\"']([^\"']+)[\"']", text)
+    if m:
+        return m.group(1)
+    # pnpm importers / yarn berry: `<name>@range:` block with a `version: x` line.
+    m = re.search(r"(?m)^\s*['\"]?" + esc + r"@[^\n]*:\n(?:[ \t]+[^\n]*\n)*?"
+                  r"[ \t]+version:\s*[\"']?([\w.\-+]+)", text)
+    return m.group(1) if m else None
+
+
+def npm_lock_versions(dirpath):
+    """name -> resolved version, from whichever lockfile sits beside the manifest.
+
+    Order is `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` (the spec's order); the
+    first lockfile that names a package wins, and a tree with two lockfiles is a tree
+    whose author has a bigger problem than this script.
+    """
+    out = {}
+    plock, _ = load_json(os.path.join(dirpath, "package-lock.json"))
+    if isinstance(plock, dict):
+        # v2/v3: packages["node_modules/<name>"].version
+        packages = plock.get("packages")
+        if isinstance(packages, dict):
+            for key, meta in packages.items():
+                if not isinstance(meta, dict) or not key.startswith("node_modules/"):
+                    continue
+                name = key.split("node_modules/")[-1]
+                if isinstance(meta.get("version"), str):
+                    out.setdefault(name, meta["version"])
+        # v1: dependencies[<name>].version
+        deps = plock.get("dependencies")
+        if isinstance(deps, dict):
+            for name, meta in deps.items():
+                if isinstance(meta, dict) and isinstance(meta.get("version"), str):
+                    out.setdefault(name, meta["version"])
+    for lock in ("pnpm-lock.yaml", "yarn.lock"):
+        path = os.path.join(dirpath, lock)
+        if os.path.isfile(path):
+            text = read(path)
+            out["__scrape__" + lock] = text  # kept for the per-name lookup below
+    return out
+
+
+def npm_lock_lookup(locks, name):
+    if name in locks:
+        return locks[name]
+    for key, text in locks.items():
+        if key.startswith("__scrape__"):
+            found = _pnpm_yarn_version(text, name)
+            if found:
+                return found
+    return None
+
+
+# ---------------------------------------------------------------------- npm scan
+
+def npm_classify(name, spec, locks):
+    """None (not a finding), or a row. `spec` is the raw string from the manifest."""
+    if not isinstance(spec, str):
+        return None
+    raw = spec.strip()
+    lowered = raw.lower()
+    if any(lowered.startswith(p) for p in NPM_SKIP_PREFIXES) or "/" in raw:
+        return None                       # a protocol, alias or path — not a range
+    if EXACT_SEMVER.match(raw):
+        return None                       # already one version
+    locked = npm_lock_lookup(locks, name)
+    if locked:
+        return row("npm", None, name, spec, target=locked)
+    floor = NPM_FLOOR.match(raw)
+    if floor:
+        return row("npm", None, name, spec, target=floor.group(1))
+    if lowered in NPM_NO_FLOOR_TOKENS:
+        return row("npm", None, name, spec, reason=REASON_NPM_WILDCARD)
+    if re.fullmatch(r"[~^]?\d+(?:\.\d+)?(?:\.[xX*])?(?:\.\d+)?", raw) or "*" in raw \
+            or "x" in lowered:
+        return row("npm", None, name, spec, reason=REASON_NPM_WILDCARD)
+    return row("npm", None, name, spec,
+               reason=f'no lockfile; range "{raw}" has no single floor')
+
+
+def scan_npm(root):
+    rows, errors = [], []
+    for dirpath, reldir, filenames in walk(root):
+        if "package.json" not in filenames:
+            continue
+        path = os.path.join(dirpath, "package.json")
+        data, err = load_json(path)
+        if err:
+            errors.append(err)
+            continue
+        if not isinstance(data, dict):
+            continue
+        locks = npm_lock_versions(dirpath)
+        rel = relpath(root, path)
+        for section in NPM_SECTIONS:
+            deps = data.get(section)
+            if not isinstance(deps, dict):
+                continue
+            for name in sorted(deps):
+                found = npm_classify(name, deps[name], locks)
+                if found:
+                    found["manifest"] = rel
+                    found["section"] = section
+                    rows.append(found)
+    return rows, errors
+
+
+# ------------------------------------------------------------------- python scan
+
+PY_LINE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)"
+                     r"(?P<extras>\[[^\]]*\])?(?P<rest>.*)$")
+PY_PIN = re.compile(r"^\s*==\s*(?P<ver>[\w.\-+!*]+)\s*$")
+
+
+def py_normalize(name):
+    """PEP 503 normalisation — `Flask`, `flask`, `flask_x` and `flask-x` are one name."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def is_requirements(reldir, filename):
+    if filename.endswith(".txt") and reldir.split("/")[-1] == "requirements":
+        return True
+    return filename.startswith("requirements") and filename.endswith(".txt")
+
+
+def py_locked_versions(root):
+    """name -> exact version, harvested from every `*.lock` and `*.txt` in the tree.
+
+    A pip-compile output IS the lock: `requirements.txt` holding `flask==2.0.1` resolves
+    a bare `flask` in `requirements-dev.txt`. NEVER INVENTED — if no file in the tree
+    states an exact version for a name, that name is UNPINNABLE and says so.
+    """
+    out = {}
+    for dirpath, _reldir, filenames in walk(root):
+        for fn in filenames:
+            if not (fn.endswith(".lock") or fn.endswith(".txt")):
+                continue
+            for line in read(os.path.join(dirpath, fn)).splitlines():
+                line = line.split("#", 1)[0].strip()
+                m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*==\s*"
+                             r"([\w.\-+!]+)\s*$", line)
+                if m:
+                    out.setdefault(py_normalize(m.group(1)), m.group(2))
+    return out
+
+
+def py_classify(line):
+    """(name, spec_text, marker, pinned) for a requirements line, or None to skip."""
+    body = line.split("#", 1)[0].rstrip()
+    if not body.strip():
+        return None
+    if body.lstrip().startswith("-"):
+        return None                       # -r/-e/--hash and friends are options
+    if "@" in body:
+        return None                       # PEP 508 direct reference: already exact
+    head, sep, marker = body.partition(";")
+    m = PY_LINE.match(head.strip())
+    if not m:
+        return None
+    spec = m.group("rest").strip()
+    return {"name": m.group("name"), "extras": m.group("extras") or "",
+            "spec": spec, "marker": (sep + marker) if sep else "",
+            "pinned": bool(PY_PIN.match(spec)) and "*" not in spec}
+
+
+def scan_python(root):
+    rows = []
+    locked = py_locked_versions(root)
+    for dirpath, reldir, filenames in walk(root):
+        for fn in filenames:
+            if not is_requirements(reldir, fn):
+                continue
+            path = os.path.join(dirpath, fn)
+            rel = relpath(root, path)
+            for lineno, line in enumerate(read(path).splitlines(), 1):
+                parsed = py_classify(line)
+                if not parsed or parsed["pinned"]:
+                    continue
+                version = locked.get(py_normalize(parsed["name"]))
+                shown = parsed["spec"] or "(no version)"
+                found = row("pip", rel, parsed["name"], shown,
+                            target=version,
+                            reason=None if version else REASON_PY_NO_LOCK)
+                found["line"] = lineno
+                rows.append(found)
+    return rows
+
+
+# -------------------------------------------------------------------- cargo scan
+
+CARGO_TABLE = re.compile(r"^\[(?:workspace\.)?(?:target\.[^\]]+\.)?"
+                         r"(dependencies|dev-dependencies|build-dependencies)\]\s*$")
+CARGO_OTHER_TABLE = re.compile(r"^\[")
+
+
+def scan_cargo(root):
+    """Loose Cargo specs are REPORTED, never rewritten — a measured launch limit.
+
+    Only tables that actually hold dependencies are read, because `[package]` carries a
+    `version = "0.1.0"` key that is the crate's OWN version; flagging it would be the
+    detector claiming a finding about a line it does not understand.
+
+    NOT `tomllib`, which would parse this properly: it arrived in the standard library
+    in Python 3.11, and this script runs on end users' machines where the interpreter
+    version is whatever is there. A line reader that only ever REPORTS degrades to
+    missing a row on an exotic layout; an import that is absent takes the whole guard
+    down mid-commit.
+    """
+    rows = []
+    for dirpath, _reldir, filenames in walk(root):
+        if "Cargo.toml" not in filenames:
+            continue
+        path = os.path.join(dirpath, "Cargo.toml")
+        rel = relpath(root, path)
+        in_deps = False
+        for line in read(path).splitlines():
+            stripped = line.strip()
+            if CARGO_OTHER_TABLE.match(stripped):
+                in_deps = bool(CARGO_TABLE.match(stripped))
+                continue
+            if not in_deps or not stripped or stripped.startswith("#"):
+                continue
+            m = re.match(r'^([A-Za-z0-9_-]+)\s*=\s*(.+)$', stripped)
+            if not m:
+                continue
+            name, value = m.group(1), m.group(2).strip()
+            inline = re.search(r'version\s*=\s*"([^"]+)"', value)
+            if value.startswith('"'):
+                spec = value.strip('"')
+            elif inline:
+                spec = inline.group(1)
+            else:
+                continue
+            if spec.startswith("=") or EXACT_SEMVER.match(spec):
+                continue
+            rows.append(row("cargo", rel, name, spec,
+                            reason="ecosystem cargo pinning not supported yet"))
+    return rows
+
+
+def scan(root):
+    npm_rows, errors = scan_npm(root)
+    rows = npm_rows + scan_python(root) + scan_cargo(root)
+    rows.sort(key=lambda r: (r["manifest"], r["ecosystem"], r["name"], r["spec"]))
+    return rows, errors
+
+
+# --------------------------------------------------------------------- dependabot
+
+ECO_BY_FILE = (
+    ("package.json", "npm"),
+    ("pyproject.toml", "pip"),
+    ("Pipfile", "pip"),
+    ("Cargo.toml", "cargo"),
+    ("Gemfile", "bundler"),
+    ("go.mod", "gomod"),
+    ("composer.json", "composer"),
+    ("pom.xml", "maven"),
+    ("build.gradle", "gradle"),
+    ("build.gradle.kts", "gradle"),
+    ("Dockerfile", "docker"),
+)
+
+DEPENDABOT_NAMES = (".github/dependabot.yml", ".github/dependabot.yaml")
+
+
+def detect_ecosystems(root):
+    """The (ecosystem, directory) pairs dependabot should be watching, sorted."""
+    found = set()
+    for _dirpath, reldir, filenames in walk(root):
+        directory = "/" + reldir if reldir else "/"
+        if reldir == ".github/workflows" and filenames:
+            found.add(("github-actions", "/"))
+        for fn in filenames:
+            for candidate, eco in ECO_BY_FILE:
+                if fn == candidate:
+                    found.add((eco, directory))
+            if is_requirements(reldir, fn):
+                found.add(("pip", directory))
+            if fn.endswith(".Dockerfile") or fn.startswith("Dockerfile."):
+                found.add(("docker", directory))
+    return sorted(found)
+
+
+def dependabot_path(root):
+    for rel in DEPENDABOT_NAMES:
+        path = os.path.join(root, rel.replace("/", os.sep))
+        if os.path.isfile(path):
+            return path, rel
+    return None, DEPENDABOT_NAMES[0]
+
+
+ECO_LINE = re.compile(r"^\s*-?\s*package-ecosystem:\s*[\"']?([\w-]+)")
+DIR_LINE = re.compile(r"^\s*directory:\s*[\"']?([^\"'\s]+)")
+
+
+def parse_dependabot(text):
+    """The (ecosystem, directory) pairs an existing file already covers.
+
+    Line-based and add-only. A YAML parser is not in the stdlib, and one is not needed
+    to answer the only question asked here — WHICH PAIRS ARE ALREADY COVERED — because
+    nothing this script does ever edits or reorders an existing entry.
+    """
+    covered, pending = set(), None
+    for line in text.splitlines():
+        m = ECO_LINE.match(line)
+        if m:
+            if pending:
+                covered.add((pending, "/"))
+            pending = m.group(1)
+            continue
+        d = DIR_LINE.match(line)
+        if d and pending:
+            covered.add((pending, d.group(1)))
+            pending = None
+    if pending:
+        covered.add((pending, "/"))
+    return covered
+
+
+def dependabot_state(root):
+    """(status, missing pairs, path, rel, note)."""
+    wanted = detect_ecosystems(root)
+    path, rel = dependabot_path(root)
+    if path is None:
+        return "MISSING", wanted, None, rel, None
+    text = read(path)
+    if not re.search(r"(?m)^\s*updates:\s*$", text):
+        return ("UNPARSEABLE", [], path, relpath(root, path),
+                "no `updates:` key — reported, never clobbered")
+    covered = parse_dependabot(text)
+    missing = [pair for pair in wanted if pair not in covered]
+    status = "PARTIAL" if missing else "PRESENT"
+    return status, missing, path, relpath(root, path), None
+
+
+def dependabot_block(eco, directory, indent="  "):
+    return (f"{indent}- package-ecosystem: \"{eco}\"\n"
+            f"{indent}  directory: \"{directory}\"\n"
+            f"{indent}  schedule:\n"
+            f"{indent}    interval: \"weekly\"\n")
+
+
+def dependabot_document(pairs):
+    body = ("# Written by wf-pin-check (claude-workforce). Entries are APPEND-ONLY:\n"
+            "# nothing here is ever edited or reordered by the guard.\n"
+            "version: 2\n"
+            "updates:\n")
+    for eco, directory in pairs:
+        body += dependabot_block(eco, directory)
+    return body
+
+
+def dependabot_merge_text(text, pairs):
+    """Append the missing entry blocks under `updates:`. Existing lines are untouched."""
+    lines = text.splitlines(keepends=True)
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*updates:\s*$", line):
+            start = i
+            break
+    if start is None:
+        return None
+    indent = "  "
+    for line in lines[start + 1:]:
+        m = re.match(r"^(\s*)-\s*package-ecosystem:", line)
+        if m:
+            indent = m.group(1)
+            break
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        stripped = lines[i].rstrip("\n")
+        if stripped and not stripped[0].isspace() and not stripped.startswith("#"):
+            end = i
+            break
+    added = "".join(dependabot_block(eco, d, indent) for eco, d in pairs)
+    if end > start + 1 and not lines[end - 1].endswith("\n"):
+        lines[end - 1] += "\n"
+    return "".join(lines[:end]) + added + "".join(lines[end:])
+
+
+# ------------------------------------------------------------------------- writes
+
+def write_text(path, text):
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def pin_npm_manifest(path, rows):
+    """Rewrite ONLY the version string on each pinned dependency line.
+
+    NOT `json.dump` of the parsed object: that reformats a file the user owns —
+    indentation, key order, trailing newline, comment-shaped keys — and turns a
+    one-token fix into a whole-file diff nobody will review. The targeted substitution
+    is what makes this safe to run unattended on every commit.
+    """
+    text = read(path)
+    done = []
+    for r in rows:
+        pattern = re.compile(r'("' + re.escape(r["name"]) + r'"\s*:\s*")'
+                             + re.escape(r["spec"]) + r'(")')
+        text, count = pattern.subn(r"\g<1>" + r["target"].replace("\\", "\\\\") + r"\g<2>",
+                                   text)
+        if count:
+            done.append(r)
+    if done:
+        write_text(path, text)
+    return done
+
+
+def pin_py_manifest(path, rows):
+    lines = read(path).splitlines(keepends=True)
+    done = []
+    for r in rows:
+        idx = r["line"] - 1
+        if idx >= len(lines):
+            continue
+        original = lines[idx]
+        newline = "\n" if original.endswith("\n") else ""
+        body, hashmark, comment = original.rstrip("\n").partition("#")
+        parsed = py_classify(original)
+        if not parsed or parsed["name"] != r["name"]:
+            continue
+        trailing = len(body) - len(body.rstrip())
+        rebuilt = (f"{parsed['name']}{parsed['extras']}=={r['target']}"
+                   f"{parsed['marker']}" + " " * trailing + hashmark + comment + newline)
+        lines[idx] = rebuilt
+        done.append(r)
+    if done:
+        write_text(path, "".join(lines))
+    return done
+
+
+def apply_pins(root, rows):
+    """Pin every pinnable row. Returns (applied rows, changed manifest relpaths)."""
+    applied, changed = [], []
+    by_manifest = {}
+    for r in rows:
+        if r["pinnable"]:
+            by_manifest.setdefault(r["manifest"], []).append(r)
+    for rel in sorted(by_manifest):
+        path = os.path.join(root, rel.replace("/", os.sep))
+        group = by_manifest[rel]
+        if rel.endswith("package.json"):
+            done = pin_npm_manifest(path, group)
+        else:
+            done = pin_py_manifest(path, group)
+        if done:
+            applied.extend(done)
+            changed.append(rel)
+    return applied, changed
+
+
+def verify_pins(root, applied):
+    """RE-READ the manifests and confirm each target landed. A write believed and never
+    made is the defect this project keeps finding; a report that quotes the string it
+    passed to write() reproduces it exactly."""
+    unverified = []
+    cache = {}
+    for r in applied:
+        rel = r["manifest"]
+        if rel not in cache:
+            cache[rel] = read(os.path.join(root, rel.replace("/", os.sep)))
+        body = cache[rel]
+        if rel.endswith("package.json"):
+            ok = f'"{r["name"]}": "{r["target"]}"' in re.sub(r'"\s*:\s*"', '": "', body)
+        else:
+            ok = re.search(r"(?m)^" + re.escape(r["name"]) + r"(\[[^\]]*\])?=="
+                           + re.escape(r["target"]), body) is not None
+        if not ok:
+            unverified.append(f'{rel}: {r["name"]}')
+    return unverified
+
+
+# ---------------------------------------------------------------------------- git
+
+def is_git_repo(root):
+    dot = os.path.join(root, ".git")
+    return os.path.isdir(dot) or os.path.isfile(dot)
+
+
+def git(root, *args):
+    """(returncode, stdout). Never raises: git may be absent, and a guard that dies
+    because git is missing blocks the commit it promised never to block."""
+    if not shutil.which("git"):
+        return 127, ""
+    try:
+        p = subprocess.run(["git", "-C", root] + list(args), capture_output=True,
+                           text=True, stdin=subprocess.DEVNULL, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return 127, ""
+    return p.returncode, (p.stdout or "").strip()
+
+
+def hooks_path_now(root):
+    code, out = git(root, "config", "--local", "--get", "core.hooksPath")
+    return out if code == 0 and out else None
+
+
+def self_source():
+    """THIS FILE. The installed hook is a byte copy of the running wf-pin-check.
+
+    Resolved from `__file__`, so the source tree, a personal install and a project
+    install all answer with the copy that is actually executing — no scope is hardcoded
+    and none has to be guessed. `references/scopes.md` forbids a bare project-scope path
+    for exactly that reason, and the running file's own location cannot be wrong.
+    """
+    return os.path.abspath(__file__)
+
+
+def sha256(path):
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def load_owned(root):
+    path = os.path.join(root, OWNED_REL)
+    data, _ = load_json(path)
+    if not isinstance(data, dict):
+        data = {}
+    return path, data
+
+
+def dump_owned(path, data):
+    write_text(path, json.dumps(data, indent=2) + "\n")
+
+
+# ------------------------------------------------------------------------- report
+
+def counts_of(rows):
+    pinnable = sum(1 for r in rows if r["pinnable"])
+    return {"unpinned": len(rows), "pinnable": pinnable,
+            "unpinnable": len(rows) - pinnable}
+
+
+def print_rows(rows, execute, applied_names):
+    for r in rows:
+        head = f'{r["ecosystem"]}  {r["manifest"]}: {r["name"]} {r["spec"]}'
+        if not r["pinnable"]:
+            print(f'  ~ unpinnable  {head}  -> UNPINNABLE: {r["reason"]}')
+        elif execute and (r["manifest"], r["name"]) in applied_names:
+            print(f'  + pinned      {head} -> {r["target"]}')
+        elif execute:
+            print(f'  ! UNVERIFIED  {head} -> {r["target"]}')
+        else:
+            print(f'  ~ unpinned    {head}  -> {r["target"]}')
+
+
+def inv_line(rows, status):
+    c = counts_of(rows)
+    return (f'INV-PINS  unpinned {c["unpinned"]} · pinnable {c["pinnable"]} · '
+            f'unpinnable {c["unpinnable"]} · dependabot {status}')
+
+
+def do_report(root, execute):
+    rows, errors = scan(root)
+    status, missing, dpath, drel, note = dependabot_state(root)
+
+    print(f"PIN GUARD  {root}")
+    for err in errors:
+        print(f"  ! unreadable  {err}")
+
+    applied, changed = [], []
+    if execute:
+        applied, changed = apply_pins(root, rows)
+    applied_names = {(r["manifest"], r["name"]) for r in applied}
+    print_rows(rows, execute, applied_names)
+
+    if status == "MISSING":
+        print("  ~ dependabot  MISSING")
+    elif status == "PARTIAL":
+        print(f'  ~ dependabot  PARTIAL (missing: {",".join(e for e, _d in missing)})')
+    elif status == "PRESENT":
+        print("  ~ dependabot  PRESENT")
+    else:
+        print(f"  ~ dependabot  UNPARSEABLE {drel}: {note}")
+
+    dependabot_written = None
+    if execute and status == "MISSING":
+        pairs = detect_ecosystems(root)
+        if pairs:
+            target = os.path.join(root, DEPENDABOT_NAMES[0].replace("/", os.sep))
+            write_text(target, dependabot_document(pairs))
+            dependabot_written = DEPENDABOT_NAMES[0]
+            print(f'  + dependabot  wrote {DEPENDABOT_NAMES[0]} '
+                  f'({",".join(sorted({e for e, _d in pairs}))})')
+    elif execute and status == "PARTIAL":
+        merged = dependabot_merge_text(read(dpath), missing)
+        if merged is not None:
+            write_text(dpath, merged)
+            dependabot_written = drel
+            print(f'  + dependabot  merged {drel} '
+                  f'(added: {",".join(sorted({e for e, _d in missing}))})')
+    elif not execute and status == "MISSING" and detect_ecosystems(root):
+        print(f"  ~ dependabot  would write {DEPENDABOT_NAMES[0]}")
+    elif not execute and status == "PARTIAL":
+        print(f'  ~ dependabot  would merge {drel} '
+              f'(add: {",".join(sorted({e for e, _d in missing}))})')
+
+    print(inv_line(rows, status))
+
+    if execute:
+        unverified = verify_pins(root, applied)
+        if unverified:
+            eprint("wf-pin-check: PINS UNVERIFIED — a re-read did not find the exact "
+                   f"version on disk for: {unverified}")
+        elif applied:
+            print(f"  verified on disk: {len(applied)} exact spec(s) in "
+                  f'{", ".join(changed)}')
+        if dependabot_written and read(os.path.join(root, dependabot_written.replace("/", os.sep))):
+            print(f"  verified on disk: {dependabot_written}")
+    else:
+        pinnable = counts_of(rows)["pinnable"]
+        if pinnable:
+            print(f"  ~ would pin {pinnable} spec(s)")
+        if pinnable or status in ("MISSING", "PARTIAL"):
+            print("  apply with: --execute")
+    return rows, applied, changed, dependabot_written
+
+
+def do_json(root):
+    rows, errors = scan(root)
+    status, missing, _dpath, _drel, _note = dependabot_state(root)
+    payload = {
+        "root": root,
+        "unpinned": [{"ecosystem": r["ecosystem"], "manifest": r["manifest"],
+                      "name": r["name"], "spec": r["spec"], "target": r["target"],
+                      "pinnable": r["pinnable"], "reason": r["reason"]} for r in rows],
+        "dependabot": {"status": status,
+                       "missing": sorted({e for e, _d in missing})},
+        "counts": counts_of(rows),
+        "errors": errors,
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+# --------------------------------------------------------------------- pre-commit
+
+def do_pre_commit(root):
+    """Auto-fix, stage the fixes, ALWAYS exit 0.
+
+    The user chose auto-fix-then-allow. A guard that blocks a commit on its own bug is
+    worse than the drift it guards, so every failure path here still returns 0 — and
+    every unpinnable finding is printed, because a silent skip would let the tree drift
+    under a guard that reports success.
+    """
+    try:
+        rows, applied, changed, dependabot_written = do_report(root, execute=True)
+    except Exception as exc:                       # noqa: BLE001 — see docstring
+        eprint(f"wf-pin-check: pin guard failed ({exc.__class__.__name__}: {exc}) — "
+               "commit allowed. The guard never blocks on its own bug.")
+        print("PIN GUARD (pre-commit)  auto-fixed 0, staged 0; 0 unpinnable left "
+              "— commit allowed")
+        return 0
+
+    to_stage = list(changed) + ([dependabot_written] if dependabot_written else [])
+    staged, note = 0, ""
+    if to_stage and is_git_repo(root):
+        code, _out = git(root, "add", "--", *to_stage)
+        if code == 0:
+            staged = len(to_stage)
+        else:
+            note = " (git add failed)"
+    elif to_stage:
+        note = " (not a git repository)"
+
+    unpinnable = counts_of(rows)["unpinnable"]
+    print(f"PIN GUARD (pre-commit)  auto-fixed {len(applied)}, staged {staged}{note}; "
+          f"{unpinnable} unpinnable left — commit allowed")
+    return 0
+
+
+def chain_prior_hook(root, argv):
+    """Run the pre-commit hook that was in force before ours, and RETURN ITS CODE.
+
+    `core.hooksPath` REPLACES `.git/hooks` wholesale, so wiring this guard would
+    otherwise silently delete whatever gate the repository already had — a lint hook, a
+    secret scanner, a test run. Its verdict is the REPOSITORY'S, not this guard's, so it
+    is passed through unchanged: only wf-pin-check's own contribution is non-blocking.
+    Swallowing a prior hook's rejection would make installing this guard a way to
+    disable someone else's, which is worse than the drift it exists to fix.
+
+    Every failure to RUN it (missing, not executable, unlaunchable) is reported and
+    returns 0 — that is this guard's own machinery failing, and it never blocks.
+    """
+    chain_file = os.path.join(root, *CHAIN_REL.split("/"))
+    if not os.path.isfile(chain_file):
+        return 0
+    prior = read(chain_file).strip()
+    if not prior:
+        return 0
+    if not (os.path.isfile(prior) and os.access(prior, os.X_OK)):
+        eprint(f"wf-pin-check: the chained prior pre-commit hook {prior} is missing or "
+               "not executable — skipped, commit allowed.")
+        return 0
+    # FLUSH FIRST. Python block-buffers stdout when it is not a tty — which it never is
+    # under git — so without this the chained hook's output lands ABOVE this guard's own
+    # report and the committer reads the two verdicts in the wrong order. Measured
+    # 2026-08-12 on a real commit.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    try:
+        p = subprocess.run([prior] + list(argv))
+    except (OSError, subprocess.SubprocessError) as exc:
+        eprint(f"wf-pin-check: could not run the chained prior hook {prior} ({exc}) — "
+               "skipped, commit allowed.")
+        return 0
+    if p.returncode != 0:
+        eprint(f"wf-pin-check: the prior pre-commit hook {prior} exited "
+               f"{p.returncode}. That verdict is the repository's own and it stands — "
+               "the pin guard's contribution was applied and allowed.")
+    return p.returncode
+
+
+def run_as_git_hook(argv):
+    """git invoked the installed copy of this script under the name `pre-commit`.
+
+    git runs a hook with the repository top-level as the working directory and passes
+    pre-commit no arguments, so `os.getcwd()` IS the root and there is nothing to parse.
+    `--root` is not consulted here precisely because there is no caller to have got it
+    wrong — the empty-root hazard the flag path guards against cannot arise.
+    """
+    root = os.getcwd()
+    do_pre_commit(root)
+    return chain_prior_hook(root, argv)
+
+
+# ------------------------------------------------------------------- hook wiring
+
+def install_hook_copy(root, source, execute):
+    """Materialise `<root>/.claude/workforce/git-hooks/pre-commit` as a copy of SOURCE.
+
+    Returns the action taken: `install` (absent), `refresh` (present but a different
+    sha), `current` (byte-identical — the second run of an unchanged install), or `self`
+    (the running script IS the installed copy).
+
+    THE SHA COMPARISON IS WHAT MAKES AN UPDATE PROPAGATE. A copy is a snapshot: without
+    it, a repo wired last month keeps running last month's guard forever while
+    `core.hooksPath` reports everything is wired. With it, the next `--install-hook
+    --execute` — the step an audit or an update already runs — brings the copy forward
+    and says so, while leaving the git config a genuine no-op.
+    """
+    dest_dir = os.path.join(root, *HOOKS_DIR_REL.split("/"))
+    dest = os.path.join(dest_dir, HOOK_ENTRY_NAME)
+    if os.path.abspath(dest) == os.path.abspath(source):
+        return "self", dest
+    if not os.path.exists(dest):
+        action = "install"
+    elif sha256(dest) != sha256(source):
+        action = "refresh"
+    else:
+        action = "current"
+    if execute and action in ("install", "refresh"):
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.copyfile(source, dest)
+        os.chmod(dest, 0o755)
+    return action, dest
+
+
+def do_install_hook(root, execute):
+    if not is_git_repo(root):
+        print(f"GIT HOOK  not a git repository: {root} — nothing to wire")
+        return 0
+
+    source = self_source()
+    if not os.path.isfile(source):
+        print(f"GIT HOOK  cannot read this script on disk: {source} — nothing wired "
+              "(dead wiring is worse than none)")
+        return 0
+
+    prior = hooks_path_now(root)
+    # THE COPY IS MADE BEFORE core.hooksPath POINTS AT IT. git silently runs no
+    # pre-commit hook when the directory it was given holds none, so this order is the
+    # difference between a wired guard and a repo that believes it has one.
+    action, dest = install_hook_copy(root, source, execute)
+    refreshed = 1 if action in ("install", "refresh") else 0
+
+    if prior == HOOKS_DIR_REL:
+        # The git config is already ours: this run can only be a no-op or a catch-up.
+        head = f"GIT HOOK  core.hooksPath already {HOOKS_DIR_REL} — "
+        if refreshed and not execute:
+            print(head + f"would refresh {refreshed} hook copy ({action})")
+            print("  apply with: --execute")
+        elif refreshed:
+            print(head + f"refreshed {refreshed} hook copy ({action})")
+            print(f"  verified on disk: {relpath(root, dest)} matches wf-pin-check")
+        else:
+            print(head + "NOOP (hook copy current, refreshed 0)")
+        return 0
+
+    shown = prior if prior else "unset"
+    if not execute:
+        print(f"GIT HOOK  would register core.hooksPath -> {HOOKS_DIR_REL}  "
+              f"(prior: {shown})")
+        print("  apply with: --execute")
+        return 0
+
+    chain = None
+    if prior:
+        base = prior if os.path.isabs(prior) else os.path.join(root, prior)
+        candidate = os.path.join(base, "pre-commit")
+        if os.path.isfile(candidate):
+            chain = candidate
+    else:
+        candidate = os.path.join(root, ".git", "hooks", "pre-commit")
+        if os.path.isfile(candidate):
+            chain = candidate
+    chain_file = os.path.join(root, *CHAIN_REL.split("/"))
+    if chain:
+        write_text(chain_file, chain + "\n")
+    elif os.path.exists(chain_file):
+        os.remove(chain_file)
+
+    # Ownership FIRST. A sidecar written before the config change is recoverable; a
+    # config change whose reversal was never recorded is not.
+    owned_path, owned = load_owned(root)
+    section = owned.setdefault("git_config", {})
+    if not isinstance(section, dict):
+        section = owned["git_config"] = {}
+    section["core.hooksPath"] = {"set_to": HOOKS_DIR_REL, "prior": prior}
+    dump_owned(owned_path, owned)
+
+    code, _out = git(root, "config", "--local", "core.hooksPath", HOOKS_DIR_REL)
+    if code != 0:
+        eprint("wf-pin-check: could not set core.hooksPath (git exited "
+               f"{code}) — nothing wired.")
+        return 0
+
+    print(f"GIT HOOK  core.hooksPath -> {HOOKS_DIR_REL}  (prior: {shown})  registered")
+    landed = hooks_path_now(root)
+    if landed != HOOKS_DIR_REL:
+        eprint(f"wf-pin-check: HOOK UNVERIFIED — re-read core.hooksPath = {landed!r}, "
+               f"expected {HOOKS_DIR_REL!r}.")
+        return 0
+    # RE-READ BOTH HALVES. A wired config pointing at a directory whose hook is missing
+    # or stale is the dead-wiring failure with a green report on top of it.
+    if sha256(dest) != sha256(source):
+        eprint(f"wf-pin-check: HOOK COPY UNVERIFIED — {relpath(root, dest)} does not "
+               "match the running wf-pin-check.")
+        return 0
+    print(f"  verified on disk: core.hooksPath = {landed} · {relpath(root, dest)} "
+          "matches wf-pin-check"
+          + (f" · chains to {relpath(root, chain)}" if chain else ""))
+    return 0
+
+
+def do_uninstall_hook(root, execute):
+    if not is_git_repo(root):
+        print(f"GIT HOOK  not a git repository: {root} — nothing to unwire")
+        return 0
+
+    owned_path, owned = load_owned(root)
+    section = owned.get("git_config") if isinstance(owned.get("git_config"), dict) else {}
+    record = section.get("core.hooksPath") if isinstance(section, dict) else None
+    if not isinstance(record, dict):
+        print("GIT HOOK  no recorded core.hooksPath ownership — we own nothing here, "
+              "nothing removed")
+        return 0
+
+    current = hooks_path_now(root)
+    prior = record.get("prior")
+    shown = prior if prior else "unset"
+    if current is not None and current != record.get("set_to"):
+        print(f"GIT HOOK  core.hooksPath is {current}, not the {record.get('set_to')} "
+              "we recorded — changed since install; refusing to overwrite it")
+        return 0
+
+    if not execute:
+        print(f"GIT HOOK  would restore core.hooksPath -> {shown}  "
+              f"(recorded prior: {shown})")
+        print("  apply with: --execute")
+        return 0
+
+    if prior:
+        code, _out = git(root, "config", "--local", "core.hooksPath", prior)
+    else:
+        code, _out = git(root, "config", "--local", "--unset", "core.hooksPath")
+        if code == 5:                      # 5 = the key was already absent
+            code = 0
+    if code != 0:
+        eprint(f"wf-pin-check: could not restore core.hooksPath (git exited {code}).")
+        return 0
+
+    section.pop("core.hooksPath", None)
+    if not section:
+        owned.pop("git_config", None)
+    dump_owned(owned_path, owned)
+
+    landed = hooks_path_now(root)
+    print(f"GIT HOOK  core.hooksPath restored -> {shown}  ownership dropped")
+    if landed != prior:
+        eprint(f"wf-pin-check: UNWIRE UNVERIFIED — re-read core.hooksPath = {landed!r}, "
+               f"expected {prior!r}.")
+        return 0
+    print(f"  verified on disk: core.hooksPath = {landed if landed else 'unset'}")
+    return 0
+
+
+# ---------------------------------------------------------------------------- cli
+
+def invoked_as_git_hook(argv0):
+    """True when git ran the installed copy. The dispatch is the FILE NAME and nothing
+    else: git passes pre-commit no arguments, so there is no flag to look for, and
+    `--install-hook` is what put a file called `pre-commit` on disk."""
+    return os.path.basename(argv0 or "") == HOOK_ENTRY_NAME
+
+
+def main(argv=None):
+    # THE GIT-HOOK ENTRY, BEFORE ANY ARGUMENT PARSING. This branch is reached only when
+    # this file has been copied to `<repo>/.claude/workforce/git-hooks/pre-commit`; a
+    # direct invocation resolves argv[0] to `wf-pin-check` and every explicit flag below
+    # keeps working, which is how the fixtures exercise the same code paths.
+    if argv is None and invoked_as_git_hook(sys.argv[0]):
+        return run_as_git_hook(sys.argv[1:])
+
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="")
+    ap.add_argument("--json", action="store_true",
+                    help="machine-readable report; writes nothing")
+    ap.add_argument("--execute", action="store_true",
+                    help="consent: pin the specs and write/merge dependabot.yml")
+    ap.add_argument("--pre-commit", action="store_true",
+                    help="auto-fix and stage; always exits 0")
+    ap.add_argument("--install-hook", action="store_true",
+                    help="copy this script to .claude/workforce/git-hooks/pre-commit "
+                         "and point core.hooksPath at it")
+    ap.add_argument("--uninstall-hook", action="store_true",
+                    help="restore the recorded prior core.hooksPath")
+    args = ap.parse_args(argv)
+
+    # A CONFLICT IS NAMED, NEVER SILENTLY RESOLVED. Picking one of two contradictory
+    # flags means the caller got a mode it did not ask for and no message saying so.
+    if args.install_hook and args.uninstall_hook:
+        eprint("wf-pin-check: --install-hook and --uninstall-hook conflict. Pick one.")
+        return 2
+    if args.pre_commit and (args.install_hook or args.uninstall_hook):
+        eprint("wf-pin-check: --pre-commit is the commit-time fix; it does not wire or "
+               "unwire the hook. Pick one.")
+        return 2
+    if args.json and (args.execute or args.pre_commit or args.install_hook
+                      or args.uninstall_hook):
+        eprint("wf-pin-check: --json reports and writes nothing; it cannot be combined "
+               "with --execute, --pre-commit, --install-hook or --uninstall-hook.")
+        return 2
+
+    # AN EMPTY --root IS A CALLER ERROR, never a silent retarget to the CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so a shipped `--root
+    # "${CLAUDE_PROJECT_DIR}"` block expands to `--root ""`, and abspath("") is the CWD
+    # — a real directory that passes an is-a-directory guard. This script WRITES.
+    if not (args.root or "").strip():
+        eprint("wf-pin-check: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+               "hook; pass an explicit path.")
+        return 2
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        eprint(f"wf-pin-check: not a directory: {root}")
+        return 2
+
+    if args.install_hook:
+        return do_install_hook(root, args.execute)
+    if args.uninstall_hook:
+        return do_uninstall_hook(root, args.execute)
+    if args.pre_commit:
+        return do_pre_commit(root)
+    if args.json:
+        return do_json(root)
+    do_report(root, args.execute)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
