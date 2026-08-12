@@ -133,7 +133,7 @@ The CEO isn't a funnel. Routing everything through the top would burn a delegati
 ![A cross-section of a three-level workshop where the top figure surveys the landscape through a window, the middle figure coordinates between two doors, and the bottom figure works at a bench with precise tools, each level has its own job, and there is no level below the third](assets/images/three-tiers-new.png)
 *Three levels is all you get. The ceiling was measured before any of this was designed.*
 
-Delegation bottoms out three layers below your conversation. A canary measured that on a real host before any of this was designed: the session, plus CEO, plus lead, plus IC. No fourth tier.
+Delegation bottoms out three tiers deep. A canary measured that ceiling on a real host before any of this was designed. Your session is the CEO, tier one. It delegates to a lead, tier two. The lead delegates to an IC, tier three. No fourth tier.
 
 A tier past the ceiling doesn't error. It collapses. The deepest employee loses its ability to delegate and quietly does the work itself, while its handbook still says it delegated. The failure reads as success, so the limit is enforced rather than suggested.
 
@@ -153,7 +153,7 @@ Web-facing work is the hardest kind to write a real check for. [playwright-mcp](
 
 Some work has no command that can check it. There, the check is a catalog. Every project gets two evaluators, one for code quality and one for text authenticity, each carrying a list of tells and taxonomies. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this cluster three or more of these tells?"* is close to mechanical.
 
-## Nobody Is Hired Until a Stranger Can Follow the Handbook
+## A Handbook Isn't Finished Until a Stranger Can Follow It
 
 ![A stranger standing in the doorway of an organized workshop at dawn, reading a single page, golden morning light streaming in behind them. The regular workers are gone, the tools are laid out, and everything depends on whether the page is good enough](assets/images/cold-reader.png)
 *If the handbook can't survive a stranger reading it cold, it isn't finished.*
