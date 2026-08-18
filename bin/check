@@ -4578,6 +4578,28 @@ check(
     "object carries none by design). The analytical lane splits its recommendation by tier.",
 )
 
+# The split is not just "two distinct recs" — it has a direction. The statics table
+# is ordered most-expensive-first, and the IC is the wide fan-out wave whose levers
+# both point at cost, so its recommended model must be no more expensive than the
+# steerable Lead's. Without this, a regression to the exact symptom reported
+# 2026-08-17 (Doers recommending the pricier Lead model, claude-opus-4-8) passes the
+# check above unnoticed. Rank is the table row order, so this survives a pool refresh.
+_cost_rank = {
+    m.group(2): i
+    for i, m in enumerate(re.finditer(r"\|\s*(\d+)\s*\|\s*`(claude-[\w.-]+)`", _tpl_cfg))
+}
+_ic_rec, _lead_rec = _lane_recs.get("analytical ic"), _lane_recs.get("analytical lead")
+check(
+    "org-config: the analytical IC recommendation is no more expensive than the Lead's",
+    _ic_rec in _cost_rank
+    and _lead_rec in _cost_rank
+    and _cost_rank[_ic_rec] >= _cost_rank[_lead_rec],
+    f"analytical IC recommends {_ic_rec!r} (cost-rank {_cost_rank.get(_ic_rec)}) but the "
+    f"Lead recommends {_lead_rec!r} (cost-rank {_cost_rank.get(_lead_rec)}); the IC is the "
+    "wide fan-out wave and its pick must sit at or below the Lead's on the cost ladder "
+    "(higher row number = cheaper). If they invert, the wide-wave lane is paying Lead prices.",
+)
+
 # Two shipped agents sharing a name resolve silently by filesystem order. The
 # file that exists to prevent this had zero assertions.
 _agent_names = {}
