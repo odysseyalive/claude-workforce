@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 51 assertion(s) in bin/check name this file; 104 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 52 assertion(s) in bin/check name this file; 106 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1027,6 +1027,12 @@ Lane assignment (per employee)
 | engineering-site   | engineering | code       | derived from the work                  |
 | ops-runner         | ops         | analytical | unclassified - fell to the baseline    |
 ```
+
+**The pool is read from the shipped template, never from the project config.** The four statics behind
+the receipt come from `org-config.template.md` § Model statics only. If this project's `org-config.md`
+carries a legacy `## Model statics` heading, the run reports it as a stale artifact here and reads the
+pool from the template regardless — it is never read from that copy, and the never-clobber rule forbids
+rewriting or deleting it (`org-config.template.md` § Model statics).
 
 **Both blocks, always.** The receipt says what each lane costs; the assignment says who pays it.
 Assignment is **per employee**, not per department — two employees in one department can land in

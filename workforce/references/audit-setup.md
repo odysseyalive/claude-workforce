@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 46 assertion(s) in bin/check name this file; 60 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 47 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -386,6 +386,13 @@ business; the question text is not the place for them:
 Each object offers the four statics from `org-config.template.md` § Model statics, in the order listed
 there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
 runs on whatever model the user chose for their Claude Code session.
+
+**The four statics are read from the shipped template's § Model statics and from nowhere else** — never
+from the project's `org-config.md`, even when a legacy instantiation left a `## Model statics` section
+inside it. Such a section is reported as a stale legacy artifact and read past, never clobbered
+(`org-config.template.md` § Model statics). Reading the pool from a co-located stale copy is exactly how a
+re-audited project once proposed a stale four and dropped the lower-cost static the template had since
+added.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical

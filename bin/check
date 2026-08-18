@@ -4356,7 +4356,22 @@ check(
 # The budget can only offer IDs that exist in the statics pool. The pool was
 # emptied once (CLAUDE.md, closed 2026-07-29) with nothing noticing, and a tier
 # default shipped naming an ID outside its own pool.
-_pool = set(re.findall(r"`(claude-[\w.-]+)`", _tpl_cfg.split("## Model statics")[-1][:900]))
+#
+# READ FROM THE TABLE'S NUMBERED ROWS, not from a fixed-width window into the
+# section. The window form was `[:900]`, and adding one paragraph of doctrine to
+# § Model statics on 2026-08-17 pushed the fourth row past the cut: MEASURED, the
+# window ended mid-token at `claude-sonnet-`, and the only reason `every tier
+# default is drawn from the statics pool` still passed is that the new paragraph
+# happens to mention that same ID in prose. A reader whose correctness depends on
+# how much prose sits above the data is a reader that will be wrong silently, and
+# the assertion it feeds would have failed for a reason having nothing to do with
+# the pool. The section also names IDs that are deliberately NOT in the pool — the
+# "Other" field's worked examples — so a window wide enough to reach the table is
+# also wide enough to swallow those, and there is no width that is right.
+_stat_sec = _tpl_cfg.split("\n## Model statics")[-1].split("\n## ")[0]
+_POOL_ROW_RX = re.compile(r"^\|\s*\d+\s*\|\s*`(claude-[\w.-]+)`\s*\|", re.M)
+_pool = set(_POOL_ROW_RX.findall(_stat_sec))
+_stat_prose_ids = set(re.findall(r"`(claude-[\w.-]+)`", _stat_sec)) - _pool
 _tier_ids = set(re.findall(r"\|\s*(?:CEO|Lead|IC|creative)[^|]*\|\s*`(claude-[\w.-]+)`", _tpl_cfg))
 check(
     "org-config: the statics pool is non-empty",
@@ -4365,11 +4380,118 @@ check(
     "which is the seam closed 2026-07-29 reopening",
 )
 check(
+    "org-config: the pool is the table's rows, and the section's prose IDs are not in it",
+    bool(_pool) and bool(_stat_prose_ids),
+    f"pool={sorted(_pool)} · prose-only={sorted(_stat_prose_ids)} — § Model statics "
+    "carries two populations: the numbered rows, which ARE the pool, and the worked "
+    "examples for the 'Other' field, which are explicitly not. An empty prose set "
+    "means the distinction is no longer exercised and any reader would pass; an empty "
+    "pool means the reader stopped finding the table",
+)
+check(
     "org-config: every tier default is drawn from the statics pool",
     _tier_ids <= _pool,
     f"tier defaults outside the pool: {sorted(_tier_ids - _pool)} — a user cannot "
     "re-select their own default from the four options offered",
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ONE POOL, ONE SOURCE
+# ─────────────────────────────────────────────────────────────────────────────
+# The pool has exactly one home: `org-config.template.md` § Model statics. A
+# project's instantiated `.claude/workforce/org-config.md` records the values a
+# user CHOSE — the Budget Receipt, the lane assignment, the caps — and never the
+# pool it chose from. A legacy `## Model statics` section left inside one by an
+# older instantiation is REPORTED as stale and read PAST; it is never rewritten
+# and never deleted, because the project file is the user's.
+#
+# The rule was written into four shipped files and `grep -n 'statics pool'
+# bin/check` returned nothing — a rule with four readers and no mechanism, which
+# is this project's named dominant failure mode. The failure it prevents was
+# real: a re-audited project read the pool from the stale copy co-located with
+# its own config and proposed a four that predated the lower-cost static the
+# template had since added.
+#
+# ASSERTED ON THE PROSE SENTINELS, NEVER ON A MODEL ID. `constants: stated once`
+# forbids a literal `claude-*` ID in bin/check and in every shipped .md but the
+# template itself, so an assertion keyed on the missing static would have to
+# restate the very constant it exists to protect.
+check(
+    "org-config: the template declares itself the pool's only home",
+    "The statics pool lives only here" in _tpl_cfg,
+    "org-config.template.md § Model statics no longer claims sole source. Without "
+    "that sentence the section reads as one copy among several, and a project's "
+    "co-located `org-config.md` is the nearest other copy a run will reach for",
+)
+check(
+    "org-config: a legacy pool in a project config is read PAST, never read from",
+    "read from this template, never from that stale copy" in _tpl_cfg,
+    "org-config.template.md no longer says what to do with a `## Model statics` "
+    "heading found inside a project's own config. The two wrong answers are read it "
+    "(the measured regression) and clobber it (the never-clobber rule); the section "
+    "is reported stale and read past, and only this sentence says so",
+)
+check(
+    "audit-setup: the budget's four statics come from the template and nowhere else",
+    "read from the shipped template's § Model statics and from nowhere else" in _asu,
+    "audit-setup.md Step 0.4a no longer names the sole source for the four statics "
+    "it renders. It is the file a run follows while BUILDING the questions, so an "
+    "unsourced pool there is the seam itself, not a description of it",
+)
+# Bound to NAMES rather than read inline in the condition. `bin/coverage` derives
+# its attribution map from `x = read("path")` assignments, so an inline read in a
+# condition credits the assertion to no file at all and the guarded file stamps
+# itself short — the undercount-your-own-floor defect that tool exists to report.
+_aud_pool = read("workforce/references/procedures/audit.md")
+_mm_pool = read("workforce/references/procedures/model-map.md")
+check(
+    "audit: the receipt's pool is read from the template, never from the project config",
+    "The pool is read from the shipped template, never from the project config."
+    in _aud_pool,
+    "audit.md § Budget Receipt no longer states where the four behind the receipt "
+    "come from — and audit.md is the one procedure standing next to the project's "
+    "own org-config.md while it writes the receipt",
+)
+check(
+    "model-map: the statics are read from the template, never from the project config",
+    "never from the project's `org-config.md`" in _mm_pool,
+    "model-map.md re-renders the same budget objects as the audit and is the second "
+    "reader of the pool. A sole-source rule stated in one reader and not the other "
+    "is a rule the other reader may correctly ignore",
+)
+
+# The reference SHAPE, measured rather than described: this repository's own
+# instantiated config carries a Budget Receipt and no pool. There is no earlier
+# read of it in this file — `PRODUCERS` names the path as a dict KEY, which maps
+# it to a producer and never opens it — so it is opened once here.
+#
+# The negative below needs a companion, and this is it. `.claude/` is gitignored,
+# `read()` returns "" for an absent file, and `"## Model statics" not in ""` is
+# True: an unreadable config would report the rule upheld having measured nothing.
+# That is the same vacuous green the personal-install drift check grew its
+# `_compared > 0` guard for, and the same one bin/prove exists to find.
+_proj_cfg = read(".claude/workforce/org-config.md")
+check(
+    "the project-config pool check actually read a project config",
+    "## Budget Receipt" in _proj_cfg,
+    ".claude/workforce/org-config.md is absent or is not an instantiated config, so "
+    "the sole-source check below has nothing to look at and would pass on an empty "
+    "string. Run `/workforce audit` in this repo, or accept that the assertion under "
+    "it is unproven — never both",
+)
+check(
+    "org-config: a project's config declares no competing statics pool",
+    not re.search(r"(?m)^## Model statics", _proj_cfg),
+    "this repository's `.claude/workforce/org-config.md` carries a `## Model statics` "
+    "heading of its own. That is the legacy artifact the template says to report and "
+    "read PAST, and this repo's config is the shape every other project's is compared "
+    "against. Report it; do NOT delete it — the never-clobber rule owns that file",
+)
+# LINE-ANCHORED, and that is load-bearing rather than incidental. The doctrine
+# requires the stale section to be REPORTED, so a correct config may well mention
+# `## Model statics` in prose or inside a fence while carrying no such section.
+# An unanchored `in` test would fire on the report and force the reporter to stop
+# naming the thing it reports — the same reasoning the sacred-marker readers use.
 
 # The pool is ordered by cost so a user can price a choice at a glance, and the
 # HOST convention is the opposite: promote a recommended option to the top. That

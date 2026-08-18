@@ -1,6 +1,6 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without
@@ -42,7 +42,10 @@ analytical (`org-config.template.md` § Creative).
 when nothing changed. **A marker may change a default; it may never drop a question.**
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose; anything
-else arrives via the blank field.
+else arrives via the blank field. **The statics are read from `org-config.template.md` § Model statics
+only** — never from the project's `org-config.md`. A legacy `## Model statics` section embedded in a
+project config is reported as a stale artifact and read past, never clobbered
+(`org-config.template.md` § Model statics).
 
 ## Resolution
 

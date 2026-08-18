@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -9,7 +9,11 @@
      references/scopes.md. -->
 
 This is **your** file. Edit it freely — model IDs, department names, caps. The audit reads it and
-writes back only the values you chose in its setup questions.
+writes back only the values you chose in its setup questions. Those values are the Budget Receipt, the
+lane assignments, and the caps — never the **statics pool**, which the audit reads only from § Model
+statics of the shipped template. A project's `org-config.md` never defines the pool; a legacy `## Model
+statics` section left inside one by an older instantiation is reported as stale and read past, with the
+pool taken from the template regardless (§ Model statics).
 
 ---
 
@@ -19,6 +23,15 @@ writes back only the values you chose in its setup questions.
 **These are the only IDs `audit` and `model-map` may propose.** Anything else reaches a config by the
 user typing it into the budget's "Other" field. Refreshed on every release (`version.md` step 2) — they
 go stale between releases, and there is no discovery ladder.
+
+**The statics pool lives only here, in the shipped template.** `audit` and `model-map` read the four
+statics from this section and from nowhere else; a project's instantiated `org-config.md` records chosen
+values, not the pool, and carries no `## Model statics` section of its own. If a project's `org-config.md`
+still carries a `## Model statics` heading — a legacy artifact from an older instantiation that copied the
+pool in — the pool is **read from this template, never from that stale copy**, and the run reports the
+embedded section as a stale legacy artifact. The never-clobber rule holds: the stale section is reported,
+never rewritten or deleted, because the project file is the user's. Reading the pool from a co-located
+stale copy is exactly how a re-audited project once proposed the pre-`claude-sonnet-5` four.
 
 | # | Model ID | Context | Max output | Notes |
 |---|---|---|---|---|
