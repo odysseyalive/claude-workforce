@@ -12,25 +12,37 @@ Spec: `references/org-config.template.md`.
 
 ## The budgets
 
-**Two `AskUserQuestion` calls, nine objects, fixed regardless of headcount.** The four things managed
-separately are **analytical, creative, code, and advisor** (`org-config.template.md` § The four lanes).
+**`model-map` is the standalone editor for every budget value — model, effort, and the advisor —
+changeable without a full audit and without either gate question** (there is nothing to consent to and
+nothing to archive, because it writes only the config and the frontmatter it names). It renders **three
+`AskUserQuestion` calls**, fixed regardless of headcount:
 
-- **Model budget (5):** analytical Lead · analytical IC · creative · code · advisor. Each object offers
-  the four statics from `org-config.template.md` § Model statics, in the order listed there, plus
-  "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session. **No separate
-  tier question** — the analytical lane supplies the Lead and IC defaults. "Other" on the advisor is
-  where the user types "No Advisor" to decline one.
-- **Effort budget (4):** the same lanes minus the advisor, which has no effort because it reaches no
-  spawned employee.
+- **Model budget — 4 objects:** `analytical · Lead`, `analytical · IC`, `creative`, `code`
+  (`org-config.template.md` § The four lanes). Each object offers the four statics from
+  `org-config.template.md` § Model statics in cost order, plus a **blank field** for a hand-typed model
+  ID, and marks its lane's recommended static `(recommended)` where the cost order puts it — never
+  promoted to the top (`audit-setup.md` § Step 0.4a). **No CEO question** — the CEO is the main session.
+  **No separate tier question** — the analytical lane supplies the Lead and IC rows, which now differ in
+  model as well as effort.
+- **Effort budget — 4 objects:** the same four lanes, each marking its recommended rung `(recommended)`
+  (`audit-setup.md` § Step 0.4b) and offering only rungs the lane's selected model supports — at most
+  four, because `AskUserQuestion` caps options at four.
+- **Advisor — 1 object:** pre-selected from `advisorModel` in settings; same model pool, no
+  recommendation, and its **blank field is where the user types `none` to remove the `advisorModel` key
+  entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
+  full `audit` it is the second object of the backup call, `audit-setup.md` § Step 0.2), and because a
+  four-object budget has no room for a fifth object.
 
-Lane membership is derived from the work, never asked (`audit-setup.md` § Which departments are in
-which lane is NOT a question). Image generation, content, and visual design are always creative.
+Lane membership is derived from the work **per employee**, never asked (`audit-setup.md` § Which
+departments are in which lane is NOT a question) — `model-map` does not re-derive it; it edits the values
+a prior run recorded. Generative work is always creative; a support role inside a creative department is
+analytical (`org-config.template.md` § Creative).
 
-**All nine objects render on every interactive run**, current values pre-selected. Answering costs
-one click when nothing changed. **A marker may change a default; it may never drop a question.**
+**Every object renders on every interactive run**, current values pre-selected. Answering costs one click
+when nothing changed. **A marker may change a default; it may never drop a question.**
 
-**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
-anything else arrives via "Other."
+**Never fabricate a model ID.** The shipped statics are the only IDs this project may propose; anything
+else arrives via the blank field.
 
 ## Resolution
 
@@ -52,7 +64,8 @@ the `model:` and `effort:` frontmatter lines, verified by re-reading the file. I
 and it is never a route around a gate.
 
 A changed advisor model writes or removes `advisorModel` in the project's `.claude/settings.json`
-(or `.claude/settings.local.json`, whichever carried it). "None" removes the key entirely.
+(or `.claude/settings.local.json`, whichever carried it). Typing **`none`** in the blank field removes the
+key entirely — never an empty string or sentinel value.
 
 Nothing else in a handbook is touched. A model change is not an amendment and does not go through
 dual key — it changes what an employee runs on, not what it does.

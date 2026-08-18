@@ -113,7 +113,35 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-12
+## Open, as of 2026-08-17
+
+**Landed 2026-08-17 — model budget streamlined against benchmarks, and the creative floor rewritten
+from per-department to per-role.** Requested by the user (`/workforce dev`) after a review of the budget
+selector plus published benchmarks (SWE-bench, Terminal-Bench, the Anthropic model reference, verified
+2026-08-17). Two changes, both in the shared budget/lane files so every project inherits them:
+
+- **Pool + lane defaults + recommendations.** The four-model statics pool is now
+  `claude-opus-5` (code) · `claude-opus-4-8` (analytical Lead) · `claude-opus-4-6` (creative) ·
+  `claude-sonnet-5` (analytical IC) — a clean cost ladder that drops the three-near-identical-Opus
+  redundancy and the frontier `claude-fable-5` (still reachable via the blank field, as is
+  `claude-haiku-4-5` for mechanical ICs). The **analytical lane now splits its recommendation by tier**:
+  Opus 4.8 for the Lead (steerable thought-partner; chosen over higher-scoring Opus 5 because a
+  coordinating seat must stay steerable as context grows), Sonnet 5 for the wide-wave IC (~40% cheaper,
+  near-Opus). `bin/check`'s lane-recommendation parser was updated from three lanes to four and made
+  column-agnostic. The effort budget marks its recommended rung the same way the model budget does, and
+  Step 0.4b now caps effort options at four (the ladder is five) and drops the far rung. The advisor's
+  blank field is now `none` (removes `advisorModel` entirely), not "No Advisor". `model-map.md` was
+  un-stalled (it still said "nine objects / Model budget (5)") and is documented as the standalone editor
+  for every budget value — model, effort, advisor — without a full audit.
+- **Creative floor → per-role.** The floor no longer assigns whole DEPARTMENTS ("content and visual
+  design are always creative"); it assigns per EMPLOYEE by the work its handbook describes. Generative
+  work is always creative wherever it sits (the floor's anti-cheapening intent, preserved); a support
+  role inside a creative department — researcher, promoter, mechanical evaluator — is analytical and
+  routes to the cheaper IC. Ambiguity errs toward creative and is named in the report. `bin/check`'s
+  floor assertion was rewritten to test the new bidirectional per-role framing. This is the bigger
+  token lever than the pool edit: measured against `odyssey-alive`, the pool change alone reached only
+  3 of 18 employees, while per-role classification reaches every mechanical support role the old
+  per-department floor cheapened at authorship prices — across all projects, not one.
 
 **Landed 2026-08-12 — a commit-time guard that keeps dependencies pinned and Dependabot present,
 installed WITH audit.** Requested by the user (`/workforce dev`): *"a system installed with audit that

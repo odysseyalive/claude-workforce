@@ -473,16 +473,26 @@ work into `engineering` and there was nothing for the user to check — they wer
 image employee fell through to the tier default, and it silently ran on the coding model. Nothing errored,
 and no question was skipped: the option was never constructible.
 
-**The floor closes that hole and this step enforces it.** Image generation, content, and visual design are
-always creative (`org-config.template.md` § Creative), so an employee doing that work is in the creative
-lane no matter which department it was homed in, and no classifier reading may move it. Lane membership is
-derived here and reported, never asked.
+**The floor closes that hole and this step enforces it — per employee, and in both directions.**
+Generative work — writing prose or copy, generating images, visual design or layout — is always creative
+(`org-config.template.md` § Creative), so an employee doing that work is in the creative lane no matter
+which department it was homed in, and no classifier reading may move it down. **The converse also holds,
+and it is where the tokens are saved: an employee whose own work is research, review, ops, or analysis is
+ANALYTICAL — routed to the analytical IC — even when it sits inside a content or visual department.** The
+old floor assigned whole DEPARTMENTS, so a researcher gathering sources or a promoter formatting for
+channels was swept onto the authorship model; per-role assignment reads each employee's handbook and
+routes support roles where their work lives. A role genuinely ambiguous between generation and support
+stays **creative** (the non-cheapening side) and is **named in the report** with the reading chosen and
+why. Lane membership is derived here and reported, never asked.
 
 So, in order:
 
-1. **Home generative work in a department in the creative lane** wherever the department budget allows.
-   The floor kinds are in `references/org-config.template.md` § Creative; voice and translation are
-   creative by default and reassignable with a stated reason. That is the list to check the roster against.
+1. **Classify each employee by the work its handbook describes, not by its department.** Generative work
+   → creative (the floor); research/review/ops/analysis → analytical, IC by tier, even inside a creative
+   department; genuinely ambiguous → creative and named in the report. The floor kinds are in
+   `references/org-config.template.md` § Creative; voice and translation are creative by default and
+   reassignable with a stated reason. **Home generative work in a department in the creative lane**
+   wherever the department budget allows. That is the list to check the roster against.
 2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
    A roster that quietly routes image work to the coding model has made a model decision the receipt
@@ -1010,17 +1020,21 @@ Budget Receipt
 | code                 | <id>   | medium | blank -> analytical      |
 | advisor              | <id>   | --     | unchanged, pre-selected  |
 
-Lane assignment
-| Department   | Lane       | Why                                  |
-| content      | creative   | FLOOR - content is always creative   |
-| engineering  | code       | derived from the work                |
-| ops          | analytical | unclassified - fell to the baseline  |
+Lane assignment (per employee)
+| Employee           | Dept        | Lane       | Why                                    |
+| content-drafter    | content     | creative   | FLOOR - generative work (authorship)   |
+| content-researcher | content     | analytical | per-role - research, not generative    |
+| engineering-site   | engineering | code       | derived from the work                  |
+| ops-runner         | ops         | analytical | unclassified - fell to the baseline    |
 ```
 
-**Both blocks, always.** The receipt says what each lane costs; the assignment says which departments
-pay it. A receipt alone cannot show a department that landed in the wrong lane, and the `Why` column is
-what separates a floor from a derivation from a residual — three different things that produce the same
-cell (`references/org-config.template.md` § The four lanes).
+**Both blocks, always.** The receipt says what each lane costs; the assignment says who pays it.
+Assignment is **per employee**, not per department — two employees in one department can land in
+different lanes (a `content-drafter` is creative by the floor; a `content-researcher` beside it is
+analytical, because research is not generative). A receipt alone cannot show an employee that landed in
+the wrong lane, and the `Why` column is what separates a floor from a per-role reassignment from a
+department derivation from a residual — four things that produce the same cell
+(`references/org-config.template.md` § The four lanes).
 
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a

@@ -20,29 +20,37 @@ writes back only the values you chose in its setup questions.
 user typing it into the budget's "Other" field. Refreshed on every release (`version.md` step 2) — they
 go stale between releases, and there is no discovery ladder.
 
-| # | Model ID | Context | Notes |
-|---|---|---|---|
-| 1 | `claude-fable-5` | 1M | most capable; priced above the Opus tier |
-| 2 | `claude-opus-5` | 1M | the current Opus. **Recommended for code** |
-| 3 | `claude-opus-4-8` | 1M | **Recommended for analytical** — supplies both the Lead and IC rows |
-| 4 | `claude-opus-4-6` | 1M | previous Opus. **Recommended for creative** |
+| # | Model ID | Context | Max output | Notes |
+|---|---|---|---|---|
+| 1 | `claude-opus-5` | 1M | 128K | strongest at programming; commits and drives. **Recommended for code** |
+| 2 | `claude-opus-4-8` | 1M | 128K | the steerable thought-partner. **Recommended for analytical Lead** (agents that coordinate) |
+| 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative** (writing & design) |
+| 4 | `claude-sonnet-5` | 1M | 128K | near-Opus quality at ~40% lower cost ($3/$15 vs $5/$25). **Recommended for analytical IC** (agents that do the work) |
 
-**Ordered by cost, most expensive first, and presented in that order every time.** The "Other" field
-accepts any model ID typed by hand. On the advisor object, "Other" is where the user types "No Advisor"
-to decline one.
+**Ordered by cost, most expensive first, and presented in that order every time** (`claude-opus-5`,
+`claude-opus-4-8`, and `claude-opus-4-6` share the `$5/$25` tier and are ordered newest-first within it;
+`claude-sonnet-5` is `$3/$15` and sits last). The blank "Other" field accepts any model ID typed by
+hand — this is how a project reaches a model not in the four, e.g. `claude-fable-5` for frontier
+long-horizon work ($10/$50, 2×) or `claude-haiku-4-5` for high-volume mechanical ICs ($1/$5, 200K/64K,
+**and note it does not accept an effort setting**). On the advisor object, the blank field is where the
+user types **none** to decline one — which removes the `advisorModel` key entirely (§ Session advisor).
 
 **A recommendation is a label, never a position.** Mark the recommended model where the cost order
 already puts it; it is never promoted to the top of the list. This deliberately overrides the host
 convention that a recommended option leads the list, because here the order carries information of its
 own: a reader pricing a choice needs the list ranked by cost and by nothing else. Promoting one option
 to surface it destroys that ranking for every object that shares the pool — and the pool is shared by
-all five.
+all four lane objects (the advisor draws from it too but carries no recommendation, § Session advisor).
 
-*Which model is recommended for which lane is the user's stated preference, recorded 2026-08-03, and is
-NOT a measured result — nothing in this project benchmarks a model. As stated: `claude-opus-5` is the
-strongest at programming and is not the strongest elsewhere, `claude-opus-4-8` is the better analytical
-model, and `claude-opus-4-6` stays the creative pick. Edit the Notes column when that changes; the
-budget question reads these cells and has no other source.*
+*The per-lane recommendations were reviewed against published third-party benchmarks (SWE-bench,
+Terminal-Bench, and the Anthropic model reference) on 2026-08-17, updating the earlier 2026-08-03
+preference. The analytical lane now splits its recommendation by tier — a change from the era when one
+model supplied both rows: `claude-opus-4-8` for the **Lead** (the steerable thought-partner seat, where a
+model's mistakes are inherited by every IC beneath it), `claude-sonnet-5` for the **IC** (the wide fan-out
+wave, near-Opus quality at ~40% lower cost). `claude-opus-5` stays the code pick (executed output, where
+committing and driving is a virtue), and `claude-opus-4-6` stays the creative pick. A benchmark still is
+not a measurement of THIS project's work — treat the picks as informed defaults, not a certificate. Edit
+the Notes column when that changes; the budget question reads these cells and has no other source.*
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 
@@ -63,11 +71,23 @@ and is never promoted to the top.
 There is no "Other" rung. The ladder is the whole set the harness accepts, so a hand-typed value could
 only be a rung already offered or one that does not exist.
 
-*The recommendation per lane is whatever the lane tables below already carry — `analytical · Lead`
-`high`, `analytical · IC` `medium`, `creative` `medium`, `code` `high`. **Named with the canonical
-categories** (§ The four lanes): this section previously wrote "Lead" and "IC" bare, which read as a tier
-axis beside a lane axis and is half of why the two budgets looked like different schemes. This section
-sets the order the choices are shown in and changes none of them.*
+**The effort budget marks its recommended rung exactly as the model budget marks its recommended model** —
+`(recommended)` appended to the lane's rung where the cost order puts it, never promoted to the top
+(`references/audit-setup.md` § Step 0.4b). The recommendation per lane:
+
+| Lane (canonical) | Recommended effort |
+|---|---|
+| `analytical · Lead` | `high` |
+| `analytical · IC` | `medium` |
+| `creative` | `medium` |
+| `code` | `high` |
+
+**Availability is not uniform, and the budget offers only rungs the lane's selected model supports.** Two
+that bite with this pool: `claude-opus-4-6` (the creative pick) has no `xhigh` — its ladder is
+`max`/`high`/`medium`/`low` — and `claude-haiku-4-5` (a mechanical-IC override) **rejects the effort
+parameter entirely**, so an employee pinned to it renders no effort object at all. **Named with the
+canonical categories** (§ The four lanes): this section sets the order the choices are shown in and,
+apart from marking the recommendation, changes none of them.
 
 ## The four lanes
 
@@ -98,29 +118,38 @@ Four lanes, each addressed and managed separately:
 ### Analytical — the baseline  (EDIT THESE FREELY)
 
 **The Lead and IC defaults are the analytical selection.** There is no separate "tier" question: an
-employee with no lane override resolves to the analytical row for its tier.
+employee with no lane override resolves to the analytical row for its tier. **The two rows now differ in
+model as well as effort** — a change from the era when one model supplied both.
 
 | Tier | Model | Effort |
 |---|---|---|
 | Lead (2) | `claude-opus-4-8` | high |
-| IC (3) | `claude-opus-4-8` | medium |
+| IC (3) | `claude-sonnet-5` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
-Claude Code session, not a budget setting.
+Claude Code session, not a budget setting. (The reviewed recommendation for that seat is Opus — the
+steerable thought-partner `claude-opus-4-8` — but it is a `/model` choice, never written here.)
 
 A blank model cell means the employee inherits the session model.
 
-**The two tiers differ deliberately, and the reason is spawn COUNT, not seniority.** `effort` is not a
-platform default this file is restating — absent the field a subagent *inherits the session*
-(`references/platform.md` fact 12b, **DOCUMENTED, not measured**), so every value here is a deliberate
-override of whatever the user is running.
+**The two tiers differ deliberately, and the reason is spawn COUNT, not seniority** — and it now drives
+both the model and the effort. `effort` is not a platform default this file is restating — absent the
+field a subagent *inherits the session* (`references/platform.md` fact 12b, **DOCUMENTED, not measured**),
+so every value here is a deliberate override of whatever the user is running.
 
-- **IC `medium`.** ICs are the wide wave. `high` across it is expensive and rarely changes mechanical
-  output (`references/delegation-budget.md`).
-- **Lead `high`.** Leads are 2–4 in the whole org and spawn once per work order, so the wide-wave cost
-  argument does not reach them. Their work — planning, dispatch, synthesis — is the judgment kind that
-  effort actually moves, and it is the tier whose mistakes are inherited by every IC beneath it. A
-  cheap Lead is the expensive place to save.
+- **IC `claude-sonnet-5` · `medium`.** ICs are the wide fan-out wave, so both levers point at cost: a
+  model at ~40% lower price than the Lead's, and `medium` effort because `high` across the wave is
+  expensive and rarely changes mechanical output (`references/delegation-budget.md`). Sonnet 5 holds
+  near-Opus quality on the research/review/ops work an analytical IC does. For the *most mechanical* ICs
+  (pure classification, routing, lookups), pin `claude-haiku-4-5` per employee (§ Employee overrides) —
+  it is cheaper still, though it takes no effort setting.
+- **Lead `claude-opus-4-8` · `high`.** Leads are 2–4 in the whole org and spawn once per work order, so
+  the wide-wave cost argument does not reach them. Their work — planning, dispatch, synthesis — is the
+  judgment kind that model strength and effort actually move, and it is the tier whose mistakes are
+  inherited by every IC beneath it. Opus 4.8 is chosen over the stronger-scoring Opus 5 on purpose: a
+  coordinating seat must stay steerable and engage in discovery as its context grows, and 4.8 is the
+  better thought-partner where 5 tends to commit to its own reading. **A cheap Lead is the expensive
+  place to save.**
 
 ### Creative
 
@@ -129,26 +158,45 @@ override of whatever the user is running.
 | Creative effort | medium |
 | Departments on creative | |
 
-**Image generation, content, and visual design are ALWAYS creative.** That is a floor, not a default:
-a department whose work is any of the three is assigned to this lane and the assignment is not
-overridable by the classifier, by evidence, or by a quieter reading of what the department "mostly"
-does. Voice and translation are creative by default and may be reassigned with a stated reason.
+**Generative work is ALWAYS creative — judged per employee, from its own handbook, not per department.**
+That is a floor, not a default: any EMPLOYEE whose own work is generation or authorship — writing prose
+or copy, generating images, producing visual design or layout — is assigned to this lane wherever it
+sits, and the assignment is not overridable by the classifier, by evidence, or by a quieter reading of
+what its department "mostly" does. The floor exists to protect authorship from being cheapened, and that
+is a property of the WORK, not the department label. Voice and translation are creative by default and
+may be reassigned with a stated reason.
 
-**Where the floor and the department drawing conflict, the floor wins and the audit reports it.**
-Generative work homed under an engineering department does not get quietly budgeted as code — the run
-names the employee, the lane its work falls in, and the department it sits in
-(`references/procedures/audit.md` Step 2). The fixes are to move the employee (`transfer.md`) or to pin
-it below.
+**The converse is the change that saves the tokens: a support role inside a creative department is
+analytical, not creative.** An employee whose work is research, review, analysis, or ops — a researcher
+gathering sources, a promoter formatting for channels, an evaluator scoring against a mechanical rubric —
+resolves to the analytical lane (Lead or IC by tier) even when it sits in a content or visual department.
+The old floor assigned whole DEPARTMENTS and swept these support roles onto the authorship model;
+per-role assignment routes them to the analytical IC (`claude-sonnet-5`) where their work actually lives.
+This is not a loophole in the floor — the floor never covered them, because their work is not generative.
+
+**Ambiguity errs toward creative, and is reported, never silent.** When a handbook's role genuinely sits
+between generation and support — an `evaluator` that may be applying a mechanical checklist OR exercising
+visual taste — the classifier keeps it CREATIVE (the safe, non-cheapening side) and the audit NAMES the
+employee, the reading it chose, and why (`references/procedures/audit.md` Step 2), so the user can pin it
+down a tier (§ Employee overrides) if the conservative call was wrong. **Never silently cheapen a role
+that might be authorship.**
+
+**Where generative work is homed under a non-creative department, the floor still wins and the audit
+reports it.** A writer or illustrator sitting under an engineering department is creative, not code — the
+run names the employee, the lane its work falls in, and the department it sits in. The fixes are to move
+the employee (`transfer.md`) or to pin it below (§ Employee overrides).
 
 ### Code
 
-| Code model | |
+| Code model | `claude-opus-5` |
 |---|---|
 | Code effort | high |
 | Departments on code | |
 
 A blank model cell falls to the analytical row for that employee's tier — the same meaning a blank has
-everywhere else in this file.
+everywhere else in this file. The shipped default is `claude-opus-5`: code output is executed rather than
+read, so the trait that makes Opus 5 a poor coordinating Lead (it commits to its own reading and drives)
+is exactly what you want here.
 
 **Code runs `high` regardless of tier.** It is the one lane whose output is executed rather than read:
 a weak paragraph is edited, a weak patch ships a bug, and the check that catches it costs more than the
@@ -158,8 +206,10 @@ for any employee on code — an IC on this lane runs `high`, not the IC row's `m
 ### Session advisor
 
 The advisor model runs alongside the main session only — it does not reach spawned employees, which is
-why it has no effort setting: nothing spawns at an effort level it controls. Choosing "No Advisor"
-removes the setting entirely.
+why it has no effort setting: nothing spawns at an effort level it controls. Its object carries a blank
+field where the user types **none** to decline one; **`none` removes the `advisorModel` key from
+`.claude/settings.json` (or `.claude/settings.local.json`, whichever carried it) entirely** — it is never
+written as an empty string or a sentinel value.
 
 | Advisor model | |
 |---|---|

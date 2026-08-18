@@ -236,11 +236,13 @@ defect above:
 **Second object on this call — the session advisor**, pre-selected from `advisorModel` (Step 0.3):
 
 > **An advisor for you?**
-> It runs alongside you, not inside any agent — a second opinion on what you are doing. Pick "Other"
-> and type **No Advisor** if you do not want one.
+> It runs alongside you, not inside any agent — a second opinion on what you are doing. Pick the blank
+> field and type **none** if you do not want one.
 
 It offers the same model pool as the model budget, in the same cost order, and **carries no
-recommendation**. It sits here rather than with the lanes because it is not a lane: it reaches no
+recommendation**. Typing **none** in the blank field removes the `advisorModel` key from settings
+entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is never written as an empty or
+sentinel value. It sits here rather than with the lanes because it is not a lane: it reaches no
 employee, it has no effort setting, and putting it among the four made the two budgets offer different
 categories — which is the mismatch this arrangement exists to remove.
 
@@ -396,7 +398,7 @@ model reads as recommended — that is a change to the question the user sees, a
 
 **The advisor object lives on the backup call** (§ Step 0.2), pre-selected from the current
 `advisorModel` in project settings (read in Step 0.3). Choosing a model writes `advisorModel`;
-"No Advisor" removes the setting. It runs only in the main session and does not compound with spawned
+typing **none** in the blank field removes the key entirely. It runs only in the main session and does not compound with spawned
 employees, **which is why it has no effort object** — nothing spawns at an effort level it controls, and
 that permanent asymmetry is exactly why it may not sit among the lanes.
 
@@ -421,6 +423,14 @@ questions render back to back and must not be ordered by opposite conventions. O
 lane's selected model supports, and never invent one — the ladder is the complete set, so there is no
 "Other" here.
 
+**`AskUserQuestion` caps options at four, and the full ladder is five** (`max`/`xhigh`/`high`/`medium`/
+`low`). Where the selected model supports five rungs, offer the **four nearest the recommended rung** —
+always including the recommended rung and the lane's current value — and drop the far end the lane will
+not reach (`low` for a `high`-recommended lane; `max` for a `medium`-recommended one). Where the model
+supports four or fewer, offer them all — the creative pick has no `xhigh`, so its ladder is exactly four
+(`org-config.template.md` § Effort statics). A model that supports no effort at all renders **no effort
+object** for its lane — not a blank one.
+
 **The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
 and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a
 first run it is simply empty. An earlier form of this line claimed the panel's output as its source,
@@ -431,11 +441,15 @@ and the ordering made that false (`procedures/audit.md` § Step 2).
 It is derived at Step 2 from the work, then reported — never asked, because a per-department question
 scales with headcount and the fixed-object budget exists to prevent exactly that.
 
-**Image generation, content, and visual design are always creative** — a floor, not a default, and not
-overridable by the classifier (`org-config.template.md` § Creative). A department matching no lane
-falls to **analytical** and is **named in the report as unclassified**. Assignment is total and its
-residual is reported; a department budgeted by a default nobody chose must never look like one budgeted
-deliberately.
+**Assignment is per EMPLOYEE, from the work its handbook describes — not per department.** Generative
+work (writing prose or copy, generating images, visual design or layout) is **always creative** — a
+floor, not a default, and not overridable by the classifier (`org-config.template.md` § Creative). But a
+support role inside a creative department — research, review, ops, analysis — is **analytical**, not
+creative, and routes to the analytical IC; the floor never covered it, because its work is not
+generative. A role genuinely ambiguous between the two stays **creative** (the non-cheapening side) and
+is **named in the report** with the reading chosen and why. An employee matching no lane falls to
+**analytical** and is likewise **named as unclassified**. Assignment is total and its residual is
+reported; a role budgeted by a default nobody chose must never look like one budgeted deliberately.
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
 anything else arrives via "Other."

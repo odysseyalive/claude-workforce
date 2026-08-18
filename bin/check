@@ -4563,18 +4563,19 @@ check(
 )
 
 _lane_recs = dict(
-    (m.group(2).lower(), m.group(1))
+    (m.group(2).strip().lower(), m.group(1))
     for m in re.finditer(
-        r"`(claude-[\w.-]+)`[^|]*\|[^|]*\|[^|]*Recommended for (\w+)", _tpl_cfg
+        r"`(claude-[\w.-]+)`[^\n]*?Recommended for ([\w ]+?)\*\*", _tpl_cfg
     )
 )
 check(
     "org-config: each lane recommendation names a model from the statics pool",
-    set(_lane_recs) == {"analytical", "creative", "code"}
+    set(_lane_recs) == {"analytical lead", "analytical ic", "creative", "code"}
     and set(_lane_recs.values()) <= _pool,
     f"lane recommendations are {_lane_recs} against pool {sorted(_pool)} — every "
-    "employee-bearing lane needs exactly one recommendation and it must be an ID the "
-    "question actually offers (the advisor object carries none by design)",
+    "employee-bearing lane (analytical Lead, analytical IC, creative, code) needs exactly "
+    "one recommendation and it must be an ID the question actually offers (the advisor "
+    "object carries none by design). The analytical lane splits its recommendation by tier.",
 )
 
 # Two shipped agents sharing a name resolve silently by filesystem order. The
@@ -4944,11 +4945,15 @@ check(
     "would be two sources for one number",
 )
 check(
-    "lanes: image, content, and visual design are a floor, not a default",
-    all(t in _ocfg for t in ("Image generation, content, and visual design",
-                             "floor, not a default")),
+    "lanes: generative work is a floor (per employee), not a per-department default",
+    all(t in _ocfg for t in ("Generative work is ALWAYS creative",
+                             "floor, not a default",
+                             "per employee",
+                             "analytical, not creative")),
     "a default can be reasoned away by a classifier weighing what a department "
-    "'mostly' does; a floor cannot",
+    "'mostly' does; a floor cannot. The floor is per the WORK (generative), judged per "
+    "employee, not per department — and its converse must be stated too: a support role "
+    "inside a creative department is analytical, not creative",
 )
 check(
     "lanes: the floor is restated where the budget is asked, and agrees",
