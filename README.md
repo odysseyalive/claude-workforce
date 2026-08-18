@@ -137,6 +137,22 @@ Delegation bottoms out three tiers deep. A canary measured that ceiling on a rea
 
 A tier past the ceiling doesn't error. It collapses. The deepest employee loses its ability to delegate and quietly does the work itself, while its handbook still says it delegated. The failure reads as success, so the limit is enforced rather than suggested.
 
+## Which Model on Each Tier
+
+The audit asks one thing it can't infer: which model each kind of agent runs on. It marks a recommendation on every choice, and taking the recommendation is almost always right. What follows is the reasoning behind those marks, so you know the one or two places worth overriding.
+
+Your session is the CEO, and you pick its model yourself with `/model`. The audit never sets it. Put a steerable model here, not the strongest one. This is the seat you talk to all day, the one whose context grows longest, and a model that commits early to its own reading of the task is the wrong thing to be steering by the afternoon. The best coordinator is the one that still hears you at turn fifty.
+
+The lead runs on the same logic. It plans, hands work out, and reads back what returns, and its early calls are inherited by every IC beneath it. A cheap lead is the expensive place to save.
+
+The IC is where that flips. This is the wide part of the fan-out, where one work order becomes many spawns, and every spawn pays for a fresh context whether or not it needed the strength to match. So the ICs get the faster, cheaper model at medium effort. More effort rarely changes mechanical output, and whatever it costs is multiplied by the width of the wave. Moving the ICs down a tier is the single biggest thing you can do about token spend.
+
+Writing and design get the model with the best prose and taste, which usually isn't the cheapest one. Code gets the strongest coder; code is read by a machine and executed, so a weak paragraph is edited and a weak patch ships a bug.
+
+The advisor is optional. It sits beside your session as a second opinion and reaches none of the employees, so it carries no effort setting. Leave the field blank and type `none` to skip it, and the setting is removed instead of stored empty.
+
+Two escapes from the four. The blank field on any choice takes a model ID you type by hand, for a frontier model on the hardest work or a small cheap one on the most mechanical ICs. And none of it is locked in at audit time. `/workforce model-map` reopens every one of these choices later, without re-running the audit.
+
 ## Employee Handbooks
 
 Two sources shaped the handbooks, and they disagree.
