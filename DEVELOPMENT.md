@@ -113,7 +113,43 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-17
+## Open, as of 2026-08-19
+
+**Landed 2026-08-19 — the `/org` receptionist is a project skill in every scope; no audit-generated
+skill lives at personal scope.** Reported by the user (`/workforce dev`): running `audit` across
+several projects, *"the org skills and others created by the audit are being placed in the global
+directory, not the local project."* The alarm was that per-project ledgers had merged into one shared
+skill dir. **They had not** — verified on disk: every project's `.claude/workforce/personnel/**`,
+`org-chart.md`, and `org-config.md` were correctly isolated (distinct file counts 14/22/20/31/19 across
+`~/lab`), and `operating-principles`, `text-eval`, and `code-evaluator` were already project-local
+everywhere. The one thing actually global was the `/org` skill itself, and its block was generic —
+placeholders, zero roster — so nothing leaked between projects.
+
+- **Root cause was an under-specified bootstrap, not a path bug.** `procedures/org.md` step 2 said
+  *"Missing → bootstrap from templates"* and named **no destination path**, while `templates.md`/`scopes.md`
+  documented `/org` as living "alongside `workforce` (same scope)" — personal for the ordinary personal
+  install. The executor therefore placed `/org` at `~/.claude/skills/org/` on some runs and in-project
+  on others (`hither-lands` had a local copy; four others resolved the global one). A personal-scope
+  `/org` also *shadows* a project's own (skills resolve enterprise > personal > project), so a project
+  that audited its dispatcher silently ran the global one.
+- **The fork the user chose: project-local, always.** `/org` now joins `operating-principles` and the
+  evaluator catalogs — everything `audit` generates is project state under `${CLAUDE_PROJECT_DIR}/.claude/`,
+  and the only workforce skill at personal scope is the shipped `workforce` skill. Doctrine reversed in
+  `templates.md`, `scopes.md` (new § *The `/org` receptionist is project-local*, and the "What lives
+  where" table moved the row), `procedures/org.md` step 2 (now names the destination — the fix is the
+  anchor), `vendor.md` (no longer vendors `org/`), and `verify.md` (new scope row flagging a
+  personal-scope `/org` that shadows a project's own).
+- **Enforcement shipped with the rule** (four `bin/check` assertions + a `bin/prove` case): step 2 names
+  the project skill root; `templates.md`/`scopes.md` carry the new wording; and a paragraph-scoped
+  regression guard refuses any shipped reference that asserts the pre-2026-08-19 scope as a **live**
+  claim, exempting the dated-retraction paragraphs. `bin/check` 907/0.
+- **Migration done in the same run.** Every audited project machine-wide now has its own
+  `.claude/skills/org/` (six created — four in `~/lab` plus `university` and `www/amishwbf.com`;
+  `hither-lands` already had one), and the global `~/.claude/skills/org/` was backed up and removed.
+  *Still open from this:* the six migrated copies carry the canonical CHECKPOINT as of the global block's
+  last `org index` (2026-08-13); each project's next `audit`/`org index` re-derives it against its own
+  chart. Behavior is unchanged in the meantime — the block dispatches against `$PWD`'s chart, which was
+  already the project's.
 
 **Landed 2026-08-17 — model budget streamlined against benchmarks, and the creative floor rewritten
 from per-department to per-role.** Requested by the user (`/workforce dev`) after a review of the budget

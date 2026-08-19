@@ -5,8 +5,13 @@ High risk (writes into the project's `.claude/skills/`); display by default.
 
 `/workforce vendor --execute`
 
-Copies the **active** `workforce` and `org` skills into `${CLAUDE_PROJECT_DIR}/.claude/skills/`, so
-the tooling travels with the repo.
+Copies the **active** `workforce` skill into `${CLAUDE_PROJECT_DIR}/.claude/skills/`, so the tooling
+travels with the repo.
+
+**`/org` is not vendored — it is already project state.** Since 2026-08-19 `audit` writes the `/org`
+receptionist to `${CLAUDE_PROJECT_DIR}/.claude/skills/org/` directly (`references/scopes.md` § The
+`/org` receptionist is project-local), so it travels with the repo like `operating-principles` and the
+evaluator catalogs. Vendor copies only the one skill that lives at personal scope: `workforce` itself.
 
 ---
 
@@ -42,7 +47,8 @@ copies employee handbooks, which are already project state.
 1. **Resolve the active skill path** — never assume a scope. Report it.
 2. **Refuse if the project already has a vendored copy** unless `--force`. Report the version of each
    and which is active, so an accidental downgrade is impossible.
-3. Copy `workforce/` and `org/` into `.claude/skills/`.
+3. Copy `workforce/` into `.claude/skills/`. Do **not** copy `org/` — `audit` already wrote it there
+   as project state; a vendor copy would clobber the project's own receptionist with the shipped one.
 4. **Copy no project state.** Config, chart, personnel records, evals, and the journal are already in
    `.claude/workforce/` and must not be duplicated into the skill directory — that is the invariant
    that makes one skill serve many projects.

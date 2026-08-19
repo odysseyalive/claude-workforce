@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -10,9 +10,22 @@ canonical text written into a file workforce does not own. *The Constitution Gat
 2026-08-06 and is retracted (§ below): it wrote into `CLAUDE.md`, which `audit` now evacuates and
 deletes.*
 
-**Scope:** `/org` is created alongside `workforce` (same scope — personal or project).
-`operating-principles` is **always a project skill**, in every scope, because a Strategic Objective is
-inherently project-specific.
+**Scope: both are ALWAYS project skills**, in every scope, written to
+`${CLAUDE_PROJECT_DIR}/.claude/skills/`. `operating-principles` because a Strategic Objective is
+inherently project-specific; `/org` because a receptionist dispatches against *this* project's chart
+and roster, and a personal install serving many projects must not put one project's dispatcher where
+another project's session resolves it. **The only workforce skill that lives at personal scope is the
+shipped `workforce` skill itself** (`references/scopes.md` § What lives where). Everything `audit`
+generates for a project — `/org`, `operating-principles`, the evaluator catalogs, every converted data
+skill — is project state and lands in the project.
+
+*Reversed 2026-08-19 by user directive. `/org` was previously "created alongside `workforce` (same
+scope)", which put it at `~/.claude/skills/org/` for the ordinary personal install. The block was
+generic — placeholders, no project data — so no roster leaked, but the placement was under-specified
+in `procedures/org.md` step 2 (no destination path) and drifted: some projects got a project-local
+`/org`, others resolved the global one, and a global `/org` silently shadows a project's own
+(skills resolve personal > project). Anchoring it in-project makes every project self-describing under
+its own `.claude/` and removes the shadow entirely.*
 
 ---
 

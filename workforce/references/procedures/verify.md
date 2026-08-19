@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 23 assertion(s) in bin/check name this file; 49 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 23 assertion(s) in bin/check name this file; 50 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -70,6 +70,7 @@ from every surface, including `roster`, which does nothing else with it.
 |---|---|
 | Which copy of the skill is **active**, by path | personal shadows project silently (skills resolve personal > project) |
 | Whether a shadowed copy also exists | a project pinned to an older version, overridden with no warning |
+| **`/org` resolves in-project — `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md` exists** | **a personal-scope `~/.claude/skills/org/` shadowing this project's receptionist** (skills resolve personal > project). `/org` is project-local in every scope since 2026-08-19 (`references/scopes.md` § The `/org` receptionist is project-local); a project with no local `/org` while a personal one exists is dispatching against the wrong project's ladder. Report both paths and which resolves; the remedy is `org index`, which rewrites the project copy — a global `/org` is reported, never edited here |
 | Settings `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` vs `platform.md` § Header (`TIER-LIMIT`) | the org's shape contract broken by a host setting |
 | **`env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` in any settings scope** | **an env key no one remembers setting, changing what every handbook's frontmatter means.** With it on, a named-teammate spawn discards `disallowedTools:` and drops `skills:` and `mcpServers:` entirely (facts 2d, 18) — so the tier ceiling rests on the `tools:` allowlist alone and preloaded doctrine never arrives. **Report it, never change it**, and name the likely source: it is commonly written by an *installer* rather than a person (`audit-setup.md` § BLOCKING). Found on 2026-08-03 in a project whose owner did not know it was enabled — by a `verify` run, after this file had been read three times without anyone checking |
 | `Agent` present in `permissions.allow` | every hop prompts; the org is unusable |

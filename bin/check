@@ -1444,6 +1444,68 @@ check(
     "not survive it (destructive-never-auto-run was simply gone) and the next "
     "index would have inserted the canonical block beside it — two ladders, one file",
 )
+# ── /org is ALWAYS a project skill (reversed 2026-08-19) ─────────────────────
+# /org used to be "created alongside `workforce` (same scope)" — at the personal
+# root `~/.claude/skills/org/` on a personal install. That silently SHADOWS every
+# project's own /org (skills resolve personal > project). It is now always written
+# to `${CLAUDE_PROJECT_DIR}/.claude/skills/org/`, like operating-principles and the
+# evaluator catalogs. Three positive assertions pin the new wording; one regression
+# guard forbids the old invariant from reappearing as a LIVE claim.
+_scopes = read("workforce/references/scopes.md")
+_tpl_scope = read("workforce/references/templates.md")
+check(
+    "org: step 2 names the project skill root as the /org bootstrap destination",
+    "${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md" in _org
+    and "The destination is the project, always" in _org,
+    "the root-cause defect was that procedures/org.md step 2 named NO destination "
+    "path, so /org drifted to the personal root on personal installs and shadowed "
+    "each project's own copy; step 2 must anchor the bootstrap at "
+    "${CLAUDE_PROJECT_DIR}/.claude/skills/org/ (scopes.md § The /org receptionist "
+    "is project-local, reversed 2026-08-19)",
+)
+check(
+    "templates: /org and operating-principles are ALWAYS project skills",
+    "**Scope: both are ALWAYS project skills**" in _tpl_scope
+    and "The only workforce skill that lives at personal scope is the" in _tpl_scope,
+    "templates.md is the canonical text audit writes; if it still scopes /org "
+    "'alongside workforce (same scope)' the T7 skill swap reinstates the personal-"
+    "scope shadow. Both host-generated skills are project skills in every scope",
+)
+check(
+    "scopes: the /org receptionist is documented as project-local in every scope",
+    "## The `/org` receptionist is project-local" in _scopes
+    and "written to `${CLAUDE_PROJECT_DIR}/.claude/skills/org/` on every audit" in _scopes
+    and "no audit-generated skill lives at" in _scopes,
+    "scopes.md is the authority on where each skill lives; the /org row must sit in "
+    "the project column and this section must state that no audit-generated skill "
+    "lives at personal scope (only the shipped workforce skill does)",
+)
+# REGRESSION GUARD, paragraph-scoped so a dated retraction that QUOTES the old
+# wording is exempt while a live claim is not. The retraction paragraphs in
+# templates.md and scopes.md legitimately cite "created alongside `workforce`
+# (same scope)"; each carries a "Reversed/Until 2026-08-19" marker. A paragraph
+# asserting the old scope WITHOUT such a marker reinstates the shadowing bug.
+_ORG_OLD_SCOPE_RX = re.compile(
+    r"created alongside `workforce`"
+    r"|`/org`[^.]{0,60}(?:same scope|either scope)"
+    r"|(?:same scope|either scope)[^.]{0,60}`/org`",
+    re.I)
+_ORG_RETRACT_RX = re.compile(
+    r"Reversed 2026-08-19|Until 2026-08-19|Until then|was previously|used to",
+    re.I)
+_org_scope_offenders = []
+for _p in sorted(glob.glob("workforce/references/**/*.md", recursive=True)):
+    for _para in re.split(r"\n\s*\n", read(_p)):
+        if _ORG_OLD_SCOPE_RX.search(_para) and not _ORG_RETRACT_RX.search(_para):
+            _org_scope_offenders.append(f"{_p}: {' '.join(_para.split())[:80]}")
+check(
+    "no shipped reference asserts the pre-2026-08-19 /org scope as a live claim",
+    not _org_scope_offenders,
+    "the /org receptionist is now ALWAYS a project skill (reversed 2026-08-19); a "
+    "paragraph placing it 'alongside `workforce` (same scope)' or at 'either scope' "
+    "without a dated retraction marker reinstates the personal-scope shadow: "
+    + "; ".join(_org_scope_offenders),
+)
 check(
     "org: exactly ONE canonical dispatch block ships",
     _org.count("ORG-DISPATCH-CHECKPOINT START — auto-generated") == 1,

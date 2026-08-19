@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -92,8 +92,18 @@ nobody checked.
 Coverage   9 rows · 6 derived (re-run this index) · 2 declared (no discovery mode) · 1 declared (cached, 12d)
 ```
 
-**2. Detect `/org`.** Missing → bootstrap from `references/templates.md`. Present → leave hand-written
-content alone; only the marked CHECKPOINT block is auto-managed (step 5).
+**2. Detect `/org` at `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md`.** Missing → bootstrap it
+there from `references/templates.md`. Present → leave hand-written content alone; only the marked
+CHECKPOINT block is auto-managed (step 5).
+
+**The destination is the project, always — never the personal skill root.** `/org` is a project skill
+in every scope (`references/scopes.md` § The `/org` receptionist is project-local): it dispatches
+against *this* project's chart, and a personal-scope `~/.claude/skills/org/` silently shadows every
+project's own copy (skills resolve personal > project). Write it to
+`${CLAUDE_PROJECT_DIR}/.claude/skills/org/`, and if a personal-scope `/org` is found while a project
+one is absent or stale, report it as a shadowing copy rather than editing it. *Until 2026-08-19 this
+step named no destination and `/org` drifted to the personal root on personal installs; the anchor is
+the fix.*
 
 **3. Read the prior chart** at `.claude/workforce/org-chart.md` and hold it as `prior`.
 

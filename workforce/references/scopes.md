@@ -1,6 +1,6 @@
 # Install Scopes — where the skill lives, where the company lives
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — read before writing any path, or before changing where state is stored. -->
 
 claude-workforce installs **personally by default** (`~/.claude/skills/workforce/`): one copy per
@@ -21,12 +21,19 @@ project on the machine.
 | Lives in the skill (either scope) | Lives in the project, always |
 |---|---|
 | `workforce/` — SKILL.md, references, procedures | `.claude/agents/*.md` — the employees |
-| the generated `/org` receptionist | `.claude/workforce/org-config.md` — tier→model, departments, markers |
-| `org-config.template.md` — the shipped template | `.claude/workforce/org-chart.md` |
-| the shipped panel agents (`manifest.txt` is the count) | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
+| `org-config.template.md` — the shipped template | `.claude/workforce/org-config.md` — tier→model, departments, markers |
+| the shipped panel agents (`manifest.txt` is the count) | `.claude/workforce/org-chart.md` |
+| | `.claude/workforce/personnel/**` — EMP / PERF / DEF / AMD / RFI / ORG records |
 | | `.claude/workforce/work/**`, `evals/**`, `ablations/**`, the conversion journal |
+| | `.claude/skills/org/` — the generated `/org` receptionist, dispatching against *this* project's chart |
 | | `.claude/skills/operating-principles/` — this project's Strategic Objective + General Operating Principles |
+| | `.claude/skills/<evaluator>/` — the project's own evaluator catalogs (`references/evaluators.md`) |
 | | `.claude-backups/` — backups and the restore kit |
+
+**The `workforce` skill is the only thing at personal scope.** Everything `audit` generates for a
+project — the `/org` receptionist, `operating-principles`, the evaluator catalogs, every converted data
+skill — is project state, written under `${CLAUDE_PROJECT_DIR}/.claude/`. `/org` was created at skill
+scope until 2026-08-19 (§ *The `/org` receptionist is project-local*, below).
 
 **Why `org-config.md` is a template, not a `keep`-flagged file in the skill.** claude-enforcer keeps
 its user-editable `model-lanes.md` inside the skill directory and protects it with the manifest's
@@ -40,6 +47,32 @@ cannot protect it from being in the wrong scope.** So the config ships as
 A useful consequence: with no user-editable file left inside the skill, the `keep` flag has no
 remaining use in this project's manifest. It is retained in both installers only because the manifest
 grammar is shared with claude-enforcer and divergence would cost more than the dead branch.
+
+---
+
+## The `/org` receptionist is project-local
+
+**`/org` is a project skill, written to `${CLAUDE_PROJECT_DIR}/.claude/skills/org/` on every audit,
+in every scope.** It is generated, not shipped — `procedures/org.md` step 2 bootstraps it and
+`org index` refreshes only its marked dispatch CHECKPOINT — and it belongs to the project because it
+dispatches against *this* project's `.claude/workforce/org-chart.md` and roster.
+
+**Why it is not at skill scope, though `workforce` is.** The two are asymmetric on purpose. The
+`workforce` skill is pure mechanism with zero project content, so one personal copy serving every
+project is the whole point of a personal install. `/org` is generated per project and, more decisively,
+**skills resolve enterprise > personal > project** — so a single `~/.claude/skills/org/` does not
+merely serve every project, it *shadows* every project's own `/org` with no warning. A project that
+audited its own dispatcher would silently run the global one. Anchoring `/org` in the project makes
+each project self-describing under its own `.claude/` and removes the shadow.
+
+*Reversed 2026-08-19 by user directive, after audits across several projects placed `/org` globally.
+Until then this file listed "the generated `/org` receptionist" under *lives in the skill (either
+scope)* and `templates.md` said it was "created alongside `workforce` (same scope)". The global block
+was generic — placeholders only, no roster — so no project's data leaked into another; the defect was
+the placement, under-specified in `procedures/org.md` step 2 (which named no destination path) and so
+drifting between scopes run to run. `operating-principles` and the evaluator catalogs were already
+project-local for the same reason; `/org` now joins them, and **no audit-generated skill lives at
+personal scope.***
 
 ---
 
