@@ -68,12 +68,16 @@ to wire and nothing to orphan.
 
    | Order | Path |
    |---|---|
-   | 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |
+   | 1 | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives` |
    | 2 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |
 
    **Personal is order 1**, matching `scopes.md` § Resolving the shipped scripts and the skill
-   precedence table it derives from. Write the resolved path **absolute** — expand `~` yourself; a
-   hook command is not run through a shell that will do it for you.
+   precedence table it derives from. The personal root is `${CLAUDE_CONFIG_DIR:-~/.claude}`, not a bare
+   `~/.claude`: a user running more than one environment directory installed the skill under the config
+   dir the session resolves from (`scopes.md` § Installing into a specific `CLAUDE_CONFIG_DIR`), so a
+   registration hardcoded to `~/.claude` would point at nothing there. `wf-settings-apply --wire-hook`
+   resolves this for you. Write the resolved path **absolute** — expand `~` and `${CLAUDE_CONFIG_DIR}`
+   yourself; a hook command is not run through a shell that will do it for you.
 
    *Corrected 2026-08-03: this table read project-first while citing `scopes.md` as its authority, and
    `scopes.md` says skills resolve **personal > project**. Project-first can return a copy that is
@@ -117,7 +121,7 @@ to wire and nothing to orphan.
    because `3 dead` is a number nobody can act on.
 
    ```bash
-   WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+   WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
    "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
    ```
 

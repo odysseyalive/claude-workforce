@@ -53,6 +53,14 @@ SKILLS_RX = re.compile(r"^skills:\s*(.+)$", re.M)
 ORG_CHAIN_RX = re.compile(
     r"^[ \t]*<!-- ORG-CHAIN START.*?^[ \t]*<!-- ORG-CHAIN END -->", re.S | re.M)
 
+
+def config_root():
+    """Personal config root. Claude Code relocates the whole ~/.claude tree via
+    $CLAUDE_CONFIG_DIR (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR), so
+    a user-scope file must be read from there, not a hardcoded ~/.claude. Unset, it is
+    exactly ~/.claude."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
 # Section -> layer. A section absent from a handbook contributes nothing; a
 # section present but unlisted lands in REFERENCE, which is the conservative
 # direction: it counts as a standing constraint rather than as task input.
@@ -95,7 +103,7 @@ def claude_md_chain(root, errs):
         if parent == d:
             break
         d = parent
-    user = os.path.expanduser("~/.claude/CLAUDE.md")
+    user = os.path.join(config_root(), "CLAUDE.md")
     if os.path.isfile(user) and user not in out:
         out.append(user)
     return [(p, len(read(p, errs) or "")) for p in out]
@@ -125,7 +133,7 @@ def preload_bytes(root, fm_line, errs):
             continue
         names.append(name)
         for base in (os.path.join(root, ".claude", "skills", name),
-                     os.path.expanduser(f"~/.claude/skills/{name}")):
+                     os.path.join(config_root(), "skills", name)):
             if os.path.isdir(base):
                 for dp, _dn, fns in os.walk(base):
                     for fn in fns:

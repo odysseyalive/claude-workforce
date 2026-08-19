@@ -113,7 +113,7 @@ count is unqualified and the report says so.
 **Run the census FIRST, and take every count in this run from it.**
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
 ```
 
@@ -148,7 +148,7 @@ with no opt-out, so its length is multiplied by fan-out: the highest-leverage co
 a hand count is stating a number nothing produced:
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-context"   --root "${CLAUDE_PROJECT_DIR:-$PWD}"   # IDENTITY bytes per spawn
 "$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}"   # DUPLICATED / DERIVABLE / USER
 ```
@@ -228,7 +228,7 @@ with them. A fresh project is where the budgets matter *most*: nothing is config
 **Run the census; do not perform it by hand.**
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-census" \
   --root "${CLAUDE_PROJECT_DIR:-$PWD}" \
   --manifest "${CLAUDE_PROJECT_DIR}/.claude/workforce/.agents-symlink-manifest.txt" \

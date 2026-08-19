@@ -75,6 +75,30 @@ guessing at a repo it may not be sitting in.
 To skip the question and force a scope, add `-- --project` or `-- --user` on Linux / macOS, or set
 `$env:WORKFORCE_SCOPE='project'` before the PowerShell line.
 
+#### Into a specific Claude config directory
+
+Run more than one Claude environment on one machine — two paid accounts side by side, say, each with
+its own `CLAUDE_CONFIG_DIR` — and a personal install needs to land in the *right* one.
+
+On Linux / macOS, name it with `--config-dir`:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)" -- --config-dir ~/.claude-work
+```
+
+On Windows PowerShell, set `WORKFORCE_CONFIG_DIR` before the install line:
+
+```powershell
+$env:WORKFORCE_CONFIG_DIR='C:\path\to\.claude-work'; irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex
+```
+
+Either way it implies a personal install into that directory: the skill, its settings, and the
+shipped agents all land under the config root the session resolves from, so the copy is actually
+reachable there rather than in a directory Claude never reads. It can't be combined with `--project`.
+If your shell already runs under the target environment (`CLAUDE_CONFIG_DIR` set), the standard
+install command above lands there on its own. Each **project's** company still lives in that project's
+own `.claude/` regardless — the config directory only relocates the personal, cross-project install.
+
 Then restart Claude Code and run your first audit:
 
 ```

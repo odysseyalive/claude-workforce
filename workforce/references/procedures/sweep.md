@@ -153,7 +153,7 @@ its command actually resolves into, compared by real path so a symlinked skill s
 owner. The hooks this step must relocate are exactly those whose `skill` equals a target of this sweep:
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --json "${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/census.json"
 ```
 

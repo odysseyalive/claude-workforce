@@ -56,7 +56,7 @@ Three readings, and only the first is a finding:
 **Run the measurement; do not estimate it.**
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-context" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
 ```
 

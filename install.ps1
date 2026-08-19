@@ -9,12 +9,19 @@
 # it once. Scope can still be forced, which skips the census entirely:
 #   $env:WORKFORCE_SCOPE='project'; irm .../install.ps1 | iex
 #
+# Running more than one environment directory? Install the personal copy into a
+# specific CLAUDE_CONFIG_DIR (implies user scope):
+#   $env:WORKFORCE_CONFIG_DIR='C:\path\to\.claude-work'; irm .../install.ps1 | iex
+#   # or inherit the environment the shell already runs under:
+#   $env:CLAUDE_CONFIG_DIR='C:\path\to\.claude-work'; irm .../install.ps1 | iex
+#
 # Linux / macOS users: use the bash installer instead:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install)"
 #
 # The list of shipped files lives in manifest.txt (shared with the bash installer).
 
 function Install-ClaudeWorkforce {
+    param([string]$ConfigDir = '')
     $ErrorActionPreference = 'Stop'
 
     # Overridable so the installer can be tested against a local checkout -- it was
@@ -24,8 +31,11 @@ function Install-ClaudeWorkforce {
     #   $env:WORKFORCE_REPO_URL = "file://$PWD"
     $RepoUrl = if ($env:WORKFORCE_REPO_URL) { $env:WORKFORCE_REPO_URL } else { 'https://raw.githubusercontent.com/odysseyalive/claude-workforce/main' }
 
-    $personalSkillDir = Join-Path $HOME '.claude/skills/workforce'
     $projectSkillDir  = Join-Path (Get-Location).Path '.claude/skills/workforce'
+    # $personalSkillDir is computed after scope resolution, once the personal config
+    # root is known: -ConfigDir / $env:WORKFORCE_CONFIG_DIR / $env:CLAUDE_CONFIG_DIR can
+    # relocate the whole ~/.claude tree so a user with more than one environment
+    # directory installs into a specific one. Unset, the root is exactly ~/.claude.
 
     # ── Scope selection ───────────────────────────────────────────────────────
     #
@@ -56,6 +66,32 @@ function Install-ClaudeWorkforce {
             return
         }
     }
+
+    # ── Personal config root ──────────────────────────────────────────────────
+    #
+    # Claude Code reads its whole config tree from $CLAUDE_CONFIG_DIR when set
+    # (default ~/.claude), which is how one machine runs more than one environment
+    # directory. The personal install must land under the SAME root the session will
+    # resolve skills from. Highest priority first: the -ConfigDir parameter (or its
+    # `irm | iex` env twin $WORKFORCE_CONFIG_DIR, mirroring $WORKFORCE_SCOPE), then the
+    # $CLAUDE_CONFIG_DIR the shell already runs under, then ~/.claude.
+    #
+    # An explicit config dir names a personal (user-scope) tree: meaningless beside
+    # --project, and it IMPLIES user scope so the census does not instead pick a
+    # project copy sitting in the current directory.
+    $configDirExplicit = if ($ConfigDir) { $ConfigDir }
+                         elseif ($env:WORKFORCE_CONFIG_DIR) { $env:WORKFORCE_CONFIG_DIR }
+                         else { '' }
+    if ($configDirExplicit -and $scopeExplicit -eq 'project') {
+        Write-Host 'Error: a config dir names a personal CLAUDE_CONFIG_DIR and cannot be combined'
+        Write-Host '       with project scope. A project install is anchored to the repo, not a config dir.'
+        return
+    }
+    if ($configDirExplicit -and -not $scopeExplicit) { $scopeExplicit = 'user' }
+    $configRoot = if ($configDirExplicit) { $configDirExplicit }
+                  elseif ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR }
+                  else { Join-Path $HOME '.claude' }
+    $personalSkillDir = Join-Path $configRoot 'skills/workforce'
 
     Write-Host 'Claude Workforce Installer'
     Write-Host '=========================='
@@ -201,9 +237,9 @@ function Install-ClaudeWorkforce {
         switch ($scope) {
             'user' {
                 $skillDir     = $personalSkillDir
-                $agentsDir    = Join-Path $HOME '.claude/agents'
-                $settingsFile = Join-Path $HOME '.claude/settings.json'
-                $scopeLabel   = 'personal (~/.claude/skills)'
+                $agentsDir    = Join-Path $configRoot 'agents'
+                $settingsFile = Join-Path $configRoot 'settings.json'
+                $scopeLabel   = "personal ($configRoot\skills)"
             }
             'project' {
                 $skillDir     = $projectSkillDir
@@ -313,7 +349,7 @@ function Install-ClaudeWorkforce {
         if ($scope -eq 'user') {
             $otherAgents = Join-Path (Get-Location).Path '.claude/agents'
         } else {
-            $otherAgents = Join-Path $HOME '.claude/agents'
+            $otherAgents = Join-Path $configRoot 'agents'
         }
         if ((Test-Path $otherAgents) -and ($otherAgents -ne $agentsDir)) {
             $dupN = 0
@@ -476,21 +512,26 @@ function Install-ClaudeWorkforce {
               Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } |
               Select-Object -First 1
         Write-Host ''
-        Write-Host 'Auto-mode grant (~/.claude/settings.json, user scope):'
+        # CLAUDE_CONFIG_DIR is exported into wf-settings-apply so its user_settings_path()
+        # resolves to THIS install's config root, not a bare ~/.claude -- under a config-dir
+        # install the auto-mode grant belongs in the same tree as the skill.
+        Write-Host "Auto-mode grant ($configRoot\settings.json, user scope):"
         Write-Host "  Claude Code's auto-mode classifier can refuse workforce's edits to its own"
         Write-Host '  .claude/ config (settings, agent handbooks, hooks) as "self-modification",'
         Write-Host '  above the permissions layer. This adds an autoMode.allow/environment entry so'
         Write-Host '  those edits are trusted, letting an audit configure a project with no manual'
         Write-Host '  step. Reversible: `claude auto-mode reset`. Skip: $env:WORKFORCE_NO_AUTOMODE=1.'
         if ($wsa -and $py) {
-            & $py $wsa --execute --automode
+            $prevCfg = $env:CLAUDE_CONFIG_DIR
+            $env:CLAUDE_CONFIG_DIR = $configRoot
+            try { & $py $wsa --execute --automode } finally { $env:CLAUDE_CONFIG_DIR = $prevCfg }
             if ($LASTEXITCODE -ne 0) {
                 Write-Host '  Could not write it now. Run it yourself later (your shell is not gated):'
-                Write-Host "    $py `"$wsa`" --execute --automode"
+                Write-Host "    `$env:CLAUDE_CONFIG_DIR='$configRoot'; $py `"$wsa`" --execute --automode"
             }
         } else {
             Write-Host '  Skipped: wf-settings-apply or python not found. After install, run:'
-            Write-Host '    python <skill-dir>/bin/wf-settings-apply --execute --automode'
+            Write-Host "    `$env:CLAUDE_CONFIG_DIR='$configRoot'; python <skill-dir>/bin/wf-settings-apply --execute --automode"
         }
         Write-Host ''
     }

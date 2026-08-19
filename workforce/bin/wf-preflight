@@ -35,6 +35,12 @@ import sys
 # but a deny/ask rule in ANY of these blocks a write, so all are scanned.
 PROJECT_SCOPES = ("settings.local.json", "settings.json")
 
+
+def config_root():
+    """Personal config root. $CLAUDE_CONFIG_DIR relocates the whole ~/.claude tree
+    (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR). Unset → ~/.claude."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
 # Path fragments a workforce audit must be able to write. A deny/ask rule matching any
 # of these is a mission blocker.
 WORKFORCE_WRITE_TARGETS = (".claude", "settings.local.json", "settings.json",
@@ -64,7 +70,7 @@ def grant_union_paths(root):
     fact 17), so a grant already in force in USER scope is not missing. This read spans
     project + user; the deny/ask/hook scan above deliberately does not."""
     paths = [os.path.join(root, ".claude", n) for n in PROJECT_SCOPES]
-    paths.append(os.path.join(os.path.expanduser("~"), ".claude", "settings.json"))
+    paths.append(os.path.join(config_root(), "settings.json"))
     return paths
 
 

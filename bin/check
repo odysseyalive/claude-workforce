@@ -682,7 +682,7 @@ for p in declared:
     prose = [
         l for l in lines
         if len(l) > 55 and not l.lstrip().startswith(("|", "#", "```", "<!--"))
-        and not l.startswith('WF="$HOME/.claude/skills/workforce"')
+        and not l.startswith('WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"')
     ]
     dup_p = sorted({l for l in prose if prose.count(l) > 1})
     check(f"no restated paragraph in {n}", not dup_p, f"repeated verbatim: {[l[:70] for l in dup_p]}")
@@ -4603,7 +4603,7 @@ check(
 # same week, which is why nothing generalised. scopes.md § Resolving the shipped
 # scripts owns the resolver; hooks.md keeps a table because a hook registration
 # needs a literal absolute path resolved at write time, not a shell variable.
-_RESOLVER = 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'
+_RESOLVER = 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'
 _BARE_PATH = re.compile(r"(?<![\w/`~}])\.claude/skills/workforce/bin/")
 _bare = []
 for _p in declared:
@@ -4639,7 +4639,7 @@ _hooks_md = read("workforce/references/procedures/hooks.md")
 # find(), not index() — a missing row must FAIL this check, not raise out of the
 # whole run. bin/prove breaks assertions by deleting their literal, so an
 # index()-based check would take every other assertion down with it.
-_hk_personal = _hooks_md.find("| 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |")
+_hk_personal = _hooks_md.find("| 1 | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives` |")
 _hk_project = _hooks_md.find("| 2 | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives` |")
 check(
     "hooks: the registration path resolves personal before project",
@@ -4664,6 +4664,35 @@ for _inst, _needles in (
         f"{_inst} is missing {_absent} — a partial install must not report success, "
         "because the first symptom is a procedure dying on a missing script",
     )
+
+# CLAUDE_CONFIG_DIR install support. A user running more than one environment
+# directory must be able to place the personal copy under a specific config root
+# (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR). This is only real if the
+# SAME variable is honored on the runtime side — a copy installed under a custom root
+# that the resolver never reads from is a dead directory, not an install. All three
+# faces ship together so none can regress while the others stand.
+_inst_bash = read("install")
+_inst_ps1 = read("install.ps1")
+check(
+    "install: bash resolves the personal root through --config-dir / CLAUDE_CONFIG_DIR",
+    '--config-dir' in _inst_bash
+    and 'CONFIG_ROOT="${CONFIG_DIR_EXPLICIT:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"' in _inst_bash,
+    "install no longer derives the personal root from --config-dir / $CLAUDE_CONFIG_DIR "
+    "— a second environment directory cannot be targeted",
+)
+check(
+    "install: powershell offers the same config-dir install as bash",
+    '$configRoot = if ($configDirExplicit)' in _inst_ps1
+    and '$env:CLAUDE_CONFIG_DIR' in _inst_ps1 and '$env:WORKFORCE_CONFIG_DIR' in _inst_ps1,
+    "install.ps1 no longer resolves the personal root through CLAUDE_CONFIG_DIR — the "
+    "two installers must offer the same environment-directory choice",
+)
+check(
+    "scopes: the canonical runtime resolver honors CLAUDE_CONFIG_DIR",
+    'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"' in read("workforce/references/scopes.md"),
+    "the runtime resolver hardcodes ~/.claude — a skill installed under a custom "
+    "CLAUDE_CONFIG_DIR would install correctly and then never resolve at runtime",
+)
 
 # The effort budget renders immediately after the model budget. Step 0.4b named
 # no order at all until 2026-08-03, so the host convention would have applied to
@@ -6478,7 +6507,7 @@ check("hooks resolves its hook path through both install scopes",
       "step 2 named only the project path; on a personal install — the ordinary case — the hook is "
       "not there and the command refuses to wire it forever")
 check("hooks names the personal-scope fallback explicitly",
-      "~/.claude/skills/workforce/bin/wf-protect-directives" in _hk,
+      "${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives" in _hk,
       "a resolution order with only one entry is not a resolution order")
 
 # ─────────────────────────────────────────────────────────────────────────────

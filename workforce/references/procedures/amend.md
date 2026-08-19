@@ -114,7 +114,7 @@ falsification is still required; **it is a human's act until commands live somew
 parseable** (see that script's module docstring).
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-checkrun" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --agent <name>
 ```
 

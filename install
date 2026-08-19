@@ -12,6 +12,11 @@
 #   bash -c "$(curl -fsSL .../install)" -- --project
 #   WORKFORCE_SCOPE=project bash -c "$(curl -fsSL .../install)"
 #
+# Running more than one environment directory? Install the personal copy into a
+# specific CLAUDE_CONFIG_DIR (implies --user):
+#   bash -c "$(curl -fsSL .../install)" -- --config-dir ~/.claude-work
+#   CLAUDE_CONFIG_DIR=~/.claude-work bash -c "$(curl -fsSL .../install)"
+#
 # Windows PowerShell users: use install.ps1 instead:
 #   irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install.ps1 | iex
 #
@@ -38,8 +43,11 @@ set -e
 # before. This is a test seam, not a new feature.
 REPO_URL="${WORKFORCE_REPO_URL:-https://raw.githubusercontent.com/odysseyalive/claude-workforce/main}"
 
-PERSONAL_SKILL_DIR="$HOME/.claude/skills/workforce"
 PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
+# PERSONAL_SKILL_DIR is computed after arg parsing (below), once the personal config
+# root is known: `--config-dir <path>` or $CLAUDE_CONFIG_DIR can relocate the whole
+# ~/.claude tree so a user with more than one environment directory installs into a
+# specific one. Unset, the root is exactly $HOME/.claude and nothing changes.
 
 # ── Scope selection ───────────────────────────────────────────────────────────
 #
@@ -66,24 +74,38 @@ PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
 
 SCOPE_EXPLICIT=""
 NO_AUTOMODE=""
+CONFIG_DIR_EXPLICIT=""
 [ -n "$WORKFORCE_NO_AUTOMODE" ] && NO_AUTOMODE="yes"
-for arg in "$@"; do
-    case "$arg" in
-        --project|--local) SCOPE_EXPLICIT="project" ;;
-        --user|--personal) SCOPE_EXPLICIT="user" ;;
-        --no-automode) NO_AUTOMODE="yes" ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --project|--local) SCOPE_EXPLICIT="project"; shift ;;
+        --user|--personal) SCOPE_EXPLICIT="user"; shift ;;
+        --no-automode) NO_AUTOMODE="yes"; shift ;;
+        # A specific CLAUDE_CONFIG_DIR to install the personal copy into. Takes a
+        # path value (space- or =-separated). Guard the value: `shift` on an empty
+        # stack aborts under `set -e`, so a bare trailing `--config-dir` must fail
+        # with a message, not a cryptic shell error.
+        --config-dir)
+            [ $# -ge 2 ] || { echo "Error: --config-dir requires a path argument."; exit 1; }
+            CONFIG_DIR_EXPLICIT="$2"; shift 2 ;;
+        --config-dir=*) CONFIG_DIR_EXPLICIT="${1#--config-dir=}"; shift ;;
         --help|-h)
-            echo "Usage: install [--user|--project] [--no-automode]"
+            echo "Usage: install [--user|--project] [--config-dir <path>] [--no-automode]"
             echo
             echo "With no flag, existing installs are found and updated in place."
             echo "A first-time install asks where to go."
             echo
-            echo "  --user         force ~/.claude/skills/workforce"
-            echo "  --project      force ./.claude/skills/workforce"
-            echo "  --no-automode  skip the ~/.claude/settings.json auto-mode grant that"
-            echo "                 lets workforce edit its own .claude/ config unprompted"
+            echo "  --user            force the personal install"
+            echo "  --project         force ./.claude/skills/workforce"
+            echo "  --config-dir DIR  install the personal copy into DIR instead of ~/.claude"
+            echo "                    (for running more than one environment directory on one"
+            echo "                    machine); implies --user, and \$CLAUDE_CONFIG_DIR does the"
+            echo "                    same if already set in your shell"
+            echo "  --no-automode     skip the auto-mode grant in the config dir's settings.json"
+            echo "                    that lets workforce edit its own .claude/ config unprompted"
             exit 0
             ;;
+        *) shift ;;
     esac
 done
 
@@ -96,6 +118,34 @@ if [ -z "$SCOPE_EXPLICIT" ] && [ -n "$WORKFORCE_SCOPE" ]; then
             ;;
     esac
 fi
+
+# ── Personal config root ──────────────────────────────────────────────────────
+#
+# Claude Code reads its whole config tree from $CLAUDE_CONFIG_DIR when set (default
+# ~/.claude), which is how one machine runs more than one environment directory. The
+# personal install must land under the SAME root the session will resolve skills from,
+# so it is derived here, highest priority first:
+#     --config-dir <path>   explicit flag, wins over everything
+#     $CLAUDE_CONFIG_DIR    the environment this shell already runs under
+#     $HOME/.claude         the default
+#
+# --config-dir names a personal (user-scope) tree, so it is meaningless beside
+# --project; refuse rather than guess. An explicit --config-dir also IMPLIES --user:
+# the user named where the personal copy goes, so the census must not instead pick a
+# project copy that happens to sit in the current directory.
+# WORKFORCE_CONFIG_DIR is the env equivalent of --config-dir, for the curl-pipe form
+# that cannot take positional flags (mirrors WORKFORCE_SCOPE). The flag still wins.
+[ -z "$CONFIG_DIR_EXPLICIT" ] && [ -n "$WORKFORCE_CONFIG_DIR" ] && CONFIG_DIR_EXPLICIT="$WORKFORCE_CONFIG_DIR"
+
+if [ -n "$CONFIG_DIR_EXPLICIT" ] && [ "$SCOPE_EXPLICIT" = "project" ]; then
+    echo "Error: --config-dir names a personal CLAUDE_CONFIG_DIR and cannot be combined"
+    echo "       with --project. A project install is anchored to the repo, not a config dir."
+    exit 1
+fi
+[ -n "$CONFIG_DIR_EXPLICIT" ] && [ -z "$SCOPE_EXPLICIT" ] && SCOPE_EXPLICIT="user"
+
+CONFIG_ROOT="${CONFIG_DIR_EXPLICIT:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
+PERSONAL_SKILL_DIR="$CONFIG_ROOT/skills/workforce"
 
 echo "Claude Workforce Installer"
 echo "=========================="
@@ -290,9 +340,9 @@ install_to_scope() {
     case "$scope" in
         user)
             skill_dir="$PERSONAL_SKILL_DIR"
-            agents_dir="$HOME/.claude/agents"
-            settings_file="$HOME/.claude/settings.json"
-            scope_label="personal (~/.claude/skills)"
+            agents_dir="$CONFIG_ROOT/agents"
+            settings_file="$CONFIG_ROOT/settings.json"
+            scope_label="personal ($CONFIG_ROOT/skills)"
             ;;
         project)
             skill_dir="$PROJECT_SKILL_DIR"
@@ -374,7 +424,7 @@ install_to_scope() {
     # REPORTED, NEVER REMOVED. The other scope is not this install's to edit; deleting
     # there is exactly the "overwrite the user's preferences" move the permissions
     # directive refuses. Name it, name the remedy, and let the operator choose.
-    if [ "$scope" = "user" ]; then other_agents="$(pwd)/.claude/agents"; else other_agents="$HOME/.claude/agents"; fi
+    if [ "$scope" = "user" ]; then other_agents="$(pwd)/.claude/agents"; else other_agents="$CONFIG_ROOT/agents"; fi
     if [ -d "$other_agents" ] && [ "$other_agents" != "$agents_dir" ]; then
         dup_n=0
         for f in "$agents_dir"/wf-*.md; do
@@ -517,20 +567,23 @@ if [ -z "$NO_AUTOMODE" ]; then
         [ -f "$cand" ] && { wsa="$cand"; break; }
     done
     echo
-    echo "Auto-mode grant (~/.claude/settings.json, user scope):"
+    # CLAUDE_CONFIG_DIR is exported into wf-settings-apply so its user_settings_path()
+    # resolves to THIS install's config root, not a bare ~/.claude — under a --config-dir
+    # install the auto-mode grant belongs in the same tree as the skill.
+    echo "Auto-mode grant ($CONFIG_ROOT/settings.json, user scope):"
     echo "  Claude Code's auto-mode classifier can refuse workforce's edits to its own"
     echo "  .claude/ config (settings, agent handbooks, hooks) as \"self-modification\","
     echo "  above the permissions layer. This adds an autoMode.allow/environment entry so"
     echo "  those edits are trusted, letting an audit configure a project with no manual"
     echo "  step. Reversible: \`claude auto-mode reset\`. Skip: re-run with --no-automode."
     if [ -n "$wsa" ] && command -v python3 &>/dev/null; then
-        if ! python3 "$wsa" --execute --automode; then
+        if ! CLAUDE_CONFIG_DIR="$CONFIG_ROOT" python3 "$wsa" --execute --automode; then
             echo "  Could not write it now. Run it yourself later (your shell is not gated):"
-            echo "    python3 \"$wsa\" --execute --automode"
+            echo "    CLAUDE_CONFIG_DIR=\"$CONFIG_ROOT\" python3 \"$wsa\" --execute --automode"
         fi
     else
         echo "  Skipped: wf-settings-apply or python3 not found. After install, run:"
-        echo "    python3 <skill-dir>/bin/wf-settings-apply --execute --automode"
+        echo "    CLAUDE_CONFIG_DIR=\"$CONFIG_ROOT\" python3 <skill-dir>/bin/wf-settings-apply --execute --automode"
     fi
     echo
 fi

@@ -313,11 +313,11 @@ CASES = [
     ("scopes: no shipped file invokes a script by a bare project-scope path",
      ORG, "append", "\n.claude/skills/workforce/bin/wf-census --root x\n"),
     ("scopes: the canonical script resolver is stated, and personal resolves first",
-     SCO, "del", 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
+     SCO, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
     ("scopes: every file using $WF also defines it",
-     BUD, "del", 'WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
+     BUD, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
     ("hooks: the registration path resolves personal before project",
-     HK, "del", "| 1 | `~/.claude/skills/workforce/bin/wf-protect-directives` |"),
+     HK, "del", "| 1 | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives` |"),
     ("install: install verifies every manifest file landed",
      INS, "del", "INCOMPLETE INSTALL"),
     ("install: install.ps1 verifies every manifest file landed",
@@ -782,6 +782,16 @@ CASES = [
      HK, "del", "wf-pin-check --uninstall-hook --root <repo> --execute"),
     ("pin guard: the guard actually emits INV-PINS",
      WPC, "del", "INV-PINS  unpinned"),
+    # ── install into a specific CLAUDE_CONFIG_DIR (2026-08-18) ─────────────────
+    # A user with more than one environment directory must be able to target the
+    # personal install, and the runtime resolver must read from the same root or the
+    # install is a dead directory. Break each of the three faces independently.
+    ("install: bash resolves the personal root through --config-dir / CLAUDE_CONFIG_DIR",
+     INS, "del", 'CONFIG_ROOT="${CONFIG_DIR_EXPLICIT:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"'),
+    ("install: powershell offers the same config-dir install as bash",
+     PS1, "del", "$configRoot = if ($configDirExplicit)"),
+    ("scopes: the canonical runtime resolver honors CLAUDE_CONFIG_DIR",
+     SCO, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"'),
 ]
 
 

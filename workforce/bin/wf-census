@@ -35,6 +35,14 @@ import re
 import shlex
 import sys
 
+
+def config_root():
+    """Personal config root. $CLAUDE_CONFIG_DIR relocates the whole ~/.claude tree
+    (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR), so user-scope agents
+    and settings must be read from there. Unset, it is exactly ~/.claude."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
+
 # Anchored for the same reason MARKER_RX is: a file DOCUMENTING the marker
 # convention mentions it in prose and inside backticks. Unanchored, this reported
 # 10 of 21 immutable blocks "unpaired" on a real project — and an unpaired sacred
@@ -136,7 +144,7 @@ class Census:
         """
         locations = [
             (os.path.join(self.root, ".claude", "agents"), "project"),
-            (os.path.expanduser("~/.claude/agents"), "personal"),
+            (os.path.join(config_root(), "agents"), "personal"),
         ]
         for base, scope in locations:
             if not os.path.isdir(base):
@@ -621,7 +629,8 @@ class Census:
         """
         scopes = [(os.path.join(self.root, r), r) for r in
                   (".claude/settings.json", ".claude/settings.local.json")]
-        scopes.append((os.path.expanduser("~/.claude/settings.json"), "~/.claude/settings.json"))
+        _user_settings = os.path.join(config_root(), "settings.json")
+        scopes.append((_user_settings, _user_settings))
         for p, rel in scopes:
             if not os.path.exists(p):
                 continue

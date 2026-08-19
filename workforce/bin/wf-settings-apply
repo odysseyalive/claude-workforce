@@ -137,8 +137,16 @@ def resolve_project_settings(root):
     return os.path.join(root, ".claude", "settings.local.json")
 
 
+def config_root():
+    """Personal config root. $CLAUDE_CONFIG_DIR relocates the whole ~/.claude tree
+    (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR); the installer exports it
+    when a --config-dir install writes the auto-mode grant, so the grant lands in the
+    same tree as the skill. Unset, it is exactly ~/.claude."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
 def user_settings_path():
-    return os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+    return os.path.join(config_root(), "settings.json")
 
 
 def union_allow(root):
@@ -279,8 +287,7 @@ def hook_command(name):
     """The absolute, shell-quoted command string for a shipped hook. Personal scope
     first, then project (scopes.md § Resolving the shipped scripts). Expand ~ here — a
     hook command is not run through a shell that will do it."""
-    home = os.path.expanduser("~")
-    personal = os.path.join(home, ".claude", "skills", "workforce", "bin", name)
+    personal = os.path.join(config_root(), "skills", "workforce", "bin", name)
     project = os.path.join("${CLAUDE_PROJECT_DIR}", ".claude", "skills", "workforce",
                            "bin", name)
     resolved = personal if os.path.exists(personal) else project

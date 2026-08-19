@@ -43,6 +43,46 @@ grammar is shared with claude-enforcer and divergence would cost more than the d
 
 ---
 
+## Installing into a specific `CLAUDE_CONFIG_DIR`
+
+A personal install normally lands in `~/.claude/`. Claude Code lets a user relocate its entire config
+tree with the `CLAUDE_CONFIG_DIR` environment variable, so one machine can hold **more than one
+environment directory** — a work profile and a personal profile, say, each with its own skills, agents,
+and settings. A personal install must be able to target the specific one the user means.
+
+The personal root is therefore `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` everywhere — the installers, the
+runtime resolver (§ Resolving the shipped scripts), and every shipped script that reads a user-scope
+file. **Unset, it is exactly `$HOME/.claude`, so the default install is byte-for-byte unchanged.**
+
+The installer resolves the personal root in this priority order, highest first:
+
+| Source | How it is set |
+|---|---|
+| `--config-dir <path>` | explicit installer flag — wins over everything |
+| `$CLAUDE_CONFIG_DIR` | the environment the installing shell is already running under |
+| `$HOME/.claude` | the default when neither is given |
+
+```bash
+# install into a named environment directory
+./install --user --config-dir ~/.claude-work
+# or inherit the environment the shell already runs under
+CLAUDE_CONFIG_DIR=~/.claude-work ./install --user
+```
+
+The PowerShell installer takes the same choice as `-ConfigDir <path>` or `$env:CLAUDE_CONFIG_DIR`.
+
+**`--config-dir` implies personal scope** — it names a `CLAUDE_CONFIG_DIR`, which is a user-level tree,
+so it is meaningless beside `--project` and the installer refuses the two together rather than guess.
+A project install is anchored to the repo, never to a config dir.
+
+The reason the runtime side matters as much as the install side: Claude Code running under
+`CLAUDE_CONFIG_DIR=/x` registers skills from `/x/skills`, so a copy installed there **is** invocable in
+that environment — but a resolver hardcoded to `~/.claude` would then run the wrong install's scripts,
+or none. Honoring the same variable on both sides is what makes the feature real rather than a directory
+the runtime never reads.
+
+---
+
 ## Which sessions can see a personal install
 
 **Do not write this rule in terms of a product name.** "Cowork" names both a cloud offering *and* the
@@ -104,7 +144,7 @@ hosts. A hardcoded project path does not degrade there; every scripted step of t
 **This is the canonical resolver. Copy it verbatim; do not paraphrase it:**
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 ```
 
 Then invoke through it — `"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}"`.
@@ -113,6 +153,14 @@ Then invoke through it — `"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$P
 table above: enterprise > personal > project). A resolver that checked project first could hand back a
 copy that is *shadowed* — the procedure would run one install's scripts while the session runs another
 install's instructions, and the two can be different versions with no warning anywhere.
+
+**`${CLAUDE_CONFIG_DIR:-$HOME/.claude}` is the personal root, not a bare `$HOME/.claude`.** Claude Code
+honors `CLAUDE_CONFIG_DIR` to relocate its whole config tree, which is how a user runs more than one
+environment on one machine (§ Installing into a specific `CLAUDE_CONFIG_DIR`). The installer writes the
+personal copy under that same root, so the resolver must read from it or it would look in `~/.claude`
+for a skill that lives in the environment directory the session is actually running under — the install
+would succeed and never resolve. Unset, the expansion is exactly `$HOME/.claude`, so every default
+install is unchanged.
 
 **It repeats in every command block on purpose.** Each block runs in a fresh shell, so a `WF` set in an
 earlier block is gone by the next one, and a reader who copies a single block must get a working

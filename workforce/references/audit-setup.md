@@ -698,7 +698,7 @@ four other defects here have had.
 **So this step RUNS the repair, unasked, in-run:**
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="<project>/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="<project>/.claude/skills/workforce"
 "$WF/bin/wf-permissions" --root "<project>" --apply
 ```
 
@@ -997,7 +997,7 @@ tools, no work product. It proves the channel, nothing else.
 `enforcement.md` names the fix, and this is the step that performs it:
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --ensure-region --execute
 ```
 

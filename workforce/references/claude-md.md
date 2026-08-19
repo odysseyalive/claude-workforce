@@ -230,7 +230,7 @@ remove anything at all, so running it early is safe in the only direction that m
 does the real classification once handbooks are in final position. `verify` reports on both.
 
 ```bash
-WF="$HOME/.claude/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}"                        # report
 "$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute              # write
 "$WF/bin/wf-claude-md" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --ensure-region --execute
