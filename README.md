@@ -233,6 +233,23 @@ Emptying the file also turned up a rule that had no other home. A dated, attribu
 
 One caveat, since the rest of this reads as a pitch. That early context loses influence as a session grows is a reason, not a measurement. Nothing here has measured it on a host, and this project's own rule is that an unmeasured fact never becomes a blocking check. What is enforced is the ledger, which is a property of files and can be verified.
 
+## The Long Session Is the Expensive One
+
+The last section was about the head of a conversation losing influence. This is about the tail of it getting too big.
+
+A model is stateless, so every turn resends the whole conversation back to it. A ten-step agent doesn't cost ten times one step; it costs the sum of a history that grows the entire way, and that curve is quadratic, not linear. Caching discounts the slope. It doesn't change the shape. And a long context doesn't only cost more, it reasons worse, because the one thing the model needs is buried in more and more that it doesn't. The long session is both the expensive one and the distracted one.
+
+![A craftsperson at an evening workbench nearly buried under a towering, spilling pile of papers accumulated over the day, squinting to find one small note at the top, while through a doorway in cool morning light a second worker begins the same task at a clean, uncluttered bench](assets/images/long-session.png)
+*A session carries its whole history, and the longer it runs the deeper the one note that matters is buried. A fresh context is the clean bench.*
+
+Most of the company already fights this without trying. An IC runs in its own fresh context and hands back a verdict, so four short contexts do the work one long one would have, and four small quadratics are cheaper than one big one. The isolation was built for the chain of command. The savings came free.
+
+What isolation doesn't catch is a single agent spinning — reading the same file a third time, re-running the command that already failed, thrashing in a way that inflates its context without moving the work. `wf-loop-guard` is a hook that watches for exactly that: the same tool, the same arguments, three times, with no edit in between. When it fires it doesn't scold. It asks the agent to say what it's trying to find, why the last attempts didn't find it, and to try a different approach or hand the problem to someone who hasn't been staring at it. A stuck agent reviewing its own stuck context is the worst-placed judge there is; the useful second look comes from a different reader, which is why the audit's panels are built to disagree.
+
+You can measure how long your own agents run. `wf-runlength` reads a project's transcripts and reports the distribution. Against this repository, the median background agent peaks around 67,000 tokens of context and the median main session around 227,000 — already past a small model's window — with the longest sessions near a million. That is what the problem looks like on a real project, not a hypothetical.
+
+The honest parts, since this could read as a pitch. The harness won't tell a hook how full a context is, so the guard watches behavior, not size: it catches loops, not a large-but-productive session, and that healthy-but-huge context is the part no runtime check can save. The quadratic cost is arithmetic and certain; that long context reasons worse is documented elsewhere and not measured here, so nothing in this project refuses your work on its basis. And the guard ships switched off — wiring it changes how every agent behaves, so it's one command you run when you want it, not a default that arrives with the install.
+
 ## The Honest Parts
 
 Four things, stated without cushioning.
