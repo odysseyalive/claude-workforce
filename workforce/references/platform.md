@@ -1,6 +1,6 @@
 # Platform Facts
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 24 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 25 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before designing any delegation, tier, or handbook frontmatter. -->
 
 ## Header — the constants, stated once
@@ -328,6 +328,30 @@ teammate, while the `tools:` allowlist is documented as honored. The shipped web
 `tools:`-based, so it is on the surviving side of that line — **verify before assuming it, because the
 distinction is one word wide and nothing measures it yet.**
 
+### Fact 21 — real run-length and peak context: subagents are not uniformly short, main sessions run past a 200k window ✅ MEASURED
+
+Evidence: `measurements/2026-08-19-agent-run-length-context.md` (2026-08-19, Claude Code 2.1.233).
+
+**Measured 2026-08-19 on Claude Code 2.1.233** — newer than this file's header stamp (2.1.220). It
+therefore carries its own version stamp and does **not** bump the header, which only a re-measure of the
+delegation canaries may do (§ Staleness, § Adding a fact). A census of this project's own transcript
+store — 223 subagent transcripts (`*/subagents/agent-*.jsonl`) and 52 main-session transcripts — read
+peak context (max over a run's assistant turns of `input + cache_read + cache_creation` tokens) and
+tool-calls (count of `tool_use` items) per run.
+
+| Layer (n) | tool-calls p50 / p90 / max | peak-context p50 / p90 / max | crossed the window |
+|---|---|---|---|
+| subagents (223) | 19 / 45 / 138 | 67,346 / 129,210 / 317,068 | 23% ≥100k · 7.6% ≥150k · 1.8% ≥200k |
+| main sessions (52) | 104 / 426 / 1024 | 227,472 / 673,845 / 994,338 | 69% ≥150k · 58% ≥180k · 54% ≥195k |
+
+**Subagents are not uniformly short.** The median employee peaks at 67k, but ~a quarter cross 100k and
+the tail reaches 317k. **Main sessions run very large** — the median already peaks *past* a 200k window
+(227k), and the largest sat at the auto-compaction ceiling (~994k peak, 1024 tool-calls).
+
+**Consequence.** Long-context / context-rot risk is concentrated in the main loop but is present in a
+real minority of subagents too. Any delegation-budget or handoff design must treat the main loop as the
+primary lever and must **not** assume employees are uniformly cheap. See `delegation-budget.md`.
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
@@ -350,6 +374,7 @@ distinction is one word wide and nothing measures it yet.**
 | 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. `wf-canary-ic` is the fixture |
 | 20 | **`All tools` is a DISPLAY string the harness generates when `tools:` is empty — it is not a value.** Written literally into frontmatter it parses as a one-entry allowlist naming a tool that does not exist | **The failure presents as the opposite of what it is:** the frontmatter reads maximally permissive and the agent can call **nothing**. Fact 14 is the correct expression of "everything" — *omit* `tools:` — and `wf-conform` now refuses the literal on every tier. It is the delegating tiers, which carry no `tools:` line, whose display output says `All tools`, so a round-trip through a human or an agent reading that output is exactly how the phrase gets written back | reported 2026-08-05 by an authoring agent that **declined the instruction** and checked the harness rather than executing it; not canaried here. Treated as DOCUMENTED, and the guard is defensive either way — refusing the literal costs nothing if the fact is wrong |
 | 19 | **A dispatched author works in its OWN context window: N handbooks cost N spawns and accumulate NOTHING in the caller.** Only the returned result reaches the dispatcher | **The fact the conversion batch rests on.** A run that authors INLINE makes its own context the bottleneck and will correctly conclude a large roster is impossible — which is what happened on 2026-08-04, 0 of 40 converted with 192 of 200 spawns unspent. `procedures/audit.md` § Step 5 dispatches for this reason, and `conversion-taxonomy.md` bars context capacity from ever deferring a run | ✅ **MEASURED 2026-08-04** — 4 handbooks authored in one parallel wave: **411,014 subagent tokens and 104 tool calls outside the caller**, 4 of 4 returned complete, wall-clock the slowest author rather than the sum. Evidence `measurements/2026-08-04-dispatched-authoring.md` |
+| 22 | **Hook observability for runtime monitoring.** **`PostToolUse` fires for tool calls made *inside* subagents when the hook is registered at `settings.json` scope** — not only in the main loop. It receives `tool_name` + `tool_input`, so identical-call repetition is detectable; it may emit `additionalContext` or `{"continue": false}` but **cannot block a call — it runs *after* the tool executes.** And **no hook exposes live per-step context size or %-of-window**; the only "context is now large" signal is `PreCompact` with `trigger="auto"` | This is what makes a **loop-guard hook** buildable — a guard watching for repeated identical calls inside an employee can fire, because PostToolUse reaches subagents and sees `tool_input`. That line is the load-bearing one. But such a guard can only observe-and-inject, never prevent (it is post-execution), and it cannot gate on context size — a "context is getting large" guard has only `PreCompact(auto)` to key on, not a live percentage. Bears on fact 21's context-rot risk and on any runtime monitor | documented, not measured — read from the Claude Code hooks documentation and verified 2026-08-19 (running harness 2.1.233); not canaried. Three documented claims in this file have already lost to measurement (facts 2, 3, 4), so the load-bearing "PostToolUse fires in subagents" line earns a canary before any gate rests on it |
 
 **Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
 that review **reports rather than blocks**. Three documented claims in this file have already lost to

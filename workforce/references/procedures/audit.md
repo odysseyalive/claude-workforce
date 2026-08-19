@@ -137,6 +137,14 @@ Gather, in order: `CLAUDE.md` · repository shape (directories, package manifest
 Per skill, where skills exist: workflow length, actors implied, inbound cross-references, immutable
 blocks, declared modes, existing agents.
 
+**Measure runaway-context proneness in the same pass** (`conversion-taxonomy.md` § Runaway context).
+Statically: a handbook instructing a long unbroken loop, a monolithic many-tool-call skill, an org
+shape funnelling into one long-lived thread. Empirically, where the project carries transcript history,
+by the Fact 21 method — peak context and tool-call count per run (`platform.md` Fact 21). This is the
+survey input for the decomposition judgment the org design (Step 2) and the conversions (Step 3) each
+make, and it is subject to the same gate: a run that decomposes on length alone, or that shards a
+coherent long task, has skipped the judgment `conversion-taxonomy.md` § THE JUDGMENT GATE states.
+
 **Report what was absent as well as what was found.** No tests, no git, no `CLAUDE.md` means evidence
 is thin and the roster must be correspondingly small. An org proposed from guesswork is worse than a
 small one proposed from facts.

@@ -24,6 +24,11 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
                         are absent from the union of all four scopes. Refuses a bare
                         `Bash`/blanket grant (audit-setup.md § Step 0.8 rule 3b).
     --wire-hook <name>  register a shipped workforce hook at its event, idempotently.
+                        A PROPOSED hook (`OPT_IN_HOOKS`) is wireable only by NAME and is
+                        never in the default set. Wiring one that owns a config file also
+                        stamps that file with the defaults the hook itself declares, IF
+                        AND ONLY IF it is absent — `wf-loop-guard` ->
+                        `.claude/workforce/loop-guard.json` (hooks.md § The loop guard).
     --automode          write autoMode.environment/allow into ~/.claude/settings.json
                         so the classifier stops refusing routine workforce maintenance.
                         User scope is deliberate: the classifier reads autoMode ONLY
@@ -38,15 +43,23 @@ confirmed by RE-READING the file — never by echoing the string passed to write
 
 OWNERSHIP. Every key this script adds is recorded in
 `.claude/workforce/.settings-owned.json` so `disband` removes exactly those and
-nothing the user wrote. A registration the sidecar does not name is the user's.
+nothing the user wrote. A registration the sidecar does not name is the user's. A
+whole FILE this script creates is recorded the same way, under `files_created`, with
+the sha256 of the exact bytes written — `disband.md` step 6b removes a created
+artifact only when the sidecar names workforce as its creator AND the bytes still
+hash to what workforce wrote, so the hash is what keeps a file the user has since
+tuned out of the sweep. `hooks --remove` deliberately does NOT reverse a stamp
+(hooks.md § The loop guard: unwiring leaves the config alone).
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
 
 OWNED_REL = os.path.join(".claude", "workforce", ".settings-owned.json")
+LOOP_GUARD_REL = os.path.join(".claude", "workforce", "loop-guard.json")
 
 # The two project-scope settings files, precedence order (references/scopes.md).
 PROJECT_SETTINGS = ("settings.local.json", "settings.json")
@@ -58,7 +71,18 @@ SHIPPED_HOOKS = {
     "wf-standing-request": ("UserPromptSubmit", None),
     "wf-protect-directives": ("PostToolUse", "Edit|Write"),
     "wf-unique-persona": ("PostToolUse", "Edit|Write"),
+    "wf-loop-guard": ("PostToolUse", None),
 }
+
+# WIREABLE, NEVER DEFAULT. hooks.md § What is wired marks `wf-loop-guard` "PROPOSED,
+# and not wired by this command's default set" — so membership in SHIPPED_HOOKS means
+# "`--wire-hook <name>` will register it", and nothing more. DEFAULT_HOOKS is the set
+# any "wire the shipped hooks" gesture iterates; a name here is excluded from it and
+# reaches a settings file only when a human types it. Two sets rather than one flag
+# because the unknown-hook error prints BOTH, which is what makes the distinction
+# observable — and therefore fixture-checkable — instead of a comment nobody executes.
+OPT_IN_HOOKS = frozenset({"wf-loop-guard"})
+DEFAULT_HOOKS = tuple(n for n in sorted(SHIPPED_HOOKS) if n not in OPT_IN_HOOKS)
 
 # The autoMode entries recommended into ~/.claude/settings.json. Prose, not patterns —
 # the classifier reads them as natural-language rules (auto-mode-config docs). Each is
@@ -294,10 +318,120 @@ def hook_command(name):
     return f'"{resolved}"', resolved
 
 
+def hook_defaults(name):
+    """The defaults a stamping hook DECLARES, imported from the hook itself.
+
+    IMPORTED, never restated — the same reason `wf-claude-md` imports the standing
+    request from `wf-standing-request` rather than keeping a second copy. Two
+    canonical copies of `nudge_at: 3` drift, and the drifting one is the one written
+    into the user's project. Returns None when the sibling cannot be read, and the
+    caller then REFUSES to stamp: a schema this script invented would be worse than
+    no file, because `wf-loop-guard` would silently ignore keys it does not know.
+    """
+    import importlib.util
+    from importlib.machinery import SourceFileLoader
+    # Never leave a __pycache__ beside a shipped script — residue in a directory the
+    # installer owns (wf-apply and wf-claude-md each hit this first).
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    modname = name.replace("-", "_")
+    try:
+        spec = importlib.util.spec_from_loader(modname, SourceFileLoader(modname, path))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        defaults = dict(mod.DEFAULTS)
+    except Exception:                                  # noqa: BLE001 — refuse, never guess
+        return None
+    return defaults or None
+
+
+# Hooks that also PRODUCE a config file at wiring time: name -> relative path.
+# hooks.md § The loop guard — "`.claude/workforce/loop-guard.json` has a producer, and
+# this step is it." An artifact with a reader and no writer is the shape `.directives.sha`
+# and `platform-local.md` each shipped in; this is that gap closed for the loop guard.
+STAMPED_FILES = {"wf-loop-guard": LOOP_GUARD_REL}
+
+
+def stamp_body(defaults):
+    """The exact bytes. One line, matching the block hooks.md § The loop guard prints,
+    so DISPLAY can show the file verbatim instead of a paraphrase of it."""
+    return json.dumps(defaults) + "\n"
+
+
+def do_stamp(root, name, execute):
+    """(rc, pending). Stamp the config file a hook owns, IF AND ONLY IF it is absent.
+
+    Never overwrites: the thresholds a user tuned are theirs, and a wiring gesture that
+    reset them would be a settings write nobody asked for. `hooks --remove` leaves the
+    file alone for the same reason (hooks.md § The loop guard).
+    """
+    rel = STAMPED_FILES.get(name)
+    if rel is None:
+        return 0, False                                # this hook owns no config file
+    path = os.path.join(root, rel)
+    if os.path.exists(path):
+        print(f"  . {rel}  already present — left alone (thresholds you tuned are yours)")
+        return 0, False
+
+    defaults = hook_defaults(name)
+    if defaults is None:
+        print(f"wf-settings-apply: STAMP REFUSED — could not read DEFAULTS from the "
+              f"shipped {name}, and this script will not invent a schema for "
+              f"{rel}. Wiring is unfinished; re-run after repairing the install.",
+              file=sys.stderr)
+        return 1, False
+    body = stamp_body(defaults)
+
+    print(f"  {'+' if execute else '~'} {rel}  "
+          f"{'stamped' if execute else 'would stamp'} (absent) — {body.strip()}")
+    if not execute:
+        return 0, True
+
+    # Sidecar reversal FIRST, with the sha256 of the exact bytes: `disband.md` step 6b
+    # removes a created artifact only when the sidecar names workforce as its creator
+    # AND the bytes still hash to what workforce wrote.
+    owned_path, owned = load_owned(root)
+    created = owned.setdefault("files_created", [])
+    if not isinstance(created, list):
+        created = owned["files_created"] = []
+    created.append({
+        "path": rel.replace(os.sep, "/"),
+        "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        "by": f"wf-settings-apply --wire-hook {name}",
+    })
+    dump(owned_path, owned)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        # "x", not "w": exclusive create. The exists() check above and the write are
+        # not atomic, and the one thing this must never do is clobber a config.
+        with open(path, "x", encoding="utf-8") as fh:
+            fh.write(body)
+    except FileExistsError:
+        print(f"  . {rel}  appeared between the check and the write — left alone")
+        return 0, False
+    except OSError as exc:
+        print(f"wf-settings-apply: could not write {path}: {exc}", file=sys.stderr)
+        return 1, False
+
+    # RE-READ, exactly as the registration is verified: never echo the string passed
+    # to write() as evidence of a write.
+    back, err = load(path)
+    if err or back != defaults:
+        print(f"wf-settings-apply: STAMP UNVERIFIED — re-read of {path} did not return "
+              f"the {len(defaults)} default(s) written. got={back!r}", file=sys.stderr)
+        return 1, False
+    print(f"  verified on disk: {os.path.basename(rel)} re-read and parses to the "
+          f"{len(defaults)} stamped default(s)")
+    return 0, False
+
+
 def do_wire_hook(root, name, execute):
     if name not in SHIPPED_HOOKS:
-        print(f"wf-settings-apply: {name} is not a shipped hook. Known: "
-              f"{', '.join(sorted(SHIPPED_HOOKS))}", file=sys.stderr)
+        print(f"wf-settings-apply: {name} is not a shipped hook. "
+              f"Default set: {', '.join(DEFAULT_HOOKS)}. "
+              f"Opt-in only, PROPOSED and never wired by the default set: "
+              f"{', '.join(sorted(OPT_IN_HOOKS))}", file=sys.stderr)
         return 2
     event, matcher = SHIPPED_HOOKS[name]
     command, resolved = hook_command(name)
@@ -307,6 +441,9 @@ def do_wire_hook(root, name, execute):
     if resolved.startswith("${CLAUDE_PROJECT_DIR}"):
         print(f"  note: no personal install found; registering the project-scope path "
               f"for {name}.")
+    if name in OPT_IN_HOOKS:
+        print(f"  note: {name} is PROPOSED and opt-in — wired only when you name it; "
+              f"the default set is {', '.join(DEFAULT_HOOKS)} and never includes it.")
 
     entry = {"hooks": [{"type": "command", "command": command}]}
     if matcher is not None:
@@ -327,16 +464,25 @@ def do_wire_hook(root, name, execute):
                 if isinstance(h, dict) and h.get("command") == command:
                     present = True
 
+    # The stamp is a SECOND write with its own precondition, so registration and stamp
+    # are reported independently and neither short-circuits the other: a hook already
+    # registered whose config file is absent must still get the file, or the artifact
+    # this command is the producer for would depend on the order a human wired things.
     if present:
         print(f"  . {name} already registered on {event} — NOOP")
-        return 0
+        rc, pending = do_stamp(root, name, execute)
+        if not execute and pending:
+            print("  apply with: --execute   (run it yourself via `!` if the classifier "
+                  "refused the agent's write)")
+        return rc
     print(f"  {'+' if execute else '~'} {name}  {event}"
           f"{('  matcher ' + matcher) if matcher else ''}  "
           f"{'registered' if execute else 'would register'}")
     if not execute:
+        rc, _pending = do_stamp(root, name, execute)
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
               "refused the agent's write)")
-        return 0
+        return rc
 
     # Sidecar reversal FIRST — the exact event/matcher/command, so `disband`/`hooks
     # --remove` removes those and nothing else.
@@ -372,7 +518,8 @@ def do_wire_hook(root, name, execute):
               f"of {name} on {event}, expected 1.", file=sys.stderr)
         return 1
     print(f"  verified on disk: {name} registered once on {event} in {spath}")
-    return 0
+    rc, _pending = do_stamp(root, name, execute)
+    return rc
 
 
 # -------------------------------------------------------------------------- automode

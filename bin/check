@@ -6716,6 +6716,7 @@ PRODUCERS = {
     ".claude/workforce/.agents-symlink-manifest.txt": "workforce/references/procedures/audit.md",
     ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
     ".claude/workforce/pass-baseline.md": "workforce/references/procedures/audit.md",
+    ".claude/workforce/loop-guard.json": "workforce/references/procedures/hooks.md",
 }
 
 _artifacts = set()
@@ -7086,6 +7087,43 @@ check("conversion-taxonomy states the backup is what makes the batch safe",
       "reversible by construction" in ct,
       "batch size was treated as a risk axis; a verified backup plus per-skill .orig plus disband "
       "means it is not one, and saying so is what removes the reason to stop")
+
+# The runaway-context conversion method (2026-08-19). The rule: MEASURE an existing
+# architecture's context-runaway proneness, DECOMPOSE the separable into shorter-lived
+# spawns behind real isolation boundaries, keep the irreducibly-coherent whole intact
+# and wire loop-guard + a different-persona re-evaluation. Its load-bearing half is the
+# JUDGMENT GATE — not every long context is decomposed. This assertion binds the gate
+# to BOTH the conversion path (ct, canonical) AND the primary creation path (_od, by
+# reference), because Principle 7c's named failure is precisely a rule that lives only
+# in the conversion branch and is invisible from the door most employees come through.
+# Structural, not a new INV row: the run-promises this rides on already print —
+# INV-REMAINDER (preservation is the verified floor of any transform), INV-SUCCESSION /
+# INV-CLOSE (convert in-run, no standing queue). Making decomposition a counted line
+# would manufacture the conversion-count success metric the taxonomy forbids and be the
+# flag-with-a-chainsaw the gate itself refuses. Same Principle-8 call script-author made
+# for wf-loop-guard: provably structural, so no invariants.md row.
+check("runaway-context judgment gate reaches BOTH the conversion and the creation path (Principle 7c)",
+      "flag with a chainsaw" in ct and "greenfield twin of decomposition" in _od,
+      "the gate — decompose the separable, keep the coherent whole and wire loop-guard + "
+      "re-evaluation — is canonical in conversion-taxonomy.md and carried onto the primary path by "
+      "org-design.md; a rule living only in the conversion branch is 7c's named failure. "
+      "Removing or inverting it in either file fires this.")
+
+# wf-runlength (2026-08-19) is the empirical twin of wf-context's static estimate — it
+# reads REAL usage tokens from a transcript store to measure runaway-context proneness
+# (audit survey, conversion-taxonomy.md § Runaway context). Two of its normative claims
+# are prose that would regress silently, so pin them: budget.md documents that the two
+# layers are reported SEPARATELY and never pooled (the core computation contract), and
+# wf-runlength itself carries the version-instability caveat (Principle 9b — the transcript
+# JSONL format is internal and the store-dir derivation is a heuristic that may change).
+# Structural (a property of the shipped text), so a bin/check assertion, not an INV row —
+# same Principle-8 call as the 7c gate above and wf-loop-guard.
+_rl = read("workforce/bin/wf-runlength")
+check("wf-runlength pins its never-pooled contract and its version-instability caveat",
+      "separately and never pooled" in _bud and "HARNESS-INTERNAL HEURISTIC that may change" in _rl,
+      "budget.md § Run length and peak context must state the two layers are reported separately and "
+      "never pooled, and wf-runlength must keep its harness-internal / version-unstable caveat "
+      "(Principle 9b). Prose regresses silently; this binds both. Dropping either fires this.")
 
 # No shipped file may re-authorize the split. This is the regression guard:
 # fact 8 has become a blocking check twice already.

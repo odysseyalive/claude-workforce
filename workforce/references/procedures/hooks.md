@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -36,6 +36,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
 | `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
+| `wf-loop-guard` | `PostToolUse` | *(none)* | **advisory; PROPOSED, and not wired by this command's default set.** Behavioural repetition — the same tool called with byte-identical arguments 3+ times with no distinct edit between them. Nudges; halts only when `WF_LOOP_GUARD_STOP_AT > 0`. § The loop guard below |
 
 **`wf-standing-request` is the one hook that adds context instead of checking something**, and it is
 there because the 2026-08-05 evacuation directive deletes `CLAUDE.md`. That request used to live in the
@@ -190,6 +191,125 @@ names, and nothing else. An absent sidecar means workforce owns nothing here: re
 `disband` does the same as part of its wider sweep. **The hook file itself is not deleted by either** —
 removing a registration is reversible; deleting the file the user installed is not, and `restore` has
 nothing to restore from if the sweep took it.
+
+---
+
+## The loop guard
+
+**Status: PROPOSED, 2026-08-19. It ships with its fixtures and this row; it is not wired.** Wiring is
+the ordinary `/workforce hooks --execute` gesture and stays a separate, deliberate act — the rule that
+nothing ships dormant is satisfied by shipping the wiring path and the wired/orphaned report, not by
+registering a hook on a user's behalf because it happened to land.
+
+`wf-loop-guard` detects **behavioural repetition**: the same tool called with byte-identical arguments,
+three or more times, with no distinct edit or write between them. That is the observable shape of an
+agent that has stopped making progress and is re-reading its way around a wall. Registered at
+`settings.json` scope it fires in the main loop **and inside subagents** — an IC grinding inside a
+spawned agent is precisely the case nobody in the main loop can see.
+
+### What it is not, and cannot become
+
+- **It does not measure context or token usage.** The `PostToolUse` payload carries `session_id`,
+  `transcript_path`, `cwd`, `hook_event_name`, `tool_name`, `tool_input`, `tool_response`, and
+  `tool_use_id`. There is no context percentage and no token count in it. A guard advertised as firing
+  "at 80% context" would be asserting a number the runtime does not hand it, and `references/platform.md`
+  is unambiguous that platform behaviour is measured, never asserted. Repetition is what a hook can
+  actually observe, so repetition is what this measures.
+- **It cannot block a call.** `PostToolUse` runs after the tool ran, so `enforcement.md`'s
+  prevents/detects table governs here exactly as it does for the two sibling hooks. There is no exit-2
+  path and none is attempted.
+- **It cannot spawn anything, or hand off to a fresh context.** A hook is a subprocess reading JSON on
+  stdin. It has no `Agent` tool — a strictly lower ceiling than an IC, which at least *has* one and is
+  denied it (`references/evaluators.md` § The three evaluators, whose tier table gives even the evaluator IC a `no`). Everything below about re-evaluation by a
+  different persona is therefore an **orchestration-layer** obligation, not something this file does.
+
+### The ladder
+
+| Rung | Fires when | Emits | Default |
+|---|---|---|---|
+| 1 — nudge | repeats `>= WF_LOOP_GUARD_NUDGE_AT` | `hookSpecificOutput.additionalContext` | **on**, threshold 3 |
+| 2 — stop | `WF_LOOP_GUARD_STOP_AT > 0` and repeats `>= ` it | `{"continue": false, "stopReason": …}` | **off** (`0`) |
+
+The nudge is advisory and **never halts a working agent by default**. The halting rung is opt-in twice
+over — the hook must be wired, and `WF_LOOP_GUARD_STOP_AT` must be set above zero — because a guard that
+stops an agent doing real work is worse than the loop it guards.
+
+A **distinct edit or write breaks the streak**: the tree changed, so a re-read of it is new information
+rather than a repeat. This is the entire discrimination between thrashing and legitimately repeated
+distinct work, and `fixtures/scripts/loopguard-nudge` and `loopguard-streak-broken` differ by exactly
+that one record so a regression in it fails one of them.
+
+### The nudge is the WEAKEST form of re-evaluation, and it says so
+
+Rung 1 is same-persona self-reflection **in the agent's own context** — a cheap first tap, and nothing
+more. A stuck agent reflecting inside the context that got it stuck is the worst-placed vantage there
+is: it has already committed to a path and will reliably rationalise it. So the nudge does not ask for
+a verdict, it demands articulation — state the goal in one line, name why the previous attempts did not
+achieve it, then pick a different approach **or return `ESCALATE:`**. The exit is part of the text on
+purpose.
+
+**Rounded re-evaluation comes from a different persona, and that is existing doctrine here, not a new
+invention.** `references/personas.md` § Panels already states it: a panel is *"perspective-diverse by
+construction — members are chosen to fail differently, not to agree"*, agreement between two draws from
+the same stance means nothing, and disagreement resolves to the conservative alternative rather than to
+a vote. `references/evaluators.md` supplies the ready-made lenses — `code-evaluator`, `text-eval`,
+`image-eval` — each with a catalog, which is what makes a second opinion a checklist rather than
+another opinion.
+
+### Where the handoff actually happens
+
+When rung 2 fires, or when a nudged agent takes the `ESCALATE:` exit, the reassessment is performed by
+**whoever can spawn** — a department Lead or the main session; per `evaluators.md` no IC and certainly
+no hook can. The receiving persona inherits **the goal, and what was tried and failed as constraints**.
+It does **not** inherit the thrash transcript: the negative results are the valuable part, and the
+rotted context is the thing being escaped. The `stopReason` says this in as many words, so a reader of
+the halt is not left to infer that resuming the same agent is the remedy.
+
+**Diversity, not redundancy — and not everywhere.** Distinct lenses beat N identical reviewers, and a
+panel costs N spawns for diminishing returns. Reserve it for genuine escalation and decision points; a
+nudge is not one. Most nudges should end with the agent changing approach and nothing being spawned at
+all.
+
+### Configuration
+
+Env first, then an optional `.claude/workforce/loop-guard.json` in the project, then the default.
+
+| key | env | default |
+|---|---|---|
+| `nudge_at` | `WF_LOOP_GUARD_NUDGE_AT` | `3` |
+| `stop_at` | `WF_LOOP_GUARD_STOP_AT` | `0` — disabled |
+| `window` | `WF_LOOP_GUARD_WINDOW` | `12` |
+| `stale_secs` | `WF_LOOP_GUARD_STALE_SECS` | `43200` |
+| `state_dir` | *(file only)* | `CLAUDE_CODE_TMPDIR`, else the system temp dir |
+
+**`.claude/workforce/loop-guard.json` has a producer, and this step is it.** When this command wires
+`wf-loop-guard` — `wf-settings-apply --wire-hook wf-loop-guard --execute`, the same gesture as any other
+hook — it also stamps `loop-guard.json` with the resolved defaults if and only if the file is absent,
+and never touches one the user has edited:
+
+```json
+{"nudge_at": 3, "stop_at": 0, "window": 12, "stale_secs": 43200}
+```
+
+Display mode prints that block and writes nothing, exactly as step 6a requires of every write here. An
+artifact with a reader and no writer is the shape `.directives.sha` and `platform-local.md` each shipped
+in; writing the defaults at wiring time is what keeps this one from repeating it, and it is also why
+unwiring leaves the file alone — a config the user has since tuned is theirs, and removing a
+registration is reversible while deleting their settings is not.
+
+State is one JSON file per session under the state dir, replaced atomically, and treated as fresh
+whenever it is unreadable, unparseable, from another session, or older than `stale_secs`. **The project
+file exists because without it the ladder is untestable**: `bin/script-conformance` gives a case a stdin
+payload and a fixture tree and sets no per-case environment, so an env-only threshold could never carry
+a re-runnable test — and a script released on tests nobody can re-run is released on an anecdote. Env
+still wins wherever both are set.
+
+**Fail-open here means SILENT, which is a deliberate divergence from its siblings.**
+`wf-protect-directives` and `wf-unique-persona` hold *never fail-silent*, because they guard the user's
+sacred text on a handful of paths and a false clean is the failure. This hook guards nothing, is
+advisory, and fires on **every** tool call — so an error message per call would itself be the runaway
+loop it exists to detect. `fixtures/scripts/loopguard-badstdin` asserts the silence so it cannot later
+read as drift.
 
 ---
 

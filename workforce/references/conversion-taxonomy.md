@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 25 assertion(s) in bin/check name this file; 60 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 26 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -324,6 +324,74 @@ commands stops working — **which is an argument for adding `/org`, not for del
 each other; deleting as you go leaves dangling references at every intermediate step, and a run that
 dies freezes it there. Marking for deletion is part of each transaction; the sweep is a single step
 after the whole org verifies.
+
+---
+
+## Runaway context — measure proneness, decompose the separable, keep the coherent whole
+
+The dispositions above ask what a skill *is*. Converting existing architecture asks one more thing of
+it: **how prone is it to runaway context** — the long unbroken accumulation Fact 21 measured as
+concentrated in the main loop and present in a real minority of subagents (`platform.md` Fact 21).
+Reducing it is the two-paths separation on a new axis — judgment out, mechanism kept, now applied to
+*length* — so it obeys the same floor and the same judgment discipline the rest of this file does.
+
+### Measure it during the survey — statically, and empirically where the record exists
+
+Runaway-proneness is a reading the survey takes, never an impression it forms. Static tells, each
+nameable on disk:
+
+- a handbook or skill instructing a **long unbroken loop** — "keep going until", "repeat for every" —
+  with no checkpoint or handoff;
+- a **monolithic** agent or skill doing many-tool-call work in one context;
+- an **org shape** funnelling everything into one long-lived thread — one actor owning work that
+  separates.
+
+Where the target project carries transcript history, measure it **empirically by the Fact 21 method**:
+peak context is the maximum over a run's assistant turns of `input + cache_read + cache_creation`, and
+the tool-call count is the number of `tool_use` items; a run whose peak crosses the window, or whose
+tool-calls run into the hundreds, is evidence rather than a worry (`platform.md` Fact 21). The script
+that reads an arbitrary project's transcript store this way is **`wf-runlength`** — the Fact 21 census
+generalised beyond this repo (`procedures/budget.md` § Run length and peak context). Run it where
+transcript history exists; where none does, the static tells stand on their own. State the
+check in the survey report, and never state a count nothing produced (`audit.md` Step 1; `SKILL.md`
+Core Principle 5).
+
+### Convert toward the method — three moves, each with a home already
+
+1. **Decompose separable long-context work into shorter-lived spawns with real isolation boundaries.**
+   The boundary is the point: a spawn returns its **goal and what failed as constraints**, never the
+   thrash transcript — the negative results are the valuable part and the rotted context is the thing
+   being escaped (`procedures/hooks.md` § Where the handoff actually happens).
+2. **Insert handoff / re-evaluation points routed to a DIFFERENT persona.** A stuck context re-reading
+   its own path is the worst-placed vantage there is; a rounded second read is perspective-diverse by
+   construction and arrives with a catalog rather than another opinion. Do not reinvent it —
+   `references/personas.md` § Panels and `references/evaluators.md` supply the lenses.
+3. **Wire the loop guard into the converted project** through the existing gesture
+   (`procedures/hooks.md` § The loop guard, `/workforce hooks --execute`). It observes byte-identical
+   repetition inside a subagent the main loop cannot see (`platform.md` Fact 22); it nudges and cannot
+   prevent, and it cannot spawn — the handoff in move 2 is the orchestration layer's, never the hook's.
+
+### THE JUDGMENT GATE — not every long context is decomposed
+
+**Length is evidence, not a verdict.** Some work is one coherent long task where a handoff loses more
+than it saves — the **lossy-handoff risk**: a summary is not the context it summarises
+(`procedures/hooks.md` § Where the handoff actually happens). Decompose where the length comes from
+**separable subtasks or thrash-prone loops**; for **irreducibly-coherent** long work keep the shape
+intact and wire loop-guard plus re-evaluation instead of cutting it. **A detector that decomposes on
+length alone is a flag with a chainsaw** — it shortens the context by severing the coherence that was
+doing the work. Which of the two a given architecture is, is a JUDGMENT the audit makes per target with
+its reason on disk, exactly as the remainder cut is (§ The cut is a JUDGMENT the audit makes per skill).
+
+### Preservation is the floor here too — a decomposition is a TRANSFORM, verified
+
+Directive one makes preservation the floor, so a decomposition is never accepted on the author's account
+of it: **the converted architecture must still do everything the original did.** This is the
+transform-with-verification that governs a reduction — `INV-REMAINDER` proves nothing was dropped from a
+skill's invocable surface (§ BLOCKING — reduction is a transform) — carried to a wider boundary: a
+decomposition that moves work across a spawn is verified by proving every capability the original reached
+is still reachable, never by asserting it. And it runs **in this run** — the audit converts the
+architecture it measures and never flags-and-defers (`invariants.md` INV-SUCCESSION, INV-CLOSE: no
+standing queue).
 
 ---
 

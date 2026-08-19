@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+"""wf-loop-guard — PostToolUse hook detecting BEHAVIOURAL repetition (a thrash loop).
+
+PROTOTYPE / PROPOSAL, 2026-08-19. It ships with its fixtures and its catalog row;
+it is NOT wired. Registration stays a separate `/workforce hooks --execute`
+gesture, exactly as `procedures/hooks.md` requires of every shipped hook — and
+saying "it is wired" of a hook nobody registered is the overclaim this project
+fails a run over.
+
+WHAT IT DETECTS. The same tool called with byte-identical arguments, three or more
+times, with no distinct edit or write between them. That is the observable shape of
+an agent that has stopped making progress and is re-reading its way around a wall.
+It keys each call by `(tool_name, canonical-JSON of tool_input)` and counts the
+current key backwards through a sliding window, stopping at the first MUTATING call
+— because an edit between two identical reads is progress, not a thrash.
+
+WHAT IT IS NOT. **It does not observe token or context size.** A hook payload
+carries `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `tool_name`,
+`tool_input`, `tool_response`, `tool_use_id` — and no context percentage, no token
+count, no compaction signal. A guard that claimed to fire "at 80% context" would be
+asserting a number the runtime does not hand it (`references/platform.md`: platform
+behaviour is measured, never asserted). Repetition is what a hook can actually see,
+so repetition is what this measures, and the name says so.
+
+WHAT IT CANNOT DO, stated flatly rather than implied:
+
+  1. **It cannot block a call.** `PostToolUse` runs AFTER the tool ran. There is no
+     exit-2 blocking path here and none is attempted — `references/enforcement.md`'s
+     prevents/detects table governs, and the two shipped sibling hooks carry the same
+     sentence for the same reason.
+  2. **It cannot see context fullness.** See above.
+  3. **It cannot perform a fresh-context handoff, and it cannot spawn anything.** A
+     hook is a subprocess reading JSON on stdin; it has no Agent tool and no session
+     to hand to. Re-evaluation by a DIFFERENT persona is an orchestration-layer
+     pattern that sits above this hook. `procedures/hooks.md` § The loop guard states
+     the division: this file is the DETECTOR, the handoff is the org's job.
+
+WHERE IT FIRES. Registered in `settings.json` it fires in the main loop AND inside
+subagents — every `PostToolUse` in the session, including tool calls made by spawned
+agents. That is the point: an IC grinding inside a subagent is the case nobody in the
+main loop can see.
+
+THE LADDER — nudge, then optionally stop. Nothing else.
+
+  rung 1  NUDGE   count >= WF_LOOP_GUARD_NUDGE_AT (default 3)
+                  emits `hookSpecificOutput.additionalContext` demanding the agent
+                  ARTICULATE the goal, name why the previous attempts failed, and
+                  pick a different approach or ESCALATE. Advisory. Never halts.
+  rung 2  STOP    count >= WF_LOOP_GUARD_STOP_AT, and only when that is > 0
+                  emits `{"continue": false, "stopReason": ...}`.
+                  **OFF BY DEFAULT** (`WF_LOOP_GUARD_STOP_AT=0` disables it). A guard
+                  that halts a working agent is worse than the loop it guards, so the
+                  halting rung is opt-in and the wiring gesture is a second opt-in.
+
+THE NUDGE IS THE WEAKEST FORM OF RE-EVALUATION AND THE TEXT ADMITS IT. It asks a
+stuck agent to reflect inside the same context that got it stuck — the worst-placed
+vantage there is, because it rationalises the path already committed to. Real
+re-evaluation comes from a different persona (`references/personas.md` § Panels:
+members are chosen to fail differently, not to agree). This hook cannot convene that,
+so the nudge offers `ESCALATE:` as the exit and rung 2's `stopReason` names the
+handoff. Both exits point OUT of the stuck context; neither pretends self-review is
+the answer.
+
+FAIL-OPEN, AND HERE THAT MEANS SILENT — a deliberate divergence from its siblings.
+`wf-protect-directives` and `wf-unique-persona` hold "never fail-silent": an empty
+parse result must never produce an empty report, because they guard the user's sacred
+text and a false clean is the failure. **This hook guards nothing.** It is advisory,
+it fires on EVERY tool call rather than on edits to a handful of paths, and an error
+message emitted per tool call would itself be the runaway loop. So: any error, any
+unreadable state, any unparseable payload -> exit 0, emit nothing. The cost of that
+silence is a missed nudge; the cost of the alternative is a hook that spams the
+session it exists to help. The divergence is named here so it cannot read as drift.
+
+STATE. Cross-invocation, one file per session, JSON, keyed by `session_id`:
+
+    <state-dir>/wf-loop-guard-<session_id>.json
+
+Written by `os.replace` over a same-directory temp file, so a concurrent reader sees
+the old file or the new one and never a half-written one — "concurrent-safe-enough"
+for a per-session sliding window where a lost sample costs one delayed nudge.
+Tolerant by construction: unreadable, unparseable, wrong-session, wrong-version, or
+older than `stale_seconds` (default 12h) all mean "start a fresh window", never
+"crash" and never "trust it anyway".
+
+CONFIGURATION — env first, then an optional project file, then the default.
+
+  | key         | env                        | default | meaning                        |
+  |-------------|----------------------------|---------|--------------------------------|
+  | nudge_at    | WF_LOOP_GUARD_NUDGE_AT     | 3       | repeats before the nudge       |
+  | stop_at     | WF_LOOP_GUARD_STOP_AT      | 0       | repeats before STOP; 0 = off   |
+  | window      | WF_LOOP_GUARD_WINDOW       | 12      | sliding window length          |
+  | stale_secs  | WF_LOOP_GUARD_STALE_SECS   | 43200   | age after which state is fresh |
+  | state_dir   | (see below)                | tmp     | where the state file lives     |
+
+State dir resolves: project file `state_dir` (relative -> under `CLAUDE_PROJECT_DIR`),
+then `CLAUDE_CODE_TMPDIR`, then the system temp dir.
+
+**The project file is `$CLAUDE_PROJECT_DIR/.claude/workforce/loop-guard.json`, and it
+exists for a reason worth stating: without it this ladder is UNTESTABLE.** The shipped
+fixture harness (`bin/script-conformance`) hands a case exactly two levers — the stdin
+payload and a fixture tree at `CLAUDE_PROJECT_DIR` — and sets no per-case environment.
+An env-only guard could therefore never have a re-runnable test for its threshold, its
+STOP rung, or its stale-state branch, and would ship on a prose anecdote. `bin/check`
+already refuses that: *"a script released on tests nobody can re-run is released on an
+anecdote."* Env still WINS over the file wherever both are set, so the documented
+env-var interface is unchanged; the file only supplies defaults and the state
+location. It is absent from a normal install and nothing is created if it is missing.
+
+Takes NO arguments. `sys.argv` is ignored, as in both sibling hooks — a hook is invoked
+by the harness with a payload on stdin and nothing else, so there is no `--root` here
+to be passed empty.
+"""
+
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+
+STATE_VERSION = 1
+
+# Calls worth counting: re-running one of these with identical arguments produces the
+# same answer it produced last time, which is the definition of a no-op repeat.
+OBSERVATIONAL = {
+    "Read", "Grep", "Glob", "LS", "NotebookRead", "WebFetch", "WebSearch", "Bash",
+}
+# A distinct edit/write BREAKS the streak: the tree changed, so a re-read of it is
+# new information rather than a repeat. Never counted as a thrash in its own right.
+MUTATING = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+
+# The one field worth naming back to the agent, per tool, so the nudge says WHAT was
+# repeated instead of only how often.
+BRIEF_FIELDS = ("file_path", "pattern", "command", "url", "query", "path", "notebook_path")
+
+DEFAULTS = {"nudge_at": 3, "stop_at": 0, "window": 12, "stale_secs": 43200}
+
+SESSION_SAFE = re.compile(r"[^A-Za-z0-9._-]")
+
+NUDGE_BODY = (
+    "Repeating an identical call rarely yields new information. Before continuing: "
+    "(1) state in one line what you are trying to find or achieve; (2) name why the "
+    "previous attempts did not achieve it; (3) choose a DIFFERENT approach, or return "
+    "`ESCALATE: <one line>` to your manager. Do not repeat the same call."
+)
+
+
+def canonical(tool_input):
+    """Byte-stable rendering of the arguments. Same args -> same string, always."""
+    return json.dumps(tool_input, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def call_key(tool_name, tool_input):
+    """`<tool> <canonical-json>` — hand-readable on purpose.
+
+    A hash would be shorter and would make the state file unreviewable and every
+    fixture unwritable by hand. This file is per-session scratch, not a wire format.
+    """
+    return f"{tool_name} {canonical(tool_input)}"
+
+
+def brief_of(tool_name, tool_input):
+    """One line naming what was repeated, truncated. Never the whole payload."""
+    if isinstance(tool_input, dict):
+        for field in BRIEF_FIELDS:
+            val = tool_input.get(field)
+            if isinstance(val, str) and val.strip():
+                val = " ".join(val.split())
+                return f"{tool_name} {field}={val[:120]}"
+    return tool_name
+
+
+def _int_from(raw, fallback):
+    try:
+        return max(0, int(str(raw).strip()))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def project_config(project_dir):
+    """`.claude/workforce/loop-guard.json`, or {} — absent and malformed read alike."""
+    if not project_dir:
+        return {}
+    path = os.path.join(project_dir, ".claude", "workforce", "loop-guard.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def settings(project_dir):
+    """(config dict, state directory). Env wins; the file supplies defaults."""
+    cfg_file = project_config(project_dir)
+    cfg = {}
+    for key, default in DEFAULTS.items():
+        env = os.environ.get("WF_LOOP_GUARD_" + key.upper())
+        if env is not None and env.strip() != "":
+            cfg[key] = _int_from(env, default)
+        else:
+            cfg[key] = _int_from(cfg_file.get(key, default), default)
+    # A nudge threshold below 2 would fire on the first call of every session.
+    cfg["nudge_at"] = max(2, cfg["nudge_at"])
+    cfg["window"] = max(cfg["window"], cfg["nudge_at"], cfg["stop_at"], 2)
+
+    state_dir = cfg_file.get("state_dir")
+    if isinstance(state_dir, str) and state_dir.strip():
+        state_dir = os.path.expanduser(state_dir)
+        if not os.path.isabs(state_dir):
+            state_dir = os.path.join(project_dir or os.getcwd(), state_dir)
+    else:
+        state_dir = os.environ.get("CLAUDE_CODE_TMPDIR") or tempfile.gettempdir()
+    return cfg, state_dir
+
+
+def state_path(state_dir, session_id):
+    safe = SESSION_SAFE.sub("_", session_id)[:96] or "unkeyed"
+    return os.path.join(state_dir, f"wf-loop-guard-{safe}.json")
+
+
+def load_state(path, session_id, stale_secs, now):
+    """The window, or a fresh one. Every unusable state reads as fresh, never as fatal."""
+    fresh = {"version": STATE_VERSION, "session": session_id, "updated": now, "calls": []}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            state = json.load(fh)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return fresh
+    if not isinstance(state, dict):
+        return fresh
+    if state.get("version") != STATE_VERSION or state.get("session") != session_id:
+        return fresh
+    if not isinstance(state.get("calls"), list):
+        return fresh
+    try:
+        age = now - float(state.get("updated", 0))
+    except (TypeError, ValueError):
+        return fresh
+    if age < 0 or age > stale_secs:
+        # A session id reused after half a day, or a clock that moved. Either way the
+        # old window describes work that is over; counting against it would nudge for
+        # a loop nobody is in.
+        return fresh
+    state["calls"] = [c for c in state["calls"] if isinstance(c, dict) and "key" in c]
+    return state
+
+
+def save_state(path, state):
+    """Atomic within the directory. A failure to persist is a lost sample, never an error."""
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", prefix=".wf-loop-guard-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(state, fh)
+            os.replace(tmp, path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def streak(calls, key):
+    """Repeats of `key`, counting backwards, stopping at the first distinct mutation.
+
+    NEAR-consecutive, not strictly consecutive: other observational calls interleaved
+    between the repeats do not reset the count, because an agent that alternates two
+    identical reads is in the same loop as one that repeats a single read. Only an
+    edit or write breaks it, and that is the whole discrimination between "thrashing"
+    and "legitimately repeated distinct work".
+    """
+    count = 0
+    for record in reversed(calls):
+        if record.get("tool") in MUTATING and record.get("key") != key:
+            break
+        if record.get("key") == key:
+            count += 1
+    return count
+
+
+def emit(obj):
+    print(json.dumps(obj))
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except ValueError:
+        return 0                      # fail-open, and here that means silent
+    if not isinstance(payload, dict):
+        return 0
+
+    tool_name = payload.get("tool_name") or ""
+    tool_input = payload.get("tool_input")
+    if not tool_name or (tool_name not in OBSERVATIONAL and tool_name not in MUTATING):
+        return 0
+    if tool_input is None:
+        tool_input = {}
+
+    session_id = str(payload.get("session_id")
+                     or os.path.basename(str(payload.get("transcript_path") or ""))
+                     or "unkeyed")
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
+    cfg, state_dir = settings(project_dir)
+    now = time.time()
+
+    path = state_path(state_dir, session_id)
+    state = load_state(path, session_id, cfg["stale_secs"], now)
+
+    key = call_key(tool_name, tool_input)
+    brief = brief_of(tool_name, tool_input)
+    state["calls"] = (state["calls"] + [{"key": key, "tool": tool_name, "brief": brief}])[-cfg["window"]:]
+    state["updated"] = now
+    save_state(path, state)
+
+    # A mutation is recorded so it can BREAK a later streak, and is never itself a
+    # thrash: two identical writes are two writes, and the tree changed both times.
+    if tool_name in MUTATING:
+        return 0
+
+    count = streak(state["calls"], key)
+
+    if cfg["stop_at"] > 0 and count >= cfg["stop_at"]:
+        emit({
+            "continue": False,
+            "stopReason": (
+                f"wf-loop-guard: {tool_name} called {count}x with identical arguments; "
+                f"halting to prevent a runaway loop. {brief}. Hand off to a different "
+                f"evaluator persona with the goal and what was already tried and failed, "
+                f"rather than resuming this agent in the context that produced the loop."
+            ),
+        })
+        return 0
+
+    if count >= cfg["nudge_at"]:
+        emit({
+            "hookSpecificOutput": {
+                "hookEventName": payload.get("hook_event_name") or "PostToolUse",
+                "additionalContext": (
+                    f"wf-loop-guard: {tool_name} has now been called {count}x with "
+                    f"identical arguments ({brief}). {NUDGE_BODY}"
+                ),
+            }
+        })
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:  # noqa: BLE001 — fail-open is the contract; see the docstring
+        sys.exit(0)

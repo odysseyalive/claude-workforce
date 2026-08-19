@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""wf-runlength — how long agents actually run, and how much context they peak at.
+
+THE EMPIRICAL TWIN OF `wf-context`. That script measures what a spawn *will*
+receive from files on disk, and its token figures are `bytes / 4`, labelled
+approximate, because this project ships no tokenizer. This one measures what runs
+*actually did* receive, from the token counts the harness itself recorded in
+`message.usage` — real numbers, not an approximation. Neither replaces the other:
+`wf-context` answers "what is in the window before any work order" for an org that
+has never run, and this answers "how big did it get" for one that has.
+
+It exists because `conversion-taxonomy.md` § Runaway context asks the survey to
+read runaway-context proneness **empirically where the record exists**, and until
+this shipped that read was done by hand.
+
+THE COMPUTATION IS FACT 21's, UNCHANGED — see `references/platform.md` Fact 21 and
+its evidence file `measurements/2026-08-19-agent-run-length-context.md`
+(census of 223 subagent and 52 main-session transcripts, Claude Code 2.1.233). The
+numbers this prints must reconcile with that census when pointed at the same store,
+which is the whole reason the method is copied rather than improved:
+
+    peak context  per transcript, the MAXIMUM over its assistant turns of
+                  input_tokens + cache_read_input_tokens + cache_creation_input_tokens
+                  read from `message.usage`; a missing field counts 0. It is a
+                  maximum, not a time-average — the number a window limit or a
+                  compaction trigger actually sees.
+    tool-calls    per transcript, the count of content items of type `tool_use`
+                  across its assistant messages. Every tool, built-in and MCP, and
+                  NOT deduplicated by tool name.
+    percentiles   NEAREST-RANK, stated here because a fixture cannot be
+                  deterministic against an unstated method: sort ascending and take
+                  the 1-based element at index ceil(p * n), clamped into range. No
+                  interpolation. n=4 therefore gives p50 = the 2nd value, p90 = the
+                  4th. Means are arithmetic.
+
+TWO LAYERS, REPORTED SEPARATELY AND NEVER POOLED. Fact 21's finding is precisely
+the difference between them — subagents are not uniformly short, and main sessions
+run past a 200k window at the median — and one merged distribution destroys it.
+
+    SUBAGENTS      <store>/*/subagents/agent-*.jsonl
+    MAIN SESSIONS  <store>/*.jsonl        (top level only, so `subagents/` and
+                                           `memory/` are excluded by construction)
+
+REPORTS; NEVER REPAIRS. Read-only. It opens transcripts and writes nothing except
+the `--json` file it is explicitly asked for.
+
+THE FORMAT IS INTERNAL AND VERSION-UNSTABLE, and this script is built around that
+rather than in spite of it (SKILL.md Core Principle 9b — measurements expire). The
+transcript JSONL is not a documented interface; fields may move or vanish between
+harness releases. So: a line that will not parse is SKIPPED AND COUNTED, never
+fatal; a record with no `usage` contributes 0 rather than crashing; and the report
+prints both the harness version(s) observed in the store itself (each record
+carries `version`) and the version the method was validated against. A run whose
+observed version has moved far from the validated one is telling you to re-read
+the method before trusting the numbers.
+
+    exit 0  measured — including a store that is present but empty, which reports
+            n=0 rather than silently omitting a layer
+    exit 2  could not read the store at all, or an unreadable transcript file
+
+WHERE THE STORE IS. `--transcripts DIR` is the primary interface and the robust
+one. `--root PATH` is a convenience that DERIVES the store directory from the
+project path, and the derivation is a HARNESS-INTERNAL HEURISTIC that may change
+without notice: observed 2026-08-19, `/home/u/lab/proj` is stored at
+`<config>/projects/-home-u-lab-proj`, i.e. `/` and `.` become `-`. Paths using
+other characters are NOT reproduced here. When the derived directory is absent this
+FAILS CLEAN and names `--transcripts` — it never falls back to guessing, because a
+census of the wrong store reads exactly like a census of the right one.
+
+RELATIVE PATHS IN `--transcripts` AND `--json` RESOLVE AGAINST `--root`, the same
+rule `wf-remainder` applies to its file arguments. An absolute path is used as
+given.
+
+Usage
+    wf-runlength [--root DIR] [--transcripts DIR] [--json PATH] [--quiet]
+"""
+
+import argparse
+import glob
+import json
+import math
+import os
+import sys
+
+# The harness the method above was validated on: the Fact 21 census
+# (`measurements/2026-08-19-agent-run-length-context.md`) read a real 275-transcript
+# store on this version. It is provenance for the METHOD, not a platform constant —
+# platform.md § Derived constants owns those, and this file restates none of them.
+VALIDATED_ON = "2.1.233"
+
+# Fact 21 reports crossings because the median main session already peaks past a
+# 200k window. The three rungs are the ones the census printed for subagents.
+THRESHOLDS = (100_000, 150_000, 200_000)
+PERCENTILES = (0.50, 0.75, 0.90, 0.99)
+
+
+def config_root():
+    """Personal config root. Claude Code relocates the whole ~/.claude tree via
+    $CLAUDE_CONFIG_DIR (scopes.md § Installing into a specific CLAUDE_CONFIG_DIR), so
+    the transcript store must be looked for there, not under a hardcoded ~/.claude."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
+
+def under_root(root, p):
+    """A relative path argument is relative to --root, absolute is used as given."""
+    return p if os.path.isabs(p) else os.path.join(root, p)
+
+
+def store_name(project_path):
+    """The store directory name Claude Code uses for a project path.
+
+    HEURISTIC, and labelled one everywhere it is used. Observed 2026-08-19 on
+    2.1.233: `/` and `.` both become `-`. A path containing anything else this does
+    not model, and the caller's recourse is `--transcripts`, which is why the
+    failure path names that flag instead of trying a second guess.
+    """
+    return project_path.replace("/", "-").replace(".", "-")
+
+
+def derive_store(root):
+    """Candidate store directories for a project root, in resolution order."""
+    name = store_name(os.path.abspath(root))
+    out = []
+    # $CLAUDE_CONFIG_DIR relocates the whole tree, but it is USUALLY UNSET, in which
+    # case config_root() already returns ~/.claude and the two candidates are the same
+    # path. Printing it twice in the failure message would read as two tries and
+    # invite the reader to look for a difference that is not there.
+    for base in (config_root(), os.path.expanduser("~/.claude")):
+        p = os.path.join(base, "projects", name)
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def measure_file(path, state):
+    """(tool_calls, peak_context_tokens) for one transcript.
+
+    Every tolerance here is deliberate and is the reason exit 0 survives a format
+    change: an unparseable line is counted in `state["skipped"]` and skipped, a
+    record that is not an assistant turn is ignored, and a missing usage field is 0.
+    Only an unreadable FILE is an error, because that is the one case where the
+    number reported would be wrong rather than merely incomplete.
+    """
+    calls, peak = 0, 0
+    try:
+        fh = open(path, encoding="utf-8", errors="replace")
+    except OSError as exc:
+        state["unreadable"].append(f"{path}: {type(exc).__name__}")
+        return None
+    with fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except (ValueError, TypeError):
+                state["skipped"] += 1
+                state["skipped_files"].add(path)
+                continue
+            if not isinstance(rec, dict):
+                state["skipped"] += 1
+                state["skipped_files"].add(path)
+                continue
+            ver = rec.get("version")
+            if isinstance(ver, str) and ver:
+                state["versions"].add(ver)
+            msg = rec.get("message")
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            usage = msg.get("usage")
+            if isinstance(usage, dict):
+                total = 0
+                for k in ("input_tokens", "cache_read_input_tokens",
+                          "cache_creation_input_tokens"):
+                    v = usage.get(k, 0)
+                    if isinstance(v, bool) or not isinstance(v, (int, float)):
+                        continue
+                    total += int(v)
+                peak = max(peak, total)
+            content = msg.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "tool_use":
+                        calls += 1
+    return calls, peak
+
+
+def pct(values, p):
+    """NEAREST-RANK order statistic: a[ceil(p*n)], 1-based, clamped.
+
+    Stated in the docstring and implemented in one place so the fixture's expected
+    numbers are derivable by hand. Interpolating percentiles would give different
+    answers on the same data and would silently stop reconciling with Fact 21.
+    """
+    n = len(values)
+    if not n:
+        return None
+    k = min(max(int(math.ceil(p * n)), 1), n)
+    return values[k - 1]
+
+
+def distribution(rows, key):
+    vals = sorted(r[key] for r in rows)
+    n = len(vals)
+    out = {f"p{int(p * 100)}": pct(vals, p) for p in PERCENTILES}
+    out["max"] = vals[-1] if n else None
+    out["mean"] = round(sum(vals) / n, 1) if n else None
+    return out
+
+
+def crossings(rows):
+    n = len(rows)
+    out = {}
+    for t in THRESHOLDS:
+        c = sum(1 for r in rows if r["peak_context"] >= t)
+        out[str(t)] = {"count": c, "of": n, "pct": round(100 * c / n) if n else 0}
+    return out
+
+
+def layer(store, pattern, state):
+    rows = []
+    for path in sorted(glob.glob(os.path.join(store, pattern))):
+        if not os.path.isfile(path):
+            continue
+        got = measure_file(path, state)
+        if got is None:
+            continue
+        calls, peak = got
+        rows.append({"transcript": os.path.relpath(path, store),
+                     "tool_calls": calls, "peak_context": peak})
+    return {
+        "n": len(rows),
+        "selector": pattern,
+        "tool_calls": distribution(rows, "tool_calls"),
+        "peak_context": distribution(rows, "peak_context"),
+        "crossings": crossings(rows),
+        # Always every row, including the zeroes. A distribution without the
+        # transcripts behind it cannot be reproduced by hand, and Core Principle 10
+        # says a census is a claim about the instrument too.
+        "transcripts": sorted(rows, key=lambda r: -r["peak_context"]),
+    }
+
+
+def fmt_row(label, d, comma):
+    if d["max"] is None:
+        return f"    {label:<14} no transcripts — no distribution to report"
+    def f(v):
+        return f"{v:,}" if comma else f"{v}"
+    parts = [f"p{int(p * 100)} {f(d[f'p{int(p * 100)}'])}" for p in PERCENTILES]
+    parts.append(f"max {f(d['max'])}")
+    parts.append(f"mean {d['mean']:,.1f}" if comma else f"mean {d['mean']:.1f}")
+    return f"    {label:<14} " + " · ".join(parts)
+
+
+def fmt_crossings(c):
+    if not c or all(v["of"] == 0 for v in c.values()):
+        return "    crossed        no transcripts — nothing crossed and nothing did not"
+    bits = [f"{c[str(t)]['count']}/{c[str(t)]['of']} ({c[str(t)]['pct']}%) >={t // 1000}k"
+            for t in THRESHOLDS]
+    return "    crossed        " + " · ".join(bits)
+
+
+def report(payload):
+    print(f"wf-runlength — {payload['transcripts_dir']}")
+    print(f"  source     {payload['source']}")
+    print(f"  format     transcript JSONL is INTERNAL and version-unstable; method "
+          f"validated on Claude Code {VALIDATED_ON}")
+    obs = payload["observed_versions"]
+    print(f"             harness version(s) recorded in this store: "
+          + (", ".join(obs) if obs else "none recorded"))
+    print("  method     peak = max over assistant turns of input + cache_read + "
+          "cache_creation (message.usage)")
+    print("             tool-calls = count of tool_use items; percentiles are "
+          "NEAREST-RANK a[ceil(p*n)]")
+    for title, key in (("SUBAGENTS", "subagents"), ("MAIN SESSIONS", "main_sessions")):
+        lay = payload["layers"][key]
+        print(f"\n  {title:<14} n={lay['n']}   {lay['selector']}")
+        print(fmt_row("tool-calls", lay["tool_calls"], comma=False))
+        print(fmt_row("peak context", lay["peak_context"], comma=True))
+        print(fmt_crossings(lay["crossings"]))
+    print()
+    if payload["skipped_lines"]:
+        print(f"  skipped {payload['skipped_lines']} unparseable line(s) in "
+              f"{payload['skipped_files']} file(s) — the format is version-unstable, so "
+              f"a line this version cannot read is TOLERATED and counted, never fatal")
+    for u in payload["unreadable"]:
+        print(f"  ! unreadable {u}")
+    print("  REPORTS; NEVER REPAIRS — nothing in the store was modified")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-runlength")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--transcripts", dest="transcripts")
+    ap.add_argument("--json", dest="json_path")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so an
+    # is-it-a-directory guard passes and the tool derives a store from a tree nobody
+    # named. Here that is worse than in the sibling scripts: the derived store would
+    # almost certainly not exist, and a caller reading `pass --transcripts` would be
+    # sent to fix the wrong end of the problem.
+    if not (args.root or "").strip():
+        print("wf-runlength: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a "
+              "hook; pass an explicit path.", file=sys.stderr)
+        return 2
+
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-runlength: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    if args.transcripts is not None and not args.transcripts.strip():
+        print("wf-runlength: --transcripts is empty. Pass the transcript store "
+              "directory, or omit the flag to derive it from --root.", file=sys.stderr)
+        return 2
+
+    if args.transcripts:
+        store = os.path.abspath(under_root(root, args.transcripts))
+        source = "given by --transcripts"
+        if not os.path.isdir(store):
+            print(f"wf-runlength: not a transcript store: {store}", file=sys.stderr)
+            return 2
+    else:
+        candidates = derive_store(root)
+        store = next((c for c in candidates if os.path.isdir(c)), None)
+        source = f"derived from --root {root} (harness-internal encoding, may change)"
+        if store is None:
+            # NEVER GUESS SILENTLY. The encoding is not a documented interface, so an
+            # absent directory means "the heuristic did not reproduce it" at least as
+            # often as it means "this project has no history". Reporting an empty
+            # census for either would be a measurement of nothing that reads clean.
+            print("wf-runlength: no transcript store found for this project.",
+                  file=sys.stderr)
+            for c in candidates:
+                print(f"  tried: {c}", file=sys.stderr)
+            print("  The store-directory name is a HARNESS-INTERNAL heuristic and can "
+                  "change. Pass --transcripts DIR with the real path rather than "
+                  "trusting this derivation.", file=sys.stderr)
+            return 2
+
+    state = {"skipped": 0, "skipped_files": set(), "versions": set(), "unreadable": []}
+    layers = {
+        "subagents": layer(store, os.path.join("*", "subagents", "agent-*.jsonl"), state),
+        "main_sessions": layer(store, "*.jsonl", state),
+    }
+    payload = {
+        "root": root,
+        "transcripts_dir": store,
+        "source": source,
+        "method": {
+            "peak_context": "max over assistant turns of input_tokens + "
+                            "cache_read_input_tokens + cache_creation_input_tokens",
+            "tool_calls": "count of tool_use content items in assistant messages",
+            "percentile": "nearest-rank, 1-based a[ceil(p*n)], no interpolation",
+        },
+        "validated_on": VALIDATED_ON,
+        "observed_versions": sorted(state["versions"]),
+        "layers": layers,
+        "skipped_lines": state["skipped"],
+        "skipped_files": len(state["skipped_files"]),
+        "unreadable": state["unreadable"],
+    }
+
+    if args.json_path:
+        with open(under_root(root, args.json_path), "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+
+    if not args.quiet:
+        report(payload)
+    return 2 if state["unreadable"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

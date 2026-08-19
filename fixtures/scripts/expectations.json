@@ -885,6 +885,133 @@
       "0 failed"
     ]
   },
+  "loopguard-badstdin": {
+    "_why": "FAIL-OPEN on a malformed payload, and DELIBERATELY SILENT -- the opposite of hook-badstdin/persona-badstdin, which must say `NOT verified`. Those two guard the user's sacred text on a handful of paths, where a false clean is the failure. This one is advisory and fires on EVERY tool call, so an error message per call would itself be the runaway loop it exists to detect. The divergence is asserted here so it cannot later read as drift.",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "hookSpecificOutput",
+      "additionalContext",
+      "continue",
+      "stopReason"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "not json at all",
+    "want": []
+  },
+  "loopguard-corruptstate": {
+    "_why": "The state file on disk is `{{{ this is not json`. FAIL-OPEN means the hook exits 0 and emits nothing, and stale-file tolerance means it REPLACES the garbage with a fresh window rather than carrying it. `after` is what makes those two claims separable: silent-and-recovered and silent-and-dead look the same on stdout, and a guard that leaves the corrupt file in place is silent forever afterwards.",
+    "after": {
+      ".claude/workforce/tmp/wf-loop-guard-sess-corrupt.json": {
+        "not": [
+          "this is not json"
+        ],
+        "want": [
+          "/repo/notes.md",
+          "sess-corrupt"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "continue",
+      "stopReason",
+      "Traceback"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-corrupt\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/notes.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": []
+  },
+  "loopguard-distinct": {
+    "_why": "THE NEGATIVE HALF OF THE PAIR, and the one that fails if the detector ever stops discriminating. Window holds two DISTINCT prior calls; the third is distinct again, so the streak is 1 and the hook must say NOTHING -- a loop guard that nudges on ordinary distinct work is noise on every tool call and gets muted, which is the only failure mode that matters more than missing a loop. `after` asserts the state file was still WRITTEN while silent: silence and not-running produce identical stdout, and only the artifact tells them apart.",
+    "after": {
+      ".claude/workforce/tmp/wf-loop-guard-sess-distinct.json": {
+        "not": [],
+        "want": [
+          "/repo/c.md",
+          "sess-distinct"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "continue",
+      "stopReason",
+      "Traceback"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-distinct\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/c.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": []
+  },
+  "loopguard-nudge": {
+    "_why": "THE POSITIVE HALF. Two identical Reads seeded, a third arrives, WF_LOOP_GUARD_NUDGE_AT defaults to 3 -- so rung 1 fires and rung 2 does not. The `want` list checks the NUDGE TEXT, not only that something was emitted: the nudge exists to force articulation (goal, why the last attempts failed, a different approach or ESCALATE), and a regression that reduced it to `repeated 3x` would still be a nudge and would still be useless. `not` pins that the advisory rung never halts while STOP_AT is 0.",
+    "exit": 0,
+    "not": [
+      "\"continue\": false",
+      "stopReason"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-nudge\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/notes.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": [
+      "hookSpecificOutput",
+      "PostToolUse",
+      "additionalContext",
+      "wf-loop-guard: Read has now been called 3x with identical arguments",
+      "/repo/notes.md",
+      "Repeating an identical call rarely yields new information",
+      "state in one line what you are trying to find or achieve",
+      "name why the previous attempts did not achieve it",
+      "ESCALATE:"
+    ]
+  },
+  "loopguard-stale": {
+    "_why": "Identical seed to loopguard-nudge except `updated` is epoch 1.0, older than the 12h stale horizon this tree leaves at its default. A session id reused after half a day describes work that is over, so the window must reset and the third identical Read must be counted as the first. Without this the guard nudges about a loop nobody is in, on the first tool call of a fresh session.",
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "continue",
+      "stopReason"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-stale\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/notes.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": []
+  },
+  "loopguard-stop": {
+    "_why": "Rung 2, which is OFF unless stop_at is set above 0 -- this fixture's tree sets stop_at=4 and seeds three identical Reads, so the fourth halts. Exit stays 0: the halt is carried by the `continue: false` payload, never by an exit code, because a PostToolUse exit 2 cannot undo the call that already ran. The stopReason must name the handoff to a different persona; a halt that tells the agent to resume itself returns it to the context that produced the loop.",
+    "exit": 0,
+    "not": [
+      "additionalContext",
+      "hookSpecificOutput"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-stop\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/notes.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": [
+      "\"continue\": false",
+      "stopReason",
+      "wf-loop-guard: Read called 4x with identical arguments",
+      "halting to prevent a runaway loop",
+      "/repo/notes.md",
+      "different evaluator persona"
+    ]
+  },
+  "loopguard-streak-broken": {
+    "_why": "Differs from loopguard-nudge by EXACTLY ONE seeded entry: a Write between the identical Reads. Same tool, same arguments, same count of repeats -- and it must be silent, because an edit between two reads means the tree changed and the re-read is new information rather than a repeat. This is the whole discrimination between thrashing and legitimately repeated distinct work, and the two cases isolate it to that one record.",
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "continue",
+      "stopReason"
+    ],
+    "script": "wf-loop-guard",
+    "stdin_raw": "{\"session_id\": \"sess-broken\", \"hook_event_name\": \"PostToolUse\", \"cwd\": \"/repo\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"/repo/notes.md\"}, \"tool_response\": {\"ok\": true}, \"tool_use_id\": \"tu_1\"}",
+    "want": []
+  },
   "permissions-apply": {
     "args": [
       "--apply"
@@ -1643,6 +1770,136 @@
       "origin: 1 open vs 0 close"
     ]
   },
+  "runlength-emptyroot": {
+    "_why": "AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD. ${CLAUDE_PROJECT_DIR} is unset in the Bash tool, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`; os.path.abspath(\"\") is the CWD, a real directory, so an is-it-a-directory guard passes. Here the damage is one step worse than in the sibling scripts: the empty root would be ENCODED into a store-directory name, the derivation would fail, and the caller would be told to pass --transcripts -- sent to fix the wrong end of the problem entirely. The harness passes --root <tree> first, so the empty value in `args` is the one argparse keeps.",
+    "args": [
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "not": [
+      "SUBAGENTS",
+      "no transcript store found",
+      "Traceback"
+    ],
+    "script": "wf-runlength",
+    "want": [
+      "--root is empty",
+      "${CLAUDE_PROJECT_DIR} is unset",
+      "pass an explicit path"
+    ]
+  },
+  "runlength-emptystore": {
+    "_why": "A STORE THAT EXISTS AND IS EMPTY IS A MEASUREMENT, and it must not read like the could-not-find-it case. wf-context's sibling rule -- 'a zero is a measurement, an org with no employees still reports' -- applied to a distribution: n=0 prints both layers and says no distribution to report, at exit 0. `not` forbids `p50 0` and `0/0`, which is what a reader that computed statistics over an empty list would emit: a printed p50 of zero is a claim that runs were measured and were small, which is the opposite of the truth here.",
+    "args": [
+      "--transcripts",
+      "store"
+    ],
+    "exit": 0,
+    "not": [
+      "p50 0",
+      "0/0",
+      "Traceback",
+      "mean 0.0"
+    ],
+    "script": "wf-runlength",
+    "want": [
+      "SUBAGENTS      n=0",
+      "MAIN SESSIONS  n=0",
+      "no transcripts \u2014 no distribution to report",
+      "nothing crossed and nothing did not",
+      "harness version(s) recorded in this store: none recorded"
+    ]
+  },
+  "runlength-noderive": {
+    "_why": "THE NEGATIVE HALF THE DESIGN TURNS ON. The store-directory name is a HARNESS-INTERNAL encoding of the project path and can change without notice, so an absent derived directory means 'the heuristic did not reproduce it' at least as often as it means 'this project has no history'. Censusing nothing would print n=0 twice and exit 0 -- indistinguishable from runlength-emptystore above, and a clean-reading report about a store nobody found. It must exit 2, print the path it tried, say the encoding is a heuristic, and name --transcripts as the recourse. `not` forbids `SUBAGENTS` and `n=0`: emitting any part of the report on this path is the silent guess the guard exists to refuse.",
+    "args": [],
+    "exit": 2,
+    "not": [
+      "SUBAGENTS",
+      "n=0",
+      "Traceback",
+      "REPORTS; NEVER REPAIRS"
+    ],
+    "script": "wf-runlength",
+    "want": [
+      "no transcript store found for this project",
+      "tried:",
+      "HARNESS-INTERNAL heuristic and can change",
+      "Pass --transcripts DIR"
+    ]
+  },
+  "runlength-nostore": {
+    "_why": "--transcripts naming something that is not a directory must exit 2 and NAME THE PATH, resolved. The flag is the documented recourse from runlength-noderive, so a silent or unnamed failure here strands the caller with nowhere left to go. It also pins that a relative --transcripts resolves against --root (wf-remainder's rule for its file arguments) rather than against the caller's CWD -- the resolved path is what appears.",
+    "args": [
+      "--transcripts",
+      "store"
+    ],
+    "exit": 2,
+    "not": [
+      "SUBAGENTS",
+      "Traceback",
+      "REPORTS; NEVER REPAIRS"
+    ],
+    "script": "wf-runlength",
+    "want": [
+      "not a transcript store:",
+      "runlength-nostore/store"
+    ]
+  },
+  "runlength-store": {
+    "_why": "THE POSITIVE HALF, and the case that pins the COMPUTATION rather than the exit code. The synthetic store is hand-built so every printed number is derivable by hand: subagent peaks are 50,000 / 100,000 / 150,000 / 250,000 and tool-calls 1 / 2 / 3 / 10, main-session peaks 180,000 / 900,000 and tool-calls 5 / 120. Nearest-rank at n=4 puts p50 on the 2nd value and p90/p99/max on the 4th, so the whole percentile row is asserted as one substring -- an interpolating percentile, or a reader that took the LAST assistant turn instead of the MAX, changes it. agent-1's max is on its FIRST turn and agent-4's on its SECOND, so either direction of that bug fires. `160,000` is forbidden because it is the mean a reader that pooled the two layers would print, and pooling is the one thing Fact 21's finding cannot survive. n=2 main sessions is the assertion that `memory/notes.jsonl` -- which carries 999 tool_use items and a 2,999,997-token turn -- was NOT read as a session, and `999` / `2,999,997` are forbidden for that reason. Two unparseable lines in agent-3 and one usage-less assistant turn in agent-2 are tolerated and COUNTED at exit 0, because the transcript format is internal and version-unstable (Core Principle 9b); `Traceback` is forbidden to pin that tolerance. `after` asserts the --json form separately: a script that prints correctly while writing the wrong artifact is the same defect one step further on. Measured 2026-08-19 against the real store this method was taken from: n=227/52, subagent tool-calls max 138 and main-session peak p50 227,472 / max 994,338 -- identical to the figures platform.md Fact 21 records, so the script reconciles with the census it reproduces.",
+    "after": {
+      "runlength.json": {
+        "not": [
+          "memory/notes.jsonl",
+          "agent-4.meta.json"
+        ],
+        "want": [
+          "\"n\": 4",
+          "\"n\": 2",
+          "\"p90\": 250000",
+          "\"mean\": 137500.0",
+          "\"max\": 900000",
+          "\"skipped_lines\": 2",
+          "\"nearest-rank, 1-based a[ceil(p*n)], no interpolation\"",
+          "sess-b/subagents/agent-4.jsonl"
+        ]
+      }
+    },
+    "args": [
+      "--transcripts",
+      "store",
+      "--json",
+      "runlength.json"
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "999",
+      "2,999,997",
+      "160,000",
+      "n=6",
+      "n=3",
+      "unreadable"
+    ],
+    "script": "wf-runlength",
+    "want": [
+      "SUBAGENTS      n=4   */subagents/agent-*.jsonl",
+      "tool-calls     p50 2 \u00b7 p75 3 \u00b7 p90 10 \u00b7 p99 10 \u00b7 max 10 \u00b7 mean 4.0",
+      "peak context   p50 100,000 \u00b7 p75 150,000 \u00b7 p90 250,000 \u00b7 p99 250,000 \u00b7 max 250,000 \u00b7 mean 137,500.0",
+      "crossed        3/4 (75%) >=100k \u00b7 2/4 (50%) >=150k \u00b7 1/4 (25%) >=200k",
+      "MAIN SESSIONS  n=2   *.jsonl",
+      "tool-calls     p50 5 \u00b7 p75 120 \u00b7 p90 120 \u00b7 p99 120 \u00b7 max 120 \u00b7 mean 62.5",
+      "peak context   p50 180,000 \u00b7 p75 900,000 \u00b7 p90 900,000 \u00b7 p99 900,000 \u00b7 max 900,000 \u00b7 mean 540,000.0",
+      "crossed        2/2 (100%) >=100k \u00b7 2/2 (100%) >=150k \u00b7 1/2 (50%) >=200k",
+      "skipped 2 unparseable line(s) in 1 file(s)",
+      "NEAREST-RANK a[ceil(p*n)]",
+      "harness version(s) recorded in this store: 2.1.233",
+      "validated on Claude Code 2.1.233",
+      "REPORTS; NEVER REPAIRS"
+    ]
+  },
   "sa-grants-blanket": {
     "_why": "A bare `Bash` grant supersedes the user's scoped rules, so it is refused with a named error and a nonzero exit rather than silently widening the permissions posture (audit-setup.md Step 0.8 rule 3b: not overwriting a preference is not the same as not defeating it).",
     "args": [
@@ -1727,6 +1984,141 @@
       "registered",
       "verified on disk",
       "UserPromptSubmit"
+    ]
+  },
+  "sa-hook-loopguard-display": {
+    "_why": "hooks.md § What is wired declares wf-loop-guard as PostToolUse with matcher *(none)*, and § The loop guard documents `--wire-hook wf-loop-guard` as the producer of `.claude/workforce/loop-guard.json`. Until 2026-08-19 the doc described a command that did not exist: the name was absent from SHIPPED_HOOKS and exited 2. DISPLAY must print the registration and the stamp it WOULD make and write NOTHING — `not verified on disk`/`stamped` assert no write happened, `not matcher` asserts the registration carries NO matcher key (the entry is {\"hooks\":[...]}, not {\"matcher\":...}), and the `after` row asserts the settings file was left byte-identical. The stamped block is quoted verbatim from hooks.md § The loop guard.",
+    "after": {
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-loop-guard",
+          "hooks"
+        ]
+      }
+    },
+    "args": [
+      "--wire-hook",
+      "wf-loop-guard"
+    ],
+    "exit": 0,
+    "not": [
+      "verified on disk",
+      "matcher",
+      "stamped"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "would register",
+      "PostToolUse",
+      "wf-loop-guard",
+      "PROPOSED and opt-in",
+      "would stamp (absent)",
+      ".claude/workforce/loop-guard.json",
+      "{\"nudge_at\": 3, \"stop_at\": 0, \"window\": 12, \"stale_secs\": 43200}"
+    ]
+  },
+  "sa-hook-loopguard-execute": {
+    "_why": "The producer actually producing. --execute registers wf-loop-guard on PostToolUse with no matcher AND stamps loop-guard.json, and both are confirmed by RE-READING rather than by echoing what was passed to write(). The `after` rows are the load-bearing half: stdout could say `stamped` while the file held a schema wf-loop-guard does not read, so the four keys asserted here are exactly wf-loop-guard's own DEFAULTS (nudge_at 3, stop_at 0, window 12, stale_secs 43200), imported from that script rather than restated. The sidecar row proves the creation was recorded with the sha256 of the exact bytes — disband.md step 6b removes a created artifact only when the sidecar names workforce as its creator and the bytes still hash to what workforce wrote. Paired with sa-hook-loopguard-display so a regression making DISPLAY write, or --execute merely report, fails one of them.",
+    "after": {
+      ".claude/settings.local.json": {
+        "not": [
+          "matcher"
+        ],
+        "want": [
+          "wf-loop-guard",
+          "PostToolUse"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "want": [
+          "hooks_added",
+          "files_created",
+          "loop-guard.json",
+          "sha256",
+          "wf-settings-apply --wire-hook wf-loop-guard"
+        ]
+      },
+      ".claude/workforce/loop-guard.json": {
+        "want": [
+          "\"nudge_at\": 3",
+          "\"stop_at\": 0",
+          "\"window\": 12",
+          "\"stale_secs\": 43200"
+        ]
+      }
+    },
+    "args": [
+      "--execute",
+      "--wire-hook",
+      "wf-loop-guard"
+    ],
+    "exit": 0,
+    "not": [
+      "would register",
+      "would stamp",
+      "matcher"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "registered",
+      "verified on disk: wf-loop-guard registered once on PostToolUse",
+      "stamped (absent)",
+      "re-read and parses to the 4 stamped default(s)"
+    ]
+  },
+  "sa-hook-loopguard-tuned": {
+    "_why": "IF AND ONLY IF ABSENT. This tree already carries a loop-guard.json the user tuned (nudge_at 7, stop_at 9 — the halting rung ON, which the shipped defaults never set). Wiring the hook must register it and leave that file untouched: hooks.md § The loop guard is explicit that a config the user has since tuned is theirs. The `after` rows fail if the stamp overwrites 7 with 3 or splices stale_secs in, which is the one way this producer could destroy something — and no stdout assertion could see it. Paired with sa-hook-loopguard-execute: the two trees differ by exactly this one file, so a regression that stops stamping fails that case and a regression that stamps unconditionally fails this one.",
+    "after": {
+      ".claude/workforce/.settings-owned.json": {
+        "not": [
+          "files_created"
+        ],
+        "want": [
+          "hooks_added"
+        ]
+      },
+      ".claude/workforce/loop-guard.json": {
+        "not": [
+          "\"nudge_at\": 3",
+          "stale_secs"
+        ],
+        "want": [
+          "\"nudge_at\": 7",
+          "\"stop_at\": 9"
+        ]
+      }
+    },
+    "args": [
+      "--execute",
+      "--wire-hook",
+      "wf-loop-guard"
+    ],
+    "exit": 0,
+    "not": [
+      "stamped",
+      "would stamp"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "verified on disk: wf-loop-guard registered once on PostToolUse",
+      ".claude/workforce/loop-guard.json  already present — left alone"
+    ]
+  },
+  "sa-hook-optin-not-default": {
+    "_why": "The opt-in guarantee, made mechanically checkable. wf-loop-guard is WIREABLE by name and is never in the default set (hooks.md § What is wired: 'PROPOSED, and not wired by this command's default set'). The unknown-hook error prints both sets, so this near-miss name pins the membership: `want` carries the default set verbatim and `not` fires if wf-loop-guard is ever sorted into it. A regression that promotes it to the default set fails this case; a regression that removes it from SHIPPED_HOOKS altogether fails the three cases above. Exit 2 also keeps the negative half honest — a name that is not a shipped hook is refused rather than registered as dead wiring.",
+    "args": [
+      "--wire-hook",
+      "wf-loopguard"
+    ],
+    "exit": 2,
+    "not": [
+      "Default set: wf-loop-guard"
+    ],
+    "script": "wf-settings-apply",
+    "want": [
+      "not a shipped hook",
+      "Default set: wf-protect-directives, wf-standing-request, wf-unique-persona",
+      "Opt-in only, PROPOSED and never wired by the default set: wf-loop-guard"
     ]
   },
   "sa-hook-unknown": {

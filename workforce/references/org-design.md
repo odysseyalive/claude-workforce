@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -198,6 +198,25 @@ capable. **A role whose whole job is executing one command is a skill wearing a 
 The converse failure is equally real, so the test is the same one the classifier uses: if executing the
 work requires deciding anything the text does not supply, it is an employee, and writing it as a skill
 buries that judgment where no probe will ever read it.
+
+---
+
+## Design against runaway context — the greenfield twin of decomposition
+
+Runaway context is not only a conversion problem. A **new** org can be drawn straight into it: one
+long-lived thread made to own work that separates, a role told to loop until done with no handoff, a
+single actor accumulating a whole job's context. So the lens the on-ramp turns on existing architecture
+applies here too, at design time — this section is **the greenfield twin of decomposition**, as
+`## Not every job needs an employee` is the greenfield twin of a reduced skill.
+
+Prefer separable, shorter-lived spawns with real isolation boundaries over one accumulating thread, and
+place a re-evaluation point routed to a **different persona** where a long task turns a corner
+(`references/personas.md` § Panels, `references/evaluators.md`). **The same judgment gate governs:** do
+not shard a job whose length is one coherent task — a handoff there loses more than it saves. The full
+method — the survey measure (static tells and the Fact 21 empirical read), the three convert moves, and
+the gate itself — lives in `conversion-taxonomy.md` § Runaway context; this section carries it onto the
+primary creation path so a rule that governs conversion is not missing from the door most employees come
+through (`SKILL.md` Core Principle 7c).
 
 ---
 

@@ -1,6 +1,6 @@
 # budget — depth, fan-out, and spawn accounting
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Read-only; executes immediately. `/workforce budget`
 
 Arithmetic and caps: `references/delegation-budget.md`. Cap values: `platform.md` — **never restated
@@ -96,6 +96,51 @@ not guess precisely. **The ratio between layers is the finding; the absolute num
 **This is what makes `CLAUDE.md` size actionable.** The line above it reports bytes, which is a number.
 This reports a *share of every employee's starting context*, which is a decision — and the file is the
 user's, so the run proposes and never edits (§ What it reports).
+
+## Run length and peak context — the empirical twin, where a record exists
+
+Everything above is a **projection from files on disk**, and its token figures are bytes ÷ 4. It
+answers what a spawn will receive before it starts. It cannot answer how big a run actually got,
+because that number is not on disk in the project — it is in the harness's own transcript store, in
+the token counts the harness recorded per turn.
+
+**Where that store exists, run the empirical measurement too. Do not infer it from the estimate.**
+
+```bash
+# $WF is resolved once, in the block above — do not restate the resolver here
+"$WF/bin/wf-runlength" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+```
+
+`wf-runlength` reports, for **subagents and main sessions separately and never pooled**, the
+distribution of tool-calls and of peak context — p50/p75/p90/p99/max, the mean, and how many runs
+crossed 100k / 150k / 200k. The computation is `platform.md` Fact 21's, unchanged, so the numbers
+reconcile with that census when pointed at the same store. Percentiles are **nearest-rank**, stated in
+the output rather than assumed.
+
+| | `wf-context` | `wf-runlength` |
+|---|---|---|
+| reads | handbooks, `CLAUDE.md`, preloads | recorded transcripts |
+| tokens | bytes ÷ 4, **labelled approximate** | real `message.usage` counts |
+| answers | what arrives before any work order | how large a run actually became |
+| available | always | only where the project has run history |
+
+**Separating them is not pooling them.** Fact 21's whole finding is the difference between the two
+layers — subagents are not uniformly short, and the median main session already peaks past a 200k
+window. One merged distribution destroys exactly the reading the survey needs.
+
+**The store location is a heuristic and the script says so.** `--root` derives the store directory
+from the project path using a **harness-internal encoding that may change**. When the derived
+directory is absent the run **fails clean and tells you to pass `--transcripts DIR`** — it never falls
+back to censusing whatever it can find, because a census of the wrong store reads exactly like a
+census of the right one. A store that exists and is empty is different again: that reports `n=0`,
+which is a measurement.
+
+**Read it as version-sensitive.** The transcript JSONL is an internal format, not a documented
+interface (`SKILL.md` Core Principle 9b — measurements expire). The script tolerates lines it cannot
+parse, counts them, and prints both the harness versions recorded in the store and the version its
+method was validated against. **A large skipped-line count, or an observed version far from the
+validated one, is a signal to re-read the method before trusting the distribution** — not a number to
+quote.
 
 ## What it cannot do
 
