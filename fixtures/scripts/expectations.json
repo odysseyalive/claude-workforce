@@ -701,11 +701,35 @@
     ]
   },
   "conform-over-ceiling": {
-    "_why": "delegation-budget.md has always said over the ceiling is 'a structural finding proposing a split, never a refusal', but the row was wired to the blocking channel, so 14 of them set a non-zero exit and INV-VERIFY read that exit as the org failing to verify. A 350-line handbook must REPORT and must NOT fail.",
+    "_why": "TWO defects in one row, both measured. (1) CHANNEL: delegation-budget.md has always said over the ceiling is never a refusal, but the row was wired to the blocking channel, so 14 of them set a non-zero exit on odyssey-alive (2026-08-05) and INV-VERIFY read that exit as the org failing to verify. The advisory marker plus exit 0 plus no '✗ ' anywhere is what pins it to res.advise(). (2) WORDING: the message read 'a structural finding proposing a split', and 'proposing' is a hand-back — it was being cashed out as an optional 'want me to split these?' offer and an AskUserQuestion picker offering 'leave as-is' or 'trim', which the no-standing-queue directive (2026-08-10) forbids and which risks dropping the user's verbiage (directive one is retention). The run PERFORMS the split by relocation this run, so 'proposing' must NOT appear and the performed/relocated wording must. Paired with conform-under-ceiling: drop the advisory and this half fails; fire it unconditionally and that half fails.",
     "exit": 0,
+    "not": [
+      "proposing",
+      "✗ "
+    ],
     "script": "wf-conform",
     "want": [
       "~ g.md: within the 150-line ceiling",
+      "the split is PERFORMED this run",
+      "relocate the heavy material",
+      "grounding library",
+      "Never trimmed, never condensed, never handed back as a question",
+      "ADVISORY: this row blocks nothing",
+      "0 failed"
+    ]
+  },
+  "conform-under-ceiling": {
+    "_why": "The other half of conform-over-ceiling: a governed handbook of EXACTLY 150 body lines, sitting on the ceiling rather than under it, so the boundary is `<=` and an off-by-one would advise every at-ceiling handbook in the org. The ceiling row must be SILENT here — no advisory line, '0 advisory' in the summary, exit 0 — because a message that fires unconditionally would satisfy conform-over-ceiling's want-list on its own and prove nothing about detection. The Negative: line is deliberate: it zeroes the OTHER advisory so '0 advisory' means the ceiling row and nothing else.",
+    "exit": 0,
+    "not": [
+      "within the 150-line ceiling",
+      "the split is PERFORMED this run",
+      "✗ "
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 advisory",
       "0 failed"
     ]
   },

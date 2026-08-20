@@ -160,8 +160,24 @@ and no value, which is this project's signature defect arriving in its own budge
 **This is a chosen budget, not a measurement, and it is labelled as one.** The basis is the IC
 template: ~57 body lines fully placeheld, so 150 is roughly 2.5× a filled template — room for a real
 procedure, tight enough that a handbook quietly covering two jobs exceeds it. Nothing was measured to
-produce it, so **over the ceiling is a structural finding proposing a split, never a refusal**. A
-number nobody measured may not block anyone's work (`platform.md` § DOCUMENTED).
+produce it, so **over the ceiling is never a refusal and never blocks a sweep** — a number nobody
+measured may not block anyone's work (`platform.md` § DOCUMENTED). **But not-blocking is not
+not-acting.** Under the no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement
+the run can perform, so **the run performs it: DISCHARGED this run, never proposed back, never raised
+as a question, never parked as an optional refinement.** A finding that says "over the ceiling — want
+me to split it?" is the deferment queue the directive forbids, wearing the word *structural*.
+
+**How the split is performed — relocation, never condensation.** The handbook is not shortened by
+cutting; it is restructured into the two-path shape (`handbook-templates.md` § Employees INVOKE
+skills): a lean core that INVOKES a skill or reads its grounding-library file **on demand**, with the
+heavy material — worked examples, mapping tables, reference data — relocated out of the body into that
+grounding library or a data skill. Relocation is proven per block, because directive one makes
+retention the floor: every line leaving the body arrives somewhere the handbook still reaches, and
+re-running `wf-conform` confirms the core is under ceiling. **Two resolutions are forbidden outright:**
+accepting a longer handbook — the length is never the answer — and trimming, condensing, or compressing
+the prose, because that risks dropping the user's verbiage and a condensed safety example is a lost one
+(directive one is retention). A handbook is over the ceiling because it carries two jobs' worth of
+material; the cure is to move a job, never to say it in fewer words.
 
 ### Description bytes — reported, never capped
 

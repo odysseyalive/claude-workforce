@@ -1458,6 +1458,18 @@ it is not a host limit, so it is DISCHARGED or it is DECIDED. "That's your call"
 hired", "left to the user", and any section titled *what I did not do* are **none of the three**, and a
 report containing one is corrected before it is printed.
 
+**An over-ceiling handbook is DISCHARGED, never DECIDED — the worked case of the line above.** It is
+not even a preference the one consolidated prompt may carry, because it has no legal either/or: the
+split is performed this run (`delegation-budget.md` § The handbook length ceiling). *Leave it as-is*
+accepts a longer handbook, which `review` step 8 forbids; *trim / condense / compress* drops the user's
+verbiage, which directive one forbids — so the only resolution is the split, and a resolution with one
+legal outcome is not a question. **IF a run is about to raise a picker, print an optional-refinement
+offer, or write a "want me to split these?" line for a handbook over the ceiling → STOP and perform the
+split.** The picker itself is the defect. *Added 2026-08-20 after two runs handed the length back — one
+as an optional "want me to take these on?" list at the close, one as a Leave-as-is / Trim-under-150
+picker mid-run. Both are the deferment queue the 2026-08-10 directive forbids, and Trim is a directive-one
+violation on top of it.*
+
 **AND IT NEED NOT BE A SECTION.** *"The sweep is now unblocked but I did not run it — it's a separate
 gesture and you asked for X"* is a closing sentence, phrased as a status note, naming a command for the
 user to type. It carries no heading for the rule above to catch and it is the same act. **IF this report

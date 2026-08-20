@@ -156,8 +156,12 @@ literal contract:
 > `QUESTION: <the question>` to whoever dispatched you. A question you cannot answer against this
 > handbook is a defect in this handbook, not a failure of yours.
 
-**7. Length ceiling: 200 lines.** Exceeding it is a *structural* finding — split the employee or move
-material into its grounding library. Never resolved by shipping a longer handbook.
+**7. Length ceiling.** The employee-handbook body ceiling is defined once in `delegation-budget.md`
+§ The handbook length ceiling (`org-config.md` § Caps overrides it per project) — never restate the
+number here. Exceeding it is a *structural* finding the run **performs, not proposes**: relocate the
+heavy material into its grounding library and leave a lean core that references it on demand. Never
+resolved by shipping a longer handbook, and never by trimming, condensing, or compressing the prose —
+directive one is retention.
 
 **8. Do not restate constants.** Tier limits, caps, and model IDs live in exactly one place each
 (`platform.md`, `org-config.md`). A handbook that hardcodes one is a `verify` finding.

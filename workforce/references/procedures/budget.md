@@ -47,7 +47,7 @@ Three readings, and only the first is a finding:
 
 | Number | What it means |
 |---|---|
-| over the ceiling | a **structural finding** — propose a split; never a refusal, the ceiling is a chosen budget rather than a measurement |
+| over the ceiling | a **structural finding the run resolves by performing the split this run** (relocate the heavy material into the grounding library, leave a lean core — `delegation-budget.md` § The handbook length ceiling); never proposed back, never a refusal, and never resolved by trimming or by a longer handbook. The ceiling is a chosen budget rather than a measurement, so it blocks nothing — but not-blocking is not not-acting |
 | description bytes | reported against no threshold, because none is measured. The per-employee breakdown is what makes it actionable |
 | handbook bytes | the denominator `ablate --org`'s `LOAD-BEARING` share is a fraction of, available without a measured run |
 

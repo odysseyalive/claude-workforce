@@ -71,8 +71,12 @@ measurement; a missing line is silence, and silence reads as a pass
 (`references/invariants.md` § The rule). Absent `calibrated-for` counts against the total rather than
 being skipped — an unstamped handbook is unmeasured, which is the state being counted.
 
-**8. Bloat.** Length against the ceiling. Over → a *structural* finding: split the employee or move
-material into its grounding library. **Never resolved by accepting a longer handbook.**
+**8. Bloat.** Length against the ceiling. Over → the split is **performed this run**, not proposed:
+move the heavy material into its grounding library and leave a lean core that references it on demand
+(`delegation-budget.md` § The handbook length ceiling). **Never resolved by accepting a longer
+handbook, and never by trimming, condensing, or compressing the prose** — that risks dropping the
+user's verbiage, and directive one is retention. `review` opens the DISCHARGE; it never hands the
+length back as a question or an optional refinement.
 
 ---
 
