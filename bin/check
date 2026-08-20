@@ -3471,6 +3471,36 @@ check(
     "two verdicts it cannot tell a wrong path from a correct reference to another "
     "repository. A detector that reports everything is read by nobody",
 )
+# THE DENOMINATOR IS THE CENSUS'S HERE TOO. `.censusignore` is the project's one
+# declaration of what its corpus is, and `wf-census.ignored()` is PUBLIC for exactly
+# that reason — its own docstring records `wf-conform` growing a divergent
+# directory-name guess back when the method was private. `wf-remainder` did not ask
+# at all. MEASURED 2026-08-20 on this repository: `.claude/skills/voice-text-eval` is
+# a gitignored overlay vendored from odyssey-alive, declared excluded, naming
+# `steganographer/scripts/scrub.js` — a path that resolves only in that other repo.
+# The census dropped it; `--dead-scripts` reported it anyway; `wf-ratchet` reads that
+# finding and re-reported `1 REGRESSION` on EVERY run. A permanent false regression is
+# the flag that sends every run round the same loop.
+#
+# `import fnmatch` is asserted ABSENT deliberately, and it is the IMPORT rather than the
+# word: the fix is reachable two ways — import the one owner, or copy its four-clause
+# `fnmatch` matcher — and only the first keeps the answer in one place. A faithful copy
+# passes every substring test aimed at behaviour and drifts the moment either side is
+# widened, which is this project's recorded failure, not a hypothetical. Forbidding the
+# bare word instead would forbid the file from EXPLAINING why it does not copy the
+# matcher, which is a comment worth more than the extra byte of coverage — measured, the
+# first form of this check failed on wf-remainder's own docstring saying so.
+check(
+    "remainder: the dead-script scan honours .censusignore through wf-census, not a second matcher",
+    "_load_census" in _rem
+    and "census.load_ignore()" in _rem
+    and "if census.ignored(sk):" in _rem
+    and "import fnmatch" not in _rem,
+    "a skill the project declared out of its corpus was scanned anyway, so a foreign "
+    "overlay's unresolvable path became a finding the ratchet re-reported as a "
+    "REGRESSION on every run. What counts as project content is answered once, by the "
+    "census, or two shipped checkers measure one tree against two denominators",
+)
 
 # ── The pass catalog's admission rule ────────────────────────────────────────
 # references/passes.md: "No pass enters this catalog without a `defect` citation that

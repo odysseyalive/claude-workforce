@@ -61,6 +61,45 @@ import os
 import re
 import sys
 
+
+def _load_census():
+    """Import the sibling `wf-census` for its exclusion loader — one owner, never
+    a second copy.
+
+    `.censusignore` is the project's DECLARATION of what its corpus is, and
+    `wf-census.ignored()` is public precisely so that the answer is given once.
+    This file did not ask. MEASURED 2026-08-20 against claude-workforce itself:
+    `.claude/skills/voice-text-eval` is a gitignored overlay vendored from another
+    repository, declared excluded in `.censusignore`, and its SKILL.md names
+    `.claude/skills/steganographer/scripts/scrub.js` — a path that resolves only in
+    that other repo. `wf-census` correctly dropped it; `--dead-scripts` reported it
+    as UNRESOLVED anyway, and `wf-ratchet` reads that finding and re-reported it as
+    `1 REGRESSION` on EVERY run. A permanent false regression is the flag that sends
+    every run round the same loop, which the project's directives forbid.
+
+    NO SECOND MATCHER, deliberately — not even an fnmatch fallback. A fallback IS
+    the divergent guess `ignored()`'s docstring records `wf-conform` growing when
+    the method was private, and two readers of one declaration that disagree is this
+    project's recorded failure rather than a hypothetical.
+
+    NEVER leave bytecode behind: importing a sibling writes `__pycache__/` into the
+    SHIPPED bin/ directory, which `bin/check` correctly reports as an undeclared
+    file the installers would never fetch.
+    """
+    import importlib.machinery
+    import importlib.util
+    _prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
+    loader = importlib.machinery.SourceFileLoader("wf_census", path)
+    spec = importlib.util.spec_from_loader("wf_census", loader)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = _prev
+    return mod
+
 # ── Marker integrity ──────────────────────────────────────────────────────────
 # These four patterns are COPIED FROM bin/check, not re-derived. A marker that one
 # reader treats as paired and another does not is how a section gets reported present
@@ -274,9 +313,17 @@ def _emit_diff(before, after, label_a, label_b):
 # REPORTS, NEVER REPAIRS. Measured precision on unique references was 1 true of 2,
 # and the false one names a real file in someone else's repository. Rewriting a
 # path on that evidence would edit a correct sentence.
+#
+# AND THE DENOMINATOR IS THE CENSUS'S. A skill the project has DECLARED out of its
+# corpus is not scanned at all — see `_load_census` for the overlay that made this
+# detector emit a permanent false regression. The exclusion is a skip, never a
+# suppression: it is applied per SKILL.md before reading, so a genuine dead script in
+# any skill that was not declared out still reports exactly as before.
 def dead_scripts(root):
     """[(skill_path, token, verdict)] for path-shaped script tokens that do not resolve."""
     skills_dir = os.path.join(root, ".claude", "skills")
+    census = _load_census().Census(root)
+    census.load_ignore()
     basenames = {}
     for dp, _dn, fn in os.walk(root):
         if os.sep + ".git" in dp:
@@ -285,6 +332,8 @@ def dead_scripts(root):
             basenames.setdefault(f, os.path.relpath(os.path.join(dp, f), root))
     out = []
     for sk in sorted(glob.glob(os.path.join(skills_dir, "*", "SKILL.md"))):
+        if census.ignored(sk):
+            continue          # declared out of the corpus: not project content
         here = os.path.dirname(sk)
         seen = set()
         for m in SCRIPT_RX.finditer(read(sk)):

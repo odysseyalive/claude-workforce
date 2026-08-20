@@ -693,6 +693,18 @@ CASES = [
     # direction this pass actually fails in: not absent, but too loud to read.
     ("remainder: dead-script detection keeps both of its tuned filters",
      REM, "del", '            if "/" not in tok or tok in seen:\n'),
+    # ── the corpus denominator (2026-08-20) ──────────────────────────────────
+    # Break the SKIP, not the import. Deleting `_load_census` would take the module
+    # out with it and the scan would crash — a red build proves nothing about a
+    # denominator. Deleting the two lines that consult it leaves a detector that
+    # still loads the declaration, still runs, and still reports, on a tree the
+    # project has said is not its own. That is the direction it failed in: a
+    # gitignored foreign overlay's unresolvable path, reported as a finding the
+    # ratchet re-raised as `1 REGRESSION` on every run, forever.
+    ("remainder: the dead-script scan honours .censusignore through wf-census, not a second matcher",
+     REM, "del",
+     "        if census.ignored(sk):\n"
+     "            continue          # declared out of the corpus: not project content\n"),
     # Break the CITATION, not the row. A deleted row would shrink the table and could
     # be caught by a count; a row that still reads like a pass while its evidence
     # points nowhere is the shape the admission rule exists to refuse, and it is the

@@ -1705,6 +1705,36 @@
       "run:kill $(pgrep -f native-host)"
     ]
   },
+  "remainder-ignored-skill": {
+    "_why": "The dead-script scan globbed every skills/*/SKILL.md and never asked .censusignore, while wf-census.ignored() is PUBLIC precisely so that 'what counts as project content' is answered once. MEASURED 2026-08-20 on claude-workforce itself: .claude/skills/voice-text-eval is a gitignored overlay vendored from odyssey-alive, declared excluded, and names steganographer/scripts/scrub.js -- a path that resolves only in that other repo. The census dropped it and --dead-scripts reported it anyway, so wf-ratchet re-reported '1 REGRESSION' on EVERY run: a permanent false flag that sends every run round the same loop. This half asserts the declared skill is SKIPPED (its path never appears) and, in the same output, that the genuine dead reference in the NON-declared skill still reports -- an exclusion that blanketed the scan would read as a clean tree and is indistinguishable from deleting the detector.",
+    "args": [
+      "--dead-scripts"
+    ],
+    "exit": 0,
+    "not": [
+      "overlay/SKILL.md",
+      "scripts/foreign-only.js",
+      "2 unresolved"
+    ],
+    "script": "wf-remainder",
+    "want": [
+      "dead scripts   1 unresolved",
+      "UNRESOLVED .claude/skills/native/SKILL.md  ->  scripts/native-gone.sh"
+    ]
+  },
+  "remainder-ignored-undeclared": {
+    "_why": "The other half of the pair, and the reason the skip cannot be a directory-name guess. The tree is byte-identical to remainder-ignored-skill except that .censusignore declares an unrelated pattern, so BOTH skills are project content and BOTH dead references must report. load_ignore() refuses inference by name ('no fixtures/ default, no guess from directory names'), and this case is what fails if the scan ever starts skipping a skill for any reason other than the project's own declaration -- including a hardcoded prune or a second, divergent matcher grown inside wf-remainder.",
+    "args": [
+      "--dead-scripts"
+    ],
+    "exit": 0,
+    "script": "wf-remainder",
+    "want": [
+      "dead scripts   2 unresolved",
+      "UNRESOLVED .claude/skills/native/SKILL.md  ->  scripts/native-gone.sh",
+      "UNRESOLVED .claude/skills/overlay/SKILL.md  ->  scripts/foreign-only.js"
+    ]
+  },
   "remainder-gutted": {
     "args": [
       "--diff",

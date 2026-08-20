@@ -113,7 +113,28 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-19
+## Open, as of 2026-08-20
+
+**Landed 2026-08-20 — `wf-remainder --dead-scripts` now honors `.censusignore`; classifier host-limit
+re-measured stale on 2.1.235.** Found by `/workforce dev audit` (run `20260820T180010Z`) of this repo.
+
+- **`wf-remainder` false regression, class-fixed.** This repo vendors two gitignored foreign overlays
+  from odyssey-alive (`.claude/skills/voice`, `voice-text-eval`); `voice-text-eval/SKILL.md` names
+  `steganographer/scripts/scrub.js`, which resolves only in that other repo. `wf-census` honors
+  `.censusignore` via its public `ignored()`, but `wf-remainder --dead-scripts` globbed skills directly
+  and flagged the overlay — a `PASS-DEAD-SCRIPT` "regression" on every ratchet run. Fixed source-first:
+  `wf-remainder` now imports `wf-census` and calls `census.ignored()` to skip declared-excluded skills
+  (the one-answer discipline `ignored()`'s docstring already anticipated). Shipped with two fixtures
+  (`fixtures/scripts/remainder-ignored-skill`, `remainder-ignored-undeclared`), an `expectations.json`
+  row, and a `bin/prove` del-case. `.censusignore` at repo root now declares the two voice overlays out.
+  `bin/check` 912/0; ratchet 0 regressions.
+- **The auto-mode classifier no longer refuses the agent's settings write on 2.1.235.** Three audits
+  (`deferred.md` Q-1/Q-2/Q-3, measured on 2.1.223) recorded the Step 0.8 additive write as refused above
+  the permissions layer, dischargeable only by a human `!` command. Re-measured on 2.1.235: it succeeded.
+  So this run added the scoped `Bash(./bin/*:*)` grants and wired the three shipped hooks in-run, and
+  `platform.md`'s DOCUMENTED refusal fact is now stale on this harness. Nothing was changed in the
+  doctrine that *handles* a refusal — that path is still correct and still needed on hosts that do refuse;
+  what changed is that this host stopped refusing.
 
 **Landed 2026-08-19 — the `/org` receptionist is a project skill in every scope; no audit-generated
 skill lives at personal scope.** Reported by the user (`/workforce dev`): running `audit` across
