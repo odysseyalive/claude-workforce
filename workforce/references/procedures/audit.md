@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 52 assertion(s) in bin/check name this file; 106 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 53 assertion(s) in bin/check name this file; 107 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -775,6 +775,31 @@ review is the whole value.
 
 **Do not staff an evaluator where there is no work for it.** The catalog still installs, so any employee
 can self-check; an employee nothing dispatches to is a pass-through hop.
+
+**Refresh the house rules in every installed evaluator, every run** (`evaluators.md` § House rules
+dominate, and the register is the sole source of a demotion). The house rules an evaluator applies are the
+supersession register and the precedence clause; a stale copy sends the evaluator's cold reader back to the
+per-file judgment the register exists to replace, which is how a settled rule returns as a maintainer
+question. So each run re-propagates the current register **and** the precedence clause into every installed
+evaluator, in the same **never skipped, never offered, never a question** manner as § Forcible propagation —
+that section refreshes the catalog CONTENTS an evaluator applies; this refreshes the RULES it applies them
+under. Report it per evaluator, including the zeroes, in the same block as the reconciliation, and print the
+run roll-up **`INV-HOUSERULES`** (`invariants.md` row 22) with it:
+
+```
+HOUSE RULES     text-eval  register 2 rows refreshed · precedence clause present
+                code-evaluator  register 0 rows · precedence clause appended
+INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
+```
+
+An evaluator that cannot receive the refresh — a `catalog-unappendable` copy with no machine-owned region
+(§ When the catalog cannot be appended) — is counted in `unrefreshed` and **names that precondition**.
+`INV-HOUSERULES` is `NOT UPHELD` only when an unrefreshed evaluator cites nothing: the same uncited-refusal
+shape as `INV-SWEPT`, so a run cannot skip the refresh silently and still close clean.
+
+A run that refreshes the catalog but leaves the rules stale has updated what the evaluator checks and not
+how it is allowed to demote what it finds — the half that produced the README question this clause was
+written for.
 
 ## Step 4b — Tier canary (the last step before anything is registered)
 

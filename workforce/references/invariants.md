@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty-one, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty-two, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -58,7 +58,13 @@ landed 2026-08-07 and is row 19's other half** — the writer was built and noth
 set it wrote was ever emptied. **Row 21 landed 2026-08-12 and is the first row a git pre-commit guard
 prints rather than an `audit` run**: the commit-time pin-and-dependabot guard emits `INV-PINS` on every
 commit, and `audit` and `verify` emit it too when they install and report the guard — a promise printed
-in three places, owed by the one procedure that owns the guard's lifecycle.)*
+in three places, owed by the one procedure that owns the guard's lifecycle. **Row 22 landed 2026-08-19
+and is the first row owed to the evaluators** rather than to conversion, the sweep, or a guard: it is the
+application-side twin of § Forcible propagation, which already owed the catalog's *contents*; this owes
+the *rules* an evaluator applies them under. A house rule the register settles is refreshed into every
+installed evaluator each run, or each evaluator left unrefreshed names the precondition that stopped it —
+the same uncited-refusal shape as row 20, because a settled rule left stale is how the README question
+this project just closed comes back.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -83,6 +89,7 @@ in three places, owed by the one procedure that owns the guard's lifecycle.)*
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
 | 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
 | 21 | the pin guard emitted its report, and its unpinned/pinnable/unpinnable counts and dependabot status are coherent | `INV-PINS` | references/procedures/hooks.md |
+| 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run
@@ -191,6 +198,7 @@ Run Invariants
   INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined
   INV-SWEPT       staged 1 · removed 1 · refused 0 · 0 uncited refusals
   INV-PINS        unpinned 3 · pinnable 2 · unpinnable 1 · dependabot PARTIAL
+  INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
   …every remaining row, always all of them…
 ```
 

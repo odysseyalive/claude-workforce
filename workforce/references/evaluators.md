@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 33 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 37 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -248,6 +248,53 @@ Measured on the first run of this path. `/image` records its inversion structura
 attribute on a user span — and derived cleanly. **`/image-eval`'s palette inversion is just as real and
 is written only in prose**, so it derived nothing and its whole catalog is withheld. That is the
 correct behavior and an unhelpful outcome, and the counted line is what keeps the second half visible.
+
+### House rules dominate, and the register is the sole source of a demotion
+
+**A project's house rules set the precedence; an evaluator's read of the file in front of it does not.**
+The house rules are two things: the supersession register above, and the catalog's own scope statements —
+each `[hard]` tell, the cluster-density rule, the voice-protection gate, and the scope each one declares.
+Together they are what the user meant by *"house rules always dominate and set the precedence"*. An
+evaluator applies them. It does not renegotiate them against the specific file it is looking at.
+
+**The register is the SOLE legitimate source of a demotion or an exemption.** *"Matches this file's own
+house style"* is a valid reason for a demotion in exactly one place: a register row that grants it, inside
+that row's stated scope. Everywhere else it is not a reason at all — it is precisely the per-file judgment
+the register exists to replace (§ The supersession register). An evaluator that reaches a `[hard]` finding
+on content **outside** every register row's scope and then demotes it as *"established style, a maintainer's
+call"* has invented an exemption no row granted, which is the one move the register was written to stop.
+
+**Outside its supersession scope a `[hard]` tell is non-demotable, and its fix is applied in the same
+pass — never skipped, never offered, never a question.** This is the § Forcible propagation clause said of
+rule APPLICATION rather than catalog CONTENTS: that section forbids skipping or offering an *entry*; this
+forbids skipping or offering a *fix* the entry's own scope already settled. A settled house rule surfaced
+to the human as a question is a flag, not a fix — and this project's standing directives hold that *"A
+DETECTOR SHIPS WITH ITS FIX"* and that a flag is not a fix (the no-deferment-queue directive). So the
+evaluator applies the fix and reports it applied, in the pass that found it.
+
+**This constrains an evaluator; it does not widen an exemption.** It bars inventing an exemption the
+register never granted, and grants none. The technical-prose em-dash standdown keeps exactly the scope
+§ A register scoped by enumeration goes stale gives it. This is a precedence-and-application rule, not a
+new tell and not a new exemption: the tells and their scopes are unchanged, and what changes is that an
+evaluator may no longer demote a firing tell on any authority but the register's.
+
+**This is a structural claim about the shipped doctrine** (`invariants.md` § The rule): the pairing that
+makes it true is a `bin/check` assertion that this subsection is present in `evaluators.md`, and a
+`bin/prove` del-case that deletes a load-bearing fragment of it and confirms the assertion breaks. A
+precedence rule that reads as settled and binds nothing is the exact failure this repository keeps paying
+for.
+
+*Raised 2026-08-19. A `/workforce dev` run rewrote the repo-root `README.md` for a non-developer audience,
+then ran text-eval and voice-text-eval as cold agents. Both correctly flagged the README's em-dashes under
+the `[hard]` em-dash rule, and then both DEMOTED the finding to "matches this file's established house style
+— a maintainer's call" and surfaced it to the human as a question. The README is user-facing copy,
+explicitly outside the em-dash supersession scope, which covers only hand-authored technical prose:
+`workforce/references/**`, `.claude/agents/**`, `.claude/workforce/**`, `DEVELOPMENT.md`. Per the house
+rules already written, those em-dashes were a mandatory auto-fix, not a question. The user's directives were:
+"Don't leave them. follow the rules recommendation of this project. they are more important"; "we need to
+embed that into the text-eval of this project so that this doesn't even need to be asked, just done."; "and
+audit should update those rules"; "house rules always dominate and set the precedence". The 29 em-dashes
+were removed (29 → 0), and that instance is fixed; it is the raising example, not the rule.*
 
 ## Seeding the catalog
 

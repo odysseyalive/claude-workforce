@@ -1137,6 +1137,29 @@ check(
     "projects seeded from one predecessor, one reconciled to v2 with 24 mechanisms, "
     "the other never reconciled and carrying no anchor at all",
 )
+check(
+    "evaluators: house rules dominate, the register is the sole source of a demotion",
+    "House rules dominate, and the register is the sole source of a demotion" in _ev
+    and "SOLE legitimate source of a demotion" in _ev
+    and "applies the fix and reports it applied" in _ev
+    and "it does not widen an exemption" in _ev,
+    "measured 2026-08-19: two cold evaluators flagged README em-dashes under the "
+    "[hard] rule and both demoted the finding to 'matches this file's established "
+    "house style, a maintainer's call' for a file outside the supersession scope, "
+    "turning a settled house rule into a question. The register is the sole demotion "
+    "authority, and a [hard] tell outside its scope is fixed in the pass, not asked",
+)
+_aud_hr = read("workforce/references/procedures/audit.md")
+check(
+    "audit: house rules refreshed in every installed evaluator each run",
+    "Refresh the house rules in every installed evaluator, every run" in _aud_hr
+    and "HOUSE RULES" in _aud_hr
+    and "INV-HOUSERULES" in _aud_hr,
+    "directive 'audit should update those rules' (2026-08-19): the evaluator step "
+    "refreshes each installed evaluator's supersession register and precedence clause "
+    "every run and prints the HOUSE RULES block plus the INV-HOUSERULES roll-up "
+    "(invariants.md row 22), so a settled rule cannot silently stop propagating",
+)
 # ─────────────────────────────────────────────────────────────────────────────
 # The third catalog slot, landed 2026-08-06.
 #
@@ -2711,7 +2734,8 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 # a specific number; it is the rule that no row arrives without its report line.
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-              "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21}
+              "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
+              "twenty-two": 22}
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.

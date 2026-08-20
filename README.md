@@ -4,17 +4,17 @@
 
 > **Supersedes** [claude-enforcer](https://github.com/odysseyalive/claude-enforcer). If you run the enforcer today, [here's the migration path](#coming-from-claude-enforcer).
 
-> **PAIRS WELL WITH:** playwright-mcp. Nobody here is hired without a check that proves the work, and web-facing employees are the hardest to hire, because a browser task rarely has an exit code. It captures a login once and scaffolds that into a deterministic Playwright suite, so the proof is a suite that passes rather than a model's opinion. It also replaces WebFetch, which subagents never receive. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
+> **PAIRS WELL WITH:** playwright-mcp. Nobody here is hired without a way to prove the work is right, and the employees who deal with websites are the hardest to hire, because clicking around a web page rarely leaves behind a clean pass-or-fail signal the way finished code does. This tool records you logging into a site once, then turns that recording into a repeatable test the employee can actually run, so the proof is a test that passes, not a model's say-so. It also handles fetching web pages, which these employees otherwise can't do on their own. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
 
 ## Not Every Brain Does Every Job
 
-You've probably switched models three times in one sitting without thinking about it. Not because anything was broken, but because each one was good at a different thing. The coder refactored your auth flow without missing a test. The writer gave your draft a pulse. Neither could do the other's job.
+You've probably switched models three times in one sitting without thinking about it. Not because anything was broken, but because each one was good at a different thing. The coder untangled a knot in your project without breaking the thing next to it. The writer gave your draft a pulse. Neither could do the other's job.
 
 We spent two years asking which model was best. [The answer turned out to be a routing problem, not a ranking one.](https://odysseyalive.com/focus/two-brains)
 
 The part that surprises people is that the best orchestrator often isn't the most powerful model. A conductor doesn't play louder than the orchestra. They hear how the pieces fit together. A model built for judgment and coordination can run a company of specialists better than a model built to write a million lines of code, because those are different jobs. The writer can't debug. The debugger can't write. Nobody complained.
 
-Claude Workforce takes that insight and builds on it. Instead of one assistant doing everything, you get a company: a CEO that routes, leads that coordinate, and individual contributors that execute. Each one runs on the model that fits its job, carries a handbook it follows, stays inside a scope it won't leave, and passes a check that proves it did the work.
+Claude Workforce turns that insight into a structure. Instead of one assistant doing everything, you get a company: a CEO that routes work to the right desk, leads that coordinate a department, and individual contributors, the workers who actually do the task. Each one runs on the model that fits its job, carries a handbook it follows, stays inside a lane it won't leave, and passes a check (some automatic proof it did the work, like a test that comes back green). So "done" means proven, not just claimed.
 
 ![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists, not playing louder, playing differently](assets/images/conductor.png)
 *The orchestrator's job is hearing how the others fit together, not playing louder than any of them.*
@@ -25,9 +25,9 @@ This project grew out of [claude-enforcer](https://github.com/odysseyalive/claud
 
 Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Nelson Liu's group at Stanford [measured that and named it "lost in the middle"](https://aclanthology.org/2024.tacl-1.9/). A model retrieves worst from the middle of a long input and best from its edges.
 
-The enforcer built layers to resist that: hardened skills, mechanical hooks, fresh-context validators that fire in their own isolated context where the conversation's noise can't reach them. And it worked. Skills stopped drifting. But the longer the system ran, the clearer a different problem became.
+The enforcer built layers to resist that: instructions that were harder to ignore, automatic rules that fired on their own, and checkers that ran in a clean, separate conversation where the clutter of the main chat couldn't reach them. And it worked. The instructions stopped drifting. But the longer the system ran, the clearer a different problem became.
 
-A hardened skill has no owner. Nothing stops it from wandering outside its domain. And it has no way to prove it actually did the job. You get a summary at the end and trust that what happened underneath was correct.
+Even a hardened set of instructions has no owner. Nothing stops it from wandering outside its lane. And it has no way to prove it actually did the job. You get a summary at the end and trust that what happened underneath was correct.
 
 The fix wasn't harder rules. It was structure.
 
@@ -62,14 +62,14 @@ It looks in both places workforce can live before it does anything, and acts on 
 |---|---|
 | an existing install | it is updated in place, at the path it is already at |
 | both a personal and a project copy | **both** are updated, and it tells you which one is shadowing the other |
-| nothing | it asks where to put it — personal or project |
+| nothing | it asks where to put it: personal or project |
 
 That question is the only one, and it only comes up on a first install. Personal puts one copy at
 `~/.claude/skills/`, serving every project on this machine, and is the right answer for almost
-everyone. Project puts a copy inside this one repo, so it travels with a clone — the reason to pick
+everyone. Project puts a copy inside this one repo, so it travels with a clone. The reason to pick
 it is collaborators, or sessions that only ever see the cloned repo.
 
-With no terminal to ask on — a CI or piped run — it installs personal and says so, rather than
+With no terminal to ask on (a CI or piped run), it installs personal and says so, rather than
 guessing at a repo it may not be sitting in.
 
 To skip the question and force a scope, add `-- --project` or `-- --user` on Linux / macOS, or set
@@ -77,8 +77,8 @@ To skip the question and force a scope, add `-- --project` or `-- --user` on Lin
 
 #### Into a specific Claude config directory
 
-Run more than one Claude environment on one machine — two paid accounts side by side, say, each with
-its own `CLAUDE_CONFIG_DIR` — and a personal install needs to land in the *right* one.
+Run more than one Claude environment on one machine (two paid accounts side by side, say, each with
+its own `CLAUDE_CONFIG_DIR`), and a personal install needs to land in the *right* one.
 
 On Linux / macOS, name it with `--config-dir`:
 
@@ -97,7 +97,7 @@ shipped agents all land under the config root the session resolves from, so the 
 reachable there rather than in a directory Claude never reads. It can't be combined with `--project`.
 If your shell already runs under the target environment (`CLAUDE_CONFIG_DIR` set), the standard
 install command above lands there on its own. Each **project's** company still lives in that project's
-own `.claude/` regardless — the config directory only relocates the personal, cross-project install.
+own `.claude/` regardless. The config directory only relocates the personal, cross-project install.
 
 Then restart Claude Code and run your first audit:
 
@@ -105,7 +105,7 @@ Then restart Claude Code and run your first audit:
 /workforce audit
 ```
 
-The audit reads your project, its layout, build tooling, purpose, history, and designs the smallest company that can do its work. It asks one question (which models at which tiers) and resolves everything else automatically with agent panels.
+The audit reads your project (its layout, its tooling, its purpose, its history) and designs the smallest company that can do its work. It asks one question (which models at which tiers) and works out everything else on its own.
 
 It works on empty projects too. Thin evidence means a small roster, which is the right answer for a project that hasn't been built yet. A role whose verification can't be named is reported unstaffed, never hired. **A role with a runnable check is an employee. A role without one is a job title.**
 
@@ -119,7 +119,7 @@ Preview the plan without writing anything. `audit --review`.
 
 Updating replaces the skill wholesale. Nothing you edit lives inside it, so there's no clobber risk.
 
-It syncs and stops — it never inspects your org, so its cost doesn't grow with how much you've
+It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
 ## Talking to the Company
@@ -150,32 +150,32 @@ That goes to the CEO, because it crosses departments and nobody below owns the a
 
 That has no owner, so it goes to HR as a hiring request.
 
-The CEO isn't a funnel. Routing everything through the top would burn a delegation level on every task and leave the people doing the work unable to delegate at all. `/org` dispatches to the *lowest* competent node. Ties resolve downward.
+The CEO isn't a funnel. Routing everything through the top would spend one of your three hand-off levels on every single task and leave the people doing the actual work with none left to hand off themselves. `/org` sends the work to the *lowest* desk that can actually handle it. When it's a toss-up, it goes downward.
 
 ## Three Tiers, Measured
 
 ![A cross-section of a three-level workshop where the top figure surveys the landscape through a window, the middle figure coordinates between two doors, and the bottom figure works at a bench with precise tools, each level has its own job, and there is no level below the third](assets/images/three-tiers-new.png)
 *Three levels is all you get. The ceiling was measured before any of this was designed.*
 
-Delegation bottoms out three tiers deep. A canary measured that ceiling on a real host before any of this was designed. Your session is the CEO, tier one. It delegates to a lead, tier two. The lead delegates to an IC, tier three. No fourth tier.
+Handing work down bottoms out three levels deep. We measured that ceiling with a tiny test probe on a real machine before any of this was designed, rather than trust what the documentation claimed. Your session is the CEO, level one. It hands work to a lead, level two. The lead hands work to an IC, level three. There is no fourth level.
 
-A tier past the ceiling doesn't error. It collapses. The deepest employee loses its ability to delegate and quietly does the work itself, while its handbook still says it delegated. The failure reads as success, so the limit is enforced rather than suggested.
+A level past that ceiling doesn't fail loudly. It collapses quietly. The deepest employee loses its ability to hand work down and just does the task itself, while its handbook still says it delegated. The failure reads as success, which is exactly why the limit is enforced rather than politely suggested.
 
 ## Which Model on Each Tier
 
 The audit asks one thing it can't infer: which model each kind of agent runs on. It marks a recommendation on every choice, and taking the recommendation is almost always right. What follows is the reasoning behind those marks, so you know the one or two places worth overriding.
 
-Your session is the CEO, and you pick its model yourself with `/model`. The audit never sets it. Put a steerable model here, not the strongest one. This is the seat you talk to all day, the one whose context grows longest, and a model that commits early to its own reading of the task is the wrong thing to be steering by the afternoon. The best coordinator is the one that still hears you at turn fifty.
+Your session is the CEO, and you pick its model yourself with `/model`. The audit never sets it. Put a model here that keeps taking direction, not the flashiest one. This is the seat you talk to all day, the conversation that runs longest, and a model that locks in early on its own reading of the task is the wrong thing to be steering by the afternoon. The best coordinator is the one that still hears you at turn fifty.
 
 The lead runs on the same logic. It plans, hands work out, and reads back what returns, and its early calls are inherited by every IC beneath it. A cheap lead is the expensive place to save.
 
-The IC is where that flips. This is the wide part of the fan-out, where one work order becomes many spawns, and every spawn pays for a fresh context whether or not it needed the strength to match. So the ICs get the faster, cheaper model at medium effort. More effort rarely changes mechanical output, and whatever it costs is multiplied by the width of the wave. Moving the ICs down a tier is the single biggest thing you can do about token spend.
+The IC is where that flips. This is the wide part, where one work order turns into many workers running at once, and every one of them costs money to start up whether or not the job needed a powerful model. So the ICs get the faster, cheaper model, working at a moderate setting. Pushing them harder rarely improves this kind of routine work, and whatever it costs gets multiplied across the whole wave of them. Moving the ICs to a cheaper model is the single biggest thing you can do about your bill.
 
 Writing and design get the model with the best prose and taste, which usually isn't the cheapest one. Code gets the strongest coder; code is read by a machine and executed, so a weak paragraph is edited and a weak patch ships a bug.
 
 The advisor is optional. It sits beside your session as a second opinion and reaches none of the employees, so it carries no effort setting. Leave the field blank and type `none` to skip it, and the setting is removed instead of stored empty.
 
-Two escapes from the four. The blank field on any choice takes a model ID you type by hand, for a frontier model on the hardest work or a small cheap one on the most mechanical ICs. And none of it is locked in at audit time. `/workforce model-map` reopens every one of these choices later, without re-running the audit.
+Two escapes from the four. The blank field on any choice takes a model name you type by hand: the very newest, most capable model for the hardest work, or a small cheap one for the most routine ICs. And none of it is locked in at audit time. `/workforce model-map` reopens every one of these choices later, without re-running the audit.
 
 ## Employee Handbooks
 
@@ -185,13 +185,13 @@ Boris Cherny, the creator of Claude Code, argues at [Startup School 2026](https:
 
 Sam Carpenter, who wrote [*Work the System*](https://www.workthesystem.com), argues the exact opposite. Assume nothing, because the person executing has never seen the job. Write every step. His whole book is built on that premise, and his document hierarchy is the skeleton of this project. A Strategic Objective at the top. Operating principles underneath. Working procedures at the bottom. Every decision conforms to the layer above it, and a case no procedure covers falls upward to the principles rather than getting a new rule written for it. That second half is the part that keeps a company from drowning in documentation about things that happened once.
 
-Both are right, for different readers. A lead reasoning about how to coordinate a department needs latitude. An IC running in a fresh context with no history and nobody to ask needs determinism. Leads get charters. ICs get numbered procedures.
+Both are right, for different readers. A lead reasoning about how to coordinate a department needs latitude. An IC running blind in a brand-new conversation, with no history and nobody to ask, needs every step spelled out. Leads get charters. ICs get numbered procedures.
 
-Every handbook names a check that proves the work: an exit code, a test suite, a file assertion. *"Review the output for quality"* gets rejected at authoring time, because an employee that can't verify itself either stops early or claims a success it didn't earn.
+Every handbook names a check that proves the work: a command that comes back successful, a set of tests that pass, a file that has to exist. *"Review the output for quality"* gets rejected at authoring time, because an employee that can't verify itself either stops early or claims a success it didn't earn.
 
-Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it. `session_login` captures a login once, then `session_scaffold_tests` generates a deterministic Playwright suite with no model in the loop. The employee verifies by running a suite that passes. It also replaces WebFetch, which subagents don't receive at all.
+Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it. It records you logging into a site once, then builds a repeatable test out of that recording, with no model involved in the checking. The employee proves its work by running that test and watching it pass. It also does the web-page fetching these employees otherwise can't do on their own.
 
-Some work has no command that can check it. There, the check is a catalog. Every project gets two evaluators, one for code quality and one for text authenticity, each carrying a list of tells and taxonomies. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this cluster three or more of these tells?"* is close to mechanical.
+Some work has no command that can check it. There, the check is a catalog, a written list to grade against. Every project gets two reviewers, one for code quality and one for whether writing reads as genuinely human, each carrying a list of tells and common mistakes. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this trip three or more of these specific tells?"* is close to mechanical.
 
 ## A Handbook Isn't Finished Until a Stranger Can Follow It
 
@@ -200,7 +200,7 @@ Some work has no command that can check it. There, the check is a catalog. Every
 
 Carpenter calls them "off-the-street people." His release rule is that a procedure isn't finished until someone uninvolved executes it cold and succeeds. Human organizations approximate this badly, because a colleague always knows *something*.
 
-Here it's exact. A subagent is a genuinely fresh context: no conversation history, no memory of the discussion that produced the document, nobody to ask. The uninvolved reader is free, and so the test is real rather than aspirational. Every handbook gets executed by a cold agent before it's registered. If that agent has to ask a question, the handbook doesn't ship.
+Here it's exact. When Claude spins up a helper in its own separate conversation, that helper starts genuinely blank: no history of the chat, no memory of the discussion that produced the document, nobody to ask. The uninvolved reader is free, and so the test is real rather than aspirational. Every handbook gets run by one of these cold helpers before it goes into service. If that helper has to ask a question, the handbook doesn't ship.
 
 ## When Something Goes Wrong, the Document Is at Fault
 
@@ -217,9 +217,9 @@ That isn't manners. Blaming the agent produces no fix. The same handbook in a fr
 
 ## Your CLAUDE.md Gets Deleted
 
-CLAUDE.md is injected once, at the head of the conversation, and that placement is the problem. Everything arriving afterward competes with it, so a rule sitting at the top of a long session is a rule that quietly stops applying. It is loudest at the start, before any work has happened, and faintest by the time the session is making the decisions that actually matter.
+CLAUDE.md is the file of standing instructions Claude reads at the very start of a session, the house rules for a project. It gets read once, at the head of the conversation, and that placement is the problem. Everything arriving afterward competes with it, so a rule sitting at the top of a long session is a rule that stops applying unnoticed. It is loudest at the start, before any work has happened, and faintest by the time the session is making the decisions that actually matter.
 
-So the audit empties it. Every line of direction moves to whichever component owns it. A rule about how one employee behaves becomes part of that employee's handbook, which arrives with the spawn that needs it. A procedure becomes a skill or a script, loaded at the moment it is invoked. Anything that has to fire on every tool call becomes a hook, which is the only always-on component there is. Routing rules and whatever fits nowhere else go into the org process. Directive blocks marked immutable are your own words, so they get extracted verbatim before anything else moves.
+So the audit empties it. Every line of direction moves to whichever piece of the system owns it. A rule about how one employee behaves becomes part of that employee's handbook, which arrives with the employee the moment it's called in. A procedure becomes a skill or a script, loaded at the moment it's used. Anything that has to happen on every single action becomes a hook: a rule that fires automatically, the one kind of instruction that's always awake instead of only being read at the start. Routing rules and whatever fits nowhere else go into the dispatch process that runs on every request. Blocks you marked as your own untouchable words get copied out exactly, character for character, before anything else moves.
 
 Architecture notes and stack descriptions go nowhere, because they are already derivable. A directory listing or a restated build command can be read off the repository on demand, and copying one into a handbook only creates a second copy to keep current.
 
@@ -227,49 +227,49 @@ Then the file is deleted.
 
 The safety here is mechanical. `wf-claude-md --evacuate` reports every directive line as either relocated or UNPLACED, and the deletion refuses while a single line is unplaced or a single immutable block is still sitting in the file. A line that arrived nowhere was not moved, it was lost, and preservation is the first directive this project has. Of the three real projects it has run against, two refuse today, at 70 and 191 unplaced lines. That is what those repositories currently look like, and the refusal is the tool working. An evacuation is finished when the lines have moved, not when the file is gone.
 
-The third is this repository, which ran the audit on itself on 2026-08-06. Its own CLAUDE.md is gone: 83 directive lines proven relocated first, the whole 168-line file stored in `.claude/workforce/.settings-owned.json` before the delete, and in git history besides. The Non-negotiables that had sat at the top of that file are now the `## Guardrails` of the one employee they constrain, and arrive with the spawn that has to obey them. The stack description moved nowhere and was dropped.
+The third is this repository, which ran the audit on itself on 2026-08-06. Its own CLAUDE.md is gone: 83 directive lines proven relocated first, the whole 168-line file stored in `.claude/workforce/.settings-owned.json` before the delete, and in git history besides. The Non-negotiables that had sat at the top of that file are now the `## Guardrails` of the one employee they constrain, and arrive with the employee that has to obey them. The stack description moved nowhere and was dropped.
 
 Emptying the file also turned up a rule that had no other home. A dated, attributed user directive, *a detector ships with its fix*, existed only in CLAUDE.md, and the shipped references carried a paraphrase of it and nothing more. No gate could have caught that, because every gate counts directives wrapped in immutable spans and this one never was. It survived exactly as long as someone kept reading the top of the file. That is the failure the deletion is for: a file can be the only place a rule lives while steadily losing the attention that makes it a rule.
 
-One caveat, since the rest of this reads as a pitch. That early context loses influence as a session grows is a reason, not a measurement. Nothing here has measured it on a host, and this project's own rule is that an unmeasured fact never becomes a blocking check. What is enforced is the ledger, which is a property of files and can be verified.
+One caveat, since the rest of this reads as a pitch. That instructions at the very start lose their grip as a session grows is a reason, not a measurement. Nothing here has measured it on an actual machine, and this project's own rule is that an unmeasured fact never becomes a check that can refuse your work. What is enforced is the paper trail (that every line moved somewhere), which is a property of files and can be verified.
 
 ## The Long Session Is the Expensive One
 
 The last section was about the head of a conversation losing influence. This is about the tail of it getting too big.
 
-A model is stateless, so every turn resends the whole conversation back to it. A ten-step agent doesn't cost ten times one step; it costs the sum of a history that grows the entire way, and that curve is quadratic, not linear. Caching discounts the slope. It doesn't change the shape. And a long context doesn't only cost more, it reasons worse, because the one thing the model needs is buried in more and more that it doesn't. The long session is both the expensive one and the distracted one.
+A model keeps no memory of its own, so every single turn the whole conversation so far gets sent back to it from scratch. A ten-step job doesn't cost ten times one step; it costs the running total of a history that keeps growing the entire way, so the price climbs faster and faster: every step costs more than the one before it. There's a discount for material that repeats, but it only softens the climb. And a long conversation doesn't only cost more, it reasons worse, because the one thing the model needs is buried in more and more that it doesn't. The long session is both the expensive one and the distracted one.
 
 ![A craftsperson at an evening workbench nearly buried under a towering, spilling pile of papers accumulated over the day, squinting to find one small note at the top, while through a doorway in cool morning light a second worker begins the same task at a clean, uncluttered bench](assets/images/long-session.png)
 *A session carries its whole history, and the longer it runs the deeper the one note that matters is buried. A fresh context is the clean bench.*
 
-Most of the company already fights this without trying. An IC runs in its own fresh context and hands back a verdict, so four short contexts do the work one long one would have, and four small quadratics are cheaper than one big one. The isolation was built for the chain of command. The savings came free.
+Most of the company already fights this without trying. An IC works in its own short, separate conversation and hands back a verdict, so four small conversations do the work one long one would have, and four small climbing curves cost less than one big one. The separation was built for the chain of command. The savings came free.
 
-What isolation doesn't catch is a single agent spinning — reading the same file a third time, re-running the command that already failed, thrashing in a way that inflates its context without moving the work. `wf-loop-guard` is a hook that watches for exactly that: the same tool, the same arguments, three times, with no edit in between. When it fires it doesn't scold. It asks the agent to say what it's trying to find, why the last attempts didn't find it, and to try a different approach or hand the problem to someone who hasn't been staring at it. A stuck agent reviewing its own stuck context is the worst-placed judge there is; the useful second look comes from a different reader, which is why the audit's panels are built to disagree.
+What separation doesn't catch is a single agent spinning its wheels: reading the same file a third time, re-running the command that already failed, thrashing in a way that piles up history without moving the work. `wf-loop-guard` is one of those always-on rules that watches for exactly that: the same action, the same inputs, three times over, with nothing changed in between. When it fires it doesn't scold. It asks the agent to say what it's trying to find, why the last attempts didn't find it, and to try a different approach or hand the problem to someone who hasn't been staring at it. A stuck agent reviewing its own stuck context is the worst-placed judge there is; the useful second look comes from a different reader, which is why the audit's panels are built to disagree.
 
-You can measure how long your own agents run. `wf-runlength` reads a project's transcripts and reports the distribution. Against this repository, the median background agent peaks around 67,000 tokens of context and the median main session around 227,000 — already past a small model's window — with the longest sessions near a million. That is what the problem looks like on a real project, not a hypothetical.
+You can measure how long your own agents run. `wf-runlength` reads a project's saved conversations and reports the spread. Against this repository, the median background helper peaks around 67,000 tokens of history, and the median main session around 227,000, already more than a small model can hold in mind at once, with the longest sessions near a million. A token is about three-quarters of a word. It's what the model reads, and what you're billed for. That is what the problem looks like on a real project, not a hypothetical.
 
-The honest parts, since this could read as a pitch. The harness won't tell a hook how full a context is, so the guard watches behavior, not size: it catches loops, not a large-but-productive session, and that healthy-but-huge context is the part no runtime check can save. The quadratic cost is arithmetic and certain; that long context reasons worse is documented elsewhere and not measured here, so nothing in this project refuses your work on its basis. And the guard ships switched off — wiring it changes how every agent behaves, so it's one command you run when you want it, not a default that arrives with the install.
+The honest parts, since this could read as a pitch. Claude Code won't tell the guard how full a conversation has gotten, so the guard watches behavior, not size: it catches loops, not a large-but-productive session, and that healthy-but-huge conversation is the part no automatic check can save. The rising cost is plain arithmetic and certain; that a long conversation reasons worse is documented elsewhere and not measured here, so nothing in this project refuses your work on its basis. And the guard ships switched off. Wiring it changes how every agent behaves, so it's a step you take deliberately, the day you decide you want it.
 
 ## The Honest Parts
 
 Four things, stated without cushioning.
 
-**The chain of command is advisory.** An employee *can* spawn a peer its handbook forbids, and the system finds out afterward rather than stopping it. Nothing in this project describes that as enforced.
+**The chain of command is advisory.** An employee *can* quietly call in a coworker its handbook says it shouldn't, and the system finds out afterward rather than stopping it in the act. Nothing in this project describes that as enforced.
 
-**Total spawns per session are capped and can't be raised.** Department width caps help. Dispatching to the lowest node helps. The counter itself is advisory.
+**The total number of helpers a session can start is capped, and can't be raised.** Limits on how wide a department gets help. Sending work to the lowest desk that can handle it helps. The cap itself is only a warning line, not a wall.
 
-**Only the top-level summary returns to you.** Every employee writes its work to a file and returns a verdict plus a path. A lead that summarizes away its team's findings isn't something the system can prevent.
+**Only the top-level summary returns to you.** Every employee writes its full work to a file and hands back a verdict plus a pointer to it. A lead that glosses over its team's findings isn't something the system can prevent.
 
-**Cost scales with fan-out.** Each spawn pays for a fresh context plus whatever the harness injects into it, with no per-agent opt-out. That is why `CLAUDE.md` gets evacuated rather than trimmed. Until the evacuation finishes, every line still in the file is paid on every spawn, multiplied by the width of your org.
+**Cost grows with how many helpers you run.** Every helper you start pays for its own fresh conversation, plus whatever Claude Code automatically loads into it, and there's no way to opt a single helper out. That is why `CLAUDE.md` gets emptied and deleted rather than just trimmed. Until that's done, every line still in the file is paid for on every helper you start, multiplied across the whole company.
 
 ## If Your Repo Has a Test Corpus
 
 The audit surveys every markdown file under your project. If some of those files are **deliberately
-malformed test fixtures** — a corpus you built precisely so some tool could detect breakage — the
+malformed test fixtures** (a corpus you built precisely so some tool could detect breakage), the
 survey will report your fixtures as real problems, and it may treat text inside them as your own
 words.
 
-Declare them in a **`.censusignore`** at your project root — one glob per line, `#` for comments:
+Declare them in a **`.censusignore`** at your project root, one glob per line, `#` for comments:
 
 ```gitignore
 # deliberately malformed trees; not project content
@@ -277,7 +277,7 @@ fixtures/
 testdata/broken-*
 ```
 
-Two things it deliberately does **not** do. It never guesses — there is no `fixtures/` default and no
+Two things it deliberately does **not** do. It never guesses: there is no `fixtures/` default and no
 inference from directory names, so a project that declares nothing has everything surveyed, which is
 the normal case. And it never hides what it skipped: every run prints how many files were excluded by
 how many patterns, lists them, and **names any pattern that matched nothing**, because a pattern
@@ -289,15 +289,15 @@ data.*
 
 ## Platform Facts Expire
 
-Before a line of this system was written, a canary measured two documented platform behaviors on a real host. One held. The other didn't, and the false one had already been built into a check that would have refused valid work.
+Before a line of this system was written, a small test probe checked two behaviors the documentation claimed, on a real machine. One held. The other didn't. And the false one had already been built into a check that would have refused perfectly valid work.
 
-Platform facts carry the harness version they were measured on. After an upgrade they go stale. A stale fact may not be the basis of any check that refuses your work.
+Facts about the platform carry the version of Claude Code they were measured on. After an update they go stale. A stale fact isn't allowed to be the basis of any check that refuses your work.
 
 ```
 /workforce verify
 ```
 
-That reports which copy of the skill is active, whether the facts are current, whether the org on disk matches the chart, and whether anything is registered but not yet loaded.
+That reports which copy of the skill is active, whether the platform facts are still current, whether the company saved on disk matches the org chart, and whether anything has been written but isn't actually live yet.
 
 ## Coming from Claude Enforcer
 
