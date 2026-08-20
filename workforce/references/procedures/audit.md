@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 53 assertion(s) in bin/check name this file; 107 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 54 assertion(s) in bin/check name this file; 109 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1048,7 +1048,7 @@ not, fail **by name** — never a generic error.
 Budget Receipt
 | Lane / Tier          | Model  | Effort | Source                   |
 | analytical / Lead    | <id>   | medium | asked this run           |
-| analytical / IC      | <id>   | medium | unchanged, pre-selected  |
+| analytical / IC      | <id>   | medium | recommended default (first run) |
 | creative             | <id>   | medium | asked this run           |
 | code                 | <id>   | medium | blank -> analytical      |
 | advisor              | <id>   | --     | unchanged, pre-selected  |
@@ -1060,6 +1060,12 @@ Lane assignment (per employee)
 | engineering-site   | engineering | code       | derived from the work                  |
 | ops-runner         | ops         | analytical | unclassified - fell to the baseline    |
 ```
+
+**A recommended default and a user's active choice must never render alike.** A first-run object that
+resolved to its lane's recommendation (`audit-setup.md` § Step 0.4a / § Step 0.4b) carries the
+first-run Source shown in the receipt above; if the user changed it, it carries `asked this run`
+instead. A value that arrived as the recommendation nobody chose must never look like one chosen
+deliberately.
 
 **The pool is read from the shipped template, never from the project config.** The four statics behind
 the receipt come from `org-config.template.md` § Model statics only. If this project's `org-config.md`

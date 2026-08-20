@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 47 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 49 assertion(s) in bin/check name this file; 69 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -403,6 +403,16 @@ the ranking is what lets a user read the cost of a choice at a glance. The advis
 recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
 model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
 
+**On a first run there is no recorded value, and the pre-selected default is still deterministic.**
+Resolve each object's default in priority order: (1) the value in this project's `org-config.md` when one
+is present — a re-audit; ELSE (2) the lane's recommended model (§ Model statics, Notes column). There is
+no third fallback —
+**a first run defaults to the recommendation** —
+never the first or most-expensive static, and never unset, so the recommendation is the forced budget
+selection unless the user overrides it, identically on every project. This is a VALUE default and is
+orthogonal to list POSITION: it does not reorder the options and does not promote the recommended
+static to the first position; the ordering rule above — position never moves to surface a pick — STANDS.
+
 **The advisor object lives on the backup call** (§ Step 0.2), pre-selected from the current
 `advisorModel` in project settings (read in Step 0.3). Choosing a model writes `advisorModel`;
 typing **none** in the blank field removes the key entirely. It runs only in the main session and does not compound with spawned
@@ -429,6 +439,16 @@ lane's current rung where that order puts it and never promotes it to the first 
 questions render back to back and must not be ordered by opposite conventions. Offer only the rungs the
 lane's selected model supports, and never invent one — the ladder is the complete set, so there is no
 "Other" here.
+
+**The pre-selected default resolves exactly as the model budget's does** (§ Step 0.4a): (1) the rung in
+this project's `org-config.md` when present — a re-audit; ELSE (2) the lane's recommended rung (§ Effort
+statics recommendation table). There is no third fallback —
+**a first run defaults to the recommended rung** —
+never the most-expensive rung and never unset, so the recommendation is the forced budget selection
+unless the user overrides it. It is a VALUE default, orthogonal to list POSITION: it neither reorders
+the ladder nor promotes the recommended rung to the first position, and the position rule above STANDS.
+The lane's *current value* is a separate seed used only for ladder windowing and is simply empty on a
+first run (below); the pre-selected default is never empty.
 
 **`AskUserQuestion` caps options at four, and the full ladder is five** (`max`/`xhigh`/`high`/`medium`/
 `low`). Where the selected model supports five rungs, offer the **four nearest the recommended rung** —

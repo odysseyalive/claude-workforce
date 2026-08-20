@@ -308,12 +308,14 @@ Managed by `audit`. Hand-edit any of them; delete one to reset.
 |---|---|---|
 | `audit-disclaimer` | `unset` \| `accepted` | Set automatically on every interactive audit. Consumed only by headless runs: with no acceptance on record a headless audit refuses, because the budget questions cannot render headless |
 | `org-setup` | `unset` \| `configured` \| `declined` | Whether this project uses a workforce org at all. `declined` silences audit entirely |
-| `budget-setup` | `unset` \| `configured` | Whether the model and effort budgets have been answered once. **Never a suppression switch** — the budget questions render on every interactive audit; this only decides which values arrive pre-selected |
+| `budget-setup` | `unset` \| `configured` | Whether the model and effort budgets have been answered once. **Never a suppression switch** — the budget questions render on every interactive audit; this only decides which values arrive pre-selected: `unset` → the lane's recommended value is the pre-selected default; `configured` → the recorded value (`references/audit-setup.md` § Step 0.4a / § Step 0.4b) |
 | `succession` | `none` \| `declared` | **`none` (default): coexistence.** Workforce lands beside the existing skill library and converts only the narrow cases — RETAIN rules 3 and 7 refuse hand-authored and foreign-generated skills. **`declared`: workforce is taking the library over.** Those two rules stand down and most one-actor workflows become eligible. Orchestrators, pure reference, `disable-model-invocation` skills, unparseable skills, **and skills whose
 imperative content sits only inside an immutable span** still refuse (`references/conversion-taxonomy.md` § SUCCESSION) |
 
 **The budget questions are never skipped.** Every full interactive audit renders every budget question,
-with current values pre-selected — answering costs one click when nothing changed. A marker may change
+with current values pre-selected — answering costs one click when nothing changed. On a first run
+(`budget-setup: unset`) the pre-selected default is the lane's recommended value; once `configured` it
+is the recorded value (`references/audit-setup.md` § Step 0.4a / § Step 0.4b). A marker may change
 a default; it may never drop a question. The audit prints a **Budget Receipt** showing each resolved
 value and where it came from (`asked this run` / `unchanged, pre-selected` / `config default`), so a
 skipped question and an answered one can never look the same.

@@ -4628,6 +4628,35 @@ check(
     "audit-setup.md Step 0.4a no longer forbids promoting the recommended static to "
     "first position; the cost ranking is the only thing that orders that list",
 )
+# A recommendation offered as a `(recommended)` LABEL is not a forced default, and
+# AskUserQuestion has no pre-select field — so without an explicit resolution rule a
+# first run adopted the recommendation only sometimes, varying by run. Step 0.4a/0.4b
+# now state the first-run default explicitly; these anchor that it stays stated.
+check(
+    "audit-setup: on a first run the model budget defaults to the recommendation",
+    "a first run defaults to the recommendation" in _asu,
+    "audit-setup.md Step 0.4a no longer states that a first run defaults to the "
+    "recommended model — without it the recommendation is only a label, not the "
+    "forced pre-selected budget default, and adoption varies by run",
+)
+check(
+    "audit-setup: on a first run the effort budget defaults to the recommended rung",
+    "a first run defaults to the recommended rung" in _asu,
+    "audit-setup.md Step 0.4b no longer states that a first run defaults to the "
+    "recommended rung — without it the effort recommendation is only a label, not the "
+    "forced pre-selected budget default, and adoption varies by run",
+)
+# A value that arrived as the recommended default and one the user actively chose must
+# not render as the same receipt Source. audit.md's Budget Receipt carries the
+# `recommended default (first run)` label so a first-run default never looks chosen.
+_aud_receipt = read("workforce/references/procedures/audit.md")
+check(
+    "audit: the Budget Receipt carries a distinct first-run recommended-default Source",
+    "recommended default (first run)" in _aud_receipt,
+    "audit.md Budget Receipt no longer carries the `recommended default (first run)` "
+    "Source — a value nobody chose then renders identically to one the user chose, the "
+    "exact confusion the receipt exists to prevent",
+)
 # hooks.md's Reporting block declared a `dead wiring` count from the day it was
 # written and nothing produced it: wf-census stored each command string and never
 # stat'd it, while its own docstring promised "the resolved command path." Three

@@ -85,7 +85,10 @@ Print the resolved table with the **source of every value**:
 | Advisor                | <id>  |        | asked this run            |
 ```
 
-**Every level that resolved a value appears by name.** `employee override (pinned)` and `analytical default` must
+**Every level that resolved a value appears by name** — including `recommended default (first run)`,
+the Source of an object that resolved to its lane's recommendation on a first run
+(`references/audit-setup.md` § Step 0.4a / § Step 0.4b), distinct from `asked this run` when the user
+changed it. `employee override (pinned)` and `analytical default` must
 never render alike: a pin is a standing exception, and one left behind after the org moved is invisible
 otherwise. An override naming an employee that no longer exists is a `reconcile` finding, not a silent
 no-op.
