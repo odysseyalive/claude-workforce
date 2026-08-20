@@ -103,6 +103,7 @@ CHK = "bin/check"
 COV = "bin/coverage"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
+WFMB = "workforce/bin/wf-model-budget"
 PRM = "workforce/bin/wf-permissions"
 CMD = "CLAUDE.md"
 DEV = "DEVELOPMENT.md"
@@ -315,6 +316,17 @@ CASES = [
      AUD, "del", "The pool is read from the shipped template, never from the project config."),
     ("model-map: the statics are read from the template, never from the project config",
      MM, "del", "never from the project's `org-config.md`"),
+    # ── the sole-source rule ships with its mechanical fix: wf-model-budget derives
+    #    the picker from the template so a re-audit cannot reconstruct a stale pool
+    #    (2026-08-20, TicketTomato) ──
+    ("audit-setup: the model budget option set is produced by wf-model-budget, not by hand",
+     ASU, "del", "PRODUCED MECHANICALLY"),
+    ("model-map: the model budget option set is produced by wf-model-budget, not by hand",
+     MM, "del", "must not derive it two ways"),
+    ("wf-model-budget hardcodes no model ID in its logic — the pool has one home",
+     WFMB, "append", '\n_LEAKED_CONSTANT = "claude-opus-5"\n'),
+    ("wf-model-budget derives the recommendation from the template's Notes column",
+     WFMB, "del", "Recommended for analytical IC"),
     ("audit-setup: the effort budget orders its rungs most expensive first",
      ASU, "del", "The rungs are offered most expensive first"),
     ("scopes: no shipped file invokes a script by a bare project-scope path",

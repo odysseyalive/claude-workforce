@@ -1,6 +1,6 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without
@@ -46,6 +46,11 @@ else arrives via the blank field. **The statics are read from `org-config.templa
 only** — never from the project's `org-config.md`. A legacy `## Model statics` section embedded in a
 project config is reported as a stale artifact and read past, never clobbered
 (`org-config.template.md` § Model statics).
+
+**The model budget's option set comes from `wf-model-budget`, the same shipped script `audit` Step 0.4a
+renders** (`references/audit-setup.md` § Step 0.4a). Run `wf-model-budget --root <project> --config
+<org-config.md>` and render its four `LANE` blocks verbatim rather than reconstructing the pool, the
+`(recommended)` marker, or the cost order by hand — the two readers of the pool must not derive it two ways.
 
 ## Resolution
 

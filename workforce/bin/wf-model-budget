@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""wf-model-budget — emit the model budget picker's options, mechanically.
+
+`audit` Step 0.4a and `model-map` render one `AskUserQuestion` with four lane
+objects — `analytical · Lead`, `analytical · IC`, `creative`, `code` — each
+offering the four static models in cost order with the lane's recommended model
+marked `(recommended)`. Until now that option set was RECONSTRUCTED from prose by
+the running agent on every run, and it drifted.
+
+WHY THIS EXISTS — a measured, recurring drift.
+
+`references/org-config.template.md` § Model statics is the SOLE source of the four
+statics (`audit-setup.md` § Step 0.4a: "read from the shipped template's § Model
+statics and from nowhere else"). A project's instantiated `org-config.md` records
+chosen values, not the pool. But an older instantiation copied a `## Model statics`
+section INTO the project file, and on a re-audit the agent reconstructing the picker
+read that co-located stale copy instead of the template — proposing the
+pre-`claude-sonnet-5` four (`claude-fable-5` present as a static, `claude-sonnet-5`
+absent) and marking `claude-opus-4-8` as the undifferentiated "analytical"
+recommendation instead of splitting Lead/IC. The template names this exact failure
+twice (§ Model statics line 34, `audit-setup.md` line 393) and guarded it with PROSE
+ONLY, so it recurred: the picker showed the stale four on precisely the projects that
+carry the stale section — re-audits that predate the sonnet-5 split — and the right
+four elsewhere. "Not consistently across all projects" is the signature of a
+prose-only rule that bites only the contaminated inputs.
+
+A DETECTOR SHIPS WITH ITS FIX (`SKILL.md` § Directives, 2026-08-05). The fix is to
+stop reconstructing the option set and DERIVE it, so the picker is a pure function of
+the template and cannot be contaminated by anything a project file carries.
+
+WHAT IT DERIVES, and from where:
+  * The four statics, in the template's cost order, with their Notes — parsed from
+    § Model statics. No model ID is written in this script; "never fabricate a model
+    ID" (`SKILL.md` Core Principle 5) and "constants stated once" (Principle 9a) both
+    forbid a second copy of the pool living in code.
+  * The per-lane recommendation — parsed from each Notes cell's `Recommended for
+    <lane>` annotation, so re-splitting or re-pointing a recommendation is a
+    template edit with no code change (`org-config.template.md` § Model statics:
+    "the budget question reads these cells and has no other source").
+  * The pre-selected default per lane — the recorded value from the project's
+    `org-config.md` four-lane tables when one is passed (a re-audit), ELSE the lane's
+    recommended model (a first run defaults to the recommendation, `audit-setup.md`
+    § Step 0.4a). A recorded value that is not one of the four statics is still
+    honored as the default and flagged, because a project may pin an "Other" model.
+
+WHAT IT REFUSES: the pool is NEVER read from `--config`. If the project's
+`org-config.md` carries its own `## Model statics` heading, it is reported as a stale
+legacy artifact and read PAST, never clobbered (the project file is the user's,
+`org-config.template.md` § Model statics: the never-clobber rule holds).
+
+The recommendation is a LABEL, never a POSITION (`org-config.template.md` § Model
+statics): the options are emitted in cost order and `(recommended)` is appended in
+place, never promoted to the top. This script emits them in that order and marks in
+place; a caller that reorders them is reintroducing the drift by hand.
+
+EXIT CODES: 0 normal (including when a stale embedded section was reported — it is a
+finding to surface, not a failure to abort on); 2 only when the template's § Model
+statics cannot be found or parsed, because then the caller has no trustworthy pool
+and must not fall back to reconstructing one.
+"""
+
+import argparse
+import os
+import re
+import sys
+
+# The canonical lane order, owned by org-config.template.md § The four lanes and
+# restated in neither budget. Parsed labels from the Notes column map onto these.
+LANES = [
+    ("analytical-lead", "analytical · Lead", "Agents that coordinate"),
+    ("analytical-ic", "analytical · IC", "Agents that do the work"),
+    ("creative", "creative", "Writing and design work"),
+    ("code", "code", "Code work"),
+]
+
+# Maps the phrase in a Notes cell's "**Recommended for X**" to a lane key above.
+# Order matters: "analytical IC"/"analytical Lead" must be tested before a bare
+# "analytical" would ever match, so the two-word forms are the only ones listed.
+_REC_PATTERNS = [
+    (re.compile(r"Recommended for analytical Lead", re.I), "analytical-lead"),
+    (re.compile(r"Recommended for analytical IC", re.I), "analytical-ic"),
+    (re.compile(r"Recommended for creative", re.I), "creative"),
+    (re.compile(r"Recommended for code", re.I), "code"),
+]
+
+
+def _die(msg, code=2):
+    sys.stderr.write("wf-model-budget: " + msg + "\n")
+    sys.exit(code)
+
+
+def _read(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read()
+    except OSError as exc:
+        _die("cannot read %s: %s" % (path, exc))
+
+
+def default_template_path():
+    """The shipped template co-located with this script: bin/ and references/ are
+    siblings in all three copies (source, runtime, personal install)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(here, "..", "references", "org-config.template.md"))
+
+
+def _section(text, heading_re):
+    """Return the body between a heading matching heading_re and the next `## `."""
+    lines = text.splitlines()
+    out, capturing = [], False
+    for line in lines:
+        if capturing:
+            if line.startswith("## "):
+                break
+            out.append(line)
+        elif heading_re.match(line):
+            capturing = True
+    return "\n".join(out) if capturing else None
+
+
+def parse_statics(template_text):
+    """Parse § Model statics into an ordered list of (model_id, notes, rec_lane_or_None).
+
+    Cost order is table order — the template states it is ordered most-expensive-first
+    and presented in that order every time, so this function never re-sorts."""
+    body = _section(template_text, re.compile(r"^##\s+Model statics"))
+    if body is None:
+        _die("template has no '## Model statics' section: " + "cannot derive the pool")
+    rows = []
+    # A statics row looks like: | 1 | `<model-id>` | 1M | 128K | ...notes... |
+    row_re = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|.*\|\s*(.*?)\s*\|\s*$")
+    for line in body.splitlines():
+        m = row_re.match(line)
+        if not m:
+            continue
+        model_id, notes = m.group(1).strip(), m.group(2).strip()
+        rec_lane = None
+        for pat, lane in _REC_PATTERNS:
+            if pat.search(notes):
+                rec_lane = lane
+                break
+        rows.append((model_id, notes, rec_lane))
+    if not rows:
+        _die("'## Model statics' present but no model rows parsed: " + "table shape changed")
+    return rows
+
+
+def recommended_by_lane(statics):
+    rec = {}
+    for model_id, _notes, lane in statics:
+        if lane is not None:
+            rec[lane] = model_id
+    return rec
+
+
+# --- project config parsing (re-audit defaults only; NEVER the pool) -------------
+
+def _find_backticked(text, label_re):
+    """First backticked token on a table row whose first cell matches label_re."""
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        if label_re.search(cells[0]):
+            for cell in cells[1:]:
+                bt = re.search(r"`([^`]+)`", cell)
+                if bt:
+                    return bt.group(1).strip()
+    return None
+
+
+def parse_config_defaults(config_text):
+    """Recorded per-lane models from a project's org-config.md four-lane tables.
+    Best-effort: a lane that cannot be found simply has no recorded default and
+    falls back to the recommendation. Returns {lane_key: model_id}."""
+    defaults = {}
+    lead = _find_backticked(config_text, re.compile(r"^Lead\b", re.I))
+    ic = _find_backticked(config_text, re.compile(r"^IC\b", re.I))
+    creative = _find_backticked(config_text, re.compile(r"^Creative model\b", re.I))
+    code = _find_backticked(config_text, re.compile(r"^Code model\b", re.I))
+    if lead:
+        defaults["analytical-lead"] = lead
+    if ic:
+        defaults["analytical-ic"] = ic
+    if creative:
+        defaults["creative"] = creative
+    if code:
+        defaults["code"] = code
+    return defaults
+
+
+def config_has_stale_statics(config_text):
+    return bool(re.search(r"^##\s+Model statics", config_text, re.M))
+
+
+# --- emission --------------------------------------------------------------------
+
+def emit(statics, rec, defaults, stale, template_path):
+    out = []
+    out.append("WF-MODEL-BUDGET  (Step 0.4a option set — render verbatim, do not reorder)")
+    out.append("source: %s § Model statics" % template_path)
+    out.append("pool (cost order, most expensive first): "
+               + ", ".join(m for m, _n, _l in statics))
+    out.append("")
+    for lane_key, lane_label, prompt_label in LANES:
+        rec_model = rec.get(lane_key)
+        default_model = defaults.get(lane_key, rec_model)
+        out.append("LANE %s  (object: \"%s\")" % (lane_label, prompt_label))
+        if rec_model is None:
+            out.append("  !! no static is marked 'Recommended for %s' in the template" % lane_label)
+        for model_id, notes, _l in statics:
+            marks = []
+            if model_id == rec_model:
+                marks.append("(recommended)")
+            if model_id == default_model:
+                marks.append("[pre-selected]")
+            suffix = ("  " + " ".join(marks)) if marks else ""
+            out.append("  - %s%s" % (model_id, suffix))
+        out.append("  + Other (hand-typed model ID)")
+        # A recorded default outside the four statics is legal (an "Other" pin) but
+        # must be surfaced so it is not mistaken for a dropped option.
+        if default_model is not None and default_model not in {m for m, _n, _l in statics}:
+            out.append("    pre-selected = %s (recorded 'Other' pin, not a static)" % default_model)
+        src = "recorded (re-audit)" if lane_key in defaults else "recommended default (first run)"
+        out.append("  default source: %s" % src)
+        out.append("")
+    if stale:
+        out.append("STALE-ARTIFACT: the project's org-config.md carries a '## Model statics' "
+                   "heading. The pool was read from the template, never from that copy. "
+                   "Report it as a stale legacy artifact; never rewrite or delete it "
+                   "(org-config.template.md § Model statics — the never-clobber rule holds).")
+    else:
+        out.append("stale embedded '## Model statics' in project config: none")
+    return "\n".join(out)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="wf-model-budget",
+        description="Emit the model budget picker's options from the shipped template.",
+    )
+    ap.add_argument("--root", default=".",
+                    help="base for resolving relative --template/--config (the test harness "
+                         "and audit invoke with the project root here)")
+    ap.add_argument("--template", default=None,
+                    help="path to org-config.template.md (default: co-located references/ copy)")
+    ap.add_argument("--config", default=None,
+                    help="path to the project's org-config.md (re-audit defaults + stale-section check)")
+    args = ap.parse_args(argv)
+
+    def _resolve(p):
+        # Absolute paths pass through; relative paths resolve against --root, so a
+        # fixture copied to a temp tree finds its own frozen template.
+        return p if os.path.isabs(p) else os.path.join(args.root, p)
+
+    template_path = _resolve(args.template) if args.template else default_template_path()
+    statics = parse_statics(_read(template_path))
+    rec = recommended_by_lane(statics)
+
+    defaults, stale = {}, False
+    config_path = _resolve(args.config) if args.config else None
+    if config_path and os.path.exists(config_path):
+        config_text = _read(config_path)
+        defaults = parse_config_defaults(config_text)
+        stale = config_has_stale_statics(config_text)
+
+    sys.stdout.write(emit(statics, rec, defaults, stale, template_path) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

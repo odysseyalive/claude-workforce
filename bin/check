@@ -4575,6 +4575,56 @@ check(
     "reader of the pool. A sole-source rule stated in one reader and not the other "
     "is a rule the other reader may correctly ignore",
 )
+# THE SOLE-SOURCE RULE SHIPS WITH ITS FIX. The four checks above assert the rule is
+# STATED in four files; every one is a prose sentinel, and a prose sentinel is exactly
+# what failed. MEASURED 2026-08-20: a re-audit (TicketTomato) reconstructed the picker
+# by hand, read the project's stale `## Model statics`, and rendered the
+# pre-`claude-sonnet-5` four with `claude-opus-4-8` marked the undifferentiated
+# analytical recommendation. "A DETECTOR SHIPS WITH ITS FIX" (SKILL.md § Directives):
+# the fix is `wf-model-budget`, which derives the option set from the template's table
+# and cannot read a project's pool at all. Both readers must NAME it, or one keeps
+# reconstructing by hand — the exact split that let the rule hold in one reader and
+# fail in the other above.
+check(
+    "audit-setup: the model budget option set is produced by wf-model-budget, not by hand",
+    "wf-model-budget" in _asu and "PRODUCED MECHANICALLY" in _asu,
+    "audit-setup.md Step 0.4a no longer names wf-model-budget as the mechanical "
+    "producer of the picker's options. Without it the run reconstructs the pool from "
+    "prose — the path that read a re-audit's stale `## Model statics` and proposed the "
+    "pre-`claude-sonnet-5` four on 2026-08-20 (fixture modelbudget-stale-reaudit)",
+)
+check(
+    "model-map: the model budget option set is produced by wf-model-budget, not by hand",
+    "wf-model-budget" in _mm_pool and "must not derive it two ways" in _mm_pool,
+    "model-map.md re-renders the same budget objects and must name the same mechanical "
+    "producer as audit-setup. A pool derived two ways by two readers is the drift the "
+    "script exists to foreclose",
+)
+# The script is a pure function of the template's table: it names NO model ID of its
+# own (constants: stated once — SKILL.md Principle 9a forbids a second copy of the
+# pool living in code) and derives the per-lane recommendation from the Notes column.
+_wfmb = read("workforce/bin/wf-model-budget")
+# The module docstring names the stale/current IDs to explain the historical drift —
+# that is documentation, not a second source of truth. Scope the constant check to
+# the code BELOW the module docstring, where a hardcoded ID would actually drive
+# emission. `_parts[1]` is the module docstring; `[0]` is the shebang, `[2:]` the code.
+_wfmb_parts = _wfmb.split('"""')
+_wfmb_code = (_wfmb_parts[0] + "".join(_wfmb_parts[2:])) if len(_wfmb_parts) >= 3 else _wfmb
+check(
+    "wf-model-budget hardcodes no model ID in its logic — the pool has one home",
+    bool(_wfmb) and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wfmb_code),
+    "wf-model-budget names a concrete claude-* model ID in executable code. The pool "
+    "lives only in org-config.template.md § Model statics; a second copy in the emitter "
+    "is the restated constant that makes a model refresh a two-file edit and drifts silently",
+)
+check(
+    "wf-model-budget derives the recommendation from the template's Notes column",
+    "Recommended for analytical IC" in _wfmb and "Recommended for analytical Lead" in _wfmb,
+    "wf-model-budget no longer parses the lane recommendation out of the Notes column. "
+    "org-config.template.md § Model statics says 'the budget question reads these cells "
+    "and has no other source' — a recommendation resolved any other way can disagree "
+    "with the template a maintainer just edited",
+)
 
 # The reference SHAPE, measured rather than described: this repository's own
 # instantiated config carries a Budget Receipt and no pool. There is no earlier

@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 49 assertion(s) in bin/check name this file; 69 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 50 assertion(s) in bin/check name this file; 69 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -393,6 +393,20 @@ inside it. Such a section is reported as a stale legacy artifact and read past, 
 (`org-config.template.md` § Model statics). Reading the pool from a co-located stale copy is exactly how a
 re-audited project once proposed a stale four and dropped the lower-cost static the template had since
 added.
+
+**This option set is PRODUCED MECHANICALLY — it is not reconstructed here by hand.** Run
+`wf-model-budget --root <project> --config <org-config.md when one is present>` (a shipped script). It
+reads the pool from the template's § Model statics and nothing else, emits the four `LANE` blocks in the
+template's cost order, marks each lane's recommended model `(recommended)` **in place** from the Notes
+column, resolves the per-lane pre-selected default (recorded value on a re-audit, else the recommendation),
+and prints a `STALE-ARTIFACT` line when the project config carries its own `## Model statics`. **Render its
+`LANE` blocks verbatim as the four objects; do not re-derive the pool, the recommendation, or the order by
+hand.** The sole-source rule above stood as prose alone until 2026-08-20, when a re-audit read the project's
+stale section and rendered the pool the template had since dropped — a superseded static shown as an
+option, the lower-cost IC static absent, and the analytical recommendation left undifferentiated rather
+than split by tier. A prose rule bites only the inputs a reader happens to read correctly, which
+is why the drift was inconsistent across projects; the script is a pure function of the template and cannot
+read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
