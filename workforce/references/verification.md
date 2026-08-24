@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -57,9 +57,11 @@ author's own pass — is the raising example, not the rule.
 (em-dash density, citation integrity, pipeline residue) fire on all prose, references included,
 within the em-dash supersession scope (`evaluators.md` § A register scoped by enumeration goes
 stale). The **Conversational register** test fires only on conversational-target content and
-**exempts** `workforce/references/**`, `.claude/agents/**`, `.claude/workforce/**`, handbooks,
-`DEVELOPMENT.md`, and run deliverables (`evaluator-additions/text-tells.md` § Conversational
-register). So the always-pass rule bites every prose deliverable;
+**exempts formal technical and reference prose**, where a formal register is correct. That exempt
+corpus is a constant, so it is stated once and not here: the authoritative exemption list lives in
+`evaluator-additions/text-tells.md` § Conversational register (mirrored in the CATALOG-ANCHOR
+supersession register), and this section points at it rather than restating it, so the two cannot
+drift. So the always-pass rule bites every prose deliverable;
 the register test inside it bites only conversational-target content. Both hold at once.
 
 **A firing `[hard]` tell outside every supersession-register scope is fixed in the same pass, never

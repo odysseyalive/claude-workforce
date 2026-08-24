@@ -113,7 +113,35 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-20
+## Open, as of 2026-08-24
+
+**Landed 2026-08-24 — text-eval is mandatory before a prose deliverable is done, and the Escalation
+Gate stops agents escalating what the documents already answer.** Landed this session in commit
+`039adb4` (plus follow-ups), each rule with its own `bin/check` assertion and `bin/prove` del-case.
+Reported by the user, who noticed across several projects that a lead hits a conflict and either
+escalates a non-problem or acts contrary to a handbook on a hunch, until the run stalls asking the
+user to adjudicate.
+
+- **text-eval before done.** `verification.md` now requires every prose deliverable to pass the
+  catalog self-check before it is done, wired into the handbook before-done gate and the audit
+  `INV-HOUSERULES` fold. The `[hard]`/mechanical tells fire on all prose; the conversational-register
+  test keeps its own scope.
+- **The Escalation Gate** (`references/principles.md § Resolve from the documents before you
+  escalate`). Born from a failure this same session: a lead escalated to the CEO the claim that a peer
+  could not do in-scope work — false, and answerable by reading that peer's handbook; the CEO nearly
+  acted on it unverified. Preloaded into every employee, it curbs both over-escalation (read laterally
+  before ruling a peer out; a resolvable escalation is itself a defect) and acting contrary on a hunch
+  (the directive is the tie-breaker unless you can quote the overriding fact), and the receiver
+  verifies before acting. Carried to the dispatcher by an `org.md` rung, and to existing projects by an
+  `audit.md` Core-skill forcible refresh: employees preload the installed `operating-principles` skill,
+  so re-installing current shipped principles every run repairs an org built before the gate existed.
+- **Gotcha, recorded so it does not recur: a bare-basename `file.md § Section` citation is ambiguous
+  when two files share the basename.** `principles.md` exists at both `references/principles.md` and
+  `references/procedures/principles.md`, so a citation written `principles.md § …` bound to the wrong
+  file and failed the anchor-checker with a confusing "does not resolve" — twice, mid-order, costing a
+  resume each time. The fix is to cite the disambiguated path and match the heading text verbatim. The
+  stronger fix, left as a candidate: have the anchor-checker warn when a basename is ambiguous rather
+  than silently bind the first match.
 
 **Landed 2026-08-20 — `wf-remainder --dead-scripts` now honors `.censusignore`; classifier host-limit
 re-measured stale on 2.1.235.** Found by `/workforce dev audit` (run `20260820T180010Z`) of this repo.

@@ -11,6 +11,14 @@ the project's machine-owned library regions are stale → audit's gap check re-r
 against the new shipped content; previously acknowledged gap rows stay suppressed
 unless their shipped entry materially changed since the acked version.
 
+**This file, and its `creative-scrub-ref-version` anchor, track the vendored import ONLY.** The
+creative-integrity set (`text-tells.md` in this directory) is a read-only import from
+claude-enforcer that must match its origin byte-for-byte and is never edited here. Tells that
+**workforce itself** authors are not in this set and are not counted by this anchor: they live in
+`evaluator-additions/text-tells.md`, versioned by its own `text-additions-version` anchor. A reader
+who reaches this file by the `catalogs/` path and never sees that slot has diffed the wrong pair
+(`evaluators.md` § Seeding).
+
 ```
 creative-scrub-ref-version: 2
 ```
