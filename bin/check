@@ -4926,8 +4926,11 @@ _lane_recs = dict(
     )
 )
 # creative-visual's recommended model (claude-fable-5) is DELIBERATELY outside the
-# statics pool — it is reached only via the "Other" field (org-config.template.md
-# § Model statics). This is the ONE sanctioned out-of-pool lane recommendation. The
+# statics pool (org-config.template.md § Model statics). Being out of pool is about
+# where it is DERIVED from, not how it is offered: since 2026-08-23 wf-model-budget
+# renders it as the LEADING first-class option of that lane's slate, marked in place
+# like any other recommendation, and drops the cheapest pool model from that lane to
+# fit the option cap. This is the ONE sanctioned out-of-pool lane recommendation. The
 # in-pool invariant still guards the other four lanes: no lane except creative-visual
 # may point outside the pool, and creative-visual is REQUIRED to. Added 2026-08-23 for
 # the creative-lane split; relaxes the old `set(_lane_recs.values()) <= _pool` exactly
@@ -4942,10 +4945,19 @@ check(
     f"lane recommendations are {_lane_recs} against pool {sorted(_pool)}; out-of-pool "
     f"lanes {sorted(_oop_lanes)} — the five employee-bearing lanes each need exactly one "
     "recommendation. Four (analytical Lead, analytical IC, creative-text, code) must name "
-    "a pool ID the question offers directly; creative-visual's is the frontier visual model "
-    "reached via 'Other' and is REQUIRED to sit outside the pool. Any OTHER lane pointing "
+    "a pool ID the question offers directly; creative-visual's is the frontier visual model, "
+    "offered as the LEADING first-class option of its lane and REQUIRED to sit outside the "
+    "pool it is derived from. Any OTHER lane pointing "
     "outside the pool — or creative-visual pointing inside it — is the error. The analytical "
     "lane splits its recommendation by tier; the advisor object carries none by design.",
+)
+
+check(
+    "audit-setup: creative-visual's out-of-pool recommendation leads as a first-class option",
+    "leads that lane's options as a first-class" in _asu,
+    "audit-setup.md no longer states that creative-visual's out-of-pool recommendation leads its lane's "
+    "options as a first-class pick — without it the doctrine can silently revert to 'reached via Other' "
+    "while wf-model-budget renders it first-class, and nothing catches the drift (2026-08-23 split).",
 )
 
 # The split is not just "two distinct recs" — it has a direction. The statics table
@@ -5326,8 +5338,9 @@ check(
 # ── The five lanes ───────────────────────────────────────────────────────────
 # Analytical is the baseline and supplies the tier defaults; creative-text and
 # creative-visual are the split of the former creative lane (opus-4-6 for text,
-# out-of-pool fable-5 for graphics/frontend design); code is a single-model
-# override; advisor is not a lane employees run in.
+# out-of-pool fable-5 for graphics/frontend design — derived from prose, but offered
+# as that lane's leading first-class option, not hidden behind "Other"); code is a
+# single-model override; advisor is not a lane employees run in.
 for _lane in ("Analytical", "creative-text", "creative-visual", "Code", "Advisor"):
     check(f"lanes: {_lane.lower()} is addressed separately in the config",
           _lane in _ocfg, "org-config.template.md § The four lanes must name it")

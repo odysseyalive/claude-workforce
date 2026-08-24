@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 50 assertion(s) in bin/check name this file; 69 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 51 assertion(s) in bin/check name this file; 68 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -400,7 +400,7 @@ The creative call: the two generative lanes.
 | Object | What it sets |
 |---|---|
 | creative-text | one model for generative writing and copy, no tier split |
-| creative-visual | one model for graphics and frontend design, reached via "Other" (out of pool) |
+| creative-visual | one model for graphics and frontend design; its out-of-pool recommendation leads the options |
 
 **Use this wording** (§ How every question is worded):
 
@@ -412,8 +412,10 @@ The creative call: the two generative lanes.
 > · **Graphics & frontend design work**
 
 Each model object offers the statics from `org-config.template.md` § Model statics, in the order listed
-there, plus "Other" for a hand-typed model ID. creative-visual's recommended model sits outside the pool
-and is reached through "Other" (`org-config.template.md` § The four lanes). **No CEO question** — the CEO
+there, plus "Other" for a hand-typed model ID. creative-visual's recommended model sits outside the pool,
+so it is offered FIRST in that lane's options as a first-class `(recommended)` choice and the cheapest
+pool model is dropped from that lane's slate to fit the four-option cap; "Other" reverts to a plain
+hand-typed catch-all there (`org-config.template.md` § The four lanes). **No CEO question** — the CEO
 is the main session and runs on whatever model the user chose for their Claude Code session.
 
 **Both model calls apply the rules below.** The pool statics are
@@ -440,12 +442,15 @@ read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
-pick, code takes code, creative-text takes its pool pick, and creative-visual takes its out-of-pool pick
-via "Other" — and leave it sitting where the cost ranking put it.
-**Never promote it to the first position.** The host convention is that a recommended option leads the
-list; that convention is wrong here and is overridden on purpose, because the list is ranked by price and
-the ranking is what lets a user read the cost of a choice at a glance. The advisor object carries no
-recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
+pick, code takes code, and creative-text takes its pool pick — and leave it sitting where the cost ranking
+put it. creative-visual is the ONE exception: its recommendation is an out-of-pool model,
+which has no cost-ranked pool row, so it leads that lane's options as a first-class `(recommended)` choice
+and the cheapest pool model is dropped from that lane's slate to fit the four-option cap.
+**Never promote an in-pool recommendation to the first position.** The host convention is that a
+recommended option leads the list; for the pool that convention is wrong here and is overridden on
+purpose, because the list is ranked by price and the ranking is what lets a user read the cost of a
+choice at a glance. The one out-of-pool exception is the creative-visual case noted just above. The
+advisor object carries no recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
 model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
 
 **On a first run there is no recorded value, and the pre-selected default is still deterministic.**

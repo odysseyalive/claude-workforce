@@ -16,14 +16,23 @@ caller that regroups them by hand is reintroducing by hand the drift this script
 exists to foreclose.
 
 ONE SANCTIONED OUT-OF-POOL RECOMMENDATION. `creative-visual` is recommended
-`claude-fable-5`, which is DELIBERATELY not a § Model statics row: it is reached only
-by hand-typing it into the budget's "Other" field. So that lane's recommendation is
-annotated on a PROSE line inside § Model statics rather than on a table row, and the
-emission carries it on the `+ Other` line — marked `(recommended)`, so a reader can
-see it is an out-of-pool pick and not a static that was silently dropped. Exactly ONE
-lane may be recommended out of pool; a second one is an ERROR (exit 2), because a
-recommendation that quietly resolves outside the pool is indistinguishable from the
-pool having gone stale — the very confusion this script was written to end.
+`claude-fable-5`, which is DELIBERATELY not a § Model statics row, so that lane's
+recommendation is annotated on a PROSE line inside § Model statics rather than on a
+table row. It is nonetheless OFFERED THE SAME WAY every other lane's recommendation
+is offered: it LEADS that lane's slate as a first-class option, marked
+`(recommended)` in place and `[pre-selected]` when it is the resolved default. A
+recommendation the user can only reach by hand-typing it is a recommendation the
+question does not actually make. That costs one option — the four pool rows already
+fill `AskUserQuestion`'s cap — so exactly enough pool models are dropped FROM THAT
+LANE'S SLATE ONLY to fit, taken positionally from the cheap end of the cost order and
+never by ID, and never the lane's RECORDED default (a re-audit's own recorded choice
+must not vanish from the slate it is pre-selected in). The global pool line and every
+other lane still carry all four statics. The `+ Other` line reverts to a plain
+free-text catch-all for this lane; a recorded out-of-pool "Other" PIN still rides it,
+named, so neither reads as a static that went missing. Exactly ONE lane may be
+recommended out of pool; a second one is an ERROR (exit 2), because a recommendation
+that quietly resolves outside the pool is indistinguishable from the pool having gone
+stale — the very confusion this script was written to end.
 
 WHY THIS EXISTS — a measured, recurring drift.
 
@@ -71,9 +80,12 @@ legacy artifact and read PAST, never clobbered (the project file is the user's,
 `org-config.template.md` § Model statics: the never-clobber rule holds).
 
 The recommendation is a LABEL, never a POSITION (`org-config.template.md` § Model
-statics): the options are emitted in cost order and `(recommended)` is appended in
+statics): POOL options are emitted in cost order and `(recommended)` is appended in
 place, never promoted to the top. This script emits them in that order and marks in
-place; a caller that reorders them is reintroducing the drift by hand.
+place; a caller that reorders them is reintroducing the drift by hand. The rule binds
+where the cost order HAS a position to respect. The out-of-pool recommendation is not
+a table row and has no rank in that order, so leading its lane's slate promotes it
+past nothing — the pool rows below it are still in cost order, still marked in place.
 
 EXIT CODES: 0 normal (including when a stale embedded section was reported — it is a
 finding to surface, not a failure to abort on); 2 when `--root` is empty, when the
@@ -102,6 +114,12 @@ LANES = [
 # AskUserQuestion accepts at most this many objects per call (platform.md § header).
 _OBJECT_CAP = 4
 
+# ...and at most this many options within one object. Aliased rather than restated so
+# the number lives in exactly one place in this file: a cap refresh is one edit, not a
+# hunt for the second copy (SKILL.md Principle 9a). Only a lane whose recommendation
+# sits outside the pool can reach this cap — see _lane_slate().
+_OPTION_CAP = _OBJECT_CAP
+
 # Five lanes overflow one call, so the picker renders as two. The grouping lives
 # here, next to the lane order it partitions, so the two cannot drift apart: the
 # validation below refuses a grouping that drops, duplicates, or overfills a lane.
@@ -110,10 +128,11 @@ CALL_GROUPS = [
     ("CALL B", "creative lanes", ("creative-text", "creative-visual")),
 ]
 
-# EXACTLY ONE lane may be recommended a model that is not in the pool. That lane's
-# model is reached only through the hand-typed "Other" field, and the emission says
-# so in place. Any OTHER lane resolving out of pool is an error, not a silent
-# acceptance — see merge_recommendations().
+# EXACTLY ONE lane may be recommended a model that is not in the pool. That lane
+# OFFERS it first-class — leading its slate, marked in place — and the emission names
+# it as the sanctioned out, so it never reads as a static that went missing. Any
+# OTHER lane resolving out of pool is an error, not a silent acceptance — see
+# merge_recommendations().
 SANCTIONED_OUT_OF_POOL_LANES = ("creative-visual",)
 
 # Maps the phrase in a "**Recommended for X**" annotation to a lane key above.
@@ -222,8 +241,8 @@ def parse_out_of_pool_recs(template_text, pool_ids):
     """Lane recommendations annotated on a NON-pool model ID.
 
     Read from the same § Model statics section, but from its PROSE lines: a model
-    reached only through the hand-typed "Other" field has no table row to carry its
-    Notes cell, so its annotation sits beside the backticked ID in prose. A prose
+    that is deliberately not a static has no table row to carry its Notes cell, so
+    its annotation sits beside the backticked ID in prose. A prose
     line that names only pool IDs is documentation restating the table and is
     skipped. Returns {lane_key: model_id}."""
     body = _statics_body(template_text)
@@ -335,16 +354,49 @@ def config_has_stale_statics(config_text):
 
 # --- emission --------------------------------------------------------------------
 
+def _lane_slate(statics, rec_model, recorded_default, pool_ids):
+    """The models THIS lane offers, in emission order, and the ones it gave up.
+
+    A lane whose recommendation sits in the pool offers the whole pool, in cost
+    order, unchanged — this returns it untouched and gives up nothing.
+
+    A lane whose recommendation sits OUTSIDE the pool offers it first-class, at the
+    head of the slate: a recommendation the user can only reach by hand-typing it is
+    a recommendation the question does not actually make. That costs one option and
+    the pool rows already fill the option cap, so enough pool models are dropped FROM
+    THIS SLATE ONLY to fit. The drop is POSITIONAL — the cost order is
+    most-expensive-first, so the walk starts at the last element, the cheapest — and
+    never by ID: naming the model to drop would put a second copy of the pool in this
+    file, which is the drift the whole script exists to foreclose.
+
+    The lane's RECORDED default is never the model dropped. A re-audit that recorded
+    the cheapest pool model would otherwise watch its own recorded choice disappear
+    from the slate it is pre-selected in, which is the silent discard this project
+    keeps finding; the walk skips it and takes the next-cheapest instead."""
+    pool = [m for m, _n, _l in statics]
+    if rec_model is None or rec_model in pool_ids:
+        return pool, []
+    slate, dropped, i = [rec_model] + pool, [], len(pool)
+    while len(slate) > _OPTION_CAP and i > 0:
+        if slate[i] != recorded_default:
+            dropped.append(slate.pop(i))
+        i -= 1
+    return slate, dropped
+
+
 def _lane_block(lane_key, lane_label, prompt_label, statics, rec, defaults, pool_ids):
-    """One AskUserQuestion object, rendered. The pool is emitted in cost order and
-    the marks are appended IN PLACE — a recommendation is a label, never a position."""
+    """One AskUserQuestion object, rendered. Pool options are emitted in cost order
+    and the marks are appended IN PLACE — a recommendation is a label, never a
+    position. An out-of-pool recommendation has no rank in that order to respect, so
+    it leads the slate; see _lane_slate() for what that costs and who pays it."""
     out = []
     rec_model = rec.get(lane_key)
     default_model = defaults.get(lane_key, rec_model)
+    slate, dropped = _lane_slate(statics, rec_model, defaults.get(lane_key), pool_ids)
     out.append("LANE %s  (object: \"%s\")" % (lane_label, prompt_label))
     if rec_model is None:
         out.append("  !! no model is marked 'Recommended for %s' in the template" % lane_key)
-    for model_id, _notes, _l in statics:
+    for model_id in slate:
         marks = []
         if model_id == rec_model:
             marks.append("(recommended)")
@@ -353,34 +405,31 @@ def _lane_block(lane_key, lane_label, prompt_label, statics, rec, defaults, pool
         suffix = ("  " + " ".join(marks)) if marks else ""
         out.append("  - %s%s" % (model_id, suffix))
 
-    # Anything outside the pool rides on the Other line, marked there. Two things
-    # can land there and they are not the same thing: this lane's sanctioned
-    # out-of-pool RECOMMENDATION, and a recorded "Other" pin the user typed on a
-    # previous run. Both are named, so neither reads as a static that went missing.
-    other = []
-    if rec_model is not None and rec_model not in pool_ids:
-        marks = ["(recommended)"]
-        if default_model == rec_model:
-            marks.append("[pre-selected]")
-        other.append((rec_model, marks))
+    # The Other line is a PLAIN free-text catch-all: this lane's recommendation, in
+    # or out of pool, is an option above and is not pre-filled here. One thing still
+    # rides it — a recorded "Other" pin the user hand-typed on a previous run, which
+    # is a recorded choice and not a recommendation. It is named, so it never reads
+    # as a static that went missing.
+    other_pin = None
     if (default_model is not None and default_model not in pool_ids
             and default_model != rec_model):
-        other.append((default_model, ["[pre-selected]"]))
-
-    if len(other) == 1:
-        out.append("  + Other (hand-typed model ID) = %s  %s"
-                   % (other[0][0], " ".join(other[0][1])))
+        other_pin = default_model
+    if other_pin is not None:
+        out.append("  + Other (hand-typed model ID) = %s  [pre-selected]" % other_pin)
     else:
         out.append("  + Other (hand-typed model ID)")
-        for model_id, marks in other:
-            out.append("    = %s  %s" % (model_id, " ".join(marks)))
 
     if rec_model is not None and rec_model not in pool_ids:
         out.append("    out-of-pool: %s is this lane's recommended model and is NOT a "
-                   "§ Model statics row. It was not dropped from the pool — it is "
-                   "reached only by hand-typing it into the Other field (the one "
-                   "sanctioned out-of-pool recommendation, lane %s)."
-                   % (rec_model, lane_key))
+                   "§ Model statics row. It was not dropped from the pool — it LEADS "
+                   "this lane's options as a first-class pick, marked in place, and is "
+                   "not something to hand-type (the one sanctioned out-of-pool "
+                   "recommendation, lane %s). Dropped from THIS lane's slate only, to "
+                   "fit the %d-option cap: %s — the cheapest pool model this lane can "
+                   "spare, never its recorded default. The global pool line above is "
+                   "unchanged and every other lane still offers all of it."
+                   % (rec_model, lane_key, _OPTION_CAP,
+                      ", ".join(dropped) if dropped else "none"))
     if (lane_key in defaults and default_model is not None
             and default_model not in pool_ids and default_model != rec_model):
         out.append("    pre-selected = %s (recorded 'Other' pin, not a static)" % default_model)

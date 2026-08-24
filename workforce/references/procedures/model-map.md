@@ -24,8 +24,10 @@ each budget renders as two calls, grouped identically to `audit-setup.md` § Ste
   (`org-config.template.md` § The four lanes). Each object offers the four statics from
   `org-config.template.md` § Model statics in cost order, plus a **blank field** for a hand-typed model
   ID, and marks its lane's recommended static `(recommended)` where the cost order puts it — never
-  promoted to the top (`audit-setup.md` § Step 0.4a). creative-visual's recommended model sits outside the
-  pool and is reached through the blank "Other" field. **No CEO question** — the CEO is the main session.
+  promoted to the top (`audit-setup.md` § Step 0.4a) — except creative-visual's recommended model, which
+  sits outside the pool and therefore leads that lane's options as a first-class `(recommended)` choice
+  (the cheapest pool model is dropped from that lane's slate to fit the four-option cap). **No CEO
+  question** — the CEO is the main session.
   **No separate tier question** — the analytical lane supplies the Lead and IC rows, which now differ in
   model as well as effort.
 - **Effort budget — two calls, six objects:** the same lanes grouped identically to the model budget,

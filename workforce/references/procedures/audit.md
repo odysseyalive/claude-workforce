@@ -1053,7 +1053,7 @@ Budget Receipt
 | analytical / Lead    | <id>   | medium | asked this run           |
 | analytical / IC      | <id>   | medium | recommended default (first run) |
 | creative-text        | <id>   | medium | asked this run           |
-| creative-visual      | <id>   | medium | Other -> out-of-pool     |
+| creative-visual      | <id>   | medium | out-of-pool recommendation |
 | code                 | <id>   | medium | blank -> analytical      |
 | advisor              | <id>   | --     | unchanged, pre-selected  |
 

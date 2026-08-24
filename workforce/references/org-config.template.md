@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -106,7 +106,7 @@ user chooses, never the starting point.
 
 **Availability is not uniform, and the budget offers only rungs the lane's selected model supports.**
 Three that bite with this pool: `claude-opus-4-6` (the creative-text pick) has no `xhigh` — its ladder
-is `max`/`high`/`medium`/`low`; `claude-fable-5` (the creative-visual pick, reached via "Other") accepts
+is `max`/`high`/`medium`/`low`; `claude-fable-5` (the creative-visual pick, offered as this lane's leading option though out of pool) accepts
 all five rungs, but the budget offers the four nearest its recommended `medium` —
 `xhigh`/`high`/`medium`/`low`, dropping the far `max` end (`references/platform.md` fact 12c, DOCUMENTED
 and unverified); and
@@ -196,9 +196,11 @@ runs on `creative-text`; graphics, visual design, frontend design, and image gen
 | Creative-visual effort | medium |
 | Departments on creative-visual | |
 
-creative-visual runs `claude-fable-5` — **Recommended for creative-visual** — the frontier visual model,
-reached only through the budget's "Other" field because it sits outside the statics pool (§ Model
-statics). creative-text stays in the pool on `claude-opus-4-6`.
+creative-visual runs `claude-fable-5` — **Recommended for creative-visual** — the frontier visual model.
+It sits outside the statics pool (§ Model statics), so the model budget offers it as the LEADING
+first-class option for this lane, marked `(recommended)`, and drops the pool's cheapest model from this
+lane's slate to fit the four-option cap — it is NOT relegated to the hand-typed "Other" field.
+creative-text stays in the pool on `claude-opus-4-6`.
 
 **Generative work is ALWAYS creative — judged per employee, from its own handbook, not per department.**
 That is a floor, not a default: any EMPLOYEE whose own work is generation or authorship — writing prose
