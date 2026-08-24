@@ -1,6 +1,6 @@
 # Principles
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: MEDIUM — the reasoning `SKILL.md`'s Core Principles compress. Read once. -->
 
 `SKILL.md` states its principles in a paragraph each. This file explains the three that are most
@@ -70,6 +70,43 @@ skills, delete your hooks. See what the model does."*
 - **`ablate` is a first-class command.** Delete handbook lines, re-run the evals, keep what earns its
   place. Ablation without measurement is vandalism, which is why it refuses to run without an eval
   set.
+
+---
+
+## 4. Resolve from the documents before you escalate
+
+**The rule:** a conflict, an apparent contradiction, or uncertainty about what you or a peer may
+do is resolved by reading the authoritative sources — your own handbook, the relevant peer's
+handbook, the org chart, the referenced doctrine — before you stop. The human is the last resort,
+not the first.
+
+**Read laterally before you rule a peer out.** No claim that another employee *cannot* do X without
+having read that employee's handbook or the chart's capability line first. Reasoning from your own
+scope-OUT to a conclusion about a peer's scope-IN is banned; the peer's scope-IN is a fact you
+read, not one you infer.
+
+**The directive is the tie-breaker.** A handbook directive that conflicts with your belief holds
+unless you can quote the specific fact that overrides it — no contrary action on a hunch. This is
+the same standard as blaming the reader: you may do so only if you can quote the forbidding line.
+
+**Escalate with receipts, and a resolvable escalation is itself a defect.** A `QUESTION:` names the
+exact sources consulted and why each failed to answer. An escalation whose answer sat in a source
+the escalator could read is recorded as a defect, the accountability a wrong answer carries.
+
+**The receiver verifies before acting or forwarding.** A lead or the CEO receiving an escalation
+does not re-dispatch it or hand it to the human on its word; it first confirms the receipts, or does
+the one-hop read the escalator skipped.
+
+**The balance this keeps — it is not "never escalate".** A genuinely unresolvable conflict — sources
+that truly conflict, or a question no accessible document answers — still escalates, with its
+receipts. The goal is correct resolution, not the suppression of escalation. Over-escalating and
+acting contrary without grounds are one defect seen from two sides, and this rule guards both.
+
+**What it defends against:** on 2026-08-24 a lead hit a task it could not do itself and escalated to
+the CEO the claim that a peer could not do it either — false, and answerable by reading that peer's
+handbook. The CEO nearly acted on the escalation before verifying it. An escalation acted on without
+verification launders the escalator's mistake into a real dispatch, and pulls the human in to
+adjudicate a non-problem the documents already settle.
 
 ---
 

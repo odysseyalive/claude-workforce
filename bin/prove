@@ -120,6 +120,7 @@ PTL  = "workforce/references/personnel-templates.md"
 DGN  = "workforce/references/procedures/diagnose.md"
 WPC  = "workforce/bin/wf-pin-check"
 ORGP = "workforce/references/procedures/org.md"
+PRIN = "workforce/references/principles.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -215,6 +216,12 @@ CASES = [
      CFM, "del", 'res.advise(f"{n}: within the {ceiling}-line ceiling"'),
     ("verification.md states that only a falsified check is a check",
      VER, "del", "Three states, and only the third is a check"),
+    ("verification: every prose deliverable passes the catalog before it is done",
+     VER, "del", "Every prose deliverable passes the catalog before it is done"),
+    ("verification: every prose deliverable passes the catalog before it is done",
+     VER, "del", "the register test inside it bites only conversational-target content"),
+    ("handbook: prose employees carry the catalog self-check as a before-done gate",
+     HBK, "del", "passed a text-eval self-check against the catalog"),
     # The class check scans EVERY bash block in EVERY read-only procedure, so an
     # append fires — which the narrow first version did not. That is the point: the
     # narrow one permitted an executing block anywhere but the first.
@@ -341,6 +348,12 @@ CASES = [
      BUD, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
     ("org: step 2 names the project skill root as the /org bootstrap destination",
      ORGP, "del", "The destination is the project, always"),
+    # ── receiver-side of resolve-before-escalate, dispatch rung 12 (2026-08-24) ──
+    # Deletes the rung's lead anchor from the byte-canonical CHECKPOINT block; the
+    # assertion reads the extracted block, so the receiver rung vanishes and the
+    # AND chain fails. The phrase is a unique contiguous line in org.md (grep -c==1).
+    ("org: the dispatcher verifies a returned escalation before acting on it (principles.md § 4 receiver)",
+     ORGP, "del", "A returned `QUESTION:` or `ESCALATE:` is verified before you act on it or forward it"),
     ("hooks: the registration path resolves personal before project",
      HK, "del", "| 1 | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives` |"),
     ("install: install verifies every manifest file landed",
@@ -849,6 +862,29 @@ CASES = [
      PS1, "del", "$configRoot = if ($configDirExplicit)"),
     ("scopes: the canonical runtime resolver honors CLAUDE_CONFIG_DIR",
      SCO, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"'),
+    # ── resolve-before-escalate (2026-08-24) ───────────────────────────────────
+    # One judgment-class principle, six load-bearing clauses that must each be
+    # present. Every payload is a unique, contiguous line in principles.md (grep -c
+    # == 1 verified), so `del` breaks exactly one clause of the `and` chain per case
+    # and the single assertion must fail. Guards both failure modes: over-escalation
+    # AND acting contrary on a hunch — deleting either half breaks the same check.
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "## 4. Resolve from the documents before you escalate"),
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "Read laterally before you rule a peer out"),
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "quote the specific fact that overrides it"),
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "a resolvable escalation is itself a defect"),
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "The receiver verifies before acting or forwarding"),
+    ("principles: resolve from the documents before escalating, and the receiver verifies",
+     PRIN, "del", "a question no accessible document answers"),
+    # ── audit repairs existing projects: Core-skill forcible refresh (2026-08-24) ─
+    # Deletes the clause's lead anchor from audit.md; the assertion's AND chain
+    # then fails because the force-refresh doctrine is gone. Unique contiguous line.
+    ("audit: the Core skills are force-refreshed to shipped source each run, operating-principles named",
+     AUD, "del", "Force-refresh the Core skills to current shipped source, every run"),
 ]
 
 

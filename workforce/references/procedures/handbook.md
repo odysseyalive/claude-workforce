@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -159,6 +159,11 @@ goes to a panel when unclear.
 **`## Verification` must name a runnable check** — an exit code, a suite, a file assertion. Not a
 judgment. For web-facing work that usually means a scaffolded deterministic suite
 (`references/verification.md`).
+
+**For a prose-producing employee, its `## Verification` also names the catalog self-check as a
+before-done gate.** Its prose is not done until it has
+**passed a text-eval self-check against the catalog** (`references/verification.md` § Every prose
+deliverable passes the catalog before it is done), applying the catalog's own scope rules.
 
 **`## Probe` must state a self-contained task and the shape of a correct result.** A handbook that
 cannot say how to check itself is not releasable — and this section is what Step 5 runs.

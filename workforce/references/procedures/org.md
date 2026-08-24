@@ -281,6 +281,15 @@ someone can read instead of re-derive.
 11. **Stop rather than guess.** Two candidates tied, or the best one below clear confidence → name the
    top candidates and ask. A command and an employee are never "tied": rung 2 already settled that, and
    reopening it here would undo the precedence.
+
+12. **A returned `QUESTION:` or `ESCALATE:` is verified before you act on it or forward it.** When a
+   dispatched agent hands one back, you are the receiver named in `references/principles.md` § 4.
+   Confirm the receipts against the documents, or do the one-hop read the escalator skipped, BEFORE
+   re-dispatching it, answering it, or carrying it to the user. **Acting on an unverified escalation
+   launders its error into a real dispatch**, and pulls the user in to settle a non-problem the
+   documents already answer. When routing itself meets a conflict or an apparent contradiction,
+   resolve it from the documents first; ask the user only when the sources genuinely conflict or
+   none answers, and then with receipts.
 <!-- ORG-DISPATCH-CHECKPOINT END -->
 ```
 

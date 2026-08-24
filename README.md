@@ -323,6 +323,18 @@ Two ways out. `disband` replays the audit journal, restoring converted skills an
 
 If the skill is gone and you can't run the command, the restore kit inside `.claude-backups/` works on its own. See [COMMANDS.md § Recovery](COMMANDS.md) for the full reference.
 
+## The Tools That Check the Work
+
+Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Two evaluators do that, and each has its own catalog.
+
+**text-eval reads prose the way an editor hunting for a robot would.** It looks for the tells that give away machine writing: the em-dash leaned on as a crutch, the "it's not X, it's Y" reasoning models reach for, a sentence built like a paragraph when a person would just say it. One tell is only a word choice. It flags a passage when several cluster together. The whole catalog is here, and every rule comes with a test you can hold it to: [text-tells.md](workforce/references/catalogs/text/text-tells.md).
+
+**code-evaluator does the same for the shipped scripts.** Its catalog is a list of the ways code goes wrong: mistakes that repeat, checks that get skipped, the small traps a reviewer learns to watch for. It's split across a [mistake taxonomy](workforce/references/catalogs/code/mistake-taxonomy.md), [cross-file consistency](workforce/references/catalogs/code/cross-file-detection.md), [guards](workforce/references/catalogs/code/guards.md), and [gotchas](workforce/references/catalogs/code/gotchas.md).
+
+You never turn these on. The audit wires them in on its own, one evaluator for each department whose work a catalog covers, so prose goes to the writers and code to the script authors. The catalog installs as a skill anyone can check their own work against, and the review is a step the lead runs before the work is called done. How that gets decided is written up in [evaluators.md](workforce/references/evaluators.md).
+
+One last thing, because it's the point. A rule only counts here if something makes it true. Every entry in these catalogs carries a test, and the structural ones sit behind a check that goes red the moment the rule is broken. A rule can't fall out of force without somebody's build failing.
+
 ## Learn More
 
 - [Two Brains: Why Dynamic Model Routing Beats Picking One AI](https://odysseyalive.com/focus/two-brains). The routing insight underneath this project, and why the answer to "which model is best?" is a routing problem, not a ranking one.
@@ -358,6 +370,8 @@ Special thanks to **Wouter Dieters**, who helped me connect organizational theor
 Thanks to **Sjoerd Tiemensma**, who convinced me to toss CLAUDE.md in favor of more agency. That nudge cleared the path for agents to own their own context instead of inheriting a shared script, which turned out to be the whole point.
 
 Thanks to **Jeff Polack**, who pointed out that this should support a personal install. That turned out to reshape the whole design, because it meant the skill holds no project state at all and the company lives entirely in `.claude/`.
+
+Thanks to **Goda Go**, who never stops saying *save everything*. That got me curious about how a model actually stores what it learns and finds it again, and that curiosity turned into the way this project keeps records. Every kind of data the company holds has a home and someone who owns it. If a record is missing or looks wrong, you go redo the work to be sure. You never write down a guess. Save a fix once and it's still there next session, so nobody solves the same problem twice.
 
 Thanks also to [**Autonomee**](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together some of the sharpest minds in the business. Several of the ideas in this project crystallized in conversations that wouldn't have happened without that community.
 

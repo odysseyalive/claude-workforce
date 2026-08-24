@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -40,6 +40,36 @@ employee for independent review (tier 4), because ICs cannot delegate.
 **A handbook may not report PASS on an unrun check.** The section states the command, the expected
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
 the exact output — never a third silent retry, never a downgraded claim.
+
+---
+
+## Every prose deliverable passes the catalog before it is done
+
+**Any prose the workforce produces or edits — a reference, a procedure, a handbook,
+`DEVELOPMENT.md`, a run deliverable, or user-facing copy like `README.md` — is not done until it
+has passed a text-eval self-check against the catalog. Unprompted, every time.** This is the tier-3
+gate (§ The rule) made mandatory, not an optional polish: a lenient self-grade that ships clustered
+tells is the failure this closes. A README acknowledgment paragraph shipped with a crutch adjective,
+a rhetorical colon, "X rather than Y" contrastive reasoning, and overbuilt prose — under the
+author's own pass — is the raising example, not the rule.
+
+**Apply the catalog with its OWN scope rules; invent none.** The `[hard]` and mechanical tells
+(em-dash density, citation integrity, pipeline residue) fire on all prose, references included,
+within the em-dash supersession scope (`evaluators.md` § A register scoped by enumeration goes
+stale). The **Conversational register** test fires only on conversational-target content and
+**exempts** `workforce/references/**`, `.claude/agents/**`, `.claude/workforce/**`, handbooks,
+`DEVELOPMENT.md`, and run deliverables (`evaluator-additions/text-tells.md` § Conversational
+register). So the always-pass rule bites every prose deliverable;
+the register test inside it bites only conversational-target content. Both hold at once.
+
+**A firing `[hard]` tell outside every supersession-register scope is fixed in the same pass, never
+surfaced as a question** (`evaluators.md` § House rules dominate). The self-check is a gate, not a
+flag: the deliverable is not done while a mandatory fix is outstanding.
+
+**Classification (`invariants.md`): structural claim about the shipped doctrine.** The pairing that
+makes it true is a `bin/check` assertion that this requirement is present here and wired into
+`handbook` and `audit`, plus a `bin/prove` del-case that deletes a load-bearing fragment and
+confirms the assertion breaks.
 
 ---
 

@@ -225,6 +225,7 @@ _amd = read("workforce/references/procedures/amend.md")
 _ocfg = read("workforce/references/org-config.template.md")
 dfr = read("workforce/references/deferred.md")
 upd = read("workforce/references/procedures/update.md")
+_prin = read("workforce/references/principles.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
@@ -1149,6 +1150,22 @@ check(
     "turning a settled house rule into a question. The register is the sole demotion "
     "authority, and a [hard] tell outside its scope is fixed in the pass, not asked",
 )
+check(
+    "principles: resolve from the documents before escalating, and the receiver verifies",
+    "## 4. Resolve from the documents before you escalate" in _prin
+    and "Read laterally before you rule a peer out" in _prin
+    and "quote the specific fact that overrides it" in _prin
+    and "a resolvable escalation is itself a defect" in _prin
+    and "The receiver verifies before acting or forwarding" in _prin
+    and "a question no accessible document answers" in _prin,
+    "recurring cross-project pattern (2026-08-24): a lead escalated to the CEO the "
+    "claim that a peer could not do in-scope work — false, and answerable by reading "
+    "the peer's handbook; the CEO nearly acted on it unverified. The principle curbs "
+    "BOTH sides: over-escalation (read laterally before ruling a peer out; a resolvable "
+    "escalation is a recorded defect) and acting contrary on a hunch (quote the "
+    "overriding fact), while a genuinely unresolvable conflict still escalates with "
+    "receipts and the receiver verifies before acting or forwarding",
+)
 _aud_hr = read("workforce/references/procedures/audit.md")
 check(
     "audit: house rules refreshed in every installed evaluator each run",
@@ -1159,6 +1176,17 @@ check(
     "refreshes each installed evaluator's supersession register and precedence clause "
     "every run and prints the HOUSE RULES block plus the INV-HOUSERULES roll-up "
     "(invariants.md row 22), so a settled rule cannot silently stop propagating",
+)
+check(
+    "audit: the Core skills are force-refreshed to shipped source each run, operating-principles named",
+    "Force-refresh the Core skills to current shipped source, every run" in _aud_hr
+    and "the current shipped `operating-principles` skill over" in _aud_hr
+    and "CORE SKILLS     operating-principles  refreshed to shipped" in _aud_hr,
+    "a re-audit must REPAIR an existing project, not only fix new ones: every employee preloads the "
+    "INSTALLED operating-principles skill (handbook-templates.md § skills:), so a principle the shipped "
+    "principles.md gained after install (e.g. § 4 resolve-before-escalate) never reaches existing "
+    "employees unless the audit force-refreshes that installed skill every run — never skipped, never "
+    "offered, never a question — and prints the CORE SKILLS roll-up so the propagation cannot stop silently",
 )
 # ─────────────────────────────────────────────────────────────────────────────
 # The third catalog slot, landed 2026-08-06.
@@ -1618,6 +1646,16 @@ check(
     "procedural enforcement is the counted line (invariants.md); without it an ask "
     "answered directly and an ask nobody considered are identical from outside",
 )
+check(
+    "org: the dispatcher verifies a returned escalation before acting on it (principles.md § 4 receiver)",
+    "A returned `QUESTION:` or `ESCALATE:` is verified before you act on it or forward it" in _org_block
+    and "receiver named in `references/principles.md` § 4" in _org_block
+    and "Acting on an unverified escalation" in _org_block,
+    "principles.md § 4 has a RECEIVER side: a lead or CEO that re-dispatches or forwards a returned "
+    "QUESTION/ESCALATE on its word launders the escalator's error into a real dispatch. Without this "
+    "rung the dispatch ladder carries only the sender's obligation, and the checkpoint that /org ships "
+    "gives the receiver no instruction to confirm receipts or do the one-hop read the escalator skipped",
+)
 
 # ── The three weak points the design shipped with, closed 2026-07-31 ──────────
 # 1. Coverage is matched by reading a prose cell. A positive claim reads
@@ -1947,6 +1985,24 @@ check(
     "a handbook said 'grep — a tier-3 check' against a catalog whose Tier 3 is "
     "explicitly not regex; and a catalog grep over a document quoting the catalog "
     "matches itself, which produced two wrong counts before the executor caught it",
+)
+check(
+    "verification: every prose deliverable passes the catalog before it is done",
+    "Every prose deliverable passes the catalog before it is done" in _vf
+    and "Unprompted, every time" in _vf
+    and "not done until it has passed a text-eval self-check" in " ".join(_vf.split())
+    and "the register test inside it bites only conversational-target content" in " ".join(_vf.split()),
+    "standing rule (2026-08-24): prose is not done until a text-eval catalog self-check "
+    "passes, unprompted, every time; a README shipped clustered tells under a lenient "
+    "self-grade. [hard]/mechanical tells fire on all prose; the conversational-register "
+    "test keeps its own scope. Structural claim about the doctrine — present here and "
+    "wired into handbook/audit",
+)
+check(
+    "handbook: prose employees carry the catalog self-check as a before-done gate",
+    "passed a text-eval self-check against the catalog" in " ".join(_hb.split()),
+    "the always-pass rule reaches producing employees only if the handbook that "
+    "generates their ## Verification names the catalog self-check as a gate before done",
 )
 
 check(

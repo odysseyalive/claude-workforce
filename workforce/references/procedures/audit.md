@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 54 assertion(s) in bin/check name this file; 110 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 112 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -763,6 +763,11 @@ the two verification paths — a **catalog grep** into each producing employee's
 and the **evaluator as reviewer** into that department's Lead handbook (tier 4, because ICs cannot
 delegate).
 
+**That tier-3 catalog grep IS the always-before-done gate** (`references/verification.md` § Every
+prose deliverable passes the catalog before it is done): a prose deliverable is not done until it
+has passed the self-check, so its presence is folded into the `INV-HOUSERULES` evaluator report
+below rather than counted as a separate wiring line.
+
 **The catalog is not converted, and the evaluator is not a conversion.** The catalog stays a skill — shared
 data many employees read (`records-ownership.md`) — and the evaluator is a *new hire* beside it. Both exist
 because they serve different tiers: an IC reads the catalog directly (it cannot dispatch to anything), a
@@ -803,6 +808,30 @@ shape as `INV-SWEPT`, so a run cannot skip the refresh silently and still close 
 A run that refreshes the catalog but leaves the rules stale has updated what the evaluator checks and not
 how it is allowed to demote what it finds — the half that produced the README question this clause was
 written for.
+
+**Force-refresh the Core skills to current shipped source, every run — never skipped, never
+offered, never a question.** The house-rules refresh above keeps an *evaluator's* rules current;
+this keeps the Core doctrine skills current, and `operating-principles` is the one that matters:
+every employee preloads the INSTALLED copy through its `skills:` frontmatter
+(`handbook-templates.md`), so a principle the shipped `principles.md` gained after install never
+reaches an existing project's employees — the source carries it, the spawns never see it, and no
+run reports the gap. So each run re-installs the current shipped `operating-principles` skill over
+the installed one — and every other Core skill (`org`, `personnel-ledger`, per
+`references/audit-setup.md` § Step 0.3 — Companion skills) whose body is shipped doctrine rather
+than project state — in the same forcible manner as § Forcible propagation, preserving any
+machine-owned user region exactly as the house-rules refresh does. Report it per skill, including
+the zeroes, in the same block as the reconciliation:
+
+```
+CORE SKILLS     operating-principles  refreshed to shipped (§ 4 now present)
+                org  refreshed · personnel-ledger  refreshed · 0 unrefreshed
+```
+
+A Core skill that cannot receive the refresh — a copy carrying user edits outside any
+machine-owned region — is counted in `unrefreshed` and **names that precondition**, the same
+uncited-refusal shape as `INV-HOUSERULES`: a run cannot skip the refresh silently and still close
+clean. A settled principle that quietly stops propagating to existing projects is exactly the
+"reads as success while doing nothing" failure, one install removed.
 
 ## Step 4b — Tier canary (the last step before anything is registered)
 
