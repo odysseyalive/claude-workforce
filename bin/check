@@ -4996,10 +4996,19 @@ check(
 # The lane token may now contain a hyphen (`creative-text`, `creative-visual`), so the
 # capture class allows one; the old `[\w ]+?` stopped at the hyphen and read both split
 # lanes as a bare "creative".
+#
+# READ FROM _stat_sec, NEVER THE WHOLE FILE. wf-model-budget — the mechanical picker —
+# derives every lane recommendation from § Model statics ALONE (parse_out_of_pool_recs
+# reads _statics_body and nothing else). A recommendation the check finds anywhere else
+# in the template is one the question never renders: MEASURED 2026-08-24, the whole-file
+# `_tpl_cfg` form passed on creative-visual's annotation while it sat only in the
+# "### Creative — two lanes" prose, and the live picker emitted "!! no model marked".
+# Scoping the detector to the section the deliverable reads makes that false green
+# impossible — the check goes green only when the annotation is where the picker looks.
 _lane_recs = dict(
     (m.group(2).strip().lower(), m.group(1))
     for m in re.finditer(
-        r"`(claude-[\w.-]+)`[^\n]*?Recommended for ([\w -]+?)\*\*", _tpl_cfg
+        r"`(claude-[\w.-]+)`[^\n]*?Recommended for ([\w -]+?)\*\*", _stat_sec
     )
 )
 # creative-visual's recommended model (claude-fable-5) is DELIBERATELY outside the

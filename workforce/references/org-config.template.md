@@ -40,13 +40,24 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 | 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
 | 4 | `claude-sonnet-5` | 1M | 128K | near-Opus quality at ~40% lower cost ($3/$15 vs $5/$25). **Recommended for analytical IC** (agents that do the work) |
 
+**The one out-of-pool recommendation.** `claude-fable-5` is the **Recommended for creative-visual** model —
+the frontier visual model (graphics & frontend design), DELIBERATELY not one of the four rows above and the
+single sanctioned exception to "propose only these IDs". It is offered the way every other lane's
+recommendation is: it LEADS the `creative-visual` object's slate as a first-class option, marked
+`(recommended)` in place, never relegated to the hand-typed "Other" field. That costs one option — the four
+pool rows already fill the question's cap — so the cheapest pool model is dropped from THAT lane's slate
+only, positionally from the cheap end and never by ID. Nothing else moves: the pool stays four, and every
+other lane object still offers all four in cost order. This annotation lives HERE, in § Model statics —
+`wf-model-budget` derives the picker from this section and from nowhere the question cannot see, so the
+budget and this table can never drift.
+
 **Ordered by cost, most expensive first, and presented in that order every time** (`claude-opus-5`,
 `claude-opus-4-8`, and `claude-opus-4-6` share the `$5/$25` tier and are ordered newest-first within it;
 `claude-sonnet-5` is `$3/$15` and sits last). The blank "Other" field accepts any model ID typed by
-hand — this is how a project reaches a model not in the four, e.g. `claude-fable-5` for frontier
-long-horizon work ($10/$50, 2×) or `claude-haiku-4-5` for high-volume mechanical ICs ($1/$5, 200K/64K,
-**and note it does not accept an effort setting**). On the advisor object, the blank field is where the
-user types **none** to decline one — which removes the `advisorModel` key entirely (§ Session advisor).
+hand — this is how a project reaches a model not in the four, e.g. `claude-haiku-4-5` for high-volume
+mechanical ICs ($1/$5, 200K/64K, **and note it does not accept an effort setting**). On the advisor
+object, the blank field is where the user types **none** to decline one — which removes the `advisorModel`
+key entirely (§ Session advisor).
 
 **A recommendation is a label, never a position.** Mark the recommended model where the cost order
 already puts it; it is never promoted to the top of the list. This deliberately overrides the host
@@ -196,7 +207,8 @@ runs on `creative-text`; graphics, visual design, frontend design, and image gen
 | Creative-visual effort | medium |
 | Departments on creative-visual | |
 
-creative-visual runs `claude-fable-5` — **Recommended for creative-visual** — the frontier visual model.
+creative-visual runs `claude-fable-5` — the frontier visual model, recommended for that lane in § Model
+statics (the sole home of the annotation the budget question reads).
 It sits outside the statics pool (§ Model statics), so the model budget offers it as the LEADING
 first-class option for this lane, marked `(recommended)`, and drops the pool's cheapest model from this
 lane's slate to fit the four-option cap — it is NOT relegated to the hand-typed "Other" field.
