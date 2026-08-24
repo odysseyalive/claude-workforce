@@ -6,6 +6,34 @@
 
 > **PAIRS WELL WITH:** playwright-mcp. Nobody here is hired without a way to prove the work is right, and the employees who deal with websites are the hardest to hire, because clicking around a web page rarely leaves behind a clean pass-or-fail signal the way finished code does. This tool records you logging into a site once, then turns that recording into a repeatable test the employee can actually run, so the proof is a test that passes, not a model's say-so. It also handles fetching web pages, which these employees otherwise can't do on their own. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
 
+## Contents
+
+- [Not Every Brain Does Every Job](#not-every-brain-does-every-job)
+- [How We Got Here](#how-we-got-here)
+- [Getting Started](#getting-started)
+  - [Install](#install)
+    - [Into a specific Claude config directory](#into-a-specific-claude-config-directory)
+  - [Updating](#updating)
+- [Talking to the Company](#talking-to-the-company)
+- [Three Tiers, Measured](#three-tiers-measured)
+- [Which Model on Each Tier](#which-model-on-each-tier)
+- [Employee Handbooks](#employee-handbooks)
+- [A Handbook Isn't Finished Until a Stranger Can Follow It](#a-handbook-isnt-finished-until-a-stranger-can-follow-it)
+- [When Something Goes Wrong, the Document Is at Fault](#when-something-goes-wrong-the-document-is-at-fault)
+- [Your CLAUDE.md Gets Deleted](#your-claudemd-gets-deleted)
+- [The Long Session Is the Expensive One](#the-long-session-is-the-expensive-one)
+- [The Honest Parts](#the-honest-parts)
+- [If Your Repo Has a Test Corpus](#if-your-repo-has-a-test-corpus)
+- [Platform Facts Expire](#platform-facts-expire)
+- [Coming from Claude Enforcer](#coming-from-claude-enforcer)
+- [Uninstalling](#uninstalling)
+- [The Tools That Check the Work](#the-tools-that-check-the-work)
+- [Learn More](#learn-more)
+- [Personal Project](#personal-project)
+- [Standing on Shoulders](#standing-on-shoulders)
+  - [People](#people)
+- [License](#license)
+
 ## Not Every Brain Does Every Job
 
 You've probably switched models three times in one sitting without thinking about it. Not because anything was broken, but because each one was good at a different thing. The coder untangled a knot in your project without breaking the thing next to it. The writer gave your draft a pulse. Neither could do the other's job.
