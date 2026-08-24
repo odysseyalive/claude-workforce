@@ -37,7 +37,7 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 |---|---|---|---|---|
 | 1 | `claude-opus-5` | 1M | 128K | strongest at programming; commits and drives. **Recommended for code** |
 | 2 | `claude-opus-4-8` | 1M | 128K | the steerable thought-partner. **Recommended for analytical Lead** (agents that coordinate) |
-| 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative** (writing & design) |
+| 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
 | 4 | `claude-sonnet-5` | 1M | 128K | near-Opus quality at ~40% lower cost ($3/$15 vs $5/$25). **Recommended for analytical IC** (agents that do the work) |
 
 **Ordered by cost, most expensive first, and presented in that order every time** (`claude-opus-5`,
@@ -61,9 +61,10 @@ preference. The analytical lane now splits its recommendation by tier — a chan
 model supplied both rows: `claude-opus-4-8` for the **Lead** (the steerable thought-partner seat, where a
 model's mistakes are inherited by every IC beneath it), `claude-sonnet-5` for the **IC** (the wide fan-out
 wave, near-Opus quality at ~40% lower cost). `claude-opus-5` stays the code pick (executed output, where
-committing and driving is a virtue), and `claude-opus-4-6` stays the creative pick. A benchmark still is
-not a measurement of THIS project's work — treat the picks as informed defaults, not a certificate. Edit
-the Notes column when that changes; the budget question reads these cells and has no other source.*
+committing and driving is a virtue), and `claude-opus-4-6` stays the creative-text pick. A benchmark
+still is not a measurement of THIS project's work — treat the picks as informed defaults, not a
+certificate. Edit the Notes column when that changes; the budget question reads these cells and has no
+other source.*
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 
@@ -92,39 +93,54 @@ only be a rung already offered or one that does not exist.
 |---|---|
 | `analytical · Lead` | `high` |
 | `analytical · IC` | `medium` |
-| `creative` | `medium` |
+| `creative-text` | `medium` |
+| `creative-visual` | `medium` |
 | `code` | `high` |
 
-**Availability is not uniform, and the budget offers only rungs the lane's selected model supports.** Two
-that bite with this pool: `claude-opus-4-6` (the creative pick) has no `xhigh` — its ladder is
-`max`/`high`/`medium`/`low` — and `claude-haiku-4-5` (a mechanical-IC override) **rejects the effort
-parameter entirely**, so an employee pinned to it renders no effort object at all. **Named with the
-canonical categories** (§ The four lanes): this section sets the order the choices are shown in and,
-apart from marking the recommendation, changes none of them.
+**Both creative lanes recommend `medium` deliberately, so generative work does not start at high token
+cost.** Because the recommended rung is the forced first-run default (INV-BUDGET), that recommendation is
+the cost lever: `medium` is a deliberate floor a re-audit must not silently ratchet upward, and neither
+creative lane is ever recommended `high`, `xhigh`, or `max`. For `creative-visual`, whose model
+`claude-fable-5` spans the full ladder (`platform.md` fact 12c), the higher rungs are opt-in cost the
+user chooses, never the starting point.
 
-## The four lanes
+**Availability is not uniform, and the budget offers only rungs the lane's selected model supports.**
+Three that bite with this pool: `claude-opus-4-6` (the creative-text pick) has no `xhigh` — its ladder
+is `max`/`high`/`medium`/`low`; `claude-fable-5` (the creative-visual pick, reached via "Other") accepts
+all five rungs, but the budget offers the four nearest its recommended `medium` —
+`xhigh`/`high`/`medium`/`low`, dropping the far `max` end (`references/platform.md` fact 12c, DOCUMENTED
+and unverified); and
+`claude-haiku-4-5` (a mechanical-IC override) **rejects the effort parameter entirely**, so an employee
+pinned to it renders no effort object at all. **Named with the canonical categories** (§ The four lanes):
+this section sets the order the choices are shown in and, apart from marking the recommendation, changes
+none of them.
+
+## The four lanes — and the creative split that makes five
 
 Work is budgeted by **what kind of work it is**, not only by where the employee sits.
 
 **THE CANONICAL BUDGET CATEGORIES, stated once and owned here:**
-`analytical · Lead`, `analytical · IC`, `creative`, `code`.
+`analytical · Lead`, `analytical · IC`, `creative-text`, `creative-visual`, `code`.
 
-**Both budget questions offer exactly these four, in this order** (`audit-setup.md` § Step 0.4). A
-category added to one is added to both in the same change (`SKILL.md` Core Principle 7c). Neither
-question keeps its own copy of the list, and `AskUserQuestion` accepts at most four objects per call —
-so a fifth category is not a design choice, it is a call that cannot render.
+**Both budget questions offer exactly these categories, in this order** (`audit-setup.md` § Step 0.4).
+A category added to one is added to both in the same change (`SKILL.md` Core Principle 7c). Neither
+question keeps its own copy of the list. There are five employee-bearing lanes, and `AskUserQuestion`
+accepts at most four objects per call — so neither budget can render all five in one call. Each splits
+into two calls instead: a structural call (analytical Lead, analytical IC, code) and a creative call
+(creative-text, creative-visual), the identical grouping on both budgets.
 
 *Corrected 2026-08-04. The model budget carried a fifth object, the advisor, and the effort budget
 carried four — so the two questions rendered with different categories back to back, which is how a user
 noticed. The advisor is not a lane (see the table's own last row), has no effort object and never will,
 and now rides the backup call.*
 
-Four lanes, each addressed and managed separately:
+Five employee-bearing lanes plus the advisor, each addressed and managed separately:
 
 | Lane | What it covers | Carries a tier split? |
 |---|---|---|
 | **Analytical** | the baseline — research, planning, review, ops, anything not creative or code | **yes** — it supplies the Lead and IC defaults |
-| **Creative** | generative work (see the hard floor below) | no — one model for the lane |
+| **Creative-text** | generative writing and copy (see the hard floor below) | no — one model for the lane |
+| **Creative-visual** | graphics, visual design, and frontend design (see the hard floor below) | no — one model for the lane |
 | **Code** | writing, testing, and refactoring software | no — one model for the lane |
 | **Advisor** | the main session's advisor. Not a lane employees run in — it reaches no employee | no |
 
@@ -164,20 +180,34 @@ so every value here is a deliberate override of whatever the user is running.
   better thought-partner where 5 tends to commit to its own reading. **A cheap Lead is the expensive
   place to save.**
 
-### Creative
+### Creative — two lanes, text and visual
 
-| Creative model | `claude-opus-4-6` |
+The former single creative lane is split in two. Generative TEXT (prose, copy, docs, voice, translation)
+runs on `creative-text`; graphics, visual design, frontend design, and image generation run on
+`creative-visual`.
+
+| Creative-text model | `claude-opus-4-6` |
 |---|---|
-| Creative effort | medium |
-| Departments on creative | |
+| Creative-text effort | medium |
+| Departments on creative-text | |
+
+| Creative-visual model | `claude-fable-5` |
+|---|---|
+| Creative-visual effort | medium |
+| Departments on creative-visual | |
+
+creative-visual runs `claude-fable-5` — **Recommended for creative-visual** — the frontier visual model,
+reached only through the budget's "Other" field because it sits outside the statics pool (§ Model
+statics). creative-text stays in the pool on `claude-opus-4-6`.
 
 **Generative work is ALWAYS creative — judged per employee, from its own handbook, not per department.**
 That is a floor, not a default: any EMPLOYEE whose own work is generation or authorship — writing prose
-or copy, generating images, producing visual design or layout — is assigned to this lane wherever it
-sits, and the assignment is not overridable by the classifier, by evidence, or by a quieter reading of
-what its department "mostly" does. The floor exists to protect authorship from being cheapened, and that
-is a property of the WORK, not the department label. Voice and translation are creative by default and
-may be reassigned with a stated reason.
+or copy (`creative-text`), or generating images, producing visual design, layout, or frontend design
+(`creative-visual`) — is assigned to the creative family wherever it sits, and the assignment is not
+overridable by the classifier, by evidence, or by a quieter reading of what its department "mostly"
+does. The floor exists to protect authorship from being cheapened, and that is a property of the WORK,
+not the department label. Voice and translation are `creative-text` by default and may be reassigned
+with a stated reason.
 
 **The converse is the change that saves the tokens: a support role inside a creative department is
 analytical, not creative.** An employee whose work is research, review, analysis, or ops — a researcher
@@ -189,10 +219,11 @@ This is not a loophole in the floor — the floor never covered them, because th
 
 **Ambiguity errs toward creative, and is reported, never silent.** When a handbook's role genuinely sits
 between generation and support — an `evaluator` that may be applying a mechanical checklist OR exercising
-visual taste — the classifier keeps it CREATIVE (the safe, non-cheapening side) and the audit NAMES the
-employee, the reading it chose, and why (`references/procedures/audit.md` Step 2), so the user can pin it
-down a tier (§ Employee overrides) if the conservative call was wrong. **Never silently cheapen a role
-that might be authorship.**
+visual taste — the classifier keeps it CREATIVE (the safe, non-cheapening side), erring toward
+`creative-text` since text is the default generative medium, and the audit NAMES the employee, the
+reading it chose, and why (`references/procedures/audit.md` Step 2), so the user can pin it down a tier
+(§ Employee overrides) if the conservative call was wrong. **Never silently cheapen a role that might be
+authorship.**
 
 **Where generative work is homed under a non-creative department, the floor still wins and the audit
 reports it.** A writer or illustrator sitting under an engineering department is creative, not code — the
@@ -264,7 +295,8 @@ if a whole department's worth of work needs one, the department was drawn wrong.
 **Resolution order for any one employee: employee override → lane override → analytical tier default.**
 Stated once, here; every procedure reads it from this file rather than restating it.
 
-The lane override is the creative or code row for the employee's department. Analytical is not a level
+The lane override is the creative-text, creative-visual, or code row for the employee's department.
+Analytical is not a level
 in this order — it *is* the bottom of it, which is why an employee in the analytical lane and an
 employee whose lane cell is blank resolve identically and the receipt must distinguish them by source.
 

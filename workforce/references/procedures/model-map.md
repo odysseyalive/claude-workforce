@@ -14,29 +14,34 @@ Spec: `references/org-config.template.md`.
 
 **`model-map` is the standalone editor for every budget value — model, effort, and the advisor —
 changeable without a full audit and without either gate question** (there is nothing to consent to and
-nothing to archive, because it writes only the config and the frontmatter it names). It renders **three
-`AskUserQuestion` calls**, fixed regardless of headcount:
+nothing to archive, because it writes only the config and the frontmatter it names). It renders **five
+`AskUserQuestion` calls** — model budget as two, effort budget as two, and the advisor — fixed regardless
+of headcount. `AskUserQuestion` caps options at four objects per call, and the five lanes overflow it, so
+each budget renders as two calls, grouped identically to `audit-setup.md` § Step 0.4:
 
-- **Model budget — 4 objects:** `analytical · Lead`, `analytical · IC`, `creative`, `code`
+- **Model budget — two calls, six objects:** Call A (3 objects) = `analytical · Lead`, `analytical · IC`,
+  `code`; Call B (2 objects) = `creative-text`, `creative-visual`
   (`org-config.template.md` § The four lanes). Each object offers the four statics from
   `org-config.template.md` § Model statics in cost order, plus a **blank field** for a hand-typed model
   ID, and marks its lane's recommended static `(recommended)` where the cost order puts it — never
-  promoted to the top (`audit-setup.md` § Step 0.4a). **No CEO question** — the CEO is the main session.
+  promoted to the top (`audit-setup.md` § Step 0.4a). creative-visual's recommended model sits outside the
+  pool and is reached through the blank "Other" field. **No CEO question** — the CEO is the main session.
   **No separate tier question** — the analytical lane supplies the Lead and IC rows, which now differ in
   model as well as effort.
-- **Effort budget — 4 objects:** the same four lanes, each marking its recommended rung `(recommended)`
-  (`audit-setup.md` § Step 0.4b) and offering only rungs the lane's selected model supports — at most
-  four, because `AskUserQuestion` caps options at four.
+- **Effort budget — two calls, six objects:** the same lanes grouped identically to the model budget,
+  each marking its recommended rung `(recommended)` (`audit-setup.md` § Step 0.4b) and offering only rungs
+  the lane's selected model supports — at most four, because `AskUserQuestion` caps options at four.
 - **Advisor — 1 object:** pre-selected from `advisorModel` in settings; same model pool, no
   recommendation, and its **blank field is where the user types `none` to remove the `advisorModel` key
   entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
-  full `audit` it is the second object of the backup call, `audit-setup.md` § Step 0.2), and because a
-  four-object budget has no room for a fifth object.
+  full `audit` it is the second object of the backup call, `audit-setup.md` § Step 0.2), and because
+  every budget call is already at its object cap.
 
 Lane membership is derived from the work **per employee**, never asked (`audit-setup.md` § Which
 departments are in which lane is NOT a question) — `model-map` does not re-derive it; it edits the values
-a prior run recorded. Generative work is always creative; a support role inside a creative department is
-analytical (`org-config.template.md` § Creative).
+a prior run recorded. Generative work is always creative: writing prose or copy routes to `creative-text`,
+graphics and frontend design route to `creative-visual`, and a support role inside a creative department
+is analytical (`org-config.template.md` § Creative).
 
 **Every object renders on every interactive run**, current values pre-selected. Answering costs one click
 when nothing changed. **A marker may change a default; it may never drop a question.**

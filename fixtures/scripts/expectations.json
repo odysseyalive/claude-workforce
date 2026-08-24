@@ -2257,7 +2257,7 @@
     ]
   },
   "modelbudget-firstrun": {
-    "_why": "The model budget picker was reconstructed from prose on every run and drifted: on a re-audit it read the project's stale `## Model statics` and proposed the pre-`claude-sonnet-5` four (`claude-fable-5` present, `claude-sonnet-5` absent), marking `claude-opus-4-8` as the undifferentiated analytical recommendation. This case freezes the first-run contract against a template: the pool is the four current statics in cost order, and the analytical IC lane's recommendation is `claude-sonnet-5` — the exact cell the drift got wrong. `not` asserts `claude-fable-5` is never a static (it reaches a config only via the Other field).",
+    "_why": "The model budget picker was reconstructed from prose on every run and drifted: on a re-audit it read the project's stale `## Model statics` and proposed the pre-`claude-sonnet-5` four (`claude-fable-5` present, `claude-sonnet-5` absent), marking `claude-opus-4-8` as the undifferentiated analytical recommendation. This case freezes the first-run contract against a template: the pool is the four current statics in cost order, and the analytical IC lane's recommendation is `claude-sonnet-5` — the exact cell the drift got wrong. Extended 2026-08-23 for the creative-lane split: FIVE lanes now exist and overflow AskUserQuestion's four-object cap, so the emission must carry the grouping (CALL A = 3 structural objects, CALL B = 2 creative objects) rather than leave the split to the caller. `creative-text` recommends `claude-opus-4-6` from a pool row; `creative-visual` recommends `claude-fable-5`, which is DELIBERATELY not a pool row and is derived from the out-of-pool prose annotation — so its recommendation rides the `+ Other` line, marked in place. The old `not: [claude-fable-5]` was RETIRED because fable-5 is now a legitimate output; what it was really guarding — the stale pool — is asserted precisely instead, as `\"  - claude-fable-5\"`, the shape fable-5 would take if it were ever rendered as a static. Measured: with the annotation split across two prose lines the visual lane emits `!! no model is marked`, so `not` also asserts that marker is absent.",
     "script": "wf-model-budget",
     "args": [
       "--template",
@@ -2266,17 +2266,25 @@
     "exit": 0,
     "want": [
       "pool (cost order, most expensive first): claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5",
+      "lanes: 5, rendered as 2 AskUserQuestion calls (cap: 4 objects per call)",
+      "CALL A  (structural lanes — 3 objects: analytical · Lead, analytical · IC, code)",
+      "CALL B  (creative lanes — 2 objects: creative-text, creative-visual)",
       "LANE analytical · IC",
       "claude-sonnet-5  (recommended) [pre-selected]",
       "claude-opus-5  (recommended) [pre-selected]",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6  (recommended) [pre-selected]\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5\n  + Other (hand-typed model ID) = claude-fable-5  (recommended) [pre-selected]\n",
+      "out-of-pool: claude-fable-5 is this lane's recommended model and is NOT a § Model statics row",
       "recommended default (first run)"
     ],
     "not": [
-      "claude-fable-5"
+      "  - claude-fable-5",
+      "!! no model is marked",
+      "LANE creative  (object"
     ]
   },
   "modelbudget-stale-reaudit": {
-    "_why": "THE REGRESSION TEST for the reported bug (TicketTomato re-audit, 2026-08-20). The project's org-config.md carries a stale `## Model statics` naming `claude-fable-5` and records `claude-opus-4-8` as its analytical IC. The pool MUST still come from the template (`claude-fable-5` never appears as a static), the IC recommendation MUST be `claude-sonnet-5`, the user's recorded prior choice `claude-opus-4-8` stays pre-selected on the IC lane, and the stale section is REPORTED, never clobbered (org-config.template.md § Model statics).",
+    "_why": "THE REGRESSION TEST for the reported bug (TicketTomato re-audit, 2026-08-20). The project's org-config.md carries a stale `## Model statics` naming `claude-fable-5` and records `claude-opus-4-8` as its analytical IC. The pool MUST still come from the template, the IC recommendation MUST be `claude-sonnet-5`, the user's recorded prior choice `claude-opus-4-8` stays pre-selected on the IC lane, and the stale section is REPORTED, never clobbered (org-config.template.md § Model statics). Extended 2026-08-23 for the creative split, and this config is the awkward real shape: it predates the split, so the TEXT lane is recorded under the OLD `Creative model` label, while a later hand edit added a `Creative-visual model` row. Both must be read — `not: [\"recommended default (first run)\"]` is the sharp end of that, because ALL FIVE lanes are recorded here, so any lane that fell back to its recommendation (the shape a broken backward-compat read takes) fails this case. The visual lane also separates the two marks that a single-lane check cannot: `(recommended)` sits out of pool on the Other line while `[pre-selected]` sits on the recorded in-pool `claude-sonnet-5`. The old `not: [claude-fable-5]` was retired (fable-5 is now the visual recommendation) and replaced with `\"  - claude-fable-5\"`, which is what reading the STALE pool would actually look like.",
     "script": "wf-model-budget",
     "args": [
       "--template",
@@ -2287,13 +2295,80 @@
     "exit": 0,
     "want": [
       "pool (cost order, most expensive first): claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5",
+      "CALL A  (structural lanes — 3 objects: analytical · Lead, analytical · IC, code)",
+      "CALL B  (creative lanes — 2 objects: creative-text, creative-visual)",
       "claude-sonnet-5  (recommended)",
       "claude-opus-4-8  [pre-selected]",
       "recorded (re-audit)",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6  (recommended) [pre-selected]\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recorded (re-audit)",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5  [pre-selected]\n  + Other (hand-typed model ID) = claude-fable-5  (recommended)\n",
       "STALE-ARTIFACT: the project's org-config.md carries a '## Model statics' heading"
     ],
     "not": [
-      "claude-fable-5"
+      "  - claude-fable-5",
+      "!! no model is marked",
+      "recommended default (first run)"
+    ]
+  },
+  "modelbudget-outofpool-visual": {
+    "_why": "The POSITIVE half of the out-of-pool pair: `creative-visual` is the ONE lane sanctioned to be recommended a model that is not in the pool, and this case proves the derive finds it, keeps the pool at the four in-pool statics, and renders it as an Other pick rather than a dropped static. The frozen template is deliberately hostile in three ways a hand-written one is not: (1) the fable-5 annotation sits ABOVE the table, so a reader that walks only table rows finds nothing for the lane; (2) a decoy names a non-pool model with the PRE-SPLIT `**Recommended for creative**` — no bare `creative` lane exists any more, so a prefix-happy pattern would adopt it as `creative-text`'s recommendation and resolve that lane out of pool, which the sibling `modelbudget-outofpool-unsanctioned` case shows exits 2; (3) a second decoy sits in `## Effort statics`, outside § Model statics, which a whole-file scan would wrongly adopt. Measured against the patched script: `claude-haiku-4-5` appears in the fixture template three times and in the emission zero times, which is what `not` asserts.",
+    "script": "wf-model-budget",
+    "args": [
+      "--template",
+      "template.md"
+    ],
+    "exit": 0,
+    "want": [
+      "pool (cost order, most expensive first): claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5",
+      "lanes: 5, rendered as 2 AskUserQuestion calls (cap: 4 objects per call)",
+      "CALL A  (structural lanes — 3 objects: analytical · Lead, analytical · IC, code)",
+      "CALL B  (creative lanes — 2 objects: creative-text, creative-visual)",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6  (recommended) [pre-selected]\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  - claude-opus-5\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5\n  + Other (hand-typed model ID) = claude-fable-5  (recommended) [pre-selected]\n",
+      "out-of-pool: claude-fable-5 is this lane's recommended model and is NOT a § Model statics row. It was not dropped from the pool",
+      "the one sanctioned out-of-pool recommendation, lane creative-visual"
+    ],
+    "not": [
+      "claude-haiku-4-5",
+      "  - claude-fable-5",
+      "!! no model is marked"
+    ]
+  },
+  "modelbudget-outofpool-unsanctioned": {
+    "_why": "The NEGATIVE half of the out-of-pool pair, and the reason the derive is TIGHT rather than permissive. Exactly one lane (`creative-visual`) may be recommended a model outside the pool. Here the `claude-opus-5` row has lost its annotation and a prose line recommends the non-pool `claude-haiku-4-5` for `code` — the shape a half-finished template edit takes. Rendered, that is indistinguishable from the pool having gone stale, which is the exact drift wf-model-budget was written to end, so it must exit 2 and NAME the offending lane and model rather than emit an option set. `not` asserts nothing was emitted on the way out: no pool line, no CALL header. A permissive derive (accept any out-of-pool rec) passes the sibling `modelbudget-outofpool-visual` case and fails only this one; a derive that rejects ALL out-of-pool recs passes this one and fails the sibling. Neither case alone can tell those apart.",
+    "script": "wf-model-budget",
+    "args": [
+      "--template",
+      "template.md"
+    ],
+    "exit": 2,
+    "want": [
+      "wf-model-budget: unsanctioned out-of-pool recommendation: lane 'code' is recommended 'claude-haiku-4-5', which is not a row of the template's § Model statics table",
+      "Exactly one lane may be recommended out of pool (creative-visual); every other lane's recommendation must come from a pool table row."
+    ],
+    "not": [
+      "pool (cost order, most expensive first)",
+      "CALL A",
+      "LANE code"
+    ]
+  },
+  "modelbudget-emptyroot": {
+    "_why": "AN EMPTY --root IS A CALLER ERROR, never a silent retarget to the CWD. `${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`, and `os.path.abspath(\"\")` is the CWD — a real directory that passes a naive is-a-directory guard. wf-model-budget resolves `--template`/`--config` against the root, so an empty one either derives the picker's whole option set from whatever `template.md` happens to sit in the CWD, or — measured on the unguarded script — exits 2 saying it `cannot read template.md`, which sends the caller to fix the wrong end of the problem entirely. The exit code alone cannot tell those two apart: BOTH are 2. That is why `want` pins the message to the ROOT and `not` forbids the template-unreadable wording, and why this row would pass on exit code against the unguarded script and still fail. The harness passes `--root <tree>` itself, so the row appends a second, empty `--root` that argparse resolves last.",
+    "script": "wf-model-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "want": [
+      "wf-model-budget: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; pass an explicit path."
+    ],
+    "not": [
+      "cannot read",
+      "pool (cost order, most expensive first)",
+      "CALL A"
     ]
   }
 }

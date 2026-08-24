@@ -1,11 +1,29 @@
 #!/usr/bin/env python3
 """wf-model-budget — emit the model budget picker's options, mechanically.
 
-`audit` Step 0.4a and `model-map` render one `AskUserQuestion` with four lane
-objects — `analytical · Lead`, `analytical · IC`, `creative`, `code` — each
-offering the four static models in cost order with the lane's recommended model
-marked `(recommended)`. Until now that option set was RECONSTRUCTED from prose by
-the running agent on every run, and it drifted.
+`audit` Step 0.4a and `model-map` render FIVE lane objects — `analytical · Lead`,
+`analytical · IC`, `creative-text`, `creative-visual`, `code` — each offering the
+four static models in cost order with the lane's recommended model marked
+`(recommended)`. Until now that option set was RECONSTRUCTED from prose by the
+running agent on every run, and it drifted.
+
+FIVE LANES DO NOT FIT ONE CALL. `AskUserQuestion` accepts at most FOUR objects per
+call (`platform.md` § header), so the five lanes render as TWO calls and this script
+emits that grouping explicitly rather than leaving the split to the caller: CALL A
+carries the three structural lanes (`analytical · Lead`, `analytical · IC`, `code`)
+and CALL B carries the two creative lanes (`creative-text`, `creative-visual`). A
+caller that regroups them by hand is reintroducing by hand the drift this script
+exists to foreclose.
+
+ONE SANCTIONED OUT-OF-POOL RECOMMENDATION. `creative-visual` is recommended
+`claude-fable-5`, which is DELIBERATELY not a § Model statics row: it is reached only
+by hand-typing it into the budget's "Other" field. So that lane's recommendation is
+annotated on a PROSE line inside § Model statics rather than on a table row, and the
+emission carries it on the `+ Other` line — marked `(recommended)`, so a reader can
+see it is an out-of-pool pick and not a static that was silently dropped. Exactly ONE
+lane may be recommended out of pool; a second one is an ERROR (exit 2), because a
+recommendation that quietly resolves outside the pool is indistinguishable from the
+pool having gone stale — the very confusion this script was written to end.
 
 WHY THIS EXISTS — a measured, recurring drift.
 
@@ -37,6 +55,10 @@ WHAT IT DERIVES, and from where:
     <lane>` annotation, so re-splitting or re-pointing a recommendation is a
     template edit with no code change (`org-config.template.md` § Model statics:
     "the budget question reads these cells and has no other source").
+  * The ONE sanctioned out-of-pool recommendation — the same `Recommended for
+    <lane>` annotation, found on a PROSE line of § Model statics beside a backticked
+    model ID that is not a pool row. `claude-fable-5` reaches `creative-visual` this
+    way and no model ID for it is written here either.
   * The pre-selected default per lane — the recorded value from the project's
     `org-config.md` four-lane tables when one is passed (a re-audit), ELSE the lane's
     recommended model (a first run defaults to the recommendation, `audit-setup.md`
@@ -54,9 +76,10 @@ place, never promoted to the top. This script emits them in that order and marks
 place; a caller that reorders them is reintroducing the drift by hand.
 
 EXIT CODES: 0 normal (including when a stale embedded section was reported — it is a
-finding to surface, not a failure to abort on); 2 only when the template's § Model
-statics cannot be found or parsed, because then the caller has no trustworthy pool
-and must not fall back to reconstructing one.
+finding to surface, not a failure to abort on); 2 when `--root` is empty, when the
+template's § Model statics cannot be found or parsed, or when a lane other than the
+one sanctioned lane resolves to an out-of-pool recommendation — in each of those the
+caller has no trustworthy pool and must not fall back to reconstructing one.
 """
 
 import argparse
@@ -66,27 +89,71 @@ import sys
 
 # The canonical lane order, owned by org-config.template.md § The four lanes and
 # restated in neither budget. Parsed labels from the Notes column map onto these.
+# The lane KEY is the token the annotation is written with and the token the two
+# budgets agree on; the second field is the object header, the third its prompt.
 LANES = [
     ("analytical-lead", "analytical · Lead", "Agents that coordinate"),
     ("analytical-ic", "analytical · IC", "Agents that do the work"),
-    ("creative", "creative", "Writing and design work"),
+    ("creative-text", "creative-text", "Writing & copy work"),
+    ("creative-visual", "creative-visual", "Graphics & frontend design work"),
     ("code", "code", "Code work"),
 ]
 
-# Maps the phrase in a Notes cell's "**Recommended for X**" to a lane key above.
+# AskUserQuestion accepts at most this many objects per call (platform.md § header).
+_OBJECT_CAP = 4
+
+# Five lanes overflow one call, so the picker renders as two. The grouping lives
+# here, next to the lane order it partitions, so the two cannot drift apart: the
+# validation below refuses a grouping that drops, duplicates, or overfills a lane.
+CALL_GROUPS = [
+    ("CALL A", "structural lanes", ("analytical-lead", "analytical-ic", "code")),
+    ("CALL B", "creative lanes", ("creative-text", "creative-visual")),
+]
+
+# EXACTLY ONE lane may be recommended a model that is not in the pool. That lane's
+# model is reached only through the hand-typed "Other" field, and the emission says
+# so in place. Any OTHER lane resolving out of pool is an error, not a silent
+# acceptance — see merge_recommendations().
+SANCTIONED_OUT_OF_POOL_LANES = ("creative-visual",)
+
+# Maps the phrase in a "**Recommended for X**" annotation to a lane key above.
 # Order matters: "analytical IC"/"analytical Lead" must be tested before a bare
 # "analytical" would ever match, so the two-word forms are the only ones listed.
+# The trailing `(?![\w-])` is what keeps the two hyphenated creative lanes apart:
+# without it a `creative-text` pattern would swallow `creative-visual`'s annotation
+# (and a bare `creative`, a lane that no longer exists, would swallow both).
 _REC_PATTERNS = [
-    (re.compile(r"Recommended for analytical Lead", re.I), "analytical-lead"),
-    (re.compile(r"Recommended for analytical IC", re.I), "analytical-ic"),
-    (re.compile(r"Recommended for creative", re.I), "creative"),
-    (re.compile(r"Recommended for code", re.I), "code"),
+    (re.compile(r"Recommended for analytical Lead(?![\w-])", re.I), "analytical-lead"),
+    (re.compile(r"Recommended for analytical IC(?![\w-])", re.I), "analytical-ic"),
+    (re.compile(r"Recommended for creative-text(?![\w-])", re.I), "creative-text"),
+    (re.compile(r"Recommended for creative-visual(?![\w-])", re.I), "creative-visual"),
+    (re.compile(r"Recommended for code(?![\w-])", re.I), "code"),
 ]
+
+# A statics row looks like: | 1 | `<model-id>` | 1M | 128K | ...notes... |
+_POOL_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|.*\|\s*(.*?)\s*\|\s*$")
+
+_LANE_KEYS = [k for k, _lbl, _p in LANES]
 
 
 def _die(msg, code=2):
     sys.stderr.write("wf-model-budget: " + msg + "\n")
     sys.exit(code)
+
+
+def _validate_grouping():
+    """The call grouping must partition the lanes exactly and fit the tool's cap.
+
+    A lane silently missing from both calls is a lane the user is never asked
+    about, and the run would pin it to a default nobody chose."""
+    grouped = [k for _n, _d, keys in CALL_GROUPS for k in keys]
+    if sorted(grouped) != sorted(_LANE_KEYS):
+        _die("internal: CALL_GROUPS does not partition LANES (%s vs %s)"
+             % (", ".join(sorted(grouped)), ", ".join(sorted(_LANE_KEYS))))
+    for name, _desc, keys in CALL_GROUPS:
+        if len(keys) > _OBJECT_CAP:
+            _die("internal: %s carries %d objects; the cap is %d per call"
+                 % (name, len(keys), _OBJECT_CAP))
 
 
 def _read(path):
@@ -123,26 +190,61 @@ def parse_statics(template_text):
 
     Cost order is table order — the template states it is ordered most-expensive-first
     and presented in that order every time, so this function never re-sorts."""
-    body = _section(template_text, re.compile(r"^##\s+Model statics"))
-    if body is None:
-        _die("template has no '## Model statics' section: " + "cannot derive the pool")
+    body = _statics_body(template_text)
     rows = []
-    # A statics row looks like: | 1 | `<model-id>` | 1M | 128K | ...notes... |
-    row_re = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|.*\|\s*(.*?)\s*\|\s*$")
     for line in body.splitlines():
-        m = row_re.match(line)
+        m = _POOL_ROW_RE.match(line)
         if not m:
             continue
         model_id, notes = m.group(1).strip(), m.group(2).strip()
-        rec_lane = None
-        for pat, lane in _REC_PATTERNS:
-            if pat.search(notes):
-                rec_lane = lane
-                break
-        rows.append((model_id, notes, rec_lane))
+        rows.append((model_id, notes, _rec_lane(notes)))
     if not rows:
         _die("'## Model statics' present but no model rows parsed: " + "table shape changed")
     return rows
+
+
+def _statics_body(template_text):
+    body = _section(template_text, re.compile(r"^##\s+Model statics"))
+    if body is None:
+        _die("template has no '## Model statics' section: " + "cannot derive the pool")
+    return body
+
+
+def _rec_lane(text):
+    """The lane a `**Recommended for <lane>**` annotation names, or None."""
+    for pat, lane in _REC_PATTERNS:
+        if pat.search(text):
+            return lane
+    return None
+
+
+def parse_out_of_pool_recs(template_text, pool_ids):
+    """Lane recommendations annotated on a NON-pool model ID.
+
+    Read from the same § Model statics section, but from its PROSE lines: a model
+    reached only through the hand-typed "Other" field has no table row to carry its
+    Notes cell, so its annotation sits beside the backticked ID in prose. A prose
+    line that names only pool IDs is documentation restating the table and is
+    skipped. Returns {lane_key: model_id}."""
+    body = _statics_body(template_text)
+    found = {}
+    for line in body.splitlines():
+        if _POOL_ROW_RE.match(line):
+            continue  # a pool row — parse_statics owns it
+        lane = _rec_lane(line)
+        if lane is None:
+            continue
+        outside = [t.strip() for t in re.findall(r"`([^`]+)`", line)
+                   if t.strip() and t.strip() not in pool_ids]
+        if not outside:
+            continue
+        model_id = outside[0]
+        if found.get(lane, model_id) != model_id:
+            _die("lane '%s' is annotated with two different out-of-pool models "
+                 "('%s' and '%s') in § Model statics: the recommendation is ambiguous"
+                 % (lane, found[lane], model_id))
+        found[lane] = model_id
+    return found
 
 
 def recommended_by_lane(statics):
@@ -150,6 +252,30 @@ def recommended_by_lane(statics):
     for model_id, _notes, lane in statics:
         if lane is not None:
             rec[lane] = model_id
+    return rec
+
+
+def merge_recommendations(statics, out_of_pool):
+    """Fold the out-of-pool annotations into the in-pool ones, TIGHTLY.
+
+    Exactly one lane is sanctioned to be recommended a model outside the pool. A
+    second one is refused rather than accepted, because an unexplained out-of-pool
+    recommendation and a pool that has gone stale look identical in the emission —
+    and reading a stale pool is the failure this script was written to end."""
+    rec = recommended_by_lane(statics)
+    for lane in sorted(out_of_pool):
+        model_id = out_of_pool[lane]
+        if lane not in SANCTIONED_OUT_OF_POOL_LANES:
+            _die("unsanctioned out-of-pool recommendation: lane '%s' is recommended "
+                 "'%s', which is not a row of the template's § Model statics table. "
+                 "Exactly one lane may be recommended out of pool (%s); every other "
+                 "lane's recommendation must come from a pool table row."
+                 % (lane, model_id, ", ".join(SANCTIONED_OUT_OF_POOL_LANES)))
+        if rec.get(lane, model_id) != model_id:
+            _die("lane '%s' is recommended twice: '%s' by a pool table row and '%s' "
+                 "by an out-of-pool annotation in § Model statics"
+                 % (lane, rec[lane], model_id))
+        rec[lane] = model_id
     return rec
 
 
@@ -172,20 +298,32 @@ def _find_backticked(text, label_re):
 
 
 def parse_config_defaults(config_text):
-    """Recorded per-lane models from a project's org-config.md four-lane tables.
+    """Recorded per-lane models from a project's org-config.md lane tables.
     Best-effort: a lane that cannot be found simply has no recorded default and
-    falls back to the recommendation. Returns {lane_key: model_id}."""
+    falls back to the recommendation. Returns {lane_key: model_id}.
+
+    A config written before the creative lane split records one `Creative model`
+    row and no visual row. That row is the recorded TEXT model — reading it as
+    nothing would silently discard a choice the user made, so it is honoured as the
+    `creative-text` default when no `Creative-text model` row is present. The visual
+    lane then simply has no recorded default and first-runs on its recommendation,
+    which is the truth about such a config: it predates the lane."""
     defaults = {}
     lead = _find_backticked(config_text, re.compile(r"^Lead\b", re.I))
     ic = _find_backticked(config_text, re.compile(r"^IC\b", re.I))
-    creative = _find_backticked(config_text, re.compile(r"^Creative model\b", re.I))
+    ctext = _find_backticked(config_text, re.compile(r"^Creative-text model\b", re.I))
+    if not ctext:
+        ctext = _find_backticked(config_text, re.compile(r"^Creative model\b", re.I))
+    cvisual = _find_backticked(config_text, re.compile(r"^Creative-visual model\b", re.I))
     code = _find_backticked(config_text, re.compile(r"^Code model\b", re.I))
     if lead:
         defaults["analytical-lead"] = lead
     if ic:
         defaults["analytical-ic"] = ic
-    if creative:
-        defaults["creative"] = creative
+    if ctext:
+        defaults["creative-text"] = ctext
+    if cvisual:
+        defaults["creative-visual"] = cvisual
     if code:
         defaults["code"] = code
     return defaults
@@ -197,35 +335,82 @@ def config_has_stale_statics(config_text):
 
 # --- emission --------------------------------------------------------------------
 
+def _lane_block(lane_key, lane_label, prompt_label, statics, rec, defaults, pool_ids):
+    """One AskUserQuestion object, rendered. The pool is emitted in cost order and
+    the marks are appended IN PLACE — a recommendation is a label, never a position."""
+    out = []
+    rec_model = rec.get(lane_key)
+    default_model = defaults.get(lane_key, rec_model)
+    out.append("LANE %s  (object: \"%s\")" % (lane_label, prompt_label))
+    if rec_model is None:
+        out.append("  !! no model is marked 'Recommended for %s' in the template" % lane_key)
+    for model_id, _notes, _l in statics:
+        marks = []
+        if model_id == rec_model:
+            marks.append("(recommended)")
+        if model_id == default_model:
+            marks.append("[pre-selected]")
+        suffix = ("  " + " ".join(marks)) if marks else ""
+        out.append("  - %s%s" % (model_id, suffix))
+
+    # Anything outside the pool rides on the Other line, marked there. Two things
+    # can land there and they are not the same thing: this lane's sanctioned
+    # out-of-pool RECOMMENDATION, and a recorded "Other" pin the user typed on a
+    # previous run. Both are named, so neither reads as a static that went missing.
+    other = []
+    if rec_model is not None and rec_model not in pool_ids:
+        marks = ["(recommended)"]
+        if default_model == rec_model:
+            marks.append("[pre-selected]")
+        other.append((rec_model, marks))
+    if (default_model is not None and default_model not in pool_ids
+            and default_model != rec_model):
+        other.append((default_model, ["[pre-selected]"]))
+
+    if len(other) == 1:
+        out.append("  + Other (hand-typed model ID) = %s  %s"
+                   % (other[0][0], " ".join(other[0][1])))
+    else:
+        out.append("  + Other (hand-typed model ID)")
+        for model_id, marks in other:
+            out.append("    = %s  %s" % (model_id, " ".join(marks)))
+
+    if rec_model is not None and rec_model not in pool_ids:
+        out.append("    out-of-pool: %s is this lane's recommended model and is NOT a "
+                   "§ Model statics row. It was not dropped from the pool — it is "
+                   "reached only by hand-typing it into the Other field (the one "
+                   "sanctioned out-of-pool recommendation, lane %s)."
+                   % (rec_model, lane_key))
+    if (lane_key in defaults and default_model is not None
+            and default_model not in pool_ids and default_model != rec_model):
+        out.append("    pre-selected = %s (recorded 'Other' pin, not a static)" % default_model)
+    src = "recorded (re-audit)" if lane_key in defaults else "recommended default (first run)"
+    out.append("  default source: %s" % src)
+    out.append("")
+    return out
+
+
 def emit(statics, rec, defaults, stale, template_path):
+    pool_ids = [m for m, _n, _l in statics]
+    pool_set = set(pool_ids)
+    meta = {k: (lbl, prompt) for k, lbl, prompt in LANES}
     out = []
     out.append("WF-MODEL-BUDGET  (Step 0.4a option set — render verbatim, do not reorder)")
     out.append("source: %s § Model statics" % template_path)
-    out.append("pool (cost order, most expensive first): "
-               + ", ".join(m for m, _n, _l in statics))
+    out.append("pool (cost order, most expensive first): " + ", ".join(pool_ids))
+    out.append("lanes: %d, rendered as %d AskUserQuestion calls (cap: %d objects per call)"
+               % (len(LANES), len(CALL_GROUPS), _OBJECT_CAP))
     out.append("")
-    for lane_key, lane_label, prompt_label in LANES:
-        rec_model = rec.get(lane_key)
-        default_model = defaults.get(lane_key, rec_model)
-        out.append("LANE %s  (object: \"%s\")" % (lane_label, prompt_label))
-        if rec_model is None:
-            out.append("  !! no static is marked 'Recommended for %s' in the template" % lane_label)
-        for model_id, notes, _l in statics:
-            marks = []
-            if model_id == rec_model:
-                marks.append("(recommended)")
-            if model_id == default_model:
-                marks.append("[pre-selected]")
-            suffix = ("  " + " ".join(marks)) if marks else ""
-            out.append("  - %s%s" % (model_id, suffix))
-        out.append("  + Other (hand-typed model ID)")
-        # A recorded default outside the four statics is legal (an "Other" pin) but
-        # must be surfaced so it is not mistaken for a dropped option.
-        if default_model is not None and default_model not in {m for m, _n, _l in statics}:
-            out.append("    pre-selected = %s (recorded 'Other' pin, not a static)" % default_model)
-        src = "recorded (re-audit)" if lane_key in defaults else "recommended default (first run)"
-        out.append("  default source: %s" % src)
+    for call_name, call_desc, keys in CALL_GROUPS:
+        ordered = [k for k in _LANE_KEYS if k in keys]
+        out.append("%s  (%s — %d objects: %s)"
+                   % (call_name, call_desc, len(ordered),
+                      ", ".join(meta[k][0] for k in ordered)))
         out.append("")
+        for lane_key in ordered:
+            lane_label, prompt_label = meta[lane_key]
+            out.extend(_lane_block(lane_key, lane_label, prompt_label,
+                                   statics, rec, defaults, pool_set))
     if stale:
         out.append("STALE-ARTIFACT: the project's org-config.md carries a '## Model statics' "
                    "heading. The pool was read from the template, never from that copy. "
@@ -250,14 +435,30 @@ def main(argv=None):
                     help="path to the project's org-config.md (re-audit defaults + stale-section check)")
     args = ap.parse_args(argv)
 
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, a real directory, so an
+    # is-it-a-directory guard passes. Here the empty value would silently resolve
+    # `--template`/`--config` against a tree nobody named: the picker would either
+    # fail claiming the TEMPLATE is unreadable — sending the caller to fix the wrong
+    # end of the problem — or, worse, derive the pool from whatever `template.md`
+    # happened to sit in the CWD. Refuse it and name the empty argument.
+    _validate_grouping()
+    if not (args.root or "").strip():
+        _die("--root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; "
+             "pass an explicit path.")
+
     def _resolve(p):
         # Absolute paths pass through; relative paths resolve against --root, so a
         # fixture copied to a temp tree finds its own frozen template.
         return p if os.path.isabs(p) else os.path.join(args.root, p)
 
     template_path = _resolve(args.template) if args.template else default_template_path()
-    statics = parse_statics(_read(template_path))
-    rec = recommended_by_lane(statics)
+    template_text = _read(template_path)
+    statics = parse_statics(template_text)
+    pool_ids = {m for m, _n, _l in statics}
+    rec = merge_recommendations(statics, parse_out_of_pool_recs(template_text, pool_ids))
 
     defaults, stale = {}, False
     config_path = _resolve(args.config) if args.config else None

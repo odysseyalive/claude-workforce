@@ -1,6 +1,14 @@
-# org-config template (frozen fixture)
+# org-config template (frozen fixture — reachable ONLY through an explicit --root)
+
+This tree is well-formed on purpose. The case passes `--root ""` after the harness's own
+`--root <tree>`, and argparse keeps the last one; with an empty root the relative `--template
+template.md` no longer resolves here at all. The script must say the ROOT is empty — not that the
+template is unreadable, which sends the caller to fix the wrong end of the problem — and it must
+emit no option set.
 
 ## Model statics — the pool the model budget proposes from
+
+`claude-fable-5` is **Recommended for creative-visual** (graphics & frontend design work), out of pool.
 
 | # | Model ID | Context | Max output | Notes |
 |---|---|---|---|---|
@@ -8,12 +16,6 @@
 | 2 | `claude-opus-4-8` | 1M | 128K | the steerable thought-partner. **Recommended for analytical Lead** (agents that coordinate) |
 | 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy work) |
 | 4 | `claude-sonnet-5` | 1M | 128K | near-Opus quality at ~40% lower cost. **Recommended for analytical IC** (agents that do the work) |
-
-The blank "Other" field accepts any model ID typed by hand — that is how a project reaches a model
-outside the four, and one lane is recommended such a model. The annotation and the model ID sit on
-ONE line, exactly as they do in a table row's Notes cell:
-
-`claude-fable-5` — the frontier visual model — is **Recommended for creative-visual** (graphics & frontend design work). It is deliberately NOT a pool row.
 
 ## Effort statics
 

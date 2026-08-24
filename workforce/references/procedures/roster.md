@@ -13,7 +13,8 @@ Budget
 | Lane / Tier       | Model   | Effort | Source                  |
 | analytical / Lead | <id>    | medium | unchanged, pre-selected |
 | analytical / IC   | <id>    | medium | unchanged, pre-selected |
-| creative          | <id>    | medium | lane override           |
+| creative-text     | <id>    | medium | lane override           |
+| creative-visual   | <id>    | medium | Other -> out-of-pool    |
 | code              | <id>    | medium | blank -> analytical     |
 | advisor           | <id>    | --      | unchanged, pre-selected |
 

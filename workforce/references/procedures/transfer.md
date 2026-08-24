@@ -21,7 +21,8 @@ different model, changing cost and output character with no visible edit to its 
 explicitly in the plan, and run the model rewrite as part of the transfer.
 
 **A pin makes the transfer a no-op for the model rewrite, and that is also worth reporting.** Moving a pinned employee
-into a creative department does *not* give it the creative model — the pin wins. Say so in the plan: a user
+into a creative department does *not* give it that department's creative-lane model (creative-text or
+creative-visual) — the pin wins. Say so in the plan: a user
 who transfers an employee expecting the model to follow, and finds an old pin silently holding it, has hit
 the failure this level was added to prevent, pointed the other way. If the pin is now redundant, propose
 deleting the row rather than leaving two mechanisms describing one decision.

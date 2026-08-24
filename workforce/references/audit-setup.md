@@ -18,15 +18,18 @@ backup; the ordering rule is stated in Step 0.2 and is not a matter of convenien
 
 Companions install on absence. The org is designed from evidence and built. **The only questions are
 consent, the backup, the model budget, and the effort budget** — whether to proceed, whether to
-back up first, and which model and effort level each lane runs at.
+back up first, and which model and effort level each lane runs at. The model budget and the effort
+budget each render as **two calls** (five lanes overflow one call), so the surface is six questions.
 
 | # | Step | What happens | Calls | Objects |
 |---|---|---|---|---|
 | 1 | 0 | Consent — proceed with this audit, or stop | **1** | 1 |
 | 2 | 0.2 | Backup — copy the project first · **and the session advisor** | **1** | 2 |
 | — | 0.3 | Absent companions installed automatically | 0 | — |
-| 3 | 0.4a | Model budget — analytical Lead/IC, creative, code | **1** | 4 |
-| 4 | 0.4b | Effort budget — analytical Lead/IC, creative, code | **1** | 4 |
+| 3 | 0.4a | Model budget — Call A: analytical Lead/IC, code | **1** | 3 |
+| 4 | 0.4b | Model budget — Call B: creative-text, creative-visual | **1** | 2 |
+| 5 | 0.4c | Effort budget — Call A: analytical Lead/IC, code | **1** | 3 |
+| 6 | 0.4d | Effort budget — Call B: creative-text, creative-visual | **1** | 2 |
 | — | 5 | Org designed from evidence, built, and reported | 0 | — |
 
 Everything else is a panel or an automatic gate. **Suppressed entirely** in headless, non-interactive,
@@ -44,10 +47,11 @@ accepts at most FOUR objects per call, and the model budget declared five.** It 
 specified, and what a user actually saw was a model budget shaped differently from the effort budget
 beside it — which is how this was noticed. **Soft: the two budgets must offer the SAME categories.**
 With the advisor among them they never could, because the advisor has no effort object and never will
-(§ Step 0.4a). Four lanes on both sides is the only arrangement where the two questions agree about what
-a lane is.*
+(§ Step 0.4a). The same five lanes grouped identically across both budgets — a structural call of three
+(analytical Lead, analytical IC, code) and a creative call of two (creative-text, creative-visual) — is
+the only arrangement where the two questions agree about what a lane is.*
 
-**Four questions is the whole surface, and it is a design constraint rather than a current count.**
+**Six questions is the whole surface, and it is a design constraint rather than a current count.**
 Discoveries, repairs, classifications, and deferrals are handled by the run — not escalated. Two places
 where a question is the obvious move and is refused:
 
@@ -58,9 +62,10 @@ where a question is the obvious move and is refused:
   loudly (`procedures/audit.md` § Step 2). `transfer` restructures later if the user disagrees.
 
 The only sanctioned addition is **charter-first** (`procedures/charter.md`): a bare directory has no
-evidence to read, so the charter comes from the user. That is a fifth question on an empty project and
-nowhere else. **The ordinal is not decoration** — it moved from fourth to fifth when consent and the
-backup became questions, and a stale ordinal here is how the ceiling quietly gains a slot.
+evidence to read, so the charter comes from the user. That is a seventh question on an empty project and
+nowhere else. **The ordinal is not decoration** — it grew as consent and the backup became questions and
+as the two budgets each split into two calls, and a stale ordinal here is how the ceiling quietly gains a
+slot.
 
 **Adding a question is a design change, not a convenience.** The failure it prevents is real: a run that
 stops forty times is a run nobody finishes, and the work it was stopping for gets skipped by hand
@@ -68,7 +73,7 @@ instead.
 
 ---
 
-## Step 0 — Consent  (question 1 of 4)
+## Step 0 — Consent  (question 1 of 6)
 
 **Ask before proceeding.** One object: proceed, or stop. A declined consent ends the run having
 written nothing — not a partial run, not a half-built org.
@@ -103,7 +108,7 @@ eligible skills. Naming those is what makes "proceed" answerable.
 *An earlier design made invocation the consent and asked nothing, on the reasoning that the command
 name is unambiguous and the backup protects what a question would have protected. Superseded 2026-08-01
 by user directive. The prior reasoning is recorded here rather than deleted, because the cost it names
-is real and is now paid deliberately: two of the four questions are gates rather than settings.*
+is real and is now paid deliberately: two of the six questions are gates rather than settings.*
 
 **Write the `audit-disclaimer` marker AFTER the backup**, not on entry. The marker lives in
 `org-config.md`, inside the tree Step 0.2 archives — so writing it first makes `INV-BACKUP`'s counted
@@ -173,9 +178,9 @@ from that list for a full commit and no run ever executed it; this gate does not
 
 ## How every question is worded — plain language, no exceptions
 
-**The four questions are the only part of this system a human reads.** Everything else in this
+**The six questions are the only part of this system a human reads.** Everything else in this
 distribution is written for an agent in a fresh context, and it is dense on purpose. **That register
-must not reach the questions.** A reader at question 2 of 4 has installed a skill and typed one
+must not reach the questions.** A reader at question 2 of 6 has installed a skill and typed one
 command. They have not read `conversion-taxonomy.md`. They do not know what a sweep is.
 
 **Banned from the QUESTION TEXT and from every option label — this is a list, and it is checked
@@ -217,7 +222,7 @@ with it. Specifying the words is the fix; a rule about tone would not have been.
 
 ---
 
-## Step 0.2 — Backup  (question 2 of 4)
+## Step 0.2 — Backup  (question 2 of 6)
 
 **Ask, then take the backup** (`procedures/backup.md`) — before any other gate writes anything.
 
@@ -349,26 +354,32 @@ decides what happens — not this gate.
 
 ## Step 0.4 — Model budget, effort budget
 
-Two `AskUserQuestion` calls, **four objects each**, fixed regardless of headcount
-(`references/org-config.template.md` § The four lanes).
+Four `AskUserQuestion` calls in total: the model budget is two calls and the effort budget is two calls,
+fixed regardless of headcount (`references/org-config.template.md` § The four lanes). `AskUserQuestion`
+accepts **at most four** objects per call, and the five lanes overflow it, so each budget splits into two
+calls — a structural call of three objects (analytical Lead, analytical IC, code) and a creative call of
+two (creative-text, creative-visual).
 
-**BLOCKING — both calls offer the SAME four categories, in the same order: `analytical · Lead`,
-`analytical · IC`, `creative`, `code`.** One canonical set, owned by
-`org-config.template.md` § The four lanes and restated in neither budget. A category added to one is
-added to both in the same change, or the two questions disagree about what a lane is
-(`SKILL.md` Core Principle 7c).
+**BLOCKING — both budgets offer the SAME five categories, grouped identically: `analytical · Lead`,
+`analytical · IC`, `code` on Call A; `creative-text`, `creative-visual` on Call B.** One canonical set,
+owned by `org-config.template.md` § The four lanes and restated in neither budget. A category added to
+one is added to both in the same change, or the two budgets disagree about what a lane is
+(`SKILL.md` Core Principle 7c). The grouping is identical for model and effort so the two budgets offer
+the same categories in the same order.
 
 **No call may carry more than four objects — `AskUserQuestion` accepts at most four.** The advisor was a
-fifth here until 2026-08-04 and the call could not render; it is now an object on the backup call
-(§ Step 0.2), where it belongs, because the advisor is not a lane.
+fifth object on the model call until 2026-08-04 and the call could not render; it is now an object on the
+backup call (§ Step 0.2), where it belongs, because the advisor is not a lane. The creative lane split
+took the lanes to five, which is itself over the cap — hence the two-call split for each budget.
 
-### Step 0.4a — Model budget  (question 3 of 4 · 4 objects)
+### Step 0.4a — Model budget, Call A  (question 3 of 6 · 3 objects)
+
+The structural call: the three non-creative lanes.
 
 | Object | What it sets |
 |---|---|
 | analytical — Lead | the Lead default. **There is no separate tier question**: the analytical lane supplies it |
 | analytical — IC | the IC default, same reason |
-| creative | one model for the whole creative lane, no tier split |
 | code | one model for the whole code lane, no tier split |
 
 **Use this wording** (§ How every question is worded). The internal lane names are the *object labels'*
@@ -380,27 +391,46 @@ business; the question text is not the place for them:
 >
 > · **Agents that coordinate** — they hand work out and check what comes back
 > · **Agents that do the work** — the ones actually editing files and running commands
-> · **Writing and design work**
 > · **Code work**
 
-Each object offers the four statics from `org-config.template.md` § Model statics, in the order listed
-there, plus "Other" for a hand-typed model ID. **No CEO question** — the CEO is the main session and
-runs on whatever model the user chose for their Claude Code session.
+### Step 0.4b — Model budget, Call B  (question 4 of 6 · 2 objects)
 
-**The four statics are read from the shipped template's § Model statics and from nowhere else** — never
-from the project's `org-config.md`, even when a legacy instantiation left a `## Model statics` section
-inside it. Such a section is reported as a stale legacy artifact and read past, never clobbered
-(`org-config.template.md` § Model statics). Reading the pool from a co-located stale copy is exactly how a
-re-audited project once proposed a stale four and dropped the lower-cost static the template had since
-added.
+The creative call: the two generative lanes.
+
+| Object | What it sets |
+|---|---|
+| creative-text | one model for generative writing and copy, no tier split |
+| creative-visual | one model for graphics and frontend design, reached via "Other" (out of pool) |
+
+**Use this wording** (§ How every question is worded):
+
+> **Which model should the creative agents use?**
+> These agents produce the finished work — the writing, and the visuals — so they are pinned separately.
+> You can change either later with `/workforce model-map`.
+>
+> · **Writing & copy work**
+> · **Graphics & frontend design work**
+
+Each model object offers the statics from `org-config.template.md` § Model statics, in the order listed
+there, plus "Other" for a hand-typed model ID. creative-visual's recommended model sits outside the pool
+and is reached through "Other" (`org-config.template.md` § The four lanes). **No CEO question** — the CEO
+is the main session and runs on whatever model the user chose for their Claude Code session.
+
+**Both model calls apply the rules below.** The pool statics are
+read from the shipped template's § Model statics and from nowhere else — never from the project's
+`org-config.md`, even when a legacy instantiation left a `## Model statics` section inside it. Such a
+section is reported as a stale legacy artifact and read past, never clobbered (`org-config.template.md`
+§ Model statics). Reading the pool from
+a co-located stale copy is exactly how a re-audited project once proposed a stale pool and dropped the
+lower-cost static the template had since added.
 
 **This option set is PRODUCED MECHANICALLY — it is not reconstructed here by hand.** Run
 `wf-model-budget --root <project> --config <org-config.md when one is present>` (a shipped script). It
-reads the pool from the template's § Model statics and nothing else, emits the four `LANE` blocks in the
+reads the pool from the template's § Model statics and nothing else, emits the `LANE` blocks in the
 template's cost order, marks each lane's recommended model `(recommended)` **in place** from the Notes
 column, resolves the per-lane pre-selected default (recorded value on a re-audit, else the recommendation),
 and prints a `STALE-ARTIFACT` line when the project config carries its own `## Model statics`. **Render its
-`LANE` blocks verbatim as the four objects; do not re-derive the pool, the recommendation, or the order by
+`LANE` blocks verbatim as the objects; do not derive the pool, the recommendation, or the order by
 hand.** The sole-source rule above stood as prose alone until 2026-08-20, when a re-audit read the project's
 stale section and rendered the pool the template had since dropped — a superseded static shown as an
 option, the lower-cost IC static absent, and the analytical recommendation left undifferentiated rather
@@ -410,7 +440,8 @@ read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
-pick, creative takes creative, code takes code — and leave it sitting where the cost ranking put it.
+pick, code takes code, creative-text takes its pool pick, and creative-visual takes its out-of-pool pick
+via "Other" — and leave it sitting where the cost ranking put it.
 **Never promote it to the first position.** The host convention is that a recommended option leads the
 list; that convention is wrong here and is overridden on purpose, because the list is ranked by price and
 the ranking is what lets a user read the cost of a choice at a glance. The advisor object carries no
@@ -433,7 +464,9 @@ typing **none** in the blank field removes the key entirely. It runs only in the
 employees, **which is why it has no effort object** — nothing spawns at an effort level it controls, and
 that permanent asymmetry is exactly why it may not sit among the lanes.
 
-### Step 0.4b — Effort budget  (question 4 of 4 · 4 objects)
+### Step 0.4c — Effort budget, Call A  (question 5 of 6 · 3 objects)
+
+The structural call: the same three lanes as the model budget's Call A, in the same order.
 
 **Use this wording** (§ How every question is worded):
 
@@ -441,18 +474,35 @@ that permanent asymmetry is exactly why it may not sit among the lanes.
 > Higher settings are slower and cost more. The middle setting is right for most work; the agents that
 > coordinate benefit most from a higher one, because they are deciding rather than executing.
 >
-> · **Agents that coordinate** · **Agents that do the work** · **Writing and design work** · **Code work**
+> · **Agents that coordinate** · **Agents that do the work** · **Code work**
 
-**The same four categories as Step 0.4a, in the same order** — `analytical · Lead`, `analytical · IC`,
-`creative`, `code`. Not "minus the advisor": the sets are now identical, because the advisor was never a
-lane and no longer sits among them.
+**The same three categories as Step 0.4a, in the same order** — `analytical · Lead`, `analytical · IC`,
+`code`. The grouping matches the model budget's Call A exactly, so the two budgets agree about what a
+lane is.
 
-**The rungs are offered most expensive first**, in the order given by `org-config.template.md` § Effort
-statics, and **the recommendation rule is the model budget's rule unchanged**: `(recommended)` marks the
-lane's current rung where that order puts it and never promotes it to the first position. These two
-questions render back to back and must not be ordered by opposite conventions. Offer only the rungs the
-lane's selected model supports, and never invent one — the ladder is the complete set, so there is no
-"Other" here.
+### Step 0.4d — Effort budget, Call B  (question 6 of 6 · 2 objects)
+
+The creative call: the same two lanes as the model budget's Call B.
+
+**Use this wording** (§ How every question is worded):
+
+> **How hard should the creative agents think?**
+> Higher settings are slower and cost more. The middle setting is the deliberate default for creative
+> work, so it does not start at high cost; you can raise it later if you want.
+>
+> · **Writing & copy work**
+> · **Graphics & frontend design work**
+
+**The same two categories as Step 0.4b, in the same order** — `creative-text`, `creative-visual`. Both
+recommend `medium` deliberately (`org-config.template.md` § Effort statics): generative work does not
+start at high token cost, and the higher rungs are opt-in cost the user chooses.
+
+**Both effort calls apply the rules below.** **The rungs are offered most expensive first**, in the order
+given by `org-config.template.md` § Effort statics, and **the recommendation rule is the model budget's
+rule unchanged**: `(recommended)` marks the lane's current rung where that order puts it and never
+promotes it to the first position. The model and effort calls render back to back and must not be ordered
+by opposite conventions. Offer only the rungs the lane's selected model supports, and never invent one —
+the ladder is the complete set, so there is no "Other" here.
 
 **The pre-selected default resolves exactly as the model budget's does** (§ Step 0.4a): (1) the rung in
 this project's `org-config.md` when present — a re-audit; ELSE (2) the lane's recommended rung (§ Effort
@@ -468,9 +518,11 @@ first run (below); the pre-selected default is never empty.
 `low`). Where the selected model supports five rungs, offer the **four nearest the recommended rung** —
 always including the recommended rung and the lane's current value — and drop the far end the lane will
 not reach (`low` for a `high`-recommended lane; `max` for a `medium`-recommended one). Where the model
-supports four or fewer, offer them all — the creative pick has no `xhigh`, so its ladder is exactly four
-(`org-config.template.md` § Effort statics). A model that supports no effort at all renders **no effort
-object** for its lane — not a blank one.
+supports four or fewer, offer them all — creative-text's model has no `xhigh`, so its ladder
+is exactly four (`org-config.template.md` § Effort statics). creative-visual's model spans all
+five rungs (`references/platform.md` fact 12c), so the four nearest its `medium` recommendation are
+offered — `xhigh`/`high`/`medium`/`low`, dropping the far `max` end. A model that supports no effort at
+all renders **no effort object** for its lane — not a blank one.
 
 **The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
 and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a
@@ -483,11 +535,12 @@ It is derived at Step 2 from the work, then reported — never asked, because a 
 scales with headcount and the fixed-object budget exists to prevent exactly that.
 
 **Assignment is per EMPLOYEE, from the work its handbook describes — not per department.** Generative
-work (writing prose or copy, generating images, visual design or layout) is **always creative** — a
-floor, not a default, and not overridable by the classifier (`org-config.template.md` § Creative). But a
-support role inside a creative department — research, review, ops, analysis — is **analytical**, not
-creative, and routes to the analytical IC; the floor never covered it, because its work is not
-generative. A role genuinely ambiguous between the two stays **creative** (the non-cheapening side) and
+work is **always creative** — a floor, not a default, and not overridable by the classifier
+(`org-config.template.md` § Creative): writing prose or copy routes to `creative-text`, and generating
+images, visual design, or frontend design routes to `creative-visual`. But a support role inside a
+creative department — research, review, ops, analysis — is **analytical**, not creative, and routes to
+the analytical IC; the floor never covered it, because its work is not generative. A role genuinely
+ambiguous between the two stays **creative** (the non-cheapening side, erring toward `creative-text`) and
 is **named in the report** with the reading chosen and why. An employee matching no lane falls to
 **analytical** and is likewise **named as unclassified**. Assignment is total and its residual is
 reported; a role budgeted by a default nobody chose must never look like one budgeted deliberately.
@@ -502,9 +555,9 @@ The run prints **`INV-BUDGET`** — questions rendered against questions owed (`
 
 **`INV-BUDGET` fails in BOTH directions, and it used to fail in only one.** It read "every budget
 question rendered," which catches a *missing* question and is blind to an *extra* one — so the budget was
-a ceiling with a floor-only invariant. A run that renders five questions is as much a violation as one
-that renders three, and it is the more likely error: every added question feels locally justified.
-Print `rendered N of 4 owed`, and **N greater than 4 is UPHELD=false**, naming the surplus question
+a ceiling with a floor-only invariant. A run that renders seven questions is as much a violation as one
+that renders five, and it is the more likely error: every added question feels locally justified.
+Print `rendered N of 6 owed`, and **N greater than 6 is UPHELD=false**, naming the surplus question
 verbatim.
 
 *Added 2026-08-04, after a run asked a fifth question — "Are you migrating off claude-enforcer, or

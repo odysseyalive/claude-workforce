@@ -13,10 +13,10 @@ executes its own recommendations.
 **Autonomy model:** companions install on absence; the org is designed from evidence and built.
 **The only questions are consent, the backup, the model budget, and the effort budget** — whether to
 proceed, whether to archive first, and which model and effort each lane runs at
-(`references/audit-setup.md` § The question budget). The four things the budgets manage separately are
-**analytical, creative, code, and advisor**; the advisor is an object inside the model budget, not a
-call of its own. Everything else is resolved by agent panels. Failures land as ✗ in the Execution Summary with the step they failed at,
-never as "run this command yourself."
+(`references/audit-setup.md` § The question budget). The lanes the budgets manage separately are
+**analytical, creative-text, creative-visual, code**, plus the advisor; the advisor is an object on the
+backup call, not a lane and not a call of its own. Everything else is resolved by agent panels. Failures
+land as ✗ in the Execution Summary with the step they failed at, never as "run this command yourself."
 
 ---
 
@@ -476,30 +476,33 @@ it false: departments were classified after the question that was supposed to re
 
 **A lane is a property of a DEPARTMENT, but the kind of work is a property of an EMPLOYEE.** That gap is
 where the old design leaked: lane membership used to be a multi-select built from this panel's output, so
-generative work reached the creative model *only* if some department the panel proposed owned it. Fold image
-work into `engineering` and there was nothing for the user to check — they were asked about `content`, the
-image employee fell through to the tier default, and it silently ran on the coding model. Nothing errored,
-and no question was skipped: the option was never constructible.
+generative work reached a creative-lane model *only* if some department the panel proposed owned it. Fold
+image work into `engineering` and there was nothing for the user to check — they were asked about
+`content`, the image employee fell through to the tier default, and it silently ran on the coding model.
+Nothing errored, and no question was skipped: the option was never constructible.
 
 **The floor closes that hole and this step enforces it — per employee, and in both directions.**
-Generative work — writing prose or copy, generating images, visual design or layout — is always creative
-(`org-config.template.md` § Creative), so an employee doing that work is in the creative lane no matter
-which department it was homed in, and no classifier reading may move it down. **The converse also holds,
+Generative work is always creative (`org-config.template.md` § Creative) — writing prose or copy routes to
+`creative-text`, and generating images, visual design, layout, or frontend design routes to
+`creative-visual` — so an employee doing that work is in the creative family no matter which department it
+was homed in, and no classifier reading may move it down. **The converse also holds,
 and it is where the tokens are saved: an employee whose own work is research, review, ops, or analysis is
 ANALYTICAL — routed to the analytical IC — even when it sits inside a content or visual department.** The
 old floor assigned whole DEPARTMENTS, so a researcher gathering sources or a promoter formatting for
 channels was swept onto the authorship model; per-role assignment reads each employee's handbook and
 routes support roles where their work lives. A role genuinely ambiguous between generation and support
-stays **creative** (the non-cheapening side) and is **named in the report** with the reading chosen and
-why. Lane membership is derived here and reported, never asked.
+stays **creative** (the non-cheapening side, erring toward `creative-text`) and is **named in the report**
+with the reading chosen and why. Lane membership is derived here and reported, never asked.
 
 So, in order:
 
-1. **Classify each employee by the work its handbook describes, not by its department.** Generative work
-   → creative (the floor); research/review/ops/analysis → analytical, IC by tier, even inside a creative
-   department; genuinely ambiguous → creative and named in the report. The floor kinds are in
-   `references/org-config.template.md` § Creative; voice and translation are creative by default and
-   reassignable with a stated reason. **Home generative work in a department in the creative lane**
+1. **Classify each employee by the work its handbook describes, not by its department.** Generative text
+   (prose or copy) → `creative-text`; graphics, visual design, layout, or frontend design →
+   `creative-visual`; research/review/ops/analysis → analytical, IC by tier, even inside a creative
+   department; genuinely ambiguous → `creative-text` and named in the report. The floor kinds are in
+   `references/org-config.template.md` § Creative; voice and translation are `creative-text` by
+   default and reassignable with a stated reason. **Home generative work in a department in the creative
+   family**
    wherever the department budget allows. That is the list to check the roster against.
 2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
@@ -1049,13 +1052,14 @@ Budget Receipt
 | Lane / Tier          | Model  | Effort | Source                   |
 | analytical / Lead    | <id>   | medium | asked this run           |
 | analytical / IC      | <id>   | medium | recommended default (first run) |
-| creative             | <id>   | medium | asked this run           |
+| creative-text        | <id>   | medium | asked this run           |
+| creative-visual      | <id>   | medium | Other -> out-of-pool     |
 | code                 | <id>   | medium | blank -> analytical      |
 | advisor              | <id>   | --     | unchanged, pre-selected  |
 
 Lane assignment (per employee)
 | Employee           | Dept        | Lane       | Why                                    |
-| content-drafter    | content     | creative   | FLOOR - generative work (authorship)   |
+| content-drafter    | content     | creative-text | FLOOR - generative text (authorship) |
 | content-researcher | content     | analytical | per-role - research, not generative    |
 | engineering-site   | engineering | code       | derived from the work                  |
 | ops-runner         | ops         | analytical | unclassified - fell to the baseline    |
@@ -1075,7 +1079,7 @@ rewriting or deleting it (`org-config.template.md` § Model statics).
 
 **Both blocks, always.** The receipt says what each lane costs; the assignment says who pays it.
 Assignment is **per employee**, not per department — two employees in one department can land in
-different lanes (a `content-drafter` is creative by the floor; a `content-researcher` beside it is
+different lanes (a `content-drafter` is creative-text by the floor; a `content-researcher` beside it is
 analytical, because research is not generative). A receipt alone cannot show an employee that landed in
 the wrong lane, and the `Why` column is what separates a floor from a per-role reassignment from a
 department derivation from a residual — four things that produce the same cell
