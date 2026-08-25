@@ -459,10 +459,14 @@ check("README: every image resolves", not img_broken, f"missing: {img_broken}")
 
 # In-document anchors are not paths. Resolve them against the heading slugs
 # instead — treating them as files was a false positive on this check's own terms.
-slugs = {
-    re.sub(r"[^a-z0-9]+", "-", h.lower()).strip("-")
-    for h in re.findall(r"^#{2,3} (.+)$", readme, re.M)
-}
+# Replicate GitHub's slug rule exactly: lowercase, DELETE punctuation (apostrophes
+# and periods vanish — `Isn't`→`isnt`, `CLAUDE.md`→`claudemd`; hyphenating them was
+# a second false positive), spaces→hyphens. Harvest h2–h6, since GitHub anchors every
+# heading level and the TOC legitimately links a nested h4.
+def _slug(_h):
+    _s = re.sub(r"[^\w\s-]", "", _h.strip().lower())
+    return re.sub(r"\s+", "-", _s).strip("-")
+slugs = {_slug(h) for h in re.findall(r"^#{2,6} (.+)$", readme, re.M)}
 bad_anchors = [a for a in re.findall(r"\]\(#([^)]+)\)", readme) if a not in slugs]
 check("README: every in-document anchor resolves", not bad_anchors, f"broken: {bad_anchors}")
 
