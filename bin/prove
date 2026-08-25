@@ -116,6 +116,7 @@ DAU  = ".claude/agents/doctrine-author.md"
 CEN2 = "workforce/bin/wf-census"
 EVL  = "workforce/references/evaluators.md"
 ADDT = "workforce/references/evaluator-additions/text-tells.md"
+CEA  = "workforce/references/evaluator-additions/code-eval.md"
 PTL  = "workforce/references/personnel-templates.md"
 DGN  = "workforce/references/procedures/diagnose.md"
 WPC  = "workforce/bin/wf-pin-check"
@@ -142,6 +143,12 @@ CASES = [
      MAN, "del", "AUTHORED HERE, NOT VENDORED"),
     ("additions: the vendored version anchor cross-references the authored slot",
      CTV, "del", "text-additions-version"),
+    # The mass-ranking guidance survives with the band/formula present but its anti-gate
+    # caveat gone. Deleting the closing "do not gate on it" leaves 0.68 and the formula in
+    # place, so the coupling clause fails and the check must fire. Payload is unique in the
+    # file (grep -c == 1); "never a gate" appears twice, so it is the wrong del target.
+    ("additions: complexity mass-ranking ships with its anti-gate caveat, inseparable",
+     CEA, "del", "do not gate on it"),
     # ── the source-tree executable bit (2026-08-07) ──────────────────────────
     # A mode assertion cannot be broken with a chmod here — the disposable copy has
     # no .git and copytree preserves the source bits — so break the INPUT instead:

@@ -1,5 +1,5 @@
-<!-- code-additions-version: 1 -->
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- code-additions-version: 2 -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- origin: workforce | modifiable: true -->
 # Code-eval additions — authored by workforce
 
@@ -37,4 +37,35 @@ claims to cover and what it selected. State the count or the subject, never the 
 **Why these two and nothing else.** The rest of this session's findings were prose or doctrine, and
 belong in `text-tells.md` or a procedure. A code taxonomy that grows by analogy stops describing
 defects anyone has seen.
+
+---
+
+## Complexity prioritization — a ranking method, not a defect class
+
+**This is NOT a Group W1 row**, and the separation is deliberate. Group W1 catalogs defects
+measured in this repository; this is a way to *order* hotspots a pass has already found, ported
+from an outside tool rather than seen here. It is kept under its own heading so the closing
+discipline above still holds — it must never be read as a taxonomy row grown by analogy, because
+it describes no new defect.
+
+**Rank hotspots by concentrated mass.** The code catalog's complexity pass
+(`cross-file-detection.md` §5) flags a callable on decision-point density and on length
+independently. When several are flagged, rank them by **mass = CC × √SLOC**, worst first. The
+√SLOC is deliberate: it compresses size so complexity dominates, so a short branchy function
+ranks above a long flat one — and the long flat function is not the failure mode.
+
+As an orientation figure — **never a gate** — the share of total complexity mass held by
+callables with CC > 10 (Σ mass(CC>10) / Σ mass(all)) sits near **0.34** in human repositories
+and **0.68** in coding-agent checkpoints (SlopCodeBench, arXiv:2603.24755, via the
+slopcheck-deslop reference). Use it to orient one tree against a known band and to watch a
+project's own trend, never as a threshold that blocks.
+
+**Why it is never a gate.** It is a mass *ratio*, so decomposing one complex function into
+several small ones lowers it without removing complexity — it spreads the work AND pads the
+denominator. Rank with it; **do not gate on it.**
+
+*Ported 2026-08-25 from slopcheck-deslop (built on SlopCodeBench, arXiv:2603.24755). Only the
+language-agnostic complexity-concentration metric is taken; the tool's per-language ast-grep
+rules are measured in other repositories and are left there, so this addition stays
+language-agnostic and measured-or-cited rather than imported wholesale.*
 <!-- /origin -->
