@@ -115,6 +115,43 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-25
 
+**Landed 2026-08-25 (dev session) — a live audit of `odyssey-alive` found `wf-seed` could not reach a
+customized, personal-scope install, and the three distribution defects that audit had deferred are now
+closed.** An `/workforce audit` on `odyssey-alive` reported `INV-SEED 2 error` and carried three
+deferred rows, each a fix that lives in this distribution and is reachable only through `/workforce
+dev`. The user asked whether audit was still broken; a dev session reproduced the failure, drained all
+three rows, and seeded `odyssey-alive`.
+
+- **`wf-seed` now resolves slots and catalog targets across scope and layout.** Three defects, each
+  reproduced against `odyssey-alive` before its fix. (a) `_slot_dir` searched only project-relative
+  paths, so a personal-scope install — `~/.claude/skills/workforce`, where the slots actually ship —
+  found nothing; the home path is now a candidate. (b) The region target was resolved only at the skill
+  root, so a catalog kept under `references/` (the ordinary customized layout) reported the target
+  absent; target and anchor are now resolved against both the root and `references/`. (c) The text
+  target was hardcoded `text-tells.md`, so a retargeted catalog reading `references/ai-patterns.md`
+  never matched; targets are now a candidate list that honors an anchor `region-file=` declaration
+  first, so the choice self-stabilizes across runs. Shipped with three fixtures for the references/-subdir,
+  retargeted-text, and no-target shapes the old `seed-fresh` fixture never exercised, their
+  `expectations.json` rows, a `bin/check` assertion, and a `bin/prove` case. `odyssey-alive` was then
+  seeded (`2 seeded`, idempotent on re-run).
+- **`wf-pin-check` skips `.next/`.** `SKIP_DIRS` excluded `dist` and `build` as generated copies but
+  not `.next`, so the pin guard would walk a Next.js build artifact and rewrite a gitignored generated
+  file. `.next` is now a member, shipped with a fixture proving the walk stops there, a `bin/check`
+  assertion, and a `bin/prove` case. Closes `DEF-2026-08-12-pin-guard-walks-next-build-artifact`.
+- **The handbook length ceiling is a measured floor of 172 lines.** The 150-line ceiling forbade both
+  a longer handbook and condensing binding prose, an unsatisfiable pair for a handbook carrying one
+  job's worth of irreducible rules. A live relocation of the worst case (`engineering-site`, 242 lines)
+  to everything genuinely relocatable reached 172, with retention verified and a cold-read re-probe
+  passing. `delegation-budget.md` now decomposes 172 into a 154-line authored body plus an 18-line
+  allowance for the auto-generated `ORG-RECORD`/`ORG-CHAIN` block the `embed` step appends and no author
+  can relocate, labels it a measured floor, and stamps it, keeping the relocation-not-condensation rule
+  intact for what genuinely is relocatable. `bin/check` and `bin/prove` bind the measured value; 150 is
+  written in no live check.
+
+`bin/check` 936/0 after `bin/sync --personal` to runtime and personal install. Working tree, not yet
+committed. `odyssey-alive`'s catalogs, anchors, and `deferred.md` are its own repo's state — its next
+audit reconciles the deferred rows now that the tools land.
+
 **Landed 2026-08-25 — the code-evaluator ranks complexity by concentrated mass, and two harness
 defects it surfaced are fixed.** Brought by the user, who found `~/lab/slopcheck-deslop` (a
 third-party tool built on SlopCodeBench, arXiv:2603.24755) and asked whether anything ported. One

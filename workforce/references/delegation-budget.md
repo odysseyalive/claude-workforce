@@ -149,23 +149,37 @@ a narrow org of enormous handbooks is expensive in a way no fan-out number revea
 
 ### The handbook length ceiling
 
-**150 lines**, and this is the only place the number is written. `verify` § Handbook conformance and
-`review` step 8 both check against it, and `org-config.md` § Caps overrides it per project.
+**172 lines**, and this is the only place the number is written. `verify` § Handbook conformance
+and `review` step 8 both check against it, and `org-config.md` § Caps overrides it per project.
+The number is two components a single budget must not conflate: a **154-line authored body** — the
+binding prose an author controls (numbered Procedure and Verification steps, Guardrail rules) plus
+whatever survives relocation — and an **18-line allowance** for the `ORG-RECORD` and `ORG-CHAIN`
+block the mandatory `embed` step appends and no author can relocate or condense. 154 + 18 = 172.
 
 **A blank cell in `org-config.md` means this default, not "no ceiling."** It was blank in the shipped
 template while three consumers already checked "under the length ceiling" — a rule with three readers
 and no value, which is this project's signature defect arriving in its own budget file. Found
 2026-08-01.
 
-**This is a chosen budget, not a measurement, and it is labelled as one.** The basis is the IC
-template: ~57 body lines fully placeheld, so 150 is roughly 2.5× a filled template — room for a real
-procedure, tight enough that a handbook quietly covering two jobs exceeds it. Nothing was measured to
-produce it, so **over the ceiling is never a refusal and never blocks a sweep** — a number nobody
-measured may not block anyone's work (`platform.md` § DOCUMENTED). **But not-blocking is not
-not-acting.** Under the no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement
-the run can perform, so **the run performs it: DISCHARGED this run, never proposed back, never raised
-as a question, never parked as an optional refinement.** A finding that says "over the ceiling — want
-me to split it?" is the deferment queue the directive forbids, wearing the word *structural*.
+**This is now a MEASURED floor, not a chosen budget.** The predecessor was 150 lines and labelled
+a chosen budget — ~2.5× a filled IC template, with nothing measured to produce it — and a live
+audit measured it invalid. The worst-case single-job handbook, `engineering-site` (242 lines), was
+relocated block by block to a grounding library: retention verified verbatim, every do-not-touch
+block intact, `wf-conform` exit 0, and a cold-read re-probe PASS. It reached **172 lines, not
+≤150**. An independent cold context confirmed 172 is the floor — what remains is irreducible
+binding imperative prose PLUS the ~18 auto-generated `ORG-*` lines the `embed` step itself appends,
+neither of which any author can cut. A measured floor outranks an unmeasured budget (Principle 4,
+Measure don't assume; `platform.md` § DOCUMENTED bars only the unmeasured from blocking), so 172 is
+the number and 150 is retired. Recorded 2026-08-25 from the live `engineering-site` audit
+(measurements stamped, Principle 9b).
+
+**Over the ceiling still never blocks a sweep — but not-blocking is not not-acting.** Under the
+no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement the run can perform,
+so **the run performs it: DISCHARGED this run, never proposed back, never raised as a question,
+never parked as an optional refinement.** A finding that says "over the ceiling — want me to split
+it?" is the deferment queue the directive forbids, wearing the word *structural*. The measurement
+changes the number, not this disposition: exceeding 172 means the handbook carries more than one
+job's irreducible prose, so the cure is still to move a job, never to say it in fewer words.
 
 **How the split is performed — relocation, never condensation.** The handbook is not shortened by
 cutting; it is restructured into the two-path shape (`handbook-templates.md` § Employees INVOKE
@@ -176,8 +190,9 @@ retention the floor: every line leaving the body arrives somewhere the handbook 
 re-running `wf-conform` confirms the core is under ceiling. **Two resolutions are forbidden outright:**
 accepting a longer handbook — the length is never the answer — and trimming, condensing, or compressing
 the prose, because that risks dropping the user's verbiage and a condensed safety example is a lost one
-(directive one is retention). A handbook is over the ceiling because it carries two jobs' worth of
-material; the cure is to move a job, never to say it in fewer words.
+(directive one is retention). The 154-line authored body and the 18-line `ORG-*` allowance are
+what the measured floor protects: binding imperative prose and the auto-generated block are never
+condensed to fit, because there is nothing left to relocate once a handbook is down to one job.
 
 ### Description bytes — reported, never capped
 

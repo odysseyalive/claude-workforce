@@ -19,7 +19,10 @@ VERBATIM, as one machine-owned region inside a catalog file the evaluator alread
 never mirrored into existing tables, so a later reconcile can still tell an authored row
 from a vendored one (§ Seeding step 1b: "a merged file it cannot decompose is a reconcile
 that has to be redone by hand"). Re-running replaces the region only when the slot version
-moved; equal versions are a no-op.
+moved; equal versions are a no-op. Both ends are RESOLVED rather than assumed — the slot
+directory across project and personal scope (`_slot_candidates`), the target across the
+skill root and `references/` and a per-kind candidate list (`CATALOGS`) — because an
+install customizes both, and an unresolved end reports as this script's own error.
 
 WHAT STOPS IT. Exactly one thing, and it is the doctrine's single blocker: the target
 catalog file is **immutable end to end**, leaving no position to open a region without
@@ -68,37 +71,116 @@ _REGION_RX = re.compile(
 _ANCHOR_LINE_RX = re.compile(r"^<!-- additions-seeded:.*-->\s*$", re.MULTILINE)
 
 
-# Catalog kind → (slot filename, version-anchor key, catalog file that receives the region).
+# Catalog kind → (slot filename, version-anchor key, ordered candidate names for the
+# catalog file that receives the region).
+#
 # The region target MUST be a file the evaluator already reads (SKILL.md § What is here
-# enumerates files by name), so a new standalone file would not be read.
+# enumerates files by name), so a new standalone file would not be read — which is why
+# the target is RESOLVED against the install instead of assumed. Two things vary per
+# install and both were measured wrong on odyssey-alive (2026-08-25, both catalogs
+# reported "slot/target not found" against a perfectly seedable tree):
+#   LAYOUT — a customized skill keeps its catalog files under `references/`, not at the
+#            skill root, so every candidate is tried at BOTH (`_rel_candidates`).
+#   NAMING — a retargeted catalog renames its main file: text-eval's is
+#            `ai-patterns.md`, not `text-tells.md`. So `targets` is an ordered list and
+#            the first that EXISTS wins.
+# `slot` is workforce's OWN shipped filename and never varies. Once a region has been
+# written, the anchor's `region-file=` pins the choice for every later run, so the
+# resolution is self-stabilizing and a project can pin its own target by seeding once.
 CATALOGS = {
     "code": {
         "match": lambda d: "code" in d and ("eval" in d),
         "slot": "code-eval.md",
         "version_key": "code-additions-version",
-        "target": "mistake-taxonomy.md",
+        "targets": ["mistake-taxonomy.md"],
     },
     "text": {
         "match": lambda d: "text" in d and "eval" in d and "voice" not in d,
         "slot": "text-tells.md",
         "version_key": "text-additions-version",
-        "target": "text-tells.md",
+        "targets": ["text-tells.md", "ai-patterns.md"],
     },
 }
 
 
-def _slot_dir(root):
-    """Where the shipped additions slots live. On a host they ship inside the workforce
-    skill install; in the maintainer tree they are the source distribution. Either is a
-    valid checkout — never hardcode one (Core Principle 9a)."""
-    candidates = [
+def _slot_candidates(root):
+    """Ordered places the shipped additions slots can live. On a host they ship inside
+    the workforce skill install; in the maintainer tree they are the source
+    distribution. Either is a valid checkout — never hardcode one (Core Principle 9a).
+
+    The third candidate is the PERSONAL-scope install (references/scopes.md): a project
+    installed at personal scope has NO local `.claude/skills/workforce` at all, and its
+    slots exist only under the home config dir. Without it wf-seed reported "additions
+    slot not found" for every catalog of every personal-scope project — the exact
+    failure it exists to detect, reported as its own error. The path follows the
+    canonical runtime resolver, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce`,
+    which is also the seam these candidates are tested through.
+
+    Project candidates stay FIRST: a project-scope install must never be answered from
+    the home copy, whatever version happens to sit there.
+    """
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    return [
         os.path.join(root, ".claude", "skills", "workforce", "references", "evaluator-additions"),
         os.path.join(root, "workforce", "references", "evaluator-additions"),
+        os.path.join(cfg, "skills", "workforce", "references", "evaluator-additions"),
     ]
-    for c in candidates:
+
+
+def _slot_dir(root):
+    """First existing slot directory, or None when workforce is installed nowhere."""
+    for c in _slot_candidates(root):
         if os.path.isdir(c):
             return c
     return None
+
+
+def _rel_candidates(name):
+    """The relative paths a catalog file may occupy inside an installed skill: the skill
+    root, then `references/`. A name that already carries a directory is used as given."""
+    if os.sep in name or "/" in name:
+        return [name]
+    return [
+        name,
+        os.path.join("references", name),   # customized install: catalogs under references/
+    ]
+
+
+def _resolve_one(ev_path, name, default=None):
+    """Relative path of `name` inside an installed skill; first existing wins."""
+    for rel in _rel_candidates(name):
+        if os.path.isfile(os.path.join(ev_path, rel)):
+            return rel
+    return default
+
+
+def _seeded_region_file(anchor_text):
+    """The file this catalog was last seeded into, from the anchor's `region-file=`.
+    It pins the target across runs: a later run must not open a second region in a
+    different file than the one it already owns."""
+    m = re.search(r"<!-- additions-seeded:[^>]*\bregion-file=([^\s>]+)", anchor_text)
+    return m.group(1) if m else None
+
+
+def _resolve_target(ev_path, spec, anchor_text):
+    """(relative, absolute, tried) for the catalog file that receives the region.
+    Order: the pinned `region-file=` if it still exists, then the kind's candidates,
+    each at the skill root and under `references/`. `tried` names every path examined,
+    so a refusal can say what it looked for rather than naming one guess."""
+    names = []
+    pinned = _seeded_region_file(anchor_text)
+    if pinned:
+        names.append(pinned)
+    names += [n for n in spec["targets"] if n not in names]
+    tried = []
+    for name in names:
+        for rel in _rel_candidates(name):
+            if rel in tried:
+                continue
+            tried.append(rel)
+            if os.path.isfile(os.path.join(ev_path, rel)):
+                return rel, os.path.join(ev_path, rel), tried
+    return None, None, tried
 
 
 def _slot_version(slot_path):
@@ -161,7 +243,8 @@ def plan_catalog(root, ev_dir, slot_dir):
     dname = ev_dir.lower()
     spec = next((s for s in CATALOGS.values() if s["match"](dname)), None)
     ev_path = os.path.join(root, ".claude", "skills", ev_dir)
-    anchor_path = os.path.join(ev_path, "CATALOG-ANCHOR.md")
+    anchor_rel = _resolve_one(ev_path, "CATALOG-ANCHOR.md", default="CATALOG-ANCHOR.md")
+    anchor_path = os.path.join(ev_path, anchor_rel)
     result = {"evaluator": ev_dir, "action": None, "detail": "", "writes": []}
 
     if spec is None:
@@ -191,17 +274,18 @@ def plan_catalog(root, ev_dir, slot_dir):
         result.update(action="mirror", detail=f"method=mirror ({cur}); not managed by wf-seed")
         return result
 
-    target_path = os.path.join(ev_path, spec["target"])
-    if not os.path.isfile(target_path):
+    target_rel, target_path, tried = _resolve_target(ev_path, spec, anchor_text)
+    if target_rel is None:
         result.update(action="error",
-                      detail=f"region target {spec['target']} absent; the evaluator must read it")
+                      detail="region target not found: tried " + ", ".join(tried)
+                             + "; the evaluator must already read it")
         return result
     target_text = open(target_path, encoding="utf-8").read()
 
     # THE ONE BLOCKER. Immutable end to end → no legal insertion point at EOF.
     if _ends_inside_immutable(target_text):
         spans = _immutable_spans(target_text)
-        where = ", ".join(f"{spec['target']}:{a}-{b or 'EOF'}" for a, b in spans)
+        where = ", ".join(f"{target_rel}:{a}-{b or 'EOF'}" for a, b in spans)
         result.update(action="unappendable",
                       detail=f"immutable end to end; spans: {where}")
         return result
@@ -213,8 +297,8 @@ def plan_catalog(root, ev_dir, slot_dir):
 
     frm = region_ver if region_ver is not None else (seeded_ver if seeded_ver is not None else 0)
     result.update(action="seed", detail=f"additions v{frm} -> v{slot_ver}",
-                  target=target_path, target_rel=spec["target"], anchor=anchor_path,
-                  slot=slot_path, region_ver=region_ver)
+                  target=target_path, target_rel=target_rel, anchor=anchor_path,
+                  anchor_rel=anchor_rel, slot=slot_path, region_ver=region_ver)
     return result
 
 
@@ -255,7 +339,7 @@ def apply_catalog(plan):
         fh.write(new_target)
     with open(plan["anchor"], "w", encoding="utf-8") as fh:
         fh.write(new_anchor)
-    plan["writes"] = [plan["target_rel"], "CATALOG-ANCHOR.md"]
+    plan["writes"] = [plan["target_rel"], plan.get("anchor_rel", "CATALOG-ANCHOR.md")]
 
 
 def run(root, execute):
@@ -310,7 +394,7 @@ def main(argv=None):
         tag = f" [{p.get('tag')}]" if p.get("tag") else ""
         if p["action"] == "seed":
             done = "region written" if args.execute and p.get("writes") else "region PENDING (dry run)"
-            print(f"  SEED  {p['evaluator']}{tag}  {p['detail']} · {done}")
+            print(f"  SEED  {p['evaluator']}{tag}  {p['detail']} · into {p['target_rel']} · {done}")
         elif p["action"] == "current":
             print(f"  ok    {p['evaluator']}{tag}  {p['detail']}")
         elif p["action"] == "mirror":

@@ -123,6 +123,7 @@ WPC  = "workforce/bin/wf-pin-check"
 ORGP = "workforce/references/procedures/org.md"
 PRIN = "workforce/references/principles.md"
 CTV  = "workforce/references/catalogs/text/version.md"
+DBUD = "workforce/references/delegation-budget.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -230,6 +231,10 @@ CASES = [
      CFM, "del", 'if re.match(r"\\s*\\d+[a-z]?\\.\\s", _l) and _step:'),
     ("the handbook line ceiling is advisory, not a refusal",
      CFM, "del", 'res.advise(f"{n}: within the {ceiling}-line ceiling"'),
+    # Deleting the measured-floor label leaves the ceiling reading as a chosen budget
+    # again, which is the exact defect this recalibration retired. The check must go red.
+    ("volume: the handbook length ceiling is a measured floor, stamped",
+     DBUD, "del", "a MEASURED floor, not a chosen budget"),
     ("verification.md states that only a falsified check is a check",
      VER, "del", "Three states, and only the third is a check"),
     ("verification: every prose deliverable passes the catalog before it is done",
@@ -870,6 +875,13 @@ CASES = [
      HK, "del", "wf-pin-check --uninstall-hook --root <repo> --execute"),
     ("pin guard: the guard actually emits INV-PINS",
      WPC, "del", "INV-PINS  unpinned"),
+    # The sixth (2026-08-25): where the walk goes. Payload is the SKIP_DIRS member with
+    # its quotes and separator, unique in the file (grep -c == 1) — the comment above the
+    # set spells `.next` in backticks, so `del` removes the set entry and leaves the
+    # rationale intact, which is exactly the regression shape: prose still claims
+    # generated copies are skipped while the set no longer skips one.
+    ("pin guard: the walk never descends into generated build output",
+     WPC, "del", '".next", '),
     # ── install into a specific CLAUDE_CONFIG_DIR (2026-08-18) ─────────────────
     # A user with more than one environment directory must be able to target the
     # personal install, and the runtime resolver must read from the same root or the

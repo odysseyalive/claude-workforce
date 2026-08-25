@@ -1517,6 +1517,83 @@
       "INV-PINS  unpinned 2 \u00b7 pinnable 0 \u00b7 unpinnable 2 \u00b7 dependabot MISSING"
     ]
   },
+  "pincheck-skip-build-output": {
+    "_why": "THE REPORT HALF of the .next skip pair (DEF-2026-08-12, the pin guard walks the next build artifact). SKIP_DIRS already excluded `dist` and `build` as \"checked-in or generated copies\"; `.next/` is the same category and was NOT in the set, so the guard descended into Next.js build output. MEASURED 2026-08-25 against the unpatched script on this exact tree: it printed `~ unpinned    npm  .next/package.json: next-generated-dep ^9.9.9  -> 9.9.9`, counted `unpinned 2 \u00b7 pinnable 2`, and -- the consequence the DEF row did not name -- downgraded a fully-covering dependabot.yml to `PARTIAL (missing: npm)`, because it had invented an npm ecosystem at `/.next`. The tree carries BOTH a `.next/` and a `dist/` manifest with distinctly-named deps: `dist` proves the pre-existing exclusions still hold, `.next` proves the new one does, and the one root manifest with a real finding keeps this from passing vacuously on a walker that reads nothing at all.",
+    "args": [],
+    "exit": 0,
+    "not": [
+      "next-generated-dep",
+      ".next/package.json",
+      "dist-generated-dep",
+      "dist/package.json",
+      "PARTIAL",
+      "would merge"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "~ unpinned    npm  package.json: left-pad ^1.0.0  -> 1.0.0",
+      "~ dependabot  PRESENT",
+      "INV-PINS  unpinned 1 \u00b7 pinnable 1 \u00b7 unpinnable 0 \u00b7 dependabot PRESENT",
+      "apply with: --execute"
+    ]
+  },
+  "pincheck-skip-build-output-execute": {
+    "_why": "THE WRITE HALF, and the one that shows the harm. Identical bytes to pincheck-skip-build-output; `--execute` is the only difference, so a regression that makes the REPORT descend into `.next/` fails there and one that makes the WRITE descend fails here. No stdout assertion can show this -- the damage is on disk. MEASURED 2026-08-25 against the unpatched script on this tree, `--execute` rewrote `.next/package.json` to `\"next-generated-dep\": \"9.9.9\"` -- a gitignored file the next build regenerates, so that edit is both unreviewable and lost -- AND appended a `directory: \"/.next\"` npm block to the user's `.github/dependabot.yml`, which is not lost and makes Dependabot open PRs against build output forever. `after` asserts all three artifacts: the root manifest MUST be pinned, or the case would pass on a walker that skipped everything, and `.next/` and `dist/` MUST still hold the caret specs they started with.",
+    "after": {
+      ".github/dependabot.yml": {
+        "not": [
+          "directory: \"/.next\"",
+          "directory: \"/dist\""
+        ],
+        "want": [
+          "- package-ecosystem: \"npm\"",
+          "directory: \"/\""
+        ]
+      },
+      ".next/package.json": {
+        "not": [
+          "\"next-generated-dep\": \"9.9.9\""
+        ],
+        "want": [
+          "\"next-generated-dep\": \"^9.9.9\""
+        ]
+      },
+      "dist/package.json": {
+        "not": [
+          "\"dist-generated-dep\": \"8.8.8\""
+        ],
+        "want": [
+          "\"dist-generated-dep\": \"^8.8.8\""
+        ]
+      },
+      "package.json": {
+        "not": [
+          "\"left-pad\": \"^1.0.0\""
+        ],
+        "want": [
+          "\"left-pad\": \"1.0.0\""
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "next-generated-dep",
+      ".next/package.json",
+      "dist-generated-dep",
+      "merged .github/dependabot.yml",
+      "PARTIAL"
+    ],
+    "script": "wf-pin-check",
+    "want": [
+      "+ pinned      npm  package.json: left-pad ^1.0.0 -> 1.0.0",
+      "~ dependabot  PRESENT",
+      "INV-PINS  unpinned 1 \u00b7 pinnable 1 \u00b7 unpinnable 0 \u00b7 dependabot PRESENT",
+      "verified on disk: 1 exact spec(s) in package.json"
+    ]
+  },
   "preflight-clean": {
     "_why": "A tree with no deny/ask rule, no intercepting hook, and no missing grant has ZERO hard blockers. The self-modification-classifier row is always advisory (whether it fires is measured at the write, not readable from config), so it never counts, and the run prints `0 blockers` deterministically regardless of the host's live auto-mode state. Paired with preflight-deny so a regression that always-flags or never-flags fails one.",
     "args": [],
@@ -2453,6 +2530,111 @@
       ".claude/skills/code-evaluator/mistake-taxonomy.md": {
         "not": [
           "WF-ADDITIONS"
+        ]
+      }
+    }
+  },
+  "seed-refs-subdir": {
+    "_why": "LAYOUT, measured on odyssey-alive 2026-08-25: a customized code-evaluator keeps its catalog files under references/, not at the skill root. wf-seed resolved the target at the root only, so it reported `region target mistake-taxonomy.md absent` against a tree that plainly had one and refused to seed the catalog it was written to seed. The target must resolve at root THEN references/, and the anchor must record the path actually written (region-file=references/mistake-taxonomy.md) — a bare name there would send the next run looking at the root again and open a second region. `after` proves both halves: the region landed in the references/ file, and the anchor names that file.",
+    "script": "wf-seed",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "SEED",
+      "code-evaluator",
+      "additions v0 -> v2",
+      "into references/mistake-taxonomy.md",
+      "region written",
+      "1 seeded"
+    ],
+    "not": [
+      "PENDING",
+      "ERR",
+      "HELD"
+    ],
+    "after": {
+      ".claude/skills/code-evaluator/references/mistake-taxonomy.md": {
+        "want": [
+          "WF-ADDITIONS:code BEGIN version=2",
+          "Guard keyed on a neighbour",
+          "WF-ADDITIONS:code END"
+        ]
+      },
+      ".claude/skills/code-evaluator/CATALOG-ANCHOR.md": {
+        "want": [
+          "additions-seeded: tag=code version=2 method=region region-file=references/mistake-taxonomy.md"
+        ]
+      }
+    }
+  },
+  "seed-retargeted-text": {
+    "_why": "NAMING, the second half of the same 2026-08-25 measurement: text-eval's main catalog is `references/ai-patterns.md` and no `text-tells.md` exists anywhere in the install, yet wf-seed hardcoded `text-tells.md` as the target and errored. `text-tells.md` is workforce's own SLOT filename and stays; only the TARGET is candidate-resolved, first existing wins, so the same slot reaches a retargeted catalog. A second catalog file (colon-detection.md) is present so a resolver that simply took whatever file it found would still be wrong here.",
+    "script": "wf-seed",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "SEED",
+      "text-eval",
+      "additions v0 -> v6",
+      "into references/ai-patterns.md",
+      "region written",
+      "1 seeded"
+    ],
+    "not": [
+      "PENDING",
+      "ERR",
+      "HELD"
+    ],
+    "after": {
+      ".claude/skills/text-eval/references/ai-patterns.md": {
+        "want": [
+          "WF-ADDITIONS:text BEGIN version=6",
+          "Escalating triad",
+          "WF-ADDITIONS:text END"
+        ]
+      },
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "additions-seeded: tag=text version=6 method=region region-file=references/ai-patterns.md"
+        ]
+      },
+      ".claude/skills/text-eval/references/colon-detection.md": {
+        "not": [
+          "WF-ADDITIONS"
+        ]
+      }
+    }
+  },
+  "seed-no-target": {
+    "_why": "THE FALSIFYING HALF of the two rows above. Candidate resolution widened where wf-seed looks; this pins that it did not widen what it will WRITE INTO. No candidate exists at either location here — only an unrelated catalog file — so the run must ERROR, exit 3, and NAME every path it tried, never fall back to the first file it happens to see and never invent one. Without this case, a resolver degraded to 'write into any catalog file' would pass seed-refs-subdir and seed-retargeted-text unchanged.",
+    "script": "wf-seed",
+    "args": [
+      "--execute"
+    ],
+    "exit": 3,
+    "want": [
+      "ERR",
+      "code-evaluator",
+      "region target not found: tried mistake-taxonomy.md, references/mistake-taxonomy.md",
+      "1 error"
+    ],
+    "not": [
+      "SEED  code-evaluator",
+      "region written"
+    ],
+    "after": {
+      ".claude/skills/code-evaluator/references/guards.md": {
+        "not": [
+          "WF-ADDITIONS"
+        ]
+      },
+      ".claude/skills/code-evaluator/CATALOG-ANCHOR.md": {
+        "not": [
+          "additions-seeded"
         ]
       }
     }
