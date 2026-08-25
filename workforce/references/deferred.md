@@ -190,7 +190,7 @@ matters is how many chances to discharge it went by.
 | `amend`, `handbook`, `org index`, `checksums`, `org-chart-format` | `contract-stamp` ≠ recomputation → `CONTRACT-DRIFT` | `review <employee>` |
 | `model-map` | a changed budget cell, one row per affected handbook | `model-map --execute` |
 | `audit` Step 7 | canary `UNAVAILABLE` **after Step 6a's second attempt** — never after the first | `verify`, once the fixtures register |
-| `audit` Step 0.7 | `catalog-unappendable` — the append was skipped | `audit`, once `<catalog>` has a machine-owned region — **the precondition, not just the command** |
+| `audit` Step 0.7 | `catalog-unappendable` — the append was skipped because `<catalog>` is immutable end to end | `audit`, once the user opens a legal insertion point in `<catalog>` (a position outside every immutable span) — **the precondition, not just the command.** A missing machine-owned region is not this row: the append creates one |
 | `hire` | a transaction that failed with ✗ | `hire <role>` |
 | `amend` | `latency: pending-human-key` — suspended awaiting a human | `amend <target> --execute` |
 | `review` | a `NEUTRAL` line owed an eval case (`ablation.md`) | `evals <employee>` |

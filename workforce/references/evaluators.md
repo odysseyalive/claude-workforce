@@ -1,6 +1,6 @@
 # Evaluators — code and text quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 37 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 41 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
@@ -189,9 +189,16 @@ overridden and the customization that overrode it:
 ```
 
 **The append reads this register, not the prose.** An entry listed here is reported and skipped; anything
-else lands. **A register that cannot be written — no machine-owned region — makes the whole catalog
-`catalog-unappendable`**, which is the existing state and the correct outcome: report the entries that
-would have been added, and write nothing.
+else lands. **This register governs only the VENDORED append** — the shipped-corpus rows a project might
+have superseded. **A register that cannot be *derived*** — the catalog is customized but nothing structurally
+records what any customization supersedes (§ A register scoped by enumeration goes stale) — **leaves the
+vendored append with no safe basis**, so those entries are reported and withheld rather than pasted over a
+customization nobody recorded. That withholding is about *derivation*, and it is **not** `catalog-unappendable`:
+a machine-owned region is always creatable at the end of a catalog that is not immutable end to end
+(§ When the catalog cannot be appended), so a missing region is never why a register cannot be written. And
+it withholds only the vendored rows — **workforce's own additions carry no supersession question** (they
+were never in the vendored corpus, so nothing can have superseded them) and are governed solely by
+§ Seeding step 1b and the single insertion-point blocker, never by the state of this register.
 
 **Conversion never invents a row.** Each one cites the customization that supersedes it, by path. A row
 with no citation is a guess about the user's intent, and the register exists precisely so nobody has to
@@ -233,14 +240,18 @@ amendment, never edited** — so a row comes from:
 
 **An empty register on a customized catalog is a legitimate, reportable outcome** — it means the
 customizations exist and none of them was recorded as superseding a shipped entry. The safe response is
-`catalog-unappendable`, not an append against a register nobody could build.
+to **withhold the vendored append** and report it, not an append against a register nobody could build.
+This withholding is not `catalog-unappendable` — that term is reserved for the one insertion-point blocker
+(§ When the catalog cannot be appended) — and it never stops workforce's own additions, which have no
+supersession question to derive.
 
-**And say what that costs, every run — because the safe outcome is also a permanent one.** A catalog
-left unappendable never receives another shipped entry, which is the sweep-exclusion problem in a
-different file: caution that becomes neglect when nothing surfaces it.
+**And say what that costs, every run — because the safe outcome is also a permanent one.** A catalog whose
+vendored append is withheld never receives another *shipped upstream* entry, which is the sweep-exclusion
+problem in a different file: caution that becomes neglect when nothing surfaces it. It still receives
+workforce's own additions — those never depended on the register.
 
 ```
-Catalogs   4 customized · 1 register derived (image, 1 row) · 3 unappendable, register empty
+Catalogs   4 customized · 1 register derived (image, 1 row) · 3 vendored-append withheld, register empty
            23 shipped entries withheld — record a supersedes: attribute to unblock
 ```
 
@@ -473,6 +484,16 @@ or do not make the claim.**
 
 An installed catalog this project did write, with its own anchor and its own machine-owned region, still
 receives the unconditional append. Nothing above weakens that case.
+
+**And the workforce-authored additions are a SEPARATE append with a SEPARATE gate.** Everything in this
+section governs the vendored corpus and the supersession register that guards it.
+`references/evaluator-additions/` is neither vendored nor superseded — it is workforce's own — so its append
+(§ Seeding step 1b) is stopped by **exactly one** thing, the insertion-point blocker above, and by nothing
+else: not an empty supersession register, not a foreign version anchor, not foreign ownership of the skill.
+A run that withholds the additions for any of those reasons has confused the two appends — the error
+measured on `code-evaluator`, whose own additions sat unseeded for weeks while the catalog was, by every
+test in this section, appendable. The mechanism that performs this append is `bin/wf-seed`
+(`procedures/audit.md` § Step 6, evaluator maintenance); it keys on the insertion-point blocker alone.
 
 **Ownership does not survive genuine unappendability, but the employee does** — and after the
 correction above this case is rare rather than routine, so reaching it should itself prompt a re-check. `records-ownership.md` defines a

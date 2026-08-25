@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 112 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 116 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -774,10 +774,13 @@ because they serve different tiers: an IC reads the catalog directly (it cannot 
 Lead dispatches to the evaluator. Reporting this as "the catalog was left alone" without naming the hire
 undercounts what the run produced.
 
-**Where the catalog is `catalog-unappendable`, hire the evaluator but do NOT assert ownership of it**
-(`evaluators.md` § When the catalog cannot be appended). A Records Owner "drafts every amendment", and a
-catalog that is immutable or owned by another generator cannot receive one — naming an owner there claims a
-capability the doctrine withholds. Mark it `Records Owner: none (read-only: <reason>)` and route change
+**Where the catalog is `catalog-unappendable` — immutable end to end (§ When the catalog cannot be
+appended) — hire the evaluator but do NOT assert ownership of it.** A Records Owner "drafts every
+amendment", and a catalog with no legal insertion point cannot receive one — naming an owner there claims a
+capability the doctrine withholds. **Foreign ownership of the skill is NOT this state**: a foreign-authored
+catalog whose file still has a position outside every immutable span takes the append and keeps an owner —
+`owned by <generator>` is not a reason on its own (`evaluators.md` § When the catalog cannot be appended).
+Mark a genuinely unappendable one `Records Owner: none (read-only: immutable end to end)` and route change
 requests to the user. **The employee is still worth hiring**: reading and reviewing are unaffected, and
 review is the whole value.
 
@@ -791,7 +794,8 @@ per-file judgment the register exists to replace, which is how a settled rule re
 question. So each run re-propagates the current register **and** the precedence clause into every installed
 evaluator, in the same **never skipped, never offered, never a question** manner as § Forcible propagation —
 that section refreshes the catalog CONTENTS an evaluator applies; this refreshes the RULES it applies them
-under. Report it per evaluator, including the zeroes, in the same block as the reconciliation, and print the
+under. **Both writes execute at Step 6-E**: the CONTENTS append (workforce's additions) is performed
+mechanically by `bin/wf-seed`, and this RULES refresh runs beside it. Report it per evaluator, including the zeroes, in the same block as the reconciliation, and print the
 run roll-up **`INV-HOUSERULES`** (`invariants.md` row 22) with it:
 
 ```
@@ -800,10 +804,12 @@ HOUSE RULES     text-eval  register 2 rows refreshed · precedence clause presen
 INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
 ```
 
-An evaluator that cannot receive the refresh — a `catalog-unappendable` copy with no machine-owned region
-(§ When the catalog cannot be appended) — is counted in `unrefreshed` and **names that precondition**.
-`INV-HOUSERULES` is `NOT UPHELD` only when an unrefreshed evaluator cites nothing: the same uncited-refusal
-shape as `INV-SWEPT`, so a run cannot skip the refresh silently and still close clean.
+An evaluator that cannot receive the refresh — a `catalog-unappendable` copy that is immutable end to end,
+leaving no position to open a machine-owned region (§ When the catalog cannot be appended) — is counted in
+`unrefreshed` and **names that precondition, with the file and the spans**. A *missing* machine-owned region
+is never this case: the refresh creates the region. `INV-HOUSERULES` is `NOT UPHELD` only when an
+unrefreshed evaluator cites nothing: the same uncited-refusal shape as `INV-SWEPT`, so a run cannot skip the
+refresh silently and still close clean.
 
 A run that refreshes the catalog but leaves the rules stale has updated what the evaluator checks and not
 how it is allowed to demote what it finds — the half that produced the README question this clause was
@@ -943,7 +949,7 @@ defers a run.*
 ## Step 6 — Execute
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
-principles → model rewrite → `org index` → `org embed` →
+principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
 `wf-claude-md` → `checksums` → **the git pin-guard install (Step 6-G)** → `verify` → **discharge (Step 6b)** → the sweep.**
 
 **Discharge sits between `verify` and the sweep** because it is the last step that may still change the
@@ -1117,6 +1123,33 @@ department derivation from a residual — four things that produce the same cell
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+### Step 6-E — Seed evaluator additions and refresh the house rules
+
+The evaluator wiring in Step 4 is a DESIGN decision; **this is where the writes happen**, and until this
+step existed they did not — the append that carries `references/evaluator-additions/` into an installed
+catalog was prose-only, performed by whoever ran the audit and remembered. `code-evaluator` is the proof:
+its own additions sat unseeded from 2026-08-06 to 2026-08-25 while its anchor reported the gap every run.
+A detector without its fix is a flag (SKILL.md § Directives), and the fix is a step that always runs.
+
+```
+wf-seed --root ${CLAUDE_PROJECT_DIR} --execute
+```
+
+`wf-seed` appends each shipped additions slot VERBATIM as one `WF-ADDITIONS:<tag>` machine-owned region
+inside a catalog file the evaluator already reads, updates the `additions-seeded` record in that catalog's
+`CATALOG-ANCHOR.md`, and is idempotent — a re-run with an unchanged slot version is a no-op, so this step
+is both the detector and the reconciler in one pass (`evaluators.md` § When the catalog cannot be
+appended, § Seeding step 1b). It keys on the **single insertion-point blocker** and on nothing else: a
+missing machine-owned region is created here, a foreign anchor or foreign skill ownership never stops it,
+and the supersession register — which guards only the VENDORED append — never withholds workforce's own
+additions. A catalog it reports `unappendable` is immutable end to end, and it names the file and the
+spans. Print its `INV-SEED` line, including the zeroes.
+
+Then refresh the house rules (§ Step 4, "Refresh the house rules in every installed evaluator") and print
+`INV-HOUSERULES` in the same block. The additions carry the catalog CONTENTS; the house-rules refresh
+carries the RULES the evaluator applies them under — both are "never skipped, never offered, never a
+question," and both run here before `verify` so `verify` checks their result.
 
 ### Step 6-G — Wire the git pre-commit pin guard (installed WITH audit, alongside the hooks)
 

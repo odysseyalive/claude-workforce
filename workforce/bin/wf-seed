@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""wf-seed — propagate workforce-authored evaluator additions into an installed catalog.
+
+    wf-seed --root <tree>                 dry run: report what each catalog would receive
+    wf-seed --root <tree> --execute       write the machine-owned additions region
+    wf-seed --root <tree> --json          machine-readable, for the audit's report block
+
+WHY THIS EXISTS. `references/evaluator-additions/{code-eval,text-tells}.md` are the ONE
+sanctioned place workforce grows its own review entries (`evaluators.md` § Seeding step
+1b). Until this script, the append that carries them into an installed catalog was
+prose-only — described in `audit.md`, performed by whoever ran the audit and remembered.
+`code-evaluator` proves the cost: its own additions sat unseeded from 2026-08-06 while its
+anchor honestly reported "not yet seeded" every run. **A detector without its fix is a
+flag** (SKILL.md § Directives, "A DETECTOR SHIPS WITH ITS FIX"), and this is the fix: run
+every audit, idempotent, so it is the active detector AND the reconciler in one pass.
+
+WHAT IT DOES. For each installed evaluator catalog it appends the shipped additions slot,
+VERBATIM, as one machine-owned region inside a catalog file the evaluator already reads —
+never mirrored into existing tables, so a later reconcile can still tell an authored row
+from a vendored one (§ Seeding step 1b: "a merged file it cannot decompose is a reconcile
+that has to be redone by hand"). Re-running replaces the region only when the slot version
+moved; equal versions are a no-op.
+
+WHAT STOPS IT. Exactly one thing, and it is the doctrine's single blocker: the target
+catalog file is **immutable end to end**, leaving no position to open a region without
+writing inside an `origin: … immutable` span (`evaluators.md` § When the catalog cannot be
+appended). A MISSING machine-owned region is not this state — the region is created here. A
+FOREIGN version anchor or foreign ownership of the skill is not this state — workforce
+writes its own region and its own anchor line. Those were each measured wrong on
+2026-08-03 and are the reason odyssey-alive's appendable catalog was frozen; this script
+keys on the insertion-point blocker alone and on nothing else.
+
+The additions append is INDEPENDENT of the supersession register, which guards only the
+VENDORED append: workforce's own additions were never in the vendored corpus, so nothing
+can have superseded them. An empty or underivable register never withholds them.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+# Immutable-span grammar: content between these markers is never written into. The append
+# lands at end-of-file, so the ONLY thing that forbids it is the file ending INSIDE a span.
+# The open pattern is the project's CANONICAL sacred-marker grammar, byte-identical to
+# wf-conform's IMMUTABLE_OPEN_RX and wf-claude-md's IMMUTABLE_RX (bin/check § marker
+# grammar cross-tests every reader against one spelling; a divergent one accepts or rejects
+# a different set of blocks than the rest of the toolchain).
+_IMMUTABLE_OPEN = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
+_IMMUTABLE_CLOSE = re.compile(r"^[ \t]*<!--\s*/origin\s*-->", re.M)
+
+# One machine-owned region per catalog file, tagged by evaluator kind. The BEGIN marker
+# carries the slot version so an idempotent re-run compares without parsing the body.
+_REGION_BEGIN = "<!-- WF-ADDITIONS:{tag} BEGIN version={ver} — machine-owned; edit {slot} and re-run wf-seed, never here -->"
+_REGION_END = "<!-- WF-ADDITIONS:{tag} END -->"
+_REGION_RX = re.compile(
+    r"^<!-- WF-ADDITIONS:(?P<tag>[a-z]+) BEGIN version=\d+.*?-->.*?"
+    r"^<!-- WF-ADDITIONS:(?P=tag) END -->[ \t]*$",
+    re.S | re.M,
+)
+
+# The machine-readable propagation record wf-seed maintains in CATALOG-ANCHOR.md. It is the
+# single source of "how far additions have propagated" and is what wf-conform reads to flag a
+# catalog audit never seeded. method=region is what this script writes; method=mirror marks a
+# catalog seeded by the legacy hand-mirror path (text-eval) that wf-seed leaves alone.
+_ANCHOR_LINE_RX = re.compile(r"^<!-- additions-seeded:.*-->\s*$", re.MULTILINE)
+
+
+# Catalog kind → (slot filename, version-anchor key, catalog file that receives the region).
+# The region target MUST be a file the evaluator already reads (SKILL.md § What is here
+# enumerates files by name), so a new standalone file would not be read.
+CATALOGS = {
+    "code": {
+        "match": lambda d: "code" in d and ("eval" in d),
+        "slot": "code-eval.md",
+        "version_key": "code-additions-version",
+        "target": "mistake-taxonomy.md",
+    },
+    "text": {
+        "match": lambda d: "text" in d and "eval" in d and "voice" not in d,
+        "slot": "text-tells.md",
+        "version_key": "text-additions-version",
+        "target": "text-tells.md",
+    },
+}
+
+
+def _slot_dir(root):
+    """Where the shipped additions slots live. On a host they ship inside the workforce
+    skill install; in the maintainer tree they are the source distribution. Either is a
+    valid checkout — never hardcode one (Core Principle 9a)."""
+    candidates = [
+        os.path.join(root, ".claude", "skills", "workforce", "references", "evaluator-additions"),
+        os.path.join(root, "workforce", "references", "evaluator-additions"),
+    ]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return None
+
+
+def _slot_version(slot_path):
+    """Read `<!-- <key>-additions-version: N -->` from the slot's first line."""
+    try:
+        first = open(slot_path, encoding="utf-8").readline()
+    except OSError:
+        return None
+    m = re.search(r"additions-version:\s*(\d+)", first)
+    return int(m.group(1)) if m else None
+
+
+def _ends_inside_immutable(text):
+    """True iff end-of-file sits inside an open immutable span — the one condition that
+    leaves no legal insertion point at the end. Balanced spans return False (appendable)."""
+    depth = 0
+    for line in text.splitlines():
+        if _IMMUTABLE_OPEN.search(line):
+            depth += 1
+        elif _IMMUTABLE_CLOSE.search(line):
+            depth = max(0, depth - 1)
+    return depth > 0
+
+
+def _immutable_spans(text):
+    """(open_line, close_line) 1-indexed, for naming the spans in a refusal (§ When the
+    catalog cannot be appended: 'name the file and the spans, or do not make the claim')."""
+    spans, open_at = [], None
+    for i, line in enumerate(text.splitlines(), 1):
+        if _IMMUTABLE_OPEN.search(line):
+            open_at = i
+        elif _IMMUTABLE_CLOSE.search(line) and open_at:
+            spans.append((open_at, i))
+            open_at = None
+    if open_at:
+        spans.append((open_at, None))
+    return spans
+
+
+def _anchor_seeded(anchor_text):
+    """Parse the additions-seeded record wf-seed maintains. Returns (method, version) or
+    (None, None) when the catalog has never been seeded."""
+    m = re.search(r"<!-- additions-seeded:.*?method=(\w+).*?version=(\d+).*?-->", anchor_text)
+    if m:
+        return m.group(1), int(m.group(2))
+    m = re.search(r"<!-- additions-seeded:.*?version=(\d+).*?method=(\w+).*?-->", anchor_text)
+    if m:
+        return m.group(2), int(m.group(1))
+    return None, None
+
+
+def _region_version(target_text, tag):
+    """Version of the WF-ADDITIONS region already present in the target file, or None."""
+    m = re.search(rf"<!-- WF-ADDITIONS:{tag} BEGIN version=(\d+)", target_text)
+    return int(m.group(1)) if m else None
+
+
+def plan_catalog(root, ev_dir, slot_dir):
+    """Compute the disposition for one evaluator directory without writing anything."""
+    dname = ev_dir.lower()
+    spec = next((s for s in CATALOGS.values() if s["match"](dname)), None)
+    ev_path = os.path.join(root, ".claude", "skills", ev_dir)
+    anchor_path = os.path.join(ev_path, "CATALOG-ANCHOR.md")
+    result = {"evaluator": ev_dir, "action": None, "detail": "", "writes": []}
+
+    if spec is None:
+        result.update(action="skip", detail="no additions slot maps to this evaluator")
+        return result
+
+    tag = next(k for k, v in CATALOGS.items() if v is spec)
+    slot_path = os.path.join(slot_dir, spec["slot"]) if slot_dir else None
+    if not slot_path or not os.path.isfile(slot_path):
+        result.update(action="error", detail=f"additions slot not found: {spec['slot']}")
+        return result
+    slot_ver = _slot_version(slot_path)
+    if slot_ver is None:
+        result.update(action="error", detail=f"{spec['slot']} carries no additions-version anchor")
+        return result
+    result["tag"], result["slot_version"] = tag, slot_ver
+
+    anchor_text = ""
+    if os.path.isfile(anchor_path):
+        anchor_text = open(anchor_path, encoding="utf-8").read()
+    method, seeded_ver = _anchor_seeded(anchor_text)
+
+    # A catalog seeded by the legacy hand-mirror path (text-eval) is left alone — appending a
+    # region would duplicate rows already mirrored into its tables. Reported, never rewritten.
+    if method == "mirror":
+        cur = "current" if seeded_ver == slot_ver else f"mirror v{seeded_ver} < slot v{slot_ver}"
+        result.update(action="mirror", detail=f"method=mirror ({cur}); not managed by wf-seed")
+        return result
+
+    target_path = os.path.join(ev_path, spec["target"])
+    if not os.path.isfile(target_path):
+        result.update(action="error",
+                      detail=f"region target {spec['target']} absent; the evaluator must read it")
+        return result
+    target_text = open(target_path, encoding="utf-8").read()
+
+    # THE ONE BLOCKER. Immutable end to end → no legal insertion point at EOF.
+    if _ends_inside_immutable(target_text):
+        spans = _immutable_spans(target_text)
+        where = ", ".join(f"{spec['target']}:{a}-{b or 'EOF'}" for a, b in spans)
+        result.update(action="unappendable",
+                      detail=f"immutable end to end; spans: {where}")
+        return result
+
+    region_ver = _region_version(target_text, tag)
+    if region_ver == slot_ver and seeded_ver == slot_ver:
+        result.update(action="current", detail=f"additions v{slot_ver} already seeded")
+        return result
+
+    frm = region_ver if region_ver is not None else (seeded_ver if seeded_ver is not None else 0)
+    result.update(action="seed", detail=f"additions v{frm} -> v{slot_ver}",
+                  target=target_path, target_rel=spec["target"], anchor=anchor_path,
+                  slot=slot_path, region_ver=region_ver)
+    return result
+
+
+def _render(target_text, tag, slot_path, slot_ver, slot_rel):
+    """Return target_text with the WF-ADDITIONS:<tag> region inserted or replaced at EOF."""
+    body = open(slot_path, encoding="utf-8").read().rstrip("\n")
+    begin = _REGION_BEGIN.format(tag=tag, ver=slot_ver, slot=slot_rel)
+    end = _REGION_END.format(tag=tag)
+    region = f"{begin}\n\n{body}\n\n{end}\n"
+    stripped = _REGION_RX.sub("", target_text).rstrip("\n")   # drop any prior region of this tag
+    return stripped + "\n\n" + region
+
+
+def _write_anchor(anchor_text, tag, slot_ver, target_rel):
+    """Insert/replace the machine-readable additions-seeded record in the anchor."""
+    line = (f"<!-- additions-seeded: tag={tag} version={slot_ver} method=region "
+            f"region-file={target_rel} -->")
+    if _ANCHOR_LINE_RX.search(anchor_text):
+        return _ANCHOR_LINE_RX.sub(line, anchor_text, count=1)
+    # Place it just after the top version anchor comment if present, else at the top.
+    lines = anchor_text.splitlines()
+    for i, l in enumerate(lines):
+        if re.search(r"-ref-version:\s*\d+", l):
+            lines.insert(i + 1, "")
+            lines.insert(i + 2, line)
+            return "\n".join(lines) + ("\n" if anchor_text.endswith("\n") else "")
+    return line + "\n" + anchor_text
+
+
+def apply_catalog(plan):
+    """Perform the writes for a `seed` plan. Atomic per file: render fully, then write."""
+    slot_rel = os.path.join("references", "evaluator-additions", os.path.basename(plan["slot"]))
+    target_text = open(plan["target"], encoding="utf-8").read()
+    new_target = _render(target_text, plan["tag"], plan["slot"], plan["slot_version"], slot_rel)
+    anchor_text = open(plan["anchor"], encoding="utf-8").read() if os.path.isfile(plan["anchor"]) else ""
+    new_anchor = _write_anchor(anchor_text, plan["tag"], plan["slot_version"], plan["target_rel"])
+    with open(plan["target"], "w", encoding="utf-8") as fh:
+        fh.write(new_target)
+    with open(plan["anchor"], "w", encoding="utf-8") as fh:
+        fh.write(new_anchor)
+    plan["writes"] = [plan["target_rel"], "CATALOG-ANCHOR.md"]
+
+
+def run(root, execute):
+    sk = os.path.join(root, ".claude", "skills")
+    slot_dir = _slot_dir(root)
+    plans = []
+    if os.path.isdir(sk):
+        evs = sorted(d for d in os.listdir(sk)
+                     if os.path.isdir(os.path.join(sk, d))
+                     and ("eval" in d.lower() or "evaluator" in d.lower()))
+        for ev in evs:
+            p = plan_catalog(root, ev, slot_dir)
+            if p["action"] in (None, "skip"):
+                continue
+            if execute and p["action"] == "seed":
+                try:
+                    apply_catalog(p)
+                except OSError as exc:
+                    p.update(action="error", detail=f"write failed: {exc}")
+            plans.append(p)
+    return plans
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="")
+    ap.add_argument("--execute", action="store_true",
+                    help="write the region; default is a dry run that reports the plan")
+    ap.add_argument("--json", action="store_true")
+    args = ap.parse_args(argv)
+
+    if not (args.root or "").strip():
+        print("wf-seed: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; "
+              "pass an explicit path.", file=sys.stderr)
+        return 2
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-seed: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    plans = run(root, args.execute)
+    counts = {k: sum(1 for p in plans if p["action"] == k)
+              for k in ("seed", "current", "mirror", "unappendable", "error")}
+
+    if args.json:
+        print(json.dumps({"root": root, "executed": args.execute,
+                          "catalogs": plans, "counts": counts}, indent=2))
+        return 3 if counts["error"] else 0
+
+    verb = "seeded" if args.execute else "would seed"
+    for p in plans:
+        tag = f" [{p.get('tag')}]" if p.get("tag") else ""
+        if p["action"] == "seed":
+            done = "region written" if args.execute and p.get("writes") else "region PENDING (dry run)"
+            print(f"  SEED  {p['evaluator']}{tag}  {p['detail']} · {done}")
+        elif p["action"] == "current":
+            print(f"  ok    {p['evaluator']}{tag}  {p['detail']}")
+        elif p["action"] == "mirror":
+            print(f"  keep  {p['evaluator']}{tag}  {p['detail']}")
+        elif p["action"] == "unappendable":
+            print(f"  HELD  {p['evaluator']}{tag}  catalog-unappendable — {p['detail']}")
+        elif p["action"] == "error":
+            print(f"  ERR   {p['evaluator']}  {p['detail']}")
+    print(f"\nINV-SEED  {len(plans)} evaluator(s) · {counts['seed']} {verb} · "
+          f"{counts['current']} current · {counts['mirror']} mirror · "
+          f"{counts['unappendable']} unappendable · {counts['error']} error")
+    if not plans:
+        print("  0 evaluator catalogs — nothing to seed.")
+    return 3 if counts["error"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

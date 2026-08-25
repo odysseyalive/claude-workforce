@@ -251,6 +251,30 @@ VENDORED = {p_ for p_ in declared if p_.startswith("workforce/references/catalog
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
 
+# EXISTING ON DISK IS NOT THE SAME AS SHIPPED. Both installers fetch each manifest
+# path from the published git tree (`$RepoUrl/<path>`), so a declared file that was
+# authored but never `git add`ed 404s on every real install — while every LOCAL gate
+# reads green, because this check, the completeness pass, and a `file://$PWD` install
+# all read the working tree, and the runtime + personal copies mask the absence.
+# `bin/check` already guards this for fixtures/ (§ fixtures tracked); the shipped tree
+# is the strictly worse case and was unguarded. Found 2026-08-25: `workforce/bin/wf-seed`
+# shipped in the manifest, passed every check, and was untracked — a 404 in waiting.
+try:
+    _lsf = subprocess.run(["git", "ls-files"] + declared, cwd=ROOT,
+                          capture_output=True, text=True, timeout=30)
+    if _lsf.returncode != 0:
+        raise RuntimeError(_lsf.stderr.strip()[:120] or "git ls-files failed")
+    _tracked_decl = set(_lsf.stdout.split())
+    _untracked_manifest = sorted(p for p in declared if p not in _tracked_decl)
+    check(
+        "manifest: every declared path is tracked in git",
+        not _untracked_manifest,
+        "declared but untracked, so absent from the published tree — both installers "
+        "404 on these while every local check passes: " + ", ".join(_untracked_manifest),
+    )
+except Exception as _e:  # no git, no assertion — never a false pass
+    warn("manifest: tracked-ness not asserted", f"git unavailable ({_e})")
+
 _keep_flagged = [l.strip() for l in read("manifest.txt").splitlines() if l.strip().startswith("keep ")]
 check(
     "manifest: no `keep` flag without its handling",
@@ -1241,6 +1265,27 @@ check(
     "a shipped file no procedure reads is dead weight on every install. Path, not "
     "name: a step that mentions 'the additions' without telling the caller what to "
     "open is the same bug as an agent definition convened by nothing",
+)
+# THE `catalog-unappendable` DEFINITION, PINNED. It regained its old meaning once:
+# evaluators.md § When the catalog cannot be appended says the term is ONLY the
+# immutable-end-to-end blocker, while three other sites called "no machine-owned region"
+# or "a foreign anchor" the blocker — and an audit froze a merely foreign-authored,
+# fully-appendable catalog on exactly that wrong test (odyssey-alive, 2026-08-25). The
+# workforce-additions append is a SEPARATE append that the supersession register — which
+# guards only the vendored corpus — never withholds. This check binds the reconciled
+# wording at both the definition and the state table so the contradiction cannot silently
+# return; a `bin/prove` case deletes the anchor phrase and confirms it fires.
+_asu = read("workforce/references/audit-setup.md")
+check(
+    "catalog-unappendable: one blocker (immutable end to end), additions append independent",
+    "workforce-authored additions are a SEPARATE append" in _ev_seed
+    and "immutable end to end" in _asu
+    and "A missing machine-owned region is NOT this state" in _asu,
+    "the reconciled definition drifted. `catalog-unappendable` is ONLY the "
+    "immutable-end-to-end blocker (evaluators.md § When the catalog cannot be appended); a "
+    "missing machine-owned region and a foreign version anchor are NOT blockers, and "
+    "workforce's own additions never ride the supersession register. This contradiction "
+    "shipped once and froze a real catalog — the wording is pinned, not trusted",
 )
 check(
     "additions: manifest states the authored-vs-vendored distinction where it ships them",
@@ -3515,9 +3560,9 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
 # a THIRD promotes it to an explicit reader inventory compared by equality, not by >=.
 check(
     "grammar: counters and guards reject an indented marker; the mask does not",
-    not _indent_bad and _indent_seen >= 9,
+    not _indent_bad and _indent_seen >= 10,
     (f"{_indent_bad}. " if _indent_bad else
-     f"only {_indent_seen} line-anchored readers examined, expected 9 — a reader "
+     f"only {_indent_seen} line-anchored readers examined, expected 10 — a reader "
      "vanished or its file stopped parsing, and this check reports clean on an empty "
      "set. That is the direction it fails silently in. ")
     + "An indented marker sits in a code block and is an example. A "
@@ -3529,10 +3574,10 @@ check(
 
 check(
     "grammar: every sacred-marker reader accepts the same blocks",
-    not _grammar_bad and _grammar_readers >= 10,
+    not _grammar_bad and _grammar_readers >= 11,
     (f"{_grammar_readers} readers tested; divergent: {_grammar_bad}. "
      if _grammar_bad else
-     f"only {_grammar_readers} marker readers found (expected 10) — the extractor "
+     f"only {_grammar_readers} marker readers found (expected 11) — the extractor "
      "stopped seeing "
      "them, so this check would pass on any grammar. ")
     + "A reader that cannot see a sacred block will not checksum it, will not guard "
