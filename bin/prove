@@ -901,10 +901,23 @@ CASES = [
 
 
 def failing_checks(root):
-    """Names of the checks bin/check reports failing, run against `root`'s own copy."""
-    r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True)
-    return {ln.strip()[2:].strip()
-            for ln in r.stdout.splitlines() if ln.strip().startswith("✗ ")}
+    """Names of the checks bin/check reports failing, run against `root`'s own copy.
+
+    A completed bin/check exits 0 (green) or 1 (has FAILS) and always prints its
+    `N passed, M failed` summary. Any other outcome means the RUN broke, not that
+    nothing failed: under WORKERS-way concurrency a starved subprocess can die with
+    no ✗ lines, and reading that as green silently mislabels a firing check VACUOUS
+    (the "did NOT fire — 0 other failures" flake). Retry a broken run, then fail
+    loudly; never return a verdict from an incomplete run.
+    """
+    for _ in range(3):
+        r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True)
+        if r.returncode in (0, 1) and "passed," in r.stdout and "failed," in r.stdout:
+            return {ln.strip()[2:].strip()
+                    for ln in r.stdout.splitlines() if ln.strip().startswith("✗ ")}
+    raise RuntimeError(
+        f"bin/check did not complete under {root} after 3 attempts "
+        f"(last exit {r.returncode}); stderr tail: {r.stderr.strip()[-400:]}")
 
 
 def tree_digest(root):

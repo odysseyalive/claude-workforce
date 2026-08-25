@@ -113,7 +113,38 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-24
+## Open, as of 2026-08-25
+
+**Landed 2026-08-25 — the code-evaluator ranks complexity by concentrated mass, and two harness
+defects it surfaced are fixed.** Brought by the user, who found `~/lab/slopcheck-deslop` (a
+third-party tool built on SlopCodeBench, arXiv:2603.24755) and asked whether anything ported. One
+idea did; the rest was measured against this project's own discipline and left where it was.
+
+- **Complexity prioritization, ported into the evaluator additions.** `evaluator-additions/code-eval.md`
+  gains a ranking method — order flagged hotspots by `mass = CC × √SLOC`, so a short branchy function
+  outranks a long flat one — with the paper's 0.34 human / 0.68 agent concentration band as an
+  orientation figure, never a gate. It sits under its own heading, explicitly not a Group W1
+  measured-defect row, because it names no defect seen here; the file's anti-analogy discipline holds.
+  Only the language-agnostic metric was taken. Its eleven per-language ast-grep rules are measured in
+  other repos and were left there — porting them would break the evaluator's language-agnostic
+  principle. `code-additions-version` bumped 1 → 2, the trigger that carries the section to existing
+  installs via § Forcible propagation on their next audit. Shipped with a `bin/check` assertion
+  coupling the metric to its anti-gate caveat (if the formula or band ships, both "do not gate" lines
+  ship with it) and a `bin/prove` del-case. Commit `387a945`.
+- **The README anchor check now matches GitHub's slug rule.** Verifying the above hit a red `bin/check`:
+  `README: every in-document anchor resolves` was a false positive on three legitimate TOC links. It
+  harvested only h2–h3 headings (missing a nested h4 target) and hyphenated punctuation where GitHub
+  deletes it (`Isn't` → `isnt`, `CLAUDE.md` → `claudemd`). The slug builder now replicates GitHub's
+  actual rule — lowercase, delete punctuation, spaces to hyphens, across h2–h6 — so it accepts what
+  GitHub renders and still fires on a genuinely broken anchor. `bin/check` 929/0. Commit `8197665`.
+- **`bin/prove` no longer reads an incomplete `bin/check` as green.** A full prove run reported four
+  checks VACUOUS with the signature "did NOT fire — 0 other failures", each pre-existing and none tied
+  to the work above. They are not vacuous: a faithful harness replica and two clean runs show all four
+  firing (273/273 proven, 0 vacuous). The four had ridden in a shard whose `bin/check` subprocess died
+  under WORKERS-way concurrency and emitted no `✗` lines, which `failing_checks` read as a clean pass —
+  the same silent-staleness this file exists to catch, one layer down in the prover itself.
+  `failing_checks` now requires the run to exit 0 or 1 and print its `passed, … failed` summary; a
+  broken run is retried, then raised, never returned as an empty verdict.
 
 **Landed 2026-08-24 — text-eval is mandatory before a prose deliverable is done, and the Escalation
 Gate stops agents escalating what the documents already answer.** Landed this session in commit
