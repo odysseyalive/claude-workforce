@@ -1343,6 +1343,22 @@ check(
     "gate` and `do not gate on it` caveats, the next reader turns a mass ratio that "
     "decomposition inflates into a blocking gate — the one drift this refinement invites",
 )
+# The resource-awareness dimension (RC1-RC6, 2026-08-25). Its whole safety rests on two
+# disciplines: every finding is REPORT-ONLY (a candidate, never a verdict — no static reader
+# sees runtime scale), and it fires only through the SCALE GATE (a hot path, named file:line,
+# or it is not reported). Strip either and the six signals become false-positive noise that
+# trains reviewers to ignore the pass — the one drift a resource catalog invites. So the
+# signals and their containment are inseparable: if RC1 ships, both disciplines ship with it.
+check(
+    "additions: resource-awareness signals ship coupled to report-only + the scale gate, inseparable",
+    ("RC1 —" not in _ce_add)
+    or ("Report-only, always" in _ce_add and "scale gate" in _ce_add),
+    "the six resource-cost classes are review-by-reading candidates, not verdicts; if the "
+    "signals ship without the report-only discipline and the hot-path scale gate, the pass "
+    "becomes false-positive noise that trains reviewers to ignore it — the one drift a "
+    "resource catalog invites. The classes and their two governing disciplines are inseparable, "
+    "the same coupling the complexity mass-ranking above enforces for its anti-gate caveat",
+)
 # ─────────────────────────────────────────────────────────────────────────────
 # wf-seed RESOLVES both ends of the propagation; it assumes neither (2026-08-25).
 #

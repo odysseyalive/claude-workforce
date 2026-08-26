@@ -115,6 +115,48 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-08-25
 
+**Landed 2026-08-25 (dev session) — the code-evaluator gains a language-agnostic resource-awareness
+dimension (RC1–RC6): memory & CPU cost recognised from what a variable stores.** A `/workforce dev` run
+audited the whole code-evaluator process and confirmed a missing axis: across the entire code catalog
+`memory`/`CPU`/`allocation`/`leak` appear zero times, and `performance` appears once — only to defer it
+to "other passes" that never existed. The complexity pass (`cross-file-detection.md` §5) scores
+*cyclomatic/cognitive* complexity, a maintainability proxy, not computational time/space cost. That gap
+is now filled.
+
+- **Six cost classes, agnostic by construction.** Online research into expert practice across four
+  unrelated memory models — C++ value semantics, Python names-bind-objects, PHP zval/copy-on-write,
+  JavaScript reference-vs-primitive — collapsed onto **one** set of six classes: RC1 needless
+  copy/value-vs-reference, RC2 materialize-instead-of-stream, RC3 unbounded retention (leak), RC4
+  allocation churn on a hot path, RC5 wrong container/representation, RC6 type/shape stability in hot
+  code. The convergence across four runtimes is the grounding — a class that recurs in all four is
+  cross-cutting, so the taxonomy and its detection heuristics are agnostic and the per-language table is
+  only an illustrative *surface*. The one runtime-bound bucket, RC6, is stated as an agnostic principle
+  ("keep hot code type-stable; know your runtime's deopt cliffs") with the engine specifics in the
+  appendix. This answers the user's "can it be language-agnostic?" — yes, for all six.
+- **Three disciplines make it safe to ship, borrowed from the catalog's existing epistemics.** Every
+  finding is **report-only** (a candidate, never a verdict — no static reader sees runtime scale); it
+  fires only through the **scale gate** (a hot path, named `file:line` + why, or it is not reported —
+  RC3 leaks excepted, being unbounded growth not a constant factor); and a **resource safety floor**
+  makes premature/ineffective optimisation itself a false positive. Cited-not-measured, per this file's
+  measured-or-cited rule, with four independent primary sources per class (Core Guidelines/Meyers/Carruth;
+  CPython docs/Ramalho/Szorc/Witowski; Popov/php.net/phpdelusions; V8 blog/MDN/Node/Osmani).
+- **Detector ships with its fix.** Landed in the authored slot
+  `references/evaluator-additions/code-eval.md` at `code-additions-version: 3` (the vendored corpus is
+  untouched), with a `bin/check` coupling assertion — the RC signals may not ship without both the
+  report-only discipline and the scale gate — and a `bin/prove` del-case that deletes the unique
+  `Report-only, always` anchor and confirms the check flips to `✗`. Re-seeded into this project's own
+  installed catalog via `bin/wf-seed --execute` (`v2 → v3`, region written to
+  `mistake-taxonomy.md`), anchor prose reconciled to v3, coverage header regenerated.
+- **Off-the-Street gate passed.** A cold-read probe — a fresh context that never saw the authoring —
+  read only the installed RC section and applied it to a six-case known-answer diff: it flagged every
+  real hot-path cost (RC4+RC2 in a Python handler, RC3×2 in a JS module, RC1 in a per-request C++
+  helper) with hot-path citations, and correctly *withheld* both planted false positives (a
+  small-bounded membership test; a generator over already-materialised data) citing the exact guards.
+  No AMBIGUOUS items. Release Record: probed PASS.
+
+`bin/check` 937/0 after `bin/sync --personal`; the `bin/prove` del-case verified to flip the new check.
+Working tree, not yet committed.
+
 **Landed 2026-08-25 (dev session) — a live audit of `odyssey-alive` found `wf-seed` could not reach a
 customized, personal-scope install, and the three distribution defects that audit had deferred are now
 closed.** An `/workforce audit` on `odyssey-alive` reported `INV-SEED 2 error` and carried three
