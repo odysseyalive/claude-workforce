@@ -36,7 +36,7 @@
 
 ## Not Every Brain Does Every Job
 
-You've probably switched models three times in one sitting without thinking about it. Not because anything was broken, but because each one was good at a different thing. The coder untangled a knot in your project without breaking the thing next to it. The writer gave your draft a pulse. Neither could do the other's job.
+You've probably switched models three times in one sitting without thinking about it. Nothing was broken; each one was just good at a different thing. The coder untangled a knot in your project without breaking the thing next to it. The writer gave your draft a pulse. Neither could do the other's job.
 
 We spent two years asking which model was best. [The answer turned out to be a routing problem, not a ranking one.](https://odysseyalive.com/focus/two-brains)
 
@@ -45,7 +45,7 @@ The part that surprises people is that the best orchestrator often isn't the mos
 Claude Workforce turns that insight into a structure. Instead of one assistant doing everything, you get a company: a CEO that routes work to the right desk, leads that coordinate a department, and individual contributors, the workers who actually do the task. Each one runs on the model that fits its job, carries a handbook it follows, stays inside a lane it won't leave, and passes a check (some automatic proof it did the work, like a test that comes back green). So "done" means proven, not just claimed.
 
 ![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists, not playing louder, playing differently](assets/images/conductor.png)
-*The orchestrator's job is hearing how the others fit together, not playing louder than any of them.*
+*The orchestrator's job is hearing how the others fit together.*
 
 ## How We Got Here
 
@@ -274,9 +274,9 @@ Most of the company already fights this without trying. An IC works in its own s
 
 What separation doesn't catch is a single agent spinning its wheels: reading the same file a third time, re-running the command that already failed, thrashing in a way that piles up history without moving the work. `wf-loop-guard` is one of those always-on rules that watches for exactly that: the same action, the same inputs, three times over, with nothing changed in between. When it fires it doesn't scold. It asks the agent to say what it's trying to find, why the last attempts didn't find it, and to try a different approach or hand the problem to someone who hasn't been staring at it. A stuck agent reviewing its own stuck context is the worst-placed judge there is; the useful second look comes from a different reader, which is why the audit's panels are built to disagree.
 
-You can measure how long your own agents run. `wf-runlength` reads a project's saved conversations and reports the spread. Against this repository, the median background helper peaks around 67,000 tokens of history, and the median main session around 227,000, already more than a small model can hold in mind at once, with the longest sessions near a million. A token is about three-quarters of a word. It's what the model reads, and what you're billed for. That is what the problem looks like on a real project, not a hypothetical.
+You can measure how long your own agents run. `wf-runlength` reads a project's saved conversations and reports the spread. Against this repository, the median background helper peaks around 67,000 tokens of history, and the median main session around 227,000, already more than a small model can hold in mind at once, with the longest sessions near a million. A token is about three-quarters of a word. It's what the model reads, and what you're billed for. That is what the problem looks like on a real project.
 
-The honest parts, since this could read as a pitch. Claude Code won't tell the guard how full a conversation has gotten, so the guard watches behavior, not size: it catches loops, not a large-but-productive session, and that healthy-but-huge conversation is the part no automatic check can save. The rising cost is plain arithmetic and certain; that a long conversation reasons worse is documented elsewhere and not measured here, so nothing in this project refuses your work on its basis. And the guard ships switched off. Wiring it changes how every agent behaves, so it's a step you take deliberately, the day you decide you want it.
+Three caveats. Claude Code won't tell the guard how full a conversation has gotten, so the guard watches behavior, not size: it catches loops. It can't see a large-but-productive session, and that healthy-but-huge conversation is the part no automatic check can save. The rising cost is plain arithmetic and certain; that a long conversation reasons worse is documented elsewhere and not measured here, so nothing in this project refuses your work on its basis. And the guard ships switched off. Wiring it changes how every agent behaves, so it's a step you take deliberately, the day you decide you want it.
 
 ## The Honest Parts
 
@@ -365,7 +365,7 @@ One last thing, because it's the point. A rule only counts here if something mak
 
 ## Learn More
 
-- [Two Brains: Why Dynamic Model Routing Beats Picking One AI](https://odysseyalive.com/focus/two-brains). The routing insight underneath this project, and why the answer to "which model is best?" is a routing problem, not a ranking one.
+- [Two Brains: Why Dynamic Model Routing Beats Picking One AI](https://odysseyalive.com/focus/two-brains). The routing insight underneath this project, and why "which model is best?" turns out to be the wrong question.
 - [Context Is the Interface](https://odysseyalive.com/focus/context-is-the-interface). Why what you show a model before you speak matters more than what you say.
 - [Your AI Has Amnesia](https://odysseyalive.com/focus/your-ai-has-amnesia). Why assistants forget instructions, and why a cold reader can test a handbook its author can't.
 - [Mrinank Sharma, Please Come Back to Work](https://odysseyalive.com/focus/mrinank-sharma-please-come-back-to-work). Why adversarial agents outperform consensus, and why the audit's panels are built to disagree.
