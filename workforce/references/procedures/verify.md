@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 24 assertion(s) in bin/check name this file; 52 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 25 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -171,12 +171,42 @@ promise is kept.**
 - On `FAIL` → a finding of the first rank: employees are live on a host whose delegation semantics differ
   from the design's. Report it against the org, not against any one handbook.
 
-**This is the SECOND of the two spawns `verify` makes, and both write nothing.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
+**This is the SECOND of the three spawns `verify` makes, and all three write nothing.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement — and the third is the applied-model canary in the subsection below. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
 observation; it does not touch the org. On `PASS`, print the exact `wf-apply … --record-canary
 --execute` command to run — with an explicit absolute `--root`, never `--root "${CLAUDE_PROJECT_DIR}"`
 (unset in the Bash tool; the script exits 2 on it) — and name `/workforce amend` as what clears the
 `Tier ceiling: unverified this run` marks — **`verify` reports the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
 report that no command fulfilled.
+
+### Applied-model canary — does a `model:` pin survive to runtime
+
+The tier canary above proves a **tool grant** resolved; this one asks whether an employee's
+frontmatter `model:` pin actually applied. It is the non-audit surface for that measurement: without
+it the applied-model check can only run at audit time, so on an existing project a drifted pin goes
+unseen between audits. **Run `staging.md` § Phase D** and report its verdict.
+
+- Spawn `wf-model-canary` by its registered `subagent_type` — never through a generic agent with an
+  overriding `model` parameter, or the frontmatter pin never sits on the honored path this canary
+  exists to measure. Parse its one self-reported `MODEL=<id>` line, and compare it against **both**
+  the fixture's pin **and** the resolved session model.
+- Report one of the four Phase D outcomes: **MATCH** (self-report == pin != session model — the pin
+  applied), **MISMATCH** (self-report == session model, or any third value — the pin was
+  overridden), **INDETERMINATE** (pin == session model, so a match proves nothing), or
+  **UNAVAILABLE** (spawn suppressed at the Step 0.9 preflight, or no parseable `MODEL=` line —
+  degrade quietly).
+
+**ADVISORY, and NEVER BLOCKING — this is the line that separates it from the tier canary.** A tier
+canary `FAIL` is a finding of the first rank and may gate the run, because a tool grant is a
+deterministic observation the harness makes. A model self-report is a softer signal — a model
+introspecting its own ID — so a Phase D `MISMATCH` is **reported with the raw self-report string
+for a human to judge, and never refuses, fails, or gates the run**. `INDETERMINATE` reports plainly
+that a match would prove nothing. This canary writes nothing, like verify's other spawns.
+
+Position it as complementary to the preflight env receipt, not a replacement: the receipt
+(`procedures/preflight.md` § Procedure, step 6) is the cheap **deterministic source-check** that
+greps the one known override channel before any spawn, while this is the **best-effort end-to-end
+outcome-check** that reads what actually resolved. Run both; neither promotes to the other's
+confidence.
 
 ## Org integrity
 
