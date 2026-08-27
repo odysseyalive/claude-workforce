@@ -113,7 +113,45 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-26
+## Open, as of 2026-08-27
+
+**Landed 2026-08-27 (dev session) — `hire` becomes a recruiter: a role's bar is researched, not
+assumed, and `audit` heals an org whose bars were wrong.** Prompted by a website build that shipped the
+right titles and the wrong jobs — undifferentiated graphics, a missing card image that passed 451 e2e
+tests as a "deliberate stage," no design critic at all. The org was derived from project evidence but
+nobody encoded the industry bar for the craft, and the available design skills (`/frontend-design`,
+`/design`, `dataviz`, `artifact-design`) were never matched to the role.
+
+- **The recruiter, as a mechanism skill — `references/recruiter.md` + `bin/wf-skill-match` +
+  `recruit-seed.md`.** Per the data-acquisition directive it is invocable without a spawn and returns a
+  cited, cached role dossier: industry-standard responsibilities, the quality bar, the failure modes to
+  gate against, and the matched skills. The web research is **FORCED** — a blocking precondition of
+  authoring the bar, degrading loudly to the shipped seed only on a genuinely dead network (the
+  tier-canary `UNAVAILABLE` shape), never faking a researched bar. `wf-skill-match` is deterministic and
+  ranks the host's installed skills against the role's competencies (HEURISTIC — look-here evidence).
+- **Wired into the shared authoring path — `handbook.md` § Step 1.5.** Runs on every Step-1 case
+  (conversion, hire, refresh), so `hire` and `audit`'s greenfield batch both recruit (Core Principle
+  7c). The dossier's failure modes become `## Verification` bar entries; its matched skills become
+  `## Procedure` steps. `org-design.md`, `hire.md` (`INV-RECRUIT`), and `evaluators.md` carry the rest.
+- **The design critic — `ui-design-seed.md`, the fifth evaluator capability.** Medium-disjoint from
+  `image-eval`; its `[hard]` rule is **no missing art — a blank or placeholder media slot FAILS**, the
+  exact hole the blowout exposed. Tier-3 grep for a design employee, tier-4 via the evaluator, installed
+  on absence.
+- **`audit` § Step 5c heals an existing org in-run.** It forces fresh research on each employee's role,
+  diffs the current `## Verification` bar against the researched standard, and amends the gap in the same
+  run (DOCUMENT-attributed, re-probed — no deferment queue). It also derives the domain's expected roster
+  and staffs the roles the org is missing, the design critic among them (`INV-REMEDIATE`, four counts).
+- **User directive captured verbatim** — *"hire the most capable candidate"* + *"...force some research
+  on what those standards are"* — `SKILL.md` § Directives, 10th stamped sacred block, governing
+  `recruiter.md`: capability is a property of each hire not the headcount, reconciled to the configured
+  budget with a receipt, and measured against a freshly-researched standard.
+- **Enforcement.** 9 `bin/check` assertions + 9 byte-identical `bin/prove` del-cases (A1–A9), one per new
+  rule. A tangential find fixed on discovery: `doctrine-lead`'s handbook told it to escalate all
+  `bin/check` edits to engineering, contradicting `doctrine-author`'s owned scope — corrected to delegate
+  doctrine-binding assertions down and escalate only script/platform ones.
+
+`bin/check` 985/0 and `bin/prove` 301 of 301 after `bin/coverage --stamp` and `bin/sync --personal`.
+Working tree, committed to a branch.
 
 **Landed 2026-08-26 (dev session) — the budget questions are fully mechanised, and the residual
 wording duplication the mechanisation left behind is closed with its own drift guard.** The budget

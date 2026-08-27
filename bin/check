@@ -226,6 +226,9 @@ _ocfg = read("workforce/references/org-config.template.md")
 dfr = read("workforce/references/deferred.md")
 upd = read("workforce/references/procedures/update.md")
 _prin = read("workforce/references/principles.md")
+_rcrt = read("workforce/references/recruiter.md")
+_uis = read("workforce/references/ui-design-seed.md")
+_hbk_p = read("workforce/references/procedures/handbook.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Manifest is the single authoritative shipped-file list
@@ -8995,6 +8998,67 @@ check(
     "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
     "destroyed rather than merged. The rule now arrives with the spawn that needs it; "
     "a handbook does not decay as context grows, which is the argument for the move",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The recruiter upgrade (2026-08-27): a role brief is RESEARCHED before it is
+# authored, the deterministic half runs the shipped wf-skill-match, audit staffs
+# the roles a domain proves missing, and design work gets a fifth capability gate.
+# Each assertion binds a rule that otherwise ships as dormant prose.
+# ─────────────────────────────────────────────────────────────────────────────
+check(
+    "recruiter: names the wf-skill-match invocation",
+    "wf-skill-match --role <slug> --keywords" in _rcrt,
+    "recruiter.md must document the exact wf-skill-match call; without it the "
+    "deterministic half is unreachable and the shipped script ships dormant",
+)
+check(
+    "handbook: Step 1.5 recruits the role brief before Step 2",
+    "## Step 1.5 — Recruit the role brief" in _hbk_p,
+    "the shared authoring path must recruit the researched bar before Step 2, or a "
+    "role is authored from its author's default bar (Core Principle 7c)",
+)
+check(
+    "hire: prints INV-RECRUIT with its dossier accounting",
+    "INV-RECRUIT  dossiers" in _hire,
+    "the counted line proving every authored role got a researched-or-seeded "
+    "dossier; dropping it hides whether the bar was researched",
+)
+check(
+    "audit: Step 5c staffs the roles the domain proves missing",
+    "Staff the roles the org is missing" in aud,
+    "the missing-role remediation; without it a re-audit heals bars but never "
+    "staffs the roles the project's domain proves absent",
+)
+check(
+    "audit: Step 5c prints INV-REMEDIATE with all four counts",
+    "INV-REMEDIATE  employees" in aud and "roles added" in aud
+    and "design-critic added" in aud,
+    "the four-count remediation line; a partial line hides whether remediation ran",
+)
+check(
+    "evaluators: ui-design is a design employee's tier-3 gate",
+    "grep-checks `ui-design` as its" in _ev,
+    "the fifth capability's wiring — a design employee greps ui-design as tier-3, "
+    "symmetric to security-evaluator; without it visual work has no gate",
+)
+check(
+    "ui-design-seed: a blank or placeholder media slot FAILS",
+    "No missing art — a blank or placeholder media slot FAILS" in _uis,
+    "the no-missing-art rule — the hole that let a missing card image pass 451 e2e "
+    "tests; softening it reopens it",
+)
+check(
+    "recruiter: research is FORCED, not optional",
+    "The research — FORCED, not optional" in _rcrt,
+    "the forced-research guarantee; without it the discover-then-verify pass "
+    "silently softens to skippable",
+)
+check(
+    "recruiter: most-capable is reconciled to budget with a receipt",
+    "this role warrants opus/high; budget caps it at" in _rcrt,
+    "'hire the most capable candidate' reconciled to budget — the receipt that "
+    "prints resolved values instead of silently maxing model/effort or blowing the cap",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

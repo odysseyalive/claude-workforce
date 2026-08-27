@@ -1,5 +1,5 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
@@ -250,6 +250,27 @@ The one row that legitimately survives is one whose resolution lies in **another
 state." Mechanics at `references/procedures/audit.md` § Step 7, `references/deferred.md`, and
 `references/procedures/discharge.md`; and `references/procedures/diagnose.md`, which drains to the same
 fixpoint against workforce's own three deliverables.*
+
+> **"I think the main directive for the recruiter is, hire the most capable candidate."**
+
+> **"but we have to force some research on what those standards are."**
+
+*— Added 2026-08-27, source: user directive, naming the recruiter's main directive during the recruiter
+build. Governs `references/recruiter.md`. Two clauses, one directive: the recruiter does not settle for
+an adequate candidate when a more capable one is available, and it may not decide what "capable" means
+without first researching the role's industry standards — **the research is FORCED, a blocking
+precondition of authoring the bar, not an advisory step**. Mechanics at `references/recruiter.md`
+(§ The governing principle, § The research — FORCED, not optional) and
+`references/procedures/handbook.md` § Step 1.5; the operational reading is — capability is a property of
+each **hire**, not of the **headcount**, so it composes with the minimum-viable-org rule rather than
+widening it: the smallest number of employees, each the most capable candidate for its role. It operates
+WITHIN the configured budget — model and effort are budget choices — and where the most capable
+configuration would exceed it the recruiter surfaces a budget receipt with the resolved values rather
+than silently downgrading or silently overspending. And "capable" is measured against a **freshly
+researched** standard: a present-but-unresearched bar is never counted as satisfied, and only a genuinely
+unreachable network degrades to the shipped seed, loudly and reported (`references/recruiter.md`
+§ When the network is genuinely unavailable). This directive also reaches `references/procedures/audit.md`
+§ Step 5c, which forces the same research when remediating an existing org's bars.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

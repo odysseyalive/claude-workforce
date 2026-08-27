@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 116 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 57 assertion(s) in bin/check name this file; 122 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -956,6 +956,56 @@ authors available and wrote none of them.** This is `platform.md` fact 8's REPEA
 third axis — first the org-design path, then the conversion path on the spawn cap, now the conversion
 path on context — and the pattern is always the same: a capacity nobody measured becomes a gate that
 defers a run.*
+
+## Step 5c — Recruit-remediate: refresh existing bars, staff missing roles
+
+**On a re-audit of an existing org, this heals the disease directly — it does not only build new
+orgs.** A detector ships with its fix (`SKILL.md` § Directives): the recruiter is the detector, and the
+remediation is the fix, run **in this same run**, never deferred to a queue and never handed back as an
+optional keep-or-resolve. Full mechanism: `references/recruiter.md`.
+
+**1. Refresh each existing employee's verification bar.** Per existing employee, **force fresh research**
+on its role's standard (`recruiter.md` § In audit's remediation) — do not trust the bar already in the
+handbook, because the existing bars are exactly what proved wrong, and a present-but-unresearched bar is
+never read as satisfied. Diff the handbook's `## Verification` against the dossier's `## Failure modes to
+gate against`. A gap is **DOCUMENT-attributed** (`SKILL.md` § Sacred-Directive Enforcement Gates,
+Failure-Attribution): the handbook did not name a failure mode the standard gates against, so the cure is
+to **amend the handbook in the same run and re-probe** it — not to flag it, not to defer it.
+
+**2. Staff the roles the org is missing.** Run the recruiter on the **project's own domain or type**
+(`org-design.md` § The expected roster comes from the project's domain) to derive the industry-standard
+expected roster — a marketing/web build implies front-end, a design critic, content, and QA/e2e — and
+diff it against the current roster. **A warranted-and-checkable role that is absent is HIRED in this same
+run** — the full hire transaction (backup / canary / probe / register, `ORG` record written,
+`hire.md` § Transaction Order). No ratification question fires: hiring is a structural decision the audit
+is already authorized to make (§ When the evidence exceeds the cap — the evidence wins, loudly), and the
+no-question rule there governs this too.
+
+**3. The design critic is one instance of step 2 — and the evaluator-coverage half.** A department that
+ships visual or UI output with **no design-evaluator path** gets the `ui-design` and `image-eval`
+catalogs installed (on absence alone, § Step 6-E and `evaluators.md`) and the **design critic hired
+in-run**. It grep-checks `ui-design` as its tier-3 gate and its Lead names the design evaluator as
+tier-4, symmetric to `security-evaluator` for web work.
+
+**Guardrails — unchanged and load-bearing; this must NOT become headcount bloat.** The minimum-viable-org
+and `headcount-skeptic` discipline still govern (`org-design.md`): hire the smallest set the work
+warrants, and **panel disagreement resolves to fewer ROLES, never fewer departments the evidence
+supports.** A role whose check cannot be named — no dossier bar plus no project-evidence command, not
+even a provisional one cited from evidence — **stays UNSTAFFED and is marked so honestly, never hired
+with a faked check** (`org-design.md` § Provisional verification). A degraded `seed` bar is flagged for
+re-research when connectivity returns; it never FAILs the run (`recruiter.md` § When the network is
+genuinely unavailable).
+
+The run prints **`INV-REMEDIATE`** (`references/invariants.md`), all four counts, always:
+
+```
+INV-REMEDIATE  employees 7 · bars amended 3 · roles added 1 · design-critic added 1
+```
+
+`bars amended` is the count from step 1, `roles added` the count from step 2 (the design critic included
+in it), and `design-critic added` is `0` or `1`. A role the diff surfaced as warranted but whose check
+could not be named is **not** counted in `roles added`; it is named in the report as unstaffed with the
+reason, the same uncited-refusal honesty the other invariants carry.
 
 ## Step 6 — Execute
 

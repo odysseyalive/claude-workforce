@@ -1,19 +1,27 @@
 # Evaluators — code, text, and security quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
      names — do not conflate them in a procedure or a report. -->
 
-Four capabilities every project gets: **code quality review**, **text authenticity review**,
-**web-security review**, and **image authenticity review**. Three of them ship a **built catalog** — a
-corpus an employee greps against. `code-evaluator` and `text-eval` originate in claude-enforcer, where
-they are force-installed companion skills carrying shipped catalogs, and this project imports them
-**verbatim** (vendored). `security-evaluator` originates **here**, and its catalog is not vendored: it
-is workforce-authored, **distilled from three pinned upstream corpora and cited to them** rather than
-copied from a predecessor (§ Seeding). The fourth capability, `image-eval`, is not yet a built catalog —
-it ships as a **seed spec** (`image-eval-seed.md`), also authored here.
+Five capabilities every project gets: **code quality review**, **text authenticity review**,
+**web-security review**, **image authenticity review**, and **UI design review**. Three of them ship a
+**built catalog** — a corpus an employee greps against. `code-evaluator` and `text-eval` originate in
+claude-enforcer, where they are force-installed companion skills carrying shipped catalogs, and this
+project imports them **verbatim** (vendored). `security-evaluator` originates **here**, and its catalog
+is not vendored: it is workforce-authored, **distilled from three pinned upstream corpora and cited to
+them** rather than copied from a predecessor (§ Seeding). The remaining two, `image-eval` and
+`ui-design`, are not yet built catalogs — they ship as **seed specs** (`image-eval-seed.md`,
+`ui-design-seed.md`), also authored here.
+
+**`image-eval` and `ui-design` are medium-disjoint, and that is why they are two catalogs, not one.**
+`image-eval` reviews image **authenticity** — is a picture AI-generated, does a rendered medium respect
+its physical constraints. `ui-design` reviews **UI design** — is the interface applied to a deliberate
+theme, differentiated in hierarchy, complete (no blank or placeholder media slot), responsive, and
+accessible. A blank card and an AI-generated card are different failures caught by different criteria
+(`discovery.md` — medium-disjoint capabilities are separate catalogs), so neither subsumes the other.
 
 ## Why they matter here specifically
 
@@ -53,13 +61,18 @@ only quality check is its own self-assessment should say so.
 
 ---
 
-## The evaluators — three built catalogs and one seed
+## The evaluators — three built catalogs and two seeds
 
-`code-evaluator`, `text-eval`, and `security-evaluator` each ship a **built catalog**; `image-eval`
-ships a **seed spec** and becomes a built catalog on the first project that grows one. The seed-source
-row is where the three built catalogs differ most, and the difference is load-bearing: two are vendored
-verbatim from a predecessor and never edited, one is authored here and re-distilled from cited pins
-(§ Seeding).
+`code-evaluator`, `text-eval`, and `security-evaluator` each ship a **built catalog**; `image-eval` and
+`ui-design` ship **seed specs** and become built catalogs on the first project that grows one. The
+seed-source row is where the three built catalogs differ most, and the difference is load-bearing: two
+are vendored verbatim from a predecessor and never edited, one is authored here and re-distilled from
+cited pins (§ Seeding).
+
+The table below details the three built catalogs and `image-eval`. **`ui-design` is the fifth
+capability**, a seed spec sibling of `image-eval`: it **reviews** UI design (applied theme, visual
+hierarchy, present art, responsiveness, accessibility), ships as `ui-design-seed.md`, is **owned** by a
+design or front-end IC, and is **hired when** the project ships a user interface.
 
 | | `code-evaluator` | `text-eval` | `security-evaluator` | `image-eval` |
 |---|---|---|---|---|
@@ -352,6 +365,14 @@ directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what clo
    watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
    new entries through the forcible-append mechanism. The project's customizations, medium-specific
    checks, and user directives are never overwritten.
+
+   3b. **For `ui-design`**, this project ships `ui-design-seed.md` as the seed. It covers the required
+   checks — no missing art (a blank or placeholder media slot FAILS), applied theme (no default
+   palette), contrast and accessibility — plus visual hierarchy, responsive layout, and default-design
+   tells. It installs on absence alone, the same as `image-eval`, and where a project already carries a
+   `ui-design` catalog the existing one is canonical and the seed contributes only new entries through
+   the forcible-append mechanism. It is a **separate** catalog from `image-eval` because UI design and
+   image authenticity are medium-disjoint (§ The evaluators).
 4. **For `security-evaluator`, the catalog is authored here and distilled — not vendored.** Its five
    files under `references/catalogs/security/` carry `origin: workforce · modifiable: true`, and they
    are **distilled from three pinned upstream corpora** — OWASP/CheatSheetSeries @c735a6e,
@@ -568,19 +589,22 @@ version comparison and forcible append run whether or not anything was checked, 
 maintenance of something already installed rather than a new install.
 
 **`hire`** — an evaluator employee is proposed for each department whose work it reviews — a
-`security-evaluator` where a department does web-facing work — becomes the catalog's Records Owner, and
-gets the catalog via `skills:` preload (it works on the whole artifact). The security employee is hired
-**only where there is web work to evaluate**; the security catalog still installs on absence alone,
-regardless, so any employee can self-check against it even on a project that hires no security
-evaluator.
+`security-evaluator` where a department does web-facing work, a **design evaluator where a department
+ships visual/UI work** — becomes the catalog's Records Owner, and gets the catalog via `skills:` preload
+(it works on the whole artifact). The security employee is hired **only where there is web work to
+evaluate**, and the design evaluator **only where there is visual work**; both catalogs still install on
+absence alone, regardless, so any employee can self-check against them even on a project that hires
+neither evaluator.
 
-**`handbook`** — an employee doing web, prose, or code work gets a catalog grep in its `## Verification`
-as a tier-3 check, and its Lead's handbook names the evaluator as the tier-4 reviewer. Concretely: an
-employee doing **web work** grep-checks `security-taxonomy.md` as its tier-3 gate, and its Lead names
-`security-evaluator` as tier-4 — the same shape a prose employee gets against `text-eval` and a code
-employee against `code-evaluator`. An employee that neither self-checks nor is reviewed is unverified
-for quality regardless of whether its tests pass.
+**`handbook`** — an employee doing web, prose, code, or design work gets a catalog grep in its
+`## Verification` as a tier-3 check, and its Lead's handbook names the evaluator as the tier-4 reviewer.
+Concretely: an employee doing **web work** grep-checks `security-taxonomy.md` as its tier-3 gate, and its
+Lead names `security-evaluator` as tier-4 — the same shape a prose employee gets against `text-eval` and
+a code employee against `code-evaluator`. **A design or front-end employee grep-checks `ui-design` as its
+tier-3 gate, and its Lead names the design evaluator as tier-4** — symmetric to `security-evaluator` for
+web work. An employee that neither self-checks nor is reviewed is unverified for quality regardless of
+whether its tests pass.
 
 **`review`** — reports any employee producing catalog-relevant work with no evaluator path — a
-web-working employee with no `security-evaluator` path included — and any catalog whose version is
-behind the shipped one.
+web-working employee with no `security-evaluator` path, a visual/UI employee with no `ui-design` path —
+and any catalog whose version is behind the shipped one.

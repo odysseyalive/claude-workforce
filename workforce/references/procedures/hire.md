@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 31 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -68,6 +68,22 @@ department and needs the department cap checked.
 
 Through `handbook.md`: identity, frontmatter, template, lint, probe. Nothing is registered until the
 cold-read probe passes.
+
+**`handbook.md` Step 1.5 recruits the role brief first** (`references/recruiter.md`). The role's bar is
+researched — the dossier's failure-modes become its `## Verification` entries and its matched skills its
+`## Procedure` — rather than written from the author's default. On a genuinely dead network the recruiter
+degrades loudly to `recruit-seed.md` and **never FAILs the hire**: `UNAVAILABLE` is not `FAIL`, the same
+rule Precondition 3 applies to the tier canary. A `seed`-sourced role is flagged for re-research when
+connectivity returns.
+
+The run prints **`INV-RECRUIT`** — a dossier for every role authored, and how many were freshly
+researched versus degraded to the seed (`references/invariants.md`):
+
+```
+INV-RECRUIT  dossiers 5 · web 4 · seed 1
+```
+
+`web + seed` equals `dossiers`; a `seed` count above zero names the roles flagged for re-research.
 
 ## Step 3b — Author its records, if it has any
 

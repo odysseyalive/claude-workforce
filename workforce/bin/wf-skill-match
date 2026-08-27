@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+"""wf-skill-match — which installed skills a role should be told to invoke.
+
+A website build hired the right titles and wrote the wrong job descriptions: four
+skills that already existed on the host (`frontend-design`, `design`, `dataviz`,
+`artifact-design`) were never matched to the role that needed them, so the
+handbooks that shipped named none of them. Employees INVOKE skills; a `## Procedure`
+that names no skill is a role working from memory next to an installed tool.
+
+This is the deterministic half of the recruiter. It reads what is on disk and
+reports overlap. It does not search the web, spawn anything, or write to the tree.
+
+WHAT IT IS ALLOWED TO CONCLUDE. Description overlap is a HEURISTIC signal
+(`discovery.md` § Reliability tiers), and the tier caps the action: **"look here"
+evidence only — never a merge, a deletion, or a rewrite.** So the whole verdict is
+`why_matched`, a string naming the tokens that overlapped, and the caller decides.
+A ranked list of candidates with its reasons attached is the deliverable; an
+instruction is not.
+
+CLASSIFY BY EXCLUSION, NEVER BY RECOGNITION (`discovery.md` § Fluency). The three
+sources below are the layouts this project has measured. Anything else found while
+scanning them — a `SKILL.md` outside a recognised container, a directory in a
+skills container with no `SKILL.md`, a file that will not parse — is REPORTED, by
+path, and counted. A matcher that silently skips what it does not recognise reports
+a clean sweep over the skills it never looked at.
+
+    project    <root>/.claude/skills/<name>/SKILL.md
+    personal   <config>/skills/<name>/SKILL.md
+    plugin     <config>/plugins/**/skills/<name>/SKILL.md
+
+`<config>` is `$CLAUDE_CONFIG_DIR` or `~/.claude` (`scopes.md` § Installing into a
+specific CLAUDE_CONFIG_DIR). The plugin layout is DISCOVERED rather than asserted —
+this project has not measured it on a host, so the scan walks for `skills/`
+containers and reports every `SKILL.md` it finds outside one.
+
+FAIL-SAFE. A missing source directory is not an error, and a role that matches
+nothing exits 0 with `[]`. An empty list is an answer: the caller learns that the
+host has no skill for this role, which is exactly when a hire needs to know.
+
+Ranking is name-weighted (a token in the skill's own name counts 3, a token in its
+description counts 1), and ties break on the skill name, so two runs over one tree
+produce byte-identical output.
+
+Output
+    stdout  the JSON array, and nothing else — `[{skill, path, scope, why_matched}]`,
+            highest overlap first. Parse it; do not grep it
+    stderr  the tier line, the counts, and one line per unresolved or quarantined
+            source. Never silent, never in the array
+    --json  the full envelope (counts, sources scanned, notes) for a caller that
+            wants the notes as data
+
+Exit codes
+    0  matched, or matched nothing
+    2  caller error — no role, an empty --root or --config-dir, an unreadable root,
+       or a stdin payload that is not a JSON object
+
+Usage
+    wf-skill-match --role SLUG [--keywords a,b,c] [--root DIR] [--config-dir DIR]
+                   [--json PATH]
+    echo '{"role": "SLUG", "keywords": ["a", "b"]}' | wf-skill-match [--root DIR]
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+FM_FIELD_RX = re.compile(r"^(name|description):\s*(.*)$", re.M)
+TOKEN_RX = re.compile(r"[a-z0-9]+")
+
+# A token in the skill's own NAME is a stronger signal than one in prose that had
+# to describe something. 3-to-1 rather than 2-to-1 so that a single name hit
+# outranks two incidental description hits, which is the ordering a reader expects
+# when `design` appears in one skill's name and twice in another's paragraph.
+NAME_WEIGHT = 3
+DESC_WEIGHT = 1
+
+# Two characters, because `ui` and `qa` are real competency keywords and a
+# three-character floor drops them.
+MIN_TOKEN = 2
+# `design`/`designer` and `visual`/`visualisation` are the same signal; `ui`/`uid`
+# are not. A prefix match needs four shared characters before it counts.
+STEM_MIN = 4
+
+# Words that appear in almost every SKILL.md and therefore separate nothing. Kept
+# short on purpose: an aggressive stoplist is a silent filter on the caller's own
+# keywords, and this tool's job is to report overlap, not to curate it.
+STOP = frozenset("""
+a an and are as at be by for from has have in into is it its of on or that the
+their them then there these this to use used uses using with when what which who
+you your skill skills claude agent agents run runs
+""".split())
+
+# Measured 2026-08-26 on this host: the deepest real plugin skill sits at
+# `plugins/marketplaces/<market>/plugins/<plugin>/skills/<name>/SKILL.md`, six
+# levels under the plugins root. Eight leaves room for one nesting layer nobody
+# has seen yet, and anything past it is REPORTED rather than dropped.
+PLUGIN_DEPTH = 8
+
+
+def tokens(text):
+    """Lowercase alphanumeric tokens, minus the stoplist, in document order."""
+    return [t for t in TOKEN_RX.findall((text or "").lower())
+            if len(t) >= MIN_TOKEN and t not in STOP]
+
+
+def overlap(query, field):
+    """The distinct query tokens with an exact or stem match in `field`."""
+    field = set(field)
+    hits = []
+    for q in query:
+        for t in field:
+            if q == t or (min(len(q), len(t)) >= STEM_MIN
+                          and (t.startswith(q) or q.startswith(t))):
+                hits.append(q)
+                break
+    return hits
+
+
+def parse_skill(text):
+    """(name, description) from a SKILL.md body, or None when neither is there.
+
+    Frontmatter first, because that is what the harness itself reads. A skill
+    without frontmatter still has a heading and a first line, and reading those is
+    the difference between matching a hand-written skill and quarantining it.
+    """
+    name = desc = None
+    fm = FM_RX.match(text)
+    if fm:
+        for key, val in FM_FIELD_RX.findall(fm.group(1)):
+            val = val.strip().strip("'\"").strip()
+            if not val:
+                continue
+            if key == "name":
+                name = val
+            else:
+                desc = val
+    body = text[fm.end():] if fm else text
+
+    heading = prose = None
+    for line in body.splitlines():
+        s = line.strip()
+        # A fence, an HTML comment, or a horizontal rule describes no skill.
+        if not s or s.startswith(("```", "<!--", "---", "===")):
+            continue
+        if s.startswith("#"):
+            if heading is None:
+                heading = s.lstrip("#").strip()
+        elif prose is None:
+            prose = s
+        if heading is not None and prose is not None:
+            break
+
+    name = name or heading
+    desc = desc or prose
+    if name is None and desc is None:
+        return None
+    return name, desc or ""
+
+
+def note(notes, kind, path, why):
+    notes.append({"kind": kind, "path": path, "why": why})
+
+
+def scan_container(scope, base, notes):
+    """Every `<base>/<name>/SKILL.md`. Everything else in `<base>` is reported."""
+    out = []
+    try:
+        entries = sorted(os.listdir(base))
+    except OSError as exc:
+        note(notes, "unresolved", base, f"unreadable skills container ({exc.strerror})")
+        return out
+    for entry in entries:
+        d = os.path.join(base, entry)
+        if not os.path.isdir(d):
+            note(notes, "unresolved", d,
+                 "file directly inside a skills container — not a skill directory")
+            continue
+        sm = os.path.join(d, "SKILL.md")
+        if os.path.isfile(sm):
+            out.append((scope, sm))
+        else:
+            note(notes, "unresolved", d,
+                 "directory in a skills container with no SKILL.md")
+    return out
+
+
+def scan_plugins(base, notes):
+    """Plugin skills, by DISCOVERY. The layout is not asserted anywhere here.
+
+    A `SKILL.md` whose grandparent directory is named `skills` is a plugin skill.
+    Any other `SKILL.md` under the plugins root is an unrecognised layout and is
+    reported by path rather than dropped.
+    """
+    out = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        rel = os.path.relpath(dirpath, base)
+        depth = 0 if rel == os.curdir else rel.count(os.sep) + 1
+        # A DOT DIRECTORY IS NOT A SKILLS CONTAINER. Measured 2026-08-26 against a
+        # real `~/.claude/plugins`: the marketplaces are git clones, so walking
+        # `.git/` produced 1 unresolved line per ref directory. Noise at that
+        # volume is how a report earns being ignored.
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        truncated = False
+        if depth >= PLUGIN_DEPTH:
+            truncated = bool(dirnames)
+            dirnames[:] = []
+        if "SKILL.md" in filenames:
+            sm = os.path.join(dirpath, "SKILL.md")
+            if os.path.basename(os.path.dirname(dirpath)) == "skills":
+                out.append(("plugin", sm))
+            else:
+                note(notes, "unresolved", sm,
+                     "SKILL.md outside a `skills/` container — plugin layout not "
+                     "recognised, so it was not matched")
+        elif truncated:
+            # Only a directory that holds NO skill of its own and was cut short is
+            # unexamined. The first draft reported every real plugin skill at the
+            # depth limit as unresolved while having already matched it — a note
+            # that contradicted the array printed beside it.
+            note(notes, "unresolved", dirpath,
+                 f"deeper than the {PLUGIN_DEPTH}-level plugin scan — not descended")
+    return out
+
+
+def collect(root, config_dir, notes):
+    """Every candidate SKILL.md, with the scope it came from, plus what was scanned."""
+    found, scanned = [], []
+    for scope, base in (("project", os.path.join(root, ".claude", "skills")),
+                        ("personal", os.path.join(config_dir, "skills"))):
+        present = os.path.isdir(base)
+        scanned.append({"scope": scope, "path": base, "present": present})
+        if present:
+            found += scan_container(scope, base, notes)
+    plugins = os.path.join(config_dir, "plugins")
+    present = os.path.isdir(plugins)
+    scanned.append({"scope": "plugin", "path": plugins, "present": present})
+    if present:
+        found += scan_plugins(plugins, notes)
+    return found, scanned
+
+
+def rank(found, query, notes):
+    """Score every readable skill; return the matches, best first.
+
+    A skill that scores 0 is not a match and is not reported as one. It is still
+    counted in `read`, so the totals add up.
+    """
+    matches, read_ok = [], 0
+    for scope, path in found:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            note(notes, "quarantined", path, f"unreadable ({type(exc).__name__})")
+            continue
+        parsed = parse_skill(text)
+        if parsed is None:
+            note(notes, "quarantined", path,
+                 "no frontmatter name/description, no heading, no first line")
+            continue
+        read_ok += 1
+        name, desc = parsed
+        skill = name or os.path.basename(os.path.dirname(path))
+        name_hits = overlap(query, tokens(skill))
+        desc_hits = overlap(query, tokens(desc))
+        score = NAME_WEIGHT * len(name_hits) + DESC_WEIGHT * len(desc_hits)
+        if not score:
+            continue
+        why = []
+        if name_hits:
+            why.append("name: " + ", ".join(sorted(set(name_hits))))
+        if desc_hits:
+            why.append("description: " + ", ".join(sorted(set(desc_hits))))
+        matches.append((score, skill, {
+            "skill": skill,
+            "path": path,
+            "scope": scope,
+            "why_matched": "; ".join(why),
+        }))
+    # Deterministic to the byte: score descending, then name, then path. Two runs
+    # over one tree must not disagree about rank, or a pinned fixture is testing
+    # dictionary order.
+    matches.sort(key=lambda m: (-m[0], m[1], m[2]["path"]))
+    return [m[2] for m in matches], read_ok
+
+
+def keyword_list(raw):
+    """Accept `a,b,c`, `a b c`, or a JSON list. All three arrive in practice."""
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        items = raw
+    else:
+        items = re.split(r"[,\s]+", str(raw))
+    return [str(k).strip() for k in items if str(k).strip()]
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-skill-match")
+    ap.add_argument("--role")
+    ap.add_argument("--keywords")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--config-dir", dest="config_dir")
+    ap.add_argument("--json", dest="json_path")
+    args = ap.parse_args()
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, which is a real directory, so
+    # an is-it-a-directory guard passes and the tool reports on a tree nobody named.
+    # Checked BEFORE stdin is touched, so the caller gets the argument error rather
+    # than a read that waits on a pipe nobody is going to write to.
+    if not (args.root or "").strip():
+        print("wf-skill-match: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside "
+              "a hook; pass an explicit path.", file=sys.stderr)
+        return 2
+
+    role, keywords = args.role, keyword_list(args.keywords)
+    # STDIN IS THE SECOND INPUT FORM, not a fallback that fires by surprise: it is
+    # read only when no --role was given and stdin is not a terminal.
+    if not role and sys.stdin is not None and not sys.stdin.isatty():
+        raw = sys.stdin.read()
+        if raw.strip():
+            try:
+                payload = json.loads(raw)
+            except ValueError as exc:
+                print(f"wf-skill-match: stdin is not JSON ({exc}). Expected an object "
+                      "with a `role` key.", file=sys.stderr)
+                return 2
+            if not isinstance(payload, dict):
+                print("wf-skill-match: stdin JSON is not an object. Expected "
+                      '{"role": "...", "keywords": [...]}.', file=sys.stderr)
+                return 2
+            role = payload.get("role")
+            if not keywords:
+                keywords = keyword_list(payload.get("keywords"))
+            if not args.config_dir and payload.get("config_dir"):
+                args.config_dir = payload["config_dir"]
+            if args.root == "." and payload.get("root"):
+                args.root = payload["root"]
+
+    if not str(role or "").strip():
+        print("wf-skill-match: no role. Pass --role SLUG, or a JSON object on stdin "
+              'with a `role` key.', file=sys.stderr)
+        return 2
+
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        print(f"wf-skill-match: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    if args.config_dir is not None and not str(args.config_dir).strip():
+        print("wf-skill-match: --config-dir is empty. Omit it to use "
+              "$CLAUDE_CONFIG_DIR or ~/.claude.", file=sys.stderr)
+        return 2
+    if args.config_dir:
+        # A RELATIVE --config-dir RESOLVES AGAINST --root, not against the CWD. The
+        # caller that needs this flag is a test running against a copied tree at a
+        # path it cannot know in advance; resolving against the CWD would make that
+        # path unstatable. An absolute path is used as given.
+        config_dir = args.config_dir if os.path.isabs(args.config_dir) \
+            else os.path.join(root, args.config_dir)
+    else:
+        config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+    config_dir = os.path.abspath(config_dir)
+
+    query, seen = [], set()
+    for t in tokens(str(role).replace("-", " ")) + tokens(" ".join(keywords)):
+        if t not in seen:
+            seen.add(t)
+            query.append(t)
+
+    notes = []
+    found, scanned = collect(root, config_dir, notes)
+    matches, read_ok = rank(found, query, notes)
+
+    print(json.dumps(matches, indent=2))
+
+    if args.json_path:
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            json.dump({
+                "role": role,
+                "keywords": keywords,
+                "query_tokens": query,
+                "root": root,
+                "config_dir": config_dir,
+                "tier": "HEURISTIC",
+                "sources": scanned,
+                "read": read_ok,
+                "quarantined": sum(1 for n in notes if n["kind"] == "quarantined"),
+                "unresolved": sum(1 for n in notes if n["kind"] == "unresolved"),
+                "matches": matches,
+                "notes": notes,
+            }, fh, indent=2)
+
+    # THE COUNTS, ALWAYS, INCLUDING THE ZEROES (`discovery.md` § Quarantine is
+    # counted, never silent). A total that silently shrinks is the only signal that
+    # something was dropped, so the skills that could not be read are reported in
+    # the same line as the ones that could.
+    print("wf-skill-match: tier HEURISTIC (discovery.md) — overlap is look-here "
+          "evidence; the caller decides.", file=sys.stderr)
+    for n in notes:
+        print(f"wf-skill-match: {n['kind']}: {n['path']} — {n['why']}", file=sys.stderr)
+    print(f"wf-skill-match: role {role} — {read_ok} skill(s) read, "
+          f"{sum(1 for n in notes if n['kind'] == 'quarantined')} quarantined, "
+          f"{sum(1 for n in notes if n['kind'] == 'unresolved')} unresolved source(s), "
+          f"{len(matches)} matched", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

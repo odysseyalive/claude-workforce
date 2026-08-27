@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -244,12 +244,33 @@ The user who wants to see before committing runs that first.
    resolves to **fewer roles per department, not fewer departments** — a department the evidence
    warrants is never cut by a panel vote.
 3. Per department, propose the smallest roster that covers its work, each role with: what it owns, the
-   verification command it will use, and the evidence justifying it.
+   verification command it will use, **the dossier's quality bar as its verification-intent**
+   (`references/recruiter.md` — the researched standard the role is held to, complementing the
+   project-evidence check command), and the evidence justifying it.
 4. **Drop any role whose verification cannot be named.** An employee that cannot prove its work is an
-   employee that will report success it did not earn. If the project offers no check for that work, say
-   so and leave the role unhired rather than hiring one that cannot be held to anything.
+   employee that will report success it did not earn. The dossier bar is verification-*intent*, not a
+   runnable check: a role whose dossier + project evidence still name **no runnable check — not even a
+   provisional one cited from evidence** — stays unhired, exactly as before. The dossier says what good
+   looks like; it does not manufacture a command that does not exist.
 5. `hire` authors the batch (`hire.md` § Initial roster).
 7. Charter and principles from the same evidence (`charter.md`, `principles.md`).
 
 **Step 4 is the one most worth keeping.** It is the difference between an org chart and a company: a
 role with a runnable check is an employee, and a role without one is a job title.
+
+### The expected roster comes from the project's domain, not only its files
+
+**Derive the expected roster from the project's DOMAIN or TYPE**, using the recruiter on the domain
+itself — "a marketing/web build" implies front-end, a design critic, content, and QA/e2e before a
+single one of those files is read. Diff that industry-standard expected roster against what the evidence
+already staffs. **A warranted-and-checkable role the roster is missing is a finding, not a silence** — a
+role whose dossier bar plus project evidence name a runnable (or cited-provisional) check is proposed
+for hire; a role that names none stays unstaffed and is **marked so honestly**, never hired with a faked
+check.
+
+This is the **same missing-role logic** audit's remediation runs against an existing org
+(`procedures/audit.md` § Step 5c), reachable whether the trigger is a greenfield design or a re-audit
+(`SKILL.md` Core Principle 7c). The guardrails do not change: the minimum-viable-org and
+`headcount-skeptic` discipline still govern, panel disagreement still resolves to **fewer roles, never
+fewer departments the evidence supports**, and the result is the smallest set the work warrants — this
+adds the roles the *domain* proves are missing, it does not license headcount bloat.

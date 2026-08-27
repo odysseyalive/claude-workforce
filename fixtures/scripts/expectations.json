@@ -2342,6 +2342,100 @@
       "unstamped-record.md:directive:1"
     ]
   },
+  "skill-match-emptyroot": {
+    "_why": "`${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`, and `os.path.abspath(\"\")` is the CWD \u2014 a real directory, which an is-it-a-directory guard passes. A matcher that accepted it would report the skills of whatever tree the caller happened to be standing in, under the name of a role. The guard runs BEFORE stdin is read, so `not` asserts that no part of the named tree and no tier line reached the output: the tool refused the argument instead of surveying a tree nobody named.",
+    "args": [
+      "--role",
+      "frontend-design",
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "not": [
+      "skill-match-emptyroot",
+      "tier HEURISTIC",
+      "[]"
+    ],
+    "script": "wf-skill-match",
+    "want": [
+      "wf-skill-match: --root is empty.",
+      "${CLAUDE_PROJECT_DIR} is unset outside a hook; pass an explicit path."
+    ]
+  },
+  "skill-match-nomatch": {
+    "_why": "THE NEGATIVE HALF: a role no installed skill serves. An empty answer is an answer \u2014 the hire learns the host has nothing for this role \u2014 so this must exit 0 with `[]` rather than fail, and `not` forbids a single `\"skill\":` key, which is the only way to assert the array is EMPTY rather than merely short. The tree has no `home/.claude` at all, so the same case covers the three fail-safes that would otherwise need a crash to discover: an absent personal skills directory, an absent plugins directory, and a `--config-dir` naming neither. The counts line still prints, including its zeroes.",
+    "args": [
+      "--role",
+      "payroll-clerk",
+      "--keywords",
+      "invoice,timesheet",
+      "--config-dir",
+      "home/.claude"
+    ],
+    "exit": 0,
+    "not": [
+      "\"skill\":",
+      "Traceback",
+      "not a directory"
+    ],
+    "script": "wf-skill-match",
+    "want": [
+      "[]",
+      "tier HEURISTIC (discovery.md)",
+      "role payroll-clerk \u2014 1 skill(s) read, 0 quarantined, 0 unresolved source(s), 0 matched"
+    ]
+  },
+  "skill-match-ranked": {
+    "_why": "THE RANKED OUTPUT, PINNED IN ORDER, not merely a list containing the right names. A website build hired the right titles while four installed design skills (`frontend-design`, `design`, `dataviz`, `artifact-design`) were never matched to the role, so the handbooks named none of them; this is the producer for that inventory. The three `want` fragments that span an element boundary are what fix RANK: each runs from one entry's `scope` through the next entry's `skill`, which is the longest contiguous run of the array that contains no absolute path, and paths vary because every case runs against a copy at a temp path. Measured on this tree: frontend-design scores 10 (two name hits at 3, four description hits at 1), artifact-design 5, dataviz 3. The tree also carries one skills-container directory with no SKILL.md, one SKILL.md outside any `skills/` container, and one unparseable SKILL.md \u2014 all three are asserted as REPORTED, per discovery.md's rule that an unrecognised source is a finding and never a silent skip, and the counts line proves the quarantined one still adds up. `not` holds the HEURISTIC tier restriction: the verdict may cite overlap and may never recommend a merge or a fix.",
+    "args": [
+      "--role",
+      "frontend-design",
+      "--keywords",
+      "ui,visual,layout",
+      "--config-dir",
+      "home/.claude"
+    ],
+    "exit": 0,
+    "not": [
+      "\"skill\": \"db-migrate\"",
+      "\"skill\": \"loose-layout\"",
+      "recommend",
+      "merge",
+      "auto-fix",
+      "Traceback"
+    ],
+    "script": "wf-skill-match",
+    "want": [
+      "[\n  {\n    \"skill\": \"frontend-design\",",
+      "    \"scope\": \"project\",\n    \"why_matched\": \"name: design, frontend; description: design, layout, ui, visual\"\n  },\n  {\n    \"skill\": \"artifact-design\",",
+      "    \"scope\": \"plugin\",\n    \"why_matched\": \"name: design; description: design, visual\"\n  },\n  {\n    \"skill\": \"dataviz\",",
+      "/.claude/skills/frontend-design/SKILL.md",
+      "/home/.claude/plugins/marketplace-x/design-pack/skills/artifact-design/SKILL.md",
+      "\"scope\": \"personal\"",
+      "tier HEURISTIC (discovery.md)",
+      "/.claude/skills/notes-only \u2014 directory in a skills container with no SKILL.md",
+      "/home/.claude/plugins/loose-layout/SKILL.md \u2014 SKILL.md outside a `skills/` container",
+      "quarantined: ",
+      "/.claude/skills/broken-skill/SKILL.md \u2014 no frontmatter name/description, no heading, no first line",
+      "4 skill(s) read, 1 quarantined, 2 unresolved source(s), 3 matched"
+    ]
+  },
+  "skill-match-stdin": {
+    "_why": "THE SECOND INPUT FORM, which has no flags to typo and therefore no argparse error to warn on. A JSON object on stdin must produce the same ranked array as the flag form, and `config_dir` inside that object must be honoured \u2014 without it the run would scan the operator's real `~/.claude` and the pinned output would differ per host. The boundary fragment pins rank across the project/personal split, proving the two sources are ranked against each other rather than concatenated in scan order. `not` forbids the two caller errors, because a payload silently ignored would present as an ordinary no-match.",
+    "exit": 0,
+    "not": [
+      "no role. Pass --role",
+      "stdin is not JSON",
+      "Traceback"
+    ],
+    "script": "wf-skill-match",
+    "stdin_raw": "{\"role\": \"frontend-design\", \"keywords\": [\"ui\", \"layout\"], \"config_dir\": \"home/.claude\"}",
+    "want": [
+      "[\n  {\n    \"skill\": \"frontend-design\",",
+      "    \"scope\": \"project\",\n    \"why_matched\": \"name: design, frontend; description: design, layout, ui\"\n  },\n  {\n    \"skill\": \"dataviz\",",
+      "role frontend-design \u2014 2 skill(s) read, 0 quarantined, 0 unresolved source(s), 2 matched"
+    ]
+  },
   "standing-request": {
     "_why": "The hook that keeps spawning available once CLAUDE.md is deleted. It must emit valid UserPromptSubmit additionalContext carrying the asking, and it must exit 0 no matter what: a hook that fails a turn because it could not phrase a request breaks the session it exists to help. Without this producer, spawning goes UNAVAILABLE and every handbook registers unprobed -- quietly, because UNAVAILABLE is neither pass nor fail.",
     "exit": 0,

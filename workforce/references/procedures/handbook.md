@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -59,6 +59,32 @@ from the evidence-backed roster took everything into their handbooks. That roste
 was missing from the door most employees come through. Nine live employees on the first real target were
 authored that way. Fixed here rather than in `hire.md`, because fixing the caller would have been the
 instance and this file is the class.*
+
+## Step 1.5 — Recruit the role brief
+
+**BLOCKING, and it runs on EVERY case in the Step 1 table — conversion, hire, AND refresh.** Before the
+handbook is written, the role's bar is researched rather than assumed. This is the one step that stops a
+role being authored with whatever bar its author already had in mind — the failure that shipped the
+right titles and the wrong jobs. Full mechanism: `references/recruiter.md`.
+
+1. **Get the dossier.** Run the recruiter for the role (`references/recruiter.md` § Cache and freshness).
+   A fresh cached dossier is reused; an absent or stale one **forces** the discover-then-verify web
+   research, which is a blocking precondition, not a skippable step. A genuinely dead network degrades
+   loudly to `recruit-seed.md` and **never FAILs** the authoring — exactly the tier-canary `UNAVAILABLE`
+   rule (`staging.md`).
+2. **Match the available skills.** The dossier's `## Matched skills` come from
+   `workforce/bin/wf-skill-match --role <slug> --keywords <comma-separated competencies>` (HEURISTIC —
+   "look here" evidence, `discovery.md`). Take the strongest match per competency; do not settle for a
+   weaker skill when a better one is installed ("hire the most capable candidate", `recruiter.md`).
+3. **Wire the dossier into the handbook.** Its `## Failure modes to gate against` become `## Verification`
+   bar entries, set to the researched **standard**, never a floor. Its `## Matched skills` become
+   `## Procedure` steps — employees INVOKE skills (`handbook-templates.md`), the existing pattern.
+4. **Report the source.** State `web` or `seed` so a cold reader knows the bar's provenance, and print
+   the candidate chosen — winning skills, model/effort tier, and any budget receipt (`recruiter.md`
+   § The governing principle). A `seed`-sourced bar is flagged for re-research when connectivity returns.
+
+**IF the role fits no researched or seeded family and the network is up → research it; do not force it
+into the nearest family and call it researched** (`recruiter.md` § When the network is genuinely unavailable — degrade loudly to the seed).
 
 ## Step 2 — Resolve identity and frontmatter
 
