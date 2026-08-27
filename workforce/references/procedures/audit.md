@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 57 assertion(s) in bin/check name this file; 122 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 58 assertion(s) in bin/check name this file; 123 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -515,6 +515,18 @@ So, in order:
    **employee override** row (`references/org-config.template.md` § Employee overrides), which pins one
    employee's model without redrawing the org. **Propose the row; never write it** — that file's
    per-employee rows are the user's, and `audit` writes back only its own setup answers.
+4. **Classify a Lead by its handbook work too — a Lead is not auto-analytical.** The old floor
+   pinned every Lead to the `analytical` seat unconditionally; per-employee classification reaches
+   the Lead tier as well, because the kind of work is a property of the employee at every tier. When
+   a Lead oversees a domain — visual layout, or code architecture — whose judgment needs the domain
+   model to SEE what it judges, **option 2 is the default: keep the Lead on the steerable
+   `analytical` seat and home the domain judgment in a domain-model critic IC beneath it** — a
+   `creative-visual` critic, or a `code` reviewer (the presentation-critic pattern). The Lead
+   orchestrates; the critic sees. **Option 1 is the recorded small-org fallback:** only when the org
+   is too small to carry a separate critic IC — where adding one would be a pass-through hop that
+   violates minimum-viable-org — is the Lead itself pulled into the domain lane and run on the
+   domain model directly, and that repin is recorded in the chart WITH its reason, never taken as
+   the default.
 
 ## Step 3 — Dispositions (panel) — BROWNFIELD ONLY
 

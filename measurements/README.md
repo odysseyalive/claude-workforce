@@ -23,6 +23,7 @@ superseded, the new run gets a new file and platform.md's row cites both.
 | `2026-07-29-tier-canary.md` | 2b | entry depth does not cap an IC (a canary FAIL whose expectation was wrong) |
 | `2026-07-29-ceiling.md` | 2c | `disallowedTools` withholds a tool that `tools:` requests |
 | `2026-07-29-mcp-grant.md` | 13 | server-level MCP grants resolve **loaded**; adding `ToolSearch` defers them and widens nothing |
+| `2026-08-27-applied-model.md` | 12 | a forced `model:` applies and self-reports exactly; **no model-identifying env channel** exists for a subagent — self-report is the only one (best-effort) |
 
 **The trap these files exist to avoid.** The harness's available-agent-types listing prints each
 definition's `tools:` line — the grant it *requested*, not the grant it got. `2026-07-29-ceiling.md`

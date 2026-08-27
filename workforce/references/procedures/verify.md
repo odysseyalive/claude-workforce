@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 23 assertion(s) in bin/check name this file; 51 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 24 assertion(s) in bin/check name this file; 52 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -193,6 +193,19 @@ agreeing against the third is a finding, not a tiebreak.
 | Names unique across every agent location | a collision silently discarding an employee |
 | Personas unique, paraphrase included | a panel whose members cannot disagree |
 | Every retained playbook has exactly one Records Owner | unowned shared data |
+| Each domain-overseeing Lead has a domain-model critic IC, or a recorded repin | `LANE-DRIFT` — a Lead judging what it cannot see |
+
+**`LANE-DRIFT` is read-only, narrated like the reconciliation above.** For each Lead, IF its
+handbook describes domain judgment (visual or code seeing) AND no domain-model critic IC reports
+into it AND the org is large enough to carry one → a drift finding: the Lead is pinned to a model
+that reasons about what it should be seeing. **This is how an already-audited project picks up
+per-employee Lead classification WITHOUT re-running `audit`.** Name the remedy:
+`hire <critic-role> --execute` to add the domain-model critic beneath the Lead (option 2, the
+default), or — only in a small org that cannot carry a separate critic — an explicit
+Employee-override repin of the Lead onto the domain lane (option 1).
+**Re-running `model-map` alone CANNOT fix this** — it edits recorded budget values and never
+re-derives lane membership (`model-map.md`), so the repin must be written as an explicit override,
+not expected to fall out of the budget pass.
 
 ## Handbook conformance
 

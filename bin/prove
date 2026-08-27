@@ -99,6 +99,7 @@ VER = "workforce/references/verification.md"
 TPL = "workforce/references/handbook-templates.md"
 TPL2 = "workforce/references/templates.md"
 CANA = "workforce/canary/wf-canary-a.md"
+MDC  = "workforce/canary/wf-model-canary.md"
 CHK = "bin/check"
 COV = "bin/coverage"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
@@ -182,9 +183,22 @@ CASES = [
     ("fixtures: every live fixture declares the fact it measures",
      CANA, "del", "measures-fact: 1"),
     ("the fixture-declaration check actually examined fixtures",
-     MAN, "del", 'canary workforce/canary/wf-canary-a.md\ncanary workforce/canary/wf-canary-b.md\ncanary workforce/canary/wf-canary-c.md\ncanary workforce/canary/wf-ceiling-probe.md\n'),
+     MAN, "del", 'canary workforce/canary/wf-canary-a.md\ncanary workforce/canary/wf-canary-b.md\ncanary workforce/canary/wf-canary-c.md\ncanary workforce/canary/wf-ceiling-probe.md\ncanary workforce/canary/wf-model-canary.md\n'),
     ("fixtures: no fixture survives its own measurement",
      CHK, "del", '    if _name in _shipped_canaries:\n        continue                      # its job recurs; see the two populations above\n'),
+    # ── Phase D — the applied-model canary (2026-08-27) ──────────────────────
+    ("staging: Phase D — the applied-model canary — is specified",
+     STG, "del", "## Phase D — applied-model canary"),
+    ("staging: Phase D is fenced ADVISORY and may never block a run",
+     STG, "del", "ADVISORY and NEVER gates a run"),
+    # Two payloads, one check: the canary must be BOTH manifest-registered AND pinned.
+    # Deleting its manifest line breaks registration; deleting the pin ID from the
+    # fixture frontmatter (the only occurrence — the body cites it, never repeats it)
+    # leaves `model:` valueless. Each fires the same check for a different reason.
+    ("staging: the applied-model canary ships, pinned to a distinctive model",
+     MAN, "del", "canary workforce/canary/wf-model-canary.md\n"),
+    ("staging: the applied-model canary ships, pinned to a distinctive model",
+     MDC, "del", "claude-haiku-4-5"),
     # ── the handbook verification gap (2026-08-04) ───────────────────────────
     ("wf-checkrun is shipped in the manifest",
      MAN, "del", "exec workforce/bin/wf-checkrun\n"),
@@ -364,6 +378,15 @@ CASES = [
      CFG, "del", "**Recommended for creative-visual**"),
     ("org-config: the effort ladder is ordered most expensive first",
      CFG, "del", "`max`, `xhigh`, `high`, `medium`, `low`"),
+    # ── per-employee lane classification reaches the Lead tier (2026-08-27):
+    #    a domain-overseeing Lead defaults to analytical-seat-plus-critic (option 2),
+    #    domain-lane repin is the small-org exception (option 1) ──
+    ("audit: a Lead is classified by its handbook work, not auto-analytical",
+     AUD, "del", "a Lead is not auto-analytical"),
+    ("org-config: the Lead analytical default is conditional on the overseen domain",
+     CFG, "del", "The Lead default is conditional on the domain the Lead oversees"),
+    ("verify: LANE-DRIFT catches an audited org that never picked up Lead classification",
+     VFY, "del", "Re-running `model-map` alone CANNOT fix this"),
     # ── one pool, one source: the statics live only in the template, and a legacy
     #    `## Model statics` left in a project's config is read PAST, never from
     #    (2026-08-17) ──

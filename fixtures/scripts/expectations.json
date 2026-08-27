@@ -1648,6 +1648,78 @@
       "Edit(.claude/**)"
     ]
   },
+  "preflight-env-clean": {
+    "_why": "The zero half of the runtime-override pair, and the reason the harness learned to UNSET a variable: this case explicitly clears CLAUDE_CODE_SUBAGENT_MODEL and CLAUDE_EFFORT in the child, so it measures the script rather than the maintainer's shell. A clean environment must PRINT its zero (`0 runtime overrides`) — a zero is a measurement and silence is not (references/invariants.md) — and must not name either variable, which is what separates 'measured clean' from 'never read the environment'. Paired with preflight-env-override so a receipt that always fires fails one and a receipt that never fires fails the other.",
+    "args": [],
+    "env": {
+      "CLAUDE_CODE_SUBAGENT_MODEL": null,
+      "CLAUDE_EFFORT": null
+    },
+    "exit": 0,
+    "not": [
+      "CLAUDE_CODE_SUBAGENT_MODEL",
+      "CLAUDE_EFFORT",
+      "runtime-override-model",
+      "runtime-override-effort"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "INV-PREFLIGHT  0 blocker(s) · 1 advisory · 0 runtime override(s) · 0 unreadable",
+      "0 runtime overrides — no env var outranks the employees' pinned model/effort."
+    ]
+  },
+  "preflight-env-json": {
+    "_why": "The runtime overrides must be readable STRUCTURALLY, not only scraped out of the human table, because the settings-scout agent consumes --json. Asserts a dedicated `runtime_overrides` key and its own `override_count`, separate from `blocking_count` — and that `blocking_count` stays 0 while two overrides are in force, which is the classification claim: an env override refuses no write and is not a mission-blocker. `measured: false` on the effort row is asserted too: fact 12b is DOCUMENTED, not measured, and a caller must be able to see which row is a measurement and which is a heads-up.",
+    "args": [
+      "--json"
+    ],
+    "env": {
+      "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5",
+      "CLAUDE_EFFORT": "low"
+    },
+    "exit": 0,
+    "not": [
+      "INV-PREFLIGHT"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "\"runtime_overrides\": [",
+      "\"override_count\": 2",
+      "\"blocking_count\": 0",
+      "\"id\": \"runtime-override-model\"",
+      "\"env_var\": \"CLAUDE_CODE_SUBAGENT_MODEL\"",
+      "\"value\": \"claude-haiku-4-5\"",
+      "\"id\": \"runtime-override-effort\"",
+      "\"measured\": false"
+    ]
+  },
+  "preflight-env-override": {
+    "_why": "The failure this receipt exists for is INVISIBLE: with CLAUDE_CODE_SUBAGENT_MODEL set, every employee runs on that model regardless of the frontmatter `model:` the audit just wrote (platform.md fact 12 resolution order), and nothing errors and nothing logs. This case sets both variables in the child env and asserts the receipt NAMES the variable, its value, the citation, and a runnable `unset` remedy — not merely a count. The `not` list is the load-bearing half: `HIGH`/`MEDIUM`/`1 blocker` must be absent, because an env override refuses no write and folding it into the hard set would refuse an audit on a clean-permissions tree. `UNMEASURED` pins the effort row to the honest framing (fact 12b is DOCUMENTED, not measured) so a later edit cannot quietly promote it to an assertion.",
+    "args": [],
+    "env": {
+      "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5",
+      "CLAUDE_EFFORT": "low"
+    },
+    "exit": 0,
+    "not": [
+      "0 runtime overrides",
+      "HIGH",
+      "MEDIUM",
+      "1 blocker"
+    ],
+    "script": "wf-preflight",
+    "want": [
+      "runtime-override-model  CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5",
+      "overrides EVERY employee's frontmatter `model:`",
+      "references/platform.md fact 12",
+      "remedy: unset CLAUDE_CODE_SUBAGENT_MODEL",
+      "runtime-override-effort  CLAUDE_EFFORT=low",
+      "UNMEASURED",
+      "remedy: unset CLAUDE_EFFORT",
+      "INV-PREFLIGHT  0 blocker(s)",
+      "2 runtime override(s)"
+    ]
+  },
   "preflight-json": {
     "_why": "The machine-readable form the settings-scout agent consumes. Same tree as preflight-deny; --json emits the blocker objects and a blocking_count instead of the human table, so INV-PREFLIGHT must NOT appear and the deny-rule id and blocking_count keys must.",
     "args": [

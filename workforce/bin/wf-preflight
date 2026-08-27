@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""wf-preflight — find the settings that would stop an audit before it starts.
+"""wf-preflight — find the settings and the env that would stop an audit before it starts.
 
     wf-preflight --root <tree>              human table of mission-blockers + remedies
     wf-preflight --root <tree> --json       machine-readable, for the settings-scout agent
     wf-preflight --root <tree> --needs <file|->   also diff a required grant set
+
+It reports TWO unrelated classes. (1) MISSION-BLOCKERS: settings that would REFUSE the
+audit's writes. (2) RUNTIME OVERRIDES: environment variables that let those writes land
+correctly and then be IGNORED at runtime. See the two sections below; the second is the
+one nobody can see without reading the environment.
 
 WHY THIS EXISTS. A workforce audit writes agent-constraining state — permission
 grants, hook registrations, agent-handbook frontmatter — and any of those writes can
@@ -20,9 +25,23 @@ REPL `!` prefix (their own shell, which the classifier does not gate). A clean t
 prints `0 blockers`, because a zero is a measurement and silence is not
 (references/invariants.md § The rule).
 
+RUNTIME OVERRIDES — the second class, and the invisible one. A blocker refuses a write.
+An env override lets the write succeed and then makes it meaningless. The harness
+resolves an employee's model in the order `CLAUDE_CODE_SUBAGENT_MODEL` (env) →
+per-invocation → frontmatter `model:` → session model (references/platform.md fact 12),
+so an env var set in the audit's own session sits ABOVE every employee's pinned model.
+The audit still WRITES the correct frontmatter; the runtime silently ignores it. Nothing
+errors, nothing logs, and no amount of reading `.claude/` reveals it — which is exactly
+why preflight, the look-first command, reads the environment too.
+
+These are NOT mission-blockers and are never counted as such: a tree with impeccable
+permissions can be in force under one. They are reported as their own receipt, and a
+clean environment prints a ZERO, because a zero is a measurement and silence is not.
+
 This script only READS. It changes nothing — resolving a blocker is wf-settings-apply's
-job, run by the human. Discovery and repair are separated so discovery can run
-unattended and against a tree the run has no standing to write yet.
+job, run by the human; clearing an env override is one `unset` in the human's own shell.
+Discovery and repair are separated so discovery can run unattended and against a tree
+the run has no standing to write yet.
 """
 
 import argparse
@@ -192,6 +211,82 @@ def discover(root, needs):
     return blockers, errors
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# RUNTIME OVERRIDES — read from the process environment, reported, never blocking.
+#
+# A `deny` rule refuses the audit's write. An env override does something the write
+# cannot detect: it lets the write land and then outranks it. Model resolution is
+# `CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session model
+# (platform.md fact 12), so an env var in the audit's session overrides EVERY
+# employee's `model:` pin for the whole session, silently.
+#
+# These rows must NEVER join the `hard` blocker set. A clean-permissions tree would
+# then be refused for something that refuses no write, and `0 blockers` — the
+# measurement that says "the tree will not refuse the audit's own writes" — would
+# stop being true of the tree. They are their own receipt, with their own count.
+# ─────────────────────────────────────────────────────────────────────────────
+RUNTIME_OVERRIDE_ENV = ("CLAUDE_CODE_SUBAGENT_MODEL", "CLAUDE_EFFORT")
+
+
+def runtime_overrides(env=None):
+    """The env vars that outrank an employee's frontmatter, as receipt rows.
+
+    An empty list means MEASURED CLEAN, not unexamined — main() prints the zero. An
+    exported-but-empty value is read as unset: it names no model and no effort rung,
+    and reporting it would be a finding about a variable that selects nothing.
+    """
+    env = os.environ if env is None else env
+    rows = []
+
+    model = (env.get("CLAUDE_CODE_SUBAGENT_MODEL") or "").strip()
+    if model:
+        rows.append({
+            "id": "runtime-override-model",
+            "env_var": "CLAUDE_CODE_SUBAGENT_MODEL",
+            "value": model,
+            "status": "SET",
+            "measured": True,
+            "what_it_overrides":
+                f"CLAUDE_CODE_SUBAGENT_MODEL={model} overrides EVERY employee's frontmatter "
+                f"`model:` for this whole session. Resolution order is "
+                f"CLAUDE_CODE_SUBAGENT_MODEL -> per-invocation -> frontmatter -> session model "
+                f"(references/platform.md fact 12), so the model budget this audit WRITES is "
+                f"not the model that RUNS. The frontmatter is still written correctly; the "
+                f"runtime ignores it, and nothing errors and nothing logs.",
+            "remedy_command": "unset CLAUDE_CODE_SUBAGENT_MODEL",
+            "remedy_note":
+                "run the unset in your own shell and restart the session BEFORE the audit — a "
+                "variable already in this process cannot be cleared from inside the run. The "
+                "alternative is to accept the override knowingly, in which case every `model:` "
+                "the audit writes is a record of intent for later sessions, not this one.",
+            "run_via": "!",
+        })
+
+    effort = (env.get("CLAUDE_EFFORT") or "").strip()
+    if effort:
+        rows.append({
+            "id": "runtime-override-effort",
+            "env_var": "CLAUDE_EFFORT",
+            "value": effort,
+            "status": "PRESENT",
+            "measured": False,
+            "what_it_overrides":
+                f"CLAUDE_EFFORT={effort} is PRESENT in the environment and MAY override each "
+                f"employee's frontmatter `effort:`. UNMEASURED — platform.md fact 12b (`effort:` "
+                f"inherits the session when absent) is DOCUMENTED, not measured, and no fact in "
+                f"this distribution records an env-level effort override at all. Reported as "
+                f"present; NOT asserted to block, NOT asserted to win.",
+            "remedy_command": "unset CLAUDE_EFFORT",
+            "remedy_note":
+                "unset it before the run if the budgeted per-lane `effort:` must be the "
+                "authoritative one. Until the override is canaried this row is a heads-up, not "
+                "a finding: platform behaviour is measured, never asserted.",
+            "run_via": "!",
+        })
+
+    return rows
+
+
 def probe_automode():
     """Best-effort: is auto mode active? Ask the CLI if present; never fail on absence.
     Returns True/False/None (None = could not determine)."""
@@ -248,10 +343,15 @@ def main(argv=None):
     blockers, errors = discover(root, needs)
     # "info" rows are context, not blockers; count only what actually stops the mission.
     hard = [b for b in blockers if b["severity"] in ("high", "medium")]
+    # Kept OUT of `blockers` deliberately: an env override refuses no write, and folding
+    # it in would make `blocking_count` a claim about the environment as well as the tree.
+    overrides = runtime_overrides()
 
     if args.json:
-        print(json.dumps({"root": root, "blockers": blockers, "errors": errors,
-                          "blocking_count": len(hard)}, indent=2))
+        print(json.dumps({"root": root, "blockers": blockers,
+                          "runtime_overrides": overrides, "errors": errors,
+                          "blocking_count": len(hard),
+                          "override_count": len(overrides)}, indent=2))
         return 0
 
     for e in errors:
@@ -264,10 +364,19 @@ def main(argv=None):
             print(f"      remedy: {b['remedy_command']}{via}")
         if b.get("remedy_note"):
             print(f"      note:   {b['remedy_note']}")
+    # The runtime-override receipt: loud, because its whole defect is invisibility.
+    for o in overrides:
+        print(f"  [ENV    ] {o['id']}  {o['env_var']}={o['value']}  ({o['status']})")
+        print(f"      {o['what_it_overrides']}")
+        print(f"      remedy: {o['remedy_command']}  (run via `!`)")
+        print(f"      note:   {o['remedy_note']}")
     print(f"\nINV-PREFLIGHT  {len(hard)} blocker(s) · {len(blockers) - len(hard)} advisory "
-          f"· {len(errors)} unreadable")
+          f"· {len(overrides)} runtime override(s) · {len(errors)} unreadable")
     if not hard:
         print("  0 blockers — the tree will not refuse the audit's own writes.")
+    if not overrides:
+        print("  0 runtime overrides — no env var outranks the employees' pinned "
+              "model/effort.")
     return 0
 
 

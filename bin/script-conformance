@@ -12,7 +12,8 @@ Each fixture is a tree under `fixtures/scripts/<case>/` plus a row in
 `expectations.json` naming the script, the required exit code, substrings that MUST
 appear, and substrings that must NOT. A stdin-driven script (the hook) takes
 `stdin_file` (a path inside the fixture, wrapped as a PostToolUse payload) or
-`stdin_raw`.
+`stdin_raw`. A script that reads the process environment takes `env`: a map of
+variable name to value, where `null` UNSETS the variable in the child.
 
 **Exit code and output are both checked.** A script that exits correctly while
 reporting the wrong thing is the failure this project keeps finding — a report that
@@ -60,6 +61,23 @@ def run_case(name, spec):
 
 def _run_in(tree, script, spec):
     env = dict(os.environ, CLAUDE_PROJECT_DIR=tree)
+
+    # THE CHILD ENV IS PART OF THE FIXTURE when the script reads it. wf-preflight's
+    # runtime-override receipt reads CLAUDE_CODE_SUBAGENT_MODEL and CLAUDE_EFFORT out
+    # of the live environment, so inheriting the maintainer's shell would make those
+    # cases pass or fail according to who ran them — the "0 runtime overrides" half in
+    # particular is destroyed by one leftover export, silently, and would then be
+    # indistinguishable from a receipt that never fired.
+    #
+    # A string value SETS the variable; `null` UNSETS it. Unset must be expressible:
+    # the clean half of a pair is the half that cannot be written any other way.
+    # Added 2026-08-27 with the runtime-override receipt.
+    for _k, _v in (spec.get("env") or {}).items():
+        if _v is None:
+            env.pop(_k, None)
+        else:
+            env[_k] = str(_v)
+
     if "stdin_file" in spec or "stdin_raw" in spec:
         payload = spec.get("stdin_raw")
         if payload is None:

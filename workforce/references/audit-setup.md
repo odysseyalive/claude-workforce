@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 53 assertion(s) in bin/check name this file; 73 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 54 assertion(s) in bin/check name this file; 74 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -151,6 +151,12 @@ spawn is unavailable run its mechanism directly: `wf-preflight --root <absolute 
 `--needs <grant-set>` once the design panel has produced the org's required grants. `wf-preflight`
 reads the four scopes and the wired hooks and returns each mission-blocker with the exact one-command
 remedy. Never pass `--root "${CLAUDE_PROJECT_DIR}"` — unset in the Bash tool, the script exits 2.
+
+**The same run also surfaces the model/effort environment overrides** — `CLAUDE_CODE_SUBAGENT_MODEL`
+outranks every employee's frontmatter `model:` for the whole session (`platform.md` fact 12), so the
+model budget this audit writes is not the model that runs, and nothing errors and nothing logs;
+`CLAUDE_EFFORT` is reported PRESENT with its UNMEASURED caveat. These are advisory, never blockers —
+they refuse no write (`procedures/preflight.md` § Procedure item 6).
 
 **What the run does with the verdict:**
 

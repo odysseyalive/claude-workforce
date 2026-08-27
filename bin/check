@@ -339,10 +339,25 @@ CONST_RX = re.compile(
     r"|\bclaude-(?:opus|sonnet|haiku|fable)-[\w.\[\]-]*\d",
     re.I,
 )
+# A manifest canary's frontmatter `model:` pin is a REQUIRED RESOLVED VALUE — the same
+# class as a handbook's or org-config.template.md's pins, which § Derived constants
+# sanctions ("model IDs, which live in org-config.md, never in prose"). A canary MUST
+# name a concrete model to measure whether that pin applies (staging.md § Phase D), so
+# its frontmatter is a DECLARED exception. The exemption is scoped to the frontmatter
+# ONLY: the canary's BODY prose is still scanned, so it cannot smuggle a restated
+# constant into its instructions the way any other reference would be caught.
+_canary_set = set(manifest_canary_paths())
+def _const_scan_text(_p):
+    _t = read(_p)
+    if _p in _canary_set and _t.startswith("---\n"):
+        _end = _t.find("\n---\n", 4)
+        if _end != -1:
+            return _t[_end + 5:]
+    return _t
 offenders = [
     p for p in declared
     if p.endswith(".md") and p not in CONST_EXEMPT and p not in VENDORED
-    and CONST_RX.search(read(p))
+    and CONST_RX.search(_const_scan_text(p))
 ]
 check(
     "constants: stated once, outside the declared exceptions",
@@ -3534,6 +3549,30 @@ check(
     "no effort counterpart",
 )
 check(
+    "audit: a Lead is classified by its handbook work, not auto-analytical",
+    "a Lead is not auto-analytical" in aud,
+    "the one carve-out from per-employee classification pinned every Lead to the "
+    "analytical seat; a domain-overseeing Lead defaults to the analytical seat plus "
+    "a domain-model critic IC (option 2), the domain-lane repin being the small-org "
+    "exception (option 1) — without this the Lead reasons about what it cannot see",
+)
+check(
+    "org-config: the Lead analytical default is conditional on the overseen domain",
+    "The Lead default is conditional on the domain the Lead oversees" in _cfg2,
+    "the baseline made the Lead default unconditional; a domain-overseeing Lead "
+    "defaults to analytical-seat-plus-critic (option 2), and this must not claim "
+    "the visual producer model orchestrates as well as the analytical seat — that "
+    "is unmeasured",
+)
+check(
+    "verify: LANE-DRIFT catches an audited org that never picked up Lead classification",
+    "Re-running `model-map` alone CANNOT fix this" in vfy,
+    "an already-audited project picks up per-employee Lead classification without "
+    "re-running audit only if this read-only detector names the remedy — hire a "
+    "domain critic (option 2) or an explicit override repin (option 1); model-map "
+    "alone edits budget values and never re-derives lane membership",
+)
+check(
     "principles: creation and optimization are one workflow, stated as doctrine",
     "Creation and optimization are ONE workflow" in skill
     and "added to the creation path in the same change" in skill,
@@ -4220,6 +4259,72 @@ check(
     "clause 3 must distinguish the two writes AND route a refused ADDITION through the "
     "shipped producer `wf-settings-apply --grants` run via `!` — never re-quote the repair "
     "(exits 0, delivers nothing) and never emit a settings block for the user to paste",
+)
+# ─────────────────────────────────────────────────────────────────────────────
+# THE WRITE THAT LANDS AND IS THEN IGNORED (2026-08-27)
+#
+# Every check above this one guards a write being REFUSED. There is a second,
+# invisible failure with no refusal in it at all: model resolution is
+# CLAUDE_CODE_SUBAGENT_MODEL -> per-invocation -> frontmatter -> session model
+# (platform.md fact 12), so an env var set in the audit's own session outranks
+# every employee's pinned `model:`. The audit writes correct frontmatter and the
+# runtime ignores it — nothing errors, nothing logs, and no amount of reading
+# `.claude/` finds it. That is the literal cause of "the correct model isn't
+# applied to agents during audit".
+#
+# It is NOT a blocker and must never become one: it refuses no write, and folding
+# it into the hard set would refuse an audit on a clean-permissions tree. So the
+# pins below are in two halves — the receipt is SPECIFIED in preflight.md and the
+# script actually READS the environment (a specified receipt no script reads is
+# this project's signature defect), and separately that neither half counts it as
+# a blocker. The effort half is pinned to its UNMEASURED framing: fact 12b is
+# DOCUMENTED, not measured, and an unmeasured override stated as a fact is exactly
+# what Operating Principle 13 forbids.
+# ─────────────────────────────────────────────────────────────────────────────
+_pfm = read("workforce/references/procedures/preflight.md")
+_wfp = read("workforce/bin/wf-preflight")
+check(
+    "preflight: the runtime-override receipt is specified, both vars, cited to fact 12",
+    "sits **above every employee's pinned `model:`**" in _pfm
+    and "`platform.md` fact 12" in _pfm
+    and "**`CLAUDE_EFFORT` set**" in _pfm
+    and "**A clean environment prints `0 runtime overrides`**" in _pfm,
+    "preflight is the look-first command and an env override is invisible from the "
+    "settings files it reads. Unspecified, the receipt is one edit from being dropped "
+    "as noise — and a clean env printing nothing is indistinguishable from never looking",
+)
+check(
+    "preflight: the effort override is reported UNMEASURED, never asserted",
+    "**This is UNMEASURED and is stated as such:**" in _pfm
+    and "NOT asserted to block, NOT asserted to win." in _wfp,
+    "platform.md fact 12b is DOCUMENTED, not measured, and no fact in this distribution "
+    "records an env-level effort override at all. Reporting CLAUDE_EFFORT as a proven "
+    "override would make a belief out of a reading — Operating Principle 13",
+)
+check(
+    "wf-preflight reads BOTH override variables out of the live environment",
+    'env.get("CLAUDE_CODE_SUBAGENT_MODEL")' in _wfp
+    and 'env.get("CLAUDE_EFFORT")' in _wfp
+    and "env = os.environ if env is None else env" in _wfp,
+    "the receipt is only worth its prose if the script performs the read. Naming the "
+    "variables in a docstring while reading neither is the consumer-named/producer-"
+    "assumed shape this repository keeps finding",
+)
+check(
+    "preflight: an env override is never a blocker, and --json keys it separately",
+    "It never joins the blocker count" in _pfm
+    and "`runtime_overrides` key with its own `override_count`" in _pfm
+    and '"runtime_overrides": overrides' in _wfp
+    and '"override_count": len(overrides)' in _wfp,
+    "an env override refuses no write, so counting it in blocking_count would refuse an "
+    "audit on a clean-permissions tree and make `0 blockers` a claim about the "
+    "environment; and a scout that must scrape the human table has no structural read",
+)
+check(
+    "audit-setup: Step 0.05 surfaces the model/effort env overrides too",
+    "**The same run also surfaces the model/effort environment overrides**" in _asu2,
+    "the preflight script emits the receipt and Step 0.05 is the only step that runs it; "
+    "a gate added to preflight.md and not to its caller is how Step 0.7 was lost",
 )
 # ─────────────────────────────────────────────────────────────────────────────
 # A PROPOSAL IN THE CLOSING REPORT IS A DEFERRED ROW
@@ -5697,6 +5802,40 @@ check(
     "re-measure per host and per harness version, so their job recurs and a "
     "closed fact never makes them residue",
 )
+# ── Phase D — the applied-model canary (2026-08-27) ───────────────────────────
+# Phase D measures whether a frontmatter `model:` pin applies at runtime, by the
+# ONLY channel a subagent has for its resolved model: self-report (no env channel
+# exists — measurements/2026-08-27-applied-model.md, fact 12). That makes it SOFTER
+# than Phase C's tool-grant canary, so the doctrine fences it as ADVISORY: a
+# self-report MISMATCH is reported, never enforced. These pin both halves — the
+# doctrine that says so, and the shipped fixture that carries the distinctive pin —
+# because a Phase D that silently loses its honesty fence or ships an un-pinned
+# fixture measures nothing while reading green.
+check(
+    "staging: Phase D — the applied-model canary — is specified",
+    "## Phase D — applied-model canary" in stg,
+    "staging.md must carry Phase D, or the applied-model measurement has no procedure "
+    "and fact 12's frontmatter-path claim stops being re-checked per host/harness",
+)
+check(
+    "staging: Phase D is fenced ADVISORY and may never block a run",
+    "ADVISORY and NEVER gates a run" in stg and "INDETERMINATE" in stg,
+    "a self-report is softer than a tool grant (fact 4b), so Phase D must state it "
+    "never refuses a user's work and must carry the INDETERMINATE outcome that "
+    "distinguishes an applied pin from a session fallback equal to the pin — without "
+    "the fence it silently gains Phase C's authority to block on a soft signal",
+)
+_mc_src = "workforce/canary/wf-model-canary.md"
+_mc_declared = _mc_src in manifest_canary_paths()
+_mc_pin = re.search(r"^model:[ \t]*(\S+)", read(_mc_src), re.M) if os.path.exists(_mc_src) else None
+check(
+    "staging: the applied-model canary ships, pinned to a distinctive model",
+    _mc_declared and _mc_pin is not None and _mc_pin.group(1) == "claude-haiku-4-5",
+    f"wf-model-canary must be a manifest `canary` AND pin `model: claude-haiku-4-5` "
+    f"(declared={_mc_declared}, pin={_mc_pin.group(1) if _mc_pin else None}) — a canary "
+    "with no pin, or one not shipped, cannot measure whether the pin applies; the pin "
+    "must be distinctively UNLIKE the likely session model so a MATCH is discriminating",
+)
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
 # numbers are the reason it may not decide, and they survive rewording.
@@ -6809,9 +6948,10 @@ _inv = read("workforce/references/invariants.md")
 _stg = read("workforce/references/staging.md")
 check(
     "canary: the fixtures ship with the install, so a first run can measure",
-    len(manifest_canary_paths()) == 4
+    len(manifest_canary_paths()) == 5
     and "THE INSTALLER SHIPS THEM" in _stg,
-    f"{len(manifest_canary_paths())} canary files in the manifest — fixtures written "
+    f"{len(manifest_canary_paths())} canary files in the manifest (expected 5: the tier "
+    "chain a/b/c, the ceiling probe, and the applied-model canary) — fixtures written "
     "DURING a run cannot register in that run (fact 3), so a first audit is forced "
     "DEGRADED and the user pays a restart to clear marks it could not clear",
 )

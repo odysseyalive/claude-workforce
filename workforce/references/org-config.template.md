@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -250,6 +250,18 @@ so every value here is a deliberate override of whatever the user is running.
   coordinating seat must stay steerable and engage in discovery as its context grows, and 4.8 is the
   better thought-partner where 5 tends to commit to its own reading. **A cheap Lead is the expensive
   place to save.**
+
+**The Lead default is conditional on the domain the Lead oversees.** The `analytical` seat is the
+Lead default for a pure-orchestration seat, and the steerability reason just above is exactly WHY:
+a routing Lead stays analytical. But a Lead whose handbook work is domain judgment — reviewing
+rendered visual layout, or code architecture — needs to SEE what it judges, which the analytical
+model reasons about but cannot do. For a **domain-overseeing Lead** the default is the analytical
+seat PLUS a domain-model critic IC beneath it (option 2): the Lead keeps the steerable seat for the
+reason above and homes the seeing in a `creative-visual` or `code` critic. Only when the org is too
+small to carry that critic is the Lead itself repinned onto the domain lane (option 1, the small-org
+exception, recorded with its reason). **This does not claim `claude-fable-5` orchestrates as well as
+the analytical seat — that is unmeasured;** the point is the reverse — that a routing Lead should
+not be moved onto a producer model to buy a seeing ability it can delegate to a critic.
 
 ### Creative — two lanes, text and visual
 

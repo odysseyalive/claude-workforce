@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 25 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -340,6 +340,67 @@ shape; C2 tells you whether the shape holds when someone invokes a Lead directly
 
 ---
 
+## Phase D — applied-model canary
+
+**Does a frontmatter `model:` pin actually apply at runtime?** Every employee is model-pinned and the
+whole budget rests on those pins being honored (`platform.md` fact 12: `model:` resolves
+`CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session). Phase C canaries a tool grant.
+Phase D canaries the model — and it is a **weaker instrument by construction**, so it is fenced
+differently.
+
+**The measurement that fixed its shape.** On 2026-08-27 (harness 2.1.245) two throwaway spawns were
+run on this host, one pinned haiku and one pinned opus. Each self-reported the model it was *forced*
+to, exactly and correctly. Neither could read its model from the environment: there is **no
+model-identifying env channel a subagent can observe** — `CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_MODEL`,
+and `ANTHROPIC_MODEL` were all empty even in the spawn whose model had been overridden
+(`measurements/2026-08-27-applied-model.md`; recorded into fact 12). So the only channel is the
+model's **self-report**, and self-report is a model introspecting its own ID — real, but softer than
+Phase C's tool-grant observation (fact 4b), because a future model could misreport it.
+
+**The procedure.**
+
+1. Spawn `wf-model-canary` **by its registered `subagent_type`** — not through a generic agent with an
+   overriding `model` parameter. Registering it and spawning it by type is the only way the frontmatter
+   `model:` sits on the honored path this canary exists to measure. The fixture carries a distinctive
+   model pin in its own frontmatter (`workforce/canary/wf-model-canary.md`) — deliberately unlike the
+   model a session or a CEO is likely running — so a match is discriminating rather than accidental.
+   The pin ID lives in that one file and is not restated here.
+2. Parse the fixture's one line, `MODEL=<id>`.
+3. Compare that self-report against **both** the fixture's pin **and** the resolved session
+   model. The comparison needs both because a match against the pin means nothing when the session
+   model *is* the pin.
+
+**The four outcomes.** The extra outcome over Phase C is `INDETERMINATE`, and it exists for the reason
+the comparison needs the session model:
+
+| Outcome | Condition | Consequence |
+|---|---|---|
+| `MATCH` | self-report == pin, and pin != session model | the pin was applied. **Best-effort PASS** — evidence, not proof |
+| `MISMATCH` | self-report == session model != pin, or any third value | the pin was **not** applied; the resolution chain overrode it. Report observed-vs-pinned **and the raw self-report string** |
+| `INDETERMINATE` | pin == session model | a match proves nothing — the session fallback equals the pin, so a MATCH cannot distinguish an applied pin from an ignored one. Say so; do not record PASS |
+| `UNAVAILABLE` | spawning suppressed at the Step 0.9 spawn preflight (`audit-setup.md` § Step 0.9, `INV-SPAWN`), or no parseable `MODEL=` line returned | degrade and state it; never block |
+
+**The honesty fence — Phase D is ADVISORY and NEVER gates a run.** This is the one line that separates
+it from Phase C. Phase C's C2 assertion IS allowed to abort, because a tool grant is a deterministic
+observation the harness makes. A self-report is not, so a `MISMATCH` is **reported, never enforced**:
+it does not refuse an audit, does not fail a handbook, and does not stop a registration. A
+`MISMATCH` must carry the **raw self-report string** into its report so a human can weigh whether the
+pin was genuinely overridden or the model misreported its own ID. **Never refuse a user's work on a
+self-report alone.**
+
+**Phase D and the preflight env receipt answer different questions — run both, and do not fold one
+into the other.** The `preflight` env receipt (`procedures/preflight.md` § Procedure, the runtime-override
+receipt at step 6) is the cheap **deterministic source-check**: it reads the one known override channel,
+`CLAUDE_CODE_SUBAGENT_MODEL`, straight from the process environment **before any spawn**, and a set
+value is proof the pins will be ignored. Phase D is the **best-effort end-to-end outcome-check**: it
+spawns and reads what actually resolved, so it also catches overrides the receipt cannot name — a
+coarse per-invocation bucket, an override channel that is not the env var the receipt greps.
+Complementary: the receipt says *"an override is set"* deterministically; Phase D says *"the pin did
+or did not survive to runtime"* softly. A clean receipt plus a Phase D `MATCH` is stronger than either
+alone, and neither promotes to the other's confidence.
+
+---
+
 ## The three outcomes — and UNAVAILABLE is not FAIL
 
 **This distinction is the whole reason the canary is runnable at all.** Written with two outcomes, the
@@ -458,5 +519,6 @@ into a *blocking* gate, and measurement showed the behavior did not hold on the 
 the gate would have refused valid handbooks for a reason that is not true.
 
 Phase A checks the text. Phase B checks whether a stranger can follow it. Phase C checks whether the
-harness behaves as assumed. **None substitutes for another**, and a static grep never substitutes for
-the canary.
+harness behaves as assumed. Phase D checks whether a model pin survives to runtime — softly, and it
+alone may never block. **None substitutes for another**, and a static grep never substitutes for the
+canary.
