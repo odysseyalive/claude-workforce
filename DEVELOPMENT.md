@@ -113,7 +113,33 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-25
+## Open, as of 2026-08-26
+
+**Landed 2026-08-26 (dev session) — the budget questions are fully mechanised, and the residual
+wording duplication the mechanisation left behind is closed with its own drift guard.** The budget
+picker was half-mechanical: `wf-model-budget` derived the model pool from the template, but the
+effort ladder and the four question headers/bodies were still reconstructed from procedure prose on
+every run. This session finished the job.
+
+- **`wf-effort-budget` added.** The effort ladder is now a pure function of `org-config.template.md`
+  § Effort statics plus per-model rung availability in `platform.md`, mirroring `wf-model-budget`. It
+  emits both effort calls whole so the caller renders them verbatim and rebuilds no ladder or window
+  by hand — the reconstruction path that read a project's stale `org-config.md` and reproduced its
+  pre-split lane structure (reported 2026-08-26).
+- **The four question headers/bodies are made canonical and emitter-emitted.**
+  `org-config.template.md` § Budget question wording now owns all four calls (model/A, model/B,
+  effort/A, effort/B) stated once; both emitters parse that block and print header+body above their
+  options.
+- **The residual duplication is closed with its fix.** `audit-setup.md` § Step 0.4a–0.4d had still
+  restated all four wording blocks verbatim under a "Use this wording" line — the same constant in
+  two places (Principle 9a). Those four blocks are now pointers to the canonical home, parallel to
+  how § Step 0.4a already points at § Model statics for the model pool. A `bin/check` assertion
+  (`budget wording: no reference restates the canonical question copy`) scans every reference except
+  the canonical one for the four headers and fails on any reprint; the paired `bin/prove` append-case
+  reprints a header into `audit-setup.md` and confirms the check flips to `✗` (PROVEN, not VACUOUS).
+
+`bin/check` 946/0 after `bin/coverage --stamp` and `bin/sync --personal`. Working tree, not yet
+committed.
 
 **Landed 2026-08-25 (dev session) — the code-evaluator gains a language-agnostic resource-awareness
 dimension (RC1–RC6): memory & CPU cost recognised from what a variable stores.** A `/workforce dev` run

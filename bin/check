@@ -4916,6 +4916,180 @@ check(
     "with the template a maintainer just edited",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE OTHER HALF OF THE SAME HOLE: the EFFORT budget (2026-08-26)
+#
+# wf-model-budget closed the reconstruction hole for the model pool on 2026-08-20
+# and left the effort ladder on prose, so it went on being rebuilt by hand on every
+# run — and a lane's ladder is NOT readable off the template alone: it depends on
+# the model that lane resolved to (platform.md 12b/12c). Reported 2026-08-26: a
+# session rebuilding "the budget questions" reached for a project's instantiated
+# org-config.md and reproduced the stale lane structure it found there. The fix is
+# the mirror script; these are the assertions that keep both readers pointed at it.
+_wfeb = read("workforce/bin/wf-effort-budget")
+check(
+    "audit-setup: the effort budget option set is produced by wf-effort-budget, not by hand",
+    "wf-effort-budget" in _asu and "PRODUCED BY `wf-effort-budget`" in _asu,
+    "audit-setup.md Step 0.4c no longer names wf-effort-budget as the mechanical "
+    "producer of the effort option set. Without it the run rebuilds the ladder from "
+    "prose — and the per-model windowing (one model has no `xhigh`, one rejects "
+    "`effort` outright) is exactly the part a reader gets wrong for whichever lane "
+    "it was not thinking about (fixture effortbudget-drift-regression)",
+)
+check(
+    "model-map: the effort budget option set is produced by wf-effort-budget, not by hand",
+    "wf-effort-budget" in _mm_pool
+    and "the effort ladder is never rebuilt here either" in _mm_pool,
+    "model-map.md re-renders the same effort objects `audit` Step 0.4c does and must "
+    "name the same mechanical producer. A ladder derived two ways by two readers is "
+    "the drift the script exists to foreclose",
+)
+# The script is a pure function of the template plus platform.md: it names NO model
+# ID and NO rung of its own. Same docstring carve-out as wf-model-budget above — the
+# prose explains the drift with concrete names, and only the CODE may not restate
+# them (SKILL.md Principle 9a). The rung tokens are read from the template rather
+# than typed here, so this assertion cannot itself become a second copy of the
+# ladder; each is matched as a QUOTED literal, because `low` is a substring of
+# `allow`/`follow` and a bare scan would fail on an innocent word.
+_wfeb_parts = _wfeb.split('"""')
+_wfeb_code = (_wfeb_parts[0] + "".join(_wfeb_parts[2:])) if len(_wfeb_parts) >= 3 else _wfeb
+_m_rungs = re.search(r"The rungs are\s+([^(\n]*)", _ocfg)
+_rung_tokens = re.findall(r"`([a-z]+)`", _m_rungs.group(1)) if _m_rungs else []
+_rung_leaks = sorted({r for r in _rung_tokens
+                      if re.search(r"""['"]%s['"]""" % re.escape(r), _wfeb_code)})
+check(
+    "wf-effort-budget hardcodes no model ID and no rung in its logic",
+    bool(_wfeb) and bool(_rung_tokens)
+    and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wfeb_code)
+    and not _rung_leaks,
+    f"wf-effort-budget names a concrete model ID or rung in executable code "
+    f"(rung literals found: {_rung_leaks}; {len(_rung_tokens)} rung(s) read from the "
+    "template). The ladder lives in org-config.template.md § Effort statics and "
+    "per-model availability in platform.md; a second copy in the emitter is the "
+    "restated constant that makes a refresh a two-file edit and drifts silently",
+)
+check(
+    "wf-effort-budget derives the ladder and the recommendation from § Effort statics",
+    r"The rungs are\s+" in _wfeb and "Recommended for " in _wfeb,
+    "wf-effort-budget no longer parses the rung ladder out of the template's "
+    "§ Effort statics line, or no longer resolves a lane's fallback model from the "
+    "§ Model statics annotation. A ladder or a recommendation resolved any other way "
+    "can disagree with the template a maintainer just edited",
+)
+
+# ONE HOME FOR THE QUESTION COPY. The option set was produced mechanically while the
+# HEADER and BODY above it were still retyped from procedure prose — half a
+# hand-built question, and the half a reader is least likely to check. Both emitters
+# now print the whole call from org-config.template.md § Budget question wording.
+_wording_body = ""
+_m_word = re.search(r"^##\s+Budget question wording.*?(?=^##\s)", _ocfg, re.S | re.M)
+if _m_word:
+    _wording_body = _m_word.group(0)
+_word_calls = set(re.findall(r"^###\s+Wording:\s*([A-Za-z-]+)\s*/\s*CALL\s+([A-Z])\s*$",
+                             _wording_body, re.M))
+check(
+    "budget wording: one canonical block, covering both budgets and both calls",
+    _word_calls == {("model", "A"), ("model", "B"), ("effort", "A"), ("effort", "B")},
+    f"org-config.template.md § Budget question wording declares {sorted(_word_calls)} — "
+    "the four budget calls are model/A, model/B, effort/A, effort/B, and a call whose "
+    "wording is absent is a call the emitter cannot print and the caller retypes",
+)
+check(
+    "budget wording: both emitters read the canonical block",
+    # The READER, not the error message about it. An earlier form matched
+    # `## Budget question wording`, which the `_die` string also contains — so the
+    # assertion would have stayed green with the parse deleted and the complaint kept.
+    r"^##\s+Budget question wording" in _wfmb and r"^##\s+Budget question wording" in _wfeb,
+    "an emitter that stopped reading § Budget question wording prints options under a "
+    "header the caller has to supply — the reconstruction hole this closed, reopened "
+    "on the half nobody greps (fixtures modelbudget-nowording, effortbudget-nowording)",
+)
+# The question HEADERS, read from the canonical block rather than typed here: the
+# assertion must not become the second copy it exists to forbid.
+_word_headers = [l[2:].strip() for l in _wording_body.splitlines()
+                 if l.startswith("> **") and l.rstrip().endswith("**")]
+_word_dupes = sorted({h for h in _word_headers if h in _wfmb or h in _wfeb})
+check(
+    "budget wording: neither emitter carries its own copy of the question copy",
+    bool(_word_headers) and not _word_dupes,
+    f"question copy found inside an emitter: {_word_dupes} ({len(_word_headers)} header(s) "
+    "compared). A fallback string in the script is a second source of truth that drifts "
+    "from the template the moment either is edited (SKILL.md Principle 9a)",
+)
+# ONE HOME, ENFORCED ACROSS THE PROSE TOO. The emitters no longer carry the copy
+# (above), but audit-setup.md § Step 0.4a–0.4d restated all four blocks verbatim
+# under a "Use this wording" line until 2026-08-26 — the pool's own precedent
+# (§ Step 0.4a reads the pool "from § Model statics and from nowhere else") applied
+# to the pool but not to the wording beside it. A second verbatim copy in any
+# reference is the restated constant a wording edit silently drifts from (Principle
+# 9a). Scan every reference except the canonical home for the four question headers.
+_word_reprints = []
+for _wp in sorted(glob.glob("workforce/references/**/*.md", recursive=True)):
+    if _wp.endswith("org-config.template.md"):
+        continue
+    _wtxt = read(_wp)
+    _wraw = sorted({h for h in _word_headers if h in _wtxt})
+    if _wraw:
+        _word_reprints.append((_wp, _wraw))
+check(
+    "budget wording: no reference restates the canonical question copy",
+    bool(_word_headers) and not _word_reprints,
+    f"question copy restated outside its one home: {_word_reprints} "
+    f"({len(_word_headers)} header(s) checked). org-config.template.md § Budget "
+    "question wording owns all four calls; audit-setup.md § Step 0.4a–0.4d and every "
+    "other reference must POINT at it, never retype it — a second verbatim copy is the "
+    "restated constant a wording edit drifts from (SKILL.md Principle 9a)",
+)
+
+# THE DRIFT GUARD, RUN RATHER THAN DESCRIBED. Every assertion above is a property of
+# the TEXT. The failure being guarded is a property of the OUTPUT: a project's own
+# org-config.md must change a budget's recorded VALUES and never its STRUCTURE. This
+# runs both emitters twice over a fixture that carries a stale, pre-split config —
+# once with `--config` and once without — and compares the structural markers a
+# caller renders from. Anti-vacuity: the two runs must also DIFFER somewhere, or the
+# config was never read and the comparison proves nothing.
+_STRUCT_PREFIX = ("CALL ", "LANE ", "lanes: ", "pool (cost order", "ladder (cost order")
+
+
+def _emit_structure(script, tree, args):
+    p = subprocess.run([sys.executable, os.path.join(ROOT, "workforce", "bin", script),
+                        "--root", os.path.join(ROOT, "fixtures", "scripts", tree)] + args,
+                       capture_output=True, text=True, timeout=60)
+    out = p.stdout + p.stderr
+    return out, [l for l in out.splitlines() if l.startswith(_STRUCT_PREFIX)]
+
+
+_drift_problems = []
+try:
+    for _script, _tree, _base, _cfg_args in (
+            ("wf-model-budget", "modelbudget-stale-reaudit",
+             ["--template", "template.md"], ["--config", "org-config.md"]),
+            ("wf-effort-budget", "effortbudget-drift-regression",
+             ["--template", "template.md", "--platform", "platform.md"],
+             ["--config", "org-config.md"])):
+        _clean_out, _clean = _emit_structure(_script, _tree, _base)
+        _stale_out, _stale = _emit_structure(_script, _tree, _base + _cfg_args)
+        if not _clean or not _stale:
+            _drift_problems.append(f"{_script}: emitted no structural line at all")
+            continue
+        if _clean_out == _stale_out:
+            _drift_problems.append(
+                f"{_script}: --config changed nothing, so the stale config was never "
+                "read and this comparison proves nothing")
+        if _clean != _stale:
+            _diff = [l for l in _stale if l not in _clean] + [l for l in _clean if l not in _stale]
+            _drift_problems.append(f"{_script}: structure changed: {_diff[:3]}")
+except Exception as _e:      # a diagnostic must not die on the input it diagnoses
+    _drift_problems.append(f"could not run the emitters: {_e}")
+check(
+    "budgets: a stale project config changes recorded VALUES, never emitted STRUCTURE",
+    not _drift_problems,
+    f"{_drift_problems} — the fixtures carry the pre-split lane structure that a "
+    "session actually reproduced (reported 2026-08-26). Both emitters must be a pure "
+    "function of the shipped template: same lanes, same grouping, same ladder, "
+    "whatever the project file says",
+)
+
 # The reference SHAPE, measured rather than described: this repository's own
 # instantiated config carries a Budget Receipt and no pool. There is no earlier
 # read of it in this file — `PRODUCERS` names the path as a dict KEY, which maps
@@ -6392,7 +6566,17 @@ _Q_BANNED = (
 # DOTALL with a bounded gap: the lead-in sentence may wrap across lines, which is
 # how the first version of this regex saw one block where there were two — an
 # assertion under-counting the thing it exists to count.
+#
+# THE FOUR BUDGET CALLS MOVED HOMES (2026-08-26). When the emitters were mechanised,
+# the four budget question blocks became canonical in org-config.template.md § Budget
+# question wording (the `### Wording:` blockquotes) and audit-setup.md § Step 0.4a–0.4d
+# now POINT at them instead of retyping them — `budget wording: no reference restates
+# the canonical question copy` forbids the restatement this check once required. So
+# count BOTH homes: the two non-budget blocks (consent, backup) still specified in
+# audit-setup.md, plus the four budget blocks in their canonical section. The
+# banned-term scan below runs over both, so the copy is still checked wherever it lives.
 _q_blocks = re.findall(r"\*\*Use this wording[^\n]*(?:\n[^\n>]*)*?\n\n((?:>.*\n)+)", _asu)
+_q_blocks += re.findall(r"^###\s+Wording:[^\n]*\n\n((?:>.*\n)+)", _wording_body, re.M)
 _q_leaks = {
     w: b.strip()[:60]
     for b in _q_blocks for w in _Q_BANNED

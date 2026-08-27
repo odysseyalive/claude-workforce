@@ -2638,5 +2638,218 @@
         ]
       }
     }
+  },
+  "effortbudget-firstrun": {
+    "_why": "THE FIRST-RUN CONTRACT for the half of the budget that had no emitter. `wf-model-budget` mechanised the model pool on 2026-08-20 after a re-audit read a project's stale `## Model statics`; the EFFORT ladder was left on prose, so it was still hand-reconstructed on every run \u2014 the same hole, half-closed. This freezes what a first run must produce from a template alone: the ladder in cost order, every lane pre-selected on its RECOMMENDED rung (INV-BUDGET \u2014 never the most expensive, never unset), and the two-call grouping the model budget uses, so the two questions offer the same categories in the same order. It also freezes the two windowing facts that differ per model and cannot be read off the ladder: `claude-opus-4-6` (creative-text) has NO `xhigh`, so its object is exactly four rungs and drops nothing, while `claude-fable-5` (creative-visual) spans all five and drops the far `max` end \u2014 asserted as whole lane blocks, which is the only way to assert an ABSENT rung. The `QUESTION-HEADER`/`QUESTION-BODY` blocks are asserted byte-for-byte against org-config.template.md \u00a7 Budget question wording: an option set produced mechanically under a header retyped from memory is still half a hand-built question. `not` forbids an `Other` line \u2014 the ladder is the complete set the harness accepts and there is no `Other` rung.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md"
+    ],
+    "exit": 0,
+    "want": [
+      "ladder (cost order, most expensive first): max, xhigh, high, medium, low",
+      "lanes: 5, rendered as 2 AskUserQuestion calls (cap: 4 objects per call)",
+      "CALL A  (structural lanes \u2014 3 objects: analytical \u00b7 Lead, analytical \u00b7 IC, code)",
+      "CALL B  (creative lanes \u2014 2 objects: creative-text, creative-visual)",
+      "QUESTION-HEADER-BEGIN\n**How hard should each kind of agent think?**\nQUESTION-HEADER-END\nQUESTION-BODY-BEGIN\nHigher settings are slower and cost more. The middle setting is right for most work; the agents that\ncoordinate benefit most from a higher one, because they are deciding rather than executing.\n\n\u00b7 **Agents that coordinate** \u00b7 **Agents that do the work** \u00b7 **Code work**\nQUESTION-BODY-END",
+      "QUESTION-HEADER-BEGIN\n**How hard should the creative agents think?**\nQUESTION-HEADER-END\nQUESTION-BODY-BEGIN\nHigher settings are slower and cost more. The middle setting is the deliberate default for creative\nwork, so it does not start at high cost; you can raise it later if you want.\n\n\u00b7 **Writing & copy work**\n\u00b7 **Graphics & frontend design work**\nQUESTION-BODY-END",
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  model: claude-opus-4-8  [recommended model (fallback)]\n  - max\n  - xhigh\n  - high  (recommended) [pre-selected]\n  - medium\n  dropped to fit the 4-option cap (farthest from the recommendation): low\n",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  model: claude-opus-4-6  [recommended model (fallback)]\n  - max\n  - high\n  - medium  (recommended) [pre-selected]\n  - low\n  no \"Other\" rung",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  model: claude-fable-5  [recommended model (fallback)]\n  - xhigh\n  - high\n  - medium  (recommended) [pre-selected]\n  - low\n  dropped to fit the 4-option cap (farthest from the recommendation): max\n",
+      "default source: recommended default (first run)",
+      "stale embedded '## Effort statics' in project config: none"
+    ],
+    "not": [
+      "recorded (re-audit)",
+      "!! NO EFFORT OBJECT",
+      "Other (hand-typed",
+      "HONORED-UNSUPPORTED",
+      "model: claude-opus-4-6  [recommended model (fallback)]\n  - xhigh"
+    ]
+  },
+  "effortbudget-reaudit": {
+    "_why": "THE RE-AUDIT HALF of the default-resolution pair, and the falsifier for an emitter that ignores what the project already chose. All five lanes are recorded here with rungs that DIFFER from their recommendations, so `not: [\"recommended default (first run)\"]` fails the instant any lane falls back \u2014 the shape a broken `--config` read takes. Each lane block is asserted whole because the two marks must SEPARATE: `(recommended)` stays on the template's rung and `[pre-selected]` moves to the recorded one, which a single-mark check cannot distinguish. The blocks also pin the windowing's protected end: `analytical \u00b7 Lead` records `xhigh` and drops `low`, `code` records `max` \u2014 the expensive end, which the window may not drop because it is the recorded default \u2014 and drops `low` instead, while `analytical \u00b7 IC` records `low` and drops `max`. A window that dropped by cost rather than by distance-from-the-recommendation would silently delete a user's own recorded rung from the slate it is pre-selected in.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md",
+      "--config",
+      "org-config.md"
+    ],
+    "exit": 0,
+    "want": [
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  model: claude-opus-4-8  [recorded (re-audit)]\n  - max\n  - xhigh  [pre-selected]\n  - high  (recommended)\n  - medium\n  dropped to fit the 4-option cap (farthest from the recommendation): low\n",
+      "LANE analytical \u00b7 IC  (object: \"Agents that do the work\")\n  model: claude-sonnet-5  [recorded (re-audit)]\n  - xhigh\n  - high\n  - medium  (recommended)\n  - low  [pre-selected]\n  dropped to fit the 4-option cap (farthest from the recommendation): max\n",
+      "LANE code  (object: \"Code work\")\n  model: claude-opus-5  [recorded (re-audit)]\n  - max  [pre-selected]\n  - xhigh\n  - high  (recommended)\n  - medium\n  dropped to fit the 4-option cap (farthest from the recommendation): low\n",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  model: claude-opus-4-6  [recorded (re-audit)]\n  - max\n  - high  [pre-selected]\n  - medium  (recommended)\n  - low\n  no \"Other\" rung",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  model: claude-fable-5  [recorded (re-audit)]\n  - xhigh  [pre-selected]\n  - high\n  - medium  (recommended)\n  - low\n  dropped to fit the 4-option cap (farthest from the recommendation): max\n",
+      "default source: recorded (re-audit)"
+    ],
+    "not": [
+      "recommended default (first run)",
+      "!! NO EFFORT OBJECT",
+      "STALE-ARTIFACT"
+    ]
+  },
+  "effortbudget-haiku-override": {
+    "_why": "TWO RULES ONE CASE CANNOT SEPARATE OTHERWISE. (1) A model that rejects the effort parameter renders NO effort object \u2014 not a blank one and not a rung it will refuse (`platform.md` fact 12c, DOCUMENTED). The call header must then say TWO objects, because a header that keeps claiming three describes a call the caller cannot render. (2) `--models` OUTRANKS `--config`: the model calls are questions 3 and 4 and the effort calls are 5 and 6, so a model just resolved is newer than anything the file recorded. The fixture config records `claude-sonnet-5` for that lane and `--models` supplies `claude-haiku-4-5`, so `not: [\"claude-sonnet-5\"]` fails if the recorded value wins. The recorded `medium` effort rides along with the superseded model and must NOT be honoured against its replacement, which is what `not` asserts by forbidding a rung list under the haiku model line.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md",
+      "--config",
+      "org-config.md",
+      "--models",
+      "analytical-ic=claude-haiku-4-5"
+    ],
+    "exit": 0,
+    "want": [
+      "CALL A  (structural lanes \u2014 2 objects: analytical \u00b7 Lead, code; 1 lane renders no effort object)",
+      "LANE analytical \u00b7 IC  (object: \"Agents that do the work\")\n  model: claude-haiku-4-5  [supplied (--models)]\n  !! NO EFFORT OBJECT: claude-haiku-4-5 rejects the effort parameter entirely (platform.md). Render NO object for this lane \u2014 not a blank one, and not a rung it will refuse.\n",
+      "CALL B  (creative lanes \u2014 2 objects: creative-text, creative-visual)"
+    ],
+    "not": [
+      "claude-sonnet-5",
+      "model: claude-haiku-4-5  [supplied (--models)]\n  - ",
+      "CALL A  (structural lanes \u2014 3 objects"
+    ]
+  },
+  "effortbudget-stale-embedded": {
+    "_why": "THE EFFORT-SIDE REGRESSION TEST for the failure that produced `wf-model-budget`. A legacy instantiation copied the statics into the project's own `org-config.md`; on a re-audit the agent reconstructing the picker read that co-located stale copy instead of the template. Here the embedded `## Effort statics` names a THREE-rung ladder and recommends `low` for every lane \u2014 values that cannot survive contact with the template. The ladder must still be the template's five, no lane may pre-select the stale `low`, and the section must be REPORTED as a stale legacy artifact and read past, never rewritten or deleted (org-config.template.md \u00a7 Model statics \u2014 the project file is the user's). The recorded per-lane VALUES in the same file are still read, which is the distinction the case turns on: structure from the template, choices from the project.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md",
+      "--config",
+      "org-config.md"
+    ],
+    "exit": 0,
+    "want": [
+      "ladder (cost order, most expensive first): max, xhigh, high, medium, low",
+      "STALE-ARTIFACT: the project's org-config.md carries a '## Effort statics' heading. The ladder was read from the template, never from that copy.",
+      "never rewrite or delete it",
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  model: claude-opus-4-8  [recorded (re-audit)]\n  - max\n  - xhigh\n  - high  (recommended) [pre-selected]\n  - medium\n",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  model: claude-fable-5  [recommended model (fallback)]\n  - xhigh\n  - high\n  - medium  (recommended) [pre-selected]\n  - low\n"
+    ],
+    "not": [
+      "ladder (cost order, most expensive first): high, medium, low",
+      "  - low  [pre-selected]",
+      "lanes: 3"
+    ]
+  },
+  "effortbudget-drift-regression": {
+    "_why": "THE DRIFT REGRESSION, and the reason both budgets are emitters rather than prose. Reported 2026-08-26: a session rebuilding \"the budget questions\" reached for a project's instantiated `org-config.md` and reproduced the STRUCTURE it found there. This config carries the pre-split structure verbatim \u2014 one undifferentiated `Analytical` row at `max`, one `Creative` lane with no visual counterpart, a four-lane heading \u2014 and the emitted calls must be a pure function of the shipped template regardless: five lanes, grouped three-then-two, in the canonical order, with `creative-visual` present. `not` is the sharp end: no bare `creative` object, no four-object call, and no `[pre-selected]` on `max`, because the stale undifferentiated `Analytical | max` row matches NO lane and must reach neither analytical object \u2014 both first-run on their recommendation instead. The pre-split `Creative effort | low` row IS honoured, as `creative-text`: reading a recorded choice as nothing would silently discard what the user picked, which is the opposite failure and just as bad.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md",
+      "--config",
+      "org-config.md"
+    ],
+    "exit": 0,
+    "want": [
+      "lanes: 5, rendered as 2 AskUserQuestion calls (cap: 4 objects per call)",
+      "CALL A  (structural lanes \u2014 3 objects: analytical \u00b7 Lead, analytical \u00b7 IC, code)",
+      "CALL B  (creative lanes \u2014 2 objects: creative-text, creative-visual)",
+      "ladder (cost order, most expensive first): max, xhigh, high, medium, low",
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  model: claude-opus-4-8  [recommended model (fallback)]\n  - max\n  - xhigh\n  - high  (recommended) [pre-selected]\n  - medium\n",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  model: claude-opus-4-6  [recorded (re-audit)]\n  - max\n  - high\n  - medium  (recommended)\n  - low  [pre-selected]\n",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")"
+    ],
+    "not": [
+      "LANE creative  (object",
+      "lanes: 4",
+      "CALL A  (structural lanes \u2014 4 objects",
+      "  - max  [pre-selected]"
+    ]
+  },
+  "effortbudget-emptyroot": {
+    "_why": "AN EMPTY --root IS A CALLER ERROR, never a silent retarget to the CWD. `${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`, and `os.path.abspath(\"\")` is the CWD \u2014 a real directory that passes a naive is-a-directory guard. This emitter resolves `--template`, `--platform`, and `--config` against the root, so an empty one either derives the whole ladder from whatever `template.md` happens to sit in the CWD or exits 2 complaining it cannot read `template.md`, which sends the caller to fix the wrong end of the problem. The exit code alone cannot tell those apart: BOTH are 2. `want` pins the message to the ROOT and `not` forbids the file-unreadable wording, so this row fails against an unguarded script even though its exit code would match. The harness passes `--root <tree>` itself, so the row appends a second, empty `--root` that argparse resolves last.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md",
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "want": [
+      "wf-effort-budget: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; pass an explicit path."
+    ],
+    "not": [
+      "cannot read",
+      "ladder (cost order",
+      "CALL A",
+      "QUESTION-HEADER-BEGIN"
+    ]
+  },
+  "effortbudget-nowording": {
+    "_why": "THE FALSIFYING HALF of the wording pair. `effortbudget-firstrun` proves the emitter prints the canonical header and body byte-for-byte; alone it cannot prove the emitter would REFUSE to run without them, and an emitter that shrugs and prints options anyway hands the caller half a question and invites it to retype the other half from memory \u2014 which is exactly the reconstruction hole this change closes. The frozen template here is identical to the first-run one with `## Budget question wording` deleted, so the case isolates that one section: exit 2, name the missing section, and emit NO option set on the way out (`not` asserts no ladder line, no lane, no wording marker). A degraded emitter that defaults to an empty header passes the sibling case and fails only this one.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md"
+    ],
+    "exit": 2,
+    "want": [
+      "wf-effort-budget: template has no '## Budget question wording' section: the caller would reconstruct the question text by hand, which is the drift this emitter exists to end"
+    ],
+    "not": [
+      "ladder (cost order",
+      "LANE analytical",
+      "QUESTION-HEADER-BEGIN"
+    ]
+  },
+  "modelbudget-nowording": {
+    "_why": "The MODEL-side twin of `effortbudget-nowording`, and the pair that proves the canonical wording has exactly ONE home. Both emitters parse `## Budget question wording` from the shipped template; if either kept a private copy to fall back on, that copy would be a second source of truth and would drift from the template the moment one is edited (SKILL.md Principle 9a \u2014 constants are stated once). With the section deleted from the frozen template this must exit 2 and name it, having emitted no pool line and no CALL header. A fallback string compiled into the script passes every other modelbudget case and fails only here.",
+    "script": "wf-model-budget",
+    "args": [
+      "--template",
+      "template.md"
+    ],
+    "exit": 2,
+    "want": [
+      "wf-model-budget: template has no '## Budget question wording' section"
+    ],
+    "not": [
+      "pool (cost order, most expensive first)",
+      "CALL A",
+      "QUESTION-HEADER-BEGIN"
+    ]
+  },
+  "effortbudget-unsupported-rec": {
+    "_why": "AN AVAILABILITY CONTRADICTION IS REFUSED, NOT RENDERED. The recommended rung is the forced first-run default (INV-BUDGET), so a lane recommended a rung its model does not accept has no renderable default at all \u2014 the emission would pre-select a value the harness rejects, or quietly substitute one nobody chose. This frozen template recommends `xhigh` for `creative-text` while `platform.md` records that its model has no `xhigh`; the two sources disagree, and the emitter must say WHICH lane, WHICH rung, WHICH model, and what the model does accept, rather than emit an option set the caller would trust. It is the negative half of the windowing pair: an emitter that silently dropped the unsupported rung would pass `effortbudget-firstrun` (whose creative-text ladder is exactly four rungs) and fail only here.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md"
+    ],
+    "exit": 2,
+    "want": [
+      "wf-effort-budget: availability contradiction: lane 'creative-text' is recommended effort 'xhigh', which its model 'claude-opus-4-6' does not accept (accepts: max, high, medium, low)",
+      "The recommendation is the forced first-run default and cannot be offered"
+    ],
+    "not": [
+      "ladder (cost order",
+      "LANE creative-text",
+      "QUESTION-HEADER-BEGIN"
+    ]
   }
 }

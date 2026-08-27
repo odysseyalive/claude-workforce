@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -125,6 +125,66 @@ and unverified); and
 pinned to it renders no effort object at all. **Named with the canonical categories** (§ The four lanes):
 this section sets the order the choices are shown in and, apart from marking the recommendation, changes
 none of them.
+
+**Per-model rung availability is read from `references/platform.md` facts 12b and 12c and from nowhere
+else.** The paragraph above is a reader's summary of those two facts, not a second source: `wf-effort-budget`
+parses the facts themselves, so a model that gains or loses a rung is one edit in `platform.md`. Both facts
+are DOCUMENTED and unverified — the ladder they produce is offered, never enforced.
+
+## Budget question wording — the four calls, stated once
+
+**The header and body of all four budget calls live here.** `wf-model-budget` and `wf-effort-budget`
+parse the blocks below and print them above their option sets, so a caller renders the WHOLE call —
+header, body, objects, options — verbatim and assembles no part of it by hand.
+
+Wording rebuilt from procedure prose drifts exactly the way an option pool rebuilt from prose drifts.
+The pool was mechanised first (§ Model statics, `wf-model-budget`) and the wording was not, so half of
+each budget question was still hand-assembled; reported 2026-08-26, a session rebuilding the budget
+questions reached for a project's instantiated `org-config.md` and reproduced the stale lane structure
+it found there. A question the emitter cannot print is a question the next reader reconstructs.
+
+`audit-setup.md` § How every question is worded still owns the plain-language rule and the banned-term
+list. This section holds the text that rule produced, not the rule.
+
+**Each block is one markdown blockquote. The first line is the question header; every line after it is
+the body**, blank lines included. The `Wording:` headings are machine-read — keep the
+`<budget> / CALL <letter>` shape.
+
+### Wording: model / CALL A
+
+> **Which model should each kind of agent use?**
+> Different work needs different models, and each agent is pinned to one so you never get asked again.
+> You can change any of these later with `/workforce model-map`.
+>
+> · **Agents that coordinate** — they hand work out and check what comes back
+> · **Agents that do the work** — the ones actually editing files and running commands
+> · **Code work**
+
+### Wording: model / CALL B
+
+> **Which model should the creative agents use?**
+> These agents produce the finished work — the writing, and the visuals — so they are pinned separately.
+> You can change either later with `/workforce model-map`.
+>
+> · **Writing & copy work**
+> · **Graphics & frontend design work**
+
+### Wording: effort / CALL A
+
+> **How hard should each kind of agent think?**
+> Higher settings are slower and cost more. The middle setting is right for most work; the agents that
+> coordinate benefit most from a higher one, because they are deciding rather than executing.
+>
+> · **Agents that coordinate** · **Agents that do the work** · **Code work**
+
+### Wording: effort / CALL B
+
+> **How hard should the creative agents think?**
+> Higher settings are slower and cost more. The middle setting is the deliberate default for creative
+> work, so it does not start at high cost; you can raise it later if you want.
+>
+> · **Writing & copy work**
+> · **Graphics & frontend design work**
 
 ## The four lanes — and the creative split that makes five
 

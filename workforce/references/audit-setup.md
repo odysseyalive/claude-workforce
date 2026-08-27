@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 52 assertion(s) in bin/check name this file; 68 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 53 assertion(s) in bin/check name this file; 68 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -372,6 +372,14 @@ fifth object on the model call until 2026-08-04 and the call could not render; i
 backup call (§ Step 0.2), where it belongs, because the advisor is not a lane. The creative lane split
 took the lanes to five, which is itself over the cap — hence the two-call split for each budget.
 
+**Every one of these four calls reads its header and body from `org-config.template.md` § Budget
+question wording and from nowhere else** — exactly as each reads its lane list from § The four lanes
+and its pool from § Model statics. `wf-model-budget` and `wf-effort-budget` emit that header and body
+above their option sets, and the caller renders the whole call verbatim, assembling no part of it by
+hand. The sub-sections below name which wording block each call takes; none of them retypes it.
+Restating the copy in a sub-section is the same drift as restating the pool, and § Budget question
+wording is its one home.
+
 ### Step 0.4a — Model budget, Call A  (question 3 of 6 · 3 objects)
 
 The structural call: the three non-creative lanes.
@@ -382,16 +390,9 @@ The structural call: the three non-creative lanes.
 | analytical — IC | the IC default, same reason |
 | code | one model for the whole code lane, no tier split |
 
-**Use this wording** (§ How every question is worded). The internal lane names are the *object labels'*
-business; the question text is not the place for them:
-
-> **Which model should each kind of agent use?**
-> Different work needs different models, and each agent is pinned to one so you never get asked again.
-> You can change any of these later with `/workforce model-map`.
->
-> · **Agents that coordinate** — they hand work out and check what comes back
-> · **Agents that do the work** — the ones actually editing files and running commands
-> · **Code work**
+Wording: this call takes **Wording: model / CALL A** (§ Step 0.4 sole-source rule above). Keeping the
+internal lane names out of that question text is the object labels' business, and § How every
+question is worded owns that rule.
 
 ### Step 0.4b — Model budget, Call B  (question 4 of 6 · 2 objects)
 
@@ -402,14 +403,7 @@ The creative call: the two generative lanes.
 | creative-text | one model for generative writing and copy, no tier split |
 | creative-visual | one model for graphics and frontend design; its out-of-pool recommendation leads the options |
 
-**Use this wording** (§ How every question is worded):
-
-> **Which model should the creative agents use?**
-> These agents produce the finished work — the writing, and the visuals — so they are pinned separately.
-> You can change either later with `/workforce model-map`.
->
-> · **Writing & copy work**
-> · **Graphics & frontend design work**
+Wording: this call takes **Wording: model / CALL B** (§ Step 0.4 sole-source rule above).
 
 Each model object offers the statics from `org-config.template.md` § Model statics, in the order listed
 there, plus "Other" for a hand-typed model ID. creative-visual's recommended model sits outside the pool,
@@ -473,13 +467,7 @@ that permanent asymmetry is exactly why it may not sit among the lanes.
 
 The structural call: the same three lanes as the model budget's Call A, in the same order.
 
-**Use this wording** (§ How every question is worded):
-
-> **How hard should each kind of agent think?**
-> Higher settings are slower and cost more. The middle setting is right for most work; the agents that
-> coordinate benefit most from a higher one, because they are deciding rather than executing.
->
-> · **Agents that coordinate** · **Agents that do the work** · **Code work**
+Wording: this call takes **Wording: effort / CALL A** (§ Step 0.4 sole-source rule above).
 
 **The same three categories as Step 0.4a, in the same order** — `analytical · Lead`, `analytical · IC`,
 `code`. The grouping matches the model budget's Call A exactly, so the two budgets agree about what a
@@ -489,14 +477,7 @@ lane is.
 
 The creative call: the same two lanes as the model budget's Call B.
 
-**Use this wording** (§ How every question is worded):
-
-> **How hard should the creative agents think?**
-> Higher settings are slower and cost more. The middle setting is the deliberate default for creative
-> work, so it does not start at high cost; you can raise it later if you want.
->
-> · **Writing & copy work**
-> · **Graphics & frontend design work**
+Wording: this call takes **Wording: effort / CALL B** (§ Step 0.4 sole-source rule above).
 
 **The same two categories as Step 0.4b, in the same order** — `creative-text`, `creative-visual`. Both
 recommend `medium` deliberately (`org-config.template.md` § Effort statics): generative work does not
@@ -528,6 +509,18 @@ is exactly four (`org-config.template.md` § Effort statics). creative-visual's 
 five rungs (`references/platform.md` fact 12c), so the four nearest its `medium` recommendation are
 offered — `xhigh`/`high`/`medium`/`low`, dropping the far `max` end. A model that supports no effort at
 all renders **no effort object** for its lane — not a blank one.
+
+**This option set is PRODUCED BY `wf-effort-budget` — it is never rebuilt here by hand.** Run
+`wf-effort-budget --root <project> --config <org-config.md when one is present> --models <lane=model,...>`
+(a shipped script). It reads the ladder and the per-lane recommended rung from the template's § Effort
+statics, per-model rung availability from `references/platform.md`, and the call's header and body from
+§ Budget question wording — then emits both calls whole. **Render its `LANE` blocks and its
+`QUESTION-HEADER`/`QUESTION-BODY` blocks verbatim; derive no ladder, no window, and no question text by
+hand.** The model half of this budget was mechanised on 2026-08-20 and the effort half was left on prose,
+so it went on being reconstructed from a project's own file: a session rebuilding the budget questions
+reproduced the stale lane structure it found in an instantiated `org-config.md` (reported 2026-08-26).
+A lane's ladder depends on the model that lane resolved to, which is precisely the part a reader
+reconstructs wrongly. Regression fixtures: `effortbudget-drift-regression`, `effortbudget-stale-embedded`.
 
 **The pre-check cannot come from the Step 2 panel**, which has not run yet — this gate fires in setup
 and Step 2 designs the org later. Seed it from `org-config.md` where a prior run recorded it; on a

@@ -104,6 +104,7 @@ COV = "bin/coverage"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
 WFMB = "workforce/bin/wf-model-budget"
+WFEB = "workforce/bin/wf-effort-budget"
 PRM = "workforce/bin/wf-permissions"
 CMD = "CLAUDE.md"
 DEV = "DEVELOPMENT.md"
@@ -369,6 +370,40 @@ CASES = [
      WFMB, "del", "Recommended for analytical IC"),
     ("audit-setup: the effort budget orders its rungs most expensive first",
      ASU, "del", "The rungs are offered most expensive first"),
+    # ── the same hole's other half: the EFFORT budget had no emitter, so its ladder
+    #    was still rebuilt from prose on every run — and a lane's ladder depends on
+    #    the MODEL that lane resolved to, which is the part a reader gets wrong
+    #    (2026-08-26) ──
+    ("audit-setup: the effort budget option set is produced by wf-effort-budget, not by hand",
+     ASU, "del", "PRODUCED BY `wf-effort-budget`"),
+    ("model-map: the effort budget option set is produced by wf-effort-budget, not by hand",
+     MM, "del", "the effort ladder is never rebuilt here either"),
+    # Two payloads, one check, because the check forbids two different constants and
+    # a single break would leave the other half unproven: a model ID reaches the code
+    # from a copied pool, a rung reaches it from a retyped ladder.
+    ("wf-effort-budget hardcodes no model ID and no rung in its logic",
+     WFEB, "append", '\n_LEAKED_CONSTANT = "claude-opus-5"\n'),
+    ("wf-effort-budget hardcodes no model ID and no rung in its logic",
+     WFEB, "append", '\n_LEAKED_RUNG = "xhigh"\n'),
+    ("wf-effort-budget derives the ladder and the recommendation from § Effort statics",
+     WFEB, "del", "The rungs are\\s+"),
+    # ── one home for the question copy: the option set was produced mechanically
+    #    while the header above it was retyped from prose (2026-08-26) ──
+    ("budget wording: one canonical block, covering both budgets and both calls",
+     CFG, "del", "### Wording: effort / CALL B"),
+    ("budget wording: both emitters read the canonical block",
+     WFEB, "del", "^##\\s+Budget question wording"),
+    ("budget wording: neither emitter carries its own copy of the question copy",
+     WFEB, "append", '\n_LEAKED_COPY = "**How hard should each kind of agent think?**"\n'),
+    # ── one home in the PROSE too: reprint a canonical header into a reference and the
+    #    scan must catch it (audit-setup.md restated all four verbatim until 2026-08-26) ──
+    ("budget wording: no reference restates the canonical question copy",
+     ASU, "append", "\n**Which model should each kind of agent use?**\n"),
+    # The drift guard runs the emitters instead of reading them. Break the INPUT it
+    # depends on: with `--config` no longer read, the with/without runs are identical
+    # and the guard must report that it proved nothing rather than pass.
+    ("budgets: a stale project config changes recorded VALUES, never emitted STRUCTURE",
+     WFEB, "del", "        recorded_models, recorded_efforts = parse_config(config_text)\n"),
     ("scopes: no shipped file invokes a script by a bare project-scope path",
      ORG, "append", "\n.claude/skills/workforce/bin/wf-census --root x\n"),
     ("scopes: the canonical script resolver is stated, and personal resolves first",

@@ -1,6 +1,6 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without
@@ -58,6 +58,15 @@ project config is reported as a stale artifact and read past, never clobbered
 renders** (`references/audit-setup.md` § Step 0.4a). Run `wf-model-budget --root <project> --config
 <org-config.md>` and render its four `LANE` blocks verbatim rather than reconstructing the pool, the
 `(recommended)` marker, or the cost order by hand — the two readers of the pool must not derive it two ways.
+
+**The effort budget's option set comes from `wf-effort-budget`, the same shipped script `audit`
+Step 0.4c/0.4d renders** (`references/audit-setup.md` § Step 0.4c). Run `wf-effort-budget --root <project>
+--config <org-config.md> --models <lane=model,...>` and render its `LANE` blocks verbatim:
+**the effort ladder is never rebuilt here either.**
+Which rungs a lane may offer depends on the model that lane resolved to
+(`references/platform.md` facts 12b/12c), so a ladder retyped from memory is wrong for whichever lane
+the reader was not thinking about. Both emitters also print the call's header and body from
+`org-config.template.md` § Budget question wording, so render the WHOLE call as emitted.
 
 ## Resolution
 

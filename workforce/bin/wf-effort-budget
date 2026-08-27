@@ -1,0 +1,675 @@
+#!/usr/bin/env python3
+"""wf-effort-budget — emit the effort budget's option set and wording, mechanically.
+
+The MIRROR of `wf-model-budget`, for the other half of the budget. `audit`
+Step 0.4c/0.4d render the same five lanes — `analytical · Lead`, `analytical · IC`,
+`creative-text`, `creative-visual`, `code` — each offering the rungs of the effort
+ladder in cost order with the lane's recommended rung marked `(recommended)`. Until
+now that ladder was RECONSTRUCTED from prose by the running agent on every run. The
+model half of the budget was mechanised on 2026-08-20 after a re-audit read a
+project's stale `## Model statics` and proposed a superseded pool; the effort half was
+left on prose, which is the same hole with nothing plugging it. Reported 2026-08-26: a
+session rebuilding "the budget questions" reached for a project's instantiated
+`org-config.md` and reproduced the stale lane structure it found there.
+
+FIVE LANES DO NOT FIT ONE CALL, and the grouping is not this script's to choose.
+`AskUserQuestion` accepts at most FOUR objects per call (`platform.md` § header), so
+the five lanes render as TWO calls with the IDENTICAL grouping the model budget uses:
+CALL A carries the three structural lanes (`analytical · Lead`, `analytical · IC`,
+`code`) and CALL B the two creative lanes. The two budgets render back to back and
+must offer the same categories in the same order (`org-config.template.md` § The four
+lanes); a caller that regroups either one by hand reintroduces the drift both scripts
+exist to foreclose.
+
+WHAT IT DERIVES, and from where. No rung, no model ID, and no sentence of question
+copy is written in this file (`SKILL.md` Principle 9a — constants are stated once):
+
+  * The ladder, in cost order most-expensive-first — parsed from
+    `org-config.template.md` § Effort statics. Table order is cost order; this script
+    never re-sorts.
+  * The per-lane recommended rung — parsed from that section's recommendation table,
+    whose canonical lane labels map onto the lane keys below.
+  * PER-MODEL RUNG AVAILABILITY — parsed from `references/platform.md`, where the
+    per-model claims live (facts 12b/12c: one model has no `xhigh`, one spans all
+    five, one REJECTS `effort` entirely). Both facts are DOCUMENTED and unverified,
+    so what they produce is an offer, never an enforcement. A model platform.md says
+    nothing about is treated as supporting the whole ladder, which is fact 12b's own
+    reading ("availability depending on the model") and never silently narrows a
+    lane.
+  * The question header and body per call — parsed from `org-config.template.md`
+    § Budget question wording, the one home of that copy. This emitter prints the
+    WHOLE call so the caller renders it verbatim and assembles nothing: an option set
+    produced mechanically under a header retyped from memory is still half a
+    hand-built question.
+
+THE LANE'S MODEL IS AN INPUT, because the ladder depends on it. Resolution order,
+highest first:
+  1. `--models lane=model,...` — what the model budget just resolved. The model calls
+     are questions 3 and 4 and the effort calls are 5 and 6, so a model supplied here
+     is NEWER than anything a file recorded, and it wins.
+  2. `--config <org-config.md>` — the recorded per-lane model on a re-audit.
+  3. The lane's RECOMMENDED model, from § Model statics. A deterministic fallback
+     used ONLY to compute rung availability, never emitted as a model choice: with no
+     model resolved there is no ladder to window, and guessing the widest one would
+     offer rungs the lane may not accept.
+
+THE PRE-SELECTED DEFAULT is the recorded rung from `--config` on a re-audit, ELSE the
+lane's recommended rung on a first run (INV-BUDGET, `audit-setup.md` § Step 0.4c) —
+never the most expensive rung and never unset. A recorded rung the resolved model does
+not support is HONORED and FLAGGED rather than dropped, in the spirit of
+`wf-model-budget`'s out-of-pool default: a user's recorded choice disappearing from
+the slate it is pre-selected in is the silent discard this project keeps finding. A
+recorded value that is not a rung AT ALL cannot be honored — the ladder is the whole
+set the harness accepts — so it is reported and the lane falls back to its
+recommendation.
+
+WINDOWING. `AskUserQuestion` caps options at four and the full ladder is five, so a
+lane offers the FOUR RUNGS NEAREST its recommended rung, always including that rung
+and the recorded default, dropping the far end the lane will not reach. A tie drops
+the CHEAP end, which is what `audit-setup.md` § Step 0.4c specifies (`low` goes for a
+`high`-recommended lane; `max` goes for a `medium`-recommended one). A lane whose
+model supports four or fewer rungs offers them all and drops nothing.
+
+There is NO "Other" rung, and this script never emits one. The ladder is the complete
+set the harness accepts, so a hand-typed value could only be a rung already offered or
+one that does not exist.
+
+The recommendation is a LABEL, never a POSITION — the same rule the model budget
+follows, and here for a sharper reason: the two questions render back to back, so a
+reader who has just learned that the top of one list is the expensive end must not
+have to unlearn it one question later. `(recommended)` is appended in place.
+
+WHAT IT REFUSES: the ladder, the recommendations, and the wording are NEVER read from
+`--config`. Only recorded per-lane values are. If the project's `org-config.md`
+carries its own `## Effort statics` heading, it is reported as a stale legacy artifact
+and read PAST, never clobbered — the project file is the user's
+(`org-config.template.md` § Model statics states the never-clobber rule; it holds for
+both statics sections).
+
+EXIT CODES: 0 normal (including when a stale embedded section, an unsupported recorded
+rung, or an unknown recorded value was reported — each is a finding to surface, not a
+failure to abort on); 2 when `--root` is empty, when § Effort statics or § Budget
+question wording cannot be found or parsed, when `--models` names a lane that does not
+exist, or on an AVAILABILITY CONTRADICTION — a rung named in platform.md that is not
+on the ladder, a lane recommended a rung its resolved model does not accept, or a
+window that cannot reach the option cap without dropping a protected rung. In each of
+those the caller has no trustworthy ladder and must not fall back to reconstructing
+one.
+"""
+
+import argparse
+import os
+import re
+import sys
+
+# The canonical lane order, owned by org-config.template.md § The four lanes and
+# restated in neither budget. The lane KEY is the token both budgets agree on; the
+# second field is the object header, the third its prompt.
+LANES = [
+    ("analytical-lead", "analytical · Lead", "Agents that coordinate"),
+    ("analytical-ic", "analytical · IC", "Agents that do the work"),
+    ("creative-text", "creative-text", "Writing & copy work"),
+    ("creative-visual", "creative-visual", "Graphics & frontend design work"),
+    ("code", "code", "Code work"),
+]
+
+# AskUserQuestion accepts at most this many objects per call (platform.md § header)...
+_OBJECT_CAP = 4
+# ...and at most this many options within one object. Aliased rather than restated so
+# the number lives in exactly one place in this file (SKILL.md Principle 9a).
+_OPTION_CAP = _OBJECT_CAP
+
+# Five lanes overflow one call, so the budget renders as two — the IDENTICAL grouping
+# wf-model-budget uses. The validation below refuses a grouping that drops,
+# duplicates, or overfills a lane.
+CALL_GROUPS = [
+    ("CALL A", "structural lanes", ("analytical-lead", "analytical-ic", "code")),
+    ("CALL B", "creative lanes", ("creative-text", "creative-visual")),
+]
+
+_LANE_KEYS = [k for k, _lbl, _p in LANES]
+_LANE_LABEL = {k: lbl for k, lbl, _p in LANES}
+_LANE_PROMPT = {k: p for k, _lbl, p in LANES}
+
+# A § Model statics row: | 1 | `<model-id>` | 1M | 128K | ...notes... |
+_POOL_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|.*\|\s*(.*?)\s*\|\s*$")
+
+# The `### Wording: <budget> / CALL <letter>` sub-headings of § Budget question wording.
+_WORDING_HEAD_RE = re.compile(r"^###\s+Wording:\s*([A-Za-z-]+)\s*/\s*CALL\s+([A-Z])\s*$")
+
+# Per-model availability, read from platform.md wherever it is stated rather than from
+# a hardcoded fact number: a fact renumbered or restated elsewhere in that file is
+# still read, and no model ID is written here.
+_AVAIL_ALL_RE = re.compile(r"`([A-Za-z][\w.-]*)`\s+accepts\s+[^.\n]*?effort rungs\s*[—-]\s*([^.\n]*)")
+_AVAIL_NOT_RE = re.compile(r"`([A-Za-z][\w.-]*)`\s*\(no\s+`(\w+)`\)")
+_AVAIL_NONE_RE = re.compile(
+    r"`([A-Za-z][\w.-]*)`[^`\n]{0,60}?rejects\s+(?:the\s+)?`?effort`?(?:\s+parameter)?\s+entirely")
+
+
+def _die(msg, code=2):
+    sys.stderr.write("wf-effort-budget: " + msg + "\n")
+    sys.exit(code)
+
+
+def _read(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read()
+    except OSError as exc:
+        _die("cannot read %s: %s" % (path, exc))
+
+
+def _validate_grouping():
+    """The call grouping must partition the lanes exactly and fit the tool's cap.
+
+    A lane silently missing from both calls is a lane the user is never asked about,
+    and the run would pin it to a default nobody chose."""
+    grouped = [k for _n, _d, keys in CALL_GROUPS for k in keys]
+    if sorted(grouped) != sorted(_LANE_KEYS):
+        _die("internal: CALL_GROUPS does not partition LANES (%s vs %s)"
+             % (", ".join(sorted(grouped)), ", ".join(sorted(_LANE_KEYS))))
+    for name, _desc, keys in CALL_GROUPS:
+        if len(keys) > _OBJECT_CAP:
+            _die("internal: %s carries %d objects; the cap is %d per call"
+                 % (name, len(keys), _OBJECT_CAP))
+
+
+def default_reference(name):
+    """A shipped reference co-located with this script: bin/ and references/ are
+    siblings in all three copies (source, runtime, personal install)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(here, "..", "references", name))
+
+
+def _section(text, heading_re):
+    """The body between a heading matching heading_re and the next `## `."""
+    out, capturing = [], False
+    for line in text.splitlines():
+        if capturing:
+            if line.startswith("## "):
+                break
+            out.append(line)
+        elif heading_re.match(line):
+            capturing = True
+    return "\n".join(out) if capturing else None
+
+
+def _lane_key(label):
+    """Normalise a canonical lane label to its key: `analytical · Lead` →
+    `analytical-lead`. The middot, the spaces, and the capitals are presentation."""
+    return re.sub(r"[^a-z0-9]+", "-", label.strip().lower()).strip("-")
+
+
+def _rec_lane(text):
+    """The lane a `**Recommended for <lane>**` annotation names, or None.
+
+    Derived from the lane KEYS rather than restating five phrases: `analytical-lead`
+    matches "Recommended for analytical Lead". The trailing `(?![\\w-])` keeps the two
+    creative lanes apart — without it a `creative-text` pattern would swallow
+    `creative-visual`'s annotation."""
+    for key in _LANE_KEYS:
+        pat = r"Recommended for " + key.replace("-", "[ -]") + r"(?![\w-])"
+        if re.search(pat, text, re.I):
+            return key
+    return None
+
+
+# --- template: ladder, recommendations, fallback models, wording -----------------
+
+def _effort_body(template_text):
+    body = _section(template_text, re.compile(r"^##\s+Effort statics"))
+    if body is None:
+        _die("template has no '## Effort statics' section: cannot derive the ladder")
+    return body
+
+
+def parse_ladder(template_text):
+    """The rungs in cost order, most expensive first, from § Effort statics."""
+    body = _effort_body(template_text)
+    m = re.search(r"The rungs are\s+([^(\n]*)", body)
+    rungs = [t.strip() for t in re.findall(r"`([^`]+)`", m.group(1))] if m else []
+    rungs = [r for r in rungs if re.match(r"^[a-z]+$", r)]
+    if len(rungs) < 2:
+        _die("'## Effort statics' present but no rung ladder parsed: the "
+             "'The rungs are `...`' line changed shape")
+    if len(set(rungs)) != len(rungs):
+        _die("the rung ladder repeats a rung (%s): the cost order is ambiguous"
+             % ", ".join(rungs))
+    return rungs
+
+
+def parse_rung_recommendations(template_text, ladder):
+    """{lane_key: rung} from § Effort statics' recommendation table."""
+    body = _effort_body(template_text)
+    rec = {}
+    for cells in _rows(body):
+        if len(cells) < 2:
+            continue
+        lane = _lane_key(re.sub(r"`", "", cells[0]))
+        if lane not in _LANE_KEYS:
+            continue
+        m = re.search(r"`([^`]+)`", cells[1])
+        rung = (m.group(1) if m else cells[1]).strip()
+        if rung not in ladder:
+            _die("lane '%s' is recommended effort '%s', which is not a rung on the "
+                 "ladder (%s): the recommendation and the ladder disagree"
+                 % (lane, rung, ", ".join(ladder)))
+        rec[lane] = rung
+    if not rec:
+        _die("no per-lane effort recommendation parsed from '## Effort statics': the "
+             "recommendation table changed shape")
+    return rec
+
+
+def parse_model_recommendations(template_text):
+    """{lane_key: model_id} from § Model statics — the availability FALLBACK only.
+
+    Read exactly the way wf-model-budget reads it: the per-lane annotation sits in a
+    pool row's Notes cell, or, for the one sanctioned out-of-pool recommendation, on a
+    prose line beside a backticked ID that is not a pool row."""
+    body = _section(template_text, re.compile(r"^##\s+Model statics"))
+    if body is None:
+        _die("template has no '## Model statics' section: a lane with no supplied or "
+             "recorded model has no fallback to compute rung availability from")
+    pool, rec = [], {}
+    for line in body.splitlines():
+        m = _POOL_ROW_RE.match(line)
+        if m:
+            pool.append(m.group(1).strip())
+    for line in body.splitlines():
+        lane = _rec_lane(line)
+        if lane is None:
+            continue
+        m = _POOL_ROW_RE.match(line)
+        if m:
+            rec[lane] = m.group(1).strip()
+            continue
+        outside = [t.strip() for t in re.findall(r"`([^`]+)`", line)
+                   if t.strip() and t.strip() not in pool]
+        if outside:
+            rec.setdefault(lane, outside[0])
+    if not rec:
+        _die("no lane is annotated 'Recommended for <lane>' in '## Model statics': "
+             "the availability fallback has no source")
+    return rec
+
+
+def parse_wording(template_text):
+    """{(budget, call_letter): (header_line, [body_lines])} from § Budget question
+    wording — the ONE home of the four calls' user-facing copy.
+
+    The blockquote's first line is the question header and every line after it is the
+    body, blank lines included."""
+    body = _section(template_text, re.compile(r"^##\s+Budget question wording"))
+    if body is None:
+        _die("template has no '## Budget question wording' section: the caller would "
+             "reconstruct the question text by hand, which is the drift this emitter "
+             "exists to end")
+    found, key, quoted = {}, None, []
+
+    def _close():
+        if key and quoted:
+            found[key] = (quoted[0], quoted[1:])
+
+    for line in body.splitlines():
+        m = _WORDING_HEAD_RE.match(line)
+        if m:
+            _close()
+            key, quoted = (m.group(1).strip().lower(), m.group(2).strip().upper()), []
+        elif line.startswith(">") and key:
+            quoted.append(line[1:].lstrip(" ") if line[1:2] == " " else line[1:])
+        elif line.strip() and key and quoted:
+            _close()
+            key, quoted = None, []
+    _close()
+    return found
+
+
+def wording_for(wording, budget, call_name):
+    letter = call_name.split()[-1]
+    got = wording.get((budget, letter))
+    if got is None:
+        _die("no wording block for '%s / %s' in '## Budget question wording': every "
+             "call renders header, body, and options together or the caller retypes "
+             "the half that is missing" % (budget, call_name))
+    return got
+
+
+def _rows(text):
+    """Cell lists for every markdown table row in text."""
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        yield [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+# --- platform.md: per-model rung availability ------------------------------------
+
+def parse_availability(platform_text, ladder):
+    """{model_id: set(rungs) or None} — None meaning the model REJECTS effort.
+
+    Anti-vacuity: a parse that finds NO per-model statement is refused rather than
+    treated as "everything supports everything". Silently widening every ladder is
+    exactly the failure a prose-only rule produces, and it would render an effort
+    object for a model that rejects the parameter."""
+    avail, seen = {}, 0
+    for m in _AVAIL_ALL_RE.finditer(platform_text):
+        rungs = [t.strip() for t in re.findall(r"`([^`]+)`", m.group(2))]
+        rungs = [r for r in rungs if re.match(r"^[a-z]+$", r)]
+        if not rungs:
+            continue
+        bad = [r for r in rungs if r not in ladder]
+        if bad:
+            _die("availability contradiction: platform.md says '%s' accepts rung(s) "
+                 "%s, which are not on the ladder (%s)"
+                 % (m.group(1), ", ".join(bad), ", ".join(ladder)))
+        avail[m.group(1)] = set(rungs)
+        seen += 1
+    for m in _AVAIL_NOT_RE.finditer(platform_text):
+        model, rung = m.group(1), m.group(2)
+        if rung not in ladder:
+            _die("availability contradiction: platform.md excludes rung '%s' from "
+                 "'%s', and '%s' is not on the ladder (%s)"
+                 % (rung, model, rung, ", ".join(ladder)))
+        base = avail.get(model)
+        avail[model] = (set(ladder) if base is None else set(base)) - {rung}
+        seen += 1
+    for m in _AVAIL_NONE_RE.finditer(platform_text):
+        avail[m.group(1)] = None
+        seen += 1
+    if not seen:
+        _die("no per-model effort availability parsed from platform.md: facts 12b/12c "
+             "state which models accept which rungs, and a ladder derived without them "
+             "would offer every rung to every model — including one that rejects effort")
+    return avail
+
+
+def supported_rungs(avail, model, ladder):
+    """The rungs a model accepts. A model platform.md says nothing about supports the
+    whole ladder (fact 12b: availability depends on the model, and the exceptions are
+    the documented ones). Returns None when the model rejects effort entirely."""
+    if model in avail:
+        return avail[model]
+    return set(ladder)
+
+
+# --- project config (re-audit values only; NEVER the ladder) ---------------------
+
+def _cell_value(cells, idx):
+    if len(cells) <= idx:
+        return None
+    raw = re.sub(r"[`*]", "", cells[idx]).strip()
+    return raw or None
+
+
+def parse_config(config_text):
+    """({lane: model}, {lane: rung}) recorded in a project's org-config.md.
+
+    Best-effort: a lane that cannot be found simply has no recorded value. A config
+    written before the creative lane split records one `Creative model` / `Creative
+    effort` row and no visual row; that row is the recorded TEXT lane, and reading it
+    as nothing would silently discard a choice the user made."""
+    models, efforts = {}, {}
+
+    def _take(lane, cells, model_idx, effort_idx):
+        if lane in models and lane in efforts:
+            return
+        if model_idx is not None:
+            m = re.search(r"`([^`]+)`", cells[model_idx]) if len(cells) > model_idx else None
+            if m and lane not in models:
+                models[lane] = m.group(1).strip()
+        if effort_idx is not None:
+            val = _cell_value(cells, effort_idx)
+            if val and re.match(r"^[A-Za-z]+$", val) and lane not in efforts:
+                efforts[lane] = val.lower()
+
+    labels = [
+        (re.compile(r"^Lead\b", re.I), "analytical-lead", 1, 2),
+        (re.compile(r"^IC\b", re.I), "analytical-ic", 1, 2),
+        (re.compile(r"^Creative-text model\b", re.I), "creative-text", 1, None),
+        (re.compile(r"^Creative-text effort\b", re.I), "creative-text", None, 1),
+        (re.compile(r"^Creative-visual model\b", re.I), "creative-visual", 1, None),
+        (re.compile(r"^Creative-visual effort\b", re.I), "creative-visual", None, 1),
+        (re.compile(r"^Code model\b", re.I), "code", 1, None),
+        (re.compile(r"^Code effort\b", re.I), "code", None, 1),
+        # Pre-split labels, read last so a current row always wins.
+        (re.compile(r"^Creative model\b", re.I), "creative-text", 1, None),
+        (re.compile(r"^Creative effort\b", re.I), "creative-text", None, 1),
+    ]
+    rows = list(_rows(config_text))
+    for pat, lane, mi, ei in labels:
+        for cells in rows:
+            if cells and pat.search(cells[0]):
+                _take(lane, cells, mi, ei)
+    return models, efforts
+
+
+def config_has_stale_statics(config_text):
+    return bool(re.search(r"^##\s+Effort statics", config_text, re.M))
+
+
+# --- windowing -------------------------------------------------------------------
+
+def window(ladder, supported, rec_rung, recorded_rung, lane_key):
+    """The rungs THIS lane offers, in cost order, and the ones it gave up.
+
+    The four nearest the recommended rung, always including that rung and the recorded
+    default, dropping the far end the lane will not reach. A tie drops the CHEAP end
+    (`audit-setup.md` § Step 0.4c: `low` goes for a `high`-recommended lane). A lane
+    whose model supports four or fewer rungs offers them all."""
+    protected = {r for r in (rec_rung, recorded_rung) if r}
+    rungs = [r for r in ladder if r in supported or r == recorded_rung]
+    dropped = []
+    while len(rungs) > _OPTION_CAP:
+        i_rec = rungs.index(rec_rung) if rec_rung in rungs else 0
+        d_head, d_tail = i_rec, len(rungs) - 1 - i_rec
+        head_free, tail_free = rungs[0] not in protected, rungs[-1] not in protected
+        if not head_free and not tail_free:
+            _die("availability contradiction: lane '%s' cannot fit the %d-option cap "
+                 "— the recommended rung '%s' and the recorded rung '%s' sit at "
+                 "opposite ends of a %d-rung ladder, and neither may be dropped"
+                 % (lane_key, _OPTION_CAP, rec_rung, recorded_rung, len(rungs)))
+        if head_free and (not tail_free or d_head > d_tail):
+            dropped.append(rungs.pop(0))
+        else:
+            dropped.append(rungs.pop())
+    return rungs, dropped
+
+
+# --- emission --------------------------------------------------------------------
+
+def _lane_block(lane_key, ladder, rec_rungs, model, model_src, supported, recorded):
+    """One AskUserQuestion object, rendered — or the refusal to render one."""
+    out = ["LANE %s  (object: \"%s\")" % (_LANE_LABEL[lane_key], _LANE_PROMPT[lane_key])]
+    out.append("  model: %s  [%s]" % (model, model_src))
+    if supported is None:
+        out.append("  !! NO EFFORT OBJECT: %s rejects the effort parameter entirely "
+                   "(platform.md). Render NO object for this lane — not a blank one, "
+                   "and not a rung it will refuse." % model)
+        out.append("")
+        return out, False
+
+    rec_rung = rec_rungs.get(lane_key)
+    if rec_rung is None:
+        _die("no rung is marked recommended for lane '%s' in the template's "
+             "§ Effort statics recommendation table" % lane_key)
+    if rec_rung not in supported:
+        _die("availability contradiction: lane '%s' is recommended effort '%s', which "
+             "its model '%s' does not accept (accepts: %s). The recommendation is the "
+             "forced first-run default and cannot be offered"
+             % (lane_key, rec_rung, model, ", ".join(r for r in ladder if r in supported)))
+
+    unknown = recorded is not None and recorded not in ladder
+    honored = recorded if (recorded and not unknown) else None
+    default = honored or rec_rung
+    rungs, dropped = window(ladder, supported, rec_rung, honored, lane_key)
+    for rung in rungs:
+        marks = []
+        if rung == rec_rung:
+            marks.append("(recommended)")
+        if rung == default:
+            marks.append("[pre-selected]")
+        out.append("  - %s%s" % (rung, ("  " + " ".join(marks)) if marks else ""))
+    if dropped:
+        out.append("  dropped to fit the %d-option cap (farthest from the "
+                   "recommendation): %s" % (_OPTION_CAP, ", ".join(dropped)))
+    out.append("  no \"Other\" rung — the ladder is the whole set the harness accepts")
+    if honored and honored not in supported:
+        out.append("    HONORED-UNSUPPORTED: %s is the recorded rung and stays "
+                   "pre-selected, but platform.md does not list it for %s. Honored, "
+                   "flagged, never silently dropped — a recorded choice vanishing "
+                   "from the slate it is pre-selected in is a silent discard."
+                   % (honored, model))
+    if unknown:
+        out.append("    IGNORED-UNKNOWN-RUNG: this lane records '%s', which is not a "
+                   "rung on the ladder (%s). There is no \"Other\" rung to honor it "
+                   "with, so the lane falls back to its recommended rung."
+                   % (recorded, ", ".join(ladder)))
+    out.append("  default source: %s"
+               % ("recorded (re-audit)" if honored else "recommended default (first run)"))
+    out.append("")
+    return out, True
+
+
+def emit(ladder, rec_rungs, models, model_srcs, avail, recorded_efforts, wording,
+         stale, template_path, platform_path):
+    out = ["WF-EFFORT-BUDGET  (Step 0.4c/0.4d option set — render verbatim, do not reorder)",
+           "source: %s § Effort statics" % template_path,
+           "wording source: %s § Budget question wording" % template_path,
+           "availability source: %s (per-model rungs; DOCUMENTED, unverified)" % platform_path,
+           "ladder (cost order, most expensive first): " + ", ".join(ladder),
+           "lanes: %d, rendered as %d AskUserQuestion calls (cap: %d objects per call)"
+           % (len(LANES), len(CALL_GROUPS), _OBJECT_CAP),
+           ""]
+    for call_name, call_desc, keys in CALL_GROUPS:
+        ordered = [k for k in _LANE_KEYS if k in keys]
+        blocks, rendered = [], []
+        for lane_key in ordered:
+            model = models[lane_key]
+            block, has_object = _lane_block(
+                lane_key, ladder, rec_rungs, model, model_srcs[lane_key],
+                supported_rungs(avail, model, ladder), recorded_efforts.get(lane_key))
+            blocks.extend(block)
+            if has_object:
+                rendered.append(lane_key)
+        silent = len(ordered) - len(rendered)
+        out.append("%s  (%s — %d objects: %s%s)"
+                   % (call_name, call_desc, len(rendered),
+                      ", ".join(_LANE_LABEL[k] for k in rendered) or "none",
+                      ("; %d lane%s no effort object"
+                       % (silent, " renders" if silent == 1 else "s render")) if silent else ""))
+        header, body = wording_for(wording, "effort", call_name)
+        out.append("QUESTION-HEADER-BEGIN")
+        out.append(header)
+        out.append("QUESTION-HEADER-END")
+        out.append("QUESTION-BODY-BEGIN")
+        out.extend(body)
+        out.append("QUESTION-BODY-END")
+        out.append("")
+        out.extend(blocks)
+    if stale:
+        out.append("STALE-ARTIFACT: the project's org-config.md carries a '## Effort statics' "
+                   "heading. The ladder was read from the template, never from that copy. "
+                   "Report it as a stale legacy artifact; never rewrite or delete it "
+                   "(org-config.template.md § Model statics — the never-clobber rule holds).")
+    else:
+        out.append("stale embedded '## Effort statics' in project config: none")
+    return "\n".join(out)
+
+
+def parse_models_flag(raw):
+    """`--models lane=model,...`. An unknown lane is refused, never ignored: a
+    misspelled lane would otherwise fall back to the recommended model and window a
+    ladder the caller did not ask for, silently."""
+    supplied = {}
+    for item in (raw or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            _die("--models expects lane=model pairs; got %r" % item)
+        lane, model = item.split("=", 1)
+        key = _lane_key(lane)
+        if key not in _LANE_KEYS:
+            _die("--models names lane %r, which is not a budget lane. The five are: %s"
+                 % (lane.strip(), ", ".join(_LANE_KEYS)))
+        if not model.strip():
+            _die("--models gives lane %r an empty model" % lane.strip())
+        supplied[key] = model.strip()
+    if raw is not None and not supplied:
+        _die("--models was passed but named no lane")
+    return supplied
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="wf-effort-budget",
+        description="Emit the effort budget's option set and wording from the shipped template.",
+    )
+    ap.add_argument("--root", default=".",
+                    help="base for resolving relative --template/--platform/--config")
+    ap.add_argument("--template", default=None,
+                    help="path to org-config.template.md (default: co-located references/ copy)")
+    ap.add_argument("--platform", default=None,
+                    help="path to platform.md (default: co-located references/ copy)")
+    ap.add_argument("--config", default=None,
+                    help="path to the project's org-config.md (re-audit values + stale-section check)")
+    ap.add_argument("--models", default=None,
+                    help="lane=model,... — the models the model budget just resolved; "
+                         "outranks --config, which outranks the recommended model")
+    args = ap.parse_args(argv)
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is UNSET in the Bash tool — measured 2026-08-04 on
+    # 2.1.221 — so every shipped `--root "${CLAUDE_PROJECT_DIR}"` block expands to
+    # `--root ""`. `os.path.abspath("")` is the CWD, a real directory, so an
+    # is-it-a-directory guard passes and the emitter would resolve its template
+    # against a tree nobody named — deriving the ladder, or failing about the wrong
+    # file entirely. Refuse it and name the empty argument.
+    _validate_grouping()
+    if not (args.root or "").strip():
+        _die("--root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; "
+             "pass an explicit path.")
+
+    def _resolve(p):
+        return p if os.path.isabs(p) else os.path.join(args.root, p)
+
+    template_path = (_resolve(args.template) if args.template
+                     else default_reference("org-config.template.md"))
+    platform_path = (_resolve(args.platform) if args.platform
+                     else default_reference("platform.md"))
+    template_text = _read(template_path)
+    ladder = parse_ladder(template_text)
+    rec_rungs = parse_rung_recommendations(template_text, ladder)
+    rec_models = parse_model_recommendations(template_text)
+    wording = parse_wording(template_text)
+    avail = parse_availability(_read(platform_path), ladder)
+
+    supplied = parse_models_flag(args.models) if args.models is not None else {}
+    recorded_models, recorded_efforts, stale = {}, {}, False
+    config_path = _resolve(args.config) if args.config else None
+    if config_path and os.path.exists(config_path):
+        config_text = _read(config_path)
+        recorded_models, recorded_efforts = parse_config(config_text)
+        stale = config_has_stale_statics(config_text)
+
+    models, model_srcs = {}, {}
+    for key in _LANE_KEYS:
+        if key in supplied:
+            models[key], model_srcs[key] = supplied[key], "supplied (--models)"
+        elif key in recorded_models:
+            models[key], model_srcs[key] = recorded_models[key], "recorded (re-audit)"
+        elif key in rec_models:
+            models[key], model_srcs[key] = rec_models[key], "recommended model (fallback)"
+        else:
+            _die("lane '%s' has no model: none supplied by --models, none recorded in "
+                 "--config, and none recommended in the template's § Model statics. "
+                 "Without a model there is no rung availability to window" % key)
+
+    sys.stdout.write(emit(ladder, rec_rungs, models, model_srcs, avail, recorded_efforts,
+                          wording, stale, template_path, platform_path) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

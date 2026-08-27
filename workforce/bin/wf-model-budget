@@ -68,6 +68,11 @@ WHAT IT DERIVES, and from where:
     <lane>` annotation, found on a PROSE line of § Model statics beside a backticked
     model ID that is not a pool row. `claude-fable-5` reaches `creative-visual` this
     way and no model ID for it is written here either.
+  * The question HEADER and BODY per call — parsed from § Budget question wording,
+    the one home of that copy, so this script prints the WHOLE call and the caller
+    renders it verbatim. An option set produced mechanically under a header retyped
+    from memory is still half a hand-built question, and the reconstruction hole was
+    left open on that half until 2026-08-26.
   * The pre-selected default per lane — the recorded value from the project's
     `org-config.md` four-lane tables when one is passed (a re-audit), ELSE the lane's
     recommended model (a first run defaults to the recommendation, `audit-setup.md`
@@ -89,7 +94,7 @@ past nothing — the pool rows below it are still in cost order, still marked in
 
 EXIT CODES: 0 normal (including when a stale embedded section was reported — it is a
 finding to surface, not a failure to abort on); 2 when `--root` is empty, when the
-template's § Model statics cannot be found or parsed, or when a lane other than the
+template's § Model statics or § Budget question wording cannot be found or parsed, or when a lane other than the
 one sanctioned lane resolves to an out-of-pool recommendation — in each of those the
 caller has no trustworthy pool and must not fall back to reconstructing one.
 """
@@ -151,6 +156,11 @@ _REC_PATTERNS = [
 
 # A statics row looks like: | 1 | `<model-id>` | 1M | 128K | ...notes... |
 _POOL_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|.*\|\s*(.*?)\s*\|\s*$")
+
+# The `### Wording: <budget> / CALL <letter>` sub-headings of § Budget question
+# wording. wf-effort-budget reads the same section with the same shape — the two
+# budgets share one home for their copy, which is the point of moving it there.
+_WORDING_HEAD_RE = re.compile(r"^###\s+Wording:\s*([A-Za-z-]+)\s*/\s*CALL\s+([A-Z])\s*$")
 
 _LANE_KEYS = [k for k, _lbl, _p in LANES]
 
@@ -264,6 +274,47 @@ def parse_out_of_pool_recs(template_text, pool_ids):
                  % (lane, found[lane], model_id))
         found[lane] = model_id
     return found
+
+
+def parse_wording(template_text):
+    """{(budget, call_letter): (header_line, [body_lines])} from § Budget question
+    wording — the ONE home of the four calls' user-facing copy.
+
+    The blockquote's first line is the question header and every line after it is the
+    body, blank lines included."""
+    body = _section(template_text, re.compile(r"^##\s+Budget question wording"))
+    if body is None:
+        _die("template has no '## Budget question wording' section: the caller would "
+             "reconstruct the question text by hand, which is the drift this emitter "
+             "exists to end")
+    found, key, quoted = {}, None, []
+
+    def _close():
+        if key and quoted:
+            found[key] = (quoted[0], quoted[1:])
+
+    for line in body.splitlines():
+        m = _WORDING_HEAD_RE.match(line)
+        if m:
+            _close()
+            key, quoted = (m.group(1).strip().lower(), m.group(2).strip().upper()), []
+        elif line.startswith(">") and key:
+            quoted.append(line[1:].lstrip(" ") if line[1:2] == " " else line[1:])
+        elif line.strip() and key and quoted:
+            _close()
+            key, quoted = None, []
+    _close()
+    return found
+
+
+def wording_for(wording, budget, call_name):
+    letter = call_name.split()[-1]
+    got = wording.get((budget, letter))
+    if got is None:
+        _die("no wording block for '%s / %s' in '## Budget question wording': every "
+             "call renders header, body, and options together or the caller retypes "
+             "the half that is missing" % (budget, call_name))
+    return got
 
 
 def recommended_by_lane(statics):
@@ -439,13 +490,14 @@ def _lane_block(lane_key, lane_label, prompt_label, statics, rec, defaults, pool
     return out
 
 
-def emit(statics, rec, defaults, stale, template_path):
+def emit(statics, rec, defaults, stale, template_path, wording):
     pool_ids = [m for m, _n, _l in statics]
     pool_set = set(pool_ids)
     meta = {k: (lbl, prompt) for k, lbl, prompt in LANES}
     out = []
     out.append("WF-MODEL-BUDGET  (Step 0.4a option set — render verbatim, do not reorder)")
     out.append("source: %s § Model statics" % template_path)
+    out.append("wording source: %s § Budget question wording" % template_path)
     out.append("pool (cost order, most expensive first): " + ", ".join(pool_ids))
     out.append("lanes: %d, rendered as %d AskUserQuestion calls (cap: %d objects per call)"
                % (len(LANES), len(CALL_GROUPS), _OBJECT_CAP))
@@ -455,6 +507,13 @@ def emit(statics, rec, defaults, stale, template_path):
         out.append("%s  (%s — %d objects: %s)"
                    % (call_name, call_desc, len(ordered),
                       ", ".join(meta[k][0] for k in ordered)))
+        header, body = wording_for(wording, "model", call_name)
+        out.append("QUESTION-HEADER-BEGIN")
+        out.append(header)
+        out.append("QUESTION-HEADER-END")
+        out.append("QUESTION-BODY-BEGIN")
+        out.extend(body)
+        out.append("QUESTION-BODY-END")
         out.append("")
         for lane_key in ordered:
             lane_label, prompt_label = meta[lane_key]
@@ -508,6 +567,7 @@ def main(argv=None):
     statics = parse_statics(template_text)
     pool_ids = {m for m, _n, _l in statics}
     rec = merge_recommendations(statics, parse_out_of_pool_recs(template_text, pool_ids))
+    wording = parse_wording(template_text)
 
     defaults, stale = {}, False
     config_path = _resolve(args.config) if args.config else None
@@ -516,7 +576,7 @@ def main(argv=None):
         defaults = parse_config_defaults(config_text)
         stale = config_has_stale_statics(config_text)
 
-    sys.stdout.write(emit(statics, rec, defaults, stale, template_path) + "\n")
+    sys.stdout.write(emit(statics, rec, defaults, stale, template_path, wording) + "\n")
     return 0
 
 
