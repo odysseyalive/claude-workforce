@@ -3103,7 +3103,7 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
               "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
-              "twenty-two": 22}
+              "twenty-two": 22, "twenty-three": 23}
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.
@@ -3150,6 +3150,28 @@ check(
     "invariants: every row's token is wired into the procedure that owes it",
     not _unwired,
     f"{_unwired} — a row nothing prints is an intention with a table entry",
+)
+
+# BIND the one restatement INV-COMPANIONS forced. wf-conform is an enforcement and
+# cannot import prose, so it hard-codes the six companion names — a restated constant
+# (Principle 9a). Restating is sound here; leaving it bound by a COMMENT ("they change
+# in both") is the exact failure this project forbids. audit-setup.md Step 0.3 is the
+# list's one canonical home; assert the tuple equals what doctrine enumerates, so the
+# six change in both places or this fails. Names carry no slash; the `references/...`
+# citation on the Evaluators bullet is filtered out.
+_wfc = read("workforce/bin/wf-conform")
+_tuple_m = re.search(r"CORE_COMPANIONS\s*=\s*\(([^)]*)\)", _wfc)
+_tuple_names = set(re.findall(r'"([\w-]+)"', _tuple_m.group(1))) if _tuple_m else set()
+_doc_names = set()
+for _line in _asu.splitlines():
+    if re.match(r"\s*-\s*\*\*(?:Core|Evaluators)\*\*\s*—", _line):
+        _doc_names |= {t for t in re.findall(r"`([\w./-]+)`", _line) if "/" not in t}
+check(
+    "invariants: wf-conform's CORE_COMPANIONS equals the six audit-setup Step 0.3 names",
+    bool(_tuple_names) and _tuple_names == _doc_names,
+    f"tuple {sorted(_tuple_names)} vs doctrine {sorted(_doc_names)} — the companion list "
+    "is restated in an enforcement that cannot import prose; a comment promising they "
+    "change together is not the mechanism a restated constant owes (Principle 9a)",
 )
 
 # The instruction must REQUIRE the block, not merely mention it. An audit passed

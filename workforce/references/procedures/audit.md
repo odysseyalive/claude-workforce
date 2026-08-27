@@ -10,7 +10,9 @@ executes its own recommendations.
 /workforce audit --quick    frontmatter, chart drift, and budget only
 ```
 
-**Autonomy model:** companions install on absence; the org is designed from evidence and built.
+**Autonomy model:** companions are materialized from shipped doctrine on absence — never copied, because
+the distribution ships no companion skill directory (`references/audit-setup.md` § Step 0.3); the org is
+designed from evidence and built.
 **The only questions are consent, the backup, the model budget, and the effort budget** — whether to
 proceed, whether to archive first, and which model and effort each lane runs at
 (`references/audit-setup.md` § The question budget). The lanes the budgets manage separately are
@@ -960,6 +962,14 @@ defers a run.*
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
 `wf-claude-md` → `checksums` → **the git pin-guard install (Step 6-G)** → `verify` → **discharge (Step 6b)** → the sweep.**
+
+**`org index` runs UNCONDITIONALLY here — every audit, every mode.** It generates the project-local
+`/org` receptionist at `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md` (`procedures/org.md` step 2,
+`references/scopes.md` § The `/org` receptionist is project-local), which is why `/org` is materialized
+by its generator rather than copied at Step 0.3, and why a missing `/org` after the run is an
+`INV-COMPANIONS` failure (`references/invariants.md` row 23), never a "ships none" skip. The Step 0.3
+companion materialization and the Step 4 Core-skill force-refresh are likewise unconditional; between
+them every companion is materialized or refreshed on every run, and `INV-COMPANIONS` counts the result.
 
 **Discharge sits between `verify` and the sweep** because it is the last step that may still change the
 tree, and the sweep is the first that cannot be undone. A queue drained after the deletion is a queue
