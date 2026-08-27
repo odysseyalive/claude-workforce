@@ -125,6 +125,8 @@ ORGP = "workforce/references/procedures/org.md"
 PRIN = "workforce/references/principles.md"
 CTV  = "workforce/references/catalogs/text/version.md"
 DBUD = "workforce/references/delegation-budget.md"
+AUS  = "workforce/references/audit-setup.md"
+SECG = "workforce/references/catalogs/security/guards.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -252,6 +254,20 @@ CASES = [
      VER, "del", "the authoritative exemption list lives in"),
     ("handbook: prose employees carry the catalog self-check as a before-done gate",
      HBK, "del", "passed a text-eval self-check against the catalog"),
+    # ── the security tier (2026-08-26), twin of the prose gate above ─────────────
+    # Four breaks, each a different way the third catalog can silently vanish: its
+    # files stop shipping, an anchor a re-distillation compares against goes missing,
+    # the standing gate drops out of verification.md, or the evaluator set the
+    # companion gate reads stops naming it. Each payload is grep -c == 1 so the
+    # single del actually flips the check.
+    ("catalogs: the authored security catalog ships (all five files)",
+     MAN, "del", "workforce/references/catalogs/security/guards.md\n"),
+    ("catalogs: every security file carries a security-ref-version anchor on line 1",
+     SECG, "del", "<!-- security-ref-version: 1 -->"),
+    ("security: the standing catalog gate is written where verification is enforced",
+     VER, "del", "Every security-relevant change passes the catalog before it is done"),
+    ("catalogs: security-evaluator is enumerated in the evaluator set beside code and text",
+     AUS, "del", "security-evaluator"),
     # The class check scans EVERY bash block in EVERY read-only procedure, so an
     # append fires — which the narrow first version did not. That is the point: the
     # narrow one permitted an executing block anywhere but the first.
@@ -269,6 +285,8 @@ CASES = [
      CT, "del", "a run is never split across sessions, and no gate may defer one"),
     ("conversion-taxonomy states the backup is what makes the batch safe",
      CT, "del", "reversible by construction"),
+    ("orchestrator: a dispatch ships with its missing-result handler, never a fabricated one",
+     CT, "del", "the caller never synthesizes the missing result"),
     ("no shipped file authorizes splitting a run across sessions",
      ORG, "append", "\nWhere the batch is large, split it across sessions.\n"),
     ("platform fact 8 is marked as a repeat blocking-check offender",

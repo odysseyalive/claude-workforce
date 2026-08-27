@@ -300,7 +300,7 @@ the state by name for exactly this reason.
 **Install all absent companions automatically.** No question, no checklist.
 
 - **Core** — `org`, `operating-principles`, `personnel-ledger`
-- **Evaluators** — `code-evaluator`, `text-eval` (`references/evaluators.md`)
+- **Evaluators** — `code-evaluator`, `text-eval`, `security-evaluator` (`references/evaluators.md`)
 
 Absent → installed and reported. **The gate never uninstalls** — removal is always a separate,
 deliberate act.

@@ -245,8 +245,16 @@ declared = manifest_paths()
 # own assertions (anchor present, byte-identical to source where the source is
 # reachable). What does not: origin pairing, duplicate headings, restated
 # constants, the coverage header, and the length warning.
+#
+# The `security/` catalog is DELIBERATELY EXCLUDED: it is authored-and-distilled
+# by workforce (cited from OWASP/PayloadsAllTheThings/semgrep, not copied verbatim
+# from a single-origin corpus), so it follows workforce's OWN conventions and every
+# authoring rule above applies to it. Vendoring it would exempt authored prose from
+# the checks it is meant to pass — the honesty defect the manifest re-filing fixed.
 # ─────────────────────────────────────────────────────────────────────────────
-VENDORED = {p_ for p_ in declared if p_.startswith("workforce/references/catalogs/")}
+VENDORED = {p_ for p_ in declared
+            if p_.startswith("workforce/references/catalogs/")
+            and "/security/" not in p_}
 
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
@@ -393,10 +401,17 @@ def _norm_heading(s):
     return re.sub(r"'s\b", "", s)
 
 
-_by_name = {}
+# A bare-basename citation may collide across parallel-twin catalogs: the code and
+# security catalogs deliberately share filenames (`cross-file-detection.md`,
+# `guards.md`, `native-tool-map.md`) so an author learns one layout. So keep EVERY
+# path for a basename, not the last-glob-wins single — resolution below tries all
+# of them and accepts if the section resolves in any. An exact workforce-relative
+# path still resolves to precisely that one file.
+_by_name = {}   # basename -> [paths]
+_by_path = {}   # workforce-relative path -> path (exact, unambiguous)
 for _p in glob.glob("workforce/**/*.md", recursive=True):
-    _by_name[os.path.basename(_p)] = _p
-    _by_name[_p.replace("workforce/", "")] = _p
+    _by_name.setdefault(os.path.basename(_p), []).append(_p)
+    _by_path[_p.replace("workforce/", "")] = _p
 
 _anchor_broken = []
 for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
@@ -409,10 +424,12 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
         _raw, _sec = _m.group(1), _norm_heading(_m.group(2))
         if not _sec or _raw.startswith(GENERATED_TARGETS):
             continue
-        _tgt = _by_name.get(_raw) or _by_name.get(os.path.basename(_raw))
-        if not _tgt:
+        if _raw in _by_path:
+            _cands = [_by_path[_raw]]          # a path-qualified citation is exact
+        else:
+            _cands = _by_name.get(os.path.basename(_raw), [])
+        if not _cands:
             continue  # the PATH half is check 3's job, not this one
-        _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
         _w = _sec.split()
         # Sentence punctuation is not part of the heading. A citation ending a
         # sentence — "resolve to one of the four outcomes in staging.md § The
@@ -446,25 +463,34 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
             _rest = _h[len(_p):]
             return _rest == "" or (_rest[:1] == " " and not _rest[1:2].isalnum())
 
+        # A bare basename can name more than one file — the code and security
+        # catalogs deliberately share filenames — so try each candidate and accept
+        # if the section resolves in ANY. Merging their headings into one list
+        # instead would manufacture false ambiguity between two files that each
+        # legitimately carry a "§5".
         _hit = False
-        for _n in range(len(_w), 0, -1):
-            _pre = " ".join(_w[:_n])
-            _ms = [h for h in _heads if h.startswith(_pre)]
-            # An EXACT heading — the prefix is the whole heading, or ends at its
-            # separator — resolves even when it is also a prefix of siblings.
-            # "Step 0.4" is a real heading AND a prefix of 0.4a/b/c; without this
-            # the ambiguity rule rejects a citation that is perfectly well formed.
-            if any(h == _pre or h[len(_pre):len(_pre) + 2] in (" —", " -", ": ")
-                   for h in _ms):
-                _hit = True
-                break
-            # A UNIQUE match still has to be the right one. At full citation
-            # length uniqueness is enough; once the prefix has been shortened,
-            # the heading must end there or continue with punctuation.
-            if len(_ms) == 1 and (_n == len(_w) or _boundary(_ms[0], _pre)):
-                _hit = True
-                break
-            if len(_ms) > 1:
+        for _tgt in _cands:
+            _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
+            for _n in range(len(_w), 0, -1):
+                _pre = " ".join(_w[:_n])
+                _ms = [h for h in _heads if h.startswith(_pre)]
+                # An EXACT heading — the prefix is the whole heading, or ends at its
+                # separator — resolves even when it is also a prefix of siblings.
+                # "Step 0.4" is a real heading AND a prefix of 0.4a/b/c; without this
+                # the ambiguity rule rejects a citation that is perfectly well formed.
+                if any(h == _pre or h[len(_pre):len(_pre) + 2] in (" —", " -", ": ")
+                       for h in _ms):
+                    _hit = True
+                    break
+                # A UNIQUE match still has to be the right one. At full citation
+                # length uniqueness is enough; once the prefix has been shortened,
+                # the heading must end there or continue with punctuation.
+                if len(_ms) == 1 and (_n == len(_w) or _boundary(_ms[0], _pre)):
+                    _hit = True
+                    break
+                if len(_ms) > 1:
+                    break
+            if _hit:
                 break
         if not _hit:
             _anchor_broken.append(f"{_src.replace('workforce/', '')} → {_raw} § {_sec[:48]}")
@@ -1147,6 +1173,50 @@ check(
     ),
     "the anchor is what forcible propagation compares against; a vendored file "
     "without one cannot be reconciled and silently becomes a dead copy",
+)
+# ─────────────────────────────────────────────────────────────────────────────
+# Authored security catalog + the standing security gate, landed 2026-08-26.
+# The third evaluator tier. Unlike the vendored corpora above, this catalog is
+# authored-and-distilled by workforce (cited from OWASP/PayloadsAllTheThings/
+# semgrep), so it is NOT in VENDORED and every authoring rule already applies to
+# it; these add the tier-specific facts a generic authoring check cannot see.
+# ─────────────────────────────────────────────────────────────────────────────
+_authored_sec = [p_ for p_ in declared if "/catalogs/security/" in p_]
+check(
+    "catalogs: the authored security catalog ships (all five files)",
+    len(_authored_sec) >= 5 and all(os.path.exists(p_) for p_ in _authored_sec),
+    f"security catalog files declared={len(_authored_sec)} — the security tier ships "
+    "its catalog or a fresh install has code and prose review but no security review, "
+    "the gap install-on-absence exists to close",
+)
+check(
+    "catalogs: every security file carries a security-ref-version anchor on line 1",
+    all(
+        read(p_).splitlines()[0].startswith("<!--")
+        and "security-ref-version:" in read(p_).splitlines()[0]
+        for p_ in _authored_sec
+    ),
+    "the anchor is what a re-distillation compares against; a security file without "
+    "one silently becomes a dead copy no reconcile can advance",
+)
+_ver = read("workforce/references/verification.md")
+check(
+    "security: the standing catalog gate is written where verification is enforced",
+    "Every security-relevant change passes the catalog before it is done" in _ver
+    and "Unprompted, every time" in _ver
+    and "never reported green" in _ver
+    and "security-evaluator" in _ver,
+    "the user asked for a standing security influence that fires on the web surfaces "
+    "unprompted; a rule stated in a procedure but absent from verification.md is "
+    "advice, not a gate",
+)
+check(
+    "catalogs: security-evaluator is enumerated in the evaluator set beside code and text",
+    "security-evaluator" in read("workforce/references/audit-setup.md")
+    and "security-evaluator" in _ev,
+    "the catalog installs on absence like the others; if the set the companion gate "
+    "and evaluators.md enumerate omits it, a fresh audit never offers to install it "
+    "and the third tier never propagates",
 )
 check(
     "catalogs: vendored files carry no workforce enforcement header",
@@ -2848,6 +2918,22 @@ check(
     "no-residue: conversion-taxonomy states that a converted skill is deleted",
     "never replaced by a stub" in ct,
     "conversion-taxonomy.md § Nothing is left behind must state it",
+)
+
+# An orchestrator dispatches for a living, so a dispatch that returns nothing is its
+# defining failure mode, not an edge case. Measured 2026-08-26 in apps-odyssey-alive:
+# a nested auditor spawn was withheld, returned nothing, and the caller FABRICATED the
+# verdict with false citations. The rule that a dispatch ships with its missing-result
+# handler is the fix for that class.
+check(
+    "orchestrator: a dispatch ships with its missing-result handler, never a fabricated one",
+    "dispatch ships with its missing-result handler" in ct
+    and "the caller never synthesizes the missing result" in ct
+    and "UNAVAILABLE: <why>" in ct,
+    "conversion-taxonomy.md § An orchestrator's dispatch ships with its missing-result "
+    "handler must state that a no-result return is a first-class UNAVAILABLE outcome and "
+    "the caller never invents the result — an orchestrator one withheld spawn from "
+    "fabrication is not finished",
 )
 
 # UNSURE must not be a resting state. Defaulting an unclassified block to frozen

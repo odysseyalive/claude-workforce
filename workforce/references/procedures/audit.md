@@ -763,10 +763,18 @@ the two verification paths — a **catalog grep** into each producing employee's
 and the **evaluator as reviewer** into that department's Lead handbook (tier 4, because ICs cannot
 delegate).
 
-**That tier-3 catalog grep IS the always-before-done gate** (`references/verification.md` § Every
-prose deliverable passes the catalog before it is done): a prose deliverable is not done until it
-has passed the self-check, so its presence is folded into the `INV-HOUSERULES` evaluator report
-below rather than counted as a separate wiring line.
+**Concretely, a web-working department gets a `security-evaluator`**: proposed, made the security
+catalog's Records Owner, granted `security-taxonomy.md` via `skills:`, with the tier-3
+`security-taxonomy` grep wired into its producing employees' `## Verification` and `security-evaluator`
+named as tier-4 reviewer in that department's Lead handbook — the same shape prose gets against
+`text-eval` and code against `code-evaluator`. Security is proposed only where a department does web
+work; the catalog installs on absence regardless.
+
+**That tier-3 catalog grep IS the always-before-done gate** — the prose case in
+`references/verification.md` § Every prose deliverable passes the catalog before it is done, the
+security case in § Every security-relevant change passes the catalog before it is done: a catalog-covered
+deliverable is not done until it has passed the self-check, so its presence is folded into the
+`INV-HOUSERULES` evaluator report below rather than counted as a separate wiring line.
 
 **The catalog is not converted, and the evaluator is not a conversion.** The catalog stays a skill — shared
 data many employees read (`records-ownership.md`) — and the evaluator is a *new hire* beside it. Both exist
@@ -801,7 +809,8 @@ run roll-up **`INV-HOUSERULES`** (`invariants.md` row 22) with it:
 ```
 HOUSE RULES     text-eval  register 2 rows refreshed · precedence clause present
                 code-evaluator  register 0 rows · precedence clause appended
-INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
+                security-evaluator  register 0 rows (empty) · precedence clause present
+INV-HOUSERULES  3 evaluators · 3 registers refreshed · precedence present · 0 unrefreshed
 ```
 
 An evaluator that cannot receive the refresh — a `catalog-unappendable` copy that is immutable end to end,

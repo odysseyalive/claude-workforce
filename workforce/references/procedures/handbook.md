@@ -165,6 +165,13 @@ before-done gate.** Its prose is not done until it has
 **passed a text-eval self-check against the catalog** (`references/verification.md` § Every prose
 deliverable passes the catalog before it is done), applying the catalog's own scope rules.
 
+**For a web-working employee, its `## Verification` names the security self-check the same way.** A
+change touching a request, a query, a filesystem path, a redirect, a template, a secret, or a dependency
+is not done until it has **passed a `security-taxonomy.md` grep against the catalog**
+(`references/verification.md` § Every security-relevant change passes the catalog before it is done),
+applying the catalog's own scope rules — its access-control and business-logic findings are flagged for
+review, not reported green.
+
 **`## Probe` must state a self-contained task and the shape of a correct result.** A handbook that
 cannot say how to check itself is not releasable — and this section is what Step 5 runs.
 

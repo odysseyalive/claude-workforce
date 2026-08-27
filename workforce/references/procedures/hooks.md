@@ -220,7 +220,7 @@ spawned agent is precisely the case nobody in the main loop can see.
   path and none is attempted.
 - **It cannot spawn anything, or hand off to a fresh context.** A hook is a subprocess reading JSON on
   stdin. It has no `Agent` tool — a strictly lower ceiling than an IC, which at least *has* one and is
-  denied it (`references/evaluators.md` § The three evaluators, whose tier table gives even the evaluator IC a `no`). Everything below about re-evaluation by a
+  denied it (`references/evaluators.md` § The evaluators, whose tier table gives even the evaluator IC a `no`). Everything below about re-evaluation by a
   different persona is therefore an **orchestration-layer** obligation, not something this file does.
 
 ### The ladder
@@ -253,8 +253,8 @@ invention.** `references/personas.md` § Panels already states it: a panel is *"
 construction — members are chosen to fail differently, not to agree"*, agreement between two draws from
 the same stance means nothing, and disagreement resolves to the conservative alternative rather than to
 a vote. `references/evaluators.md` supplies the ready-made lenses — `code-evaluator`, `text-eval`,
-`image-eval` — each with a catalog, which is what makes a second opinion a checklist rather than
-another opinion.
+`security-evaluator`, `image-eval` — each with a catalog, which is what makes a second opinion a
+checklist rather than another opinion.
 
 ### Where the handoff actually happens
 

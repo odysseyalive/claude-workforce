@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -33,9 +33,9 @@ a judgment into a checklist: "does this read as machine-written?" is taste, whil
 or more of these tells?" is close to mechanical. Without one, tier 4 collapses into the rejected row —
 a second opinion with no criteria is still just an opinion.
 
-For prose and code quality, the catalogs are `code-evaluator` and `text-eval`
-(`references/evaluators.md`). An IC greps the catalog itself (tier 3); its Lead dispatches the evaluator
-employee for independent review (tier 4), because ICs cannot delegate.
+For prose, code, and web-security quality, the catalogs are `code-evaluator`, `text-eval`, and
+`security-evaluator` (`references/evaluators.md`). An IC greps the catalog itself (tier 3); its Lead
+dispatches the evaluator employee for independent review (tier 4), because ICs cannot delegate.
 
 **A handbook may not report PASS on an unrun check.** The section states the command, the expected
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
@@ -72,6 +72,37 @@ flag: the deliverable is not done while a mandatory fix is outstanding.
 makes it true is a `bin/check` assertion that this requirement is present here and wired into
 `handbook` and `audit`, plus a `bin/prove` del-case that deletes a load-bearing fragment and
 confirms the assertion breaks.
+
+---
+
+## Every security-relevant change passes the catalog before it is done
+
+**Any change the workforce makes that touches a request, a query, a filesystem path, a redirect, a
+template, a secret, or a dependency is not done until it has passed a security self-check against the
+`security-evaluator` catalog. Unprompted, every time.** This is the security twin of the prose gate
+above: the tier-3 catalog grep (§ The rule) made mandatory on the surfaces where web-security defects
+live, not an optional pass. The self-check is the `security-taxonomy.md` grep, or a real analyzer —
+semgrep, or a per-ecosystem taint engine — where the project has one installed. It is the standing
+security influence that fires on the surfaces above whenever the workforce touches them, without being
+asked for.
+
+**For the policy classes this is detection where prevention is impossible, and it says so.** A static
+reader cannot prove runtime reachability, so an access-control or business-logic finding is **flagged
+for review, never reported green** (`evaluators.md` § Seeding the catalog, step 4b). For those classes a
+reported candidate is the finished state. That disposition is the epistemics of the domain, and a
+flagged candidate is not a skipped one. The unambiguous, locally-fixable classes — a
+shell-metacharacter sink, a hardcoded secret, an unpinned dependency — are fixed in the same pass, the
+way the prose gate fixes a firing `[hard]` tell.
+
+**Apply the catalog with its own scope rules; invent none.** The security catalog's register is empty,
+so no finding is demotable on any authority yet (`evaluators.md` § House rules dominate). A firing class
+is a cleared candidate, a real defect fixed in-pass, or a flagged design-policy item — never a question
+surfaced for the human to adjudicate on a hunch.
+
+**Classification (`invariants.md`): a structural claim, enforced the way its prose twin is.** A
+`bin/check` assertion holds this section present and wired into `handbook` and `audit`; a `bin/prove`
+del-case removes a load-bearing fragment of it and confirms that assertion fails. A standing gate that
+binds nothing is the failure this whole file exists to close.
 
 ---
 

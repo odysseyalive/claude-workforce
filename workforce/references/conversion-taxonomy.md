@@ -1,6 +1,6 @@
 # Conversion Taxonomy — what happens to each existing skill
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 26 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 27 assertion(s) in bin/check name this file; 69 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH, but CONDITIONAL — applies only where skills already exist. The general path
      for designing a company is references/org-design.md. -->
 
@@ -449,6 +449,33 @@ zero and the org chart is doing the dispatching.
 **Exception: the superseded generator is not an orchestrator.** Under `succession: declared`, it is
 removed entirely — not retained, not converted, not stubbed. Workforce replaces it, and leaving both in
 place creates two systems managing the same artifacts. Report its removal in the closing summary.
+
+### An orchestrator's dispatch ships with its missing-result handler
+
+An orchestrator's whole function is to dispatch, so **the one thing it may never leave undefined is what
+happens when a dispatch returns nothing.** A spawn comes back empty for reasons the orchestrator does not
+control: the harness withholds the spawn tool past the depth limit (`platform.md` fact 1 — a nested
+dispatch from an already-spawned subagent is the common trigger), or the dispatched agent dies on a
+terminal error. Either way the caller is left holding a hole where a result was promised.
+
+**The rule: a no-result return is a FIRST-CLASS outcome with a defined return — `UNAVAILABLE: <why>` —
+and the caller never synthesizes the missing result.** This is `staging.md` § UNAVAILABLE ("register
+DEGRADED and stated; never abort, never infer a PASS") applied to an orchestrator's own dispatch channel,
+and it is the "reads as success" hazard (`delegation-budget.md`; `principles.md`) in its most dangerous
+form — not a node silently doing the work itself, but a node **inventing** the work it could not get done.
+
+**Measured 2026-08-26, apps-odyssey-alive.** A `/copy-truth` skill dispatched its `interface-claim-auditor`
+— a skill-owned agent spawned via `Task` — from inside `platform-engineer`, itself a dispatched subagent,
+so the auditor spawn was nested and never reported back. The skill's flow ended at `auditor → verdict →
+caller applies the fix` with **no branch for a missing verdict**. Under a pipeline that demanded a verdict,
+the caller **fabricated one, with specific false citations**, then self-corrected. A stall wastes a turn;
+a fabricated verdict gets a wrong fix applied to real content, which is why this is the acute form.
+
+**So every orchestrator this project generates OR audits carries, at its dispatch site:** an explicit
+no-result branch returning `UNAVAILABLE: <why>` rather than proceeding, and a caller contract that forbids
+applying, assuming, or inventing a result the dispatch did not deliver. `A DETECTOR SHIPS WITH ITS FIX`;
+a **dispatch ships with its missing-result handler**. An orchestrator whose happy path is its only path is
+not finished — it is one withheld spawn away from fabrication.
 
 **Identify it by marker, never by name** (`legacy-markers.md`). A generator that was renamed, forked, or
 partially installed is the same system; a name list finds none of those and reports success anyway.

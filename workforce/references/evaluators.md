@@ -1,15 +1,19 @@
-# Evaluators — code and text quality review
+# Evaluators — code, text, and security quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 41 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
      names — do not conflate them in a procedure or a report. -->
 
-Three capabilities every project gets: **code quality review**, **text authenticity review**, and
-**image authenticity review**. The first two originate in claude-enforcer, where `code-evaluator` and
-`text-eval` are force-installed companion skills carrying shipped catalogs. The third, `image-eval`,
-originates here.
+Four capabilities every project gets: **code quality review**, **text authenticity review**,
+**web-security review**, and **image authenticity review**. Three of them ship a **built catalog** — a
+corpus an employee greps against. `code-evaluator` and `text-eval` originate in claude-enforcer, where
+they are force-installed companion skills carrying shipped catalogs, and this project imports them
+**verbatim** (vendored). `security-evaluator` originates **here**, and its catalog is not vendored: it
+is workforce-authored, **distilled from three pinned upstream corpora and cited to them** rather than
+copied from a predecessor (§ Seeding). The fourth capability, `image-eval`, is not yet a built catalog —
+it ships as a **seed spec** (`image-eval-seed.md`), also authored here.
 
 ## Why they matter here specifically
 
@@ -49,15 +53,21 @@ only quality check is its own self-assessment should say so.
 
 ---
 
-## The three evaluators
+## The evaluators — three built catalogs and one seed
 
-| | `code-evaluator` | `text-eval` | `image-eval` |
-|---|---|---|---|
-| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | image authenticity — AI generation tells, technique violations, metadata provenance |
-| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
-| Seed source | claude-enforcer (migration import) or shipped minimal set | claude-enforcer (migration import) or shipped minimal set | `image-eval-seed.md` (this project only — no enforcer predecessor) |
-| Owner | an engineering IC | a content IC | a content or design IC |
-| Hired when | the project has code | the project produces prose | the project produces or ships images |
+`code-evaluator`, `text-eval`, and `security-evaluator` each ship a **built catalog**; `image-eval`
+ships a **seed spec** and becomes a built catalog on the first project that grows one. The seed-source
+row is where the three built catalogs differ most, and the difference is load-bearing: two are vendored
+verbatim from a predecessor and never edited, one is authored here and re-distilled from cited pins
+(§ Seeding).
+
+| | `code-evaluator` | `text-eval` | `security-evaluator` | `image-eval` |
+|---|---|---|---|---|
+| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix | image authenticity — AI generation tells, technique violations, metadata provenance |
+| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
+| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | `image-eval-seed.md` (this project only — no enforcer predecessor) |
+| Owner | an engineering IC | a content IC | a security or engineering IC | a content or design IC |
+| Hired when | the project has code | the project produces prose | the project has web-facing code | the project produces or ships images |
 
 **The catalog installs on ABSENCE ALONE, never gated on a declared department.** This is
 claude-enforcer's hard-won rule (`DEC-2026-06-12-install-on-absence`): an all-coding project received no
@@ -342,6 +352,27 @@ directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what clo
    watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
    new entries through the forcible-append mechanism. The project's customizations, medium-specific
    checks, and user directives are never overwritten.
+4. **For `security-evaluator`, the catalog is authored here and distilled — not vendored.** Its five
+   files under `references/catalogs/security/` carry `origin: workforce · modifiable: true`, and they
+   are **distilled from three pinned upstream corpora** — OWASP/CheatSheetSeries @c735a6e,
+   swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63 — with every flaw class
+   anchored to a **CWE**, because semgrep's own 2025 OWASP tags are transitional and inconsistent. A
+   verbatim copy of those repos runs to ~37 MB and would defeat the selective loading the catalog
+   exists to provide, so the catalog is a **cited distillation**, not an import. **Re-distillation
+   re-reads those three pins and appends only new flaw classes; it never rewrites an existing row.** The
+   reconcile therefore compares against the **three upstream pins**, not against a claude-enforcer
+   corpus — there is no predecessor to compare against. Editing this catalog is expected and correct: it
+   is workforce's own, which is the case the vendored "never edit" rule below does not govern.
+
+   4b. **Its findings are report-first by construction, and that is the epistemics of the domain — not a
+   supersession-register demotion.** A static reader cannot prove runtime reachability, so local
+   unambiguous fixes are applied, while reachability and policy findings are reported with a path and a
+   confidence band. The access-control and business-logic classes are **flagged for review, never
+   reported green.** This candidate-versus-autofix disposition is stated so a reader does not mistake a
+   reported candidate for a skipped fix, and no register grants it (§ House rules dominate). The
+   security catalog's own `CATALOG-ANCHOR.md` carries the same anchor, supersession register, and
+   house-rules clause the code and text catalogs carry — its register is currently empty, so no security
+   finding is demotable on any authority yet.
 
 **After the import, the dependency ends.** The catalog lives in the project at
 `${CLAUDE_PROJECT_DIR}/.claude/skills/<evaluator>/` as its owner's playbook, and it grows from the
@@ -354,6 +385,16 @@ changes in exactly one place (here, by re-copying from source) and is only ever 
 is the same shape claude-enforcer already ships and this file already describes consuming. What must
 never happen is workforce **editing** a vendored file to suit itself: that forks a corpus with one
 origin, and `manifest.txt` § Vendored evaluator catalogs says so at the top of the list.
+
+**This "never edit" rule governs the vendored corpora — `code` and `text` — and only them.** The
+security catalog is not vendored: its single origin is this project, and workforce grows it by
+re-distilling the three cited pins into it (§ Seeding the catalog, step 4). There is no upstream copy for it to fork
+away from, so editing it is not the two-canonical-texts hazard — it is maintenance of the one canonical
+copy, the same as any other reference this project owns. `catalogs/` therefore holds two kinds of corpus
+that share a shape but not a growth rule: **vendored-verbatim** (`code`, `text`, re-copied from
+claude-enforcer and never hand-edited) and **workforce-distilled** (`security`, authored here and
+re-distilled from its pins). Both are read-mostly, version-anchored, and greppable; they differ in
+origin and in who may edit them.
 
 **So growth goes to `references/evaluator-additions/`, and that is the whole reason it exists.**
 Until 2026-08-06 there were two slots and neither could take a new entry authored here: the vendored
@@ -526,12 +567,20 @@ its edits.
 version comparison and forcible append run whether or not anything was checked, because that is
 maintenance of something already installed rather than a new install.
 
-**`hire`** — an evaluator employee is proposed for each department whose work it reviews, becomes the
-catalog's Records Owner, and gets the catalog via `skills:` preload (it works on the whole artifact).
+**`hire`** — an evaluator employee is proposed for each department whose work it reviews — a
+`security-evaluator` where a department does web-facing work — becomes the catalog's Records Owner, and
+gets the catalog via `skills:` preload (it works on the whole artifact). The security employee is hired
+**only where there is web work to evaluate**; the security catalog still installs on absence alone,
+regardless, so any employee can self-check against it even on a project that hires no security
+evaluator.
 
 **`handbook`** — an employee doing web, prose, or code work gets a catalog grep in its `## Verification`
-as a tier-3 check, and its Lead's handbook names the evaluator as the tier-4 reviewer. An employee that
-neither self-checks nor is reviewed is unverified for quality regardless of whether its tests pass.
+as a tier-3 check, and its Lead's handbook names the evaluator as the tier-4 reviewer. Concretely: an
+employee doing **web work** grep-checks `security-taxonomy.md` as its tier-3 gate, and its Lead names
+`security-evaluator` as tier-4 — the same shape a prose employee gets against `text-eval` and a code
+employee against `code-evaluator`. An employee that neither self-checks nor is reviewed is unverified
+for quality regardless of whether its tests pass.
 
-**`review`** — reports any employee producing catalog-relevant work with no evaluator path, and any
-catalog whose version is behind the shipped one.
+**`review`** — reports any employee producing catalog-relevant work with no evaluator path — a
+web-working employee with no `security-evaluator` path included — and any catalog whose version is
+behind the shipped one.
