@@ -152,33 +152,111 @@ staffed. To check the org against the new release, run `/workforce verify` after
 
 ## Talking to the Company
 
-Describe the task. `/org` finds the owner.
+Describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can actually do it. You don't name an employee or pick a tier. You say what you need, and working out who gets it is the company's job. The examples below are all the same gesture, grouped by the rule each one shows.
+
+### Where the work lands
 
 ```
 /org fix the pricing copy on the homepage
 ```
 
-That goes straight to one IC, the content writer who owns homepage copy.
+Straight to one IC, the content writer who owns homepage copy. One desk, one owner. It comes back with its check run. The copy has to pass the same review catalog every piece of writing here is graded against, so "done" means proven, not claimed.
 
 ```
 /org the onboarding module needs a rewrite across design and content
 ```
 
-That goes to a lead, who fans out across the department.
+That one goes to a lead, because it crosses two people's work and someone has to coordinate them. The lead fans the job out, reads back what returns, and owns the result. A lead is the only tier allowed to hand work down, so any job that needs a second pair of hands has to enter here or above.
 
 ```
 /org should we ship the signing module standalone?
 ```
 
-That goes to the CEO, because it crosses departments and nobody below owns the answer.
+That goes to the CEO, your own session, because it's a judgment that crosses departments and nobody below owns the answer. Strategy stays at the top. The work stays at the bottom.
+
+The CEO isn't a funnel. Routing everything through the top would spend one of your three hand-off levels on every single task and leave the people doing the actual work with none left to hand off themselves. `/org` sends the work to the *lowest* desk that can actually handle it. When it's a toss-up, it goes downward.
+
+### When the answer isn't a person
+
+```
+/org who owns the checkout flow?
+```
+
+That one spins up nobody. The answer is already sitting in the org chart, so the company just reads it back to you. Paying to start an agent for a fact you can answer by reading is exactly the waste this project refuses: if the data answers the question, the data is the answer.
+
+```
+/org build a skill that tracks our conversation and stores it for scaffolding a website
+```
+
+This one asks for a capability to be built, and the first question the company asks is whether the work needs judgment or just mechanism. Tracking what's said and filing it into a database is mechanism, deterministic and repeatable, so the answer is a skill and nobody gets hired. A skill runs without spinning up an agent, returns the same result on every call, and any employee can reach it. Later, when a worker sits down to scaffold the site, it reads that stored context and skips rebuilding the whole conversation from memory. This is the split the system rests on: judgment lives in a handbook, and data gathering, storage, and the plumbing out to other tools live in a skill.
+
+### Hiring, and knowing when not to
 
 ```
 /org we need someone who can audit accessibility
 ```
 
-That has no owner, so it goes to HR as a hiring request.
+That has no owner, so it becomes a hiring request and goes to HR. And HR doesn't guess at the job. Before it writes a line of the new handbook, it researches the industry standard for the role, an accessibility auditor here, and pulls in the specific skills that role should wield. You get the most capable candidate for the work, held to the bar the field actually expects, instead of a plausible-sounding title invented on the spot. The same research runs when an audit reviews the people you already have, so a handbook written to a weak bar gets rewritten to the real one.
 
-The CEO isn't a funnel. Routing everything through the top would spend one of your three hand-off levels on every single task and leave the people doing the actual work with none left to hand off themselves. `/org` sends the work to the *lowest* desk that can actually handle it. When it's a toss-up, it goes downward.
+```
+/org the blog posts keep coming out in the wrong voice
+```
+
+That looks like a new job and usually isn't. The content writer already owns voice, so the fix is to amend its handbook rather than hire a second writer beside it. The company defaults to extending someone who already does the work, and hires only when the job is genuinely different, with its own guardrails and its own check. An org that hires for every surprise drowns in headcount nobody remembers.
+
+```
+/org staff engineering now, before we scaffold the app
+```
+
+There's no build to test yet. The rule that every employee names a real check would, taken literally, leave engineering unstaffed on the one project whose whole next move is to build. So the engineer is hired with a provisional check: it names the command that will exist, `npm test` once the app is scaffolded, and until that command is real it reports its work as unverified and never claims a pass it can't back. An honest "not proven yet" beats a department that quietly rubber-stamps itself.
+
+### Proving the work is done
+
+```
+/org every phase ships playwright-mcp e2e tests that cover new and existing functionality
+```
+
+That sets a standing rule, so it lands in the verification bar every web-facing employee works to. From then on, a phase counts as finished only when a recorded browser test runs green across the new work and the old, catching whatever a change quietly broke alongside whatever it added. No model grades the result. The test passes or it fails, and that is the kind of proof that survives a missing image trying to slip through as good enough.
+
+```
+/org review the new landing page for design quality before we ship
+```
+
+"Looks good" is not something a test can return, so this goes to a reviewer that grades against a written catalog. The design critic checks the page against a list of specific tells: is the theme actually applied, is there a real visual hierarchy, is any image slot sitting empty. A catalog turns taste into a checklist, which is how the one kind of work a machine can't score still gets held to a bar. It is the reviewer that was missing the day a blank image shipped as good enough.
+
+### When the company pushes back
+
+```
+/org have the copywriter also fix the failing checkout test
+```
+
+The copywriter won't take this one. Patching a failing test is engineering's work, outside the lane its handbook draws, so it stops and hands an escalation back to its manager. The refusal is deliberate. An employee that quietly does work it was never scoped for is an employee whose lane means nothing, and once a lane means nothing the whole chart is decoration.
+
+```
+/org run the accessibility audit across all 40 pages at once
+```
+
+Forty pages at once means forty workers at once, and that runs into a ceiling this project measured rather than guessed at. The company won't quietly launch all forty and hope the machine keeps up. It reports that the request overruns its safe fan-out and offers to run them in batches that stay under the limit. You still get the audit, with an honest account of how it has to be paced. Find the wall, say where it is, and work inside it.
+
+```
+/org write the refund policy page
+```
+
+If the content handbook never says what the refund terms actually are, the writer doesn't invent them. It returns a question and stops. The lead is not allowed to just answer it in chat, because that patches one run and leaves the gap in the handbook for the next writer, who shows up with no memory of this conversation. So the lead files the gap as a defect, amends the handbook so the terms are written down, and sends the job back. The fix lands in the document, and the next writer never hits the same blank.
+
+```
+/org how should we handle a customer asking for a feature we don't build?
+```
+
+No handbook has a procedure for this, and the company doesn't write one on the spot. A single odd case doesn't earn a new rule, because a company that writes a rule for every rare event ends up with a rulebook no one finishes. So the question falls upward, to the operating principles that sit above every handbook, and gets answered from the standard the whole company already runs on. New procedures are for patterns. One strange case conforms to the layer above it.
+
+### The whole company on one job
+
+```
+/org ship the pricing page redesign end to end
+```
+
+This is the big one, the whole company on a single job. It starts at the CEO, because it spans design, content, and engineering and no single department owns it. Each department takes its slice and proves it: the writer's copy clears its review catalog, the designer's work clears the design critic, and the engineer's build passes a playwright test that clicks through the real page. Nothing is called finished on anyone's say-so. The redesign ships only once every slice has come back green and the two gates that decide a website, how it looks and whether it works, have both held.
 
 ## Three Tiers, Measured
 
