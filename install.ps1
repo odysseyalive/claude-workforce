@@ -21,8 +21,32 @@
 # The list of shipped files lives in manifest.txt (shared with the bash installer).
 
 function Install-ClaudeWorkforce {
-    param([string]$ConfigDir = '')
+    param([string]$ConfigDir = '', [switch]$Force)
     $ErrorActionPreference = 'Stop'
+
+    # ── Version helpers ───────────────────────────────────────────────────────
+    #
+    # WORKFORCE-VERSION lives in references/version.md (§ header of that file). Both
+    # the post-install report (echoes the version just installed to each scope) and the
+    # downgrade guard (compares the incoming release against what a location already
+    # has) read it the same way, so the parse lives in one place. A missing file or
+    # line yields 'unknown' rather than throwing, so the report degrades to
+    # 'version: unknown' and the guard becomes a no-op. Kept in parity with `install`.
+    function Get-WorkforceVersion([string]$versionFile) {
+        if (Test-Path $versionFile -PathType Leaf) {
+            foreach ($vLine in (Get-Content $versionFile)) {
+                if ($vLine -match '^\s*WORKFORCE-VERSION:\s*([0-9][0-9.]*)') { return $Matches[1] }
+            }
+        }
+        return 'unknown'
+    }
+
+    # Is dotted version $a strictly OLDER than $b? [version] compares Major.Minor.Build
+    # numerically (so 1.10.0 > 1.9.0), matching the bash field-by-field compare. Callers
+    # guard 'unknown' first; an unparseable value is never treated as a downgrade.
+    function Test-VersionOlder([string]$a, [string]$b) {
+        try { return ([version]$a -lt [version]$b) } catch { return $false }
+    }
 
     # Overridable so the installer can be tested against a local checkout -- it was
     # hardcoded until 2026-08-05, which is why `install` always fetched the PUBLISHED
@@ -233,6 +257,43 @@ function Install-ClaudeWorkforce {
     $script:VerifyFailed = $false
     $script:SettingsFailed = @()
 
+    # ── Downgrade guard ───────────────────────────────────────────────────────
+    #
+    # Relocated here from the `update` procedure so a BARE full install is protected
+    # too, not only `/workforce update` (which runs this same installer). For any target
+    # that ALREADY has a copy, refuse to overwrite a NEWER installed release with an
+    # OLDER incoming one unless -Force / $env:WORKFORCE_FORCE. A first-time install has
+    # nothing to compare, so this is a strict no-op there. The incoming version is the
+    # source-side references/version.md, fetched the same way every shipped file is.
+    # Kept in step with the bash installer.
+    $incomingVersion = 'unknown'
+    try {
+        $vBody = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/workforce/references/version.md").Content
+        foreach ($vLine in ($vBody -split "`n")) {
+            if ($vLine -match '^\s*WORKFORCE-VERSION:\s*([0-9][0-9.]*)') { $incomingVersion = $Matches[1]; break }
+        }
+    } catch { $incomingVersion = 'unknown' }
+
+    $forceDowngrade = $Force -or [bool]$env:WORKFORCE_FORCE
+    foreach ($scope in $targets) {
+        $guardDir = if ($scope -eq 'user') { $personalSkillDir } else { $projectSkillDir }
+        $installedVersion = Get-WorkforceVersion (Join-Path $guardDir 'references/version.md')
+        # Nothing installed here, or either side unreadable: nothing to compare, no-op.
+        if ($incomingVersion -eq 'unknown' -or $installedVersion -eq 'unknown') { continue }
+        if (-not $forceDowngrade -and (Test-VersionOlder $incomingVersion $installedVersion)) {
+            Write-Host ''
+            Write-Host "REFUSING TO DOWNGRADE ($scope):"
+            Write-Host "    installed: $installedVersion at $guardDir"
+            Write-Host "    incoming:  $incomingVersion (older)"
+            Write-Host ''
+            Write-Host '  This would overwrite a newer release with an older one. Re-run with'
+            Write-Host "  -Force (or set `$env:WORKFORCE_FORCE=1) to install the older release anyway."
+            # NOT `exit`: the documented invocation is `irm | iex`, which runs this in the
+            # user's own console — `exit` there closes their whole terminal.
+            return
+        }
+    }
+
     foreach ($scope in $targets) {
         switch ($scope) {
             'user' {
@@ -337,6 +398,13 @@ function Install-ClaudeWorkforce {
         } else {
             Write-Host "  Verified: $vTotal/$vTotal files present."
         }
+
+        # Echo the version just installed to this scope, read from the copy that
+        # actually landed, so the report reflects disk, not the source we fetched from.
+        # Degrades to 'version: unknown' rather than failing. Parity with `install`.
+        $installedVersion = Get-WorkforceVersion (Join-Path $skillDir 'references/version.md')
+        if ($installedVersion -eq 'unknown') { $installedVersion = 'version: unknown' }
+        Write-Host "  Installed workforce $installedVersion at $skillDir ($scope)"
 
         # Canary fixtures land in ONE scope's agents/ dir and nothing reconciled the
         # other. Measured 2026-08-05: installing at both scopes over time left the four

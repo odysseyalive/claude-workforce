@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Prove bin/pre-commit-version fires — and only when it should.
+
+Builds a throwaway git repo in a temp dir, stages each scenario, runs the hook, and
+checks the exit code. Writes nothing outside the temp dir. Exit 0 = all scenarios as
+expected; exit 1 = at least one surprised us (the guard is wrong).
+"""
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HOOK = pathlib.Path(__file__).resolve().parent / "pre-commit-version"
+
+VERSION_MD = "# Version\n\n```\nWORKFORCE-VERSION: {}\n```\n"
+SKILL_MD = '---\nname: workforce\nversion: "{}"\n---\n\n# Workforce\n'
+MANIFEST = (
+    "workforce/SKILL.md\n"
+    "workforce/references/version.md\n"
+    "workforce/references/foo.md\n"
+)
+
+
+def run(args, cwd):
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+
+
+def write(root, rel, text):
+    p = pathlib.Path(root) / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+
+
+def hook(cwd):
+    return run([sys.executable, str(HOOK)], cwd).returncode
+
+
+def reset(root):
+    run(["git", "reset", "--hard", "HEAD"], root)
+    run(["git", "clean", "-fdq"], root)
+
+
+def main():
+    tmp = tempfile.mkdtemp(prefix="wf-hook-test-")
+    fails = []
+    try:
+        run(["git", "init", "-q"], tmp)
+        run(["git", "config", "user.email", "t@t"], tmp)
+        run(["git", "config", "user.name", "t"], tmp)
+        # Seed a valid tree at 1.0.0 and copy the hook in so it resolves this repo.
+        write(tmp, "manifest.txt", MANIFEST)
+        write(tmp, "workforce/references/version.md", VERSION_MD.format("1.0.0"))
+        write(tmp, "workforce/SKILL.md", SKILL_MD.format("1.0.0"))
+        write(tmp, "workforce/references/foo.md", "seed\n")
+        write(tmp, "README.md", "readme\n")  # NOT in the manifest → not shipped
+        (pathlib.Path(tmp) / "bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy(HOOK, pathlib.Path(tmp) / "bin" / "pre-commit-version")
+        run(["git", "add", "-A"], tmp)
+        run(["git", "commit", "-qm", "seed"], tmp)
+
+        def scenario(name, expect_block, mutate):
+            reset(tmp)
+            mutate()
+            run(["git", "add", "-A"], tmp)
+            blocked = hook(tmp) != 0
+            ok = blocked == expect_block
+            print(("  ok  " if ok else "  XX  ") +
+                  "{} — {}".format("blocked" if blocked else "allowed", name))
+            if not ok:
+                fails.append(name)
+
+        # A: shipped file changed, no bump → BLOCK
+        scenario("shipped change without a bump", True,
+                 lambda: write(tmp, "workforce/references/foo.md", "changed\n"))
+        # B: shipped file changed, version + mirror both bumped → ALLOW
+        def b():
+            write(tmp, "workforce/references/foo.md", "changed\n")
+            write(tmp, "workforce/references/version.md", VERSION_MD.format("1.0.1"))
+            write(tmp, "workforce/SKILL.md", SKILL_MD.format("1.0.1"))
+        scenario("shipped change with version + mirror bumped", False, b)
+        # C: only a non-shipped file changed, no bump → ALLOW
+        scenario("non-shipped change without a bump", False,
+                 lambda: write(tmp, "README.md", "changed\n"))
+        # D: version bumped but SKILL.md mirror left behind → BLOCK
+        def d():
+            write(tmp, "workforce/references/foo.md", "changed\n")
+            write(tmp, "workforce/references/version.md", VERSION_MD.format("1.0.1"))
+        scenario("version bumped but mirror not updated", True, d)
+        # E: version moved BACKWARD → BLOCK
+        def e():
+            write(tmp, "workforce/references/foo.md", "changed\n")
+            write(tmp, "workforce/references/version.md", VERSION_MD.format("0.9.0"))
+            write(tmp, "workforce/SKILL.md", SKILL_MD.format("0.9.0"))
+        scenario("version moved backward", True, e)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    if fails:
+        print("\nFAIL: {} scenario(s) surprised us: {}".format(len(fails), ", ".join(fails)))
+        return 1
+    print("\nall scenarios as expected")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

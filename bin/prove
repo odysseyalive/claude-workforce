@@ -126,6 +126,7 @@ ORGP = "workforce/references/procedures/org.md"
 PRIN = "workforce/references/principles.md"
 PRINP = "workforce/references/procedures/principles.md"
 CTV  = "workforce/references/catalogs/text/version.md"
+VSRC = "workforce/references/version.md"   # the product version anchor (WORKFORCE-VERSION)
 DBUD = "workforce/references/delegation-budget.md"
 AUS  = "workforce/references/audit-setup.md"
 SECG = "workforce/references/catalogs/security/guards.md"
@@ -136,6 +137,13 @@ UIS  = "workforce/references/ui-design-seed.md"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── version anchor / mirror (2026-08-28) ─────────────────────────────────
+    # WORKFORCE-VERSION in version.md is the sole authored anchor; SKILL.md's
+    # frontmatter `version:` mirrors it. Deleting the `WORKFORCE-VERSION:` key breaks
+    # the anchor line so the mirror no longer equals it, and the equality check fires.
+    # The literal carries no version number, so the case survives every future bump.
+    ("version: SKILL.md frontmatter `version:` mirrors WORKFORCE-VERSION exactly",
+     VSRC, "del", "WORKFORCE-VERSION:"),
     # ── the third catalog slot (2026-08-06) ──────────────────────────────────
     # Each of the four breaks a DIFFERENT way the slot can silently close, because
     # the failure mode is not "the file is wrong" but "the file ships and nothing

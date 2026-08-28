@@ -113,7 +113,31 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-27
+## Open, as of 2026-08-28
+
+**Landed 2026-08-28 (dev session) — a shipped-file change must advance `WORKFORCE-VERSION`, enforced,
+and install/`update` report the number.** Prompted by a maintainer asking whether `workforce update` is
+AI-driven or scripted. It is fully scripted — it re-runs the published installer — so a past run that
+"changed the version" was the model editing the anchor by hand, in the wrong place. The number belongs
+where a change is *made*, and it was riding unbumped: `1.0.0` through every recent commit while fixes
+landed in `bin/` and `references/`, so `update` reported `1.0.0 → 1.0.0` over a changed tree.
+
+- **`WORKFORCE-VERSION` is the sole authored anchor; `SKILL.md`'s required frontmatter `version:` is a
+  checked mirror.** `references/version.md` reworded to say so; the two are asserted byte-equal
+  (`bin/check` + one `bin/prove` del-case on the `WORKFORCE-VERSION:` key — carries no number, so it
+  survives every bump). Bumped `1.0.0 → 1.1.0`.
+- **The bump is enforced git-natively, maintainer-side only.** `bin/pre-commit-version` refuses a commit
+  that touches a shipped file (manifest paths + `install`/`install.ps1`/`manifest.txt`) without advancing
+  the number, and refuses a mirror left behind or a backward move. Wired by `bin/dev-hooks-install`
+  (`core.hooksPath → githooks/`); NOT in the manifest — it guards this project's own development, not a
+  user's project. Proven by `bin/pre-commit-version-test` (five scenarios).
+- **Both install paths report the number equally.** `install`/`install.ps1` echo `WORKFORCE-VERSION` per
+  scope, and the downgrade guard moved out of `update`'s procedure into the shared installer (behind a
+  new `--force`/`WORKFORCE_FORCE`), so a bare `./install` and `/workforce update` protect and report the
+  same. `procedures/update.md` and `procedures/version.md` updated to match.
+
+`bin/check` 1007/0 and `bin/prove` 316/316 after `bin/coverage --stamp` and `bin/sync --personal`;
+`bin/pre-commit-version-test` green. Working tree, uncommitted.
 
 **Landed 2026-08-27 (dev session) — `hire` becomes a recruiter: a role's bar is researched, not
 assumed, and `audit` heals an org whose bars were wrong.** Prompted by a website build that shipped the

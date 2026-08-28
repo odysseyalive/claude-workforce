@@ -92,8 +92,14 @@ locations have been looked at.
    **Report the path being replaced, every time.** A copy updated at a path the user did not expect is
    indistinguishable from no update at all.
 
-3. **Refuse a version downgrade** unless `--force`. Naming both versions makes an accidental one
-   impossible.
+3. **The installer refuses a version downgrade** unless `--force` — and that guard now lives in the
+   shared installer itself (`install` / `install.ps1`), not in this procedure. Relocating it there is
+   what makes it real for a **bare full install** too, not only for `/workforce update`: the installer
+   compares the incoming release against the copy already at each location it is about to overwrite and
+   refuses to replace a newer one with an older one, naming both versions. **You do not perform this
+   check by hand** — running the installer in step 4 performs it. Pass `--force` (bash) / `-Force` or
+   `$env:WORKFORCE_FORCE` (PowerShell) only to deliberately install an older release over a newer one.
+   A first-time install at a location has nothing to compare, so the guard is a no-op there.
 
 4. **Run the published installer with the scope FORCED — verbatim.** Do not fetch the manifest and
    loop over it by hand; see § One fetch implementation below. Pick the cell:
@@ -117,7 +123,10 @@ locations have been looked at.
 5. **Confirm no project state was touched.** `.claude/workforce/**` must be byte-identical before and
    after. If it is not, that is a bug in the manifest or the installer, not an acceptable outcome.
 
-6. **Report what changed** — the version before and after, the path, the file count — and stop.
+6. **Report what changed** — the version before and after, the path, the file count — and stop. The
+   installer itself now echoes `Installed workforce <version> at <path> (<scope>)` per scope it
+   touched, so the "after" version is the number it printed on its way out; the "before" is the
+   `WORKFORCE-VERSION` the step-1 census read at that path.
 
 ### What the installer does besides fetching
 

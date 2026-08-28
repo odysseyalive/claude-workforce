@@ -8,12 +8,15 @@ Read-only; executes immediately. `/workforce version [--check]`
 ## Output
 
 ```
-claude-workforce 1.0.0
-  installed at:   ~/.claude/skills/workforce          (personal scope, active)
-  also present:   ./.claude/skills/workforce  1.0.0   (vendored, shadowed)
+claude-workforce X.Y.Z
+  installed at:   ~/.claude/skills/workforce            (personal scope, active)
+  also present:   ./.claude/skills/workforce  X.Y.W     (vendored, shadowed)
   platform facts: measured on claude-code 2.1.220 — current
   harness now:    2.1.220
 ```
+
+*(`X.Y.Z` / `X.Y.W` are illustrative — the two copies can differ, which is the skew this reports;
+`WORKFORCE-VERSION` is the real number.)*
 
 Four things, and each answers a question that has bitten someone:
 
@@ -32,6 +35,12 @@ basis of a blocking check until re-measured.
 `MEASURED-ON` tracks the harness the facts were measured against. They move independently, and
 folding them into one number would hide exactly the case that matters — a current release whose facts
 predate the harness you are running.
+
+**This is the same `WORKFORCE-VERSION` the installers echo.** Both the full-install command
+(`install` / `install.ps1`) and `/workforce update` — which runs that same installer — print
+`Installed workforce <version> at <path> (<scope>)` per scope as they land, reading it from the copy
+just written. So the number `/workforce version` reports and the number the installer echoed on its
+way in are always the same figure, read from the same `references/version.md`.
 
 ## `--check`
 

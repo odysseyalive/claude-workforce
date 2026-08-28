@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Wire this clone's git hooks to the tracked githooks/ directory. Idempotent — run
+# once per clone. Maintainer-only: it enforces workforce's own version-bump discipline
+# and is never installed into a user's project.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+chmod +x "$root/githooks/pre-commit" "$root/bin/pre-commit-version"
+git -C "$root" config core.hooksPath githooks
+echo "core.hooksPath -> githooks (pre-commit-version active)"

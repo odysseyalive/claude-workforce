@@ -43,6 +43,42 @@ set -e
 # before. This is a test seam, not a new feature.
 REPO_URL="${WORKFORCE_REPO_URL:-https://raw.githubusercontent.com/odysseyalive/claude-workforce/main}"
 
+# ── Version helpers ───────────────────────────────────────────────────────────
+#
+# WORKFORCE-VERSION lives in references/version.md (§ header of that file). Both the
+# post-install report (echoes the version just installed to each scope) and the
+# downgrade guard (compares the incoming release against what a location already has)
+# read it the same way, so the parse lives in one place.
+#
+# Parse: the `WORKFORCE-VERSION: X.Y.Z` line, tolerating leading/trailing space and
+# the code fence it sits inside. A missing file or line yields "unknown" rather than
+# an error, so the report degrades to `version: unknown` and the guard becomes a no-op.
+read_workforce_version() {
+    _vf="$1"
+    _ver=""
+    if [ -f "$_vf" ]; then
+        _ver="$(sed -n 's/^[[:space:]]*WORKFORCE-VERSION:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' "$_vf" | head -n1)"
+    fi
+    [ -n "$_ver" ] || _ver="unknown"
+    printf '%s' "$_ver"
+}
+
+# Is dotted version $1 strictly OLDER than $2? Compares X.Y.Z field by field in
+# base 10 (so 1.10.0 > 1.9.0). Callers guard "unknown" first; a non-numeric or
+# absent field counts as 0. Equal versions are NOT older.
+version_is_older() {
+    _va="$1"; _vb="$2"
+    _a1="${_va%%.*}"; _ar="${_va#*.}"; _a2="${_ar%%.*}"; _a3="${_ar##*.}"
+    _b1="${_vb%%.*}"; _br="${_vb#*.}"; _b2="${_br%%.*}"; _b3="${_br##*.}"
+    for _f in "$_a1:$_b1" "$_a2:$_b2" "$_a3:$_b3"; do
+        _x=$((10#0$(printf '%s' "${_f%%:*}" | tr -cd '0-9')))
+        _y=$((10#0$(printf '%s' "${_f##*:}" | tr -cd '0-9')))
+        [ "$_x" -lt "$_y" ] && return 0
+        [ "$_x" -gt "$_y" ] && return 1
+    done
+    return 1
+}
+
 PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
 # PERSONAL_SKILL_DIR is computed after arg parsing (below), once the personal config
 # root is known: `--config-dir <path>` or $CLAUDE_CONFIG_DIR can relocate the whole
@@ -75,12 +111,17 @@ PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
 SCOPE_EXPLICIT=""
 NO_AUTOMODE=""
 CONFIG_DIR_EXPLICIT=""
+FORCE=""
 [ -n "$WORKFORCE_NO_AUTOMODE" ] && NO_AUTOMODE="yes"
+# WORKFORCE_FORCE is the env twin of --force, for the curl-pipe form that cannot take
+# positional flags (mirrors WORKFORCE_SCOPE). Either overrides the downgrade guard.
+[ -n "$WORKFORCE_FORCE" ] && FORCE="yes"
 while [ $# -gt 0 ]; do
     case "$1" in
         --project|--local) SCOPE_EXPLICIT="project"; shift ;;
         --user|--personal) SCOPE_EXPLICIT="user"; shift ;;
         --no-automode) NO_AUTOMODE="yes"; shift ;;
+        --force) FORCE="yes"; shift ;;
         # A specific CLAUDE_CONFIG_DIR to install the personal copy into. Takes a
         # path value (space- or =-separated). Guard the value: `shift` on an empty
         # stack aborts under `set -e`, so a bare trailing `--config-dir` must fail
@@ -90,7 +131,7 @@ while [ $# -gt 0 ]; do
             CONFIG_DIR_EXPLICIT="$2"; shift 2 ;;
         --config-dir=*) CONFIG_DIR_EXPLICIT="${1#--config-dir=}"; shift ;;
         --help|-h)
-            echo "Usage: install [--user|--project] [--config-dir <path>] [--no-automode]"
+            echo "Usage: install [--user|--project] [--config-dir <path>] [--no-automode] [--force]"
             echo
             echo "With no flag, existing installs are found and updated in place."
             echo "A first-time install asks where to go."
@@ -103,6 +144,9 @@ while [ $# -gt 0 ]; do
             echo "                    same if already set in your shell"
             echo "  --no-automode     skip the auto-mode grant in the config dir's settings.json"
             echo "                    that lets workforce edit its own .claude/ config unprompted"
+            echo "  --force           overwrite even when the installed release is NEWER than the"
+            echo "                    incoming one (bypasses the downgrade guard); \$WORKFORCE_FORCE"
+            echo "                    does the same for the curl-pipe form"
             exit 0
             ;;
         *) shift ;;
@@ -276,6 +320,46 @@ MANIFEST_TMP="$(mktemp)"
 trap 'rm -f "$MANIFEST_TMP"' EXIT
 curl -fsSL "$REPO_URL/manifest.txt" -o "$MANIFEST_TMP"
 
+# ── Downgrade guard ───────────────────────────────────────────────────────────
+#
+# Relocated here from the `update` procedure so a BARE full install is protected too,
+# not only `/workforce update` (which runs this same installer). For any target that
+# ALREADY has a copy, refuse to overwrite a NEWER installed release with an OLDER
+# incoming one unless --force. A first-time install has nothing to compare against, so
+# this is a strict no-op there.
+#
+# The incoming version is the source-side references/version.md — fetched the same way
+# every other shipped file is (`$REPO_URL/workforce/...`), so it reflects exactly what
+# the install loop below is about to write.
+INCOMING_VERSION="unknown"
+INCOMING_VERSION_TMP="$(mktemp)"
+if curl -fsSL "$REPO_URL/workforce/references/version.md" -o "$INCOMING_VERSION_TMP" 2>/dev/null; then
+    INCOMING_VERSION="$(read_workforce_version "$INCOMING_VERSION_TMP")"
+fi
+rm -f "$INCOMING_VERSION_TMP"
+
+for guard_scope in $TARGETS; do
+    case "$guard_scope" in
+        user) guard_dir="$PERSONAL_SKILL_DIR" ;;
+        project) guard_dir="$PROJECT_SKILL_DIR" ;;
+        *) continue ;;
+    esac
+    INSTALLED_VERSION="$(read_workforce_version "$guard_dir/references/version.md")"
+    # Nothing installed here, or either side unreadable: nothing to compare, no-op.
+    case "$INCOMING_VERSION" in unknown|'') continue ;; esac
+    case "$INSTALLED_VERSION" in unknown|'') continue ;; esac
+    if [ "$FORCE" != "yes" ] && version_is_older "$INCOMING_VERSION" "$INSTALLED_VERSION"; then
+        echo
+        echo "REFUSING TO DOWNGRADE ($guard_scope):"
+        echo "    installed: $INSTALLED_VERSION at $guard_dir"
+        echo "    incoming:  $INCOMING_VERSION (older)"
+        echo
+        echo "  This would overwrite a newer release with an older one. Re-run with"
+        echo "  --force (or set WORKFORCE_FORCE=1) to install the older release anyway."
+        exit 1
+    fi
+done
+
 FETCH_FAILED=""
 VERIFY_FAILED=""
 SETTINGS_FAILED=""
@@ -410,6 +494,13 @@ install_to_scope() {
     done < "$MANIFEST_TMP"
 
     verify_scope "$skill_dir"
+
+    # Echo the version just installed to this scope, read from the copy that actually
+    # landed (`<skill_dir>/references/version.md`), so the report reflects disk, not the
+    # source we fetched from. Degrades to `version: unknown` rather than failing.
+    installed_version="$(read_workforce_version "$skill_dir/references/version.md")"
+    [ "$installed_version" = "unknown" ] && installed_version="version: unknown"
+    echo "  Installed workforce $installed_version at $skill_dir ($scope)"
 
     # CANARY FIXTURES LAND IN ONE SCOPE'S agents/ DIR, AND NOTHING RECONCILED THE OTHER.
     #

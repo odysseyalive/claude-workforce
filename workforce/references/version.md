@@ -1,16 +1,24 @@
 # Version
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: LOW — the authoritative product version anchor. `version` and `update` read it. -->
 
 ```
-WORKFORCE-VERSION: 1.0.0
+WORKFORCE-VERSION: 1.1.0
 ```
 
-The single source of truth for the installed release. Nothing else states a version number.
+The **source of truth** for the installed release, and the only place the number is *authored*. One
+other file states it — `SKILL.md`'s frontmatter `version:` — because Claude Code's skill schema
+requires that field; it is a **mirror**, not a second anchor, and `bin/check` asserts the two are
+byte-equal so they can never drift (`/workforce verify` on a host). Bump here, and update the mirror
+in the same commit.
 
 `/workforce version` prints it; `--check` compares against `main` and reports whether an update is
 available. `/workforce update` re-runs the installer.
+
+A change to any shipped file **must** advance this number — enforced at commit time by the
+maintainer hook `bin/pre-commit-version` (not shipped: it guards workforce's own development, not a
+user's project). A shipped change that rides on an unchanged version is refused.
 
 ---
 
@@ -49,4 +57,5 @@ current-or-stale rather than folding it into the product version.
 3. Confirm no constant is restated outside its single source (`verify`'s constants check).
 4. Confirm the manifest lists every shipped file, and that nothing writes project state into the skill
    directory.
-5. Bump this file.
+5. Bump this file, and update `SKILL.md`'s frontmatter `version:` to the same value (the commit hook
+   and `bin/check`'s equality assertion both refuse a mismatch).

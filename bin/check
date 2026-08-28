@@ -571,6 +571,24 @@ check(
     f"{skill.count('<!-- ENFORCEMENT ANNOTATION')} open vs "
     f"{skill.count('<!-- END ENFORCEMENT ANNOTATION -->')} close",
 )
+# The product version is AUTHORED once — WORKFORCE-VERSION in references/version.md —
+# and MIRRORED in SKILL.md's frontmatter `version:`, which the skill schema requires.
+# They must be byte-equal, or an `update` reports one number while the skill declares
+# another. The maintainer hook `bin/pre-commit-version` forces the number to ADVANCE on
+# any shipped change; this asserts the mirror never drifts from the anchor. bin/prove
+# deletes the `WORKFORCE-VERSION:` key and confirms this fires.
+_ver_anchor = re.search(
+    r"^WORKFORCE-VERSION:\s*(\S+)\s*$", read("workforce/references/version.md"), re.M)
+_ver_mirror = re.search(r'^version:\s*"?([^"\n]+?)"?\s*$', fm, re.M)
+check(
+    "version: SKILL.md frontmatter `version:` mirrors WORKFORCE-VERSION exactly",
+    _ver_anchor is not None and _ver_mirror is not None
+    and _ver_anchor.group(1) == _ver_mirror.group(1),
+    "anchor={} mirror={} — bump both in one commit "
+    "(references/version.md § Release checklist)".format(
+        _ver_anchor.group(1) if _ver_anchor else "MISSING",
+        _ver_mirror.group(1) if _ver_mirror else "MISSING"),
+)
 # Count only STANDALONE markers — one on its own line. Prose that documents the
 # marker syntax (`<!-- origin: user | immutable: true -->` inside backticks) is a
 # mention, not a marker, and counting it produced 8 false failures on this

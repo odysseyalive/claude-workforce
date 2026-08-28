@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Refuse a commit that changes a shipped file without advancing WORKFORCE-VERSION.
+
+MAINTAINER-ONLY. This guards claude-workforce's OWN development — it is not shipped
+in the manifest and never reaches a user's project (a user's version discipline, if
+any, is their own). Wire it with `bin/dev-hooks-install`, which points this repo's
+`core.hooksPath` at `githooks/`.
+
+Why it exists: the installers pull `main` HEAD, so every commit to a shipped file is
+effectively a release. A shipped change that rides on an unchanged version number
+makes `update`/`version` report a number that no longer describes the bytes on disk —
+the "version blindness" this hook removes. The rule is therefore literal: touch a
+shipped file, advance the number. `bin/check` carries the complementary static guard
+(the SKILL.md mirror equals the anchor); this carries the one it cannot express
+statelessly (the number moved *forward* in this commit).
+
+Fails OPEN on any internal error (prints a warning, exits 0): a crashing hook must
+never wedge every commit, and `bin/check` is the backstop at verify/CI time.
+"""
+import os
+import re
+import subprocess
+import sys
+
+ANCHOR = "workforce/references/version.md"
+MIRROR = "workforce/SKILL.md"
+# Shipped-but-not-manifest-listed: the installers fetch these three by fixed URL.
+EXTRA_SHIPPED = ("install", "install.ps1", "manifest.txt")
+FLAGS = ("keep", "hook", "exec", "canary")
+
+
+def git(*args):
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, cwd=ROOT)
+
+
+def parse_version(text):
+    m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)\s*$", text, re.M)
+    return m.group(1) if m else None
+
+
+def parse_mirror(text):
+    fm = text.split("\n---\n")[0]
+    m = re.search(r'^version:\s*"?([^"\n]+?)"?\s*$', fm, re.M)
+    return m.group(1) if m else None
+
+
+def as_tuple(v):
+    """(X, Y, Z) of ints for a semver, or None if it is not plain numeric."""
+    parts = v.split(".") if v else []
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        return None
+    return tuple(int(p) for p in parts)
+
+
+def shipped_paths():
+    out = set(EXTRA_SHIPPED)
+    try:
+        with open(os.path.join(ROOT, "manifest.txt"), encoding="utf-8") as fh:
+            for line in fh:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                toks = s.split()
+                out.add(toks[1] if toks[0] in FLAGS and len(toks) > 1 else toks[0])
+    except OSError:
+        pass
+    return out
+
+
+def die(msg):
+    sys.stderr.write("pre-commit-version: " + msg + "\n")
+    sys.exit(1)
+
+
+def main():
+    staged = git("diff", "--cached", "--name-only")
+    if staged.returncode != 0:
+        sys.stderr.write("pre-commit-version: warning: git diff failed; skipping\n")
+        return 0
+    changed = {p for p in staged.stdout.splitlines() if p}
+    touched = changed & shipped_paths()
+    if not touched:
+        return 0  # no shipped file in this commit — nothing to enforce
+
+    head = git("show", "HEAD:" + ANCHOR)
+    if head.returncode != 0:
+        return 0  # no HEAD yet (initial commit) — no baseline to compare against
+    staged_anchor = git("show", ":" + ANCHOR)
+    if staged_anchor.returncode != 0:
+        die("cannot read the staged " + ANCHOR)
+
+    old = parse_version(head.stdout)
+    new = parse_version(staged_anchor.stdout)
+    sample = ", ".join(sorted(touched)[:3]) + (" …" if len(touched) > 3 else "")
+    if new is None:
+        die("WORKFORCE-VERSION is missing from the staged " + ANCHOR)
+    if old is not None and new == old:
+        die(
+            "shipped files changed but WORKFORCE-VERSION is still {}.\n"
+            "  advance it in {} (and the SKILL.md mirror) before committing "
+            "(see references/version.md § What the numbers mean).\n"
+            "  changed: {}".format(new, ANCHOR, sample))
+    ot, nt = as_tuple(old), as_tuple(new)
+    if ot is not None and nt is not None and nt <= ot:
+        die("WORKFORCE-VERSION went {} -> {}: it must ADVANCE, not move backward.".format(old, new))
+
+    # Mirror must match the anchor in the same commit, or bin/check fails afterward.
+    staged_mirror = git("show", ":" + MIRROR)
+    if staged_mirror.returncode == 0:
+        mir = parse_mirror(staged_mirror.stdout)
+        if mir != new:
+            die("SKILL.md frontmatter version ({}) does not match WORKFORCE-VERSION ({}); "
+                "bump both together.".format(mir, new))
+    return 0
+
+
+ROOT = subprocess.run(
+    ["git", "rev-parse", "--show-toplevel"],
+    capture_output=True, text=True).stdout.strip() or os.getcwd()
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception as e:  # fail open — never wedge every commit on a hook bug
+        sys.stderr.write("pre-commit-version: warning: {} ({}); skipping\n".format(
+            type(e).__name__, e))
+        sys.exit(0)
