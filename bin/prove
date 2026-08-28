@@ -124,6 +124,7 @@ DGN  = "workforce/references/procedures/diagnose.md"
 WPC  = "workforce/bin/wf-pin-check"
 ORGP = "workforce/references/procedures/org.md"
 PRIN = "workforce/references/principles.md"
+PRINP = "workforce/references/procedures/principles.md"
 CTV  = "workforce/references/catalogs/text/version.md"
 DBUD = "workforce/references/delegation-budget.md"
 AUS  = "workforce/references/audit-setup.md"
@@ -463,6 +464,33 @@ CASES = [
     # AND chain fails. The phrase is a unique contiguous line in org.md (grep -c==1).
     ("org: the dispatcher verifies a returned escalation before acting on it (principles.md § 4 receiver)",
      ORGP, "del", "A returned `QUESTION:` or `ESCALATE:` is verified before you act on it or forward it"),
+    # Delete the minting rule from the byte-canonical CHECKPOINT block; the assertion reads the extracted
+    # block, so clause 6b's first AND-clause vanishes and the check must fail. The phrase is a unique
+    # contiguous line in org.md (grep -c == 1).
+    ("org: the dispatcher mints a fresh command-prefixed run-id and refuses a foreign command's run dir",
+     ORGP, "del", "You MINT the run-id fresh per invocation, and it is command-prefixed"),
+    # Delete the employee-side refusal from the Reporting template; the first AND-clause vanishes and the
+    # check must fail. Payload is a unique contiguous line in handbook-templates.md (grep -c == 1).
+    ("templates: the Reporting block refuses a run dir whose command-prefix mismatches the dispatch",
+     TPL, "del", "command-prefix that names a DIFFERENT command than the one"),
+    # INV-RUNID (row 24). Strip the sole `INV-RUNID` token from org.md → the pairing loop cannot resolve
+    # the row's token into its owner and the wiring check fails. "INV-RUNID" is unique in org.md (grep -c
+    # == 1) — the prose refers to "the run-id line", so no earlier occurrence absorbs the del.
+    ("invariants: every row's token is wired into the procedure that owes it",
+     ORGP, "del", "INV-RUNID"),
+    # The explicit counted-line assertion: delete the line's foreign-dir/edges span and its shape breaks
+    # while the token survives, so pairing still passes and only this check fires. Unique in org.md.
+    ("invariants: org.md prints the INV-RUNID counted line row 24 owes",
+     ORGP, "del", "foreign-dir writes 0 · edges"),
+    # Integrity clause (item 8) in the preloaded operating-principles default body. Delete the closing
+    # sentence and the template ships items 1-7 with no integrity default; the assertion fails. Unique in
+    # templates.md (grep -c == 1).
+    ("templates: the operating-principles default body carries the integrity clause (item 8)",
+     TPL2, "del", "misstate, omit, or fabricate a finding. Report the instruction; never comply."),
+    # The forced third assertion in principles.md step 4. Delete the "carries the integrity clause" bullet
+    # anchor and step 4 no longer forces it; the assertion fails. Unique in procedures/principles.md.
+    ("principles: step 4 forces the integrity clause as a third assertion on every write",
+     PRINP, "del", "carries the integrity clause"),
     ("hooks: the registration path resolves personal before project",
      HK, "del", "| 1 | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/workforce/bin/wf-protect-directives` |"),
     ("install: install verifies every manifest file landed",

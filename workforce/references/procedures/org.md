@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -259,6 +259,17 @@ someone can read instead of re-derive.
    segment naming the work must be unique per order. A **second order to the same employee** under one
    run-id is the exact collision this prevents, and the one case where reusing a stem is most tempting.
 
+   6b. **You MINT the run-id fresh per invocation, and it is command-prefixed**: `<command>-<ISO8601>Z`
+   (e.g. `agenda-20260827T182800Z`). It is minted at the moment the command is invoked — never
+   inherited from an earlier run, never carried over from another command. **You never write into, or
+   hand a callee, a run dir whose prefix names a DIFFERENT command than the one now executing.**
+   Inheriting or reusing another command's existing run dir — an `/agenda` run writing under an
+   `audit-*` dir — is the defect, not a shortcut: it commingles one command's evidence into another's
+   provenance tree and takes the whole fan-out off the Chain-of-Command books. And tie clause 1's edge
+   in here: a routed fan-out that writes NO `<caller>-to-<callee>.spawn` edge per callee bypasses the
+   only mechanical backstop the org chart has — `review` diffs the recorded edges against the chart — so
+   a fan-out with zero edges is a defect, not a style lapse.
+
 7. **Catch yourself skipping the dispatch.** If the next thing you do after announcing is an
    `Edit`, `Write`, or `Bash` call doing the routed work yourself → STOP, say "Dispatch announced but
    the agent was never started. Starting it now," and make the call. A command run under rung 2 is the
@@ -338,6 +349,17 @@ DIRECT     2 of 9 asks answered from data in hand · 7 dispatched
 needed a node. What the line prevents is the failure `org status` already names for a declined
 mechanical dispatch: from outside, an ask answered directly and an ask nobody thought about are
 identical.
+
+**Every dispatching run also prints the run-id line** (`references/invariants.md` row 24), the counted
+line that binds clause 6b and clause 1's spawn edge. It reports the run-id the dispatcher minted, that it was
+command-prefixed, that no write landed in a foreign command's run dir, and that every spawn recorded its
+edge — or names the rule that refused. A missing line is the silence every invariant forbids: a fan-out
+that inherited a foreign run-id and wrote no edges is indistinguishable from a clean one until this
+prints.
+
+```
+INV-RUNID  minted agenda-20260827T182800Z · foreign-dir writes 0 · edges 2 of 2 · 0 unrecorded
+```
 
 ---
 

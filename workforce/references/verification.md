@@ -309,7 +309,7 @@ needs **no load step**, and its `## Procedure` opens on the work.
 *Corrected 2026-08-04 by a cold read. This § said a web-facing employee "uses the default grant (no
 `tools:` field)" and opened its Procedure with a `ToolSearch` load — **describing a handbook the
 tier-ceiling gate refuses to register**, and prescribing the one pairing fact 13 measures as
-counter-productive. `handbook-templates.md` § Web-facing IC carried the identical text; both are the
+counter-productive. `handbook-templates.md` § Untrusted-content-facing IC carried the identical text; both are the
 2026-08-03 `tools:` ceiling not being carried onto every path that describes a grant.*
 
 ### When the server is absent

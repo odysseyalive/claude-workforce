@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty-three, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty-four, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -69,7 +69,12 @@ companion gate** rather than to conversion, the sweep, or a guard: a real audit 
 `/org` uncreated because `audit-setup.md` Step 0.3 was framed as a copy-install and a literal run read
 *"the distribution ships none → install none"*, with nothing failing the skip. It is the
 written-and-unwired shape one gate over from row 19 — the companions were decided and materialized by no
-counted line, so a run that skipped every one closed clean.)*
+counted line, so a run that skipped every one closed clean. **Row 24 landed 2026-08-27 and is owed by
+the dispatcher** (`references/procedures/org.md`) rather than by an `audit` sweep — the INV-PINS
+precedent, a row printed by the procedure that owns the act rather than by the sweep gate. It was
+measured on odyssey-alive: an `/agenda today` fan-out inherited a stale foreign audit run-id, wrote its
+ICs' OUTPUT.md into that audit's evidence tree, and recorded no spawn edges — none of which any counted
+line caught.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -96,6 +101,7 @@ counted line, so a run that skipped every one closed clean.)*
 | 21 | the pin guard emitted its report, and its unpinned/pinnable/unpinnable counts and dependabot status are coherent | `INV-PINS` | references/procedures/hooks.md |
 | 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
+| 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run
