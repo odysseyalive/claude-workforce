@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 68 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.1.0"
+version: "1.2.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -271,6 +271,39 @@ researched** standard: a present-but-unresearched bar is never counted as satisf
 unreachable network degrades to the shipped seed, loudly and reported (`references/recruiter.md`
 § When the network is genuinely unavailable). This directive also reaches `references/procedures/audit.md`
 § Step 5c, which forces the same research when remediating an existing org's bars.*
+
+> **"we need to add a default directive to always use a sharable artifact to communicate complex
+> issues and visual asset examples. the same artifact needs to be used and updated throughout the
+> session."**
+
+> **"This is also another issue I often have to acknowledge: I see the example. I think we need to
+> break out the examples in the artifact so that as we discuss and change, we see a progression."**
+
+*— Added 2026-08-28, source: user directive, stated during `/workforce dev` and refined mid-turn: the
+first message asked for the shared session artifact, the second added that the examples inside it must
+break out as a progression. "Artifact" here is the claude.ai Artifact — a shareable, updatable page —
+not the sense the rest of this project gives the word (a produced file), and `references/session-artifact.md`
+§ The single session artifact carries that disambiguation so no reader trips on it. Two clauses, one
+directive: complex issues and visual asset examples are communicated through a shareable artifact, and
+**the same artifact is reused and updated across the whole session** — one page, one URL, never a fresh
+link per report — while **the examples inside it accumulate as a labeled progression rather than being
+overwritten** (`references/session-artifact.md` § Examples break out as a progression), because the diff
+between v1 and v2 is the very thing that makes visual work reviewable and a replaced example destroys it.
+This is retention (directive one) applied to a visual conversation: the earlier example is evidence of
+how the current one was reached, not noise to clear. Its reach is **every generated org, not just this
+operating session**: it ships as item 9 of the operating-principles default body
+(`references/templates.md` § `operating-principles`), the constitution every non-fork employee preloads
+and every audit force-refreshes, double-guarded on write exactly as the integrity clause is
+(`references/procedures/principles.md` § Procedure step 4). Enforcement is layered and each layer is
+named at its true strength (Core Principle 6): **structural** where the clause itself must be present in
+the shipped constitution and is checked; **advisory** for the operator's live act, since whether a
+running session opened one page and grew it is main-loop behavior no host check can observe; and
+**structural** again at a Lead's `## Reporting` line. Mechanics at `references/session-artifact.md`,
+`references/templates.md` § `operating-principles`, and `references/procedures/principles.md` § Procedure;
+the operational reading is — when a finding is too complex for terminal scrollback, or has a visual
+example, open one shareable artifact, keep updating that same one, and grow the examples into a labeled
+v1 → v2 → v3 trail so the progression is legible at a glance — and every company workforce builds carries
+that same rule in its constitution.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
