@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -103,6 +103,28 @@ surfaced for the human to adjudicate on a hunch.
 `bin/check` assertion holds this section present and wired into `handbook` and `audit`; a `bin/prove`
 del-case removes a load-bearing fragment of it and confirms that assertion fails. A standing gate that
 binds nothing is the failure this whole file exists to close.
+
+---
+
+## Every multi-gate work-product is wired to ALL its gates before it is done
+
+**A work-product whose kind requires more than one gate is not done until EVERY required gate is wired
+into its producing pipeline.** The raising case: a marketing/presentation surface passed the design
+critic and shipped, because nothing routed it through the content gate too — the surface cleared one
+gate and skipped another, and each gate that did run passed, so the miss was invisible. The required
+gates per work-product type are declared in the project's gate map (`org-config.md` § Gate map); the
+producing pipeline is the org-chart chain plus the producing employees' `## Verification` sections.
+
+**WIRING is the check, never the gate's output.** The question is only: for each required gate, is it
+reachable in that type's producing pipeline? A surface that clears one gate and skips another is not
+done, it is half-checked. This never judges whether a gate's verdict was *good* — that is the gate's own
+job; this proves the gate was *there*. Coverage of gates, not quality of their output.
+
+**Classification (`invariants.md`): a structural claim, enforced the way the catalog gates above are.**
+A `bin/check` assertion holds this section present and the gate-map schema shipped; a `bin/prove`
+del-case removes a load-bearing fragment and confirms it fails. On a host the wiring itself is a
+`/workforce verify` check (`procedures/verify.md` § Gate wiring), the structural mechanism — not an
+`INV-*` row, which is reserved for a property of a *run*.
 
 ---
 

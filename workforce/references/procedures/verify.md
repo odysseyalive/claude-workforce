@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 25 assertion(s) in bin/check name this file; 55 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 29 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -593,6 +593,32 @@ chart. A conversion that failed with ✗ left its skill intact, so every line de
 still true, and flagging it would send the user to delete accurate documentation.
 
 ---
+
+## Gate wiring
+
+Reads `org-config.md` § Gate map. For each declared work-product type, confirm every required gate in
+the gate map is reachable in that type's producing pipeline — the org-chart chain plus the producing
+employees' `## Verification` sections. A required gate that no producing pipeline names is the failure:
+report the type and the missing gate, and BLOCK. This is the wiring check `verification.md` § Every
+multi-gate work-product describes; it proves the gate is THERE, never grades the gate's output. If
+`org-config.md` declares no `## Gate map` — the default until a project opts in — the Gate wiring check
+is inert until a gate map is declared: it reports nothing and never fails, so distributing this payload
+does not red-fail a project that has not adopted. Authoring the map activates it; an empty map is
+likewise a clean pass, not a gap.
+
+## Coverage
+
+Reads `org-config.md` § Coverage sets. For each set, every member must (1) EXIST, (2) be free of every
+retired-direction marker the set names (a grep, exactly like palette-drift), and (3) carry the gate-pass
+record the set requires. A member that is missing, that carries a retired-direction marker, or that
+lacks its gate-pass record is named and BLOCKS. This is COMPLETENESS, never quality — a member never
+fails on a taste judgment about whether it "looks right"; that stays the critic's job and is not part of
+this check. If `org-config.md` declares no `## Coverage sets` — the default until a project opts in —
+the Coverage check is inert until a coverage set is declared: it reports nothing and never fails, so
+distributing this payload does not red-fail a project that has not adopted. Authoring a set activates
+it; an empty set is likewise a clean pass. (The executable maintainer script that walks the sets on a
+host is owed at the first project that adopts a manifest, built and proven against that project's real
+sets as its fixture — until then this section is the executor-followed check.)
 
 ## Output
 

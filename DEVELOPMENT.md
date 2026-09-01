@@ -113,7 +113,48 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-28
+## Open, as of 2026-08-31
+
+**Landed 2026-08-31 (dev session) — the directing node owns completeness; a multi-gate work-product
+wires ALL its gates; a coverage manifest catches a left-behind surface.** Prompted by a website build
+(apps.odyssey-alive) that shipped page after page with holes — copy that never passed the content gate,
+one graphic regenerated of many, a whole `/modules` page left on the retired style — because the CEO/Lead
+scoped each of those OUT of the work order and nothing checked the order. The dispatch is the org's
+single unchecked point.
+
+- **#1 directing-node completeness contract — `references/handbook-templates.md`.** The CEO template's
+  `## Guardrails` now carries the contract (copy through the content gate · every in-scope asset swept
+  as a census not a sample · whole surface · both design+content gates · name every scope-out), and the
+  Lead template binds it ("COMPLETENESS binds you too") since a Lead directing its ICs is itself a
+  directing node. 2 `bin/check` assertions + 2 `bin/prove` del-cases.
+- **#2 gate-wiring — `references/verification.md` + `org-config.template.md` § Gate map + `verify.md`
+  § Gate wiring.** A work-product type needing more than one gate is not done until ALL of them are
+  wired into its producing pipeline; the per-project `type → [gates]` map is authored in `org-config.md`.
+  WIRING only — is the gate reachable in the pipeline — never the gate's output. 3 assertions + 3
+  del-cases.
+- **#3 coverage — `org-config.template.md` § Coverage sets + `verify.md` § Coverage.** `verify` reads a
+  per-project manifest (members · retired-markers · gates) and fails a member that is missing, carries a
+  retired-direction marker (a grep, like palette-drift), or lacks its gate-pass record. COMPLETENESS,
+  never quality — a taste judgment is barred and left to the critic. 2 assertions + 2 del-cases.
+- **Taxonomy discipline.** All three are STRUCTURAL claims (`invariants.md`) — `bin/check` assertions +
+  `/workforce verify` checks, NOT `INV-*` rows (the INV set is closed to PROCEDURAL run-property claims).
+  Filing them as INV rows would be the wrong-kind error `invariants.md` warns of.
+- **Distribution-safe / opt-in.** #2 and #3 are inert until a project declares its manifest (`verify.md`
+  states it and 2 assertions + 2 del-cases guard it); #1 does not fail or flag existing handbooks
+  (`wf-conform` checks section presence/order, not `## Guardrails` content — a contract post-dating the
+  files under it is inapplicable-by-design). So `bin/sync --personal` lands all three on the shared
+  install without red-failing an un-adopted project (apps-odyssey-alive / odyssey-alive / hither-lands /
+  nsayka-wawa). Bumped `1.2.0 → 1.3.0`.
+
+**Owed, deferred:** the executable coverage maintainer script (sibling to `wf-census`) that walks a
+project's sets on a host is owed at the FIRST project that adopts a manifest — built and proven against
+that project's real sets as its fixture (`verify.md § Coverage` is the executor-followed check until
+then). Per-project adoption (author manifests + regenerate handbooks so existing employees carry the
+contract) is the next phase, apps-odyssey-alive first.
+
+`bin/check` 1021/0 after `bin/coverage --stamp` and `bin/sync --personal` (both `~/.claude` and this
+session's `CLAUDE_CONFIG_DIR` install); every new del-case (9) proven to discriminate. Working tree,
+committed to main.
 
 **Landed 2026-08-28 (dev session) — a shipped-file change must advance `WORKFORCE-VERSION`, enforced,
 and install/`update` report the number.** Prompted by a maintainer asking whether `workforce update` is

@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 25 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 27 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -157,6 +157,20 @@ partial success.
 - NEVER exceed the spawn budget above. If the work needs more, split it into sequential waves.
 - NEVER write code, tests, or documentation yourself.
 - Every decision MUST conform upward to the General Operating Principles and the Strategic Objective.
+- COMPLETENESS is yours as the directing node — the work order is the single point of failure, and you
+  are the one who writes it. Whatever you scope out of an order comes back missing, exactly as ordered.
+  Before you dispatch, the order MUST answer every line that applies, or it is not ready:
+  - **Copy gate.** If the work touches any shipped string, the order routes that copy through the
+    content gate before it is done. No copy reaches review ungated.
+  - **Asset coverage — census, not a sample.** If the work changes a direction, palette, or system, the
+    order requires EVERY in-scope asset enumerated and each one brought to the current direction, with
+    the census as a deliverable. "Regenerate the ones that are off" means all of them.
+  - **Whole surface, not a slice.** A presentation surface carries its whole-page criteria; someone
+    owns the whole surface, not one band of it.
+  - **Both gates.** A presentation surface is not done until it clears BOTH its design gate AND its
+    content gate. Sequence both in; serialize on shared files.
+  - **Name every scope-out.** Anything deliberately left out of the natural scope is NAMED in the order
+    and surfaced, never left implicit. A silent scope-out is how a hole is born.
 
 ## Exit criteria
 <Stated in verifiable terms before anything is dispatched.> You are done when every dispatched order
@@ -207,6 +221,10 @@ Lead-specific guardrails, **in addition to** the CEO set (which applies unchange
 - NEVER spawn more than <N> direct reports in parallel.
 - `SendMessage` reaches your sibling Leads only. Use it for cross-department coordination that does
   not need the CEO.
+- COMPLETENESS binds you too. When you direct your ICs you are the directing node, so the CEO
+  completeness contract above (copy gate, asset census not a sample, whole surface, both gates, named
+  scope-outs) applies unchanged to every order you write. Scoping a sweep to one asset when the whole
+  direction changed is the defect this closes.
 ```
 
 ---

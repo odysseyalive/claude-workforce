@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -440,3 +440,44 @@ skipped question and an answered one can never look the same.
 
 **Suppression:** headless, non-interactive, and `--quick` runs render no questions and write no
 markers. They honor existing markers and install nothing that has not been explicitly authorized.
+
+---
+
+## Gate map
+
+Per-project. Declares, for each work-product TYPE this project ships, the full set of gates it must
+clear. `/workforce verify` § Gate wiring reads this and fails if a declared gate is not reachable in
+that type's producing pipeline (the mechanism is generic; the map is yours to author). Empty is legal —
+a project with only single-gate work-products declares nothing here.
+
+```
+work-product-type: [gate, gate, ...]
+```
+
+| Work-product type | Required gates |
+|---|---|
+| <e.g. presentation-surface> | <e.g. design-critic, content-gate> |
+
+*(The raising case: a presentation surface routed through the design critic but never the content gate.
+Declaring `presentation-surface: [design-critic, content-gate]` makes the missing wiring a verify
+failure instead of a silent hole. WIRING only — verify proves the gate is reachable, never grades its
+output.)*
+
+## Coverage sets
+
+Per-project. Names sets of surfaces/assets that must all stay on the current direction, so a left-behind
+member (a page never rebuilt, an asset never regenerated) is a `/workforce verify` § Coverage failure
+rather than something a human must spot. The mechanism is generic; the sets, the retired-markers, and
+the required gates are yours to author. Empty is legal.
+
+```
+<set-name>:
+  members:         <glob or explicit list of paths/routes>
+  retired-markers: <strings whose PRESENCE means off-direction — e.g. retired hexes/vocabulary>
+  gates:           <gate-pass records each member must carry>
+```
+
+*(Coverage proves COMPLETENESS, never quality: a member fails only on absence, on carrying a
+retired-direction marker (a grep, like palette-drift), or on a missing gate-pass record — never on a
+taste judgment about whether it "looks right". That judgment stays the critic's, and must not enter a
+mechanical check.)*
