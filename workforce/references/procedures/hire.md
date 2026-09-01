@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 34 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -104,6 +104,25 @@ conversion. Greenfield and conversion are one path arriving with different initi
 
 **IF the employee touches no persistent state → say so and continue.** `no records` is a measurement;
 a silent skip is indistinguishable from a step that never ran.
+
+## Step 3c — Bind the vision directive (creative roles)
+
+**A role in a CREATIVE lane (`org-config.md` § The four lanes — creative-text or creative-visual) does
+not register with `## Directives` reading `(none bound)`.** Author a
+`.claude/workforce/directives/<skill>.md` that captures the role's vision as MEASURABLE ACCEPTANCE
+CRITERIA — observational or computed checks, never a prose brief — seeded from the recruiter's
+researched standard (Step 1.5) plus any owner vision available this run, and BIND it: write the
+`## Directives` pointer and set the `directives-sha`. **This AUTHORS a directive; it is not T2**, which
+EXTRACTS sacred spans from a source skill and is N/A on a hire — a hire has no source, but a creative
+role still owes the vision it will be measured against. Once bound, `wf-conform`/`verify` resolve the
+sha, which is what gives the plan-gate its teeth: a PLAN-READINESS order's acceptance criteria are
+checked against a directive that actually travels with the role, not a prose brief lost between handoffs.
+
+**Analytical, code, and session-advisor roles are unchanged** — they bind a directive only if the owner
+has vision to bind, and `(none bound)` stays correct and conformant for them. The owner's vision may not
+be fully known at hire, so the initial directive is a SEED; the promote step (`amend.md` § Promote) is
+how it ACCUMULATES as later runs validate more of it. `(none bound)` on a creative role is a gap to
+close by adoption, never a failure that blocks an un-adopted project.
 
 ## Step 4 — Register
 

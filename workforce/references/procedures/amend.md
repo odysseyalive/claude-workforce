@@ -1,6 +1,6 @@
 # amend — change a handbook or a data skill, with two keys
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The only path by which a handbook's text or a data skill's schema changes.** Strict execution and
 instant amendment are one invariant: an employee never works around its handbook, and a wrong handbook
 changes immediately.
@@ -148,6 +148,20 @@ correctly left advisory — that judgment is the whole question. Why here: this 
 dominant recorded failure mode, five defects of one shape, and `amend` is where new doctrine enters.
 The definition shipped from the beginning and no procedure convened it, which is that same failure
 wearing the shape of the thing meant to catch it.*
+
+---
+
+## Promote — owner-approved vision accumulates, it does not evaporate
+
+**When a run produces a rubric, spec, or acceptance-criteria set that the OWNER APPROVES, it does not
+stay in the throwaway `.claude/workforce/work/<run-id>/` where the next run starts blank.** PROMOTE it:
+move it into the role's bound directive file `.claude/workforce/directives/<skill>.md` and update the
+`directives-sha` — an amend of the directive, Steps 2–7 above. **This is the seam to the plan-gate:**
+the acceptance criteria a PLAN-READINESS order produced are exactly what get promoted and bound here, so
+the vision the owner validated once travels with the role and `verify` resolves it — instead of being
+re-learned through ten reactions every redesign. **Validated vision accumulates instead of evaporating.**
+Skipping the promotion is the recorded failure: this session authored a validated rubric and page-budget
+into a run-dir bound to nothing, so the next redesign would start blank.
 
 ---
 

@@ -113,7 +113,53 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-08-31
+## Open, as of 2026-09-01
+
+**Landed 2026-09-01 (dev session) — the plan-gate (Definition of Ready) and vision-binding, riding the
+completeness contract and the directives rail.** Follow-on to the completeness batch (`4ec625a`): that
+was a Definition of DONE; a surface could pass all three and still be the busy, off-vision page the
+owner rejected. Two gaps remained (synthesis of SDLC + Tesler + a workforce self-eval): no Definition
+of Ready (10 of 11 session runs fanned out a plan-less build and thrashed ~10 owner reactions; the one
+that started from a PLAN converged), and vision never captured as directives (`## Directives` read
+`(none bound)` on all 8 employees — the bind mechanism existed and no one used it).
+
+- **Plan-gate (Gap A) — `handbook-templates.md`.** Extended the CEO/Lead completeness contract with a
+  **PLAN-READINESS** clause: an ambiguous or tightly-coupled order needs an approved plan + acceptance
+  criteria before build. Crisp any-of trigger — T1 multi-surface · T2 coupled (shared file/tree/port or
+  multi-department) · T3 rebuild/redesign-shaped · T4 acceptance-criteria-unstatable. Single-IC
+  unambiguous edits are EXEMPT ("a universal plan gate is its own bureaucracy" — the DoR-bureaucracy
+  failure the SDLC research flagged). Structural claim, not an INV row (a plan is a property of a
+  dispatch, not the audit run).
+- **Vision-binding (Gap B, GENERIC) — `hire.md` Step 3c + `amend.md` § Promote + `handbook-templates.md`
+  § Directives.** The directive rail only ever ran on CONVERSION (T2 extracts sacred spans; N/A on a
+  hire), so a plain hire never AUTHORED a directive. Step 3c authors + binds a
+  `.claude/workforce/directives/<skill>.md` with MEASURABLE acceptance criteria for a creative-lane
+  role (seeded from the recruiter's researched standard); § Promote moves an owner-approved rubric/spec
+  out of the throwaway run-dir into the bound directive (sha updated) so validated vision accumulates.
+  No new INV — enforcement rides the EXISTING `directives-sha` resolution (bound → `verify` resolves it,
+  which gives the plan-gate its teeth; unbound → conformant). The generator stays domain-agnostic; the
+  Tesler content is authored at apps-odyssey-alive adoption, not baked here.
+- **The seam:** a PLAN-READINESS order's acceptance criteria are exactly what § Promote binds; once
+  bound the sha resolves — plan-gate and vision-binding reinforce.
+- **Opt-in / non-breaking**, exactly like the completeness batch: `wf-conform` checks section
+  presence/order not Guardrails content, and only resolves a sha when a directive IS bound, so an
+  un-adopted project (all `(none bound)`, no plan-gate policy) stays conformant. Adoption is per-project.
+- **Enforcement.** 4 `bin/check` assertions (1 plan-gate, 3 vision-binding) + 4 `bin/prove` del-cases,
+  each proven to discriminate. Bumped `1.3.0 → 1.5.0` (1.4.0 was the intermediate plan-gate step in the
+  same uncommitted batch).
+
+**Still owed (carried, not this batch):** the pre-existing `bin/prove` name-drift — case
+`bin/prove:500` names *"…third assertion…"* while its target `bin/check` assertion is
+*"…fourth assertion…"*, so it reports VACUOUS; it pre-dates `4ec625a` (present in parent `09ba7c5`,
+untouched by these batches) and surfaced only once the sync made `bin/prove` runnable. One-line fix
+(align the names), its own change. And the executable coverage maintainer script (sibling to
+`wf-census`) is owed at the first project that adopts a coverage manifest, built + proven against its
+real sets.
+
+`bin/check` 1025/0 after `bin/coverage --stamp` and `bin/sync --personal` (both `~/.claude` and the
+session's `CLAUDE_CONFIG_DIR` install); `bin/prove` — all 4 of this batch's del-cases proven (manually
+per-case pre-sync; confirmed end-to-end at the distribution verify), the only non-proof the pre-existing
+`third`/`fourth` drift above, not a regression. Working tree, committed to main.
 
 **Landed 2026-08-31 (dev session) — the directing node owns completeness; a multi-gate work-product
 wires ALL its gates; a coverage manifest catches a left-behind surface.** Prompted by a website build
