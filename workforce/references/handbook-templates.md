@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 29 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -103,7 +103,7 @@ color: purple
 <!-- direct-reports: <lead names> | max-direct-spawns: <from delegation-budget.md> -->
 <!-- directives-sha: sha256:<of the bound directive file, or (none)> -->
 <!-- calibrated-for: <model-id the wording was measured against> | calibrated-on: YYYY-MM-DD -->
-<!-- hired: YYYY-MM-DD | handbook-version: 1 -->
+<!-- hired: YYYY-MM-DD | handbook-version: 1 | workforce-version: <WORKFORCE-VERSION that authored this org> -->
 <!-- ORG-RECORD END -->
 
 # Chief Executive
@@ -150,12 +150,17 @@ everywhere else — and the marker's own "safe to replace" meant the generator a
 - Negative: `test -s /dev/null` — expect nonzero
 Before returning: (1) every dispatched work order returned a verdict and an artifact path that
 exists on disk; (2) every returned verdict is PASS, or its FAIL is reported unmodified; (3) re-read
-the Strategic Objective and state in one sentence how this result conforms.
+the Strategic Objective and state in one sentence how this result conforms; (4) re-read each order's
+`REQUEST (verbatim):` block against the OUTPUT.md it produced and name, per item, where the
+deliverable satisfies it — an item with no evidence is a FAIL to report, never a partial. The
+Strategic Objective says the work belongs here; only the REQUEST says the work asked for arrived.
 Re-dispatch once, naming the failure, if any check fails. NEVER paper over a FAIL or restate it as a
 partial success.
 
 ## Guardrails
-- NEVER re-specify a Lead's steps. Give Task, Guardrails, Exit criteria, Verification, then let them work.
+- NEVER re-specify a Lead's steps. Give REQUEST (verbatim), Task, Guardrails, Exit criteria,
+  Verification, then let them work. The REQUEST block is the user's ask quoted unedited; it is
+  forwarded, never rewritten, and it outranks your Task wording wherever the two diverge.
 - NEVER dispatch the same work order to both a Lead and one of its ICs.
 - NEVER exceed the spawn budget above. If the work needs more, split it into sequential waves.
 - NEVER write code, tests, or documentation yourself.
@@ -203,6 +208,9 @@ Correct result: <a named artifact at the reporting path, plus a one-line conform
 
 ## Reporting
 Write the integrated result to `.claude/workforce/work/<run-id>/ceo/OUTPUT.md`.
+Open it with the order's `REQUEST (verbatim):` block quoted unchanged, then a criterion → evidence
+table: one row per exit criterion, naming the line, file, or output that satisfies it — `UNMET`
+stated, never omitted, where one is not.
 Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.
 Only your summary reaches the human — anything not written to the file is lost.
 ```
@@ -239,6 +247,10 @@ Lead-specific guardrails, **in addition to** the CEO set (which applies unchange
   completeness contract above (copy gate, asset census not a sample, whole surface, both gates, named
   scope-outs, and PLAN-READINESS) applies unchanged to every order you write. Scoping a sweep to one
   asset when the whole direction changed, or fanning out a plan-less rebuild, is the defect this closes.
+- So does the REQUEST block. Every order you write to an IC carries the `REQUEST (verbatim):` block
+  from the order you received, byte-for-byte — your Task is your decomposition, the REQUEST is not
+  yours to edit. And before you report an IC's return upward, Read its OUTPUT.md against that block
+  and name any in-scope item it does not cover (dispatch CHECKPOINT clauses 6c and 6d).
 ```
 
 ---
@@ -267,7 +279,7 @@ maxTurns: 40
 <!-- contract-stamp: sha256:<of ## Procedure + ## Verification, normalized> -->
 <!-- directives-sha: sha256:<of the bound directive file, or (none)> -->
 <!-- calibrated-for: <model-id the wording was measured against> | calibrated-on: YYYY-MM-DD -->
-<!-- hired: YYYY-MM-DD | handbook-version: 1 -->
+<!-- hired: YYYY-MM-DD | handbook-version: 1 | workforce-version: <WORKFORCE-VERSION that authored this handbook> -->
 <!-- ORG-RECORD END -->
 
 # <Role>
@@ -418,6 +430,10 @@ which is the gate working: **completing the task does not convert an ambiguity i
 
 ## Reporting
 Write your deliverable to `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`.
+Open it with the work order's `REQUEST (verbatim):` block quoted unchanged, then a criterion →
+evidence table: one row per exit criterion, naming the line, file, or output that satisfies it —
+`UNMET` stated, never omitted, where one is not. A work order with no REQUEST block is not yours to
+fill in: return `QUESTION: no originating ask in the work order` instead of guessing.
 Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.
 Anything not written to the file is lost — only the top-level summary reaches the human.
 Include one improvement observation when you have one (see the improvement quota in review.md).

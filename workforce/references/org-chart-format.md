@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -58,6 +58,8 @@ mismatch is not a fault; it is the signal that the text is due for `ablate --cla
 
 Chain of command is enforced by prose plus permissions.deny. Prose is advisory; a subagent CAN spawn
 an employee its handbook forbids. Treat the org chart as a contract, not a sandbox.
+Deny layer measured this index: <N> workforce-owned deny rule(s) live in the resolved settings — or
+`NONE — prose-only on this install` when zero.
 
 ## Chain of Command
 - ceo (T1)
@@ -191,7 +193,15 @@ rather than omitting the section — an absent table and an empty one must not l
 - Release: probe PASS 2026-07-29 · not verified by probe: model, tools, background
 ```
 
-The honesty line is **mandatory and verbatim** (Chain-of-Command Gate). `Orchestrators` is a real
+The honesty line is **mandatory and verbatim** (Chain-of-Command Gate). **The deny-measurement line
+under it is mandatory too, and it is measured, never asserted**: `index` counts the deny rules
+`.claude/workforce/.settings-owned.json` records as workforce-written AND still present in the live
+settings file, and writes the count — `NONE — prose-only on this install` when it is zero. Measured
+2026-09-01 on two real orgs: both carried the two-layer sentence in every handbook and neither had a
+single deny rule in project settings (one audit's settings write was permission-refused and the
+emitted block never applied by hand) — a false safety claim repeated nine times that nothing counted.
+The sentence states the design; this line states this install.
+`Orchestrators` is a real
 section, not an appendix: those skills are visible in the org without being in the chain.
 
 ---

@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty-four, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty-seven, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -74,7 +74,19 @@ the dispatcher** (`references/procedures/org.md`) rather than by an `audit` swee
 precedent, a row printed by the procedure that owns the act rather than by the sweep gate. It was
 measured on odyssey-alive: an `/agenda today` fan-out inherited a stale foreign audit run-id, wrote its
 ICs' OUTPUT.md into that audit's evidence tree, and recorded no spawn edges — none of which any counted
-line caught.)*
+line caught. **Row 25 landed 2026-09-01 and is row 24's fidelity half, owed by the same dispatcher**:
+row 24 proves a dispatch was *recorded*; nothing proved the record carried the *spec* or that anyone
+read the deliverable back against it. Measured the same day on the same org: 252 recorded edges, mean
+3.5 lines, 2% carrying exit criteria, and one Lead→IC edge in the lot — a provenance trail with perfect
+run-id hygiene and no way to see that the user's ask never reached the worker or that no one opened the
+OUTPUT.md it produced. Provenance is not fidelity, and twenty-four invariants measured the first while
+none measured the second. **Rows 26 and 27 landed together the same day, and row 26 is a backfill of
+this file's own defect**: audit Step 5c had printed `INV-REMEDIATE` citing this file since the
+recruiter change — and this file had no row for it, the written-and-unwired shape row 19's history
+warns about, caught only because adding row 27 meant reading the table. Row 27 is what makes a shipped
+contract reach existing orgs: two releases sat template-only with zero deployed handbooks carrying
+them, because nothing owned bringing an already-authored handbook up to the installed doctrine — Step
+5d now does, and this row is how a run proves it happened rather than intends it.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -102,6 +114,9 @@ line caught.)*
 | 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
 | 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
+| 25 | every spawn edge recorded the REQUEST block and exit criteria, and every returned OUTPUT.md was read back against the REQUEST before the run reported | `INV-ASK` | references/procedures/org.md |
+| 26 | every existing employee's bar was re-researched and remediated, and every warranted-and-checkable missing role staffed, in-run | `INV-REMEDIATE` | references/procedures/audit.md |
+| 27 | every governed handbook is stamped at the installed version, or was refreshed to it and re-gated this run, or names the rule that declined | `INV-REFRESH` | references/procedures/audit.md |
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run

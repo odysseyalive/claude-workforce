@@ -1,6 +1,6 @@
 # preflight — find the settings that would refuse an audit's writes, and the env that would ignore them
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Read-only. Runs immediately, writes nothing (`SKILL.md` § Display vs. Execute).
 `/workforce preflight`
 
@@ -57,6 +57,13 @@ gate (`audit-setup.md` § Step 0.05); this command exposes the same check standa
      read as "never looked", which is the exact failure this receipt exists to end.
    - `--json` carries them under their own `runtime_overrides` key with its own `override_count`,
      so the settings-scout agent reads them structurally rather than scraping the table.
+7. **Report the maintainer-mode receipt** (`SKILL.md` § Dev Path Discipline): resolve the path the
+   discipline tests — `<project root>/workforce/SKILL.md`, using the absolute root from step 1 —
+   and print `Maintainer mode: ON (<resolved path>)` or `Maintainer mode: OFF (no <resolved path>)`.
+   The resolved path is printed in BOTH states, because the failure this line exists for is silent
+   mis-resolution: a session opened at a parent workspace resolves the wrong root, maintainer mode
+   reads OFF with no report, the edit lands runtime-first, and `bin/sync` then destroys it. A mode
+   nobody can see resolved is a data-loss path with no receipt.
 
 ## What it never does
 

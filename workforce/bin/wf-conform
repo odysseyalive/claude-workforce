@@ -299,6 +299,18 @@ def check_adopted(path, body, res):
             "carries an `Agent(...)` allowlist — subagent definitions IGNORE these, "
             "so the restriction does not exist at runtime"
         )
+    # `allowed-tools:` is the SKILL frontmatter key; the agent loader reads `tools:`.
+    # A ceiling declared under the wrong key reads as present and grants nothing —
+    # measured 2026-09-01 on a real org: two adopted reviewers declared "Read-only"
+    # under `allowed-tools:`, one of them authorized to apply deletions, both
+    # ceilings very likely unread by the loader.
+    _afm = frontmatter(body)
+    if _afm is not None and "allowed-tools" in _afm and "tools" not in _afm:
+        hazards.append(
+            "declares its tool ceiling under `allowed-tools:` — the agent loader "
+            "reads `tools:`, so this ceiling is very likely not applied at runtime; "
+            "rename the key"
+        )
     res.rows.append({"ok": not hazards, "check": f"{n}: adopted (not workforce-authored)",
                      "detail": "; ".join(hazards), "adopted": True})
 
@@ -309,6 +321,15 @@ def check_handbook(path, body, res, ceiling):
     res.add(fm is not None, f"{n}: frontmatter parses")
     if fm is None:
         return
+
+    # The dead-key ceiling. `allowed-tools:` is the SKILL key; agents are loaded from
+    # `tools:`. In a governed handbook this is BLOCKING, not a hazard report: workforce
+    # authored the file, so the wrong key is a defect in the generator's output, and a
+    # tier ceiling under a key the loader does not read is no ceiling at all.
+    res.add(not ("allowed-tools" in fm and "tools" not in fm),
+            f"{n}: tool ceiling declared under the key the agent loader reads",
+            "frontmatter uses `allowed-tools:` (the skill key) with no `tools:` — the "
+            "ceiling is very likely not applied at runtime; rename the key to `tools:`")
 
     tier = None
     m = TIER_RX.search(body)
@@ -480,6 +501,34 @@ def check_handbook(path, body, res, ceiling):
                 "by hand at amendment time (procedures/amend.md Step 6). No shipped "
                 "tool executes it.",
             )
+
+    # THE ASK ECHO-BACK (2026-09-01, dispatch CHECKPOINT clauses 6c/6d). A `## Reporting`
+    # that never names the REQUEST block describes a return channel where the user's
+    # ask cannot be checked against the deliverable — measured on a real org: 252
+    # dispatch edges, 2% carrying exit criteria, no OUTPUT.md opening with the ask.
+    # ADVISORY for the same governed-vs-adopted reason as the negative-test record:
+    # every handbook authored before this contract is in this state.
+    seg = section(body, "## Reporting")
+    if seg is not None and "REQUEST (verbatim)" not in seg:
+        res.advise(
+            f"{n}: Reporting does not echo the originating ask",
+            "no `REQUEST (verbatim)` in ## Reporting — the OUTPUT.md contract should "
+            "open with the work order's REQUEST block quoted unchanged plus a "
+            "criterion → evidence table (handbook-templates.md § Reporting), or "
+            "spec fidelity cannot be read back at return time.",
+        )
+
+    # THE AUTHORING-VERSION STAMP (2026-09-01). Without `workforce-version:` in the
+    # ORG-RECORD, nothing can tell a handbook authored under the current doctrine from
+    # one three releases stale — which is how two shipped contract releases sat
+    # template-only with zero deployed handbooks carrying them and no finding anywhere.
+    if "workforce-version:" not in body:
+        res.advise(
+            f"{n}: ORG-RECORD carries no workforce-version stamp",
+            "add `workforce-version: <version>` to the ORG-RECORD `hired:` line "
+            "(handbook-templates.md). A handbook that cannot state which release "
+            "authored it cannot be flagged as stale when the doctrine moves.",
+        )
 
     # BODY-vs-GRANT COHERENCE — the first check here that compares the text to the
     # capability rather than to another piece of text.

@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -55,8 +55,11 @@ Load-bearing points the template must carry:
   simply does not exist here. **Do not port `/route`'s lane preflight.** Stated in the template so a
   maintainer does not add it back by reflex.
 - **`/org` never sets `context: fork`** — a forked skill consumes a delegation tier.
-- **Work-order contract:** every dispatch payload carries exactly Task / Guardrails / Exit criteria /
-  Verification, plus the artifact path. Never re-specify steps; the handbook owns the procedure.
+- **Work-order contract:** every dispatch payload carries exactly REQUEST (verbatim — the user's ask,
+  quoted unedited and forwarded unreplaced down every hop) / Task / Guardrails / Exit criteria /
+  Verification, plus the artifact path. Never re-specify steps; the handbook owns the procedure. On
+  return, the deliverable is read back against the REQUEST before it is reported done (CHECKPOINT
+  clauses 6c and 6d).
 - **No-match ladder:** stale-chart check (a file on disk beats the chart) → capability gap hands the
   **verbatim** ask to `/workforce hire`, which owns the hire-vs-extend decision → otherwise do the
   work inline and note the gap.

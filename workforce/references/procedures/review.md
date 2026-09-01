@@ -1,6 +1,6 @@
 # review — performance review, where the subject is the document
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Assess an employee by assessing its handbook.** Runs its evals, re-reads it cold, checks for drift,
 and reports org health.
 
@@ -35,6 +35,25 @@ failed to constrain. Never against the callee, which merely answered when called
 
 This is the detection half of the chain of command. It is the only half there is
 (`references/enforcement.md`), so skipping it means nobody is watching.
+
+**4b. Edge-fidelity and dispatch-mix, from the same files.** The edges just diffed carry named fields
+(`procedures/org.md` clause 1a); count them while they are open, and print both lines with zeroes:
+
+```
+EDGE-FIELDS   request: 41 of 252 · exit-criteria: 5 of 252 · pre-schema edges 211
+DISPATCH-MIX  main-session→IC 250 · Lead→IC 1 · Lead share 0.4%
+```
+
+`EDGE-FIELDS` is the review-side reading of `INV-ASK` (invariants row 25): an edge with no `request:`
+recorded a dispatch cut loose from its ask, and a trail of them is spec loss the org cannot see.
+Edges written before clause 1a existed are counted separately, never as failures — the contract
+post-dates them. `DISPATCH-MIX` measures whether the Lead tier is in the loop at all. Measured
+2026-09-01 on a real org: 1 Lead→IC edge in 252, three weeks after the same pathology was recorded
+CLOSED — the tier holding all the spec-decomposition prose was bypassed on effectively every
+dispatch, and no statistic said so. A low Lead share is a finding to explain (rung 3's "ties go
+downward" makes CEO→IC the cheap default by design), not automatically a defect — but an org paying
+for five Lead handbooks it never routes through is either mis-routing or over-staffed, and this line
+is what forces the question.
 
 **5. Frontmatter of record.** Confirm `model`, `effort`, `disallowedTools`, and `background` still
 match `org-config.md` and the employee's tier. Drift here is silent and changes cost or capability

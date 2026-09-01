@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -180,6 +180,14 @@ someone can read instead of re-derive.
    the whole reason this rung is first**, and an edge nobody recorded is a dispatch `review` can never
    see — the org chart's only backstop is comparing what ran against what was allowed.
 
+   1a. **The edge file is a record, not a touch-file.** It carries the order's provenance in named
+   fields, one per line: `run-id:`, `caller:`, `callee:`, `rung:`, `request:` (the REQUEST block,
+   verbatim), `task:`, `exit-criteria:`, `artifact:`. An edge missing `request:` or `exit-criteria:`
+   records a dispatch cut loose from its ask — which is the defect these fields exist to make
+   visible, because a `review` cannot detect spec loss in an edge that never recorded the spec.
+   Measured 2026-09-01 on a real org before this clause existed: 252 recorded edges, mean 3.5 lines,
+   2% carrying exit criteria — an audit trail that could not see the loss it was built to catch.
+
 2. **A command that already does the job beats an agent.** Read the chart's `## Mechanicals` table
    before choosing anyone. A row can answer the whole ask only if its `Scope` cell says `derived` — a
    `declared` scope rests on prose somebody wrote, and an over-claimed coverage cell is the one error
@@ -247,9 +255,12 @@ someone can read instead of re-derive.
    would overrun what the session has left, dispatch one tier lower or split the order — and say which
    you did.
 
-6. **Every work order carries exactly four things**: the task, its guardrails, its exit criteria, and
-   how it will be verified — plus the artifact path under `.claude/workforce/work/<run-id>/`. **Do not
-   restate the employee's own steps.** Its handbook owns those.
+6. **Every work order carries exactly five things**: the ask, then the task, its guardrails, its exit
+   criteria, and how it will be verified — plus the artifact path under
+   `.claude/workforce/work/<run-id>/`. **The ask comes first and it is not yours to write**: quote the
+   user's request under a `REQUEST (verbatim):` label — unedited, untrimmed, unimproved. The task is
+   your decomposition and you own its wording; the REQUEST block you only carry. **Do not restate the
+   employee's own steps.** Its handbook owns those.
 
    6a. **One order, one `<run-id>`.** You assign the run-id, and each independent work order gets its
    own. Never reuse one across two orders. Two orders under a shared run-id write the same
@@ -269,6 +280,40 @@ someone can read instead of re-derive.
    in here: a routed fan-out that writes NO `<caller>-to-<callee>.spawn` edge per callee bypasses the
    only mechanical backstop the org chart has — `review` diffs the recorded edges against the chart — so
    a fan-out with zero edges is a defect, not a style lapse.
+
+   6c. **The REQUEST block survives every hop unreplaced.** A node re-scoping an order for a
+   subordinate narrows the Task, never the REQUEST: forward the block byte-for-byte, however many
+   tiers down the work goes. An employee handed a work order with no REQUEST block returns
+   `QUESTION: no originating ask in the work order` instead of guessing what was wanted. This is the
+   first directive — *"the users requests verbiage are absolutely retained"* (`SKILL.md`
+   § Directives) — applied at dispatch time: extraction preserved the words when the org was built,
+   and this clause preserves them while it works. A paraphrase that reaches the worker instead of
+   the ask is how work comes back to-spec against the wrong spec.
+
+   6d. **Read the deliverable back against the REQUEST before you report it done.** When a dispatch
+   returns, its summary line is a pointer, not the deliverable: Read the OUTPUT.md at the returned
+   path and state, per exit criterion and per named item in the REQUEST block, where the deliverable
+   satisfies it — naming any in-scope item it does not. An unmet criterion is a FAIL to report, never
+   a partial to summarize away. You are the one reader guaranteed to exist; an artifact nobody reads
+   back is a dispatch nobody verified.
+
+   6e. **COMPLETENESS is yours as the directing node.** The work order is the single point of
+   failure, and you are the one who writes it: whatever you scope out of an order comes back missing,
+   exactly as ordered. Before you dispatch, the order answers every line that applies — shipped copy
+   routes through the content gate; asset coverage is a census, not a sample; the whole surface, not
+   a slice; a presentation surface clears BOTH its design gate and its content gate; and every
+   deliberate scope-out is NAMED in the order. A silent scope-out is how a hole is born. (Canonical
+   wording: `references/handbook-templates.md` § CEO Guardrails — this clause is how the contract
+   reaches the ordinary org, whose CEO is the main session and holds no handbook to read it from.)
+
+   6f. **PLAN-READINESS (Definition of Ready).** An ambiguous or tightly-coupled order is not READY
+   to dispatch until an approved PLAN with acceptance criteria exists. Any-of trigger, applied BEFORE
+   you build the order: (T1) it touches more than one surface or asset-set; (T2) it would run more
+   than one agent against the same files, tree, or port, or span more than one department; (T3) it is
+   transformation-shaped — rebuild, redesign, re-envision, overhaul — rather than a bounded specified
+   edit; (T4) you cannot state its acceptance criteria in verifiable terms before dispatch. If NONE
+   hold the order is EXEMPT and dispatches directly — not everything needs a plan. The acceptance
+   criteria you write ARE the vision the work must meet, and they travel with the task.
 
 7. **Catch yourself skipping the dispatch.** If the next thing you do after announcing is an
    `Edit`, `Write`, or `Bash` call doing the routed work yourself → STOP, say "Dispatch announced but
@@ -359,6 +404,16 @@ prints.
 
 ```
 INV-RUNID  minted agenda-20260827T182800Z · foreign-dir writes 0 · edges 2 of 2 · 0 unrecorded
+```
+
+**And the ask-fidelity line** (`references/invariants.md` row 25), the counted line that binds clauses
+6, 6c, and 6d: every edge recorded its `request:` and `exit-criteria:` fields, and every returned
+OUTPUT.md was read back against the REQUEST block before the run reported. A dispatch whose edge has no
+`request:` field, or whose return was forwarded on its summary alone, is named — or the line counts it,
+because an unread deliverable and a verified one are indistinguishable from outside until this prints:
+
+```
+INV-ASK  request carried 2 of 2 edges · exit-criteria 2 of 2 · read-back 2 of 2 returns · 0 unread
 ```
 
 ---

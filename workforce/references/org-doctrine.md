@@ -1,6 +1,6 @@
 # Org Doctrine — the three documents and the loop that maintains them
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the reasoning behind every HR mechanic. Read once; it explains why the
      procedures are shaped the way they are. -->
 
@@ -36,8 +36,13 @@ written — is the master procedure that governs its own format.
 **Why the principles live in a skill, not CLAUDE.md.** The only deterministic way to get text into
 every isolated context is the agent `skills:` preload field. CLAUDE.md is auto-injected too, but it
 is injected into every main-loop turn as well, it is the user's file, and its cost multiplies by
-fan-out. So the principles are a preloaded skill, and CLAUDE.md carries only a ~10-line Constitution
-Gate pointing at them.
+fan-out. So the principles are a preloaded skill — and CLAUDE.md carries **nothing**: the
+2026-08-05 evacuation directive relocates every line into the component that owns it and deletes the
+file, and workforce writes nothing back into it (`references/templates.md` § The CLAUDE.md
+Constitution Gate — RETRACTED 2026-08-06). *This paragraph read "a ~10-line Constitution Gate
+pointing at them" until 2026-09-01 — the retraction reached `templates.md`, `charter.md`,
+`disband.md`, and `audit.md`, and missed the one high-doctrine file carrying the claim it retracted,
+which was also the one file with zero named assertions in `bin/check`.*
 
 ---
 

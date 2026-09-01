@@ -115,6 +115,60 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-01
 
+**Landed 2026-09-01 (dev session, second batch) — dispatch fidelity: the ask survives the work
+(v1.6.0).** Trigger: the owner reported orchestration "not getting the job done to specs — things get
+lost in translation" and asked for an evaluation before re-auditing. Three cold reads (this repo,
+odyssey-alive, apps-odyssey-alive) converged on one root cause: **the first directive — verbatim
+retention of the user's words — had authoring-time mechanics only.** At dispatch time the work order
+was four dispatcher-authored fields and none was the ask; the return channel was a ≤3-line summary
+nothing read back; the only conformance check pointed at the Strategic Objective, never the request.
+Measured on odyssey-alive: 252 recorded spawn edges, mean 3.5 lines, 2% carrying exit criteria,
+**1** Lead→IC edge (a pathology marked CLOSED 2026-08-05, fully recurred). And both prior contract
+batches (v1.3.0 completeness, v1.5.0 plan-gate) had landed in the CEO template — which the ordinary
+org never instantiates, the CEO being the main session — so **zero deployed handbooks carried
+either**, and with no version stamp nothing could say so.
+
+- **The five-field work order — `org.md` CHECKPOINT clause 6 + 6c/6d.** The order opens with the
+  user's request quoted unedited under `REQUEST (verbatim):`; the block survives every hop unreplaced
+  (an employee handed an order without one returns `QUESTION: no originating ask in the work order`);
+  and the directing node Reads the returned OUTPUT.md back against the REQUEST per criterion before
+  reporting. Byte-canonical, so `org index` carries it into every existing project's `/org`
+  automatically.
+- **COMPLETENESS + PLAN-READINESS moved into the CHECKPOINT (6e/6f)**, template copies kept — fixes
+  the never-instantiated-file gap that made both prior batches inert.
+- **Echo-back on return.** CEO and IC `## Reporting` open OUTPUT.md with the quoted REQUEST plus a
+  criterion → evidence table (`UNMET` stated, never omitted); the Lead guardrail forwards the block
+  byte-for-byte; CEO verification gains step (4), the read-back — "the Strategic Objective says the
+  work belongs here; only the REQUEST says the work asked for arrived."
+- **The spawn edge is a fielded record (clause 1a)** — `request:`/`exit-criteria:` among named
+  fields — and `review` § 4b prints `EDGE-FIELDS` + `DISPATCH-MIX` (the Lead-share measurement) from
+  the edges it already opens. **Invariant rows 25–27**: `INV-ASK` (fidelity, the dispatcher's row-24
+  twin), `INV-REMEDIATE` (a **backfill** — Step 5c had printed it citing invariants.md while the file
+  had no row: the written-and-unwired shape, caught by adding row 27), and `INV-REFRESH`.
+- **Audit Step 5d — doctrine refresh.** Every governed handbook whose `workforce-version:` stamp is
+  absent or old is amended up to the installed contract in-run (contract sections only, judgment
+  never rewritten), re-probed, restamped — printed as `INV-REFRESH`, declines must cite a shipped
+  rule. The stamp itself is new (`hired:` line, both templates), `wf-conform` advises on its absence
+  and on a `## Reporting` with no echo-back (advisory: both contracts post-date every deployed
+  handbook), and `verify` names staleness a finding. This is the answer to "will an audit fix
+  existing orgs?" — yes, as direction, not hope.
+- **Honesty repairs.** The chart's two-layer chain-of-command sentence now ships with a MEASURED deny
+  count (`NONE — prose-only on this install` when zero — both real orgs carried the sentence in every
+  handbook with zero deny rules on disk); `org-doctrine.md`'s retracted Constitution-Gate claim
+  corrected (26 days after the retraction reached four other files — the one HIGH-doctrine file with
+  zero named assertions held the dead claim); `wf-conform` catches the `allowed-tools:` dead-key
+  ceiling in both populations (two adopted read-only reviewers, one authorized to delete, both
+  ceilings under the unread key); `preflight` prints the maintainer-mode receipt with its resolved
+  path in both states.
+- **Enforcement.** 21 `bin/check` assertions + 21 `bin/prove` del-cases, all proven to discriminate.
+  The full prove run also surfaced two carried VACUOUS: the `bin/prove` name-drift ("third" vs
+  "fourth assertion" — the row this file recorded as still owed, now aligned) and a **fresh scoping
+  bug this batch itself introduced** — the session-split guard exempted any file containing
+  "retract", so the org-doctrine correction (which cites a retraction) silently disarmed the guard
+  for the very file its prove case mutates; the exemption is now scoped to ±200 chars of each match.
+  Both repaired cases re-proven individually; suite 350/350 provable. `bin/check` 1046/0 after
+  `bin/coverage --stamp` and `bin/sync --personal`. Bumped `1.5.0 → 1.6.0`.
+
 **Landed 2026-09-01 (dev session) — the plan-gate (Definition of Ready) and vision-binding, riding the
 completeness contract and the directives rail.** Follow-on to the completeness batch (`4ec625a`): that
 was a Definition of DONE; a surface could pass all three and still be the busy, off-vision page the

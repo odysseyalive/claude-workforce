@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 29 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 30 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -255,6 +255,13 @@ It covers: sections present and ordered; every IC carries the literal `disallowe
 non-empty and names at least one literal invocation; the length ceiling; the immutable-block sidecar
 digests; `tools:` is a real allowlist rather than the display string; and the staged draft still
 matches the registered bytes.
+
+Two advisory rows post-date most deployed handbooks and block nothing: `## Reporting` echoes the
+`REQUEST (verbatim)` block (dispatch CHECKPOINT clauses 6c/6d), and the ORG-RECORD carries a
+`workforce-version:` stamp. **The stamp is what makes staleness a finding instead of an unknown**:
+where it is present and older than the installed `WORKFORCE-VERSION` (`references/version.md`), report
+the handbook as authored under superseded doctrine — the state two contract releases sat in,
+template-only across every deployed org, with nothing anywhere able to say so.
 
 ### BLOCKING — a failure is not discounted by naming a class
 

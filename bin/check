@@ -3307,7 +3307,8 @@ inv_rows = re.findall(r"^\|\s*(\d+)\s*\|[^|]*\|\s*`(INV-[A-Z]+)`\s*\|\s*(\S+)\s*
 _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
               "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
-              "twenty-two": 22, "twenty-three": 23, "twenty-four": 24}
+              "twenty-two": 22, "twenty-three": 23, "twenty-four": 24,
+              "twenty-five": 25, "twenty-six": 26, "twenty-seven": 27}
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.
@@ -8233,11 +8234,19 @@ check("wf-runlength pins its never-pooled contract and its version-instability c
 
 # No shipped file may re-authorize the split. This is the regression guard:
 # fact 8 has become a blocking check twice already.
+# The retraction exemption is scoped to the VICINITY of each match, not the file:
+# file-wide, one unrelated "retracted" anywhere exempted the whole file, and the
+# 2026-09-01 org-doctrine correction (which cites a retraction) silently disarmed
+# this guard for exactly the file the prove case appends its authorization to —
+# reported VACUOUS, which is how the scoping bug was found.
+def _authorizes_split(_p):
+    _body = read(_p)
+    return any(
+        not re.search(r"retract|never split",
+                      _body[max(0, _m.start() - 200):_m.end() + 200], re.I)
+        for _m in re.finditer(r"split[^.]{0,40}across sessions", _body, re.I))
 _split_authorizers = sorted(
-    _p for _p in manifest_paths()
-    if _p.endswith(".md")
-    and re.search(r"split[^.]{0,40}across sessions", read(_p), re.I)
-    and not re.search(r"retract|never split", read(_p), re.I))
+    _p for _p in manifest_paths() if _p.endswith(".md") and _authorizes_split(_p))
 check("no shipped file authorizes splitting a run across sessions",
       not _split_authorizers,
       f"session-split instruction without a retraction in: {_split_authorizers} — "
@@ -9411,6 +9420,181 @@ check(
     "this role warrants opus/high; budget caps it at" in _rcrt,
     "'hire the most capable candidate' reconciled to budget — the receipt that "
     "prints resolved values instead of silently maxing model/effort or blowing the cap",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dispatch fidelity — the ask survives the work (v1.6.0, 2026-09-01)
+# ─────────────────────────────────────────────────────────────────────────────
+# The first directive ("the users requests verbiage are absolutely retained") had
+# authoring-time mechanics only: extraction, read-back, the EMP Originating-Ask
+# block. At dispatch time — the working path, ~99% of traffic — the work order was
+# four dispatcher-authored fields and none was the ask. Measured 2026-09-01 on a
+# real org: 252 recorded edges, mean 3.5 lines, 2% with exit criteria, 1 Lead→IC
+# edge, no read-back anywhere. Every assertion here is against the BYTE-CANONICAL
+# block (_org_block) where that matters, because `org index` copies the block, not
+# the prose around it.
+_wfc = read("workforce/bin/wf-conform")
+_odoc = read("workforce/references/org-doctrine.md")
+check(
+    "org block: the work order carries five fields and the fifth is the ask, verbatim",
+    "Every work order carries exactly five things" in _org_block
+    and "REQUEST (verbatim):" in _org_block,
+    "clause 6 must open the contract with the user's request quoted unedited under a "
+    "REQUEST (verbatim): label — with four fields, 'the task' is a paraphrase and the "
+    "org works to-spec against the wrong spec",
+)
+check(
+    "org block: the REQUEST survives every hop, and a missing one is a QUESTION",
+    "The REQUEST block survives every hop unreplaced" in _org_block
+    and "no originating ask in the work order" in _org_block,
+    "clause 6c: a Lead narrows the Task, never the REQUEST, and an employee handed an "
+    "order with no REQUEST returns QUESTION instead of guessing — the receiving half "
+    "without which the sending half is decoration",
+)
+check(
+    "org block: the deliverable is read back against the REQUEST before it is reported",
+    "Read the deliverable back against the REQUEST" in _org_block,
+    "clause 6d: the ≤3-line summary is a pointer, not the deliverable; without a "
+    "read-back rung the full-fidelity artifact sits unread in work/ and the only thing "
+    "reaching the human is a paraphrase of a paraphrase",
+)
+check(
+    "org block: COMPLETENESS and PLAN-READINESS reach the dispatch CHECKPOINT itself",
+    "COMPLETENESS is yours as the directing node" in _org_block
+    and "PLAN-READINESS (Definition of Ready)" in _org_block,
+    "v1.3.0/v1.5.0 landed these in the CEO handbook template — which the ordinary org "
+    "never instantiates, because the CEO is the main session. The main session reads "
+    "the CHECKPOINT; a contract in a never-instantiated file governs nobody",
+)
+check(
+    "org block: the spawn edge is a fielded record, not a touch-file",
+    "The edge file is a record, not a touch-file" in _org_block
+    and "request:" in _org_block and "exit-criteria:" in _org_block,
+    "clause 1a: an edge that never recorded the spec cannot show spec loss — review "
+    "reads these files, and 252 three-line edges was an audit trail blind to the one "
+    "defect it existed to catch",
+)
+check(
+    "org.md prints the INV-ASK counted line row 25 owes",
+    "INV-ASK  request carried" in _org,
+    "row 25 (INV-ASK) is owed by procedures/org.md; request/exit-criteria carried per "
+    "edge and read-backs per return, printed with zeroes — provenance (row 24) is not "
+    "fidelity, and until this line nothing measured the second",
+)
+check(
+    "invariants: rows 25-27 exist — ask fidelity, remediation, doctrine refresh",
+    "`INV-ASK`" in inv and "`INV-REMEDIATE`" in inv and "`INV-REFRESH`" in inv,
+    "the closed-list rule: a row is added with its token and its owner in one change. "
+    "INV-REMEDIATE is a backfill — Step 5c printed it citing this file while the file "
+    "had no row for it, the written-and-unwired shape the row-19 history warns about. "
+    "(The count declaration is guarded by the enumerated-set check, deliberately not "
+    "restated here — a pinned number-word makes every future row a two-assertion edit)",
+)
+check(
+    "audit: Step 5d refreshes existing handbooks to the installed contract, in-run",
+    "Doctrine-refresh: bring existing handbooks up to the installed contract" in aud
+    and "INV-REFRESH" in aud
+    and "NEVER a license for an audit to report and move on" in " ".join(aud.split()),
+    "without Step 5d a shipped contract reaches only newly-authored handbooks: two "
+    "releases sat template-only across every deployed org, and the advisory conform "
+    "rows that detect the gap block nothing — the audit is the one place authorized "
+    "to amend, so the audit owns the fix",
+)
+check(
+    "wf-conform: the allowed-tools dead-key ceiling is caught in both populations",
+    "the agent loader reads `tools:`" in " ".join(_wfc.split())
+    and _wfc.count("allowed-tools") >= 2,
+    "`allowed-tools:` is the skill key; an agent's ceiling under it is very likely "
+    "unread at runtime. Blocking for governed handbooks (workforce authored the "
+    "defect), a reported hazard for adopted ones (workforce does not own the file) — "
+    "measured 2026-09-01: two adopted read-only reviewers, one authorized to delete, "
+    "both ceilings under the dead key",
+)
+check(
+    "templates: the generated /org contract states five fields with the verbatim ask first",
+    "REQUEST (verbatim — the user's ask" in _tpl_scope,
+    "templates.md is what `org index` regenerates the project /org from; a four-field "
+    "contract there resurrects the paraphrase door on the next index run",
+)
+check(
+    "handbook-templates: the CEO verification closes the loop against the REQUEST, not just the Objective",
+    "only the REQUEST says the work asked for arrived" in tpl,
+    "step (3) checks conformance to the Strategic Objective — the constitution, not the "
+    "request. Step (4) is the only check anywhere that compares the delivered thing to "
+    "the requested thing",
+)
+check(
+    "handbook-templates: both Reporting contracts open OUTPUT.md with the REQUEST echo-back",
+    "Open it with the order's `REQUEST (verbatim):` block quoted unchanged" in tpl
+    and "Open it with the work order's `REQUEST (verbatim):` block quoted unchanged" in tpl,
+    "CEO and IC Reporting must both open the OUTPUT.md with the quoted REQUEST plus a "
+    "criterion → evidence table, or fidelity cannot be read back at return time",
+)
+check(
+    "handbook-templates: the Lead forwards the REQUEST byte-for-byte and reads returns against it",
+    "So does the REQUEST block" in tpl,
+    "the Lead is the hop where the paraphrase-of-a-paraphrase is minted; without this "
+    "guardrail the CEO-tier rule never reaches the tier that writes the narrow order",
+)
+check(
+    "handbook-templates: the ORG-RECORD stamps the authoring workforce version",
+    "| workforce-version: <WORKFORCE-VERSION that authored this handbook> -->" in tpl
+    and "| workforce-version: <WORKFORCE-VERSION that authored this org> -->" in tpl,
+    "without the stamp a v1.6.0 handbook and a v1.0 one are indistinguishable — which "
+    "is how two contract releases sat template-only across every deployed org with no "
+    "finding anywhere",
+)
+check(
+    "wf-conform: ships the echo-back and version-stamp advisory rows",
+    "Reporting does not echo the originating ask" in _wfc
+    and "carries no workforce-version stamp" in _wfc,
+    "the detector ships with its fix: the two new contracts are advisory rows in the "
+    "shipped conformance tool, not prose waiting for a reader — advisory, because both "
+    "post-date every deployed handbook (the governed-vs-adopted precedent)",
+)
+check(
+    "org-doctrine: the retracted Constitution Gate claim is corrected, with the retraction cited",
+    "workforce writes nothing back into it" in _odoc
+    and "RETRACTED 2026-08-06" in _odoc,
+    "org-doctrine.md carried '~10-line Constitution Gate' for 26 days after the "
+    "retraction reached templates.md, charter.md, disband.md, and audit.md — the one "
+    "HIGH-doctrine file with zero named assertions was the one holding the dead claim",
+)
+check(
+    "org-chart-format: the honesty sentence ships with its measured deny count",
+    "Deny layer measured this index:" in _ocf
+    and "NONE — prose-only on this install" in _ocf,
+    "two real orgs carried 'prose plus permissions.deny' in every handbook with zero "
+    "deny rules in project settings; the sentence states the design, the counted line "
+    "states this install, and only the second can be false-and-caught",
+)
+check(
+    "SKILL.md: the honesty clause requires the measured deny line, not just the sentence",
+    "the MEASURED deny line" in _org_sk,
+    "Chain-of-Command Gate rule 4 must demand the count beside the verbatim sentence, "
+    "or the chart keeps asserting a second enforcement layer that may not exist",
+)
+check(
+    "verify: a stamped handbook older than the installed version is a staleness finding",
+    "authored under superseded doctrine" in vfy,
+    "the stamp is only useful if something compares it: verify names the check that "
+    "turns 'new changes not yet implemented into projects' from an unknown into a row",
+)
+check(
+    "preflight: the maintainer-mode receipt prints the resolved path in both states",
+    "Maintainer mode: ON" in _pfm and "Maintainer mode: OFF" in _pfm,
+    "a silently-OFF maintainer mode plus bin/sync is a runtime-first-edit data-loss "
+    "path with no report; printing the resolved path is what makes mis-resolution "
+    "visible before the edit lands on the wrong side",
+)
+check(
+    "review: edge fidelity and dispatch mix are measured from the recorded edges",
+    "EDGE-FIELDS" in rev
+    and "measures whether the Lead tier is in the loop at all" in rev,
+    "review already opens every edge for the chain-of-command diff; counting request/"
+    "exit-criteria fields and the Lead share while they are open is what surfaces both "
+    "the spec-loss trail and the Lead-bypass pathology (1 Lead→IC edge in 252, three "
+    "weeks after that pathology was recorded CLOSED)",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

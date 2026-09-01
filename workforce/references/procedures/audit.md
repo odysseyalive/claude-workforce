@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 58 assertion(s) in bin/check name this file; 123 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 59 assertion(s) in bin/check name this file; 127 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1018,6 +1018,47 @@ INV-REMEDIATE  employees 7 · bars amended 3 · roles added 1 · design-critic a
 in it), and `design-critic added` is `0` or `1`. A role the diff surfaced as warranted but whose check
 could not be named is **not** counted in `roles added`; it is named in the report as unstaffed with the
 reason, the same uncited-refusal honesty the other invariants carry.
+
+## Step 5d — Doctrine-refresh: bring existing handbooks up to the installed contract
+
+**On a re-audit, this is what makes a shipped contract reach the orgs that already exist.** Employees
+authored under an earlier release carry that release's contracts, and nothing else re-authors them.
+Measured 2026-09-01: two contract releases (the v1.3.0 directing-node completeness contract, the
+v1.5.0 plan gate) had shipped as template text with **zero** deployed handbooks carrying either,
+across every org this skill manages — and no finding anywhere said so, because handbooks carried no
+authoring-version stamp. Step 5c's clause governs here unchanged: healed **in this same run**, never
+deferred, never handed back as an optional keep-or-resolve.
+
+Per **governed** handbook (adopted agents stay exempt until their first amendment, as everywhere):
+
+1. **Read the ORG-RECORD `workforce-version:` stamp.** Older than the installed `WORKFORCE-VERSION`
+   (`references/version.md`) → refresh-due. **Absent is not exempt** — it is the pre-stamp state,
+   refresh-due by definition, and the stamp is added by this step.
+2. **Apply the contract deltas as amendments, touching contract sections only.** The current template
+   (`references/handbook-templates.md`) is the source: `## Reporting` opens OUTPUT.md with the
+   `REQUEST (verbatim):` echo and the criterion → evidence table; a delegating handbook carries the
+   completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
+   one exists) carries verification step (4), the read-back against the REQUEST. **Role-specific
+   judgment is NEVER rewritten here** — a refresh that touches `## Procedure` prose has exceeded this
+   step and is a defect in the run.
+3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
+   `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens
+   (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked
+   `not probed (spawning unavailable)` DEGRADED exactly as a fresh registration would be.
+4. **The between-audit detector is `wf-conform`'s advisory rows** (echo-back, version stamp) — this
+   step is their fix, run where the fix is authorized. An advisory row is "reported, not blocking" so
+   that pre-contract handbooks do not drown a `verify`; it is NEVER a license for an audit to report
+   and move on. A detector ships with its fix (`SKILL.md` § Directives), and this step is the fix.
+
+The run prints **`INV-REFRESH`** (`references/invariants.md` row 27), all counts, always:
+
+```
+INV-REFRESH  governed 9 · refresh-due 9 · amended 9 · re-probed 9 (2 DEGRADED) · 0 declined
+```
+
+A declined refresh names the shipped rule that refused it — the uncited-refusal shape every other
+invariant forbids. `refresh-due 0` on a stamped, current org is the expected steady state and is
+printed, not skipped.
 
 ## Step 6 — Execute
 
