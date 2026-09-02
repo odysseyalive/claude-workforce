@@ -2415,7 +2415,7 @@
     "script": "wf-settings-apply",
     "want": [
       "not a shipped hook",
-      "Default set: wf-protect-directives, wf-standing-request, wf-unique-persona",
+      "Default set: wf-budget-guard, wf-protect-directives, wf-standing-request, wf-unique-persona",
       "Opt-in only, PROPOSED and never wired by the default set: wf-loop-guard"
     ]
   },
@@ -3161,6 +3161,133 @@
       "claude-opus-5",
       "model: claude-fable-5 ",
       "HONORED-UNSUPPORTED"
+    ]
+  },
+  "budgetguard-handbuilt": {
+    "_why": "THE MEASURED FAILURE, frozen (2026-09-02, apps-odyssey-alive, v1.8.0 install). The re-audit read the project's stale `## Model statics`, offered `claude-fable-5` as a static, marked the CURRENT PIN `(Recommended)`, dropped `claude-sonnet-5`, and never ran `wf-model-budget` \u2014 with the render-verbatim rule stated in three files. This payload is that picker verbatim. The guard must block it (exit 2), show the emitter's lane beside the offered set, surface the emitter's STALE-ARTIFACT line so the contaminating section is named, and print the command that produces the right block. The fixture config carries the exact stale section; the code lane's recorded pin (`claude-opus-5`) is honoured by the emitter as an Other pin, so the emitted slate is the four statics with row 1 recommended.",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 2,
+    "stdin_raw": "{\"tool_name\": \"AskUserQuestion\", \"tool_input\": {\"questions\": [{\"question\": \"Model for the code lane (engineering: scaffold, Convex, deploy)? Currently claude-opus-5.\", \"header\": \"Code\", \"options\": [{\"label\": \"claude-opus-5 (Recommended)\", \"description\": \"\"}, {\"label\": \"claude-fable-5\", \"description\": \"\"}, {\"label\": \"claude-opus-4-8\", \"description\": \"\"}, {\"label\": \"claude-opus-4-6\", \"description\": \"\"}]}]}}",
+    "want": [
+      "BLOCKED",
+      "offered:",
+      "claude-opus-5 (recommended), claude-fable-5, claude-opus-4-8, claude-opus-4-6",
+      "emitted for LANE code: claude-fable-5-1 (recommended), claude-opus-4-8, claude-opus-4-6, claude-sonnet-5",
+      "STALE-ARTIFACT",
+      "wf-model-budget --root",
+      "--config",
+      "never the current pin re-labelled as the recommendation"
+    ],
+    "not": [
+      "passing through"
+    ]
+  },
+  "budgetguard-verbatim": {
+    "_why": "THE POSITIVE HALF: the emitter's own LANE block, rendered verbatim, passes silently. Same tree as the hand-built case (stale config included), so the only difference between block and pass is whether the options equal what `wf-model-budget` emits \u2014 IDs, order, and the single (recommended) mark on row 1. Exit 0 with no BLOCKED and no note.",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 0,
+    "stdin_raw": "{\"tool_name\": \"AskUserQuestion\", \"tool_input\": {\"questions\": [{\"question\": \"Code work\", \"header\": \"Code\", \"options\": [{\"label\": \"claude-fable-5-1 (recommended)\", \"description\": \"\"}, {\"label\": \"claude-opus-4-8\", \"description\": \"\"}, {\"label\": \"claude-opus-4-6\", \"description\": \"\"}, {\"label\": \"claude-sonnet-5\", \"description\": \"\"}]}]}}",
+    "want": [],
+    "not": [
+      "BLOCKED",
+      "passing through"
+    ]
+  },
+  "budgetguard-unrelated": {
+    "_why": "A question that is neither a model nor an effort picker (the backup consent) must pass untouched and silently \u2014 the guard runs on every AskUserQuestion and must cost nothing on the ones it has no opinion about.",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 0,
+    "stdin_raw": "{\"tool_name\": \"AskUserQuestion\", \"tool_input\": {\"questions\": [{\"question\": \"Back up your project first?\", \"header\": \"Code\", \"options\": [{\"label\": \"Back up first (recommended)\", \"description\": \"\"}, {\"label\": \"Skip the backup\", \"description\": \"\"}]}]}}",
+    "want": [],
+    "not": [
+      "BLOCKED",
+      "passing through",
+      "wf-model-budget"
+    ]
+  },
+  "budgetguard-badstdin": {
+    "_why": "FAIL OPEN ON ITS OWN FAULT. Unparseable stdin is the guard's problem, not a hand-built picker; it must exit 0 and say so in one line rather than block the session (`enforcement.md`: a hook must fail open).",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 0,
+    "stdin_raw": "not json",
+    "want": [
+      "could not verify",
+      "passing through"
+    ],
+    "not": [
+      "BLOCKED"
+    ]
+  },
+  "budgetguard-effort-handbuilt": {
+    "_why": "THE EFFORT HALF. A hand-built ladder for the code lane offering `max/high/medium/low` with `high` marked \u2014 plausible, and wrong: the emitter windows the four rungs nearest the recommendation, which for code's `high` is `max/xhigh/high/medium`. The guard reads the ladder from `wf-effort-budget`'s output (no rung is written in the hook), recognises the rung picker, and blocks with the emitted window beside the offered one.",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 2,
+    "stdin_raw": "{\"tool_name\": \"AskUserQuestion\", \"tool_input\": {\"questions\": [{\"question\": \"How hard should code work think?\", \"header\": \"Code\", \"options\": [{\"label\": \"max\", \"description\": \"\"}, {\"label\": \"high (Recommended)\", \"description\": \"\"}, {\"label\": \"medium\", \"description\": \"\"}, {\"label\": \"low\", \"description\": \"\"}]}]}}",
+    "want": [
+      "BLOCKED",
+      "an effort picker",
+      "offered:",
+      "max, high (recommended), medium, low",
+      "emitted for LANE code: max, xhigh, high (recommended), medium",
+      "wf-effort-budget --root"
+    ],
+    "not": [
+      "passing through"
+    ]
+  },
+  "budgetguard-effort-verbatim": {
+    "_why": "The emitter's own code-lane window, rendered verbatim, passes silently. Pairs with the hand-built effort case on the same tree.",
+    "script": "wf-budget-guard",
+    "env": {
+      "WF_BUDGET_GUARD_TEMPLATE": "template.md",
+      "WF_BUDGET_GUARD_PLATFORM": "platform.md"
+    },
+    "exit": 0,
+    "stdin_raw": "{\"tool_name\": \"AskUserQuestion\", \"tool_input\": {\"questions\": [{\"question\": \"Code work\", \"header\": \"Code\", \"options\": [{\"label\": \"max\", \"description\": \"\"}, {\"label\": \"xhigh\", \"description\": \"\"}, {\"label\": \"high (recommended)\", \"description\": \"\"}, {\"label\": \"medium\", \"description\": \"\"}]}]}}",
+    "want": [],
+    "not": [
+      "BLOCKED",
+      "passing through"
+    ]
+  },
+  "sa-hook-budget-guard": {
+    "_why": "The guard is in wf-settings-apply's registry and its DEFAULT set: `--wire-hook wf-budget-guard` registers it at PreToolUse with the AskUserQuestion matcher, verified on disk, exactly as the other default-set hooks are wired. A hook that ships but cannot be wired is the dormant shape the four inherited hooks died in.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--execute",
+      "--wire-hook",
+      "wf-budget-guard"
+    ],
+    "exit": 0,
+    "want": [
+      "registered",
+      "verified on disk",
+      "PreToolUse",
+      "AskUserQuestion"
+    ],
+    "not": [
+      "would register",
+      "unknown hook"
     ]
   }
 }

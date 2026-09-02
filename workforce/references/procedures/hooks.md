@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -36,6 +36,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
 | `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
+| `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** A model or effort budget picker whose options are not one of the `LANE` blocks `wf-model-budget` / `wf-effort-budget` emit for this project: the pool rebuilt from prose or from the project's stale `## Model statics`, the current pin re-labelled `(Recommended)`, a five-rung ladder. Exit 2 hands the model the emitter's block and the command that produces it. § The budget guard below |
 | `wf-loop-guard` | `PostToolUse` | *(none)* | **advisory; PROPOSED, and not wired by this command's default set.** Behavioural repetition — the same tool called with byte-identical arguments 3+ times with no distinct edit between them. Nudges; halts only when `WF_LOOP_GUARD_STOP_AT > 0`. § The loop guard below |
 
 **`wf-standing-request` is the one hook that adds context instead of checking something**, and it is
@@ -46,11 +47,14 @@ once at the head of a conversation, so the request was faintest exactly when a l
 spawning. It exits `0` unconditionally: a hook that fails a turn because it could not phrase a request
 would break the session it exists to help.
 
-**`PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse` exit 2 cannot undo an edit
-that already happened, so this hook is **detection, not prevention** — `enforcement.md`'s table governs
-here as everywhere, and describing it as preventing a directive edit would be exactly the overclaim this
-project fails a run over. What it does is make the drift **loud at the moment it happens**, to the agent
-that just caused it, rather than at whatever later moment someone runs `verify`.
+**The two edit hooks are `PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse`
+exit 2 cannot undo an edit that already happened, so each is **detection, not prevention** —
+`enforcement.md`'s table governs here as everywhere, and describing either as preventing a directive edit
+would be exactly the overclaim this project fails a run over. What they do is make the drift **loud at the
+moment it happens**, to the agent that just caused it, rather than at whatever later moment someone runs
+`verify`. **`wf-budget-guard` is the one shipped hook on `PreToolUse`**, because there the call has not
+happened yet and a rendered picker has nothing to undo: exit 2 blocks the `AskUserQuestion` outright
+(§ The budget guard).
 
 **The `PostCompact` hook is different and is not wired by this command.** It lives in `SKILL.md`
 frontmatter — a directive-awareness re-injection that fires when context is compacted, inherited from
@@ -193,6 +197,37 @@ removing a registration is reversible; deleting the file the user installed is n
 nothing to restore from if the sweep took it.
 
 ---
+
+## The budget guard
+
+`wf-budget-guard` is the floor under a rule that prose lost three times. `wf-model-budget` (2026-08-20)
+and `wf-effort-budget` (2026-08-26) derive each budget's option set from the template, and `audit-setup.md`
+§ Step 0.4a, `model-map.md`, and `audit.md` all say to render their `LANE` blocks verbatim. Measured
+2026-09-02 on a v1.8.0 install: a re-audit of `apps-odyssey-alive` read the project's stale `## Model
+statics`, offered the retired frontier pick as a static, marked the lane's current pin `(Recommended)`, and
+never ran either script. The hook makes that render impossible rather than restating the rule a fourth time.
+
+**What it checks.** On every `AskUserQuestion`, a question whose options carry two or more model IDs is
+a model picker and one whose options are two or more rungs is an effort picker. For either, it runs the
+matching emitter for this project (`--root` the session's `cwd`, `--config` the project's `org-config.md`
+when present) and requires the offered options to equal one `LANE` block: the same IDs or rungs, in the
+same order, with the one `(recommended)` mark on the same option. Any other question passes untouched.
+
+**What it does on a mismatch.** Exit 2, with the offered set, the nearest emitted lane, any
+`STALE-ARTIFACT` line the emitter printed, and the exact command to run. A `PreToolUse` exit 2 blocks the
+call and feeds stderr to the model — DOCUMENTED in the hooks reference, not yet canaried on this host, so
+`enforcement.md` names the row "PREVENTS once wired" and `verify` § Hook wiring says whether it is wired.
+
+**What it refuses to know.** No model ID and no rung is written in the hook; the pool, order,
+recommendation, and ladder are read from the emitters' output on every call, so the guard cannot drift
+from the template either. **It fails open on its own faults only** — unparseable stdin, a missing emitter,
+an exception — with a one-line note, because a guard bug must never wedge a session. An emitter that
+REFUSES (exit 2, no trustworthy pool) is not the guard's fault and blocks with the emitter's message:
+a picker rendered from no trustworthy pool is the thing being prevented.
+
+**Fixtures:** `budgetguard-handbuilt`, `budgetguard-verbatim`, `budgetguard-unrelated`,
+`budgetguard-badstdin`, `budgetguard-effort-handbuilt`, `budgetguard-effort-verbatim`,
+`sa-hook-budget-guard`.
 
 ## The loop guard
 

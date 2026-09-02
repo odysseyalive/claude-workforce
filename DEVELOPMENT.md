@@ -115,6 +115,29 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-02
 
+**Landed 2026-09-02 (dev session) — `wf-budget-guard`: a hand-built budget picker is blocked, not
+restated (v1.9.0).** Trigger: the owner showed a screenshot from a re-audit of `apps-odyssey-alive`
+running the v1.8.0 install minutes after it landed: *"it looks like this didn't work!"* The picker
+offered `claude-fable-5` as a static, no `claude-sonnet-5`, and the lane's current pin as
+`(Recommended)`. The transcript (under a second config directory, `~/.claude-brooke`) shows the run read
+`audit-setup.md`, read the project's stale `org-config.md`, and composed the picker by hand; the only
+mentions of `wf-model-budget` are directory listings. `wf-model-budget --root <that project>` renders the
+correct new pool and prints STALE-ARTIFACT. So the defaults were right and the render path was wrong,
+for the third time past the same prose (2026-08-20, 2026-08-26, now on 1.8.0).
+
+- **The hook.** `wf-budget-guard`, `PreToolUse` on `AskUserQuestion`, in the default set. Two or more
+  model IDs among the options make a model picker; two or more rungs make an effort picker. Either must
+  equal one of the emitter's `LANE` blocks for the project (same IDs or rungs, same order, the one
+  `(recommended)` mark on the same option) or the call is blocked with the offered set, the nearest
+  emitted lane, any STALE-ARTIFACT line, and the command to run. No model ID or rung lives in the hook;
+  it reads the emitters. Fails open on its own faults only; an emitter refusal blocks.
+- **Wiring and doctrine.** Manifest `hook` line, `wf-settings-apply` registry, `hooks.md` row plus
+  § The budget guard, an `enforcement.md` row at its true strength ("PREVENTS once wired", documented
+  not canaried), and `audit-setup.md` § Step 0.4a names the floor beside the rule. Seven fixtures.
+- **Not done here, and named:** the contaminating `## Model statics` section still sits in that
+  project's `org-config.md` under the never-clobber rule; the emitter reports it every run. And the hook
+  reaches a project only once `/workforce hooks` (or the next `audit`) wires it there.
+
 **Landed 2026-09-02 (dev session) — model defaults: code, creative-visual, and the session advisor move
 to `claude-fable-5-1`, with the effort receipt (v1.8.0).** Requested by the user (`/workforce dev`):
 *"switch the recommended defaults for advisor, code, design work to claude-fable-5-1"*, then mid-turn

@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""wf-budget-guard — PreToolUse hook on AskUserQuestion: a budget picker renders the
+emitter's option set or it does not render.
+
+WHY THIS EXISTS. The model and effort budgets have a mechanical producer each
+(`wf-model-budget`, `wf-effort-budget`) and a prose rule in three files saying to
+render their `LANE` blocks verbatim. MEASURED 2026-09-02, on a v1.8.0 install, a
+re-audit of a real project read the project's stale `## Model statics`, offered
+`claude-fable-5` as a static and the lane's CURRENT PIN as `(Recommended)`, and never
+ran the script — the third time the same drift shipped past the same prose, after
+2026-08-20 (the script was written) and 2026-08-26 (the wording was mechanised).
+A rule restated a fourth time fails the same way. This is the floor under it.
+
+WHAT IT DOES. Reads the PreToolUse payload for `AskUserQuestion`. When a question's
+options are a MODEL picker (two or more option labels carry a model ID) or an EFFORT
+picker (two or more labels are rungs of the ladder), it runs the matching emitter for
+this project and requires the offered options to equal one of its `LANE` blocks —
+same IDs, same order, same single `(recommended)` mark. Anything else exits 2, which
+blocks the call and hands the model the emitter's block and the command that
+produces it. A question that is neither kind passes untouched.
+
+WHAT IT REFUSES TO KNOW. No model ID and no rung is written here. The pool, the cost
+order, the recommendation, and the ladder are read from the emitters' output on every
+call, so this file cannot drift from the template either (`SKILL.md` Principle 9a).
+
+FAIL OPEN, LOUDLY, on its OWN faults only. Unparseable stdin, a payload with no
+questions, an emitter file that is not on disk, or an exception here → exit 0 with a
+one-line stderr note, because a guard bug must never wedge a session
+(`references/enforcement.md`: "a hook must fail open"). An EMITTER that refuses (exit
+2: no trustworthy pool) is not the guard's fault and is not passed through: a picker
+rendered with no trustworthy pool is exactly what the emitter's own docstring says
+must not happen, so that case blocks with the emitter's message.
+
+WHAT A HOOK CAN AND CANNOT DO HERE. PreToolUse exit 2 blocks the tool call and feeds
+stderr to the model — DOCUMENTED in the hooks reference, not yet canaried on this
+host (`references/platform.md` § Staleness; `enforcement.md` names its row
+"PREVENTS once wired"). It fires only when registered (`/workforce hooks`, default
+set) and only in the session running the audit. It cannot make the model READ the
+emitter's output; it can only refuse to render anything else.
+
+OVERRIDES, for fixtures: WF_BUDGET_GUARD_TEMPLATE and WF_BUDGET_GUARD_PLATFORM are
+forwarded to the emitters as --template / --platform. Root resolves from the payload's
+`cwd`, else CLAUDE_PROJECT_DIR, else the working directory.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MODEL_ID_RE = re.compile(r"\bclaude-[a-z]+(?:-[a-z]+)*-\d[\w.-]*")
+REC_RE = re.compile(r"\(\s*recommended\s*\)", re.I)
+LANE_RE = re.compile(r"^LANE\s+(.+?)\s+\(object:\s*\"([^\"]*)\"\)\s*$")
+ITEM_RE = re.compile(r"^\s{2}-\s+(\S+)(.*)$")
+LADDER_RE = re.compile(r"^ladder \(cost order, most expensive first\):\s*(.+)$", re.M)
+
+
+def _note(msg):
+    sys.stderr.write("wf-budget-guard: " + msg + "\n")
+
+
+def _read_payload():
+    raw = sys.stdin.read()
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _questions(payload):
+    tool_input = payload.get("tool_input") or {}
+    qs = tool_input.get("questions")
+    if not isinstance(qs, list):
+        return []
+    out = []
+    for q in qs:
+        if not isinstance(q, dict):
+            continue
+        opts = q.get("options")
+        if not isinstance(opts, list):
+            continue
+        labels = []
+        for o in opts:
+            if isinstance(o, dict):
+                labels.append(str(o.get("label", "")))
+            elif isinstance(o, str):
+                labels.append(o)
+        out.append((str(q.get("question", "")), labels))
+    return out
+
+
+def _strip_mark(label):
+    return REC_RE.sub("", label).strip()
+
+
+def _run_emitter(name, root, extra):
+    path = os.path.join(HERE, name)
+    if not os.path.isfile(path):
+        return None, "emitter not on disk: " + path
+    cmd = [sys.executable, path, "--root", root]
+    cfg = os.path.join(root, ".claude", "workforce", "org-config.md")
+    if os.path.isfile(cfg):
+        cmd += ["--config", cfg]
+    cmd += extra
+    try:
+        p = subprocess.run(cmd, text=True, capture_output=True)
+    except OSError as exc:
+        return None, "could not run %s: %s" % (name, exc)
+    if p.returncode != 0:
+        return {"refused": True, "cmd": cmd, "stderr": p.stderr.strip(), "stdout": p.stdout}, None
+    return {"refused": False, "cmd": cmd, "stdout": p.stdout, "stderr": p.stderr}, None
+
+
+def _parse_lanes(text):
+    """[{label, prompt, items:[id...], rec:id|None}] from an emitter's LANE blocks.
+    The one `(recommended)` mark per lane comes from the emitter, never inferred."""
+    lanes, cur = [], None
+    for line in text.splitlines():
+        m = LANE_RE.match(line)
+        if m:
+            cur = {"label": m.group(1), "prompt": m.group(2), "items": [], "rec": None}
+            lanes.append(cur)
+            continue
+        if cur is None:
+            continue
+        m = ITEM_RE.match(line)
+        if m:
+            cur["items"].append(m.group(1))
+            if REC_RE.search(m.group(2)):
+                cur["rec"] = m.group(1)
+            continue
+        if not line.startswith("  "):
+            cur = None
+    return lanes
+
+
+def _stale_lines(text):
+    return [ln for ln in text.splitlines() if ln.startswith("STALE-ARTIFACT")]
+
+
+def _offered(labels, extract):
+    """(ordered values, recommended values) for the labels this picker offers."""
+    vals, recs = [], []
+    for lab in labels:
+        v = extract(_strip_mark(lab))
+        if v is None:
+            continue
+        vals.append(v)
+        if REC_RE.search(lab):
+            recs.append(v)
+    return vals, recs
+
+
+def _fmt(items, rec):
+    return ", ".join(i + (" (recommended)" if i == rec else "") for i in items)
+
+
+def _closest(lanes, question, offered):
+    ql = question.lower()
+    for ln in lanes:
+        if ln["prompt"].lower() in ql or ln["label"].lower() in ql:
+            return ln
+    best, score = None, -1
+    for ln in lanes:
+        s = len(set(ln["items"]) & set(offered))
+        if s > score:
+            best, score = ln, s
+    return best
+
+
+def _verdict(kind, emitter, question, offered, recs, result, extra_cmd):
+    """None when the picker equals one of the emitter's lanes; else the block text."""
+    if result["refused"]:
+        return ("BLOCKED — %s refused to emit an option set for this project, so there "
+                "is no trustworthy %s to render and none may be rebuilt by hand.\n  %s\n"
+                "Command run: %s" % (emitter, kind, result["stderr"] or "(no message)",
+                                     " ".join(result["cmd"])))
+    lanes = _parse_lanes(result["stdout"])
+    if not lanes:
+        return ("BLOCKED — %s emitted no LANE blocks; its output shape changed and "
+                "this picker cannot be verified against it.\nCommand run: %s"
+                % (emitter, " ".join(result["cmd"])))
+    for ln in lanes:
+        want_recs = [ln["rec"]] if ln["rec"] else []
+        if ln["items"] == offered and recs == want_recs:
+            return None
+    near = _closest(lanes, question, offered)
+    lines = [
+        "BLOCKED — this AskUserQuestion offers %s %s picker whose options are not one of "
+        "the LANE blocks %s emits for this project."
+        % ("an" if kind[0] in "aeiou" else "a", kind, emitter),
+        "  offered:                 " + (_fmt(offered, recs[0] if recs else None) or "(nothing)"),
+    ]
+    if len(recs) > 1:
+        lines.append("  (%d options carry a (recommended) mark; a lane has exactly one)" % len(recs))
+    if near is not None:
+        lines.append("  emitted for %s: %s" % ("LANE " + near["label"], _fmt(near["items"], near["rec"])))
+    for st in _stale_lines(result["stdout"]):
+        lines.append("  " + st)
+    lines.append(
+        "Render the emitter's LANE blocks verbatim — pool, order, and the one "
+        "(recommended) mark — never a slate rebuilt from prose, from memory, or from "
+        "the project's org-config.md, and never the current pin re-labelled as the "
+        "recommendation (a recorded value is [pre-selected]; recommended is the "
+        "template's label). Run:")
+    lines.append("  " + " ".join(result["cmd"]))
+    return "\n".join(lines)
+
+
+def main():
+    payload = _read_payload()
+    if payload is None:
+        _note("could not verify — stdin is not a JSON payload; passing through")
+        return 0
+    if payload.get("tool_name") not in (None, "AskUserQuestion"):
+        return 0
+    questions = _questions(payload)
+    if not questions:
+        return 0
+    root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    tpl = os.environ.get("WF_BUDGET_GUARD_TEMPLATE")
+    plat = os.environ.get("WF_BUDGET_GUARD_PLATFORM")
+    tpl_args = ["--template", tpl] if tpl else []
+    plat_args = ["--platform", plat] if plat else []
+
+    ladder = None  # read from wf-effort-budget's output, never written here
+
+    def model_of(label):
+        m = MODEL_ID_RE.search(label)
+        return m.group(0) if m else None
+
+    for question, labels in questions:
+        ids, recs = _offered(labels, model_of)
+        if len(ids) >= 2:
+            result, err = _run_emitter("wf-model-budget", root, tpl_args)
+            if err:
+                _note("could not verify — " + err + "; passing through")
+                return 0
+            v = _verdict("model", "wf-model-budget", question, ids, recs, result, tpl_args)
+            if v:
+                _note(v)
+                return 2
+            continue
+        # Effort picker: only knowable once the ladder has been read from the emitter.
+        result, err = _run_emitter("wf-effort-budget", root, tpl_args + plat_args)
+        if err:
+            _note("could not verify — " + err + "; passing through")
+            return 0
+        if not result["refused"]:
+            m = LADDER_RE.search(result["stdout"])
+            ladder = [t.strip() for t in m.group(1).split(",")] if m else []
+        rung_set = set(ladder or [])
+
+        def rung_of(label):
+            t = label.strip().lower()
+            return t if t in rung_set else None
+
+        rungs, rrecs = _offered(labels, rung_of)
+        if len(rungs) >= 2:
+            v = _verdict("effort", "wf-effort-budget", question, rungs, rrecs, result,
+                         tpl_args + plat_args)
+            if v:
+                _note(v)
+                return 2
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # a guard bug must never wedge a session
+        _note("could not verify — %s: %s; passing through" % (type(exc).__name__, exc))
+        sys.exit(0)

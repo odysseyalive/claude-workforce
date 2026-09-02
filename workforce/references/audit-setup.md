@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 54 assertion(s) in bin/check name this file; 74 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 75 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -481,6 +481,14 @@ option, the lower-cost IC static absent, and the analytical recommendation left 
 than split by tier. A prose rule bites only the inputs a reader happens to read correctly, which
 is why the drift was inconsistent across projects; the script is a pure function of the template and cannot
 read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
+
+**And the prose rule now has a mechanical floor: `wf-budget-guard`.** A `PreToolUse` hook on
+`AskUserQuestion`, in `/workforce hooks`' default set, that blocks any model or effort picker whose
+options are not one of the emitters' `LANE` blocks for this project (`procedures/hooks.md` § The budget
+guard). Measured 2026-09-02 on a v1.8.0 install: a re-audit of `apps-odyssey-alive` read the project's
+stale `## Model statics`, rendered the retired frontier pick as a static and the current pin as
+`(Recommended)`, and never ran the script, with this paragraph and two others in front of it. A rule restated a fourth
+time fails the same way; a hook does not.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical

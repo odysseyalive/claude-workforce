@@ -1,6 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
@@ -16,6 +16,7 @@ The single most important table in this project:
 | Employee follows its handbook | — | **CANNOT. Detection only.** |
 | Total spawns stay under the session cap | — | **CANNOT. Advisory only.** |
 | Two employees cannot share a name | Phase A lint + `verify` | **DETECTS** at author time and at review; the platform itself is silent |
+| A budget picker offers the emitter's option set, never one rebuilt from prose or a stale project config | `wf-budget-guard` (`PreToolUse` on `AskUserQuestion`) | **PREVENTS once wired** — a `PreToolUse` exit 2 blocks the call (DOCUMENTED in the hooks reference, not yet canaried on this host). **Nothing when unwired**; `verify` § Hook wiring reports which. Measured need 2026-09-02: three prose restatements had not held |
 
 **Anything in a "cannot" row must never be described as enforced, guaranteed, prevented, or
 sandboxed.** That is a gate, not a style preference (Chain-of-Command Gate, `SKILL.md`).

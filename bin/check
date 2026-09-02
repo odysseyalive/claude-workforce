@@ -8210,6 +8210,39 @@ check("the cold-reader remedy has a producer, and the text is stated once",
       "quietly, because UNAVAILABLE is neither pass nor fail. A hook is the only "
       "always-on component, which is why it lives there once CLAUDE.md is deleted")
 
+# THE BUDGET PICKER HAS A FLOOR. Three prose restatements of "render the emitter's LANE
+# blocks verbatim" (2026-08-20, 2026-08-26, and the fixture that froze them) did not
+# stop a v1.8.0 re-audit from rebuilding the picker out of a project's stale
+# `## Model statics` on 2026-09-02. wf-budget-guard is the PreToolUse hook that blocks
+# that render; these assertions keep it shipped, wired by default, documented where
+# the rule it enforces lives, and free of any model ID or rung of its own.
+_wbg = read("workforce/bin/wf-budget-guard")
+_wsa = read("workforce/bin/wf-settings-apply")
+_hks = read("workforce/references/procedures/hooks.md")
+check("budget guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
+      "hook workforce/bin/wf-budget-guard" in read("manifest.txt")
+      and '"wf-budget-guard": ("PreToolUse", "AskUserQuestion")' in _wsa
+      and "wf-budget-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
+      and "| `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` |" in _hks
+      and "## The budget guard" in _hks,
+      "the guard exists to make a hand-built budget picker impossible; a hook that is "
+      "not in the manifest, not in wf-settings-apply's registry, or opt-in rather than "
+      "default is the dormant shape the four inherited hooks died in")
+check("budget guard: named where the rule it enforces is stated, and in the enforcement table",
+      "mechanical floor: `wf-budget-guard`" in _asu
+      and "PREVENTS once wired" in enf and "wf-budget-guard" in enf,
+      "audit-setup.md § Step 0.4a states the render-verbatim rule and must name the "
+      "floor under it; enforcement.md must carry the row at its true strength, "
+      "PREVENTS once wired and nothing when unwired")
+_wbg_parts = _wbg.split('"""')
+_wbg_code = (_wbg_parts[0] + "".join(_wbg_parts[2:])) if len(_wbg_parts) >= 3 else _wbg
+check("budget guard: hardcodes no model ID and no rung — it reads the emitters",
+      bool(_wbg) and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wbg_code)
+      and not any(re.search(r"""['"]%s['"]""" % r, _wbg_code) for r in _rung_tokens)
+      and "wf-model-budget" in _wbg_code and "wf-effort-budget" in _wbg_code,
+      "a guard that carried its own copy of the pool or the ladder would be a third "
+      "source that drifts; it must verify against the emitters and nothing else")
+
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,
       "enforcement.md rule 3 says apply, not name; a fix nobody performs is the shrug it "
