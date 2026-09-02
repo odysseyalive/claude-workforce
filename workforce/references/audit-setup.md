@@ -251,8 +251,11 @@ defect above:
 > It runs alongside you, not inside any agent — a second opinion on what you are doing. Pick the blank
 > field and type **none** if you do not want one.
 
-It offers the same model pool as the model budget, in the same cost order, and **carries no
-recommendation**. Typing **none** in the blank field removes the `advisorModel` key from settings
+It offers the same model pool as the model budget, in the same cost order, and **takes as its
+recommendation the pool row whose Notes cell names the session advisor** (`org-config.template.md`
+§ Model statics, row 1 as shipped, the same pick as code and creative-visual), marked `(recommended)` in
+place and pre-selected on a first run; a recorded `advisorModel` pre-selects instead (Step 0.3). Typing
+**none** in the blank field removes the `advisorModel` key from settings
 entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is never written as an empty or
 sentinel value. It sits here rather than with the lanes because it is not a lane: it reaches no
 employee, it has no effort setting, and putting it among the four made the two budgets offer different
@@ -445,15 +448,16 @@ The creative call: the two generative lanes.
 | Object | What it sets |
 |---|---|
 | creative-text | one model for generative writing and copy, no tier split |
-| creative-visual | one model for graphics and frontend design; its out-of-pool recommendation leads the options |
+| creative-visual | one model for graphics and frontend design, no tier split |
 
 Wording: this call takes **Wording: model / CALL B** (§ Step 0.4 sole-source rule above).
 
 Each model object offers the statics from `org-config.template.md` § Model statics, in the order listed
-there, plus "Other" for a hand-typed model ID. creative-visual's recommended model sits outside the pool,
-so it is offered FIRST in that lane's options as a first-class `(recommended)` choice and the cheapest
-pool model is dropped from that lane's slate to fit the four-option cap; "Other" reverts to a plain
-hand-typed catch-all there (`org-config.template.md` § The four lanes). **No CEO question** — the CEO
+there, plus "Other" for a hand-typed model ID. A lane whose recommended model sits outside the pool
+(creative-visual is the one lane sanctioned to, and none does in the template as shipped since 2026-09-02)
+has it offered FIRST in that lane's options as a first-class `(recommended)` choice, with the cheapest
+pool model dropped from that lane's slate to fit the four-option cap; "Other" reverts to a plain
+hand-typed catch-all there (`org-config.template.md` § Model statics). **No CEO question** — the CEO
 is the main session and runs on whatever model the user chose for their Claude Code session.
 
 **Both model calls apply the rules below.** The pool statics are
@@ -481,14 +485,15 @@ read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
 pick, code takes code, and creative-text takes its pool pick — and leave it sitting where the cost ranking
-put it. creative-visual is the ONE exception: its recommendation is an out-of-pool model,
-which has no cost-ranked pool row, so it leads that lane's options as a first-class `(recommended)` choice
+put it. The ONE exception is a lane recommended a model outside the pool (creative-visual is the one
+lane sanctioned to be; as shipped since 2026-09-02, none is): an out-of-pool model has no cost-ranked pool
+row, so it leads that lane's options as a first-class `(recommended)` choice
 and the cheapest pool model is dropped from that lane's slate to fit the four-option cap.
 **Never promote an in-pool recommendation to the first position.** The host convention is that a
 recommended option leads the list; for the pool that convention is wrong here and is overridden on
 purpose, because the list is ranked by price and the ranking is what lets a user read the cost of a
-choice at a glance. The one out-of-pool exception is the creative-visual case noted just above. The
-advisor object carries no recommendation. Never move a row to express one, and never re-annotate the Notes column to shift which
+choice at a glance. The out-of-pool exception is the case noted just above. The advisor object takes
+the recommendation § Model statics names for it (§ Step 0.2). Never move a row to express one, and never re-annotate the Notes column to shift which
 model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
 
 **On a first run there is no recorded value, and the pre-selected default is still deterministic.**

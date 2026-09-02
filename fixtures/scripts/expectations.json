@@ -3112,5 +3112,55 @@
       "LANE creative-text",
       "QUESTION-HEADER-BEGIN"
     ]
+  },
+  "modelbudget-multilane-row": {
+    "_why": "ONE ROW, TWO LANES \u2014 the 2026-09-02 pool refresh moved `code` and `creative-visual` (and the session advisor) onto `claude-fable-5-1`, which entered the pool as row 1, and retired `claude-opus-5`. Both emitters had read a single `Recommended for` per row, and `bin/check`'s lane parser matched only the first annotation on a line: with the shipped template the picker would have marked `creative-visual` `!! no model is marked` while the table plainly recommended one. `_rec_lanes` now returns every annotation a row carries. This case also freezes the OTHER half of the change: the shipped template no longer carries an out-of-pool annotation, and its historical prose names `claude-fable-5` and the literal phrase `Recommended for <lane>` on one line WITHOUT annotating a lane \u2014 that line must derive nothing. `not` forbids the out-of-pool rendering, the unrecommended marker, the retired model, and the predecessor ID appearing as an option.",
+    "script": "wf-model-budget",
+    "args": [
+      "--template",
+      "template.md"
+    ],
+    "exit": 0,
+    "want": [
+      "pool (cost order, most expensive first): claude-fable-5-1, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5",
+      "lanes: 5, rendered as 2 AskUserQuestion calls (cap: 4 objects per call)",
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  - claude-fable-5-1\n  - claude-opus-4-8  (recommended) [pre-selected]\n  - claude-opus-4-6\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)",
+      "LANE analytical \u00b7 IC  (object: \"Agents that do the work\")\n  - claude-fable-5-1\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5  (recommended) [pre-selected]\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)",
+      "LANE code  (object: \"Code work\")\n  - claude-fable-5-1  (recommended) [pre-selected]\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  - claude-fable-5-1\n  - claude-opus-4-8\n  - claude-opus-4-6  (recommended) [pre-selected]\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  - claude-fable-5-1  (recommended) [pre-selected]\n  - claude-opus-4-8\n  - claude-opus-4-6\n  - claude-sonnet-5\n  + Other (hand-typed model ID)\n  default source: recommended default (first run)"
+    ],
+    "not": [
+      "out-of-pool:",
+      "!! no model is marked",
+      "Dropped from THIS lane's slate",
+      "claude-opus-5",
+      "- claude-fable-5\n",
+      "- claude-fable-5 "
+    ]
+  },
+  "effortbudget-multilane-row": {
+    "_why": "THE EFFORT HALF of the one-row-two-lanes change (2026-09-02). `wf-effort-budget` resolves a lane's availability FALLBACK model from the same `Recommended for` annotation `wf-model-budget` reads, and its `_rec_lane` returned only the first lane a row named \u2014 so with `claude-fable-5-1` recommended for both `code` and `creative-visual`, one of the two lanes would have had no fallback model and no rung window. Both lanes now resolve to the same model and window their four rungs around their own recommendation: code around `high` (drops `low`), creative-visual around `medium` (drops `max`). platform.md fact 12c is re-pointed to `claude-fable-5-1` and names the predecessor ID in the same claim cell; the availability parser must read the successor's ladder and not trip on the predecessor.",
+    "script": "wf-effort-budget",
+    "args": [
+      "--template",
+      "template.md",
+      "--platform",
+      "platform.md"
+    ],
+    "exit": 0,
+    "want": [
+      "ladder (cost order, most expensive first): max, xhigh, high, medium, low",
+      "LANE code  (object: \"Code work\")\n  model: claude-fable-5-1  [recommended model (fallback)]\n  - max\n  - xhigh\n  - high  (recommended) [pre-selected]\n  - medium\n  dropped to fit the 4-option cap (farthest from the recommendation): low\n",
+      "LANE creative-visual  (object: \"Graphics & frontend design work\")\n  model: claude-fable-5-1  [recommended model (fallback)]\n  - xhigh\n  - high\n  - medium  (recommended) [pre-selected]\n  - low\n  dropped to fit the 4-option cap (farthest from the recommendation): max\n",
+      "LANE analytical \u00b7 Lead  (object: \"Agents that coordinate\")\n  model: claude-opus-4-8  [recommended model (fallback)]",
+      "LANE creative-text  (object: \"Writing & copy work\")\n  model: claude-opus-4-6  [recommended model (fallback)]\n  - max\n  - high\n  - medium  (recommended) [pre-selected]\n  - low\n"
+    ],
+    "not": [
+      "!! NO EFFORT OBJECT",
+      "claude-opus-5",
+      "model: claude-fable-5 ",
+      "HONORED-UNSUPPORTED"
+    ]
   }
 }

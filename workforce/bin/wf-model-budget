@@ -15,8 +15,15 @@ and CALL B carries the two creative lanes (`creative-text`, `creative-visual`). 
 caller that regroups them by hand is reintroducing by hand the drift this script
 exists to foreclose.
 
-ONE SANCTIONED OUT-OF-POOL RECOMMENDATION. `creative-visual` is recommended
-`claude-fable-5`, which is DELIBERATELY not a § Model statics row, so that lane's
+ONE ROW MAY BE RECOMMENDED FOR SEVERAL LANES. Since 2026-09-02 the top pool row is
+recommended for both `code` and `creative-visual`, so every `Recommended for` annotation
+a row carries is read: a lane is never recommended twice, but a model may be
+recommended for as many lanes as its Notes cell names.
+
+ONE SANCTIONED OUT-OF-POOL RECOMMENDATION. `creative-visual` is the one lane that MAY
+be recommended a model that is DELIBERATELY not a § Model statics row (as it was with
+`claude-fable-5` until 2026-09-02, when that model's successor entered the pool as row 1
+and the shipped template stopped exercising this path). When a lane is, its
 recommendation is annotated on a PROSE line inside § Model statics rather than on a
 table row. It is nonetheless OFFERED THE SAME WAY every other lane's recommendation
 is offered: it LEADS that lane's slate as a first-class option, marked
@@ -64,10 +71,11 @@ WHAT IT DERIVES, and from where:
     <lane>` annotation, so re-splitting or re-pointing a recommendation is a
     template edit with no code change (`org-config.template.md` § Model statics:
     "the budget question reads these cells and has no other source").
-  * The ONE sanctioned out-of-pool recommendation — the same `Recommended for
-    <lane>` annotation, found on a PROSE line of § Model statics beside a backticked
-    model ID that is not a pool row. `claude-fable-5` reaches `creative-visual` this
-    way and no model ID for it is written here either.
+  * The ONE sanctioned out-of-pool recommendation, when the template carries one: the
+    same `Recommended for <lane>` annotation, found on a PROSE line of § Model statics
+    beside a backticked model ID that is not a pool row. `claude-fable-5` reached
+    `creative-visual` this way until 2026-09-02, and no model ID for it was ever
+    written here either.
   * The question HEADER and BODY per call — parsed from § Budget question wording,
     the one home of that copy, so this script prints the WHOLE call and the caller
     renders it verbatim. An option set produced mechanically under a header retyped
@@ -215,7 +223,7 @@ def _section(text, heading_re):
 
 
 def parse_statics(template_text):
-    """Parse § Model statics into an ordered list of (model_id, notes, rec_lane_or_None).
+    """Parse § Model statics into an ordered list of (model_id, notes, [rec_lanes]).
 
     Cost order is table order — the template states it is ordered most-expensive-first
     and presented in that order every time, so this function never re-sorts."""
@@ -226,7 +234,7 @@ def parse_statics(template_text):
         if not m:
             continue
         model_id, notes = m.group(1).strip(), m.group(2).strip()
-        rows.append((model_id, notes, _rec_lane(notes)))
+        rows.append((model_id, notes, _rec_lanes(notes)))
     if not rows:
         _die("'## Model statics' present but no model rows parsed: " + "table shape changed")
     return rows
@@ -239,12 +247,13 @@ def _statics_body(template_text):
     return body
 
 
-def _rec_lane(text):
-    """The lane a `**Recommended for <lane>**` annotation names, or None."""
-    for pat, lane in _REC_PATTERNS:
-        if pat.search(text):
-            return lane
-    return None
+def _rec_lanes(text):
+    """Every lane a `**Recommended for <lane>**` annotation on this text names.
+
+    One row may carry several (since 2026-09-02 the top row is recommended for both
+    `code` and `creative-visual`), so this returns all of them, in canonical lane
+    order, and an empty list when the text carries none."""
+    return [lane for pat, lane in _REC_PATTERNS if pat.search(text)]
 
 
 def parse_out_of_pool_recs(template_text, pool_ids):
@@ -260,19 +269,20 @@ def parse_out_of_pool_recs(template_text, pool_ids):
     for line in body.splitlines():
         if _POOL_ROW_RE.match(line):
             continue  # a pool row — parse_statics owns it
-        lane = _rec_lane(line)
-        if lane is None:
+        lanes = _rec_lanes(line)
+        if not lanes:
             continue
         outside = [t.strip() for t in re.findall(r"`([^`]+)`", line)
                    if t.strip() and t.strip() not in pool_ids]
         if not outside:
             continue
         model_id = outside[0]
-        if found.get(lane, model_id) != model_id:
-            _die("lane '%s' is annotated with two different out-of-pool models "
-                 "('%s' and '%s') in § Model statics: the recommendation is ambiguous"
-                 % (lane, found[lane], model_id))
-        found[lane] = model_id
+        for lane in lanes:
+            if found.get(lane, model_id) != model_id:
+                _die("lane '%s' is annotated with two different out-of-pool models "
+                     "('%s' and '%s') in § Model statics: the recommendation is ambiguous"
+                     % (lane, found[lane], model_id))
+            found[lane] = model_id
     return found
 
 
@@ -319,8 +329,8 @@ def wording_for(wording, budget, call_name):
 
 def recommended_by_lane(statics):
     rec = {}
-    for model_id, _notes, lane in statics:
-        if lane is not None:
+    for model_id, _notes, lanes in statics:
+        for lane in lanes:
             rec[lane] = model_id
     return rec
 

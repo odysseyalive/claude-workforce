@@ -5829,45 +5829,62 @@ check(
 # "### Creative — two lanes" prose, and the live picker emitted "!! no model marked".
 # Scoping the detector to the section the deliverable reads makes that false green
 # impossible — the check goes green only when the annotation is where the picker looks.
-_lane_recs = dict(
-    (m.group(2).strip().lower(), m.group(1))
-    for m in re.finditer(
-        r"`(claude-[\w.-]+)`[^\n]*?Recommended for ([\w -]+?)\*\*", _stat_sec
-    )
-)
-# creative-visual's recommended model (claude-fable-5) is DELIBERATELY outside the
-# statics pool (org-config.template.md § Model statics). Being out of pool is about
-# where it is DERIVED from, not how it is offered: since 2026-08-23 wf-model-budget
-# renders it as the LEADING first-class option of that lane's slate, marked in place
-# like any other recommendation, and drops the cheapest pool model from that lane to
-# fit the option cap. This is the ONE sanctioned out-of-pool lane recommendation. The
-# in-pool invariant still guards the other four lanes: no lane except creative-visual
-# may point outside the pool, and creative-visual is REQUIRED to. Added 2026-08-23 for
-# the creative-lane split; relaxes the old `set(_lane_recs.values()) <= _pool` exactly
-# far enough to admit the sanctioned visual out and no further.
+# PER ROW, EVERY ANNOTATION. Since 2026-09-02 one row is recommended for two lanes
+# (`code` and `creative-visual`), and the old single-match regex read only the first
+# annotation a line carried, so it would have reported creative-visual as unrecommended
+# while both emitters rendered it. Read the way `_rec_lanes` in both emitters reads.
+_lane_recs = {}
+for _ln in _stat_sec.splitlines():
+    _mid = re.search(r"`(claude-[\w.-]+)`", _ln)
+    if not _mid:
+        continue
+    for _lane in re.findall(r"Recommended for ([\w -]+?)\*\*", _ln):
+        _lane_recs[_lane.strip().lower()] = _mid.group(1)
+# THE SANCTIONED OUT IS PERMITTED, NOT REQUIRED. Until 2026-09-02 creative-visual's
+# recommended model (claude-fable-5) sat DELIBERATELY outside the statics pool and this
+# check REQUIRED it there. Its successor entered the pool as row 1, recommended for
+# code and creative-visual both, and the shipped template no longer carries an
+# out-of-pool annotation. The mechanism stays (wf-model-budget still leads a lane's
+# slate with an out-of-pool pick, and its fixtures still prove it), so the invariant is
+# now: every lane has exactly one recommendation; a recommendation outside the pool is
+# admitted for creative-visual ONLY, the one sanctioned lane, and for no other.
 _oop_lanes = {lane for lane, mdl in _lane_recs.items() if mdl not in _pool}
 check(
-    "org-config: each lane recommendation is in-pool, except the sanctioned visual out",
+    "org-config: each lane recommendation is in-pool, or out only on the sanctioned visual lane",
     set(_lane_recs) == {"analytical lead", "analytical ic",
                         "creative-text", "creative-visual", "code"}
-    and _lane_recs.get("creative-visual") not in _pool
-    and _oop_lanes == {"creative-visual"},
+    and _oop_lanes <= {"creative-visual"},
     f"lane recommendations are {_lane_recs} against pool {sorted(_pool)}; out-of-pool "
     f"lanes {sorted(_oop_lanes)} — the five employee-bearing lanes each need exactly one "
-    "recommendation. Four (analytical Lead, analytical IC, creative-text, code) must name "
-    "a pool ID the question offers directly; creative-visual's is the frontier visual model, "
-    "offered as the LEADING first-class option of its lane and REQUIRED to sit outside the "
-    "pool it is derived from. Any OTHER lane pointing "
-    "outside the pool — or creative-visual pointing inside it — is the error. The analytical "
-    "lane splits its recommendation by tier; the advisor object carries none by design.",
+    "recommendation, and only creative-visual may point outside the pool (the one "
+    "sanctioned out, offered as that lane's LEADING first-class option when it happens). "
+    "Any OTHER lane pointing outside the pool is the error. The analytical lane splits its "
+    "recommendation by tier.",
+)
+
+# THE ADVISOR TAKES A POOL ROW'S PICK, STATED ONCE. The session advisor carried no
+# recommendation until 2026-09-02; now exactly one pool row's Notes cell names it, and
+# § Session advisor's shipped-default cell must carry that row's ID, the coupling that
+# keeps a pool refresh from leaving the advisor pointing at a model the pool dropped.
+_adv_rows = [m.group(1) for m in re.finditer(
+    r"^\|\s*\d+\s*\|\s*`(claude-[\w.-]+)`[^\n]*session advisor", _stat_sec, re.M)]
+_adv_cell = re.search(r"^\|\s*Advisor model\s*\|\s*`([^`]+)`\s*\|", _tpl_cfg, re.M)
+check(
+    "org-config: the session advisor's recommendation is the one pool row that names it",
+    len(_adv_rows) == 1 and _adv_cell is not None and _adv_cell.group(1) == _adv_rows[0],
+    f"pool rows naming the session advisor: {_adv_rows}; § Session advisor cell: "
+    f"{_adv_cell.group(1) if _adv_cell else None!r}. Exactly one row names the advisor and "
+    "the § Session advisor default cell carries that row's ID: two statements of one "
+    "constant must agree, or the advisor object pre-selects a model the pool does not offer",
 )
 
 check(
-    "audit-setup: creative-visual's out-of-pool recommendation leads as a first-class option",
+    "audit-setup: an out-of-pool recommendation leads its lane's options as a first-class option",
     "leads that lane's options as a first-class" in _asu,
-    "audit-setup.md no longer states that creative-visual's out-of-pool recommendation leads its lane's "
-    "options as a first-class pick — without it the doctrine can silently revert to 'reached via Other' "
-    "while wf-model-budget renders it first-class, and nothing catches the drift (2026-08-23 split).",
+    "audit-setup.md no longer states that an out-of-pool recommendation leads its lane's options as a "
+    "first-class pick — without it the doctrine can silently revert to 'reached via Other' while "
+    "wf-model-budget renders it first-class, and nothing catches the drift (2026-08-23 split; the "
+    "shipped template stopped exercising the path 2026-09-02 but the rule and the emitter both remain).",
 )
 
 # The split is not just "two distinct recs" — it has a direction. The statics table
@@ -6281,10 +6298,10 @@ check(
 
 # ── The five lanes ───────────────────────────────────────────────────────────
 # Analytical is the baseline and supplies the tier defaults; creative-text and
-# creative-visual are the split of the former creative lane (opus-4-6 for text,
-# out-of-pool fable-5 for graphics/frontend design — derived from prose, but offered
-# as that lane's leading first-class option, not hidden behind "Other"); code is a
-# single-model override; advisor is not a lane employees run in.
+# creative-visual are the split of the former creative lane (opus-4-6 for text; the
+# pool's top row for graphics/frontend design since 2026-09-02, out-of-pool fable-5
+# before that); code is a single-model override; advisor is not a lane employees run
+# in, though since 2026-09-02 it takes the pool row that names it as its recommendation.
 for _lane in ("Analytical", "creative-text", "creative-visual", "Code", "Advisor"):
     check(f"lanes: {_lane.lower()} is addressed separately in the config",
           _lane in _ocfg, "org-config.template.md § The four lanes must name it")

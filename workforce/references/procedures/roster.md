@@ -14,7 +14,7 @@ Budget
 | analytical / Lead | <id>    | medium | unchanged, pre-selected |
 | analytical / IC   | <id>    | medium | unchanged, pre-selected |
 | creative-text     | <id>    | medium | lane override           |
-| creative-visual   | <id>    | medium | out-of-pool recommendation |
+| creative-visual   | <id>    | medium | recommended default (first run) |
 | code              | <id>    | medium | blank -> analytical     |
 | advisor           | <id>    | --      | unchanged, pre-selected |
 

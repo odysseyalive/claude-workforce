@@ -115,6 +115,33 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-02
 
+**Landed 2026-09-02 (dev session) — model defaults: code, creative-visual, and the session advisor move
+to `claude-fable-5-1`, with the effort receipt (v1.8.0).** Requested by the user (`/workforce dev`):
+*"switch the recommended defaults for advisor, code, design work to claude-fable-5-1"*, then mid-turn
+*"please also provide the most cost-effective and efficient effort levels for these selections too."*
+Researched against the `claude-api` model reference (cached 2026-06-24): Fable 5.1 is the most capable
+widely released model, the successor to Fable 5 at the same $10/$50, all five effort rungs; its lower rungs
+are documented to match or beat prior models' higher ones. Measured effort curves from the same source:
+long-horizon coding is steep (`medium` −2 points of pass rate for half the cost, `low` −8 for a quarter);
+knowledge and generative work is flat (`medium` = the default's accuracy at 70–85% of its cost).
+
+- **Pool.** `claude-fable-5-1` enters § Model statics as row 1, recommended for `code` AND
+  `creative-visual`; `claude-opus-5` leaves (recommended for nothing, still reachable via "Other"). The
+  out-of-pool path (`claude-fable-5` leading creative-visual's slate) is no longer exercised by the
+  shipped template. The mechanism, its fixtures, and creative-visual's standing as the one sanctioned lane
+  all stay; `bin/check` now PERMITS an out on that lane instead of REQUIRING one.
+- **One row, several lanes.** Both emitters read a single `Recommended for` per row and `bin/check`'s
+  lane parser matched only the first on a line, so the shipped template would have rendered
+  creative-visual `!! no model is marked`. `_rec_lanes` returns every annotation a row carries
+  (fixtures `modelbudget-multilane-row`, `effortbudget-multilane-row`); the check reads per row.
+- **Advisor.** Its first recommendation: the pool row whose Notes cell names the session advisor (row 1),
+  pre-selected on a first run, the recorded `advisorModel` on a re-audit; `none` still removes the key.
+  A new check couples § Session advisor's default cell to that row so a pool refresh cannot strand it.
+- **Effort: values unchanged, receipt added.** § Effort statics now states why: code `high` (steep
+  curve, executed output; the API default and the reference's recommended start for Fable 5.1),
+  creative-visual `medium` (flat curve, and the creative floor forbids ratcheting it), advisor none (no
+  spawn, no rung). `platform.md` fact 12c re-pointed to `claude-fable-5-1`, predecessor named in the claim.
+
 **Landed 2026-09-02 (dev session) — context-wiring: the reference material the ask draws on
 (v1.7.0).** Trigger: the owner reported that in sophisticated orgs "one hand doesn't know what the
 other hand is doing" — agents and the session CEO are *"gasslighted"* because they do not know the
