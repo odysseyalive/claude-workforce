@@ -90,6 +90,7 @@ AUD2 = "workforce/references/procedures/audit.md"
 MAN = "manifest.txt"
 STG2 = "workforce/references/staging.md"
 DSC = "workforce/references/procedures/discharge.md"
+DISC = "workforce/references/discovery.md"
 HIR = "workforce/references/procedures/hire.md"
 VFY = "workforce/references/procedures/verify.md"
 HBK = "workforce/references/procedures/handbook.md"
@@ -135,6 +136,7 @@ UIS  = "workforce/references/ui-design-seed.md"
 OCF  = "workforce/references/org-chart-format.md"
 PFL  = "workforce/references/procedures/preflight.md"
 RVW  = "workforce/references/procedures/review.md"
+ORGD = "workforce/references/org-design.md"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -1121,6 +1123,16 @@ CASES = [
      INV, "del", "`INV-ASK`"),
     ("templates: the generated /org contract states five fields with the verbatim ask first",
      TPL2, "del", "REQUEST (verbatim — the user's ask"),
+    ("templates: constitution item 10 binds employees to search Sources before reporting absence",
+     TPL2, "del", "before searching your `## Sources`"),
+    ("handbook-templates: the IC Sources section carries the search-before-you-report-missing contract",
+     TPL, "del", "and search it before you ever report"),
+    ("handbook-templates: the IC Sources section says name a root or glob, not a file list",
+     TPL, "del", "not a file list, so material added later is in scope without a"),
+    ("handbook-templates: the CEO Sources section makes the directing node name sources in every order",
+     TPL, "del", "every work order you write that touches a surface names the sources the doer must consult"),
+    ("handbook-templates: the Lead inheritance list still names Sources among the CEO sections",
+     TPL, "del", "`Directives`, `Sources`, `Chain of Command`"),
     ("handbook-templates: the CEO verification closes the loop against the REQUEST, not just the Objective",
      TPL, "del", "only the REQUEST says the work asked for arrived"),
     # The echo-back assertion names BOTH Reporting contracts by their distinct
@@ -1150,6 +1162,40 @@ CASES = [
      RVW, "del", "measures whether the Lead tier is in the loop at all"),
     ("audit: Step 5d refreshes existing handbooks to the installed contract, in-run",
      AUD2, "del", "Doctrine-refresh: bring existing handbooks up to the installed contract"),
+    # ── Sources inclusion + wiring criterion, and seam-completeness (2026-09-02) ──
+    # Each payload is a contiguous, grep-unique fragment of the criterion in org-design.md;
+    # deleting it drops the exact clause its bin/check assertion anchors, so the check fires.
+    ("org-design: a source is an INPUT the craft consumes, never its own OUTPUT",
+     ORGD, "del", "X is an INPUT E consumes, not E's own OUTPUT"),
+    ("org-design: every wired root carries an evidence line, never fabricated",
+     ORGD, "del", "every root written carries an evidence line"),
+    ("org-design: a read-write state store is named by its data-skill invocation, not a raw path",
+     ORGD, "del", "Skill invocation** `Skill(<data-skill>)`, NOT a raw file path"),
+    ("org-design: an unfronted source is a by-path read marked degraded until a skill fronts it",
+     ORGD, "del", "a by-path read, EXPLICITLY MARKED degraded"),
+    ("org-design: a subordinated concern is healed by amendment, never a new hire",
+     ORGD, "del", "Heal by amendment, never by a new hire"),
+    # ── context-wiring: authored, hired, healed, discovered, verified, counted (2026-09-02) ──
+    # Each payload is a contiguous, grep-unique fragment (grep -c == 1) of the clause its
+    # bin/check assertion anchors; deleting it makes the assertion fail on the throwaway copy.
+    ("context-wiring: handbook authoring writes each producing employee's Sources from the criterion",
+     HBK, "del", "is authored here, FROM the criterion"),
+    ("context-wiring: the hire transaction requires the Sources write before register",
+     HIR, "del", "T5 (register) is gated on the Sources write"),
+    ("context-wiring: audit 5c/5d heals into the Sources+seam shape in-run",
+     AUD2, "del", "heals an existing org into the Sources + seam shape IN-RUN"),
+    ("context-wiring: a missing Sources or unowned seam ranks load-bearing",
+     AUD2, "del", "an unowned deletable-content seam LOAD-BEARING"),
+    ("context-wiring: discovery carries the reverse sources census row",
+     DISC, "del", "is any producing employee's `## Sources` wired to it?"),
+    ("context-wiring: verify carries the Sources coverage-set check between audits",
+     VFY, "del", "no producing employee's `## Sources` names is a `verify` failure"),
+    ("context-wiring: org-config states the Sources map is derived, never re-listed",
+     CFG, "del", "MUST NOT require the roots re-listed"),
+    ("context-wiring: INV-SOURCES row names its text and token in invariants.md",
+     INV, "del", "not empty categories"),
+    ("context-wiring: INV-SEAM row names its text and token in invariants.md",
+     INV, "del", "every declared deletable content slot"),
 ]
 
 

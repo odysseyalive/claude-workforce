@@ -5,7 +5,7 @@ disallowedTools: Agent
 ---
 
 <!-- ORG-RECORD START -->
-tier: 3
+<!-- tier: 3 (IC) | department: quality | reports-to: quality-lead -->
 <!-- hired: 2026-09-02 | workforce-version: 1.7.0 -->
 <!-- ORG-RECORD END -->
 
@@ -13,7 +13,8 @@ tier: 3
 Review prose against the catalog.
 
 ## Scope
-IN: review. OUT: rewriting.
+- IN: review verdicts.
+- OUT: rewriting the prose.
 
 ## Directives
 (none bound)
@@ -23,11 +24,11 @@ IN: review. OUT: rewriting.
 
 ## Procedure
 1. Read the draft.
-2. Run the mechanical scan in `## Verification` — it answers the countable
-   questions, and reading for them by hand answers the same question worse.
+2. Grep it against the catalog and count the clusters.
 
 ## Verification
 - Check: `test -s .claude/agents/reviewer.md` — expect exit 0
+- Negative: `test -s /dev/null` — expect nonzero
 
 ## Guardrails
 - NEVER rewrite the prose.

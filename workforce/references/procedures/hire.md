@@ -1,6 +1,6 @@
 # hire — staff the company, and the transaction order every registration uses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 34 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 36 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **HR's entry point, and the main verb on a fresh project.** Adds employees, authors their handbooks,
 and registers them — from a ratified initial roster, from a capability gap, or from a conversion.
 
@@ -238,6 +238,21 @@ one: `INV-REMAINDER` prints reduced and deleted separately for exactly this reas
 **The invariant:** at every observable instant the capability is reachable by **exactly one or exactly
 two paths — never zero.** A crash before T5 leaves the original untouched. A crash between T5 and T7
 leaves both live: degraded, and safe.
+
+### A producing employee never registers without its `## Sources`
+
+**T5 (register) is gated on the Sources write, on a hire exactly as on a conversion.** `handbook.md`
+Step 3b authors each producing employee's `## Sources` from the criterion (`org-design.md` § Wiring the
+org to its reference material — the Sources criterion); this order REQUIRES that write to have happened,
+so `org`/`hire` never mints a producing employee with an empty or absent `## Sources`. A staged
+handbook whose role produces content, surfaces, data, or analysis and whose `## Sources` is blank does
+not reach T5 — it is a lint block at T3 (staging Phase A), returned to authoring, never registered now
+and reported wired later.
+
+**A pure reviewer or mechanism-only role satisfies this with `## Sources` reading `(none)`** — the
+measured no-input outcome, exactly like `## Directives` reading `(none bound)`, not a silent skip.
+`(none)` clears the gate; an empty or missing section does not. This is the READ half of the seam;
+write-coordination on a shared store stays owned by `data-skills.md`, not folded in here.
 
 ### On a HIRE, T2 and T7 do not apply — and this had to be said
 

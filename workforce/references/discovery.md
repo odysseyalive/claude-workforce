@@ -1,6 +1,6 @@
 # Discovery — how much a finding is trusted, and what may be done about it
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the tier caps the action. A finding may never be acted on above its tier. -->
 
 `conversion-taxonomy.md` classifies **what a skill is**. This file classifies **how much a finding
@@ -75,8 +75,26 @@ from both ends and reports the difference.
 | **hooks** | registered in settings → does the file exist? | on disk → is it registered? | **dead wiring** / **orphans** |
 | **files** | every file → which category? | every category → which files? | **UNCLASSIFIED residual** |
 | **records** | data skill → does its data exist? | dataset on disk → does it have an owner? | broken pointer / unowned data |
+| **sources** | producing handbook `## Sources` → does the root exist? | reference source on disk → is any producing employee's `## Sources` wired to it? | thin-surface authoring / orphaned reference |
 | **agents** | chart → is it registered? | registered → is it in the chart? | phantom employee / unmanaged agent |
 | **skills** | manifest → present? | present → declared? | missing file / undeclared file |
+
+### The reverse Sources census — who is wired to each reference root
+
+The **sources** row is the twin of **records**, run over reference material instead of datasets. Its
+reverse direction is the one that ends the gaslighting: for every authoritative root on disk, ask which
+producing employee's `## Sources` names it. A root no `## Sources` covers is an **orphaned reference** —
+present, undiscoverable, and a finding, healed in-run (`org-design.md` § Wiring the org to its reference
+material — the Sources criterion), never a silence.
+
+The reverse test is per type, because the two source types are named differently in `## Sources`:
+
+- A **read-only reference root** → does a `## Sources` glob cover it? The glob is the wiring; a root no
+  glob reaches is the orphan.
+- A **read-write data store** → does a `## Sources` name its GATEWAY SKILL `Skill(<data-skill>)`, NOT
+  the file? Read-write stores are already the **records** census's domain (dataset on disk → owner), so
+  this reuses that discovery rather than re-walking the store — the sources census only asks the added
+  question of whether a reader is wired to the gateway.
 
 ### Dead wiring
 

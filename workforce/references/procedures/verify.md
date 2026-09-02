@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 30 assertion(s) in bin/check name this file; 59 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 31 assertion(s) in bin/check name this file; 62 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -626,6 +626,23 @@ distributing this payload does not red-fail a project that has not adopted. Auth
 it; an empty set is likewise a clean pass. (The executable maintainer script that walks the sets on a
 host is owed at the first project that adopts a manifest, built and proven against that project's real
 sets as its fixture — until then this section is the executor-followed check.)
+
+### The Sources coverage set — a left-behind reference root fails BETWEEN audits
+
+**A source on disk that no producing employee's `## Sources` names is a `verify` failure, not only a
+re-audit finding.** The Sources map is registered here as a `## Coverage set`
+(`org-config.template.md` § Coverage sets): the reverse Sources census (`discovery.md` § Both
+directions, always) is the membership test, run every `verify`, so an orphaned reference root
+is caught in the window between audits rather than surviving until the next full sweep. This reuses the
+existing Coverage mechanism unchanged — a member is a reference root, and it fails on being uncovered
+exactly as any coverage member fails on absence.
+
+**The check DERIVES the roots; it never reads them from a list.** It walks the handbooks' `## Sources`
+plus the filesystem inventory (`discovery.md`'s classify-by-exclusion) each run and compares the two
+directions; the roots are not re-listed in `org-config.md`, because that re-listing is the
+two-canonical-texts failure this project refuses (`org-config.template.md` § Coverage sets, the
+anti-drift rule). COMPLETENESS only: an uncovered root is a finding, while whether a root is
+authoritative for a given craft stays the audit's judgment, never a `verify` taste call.
 
 ## Output
 

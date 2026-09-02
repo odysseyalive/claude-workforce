@@ -2809,6 +2809,38 @@ check(
     "count is what made the lopsided shape visible in the first place",
 )
 
+# ── Sources inclusion + wiring criterion, and seam-completeness (2026-09-02) ─
+check(
+    "org-design: a source is an INPUT the craft consumes, never its own OUTPUT",
+    "X is an INPUT E consumes, not E's own OUTPUT" in _od,
+    "a craft naming its own output as its source is the circular wiring failure; the "
+    "criterion's first clause forbids it, cited to the craft's own IN-paths",
+)
+check(
+    "org-design: every wired root carries an evidence line, never fabricated",
+    "every root written carries an evidence line" in _od,
+    "principle 5 + directive one: a candidate that cannot be justified is reported "
+    "UNWIRED for the user to confirm, never invented into the Sources list",
+)
+check(
+    "org-design: a read-write state store is named by its data-skill invocation, not a raw path",
+    "Skill invocation** `Skill(<data-skill>)`, NOT a raw file path" in _od,
+    "data-skills.md makes the skill the only sanctioned path to its dataset; naming the "
+    "raw file invites an agent to bypass the gateway's dependable context",
+)
+check(
+    "org-design: an unfronted source is a by-path read marked degraded until a skill fronts it",
+    "a by-path read, EXPLICITLY MARKED degraded" in _od,
+    "the channel tracks the two-path design: by-path is degraded mode, upgraded to the "
+    "skill invocation once one fronts the source, the workaround removed not left as sediment",
+)
+check(
+    "org-design: a subordinated concern is healed by amendment, never a new hire",
+    "Heal by amendment, never by a new hire" in _od,
+    "an owned concern whose output lives in another department's path with no gate/seam "
+    "is healed by granting slot-authority + a gate-map seam, reusing existing primitives",
+)
+
 # ── `--review` writes nothing, including in the gates that write ─────────────
 # Found by PREPARING to run the first mock audit, before a step executed. A prior
 # pass fixed the two steps that contradicted "--review writes nothing" — both in
@@ -3308,7 +3340,8 @@ _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thi
               "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
               "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
               "twenty-two": 22, "twenty-three": 23, "twenty-four": 24,
-              "twenty-five": 25, "twenty-six": 26, "twenty-seven": 27}
+              "twenty-five": 25, "twenty-six": 26, "twenty-seven": 27,
+              "twenty-eight": 28, "twenty-nine": 29}
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.
@@ -9517,6 +9550,14 @@ check(
     "contract there resurrects the paraphrase door on the next index run",
 )
 check(
+    "templates: constitution item 10 binds employees to search Sources before reporting absence",
+    "before searching your `## Sources`" in _tpl_scope,
+    "constitution item 10 is the anti-gaslighting General Operating Principle — an "
+    "employee reports context missing only after searching its ## Sources. It lives "
+    "inside the origin/immutable span, so this asserts the shipped constitution still "
+    "carries the search-first clause",
+)
+check(
     "handbook-templates: the CEO verification closes the loop against the REQUEST, not just the Objective",
     "only the REQUEST says the work asked for arrived" in tpl,
     "step (3) checks conformance to the Strategic Objective — the constitution, not the "
@@ -9543,6 +9584,35 @@ check(
     "without the stamp a v1.6.0 handbook and a v1.0 one are indistinguishable — which "
     "is how two contract releases sat template-only across every deployed org with no "
     "finding anywhere",
+)
+check(
+    "handbook-templates: the IC Sources section carries the search-before-you-report-missing contract",
+    "and search it before you ever report" in tpl,
+    "context that arrives on discovery is gaslit when a doer reports it absent without "
+    "searching the reference material that holds it. The IC ## Sources body is the "
+    "anti-gaslighting/ask-don't-guess anchor — drop it and every IC is licensed to "
+    "fabricate an absence it never looked for",
+)
+check(
+    "handbook-templates: the IC Sources section says name a root or glob, not a file list",
+    "not a file list, so material added later is in scope without a" in tpl,
+    "a Sources list of named files goes stale the moment material is added and is never "
+    "revisited; the root-or-glob instruction is the in-repo structural anchor for the "
+    "INV-SOURCES 'real path/glob roots, not empty categories' rule",
+)
+check(
+    "handbook-templates: the CEO Sources section makes the directing node name sources in every order",
+    "every work order you write that touches a surface names the sources the doer must consult" in tpl,
+    "orchestration fails when the CEO dispatches without naming where the doer's context "
+    "lives — the doer then reports it missing. The CEO ## Sources body binds the "
+    "directing node to name sources in the order it writes",
+)
+check(
+    "handbook-templates: the Lead inheritance list still names Sources among the CEO sections",
+    "`Directives`, `Sources`, `Chain of Command`" in tpl,
+    "the Lead template inherits its section set from the CEO by naming each section; if "
+    "`Sources` silently drops out of that ordered list the Lead ships with no Sources "
+    "contract and no check would otherwise notice",
 )
 check(
     "wf-conform: ships the echo-back and version-stamp advisory rows",
@@ -9595,6 +9665,73 @@ check(
     "exit-criteria fields and the Lead share while they are open is what surfaces both "
     "the spec-loss trail and the Lead-bypass pathology (1 Lead→IC edge in 252, three "
     "weeks after that pathology was recorded CLOSED)",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# context-wiring (v1.7.0): every producing employee is wired to the reference
+# material it reads, and the wiring is authored, hired, healed, verified, and
+# counted — so an org is never gaslit by material present on disk and undiscoverable.
+# ─────────────────────────────────────────────────────────────────────────────
+_cw_hbk = read("workforce/references/procedures/handbook.md")
+_cw_hir = read("workforce/references/procedures/hire.md")
+_cw_aud = read("workforce/references/procedures/audit.md")
+_cw_dsc = read("workforce/references/discovery.md")
+_cw_vfy = read("workforce/references/procedures/verify.md")
+_cw_cfg = read("workforce/references/org-config.template.md")
+_cw_inv = read("workforce/references/invariants.md")
+check(
+    "context-wiring: handbook authoring writes each producing employee's Sources from the criterion",
+    "is authored here, FROM the criterion" in _cw_hbk,
+    "handbook.md Step 3b must author `## Sources` FROM org-design's Sources criterion, "
+    "or a producing employee ships blind to the material it reads",
+)
+check(
+    "context-wiring: the hire transaction requires the Sources write before register",
+    "T5 (register) is gated on the Sources write" in _cw_hir,
+    "hire.md's Transaction Order must gate T5 on the Sources write, so org/hire never "
+    "mints a producing employee with an empty or absent `## Sources`",
+)
+check(
+    "context-wiring: audit 5c/5d heals into the Sources+seam shape in-run",
+    "heals an existing org into the Sources + seam shape IN-RUN" in _cw_aud,
+    "audit Step 5e must heal an existing org into the Sources+seam shape in this same "
+    "run, extending the 5c/5d heal path rather than deferring or building a parallel one",
+)
+check(
+    "context-wiring: a missing Sources or unowned seam ranks load-bearing",
+    "an unowned deletable-content seam LOAD-BEARING" in _cw_aud,
+    "a missing `## Sources` or an unowned deletable-content seam must rank LOAD-BEARING, "
+    "above every optimization finding, mirroring load-bearing dead wiring",
+)
+check(
+    "context-wiring: discovery carries the reverse sources census row",
+    "is any producing employee's `## Sources` wired to it?" in _cw_dsc,
+    "discovery.md § Both directions must carry the sources census row, the twin of the "
+    "records row, whose reverse asks who is wired to each reference root on disk",
+)
+check(
+    "context-wiring: verify carries the Sources coverage-set check between audits",
+    "no producing employee's `## Sources` names is a `verify` failure" in _cw_vfy,
+    "verify.md must register the Sources map as a `## Coverage set`, so a left-behind "
+    "reference root is caught between audits, not only at re-audit",
+)
+check(
+    "context-wiring: org-config states the Sources map is derived, never re-listed",
+    "MUST NOT require the roots re-listed" in _cw_cfg,
+    "org-config.template.md must state the anti-drift rule: the coverage check derives "
+    "roots from handbooks+filesystem and must not require them re-listed in org-config.md",
+)
+check(
+    "context-wiring: INV-SOURCES row names its text and token in invariants.md",
+    "INV-SOURCES" in _cw_inv and "not empty categories" in _cw_inv,
+    "invariants.md row 28 must carry INV-SOURCES and its text — every producing handbook "
+    "carries a `## Sources` naming real roots, not empty categories, or the rule for `(none)`",
+)
+check(
+    "context-wiring: INV-SEAM row names its text and token in invariants.md",
+    "INV-SEAM" in _cw_inv and "every declared deletable content slot" in _cw_inv,
+    "invariants.md row 29 must carry INV-SEAM and its text — every declared deletable "
+    "content slot is owned by a gate/sign-off seam, or names the rule that left it unowned",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

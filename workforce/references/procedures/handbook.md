@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -221,6 +221,34 @@ Mechanical preference   11 procedure steps · 6 name a command · 4 stated why n
 step should be a command belongs to the author and its reviewer, and refusing to release over it would
 turn a preference into a gate on an unmeasurable property. But an unprinted count is the same as a rule
 nobody applied, so the line appears on every authoring and every amendment, zeros included.
+
+## Step 3b — Author the employee's `## Sources` — wire the craft to its reference material
+
+**Every PRODUCING employee's `## Sources` is authored here, FROM the criterion — not left for an audit
+to backfill.** A producing role is one whose output is content, surfaces, data, or analysis a project
+ships; it reads authoritative material to do that, and a handbook that never names where that material
+lives ships the craft blind — the context an issue needs is present on disk and undiscoverable to the
+actor the issue reaches (`org-design.md` § Wiring the org to its reference material — the Sources
+criterion). Run that criterion's five clauses over the reference inventory and write each root the role
+actually consumes, each carrying its own evidence line, none invented.
+
+**Name BOTH source types by the access channel the two-path design fixes** (`handbook-templates.md`
+§ Employees INVOKE skills):
+
+- A **read-only reference root** is named as a path/glob plus how it is reached — a by-path read while
+  no skill fronts it, EXPLICITLY MARKED degraded mode, upgraded to the skill invocation once one is
+  reduced and the by-path workaround removed rather than left as sediment.
+- A **read-write state store** is named as its gateway `Skill(<data-skill>)`, never the raw file, and
+  FLAGGED read-write so write discipline is invoked (`data-skills.md`).
+
+A Sources entry naming `Skill(X)` means the `## Procedure` grants that invocation and the tool grant
+includes `Skill`: Sources says WHERE the truth is and HOW to reach it; the Procedure exercises the
+reach. This is the identity+channel / exercised-step split, not two canonical texts.
+
+**A pure reviewer, adjudicator, or mechanism-only role reads no authoritative input of its own → write
+`## Sources` as `(none)`**, exactly as `## Directives` reads `(none bound)` when nothing is bound. A
+silent skip is not `(none)`: it is indistinguishable from a Sources authoring nobody performed, which
+is the gaslighting the criterion exists to end.
 
 ## Step 4 — Lint (Phase A)
 

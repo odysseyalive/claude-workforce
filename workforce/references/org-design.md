@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -274,3 +274,110 @@ This is the **same missing-role logic** audit's remediation runs against an exis
 `headcount-skeptic` discipline still govern, panel disagreement still resolves to **fewer roles, never
 fewer departments the evidence supports**, and the result is the smallest set the work warrants — this
 adds the roles the *domain* proves are missing, it does not license headcount bloat.
+
+---
+
+## Wiring the org to its reference material — the Sources criterion
+
+An org that cannot find the material it needs is gaslit by its own project. The reference exists on
+disk, and the employees who need it do not know it is there — so a work order arrives on discovery,
+the context that would resolve it is present, and the actor reports it missing. Deriving the roster
+is only half the design: the other half is **wiring each craft to the authoritative material it
+reads**, so the context an issue needs is discoverable to the actor the moment the issue arrives.
+This is the primary path, not an audit-only repair — a greenfield org is wired here or ships blind.
+
+### Reference inventory — what authoritative material the project holds
+
+Before wiring anyone, enumerate the material. Use discovery.md's **classify-by-exclusion**: ask what
+a file *is not* — not code, not config, not test, not generated output — and the remainder is the
+authoritative reference the org must reach: content/MDX, `grounding/`, `docs/`, domain data.
+Directory role is the coarse signal; a `content/`, a `grounding/`, a `docs/` each declares a kind of
+authority. The inventory is a census, not a sample: an unclassified root is a finding, never a
+silence (discovery.md's classify-by-exclusion rule).
+
+### Who-consults-what — the reverse census
+
+For every root in the inventory, name which employee's `## Sources` should carry it. The forward
+question is "what does this craft read?"; the reverse question, run over the inventory, is "who is
+wired to this root?" A root no employee's `## Sources` names is an **unwired source** — the material
+is present and undiscoverable, which is the gaslighting this section exists to end.
+
+### The Sources inclusion + wiring criterion
+
+A root X is a source for craft E when ALL hold, each cited to evidence, none invented:
+
+1. X is an INPUT E consumes, not E's own OUTPUT (X is outside E's `## Scope` IN-paths — prevents the
+   circular failure where a craft names its own output as its source).
+2. X is AUTHORITATIVE — surfaced by discovery.md's classify-by-exclusion (not code/config/test/
+   generated-output → the remainder: content/MDX, grounding/, docs/, domain data). Directory role is
+   the coarse signal.
+3. X actually FEEDS E — a MECHANICAL wiring signal, not a guess: the import/reference graph (E's
+   owned files import/read X) or git co-change (org-design evidence rank 4).
+4. Confidence is TIERED per discovery.md: mechanical signals (directory role + import graph +
+   co-change) auto-PROPOSE at ROOT/GLOB level; the "authoritative-for-this-craft vs incidental" call
+   is JUDGMENT, panel-adjudicated conservatively, user ratifies. Same recommends→ratifies ordering
+   as the rest of org design.
+5. NEVER INVENT (Principle 5 + directive one): every root written carries an evidence line (e.g.
+   "`content/modules/**` — copy-lead's components import these; copy edits co-change with them"). A
+   candidate that can't be justified is reported UNWIRED for the user to confirm, never fabricated
+   into the list.
+
+Apply at ROOT/GLOB level, not per-file — the "is this directory authoritative for this craft"
+judgment is made once, so a new file under an approved root inherits it with no re-judgment (this is
+also what makes the sync/anti-drift story hold).
+
+**Two source types, one criterion:**
+
+1. READ-ONLY reference roots — named in `## Sources` as a path/glob (module MDX, grounding/, docs,
+   exemplar surfaces).
+2. READ-WRITE state stores fronted by a data skill (journal/ledger/DB) — named in `## Sources` as
+   the **Skill invocation** `Skill(<data-skill>)`, NOT a raw file path. Rationale: data-skills.md
+   makes the skill "the only sanctioned path to its dataset"; naming the raw file invites an
+   agent to bypass the skill's mechanically-created dependable context.
+
+For type 2: already discovered by discovery.md's RECORDS census ("dataset on disk → owner?"); the
+reverse Sources census "who's wired to it?" test for a data store is "does this employee's
+`## Sources` name the GATEWAY SKILL," not "the file." FLAG the source read-write so write discipline
+is invoked (data-skills.md + the COMPLETENESS "serialize on shared files" rule). Do NOT fold
+write-coordination INTO Sources: Sources solves READ-discoverability (all actors read current state
+through one gateway); concurrent-write coordination stays owned by data-skills.md — state that
+boundary explicitly. CEO/Lead `## Sources` applies too: a journal the CEO reads/edits is named via
+its gateway skill.
+
+**The access channel is part of every entry** = source + how to reach it:
+
+- Read-write state store: the entry IS the channel — `Skill(<data-skill>)`; read/write through the
+  gateway, never the raw file.
+- Read-only reference root: name the path/glob AND how it's reached (a read at the path, or the
+  fronting skill's invocation once one exists).
+
+The channel MUST track the two-path design in `handbook-templates.md` § Employees INVOKE skills.
+Where a data/reduced skill fronts the source → channel = the skill invocation (target state); where
+NO skill fronts it yet (unconverted tree) → channel = a by-path read, EXPLICITLY MARKED degraded
+mode, upgraded to the skill invocation when the skill is reduced, the by-path workaround removed
+(not left as sediment). Consistency rule: a Sources channel naming `Skill(X)` means the employee
+must be able to invoke X — so its `## Procedure` grants that invocation and its tool grant includes
+`Skill`. Sources says WHERE the truth is + HOW to reach it; the Procedure EXERCISES that reach. This
+is NOT two-canonical-texts drift — Sources = identity+channel, Procedure = exercised step; they
+reference the same skill for different purposes.
+
+### Seam-completeness — authority over structure
+
+Wiring reads is half the seam; the other half is authority over what gets written and removed. For
+every surface-shipping department, derive the surface's required gates from its work-product type
+and propose the `## Gate map` entries, plus a **sign-off seam**. A presentation or marketing surface
+needs a **message/content gate**, not only a design gate: the department that renders the surface
+does not own the words on it, and the deleting department may NOT remove a declared content slot
+without the content owner's sign-off.
+
+The failure to detect is the **SUBORDINATED CONCERN** — an owned concern whose output lives in
+another department's owned path with no gate and no seam. The message owner's copy ships inside the
+surface department's files, so the structure hides that two departments own one artifact, and the
+concern with no seam is silently overridden by the one that owns the path.
+
+**Heal by amendment, never by a new hire.** Grant the message owner slot-authority over its content
+slots and add a `## Gate map` seam so removing a slot is a verify failure rather than a silent
+deletion. Reuse the existing `## Gate map` and `## Coverage sets` primitives in
+`org-config.template.md` — the gate map makes the missing content gate a wiring failure, coverage
+sets make a left-behind or deleted slot a completeness failure. Invent no new primitive; the shape
+that catches "a surface routed through the design critic but never the content gate" already exists.

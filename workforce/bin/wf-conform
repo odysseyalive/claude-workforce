@@ -118,6 +118,11 @@ IMMUTABLE_OPEN_RX = re.compile(
     r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
 EXTRACT_CITE_RX = re.compile(r"\.claude/skills/([^/`\s]+)/([^`\s:]+):(\d+)")
 MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
+# A `## Sources` ACCESS CHANNEL that is a skill invocation rather than a path.
+# `org-design.md` § The access channel is part of every entry: a read-write state
+# store is named by its GATEWAY SKILL — `Skill(<data-skill>)` — never by the raw
+# file, because naming the file invites an agent to bypass the gateway.
+SOURCES_SKILL_RX = re.compile(r"\bSkill\(\s*([^()\s]+)\s*\)")
 # A server named only to FORBID it is not a dependency. `procedure-for-procedures.md`
 # requires guardrails to carry a literal NEVER / MUST NOT / STOP, so keying off that
 # vocabulary is reading the project's own grammar rather than guessing at intent.
@@ -432,6 +437,80 @@ def check_handbook(path, body, res, ceiling):
         res.add("(none bound)" in seg or ".claude/workforce/directives/" in seg,
                 f"{n}: Directives section resolves or declares none",
                 "a blank Directives section reads as 'none bound' and is not")
+
+    # THE SOURCES CONTRACT (v1.7.0). Two rows, both ADVISORY, for the same reason the
+    # negative-test record and the version stamp below are advisory: the contract
+    # post-dates every deployed handbook, and failing all of them at once reproduces
+    # the run that taught this script "a check that always fails stops being read."
+    #
+    # DELIBERATELY NOT IN `SECTIONS`. Adding it there would make it blocking AND
+    # order-checked in one move, against files authored before the section existed —
+    # the exact overreach the tier-conditional section list was rewritten to end.
+    #
+    # ABSENT IS THE DEFECT; `(none)` IS A MEASUREMENT — the convention `## Directives`
+    # already uses for `(none bound)`. A pure reviewer or mechanism role legitimately
+    # produces nothing from reference material and says so (handbook-templates.md
+    # § Sources), so this fires ONLY on total absence and is silent on a handbook that
+    # measured itself sourceless. Otherwise the check would push every reviewer to
+    # invent a source, which is the failure org-design.md § NEVER INVENT names.
+    _sources = section(body, "## Sources")
+    if _sources is None:
+        res.advise(
+            f"{n}: no ## Sources section",
+            "the handbook names no authoritative reference material — add a "
+            "`## Sources` section after `## Directives` (handbook-templates.md) "
+            "naming each reference root or glob, or `Skill(<data-skill>)` for a "
+            "read-write store, or the literal `(none)` for a pure reviewer or "
+            "mechanism role. An org not wired to its own reference material is "
+            "gaslit by its own project: the context an order needs is on disk and "
+            "the actor reports it missing (org-design.md § Wiring the org to its "
+            "reference material). ADVISORY: this row blocks nothing",
+        )
+    else:
+        # A `Skill(X)` entry is a CHANNEL, not a name. `org-design.md` § The access
+        # channel: "a Sources channel naming `Skill(X)` means the employee must be
+        # able to invoke X — so its `## Procedure` grants that invocation. Sources
+        # says WHERE the truth is + HOW to reach it; the Procedure EXERCISES that
+        # reach." A channel no step ever reaches for is a DEAD POINTER: the handbook
+        # states where its truth lives and never opens the gateway.
+        #
+        # Read from `## Procedure` ONLY — the section org-design names as the
+        # granting one — and skipped entirely when there is no `## Procedure`, which
+        # is the DELEGATING TIERS. A CEO and a Lead carry `## Sources` and no
+        # Procedure by design (the same tier-conditional the section list encodes
+        # above), so measuring them against a section they must not have would
+        # reproduce the 9-false-failures run, one contract later.
+        #
+        # Prohibition lines are dropped, exactly as the tier-3 skill check below
+        # drops them: "NEVER invoke X" names X in order to forbid it.
+        #
+        # MATCHING IS GENEROUS AND THE RISK IS ONE-SIDED — the same call ROUTING_RX
+        # makes. Handbooks write the invocation three ways (`Skill(x)`, `/x`, and
+        # prose: "invoke the x skill"), so any word-boundary mention of X in the
+        # Procedure counts as naming it; a stricter grammar would report the third
+        # form as a dead pointer. What survives is the case with no counter-argument:
+        # a Sources channel whose skill the Procedure never mentions at all.
+        _proc = section(body, "## Procedure")
+        if _proc is not None:
+            _proc = "\n".join(l for l in _proc.splitlines()
+                              if not PROHIBITION_RX.search(l))
+            for _sk in sorted(set(SOURCES_SKILL_RX.findall(_sources))):
+                # `Skill(<data-skill>)` is the template's own unfilled slot. Reporting
+                # a placeholder as a dead pointer is noise, not a finding.
+                if "<" in _sk or ">" in _sk:
+                    continue
+                if re.search(r"(?<![\w-])" + re.escape(_sk) + r"(?![\w-])", _proc):
+                    continue
+                res.advise(
+                    f"{n}: Sources names Skill({_sk}), which its Procedure never invokes",
+                    f"`## Sources` routes this role's reference material through "
+                    f"`Skill({_sk})` and `## Procedure` never names {_sk} — the "
+                    f"channel is a dead pointer: the handbook says where the truth "
+                    f"lives and never reaches for it. Grant the invocation in a "
+                    f"numbered step (org-design.md § The access channel is part of "
+                    f"every entry), or name the source by the channel it is actually "
+                    f"read through. ADVISORY: this row blocks nothing",
+                )
 
     # ADVISORY, and the message has said so since it was written. `delegation-budget.md`
     # § The handbook length ceiling: "over the ceiling is never a refusal and never

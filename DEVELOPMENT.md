@@ -113,7 +113,68 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-01
+## Open, as of 2026-09-02
+
+**Landed 2026-09-02 (dev session) — context-wiring: the reference material the ask draws on
+(v1.7.0).** Trigger: the owner reported that in sophisticated orgs "one hand doesn't know what the
+other hand is doing" — agents and the session CEO are *"gasslighted"* because they do not know the
+reference material an issue needs is present, and author from the thin surface in front of them, then
+report the content as *"structurally deleted, by design"* when it was recoverable in seconds. This is
+the other half of v1.6.0: **dispatch fidelity carried the ASK down the chain; this wires each craft to
+the reference material the ask draws on.** Diagnosed on `apps-odyssey-alive`, whose own CEO named the
+fix — *"the authority over structure and the standing discovery step, both of which are handbook
+amendments, not a new person."* Two gaps: no handbook names where a craft's truth lives (the standing
+discovery step), and a concern whose output another department can delete (a selling slot cut for "page
+budget") has no owner with sign-off (authority over structure).
+
+- **The `## Sources` contract — a new handbook section (IC/CEO/Lead templates).** Every producing
+  employee names the project's authoritative reference material for its craft; pure reviewer/mechanism
+  roles read `(none)`, the measured no-input outcome. It carries the coupled **anti-gaslighting + ask**
+  rule, also landed as **constitution item 10**: *before reporting information missing, or acting on
+  context it lacks, a node searches its `## Sources`; if still unresolved that is a `QUESTION:` up the
+  chain, never a fabricated absence, never a guess.* This extends the existing `QUESTION:` trigger
+  (GOP 3–4), which fired only on an uncovered handbook case — never on a wrong conclusion reported as
+  fact, which is exactly the odyssey failure. The receiving side is reinforced: a directing node
+  resolves a subordinate's `QUESTION` (file `DEF`, amend, re-dispatch) and **escalates upward if it
+  cannot — never absorb-and-guess.**
+- **The Sources criterion — `org-design.md` § Wiring the org to its reference material.** Evidence-cited,
+  root/glob-level, never-invent: a root is a source for craft E only if it is an INPUT E consumes (not
+  its own output), is authoritative (discovery.md's classify-by-exclusion), and mechanically feeds E
+  (import graph or git co-change); confidence is tiered, the user ratifies, and an unjustifiable
+  candidate is reported UNWIRED, never fabricated. **Two source types**: read-only reference roots
+  (named as a path/glob) and read-write state stores fronted by a data skill (named as the gateway
+  `Skill(<data-skill>)`, never the raw file). The **access channel is part of every entry** and tracks
+  the two-path design — skill invocation where one fronts it, by-path marked DEGRADED where none does
+  yet, upgraded on reduction. **Seam-completeness**: a subordinated concern (an owned concern whose
+  output lives in another department's owned path with no gate/seam) is healed by amendment — slot
+  authority + a `## Gate map` seam — never a new hire.
+- **The audit heals existing orgs in-run — `audit.md` Step 5e**, riding v1.6.0's Step 5d + the
+  `workforce-version:` stamp. A **reverse Sources census** (`discovery.md` § Both directions, the
+  `sources` row — the twin of `records`) is the detector; a missing `## Sources` or an unowned deletable
+  slot ranks **load-bearing**, above every optimization finding. Never deferred. `verify` registers the
+  Sources map as a `## Coverage set` so a left-behind root fails between audits; `handbook.md` Step 3b +
+  `hire.md` gate T5 on the Sources write so `org`/`hire` never mints a producing employee blind.
+  **Anti-drift**: the handbook `## Sources` is the ONE authored record — census, invariant, and coverage
+  all DERIVE the roots from the handbooks + filesystem; `org-config.md` re-listing them is refused as
+  two-canonical-texts. Invariants **28 `INV-SOURCES` / 29 `INV-SEAM`**.
+- **Enforcement — 19 paired `bin/check` assertions + `bin/prove` del-cases**, plus a `wf-conform`
+  advisory (missing `## Sources`; a `Skill(X)` channel absent from the Procedure) with 4 fixtures. All
+  proven to discriminate: the first full `bin/prove` run cleared the 10 anchor + criterion cases
+  (358/358, zero VACUOUS) and a targeted harness cleared the 9 heal-path assertions against their real
+  files. **Proving
+  caught a real defect**: the discovery del-case was misrouted to `discharge.md` (`DSC`) instead of
+  `discovery.md`, so under the shipped harness it would have read VACUOUS — fixed by adding a `DISC`
+  constant. That is the value of proving over trusting the author's "byte-identical del-case" claim.
+- **Swept adjacent debt.** Four count-pinned `bin/script-conformance` fixtures
+  (`conform-companions-*`, `conform-no-negative`, `conform-under-ceiling`) had gone stale — v1.6.0's
+  advisories shifted `N checks`/`N advisory` totals and the new Sources advisory shifted them again;
+  re-measured (and, where clean, moved off brittle absolute counts). The directive quote is captured
+  verbatim in `SKILL.md` § Directives (2026-09-02). Bumped `1.6.0 → 1.7.0`.
+- **Two follow-up observations (not acted on this batch).** `bin/prove` refuses on ANY red baseline
+  (lines 1249–1252), so authors cannot prove their own cases during the normally-red maintainer states
+  (uncommitted immutable directive, unsynced source); a name-keyed variant — *does THIS assertion newly
+  join the FAIL list under mutation* — would be baseline-immune. And absolute `N checks`/`N advisory`
+  pins in the conformance fixtures break on every new advisory; the pair-delta form is the durable one.
 
 **Landed 2026-09-01 (dev session, second batch) — dispatch fidelity: the ask survives the work
 (v1.6.0).** Trigger: the owner reported orchestration "not getting the job done to specs — things get

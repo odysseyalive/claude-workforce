@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 68 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 70 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.6.0"
+version: "1.7.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -304,6 +304,46 @@ the operational reading is — when a finding is too complex for terminal scroll
 example, open one shareable artifact, keep updating that same one, and grow the examples into a labeled
 v1 → v2 → v3 trail so the progression is legible at a glance — and every company workforce builds carries
 that same rule in its constitution.*
+
+> **"Many of my projects that use workforce are highly sophisticated. The session ceo, agents and sub
+> agents need to be able to orchestrate appropriately together. The issue is one hand doesn't know what
+> the other hand is doing."**
+
+> **"much of the context they need for the issues that arrive on discovery is being gasslighted,
+> because the agents and the session ceo do not know that the info they need is present. This kills any
+> kind of productive orchestration."**
+
+> **"we have plenty of reference material. why isn't that discoverable to the agents?"**
+
+> **"better than gasslighting, it's better to ask questions on what's not understood."**
+
+> **"This has to be fixed in workforce, and how the audit process heals broken structures like this.
+> Otherwise, workforce project is hobbled and is not effective."**
+
+*— Added 2026-09-02, source: user directive, stated during `/workforce dev` after the v1.6.0
+dispatch-fidelity batch and refined across the turn. **Dispatch fidelity carried the ask down the chain;
+this names the other half — the reference material the ask draws on.** The disconnect is not a search
+problem: the material is findable in seconds, but no handbook names it, so an employee authors from the
+thin surface in front of it and reports the missing content as "structurally deleted, by design" when it
+was recoverable from module docs, grounding files, or a sibling surface that already does the job.
+Diagnosed live on `apps-odyssey-alive`, whose own CEO named the fix: "the authority over structure and
+the standing discovery step, both of which are handbook amendments, not a new person." Three things
+follow, each a rule: **(a)** every producing employee's handbook carries a `## Sources` section naming
+the project's authoritative reference material for its craft — consulted before it authors, and searched
+before it ever reports information missing; **(b)** the anti-gaslighting clause is coupled to an ask
+clause — *before asserting absence or acting on context it lacks, a node searches its Sources; if still
+unresolved it returns `QUESTION:` up the chain, never fabricating, never guessing* — because the
+existing question-trigger fires only on an uncovered handbook case, never on a wrong conclusion reported
+as fact; **(c)** a concern whose output another department can delete (a selling slot cut for "page
+budget") has an owner with sign-off at that seam. And the audit **heals** an existing org into this shape
+in the same run (`Step 5d`, riding the `workforce-version:` stamp the v1.6.0 batch installed), never a
+fresh-install-only improvement — directive one makes preservation the floor, so a broken org is repaired,
+not left. Mechanics at `references/handbook-templates.md` § Sources, `references/templates.md`
+§ `operating-principles`, `references/org-design.md`, `references/procedures/audit.md` § Step 5c and
+§ Step 5d, `references/discovery.md` § Both directions, and `references/invariants.md` (`INV-SOURCES`,
+`INV-SEAM`); the operational reading is — **wire each employee to where its craft's truth lives, forbid
+reporting truth as missing before searching it, seam every deletable concern to an owner, and let the
+audit heal all three into the orgs that already exist.***
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

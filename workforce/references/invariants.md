@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty-seven, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Twenty-nine, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -86,7 +86,14 @@ recruiter change — and this file had no row for it, the written-and-unwired sh
 warns about, caught only because adding row 27 meant reading the table. Row 27 is what makes a shipped
 contract reach existing orgs: two releases sat template-only with zero deployed handbooks carrying
 them, because nothing owned bringing an already-authored handbook up to the installed doctrine — Step
-5d now does, and this row is how a run proves it happened rather than intends it.)*
+5d now does, and this row is how a run proves it happened rather than intends it. **Rows 28 and 29
+landed 2026-09-02 as the context-wiring contract's invariants** — the first rows owed to an org being
+gaslit by its own reference material: the context an issue needs is present on disk and undiscoverable
+to the actor it reaches, because no producing handbook's `## Sources` names it. Row 28 counts that every
+producing employee is wired to the material it reads (`org-design.md` § Wiring the org to its reference
+material); row 29 is its authority-over-structure half, that every deletable content slot has an owning
+gate/sign-off seam. Both are healed in-run by audit Step 5e, the 5c/5d heal path applied to
+reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 
 | # | Invariant | Token the run prints | Owed by |
 |---|---|---|---|
@@ -117,6 +124,8 @@ them, because nothing owned bringing an already-authored handbook up to the inst
 | 25 | every spawn edge recorded the REQUEST block and exit criteria, and every returned OUTPUT.md was read back against the REQUEST before the run reported | `INV-ASK` | references/procedures/org.md |
 | 26 | every existing employee's bar was re-researched and remediated, and every warranted-and-checkable missing role staffed, in-run | `INV-REMEDIATE` | references/procedures/audit.md |
 | 27 | every governed handbook is stamped at the installed version, or was refreshed to it and re-gated this run, or names the rule that declined | `INV-REFRESH` | references/procedures/audit.md |
+| 28 | every producing handbook carries a `## Sources` naming real path/glob or `Skill(...)` roots, not empty categories, or names the rule that made it `(none)` | `INV-SOURCES` | references/procedures/audit.md |
+| 29 | every declared deletable content slot is owned by a gate/sign-off seam, or names the rule that left it unowned | `INV-SEAM` | references/procedures/audit.md |
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run

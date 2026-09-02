@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 59 assertion(s) in bin/check name this file; 127 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 61 assertion(s) in bin/check name this file; 130 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1059,6 +1059,48 @@ INV-REFRESH  governed 9 · refresh-due 9 · amended 9 · re-probed 9 (2 DEGRADED
 A declined refresh names the shipped rule that refused it — the uncited-refusal shape every other
 invariant forbids. `refresh-due 0` on a stamped, current org is the expected steady state and is
 printed, not skipped.
+
+## Step 5e — Wire the org to its reference material: the Sources + seam heal
+
+**On a re-audit this heals an existing org into the Sources + seam shape IN-RUN, never deferred** —
+this is the 5c/5d heal path applied to reference-wiring, not a parallel mechanism. Step 5c's in-run
+clause governs unchanged: a detector ships with its fix (`SKILL.md` § Directives), so the reverse
+Sources census below is the detector and this step is the fix, run in this same run, never handed back
+as an optional keep-or-resolve.
+
+1. **Run the REVERSE SOURCES CENSUS.** For every authoritative reference root on disk (discovery.md's
+   classify-by-exclusion) and every read-write data store, ask which producing employee's `## Sources`
+   names it — the `discovery.md` § Both directions **sources** row. A root no `## Sources` covers is an
+   **orphaned reference**; a producing employee with an empty or absent `## Sources` is a
+   **thin-surface authoring**. Consume that census here; do not re-walk a read-write store the
+   **records** census already owns — the sources census only adds whether a reader is wired to its
+   gateway skill.
+2. **Heal each gap into the Sources shape, in-run.** Author the missing `## Sources` FROM the criterion
+   (`org-design.md` § Wiring the org to its reference material — the Sources criterion; the authoring
+   mechanism is `handbook.md` Step 3b): read-only roots as path/glob + channel, read-write stores as
+   `Skill(<data-skill>)`, each with its evidence line, none invented. A pure reviewer/mechanism role is
+   healed to `## Sources` `(none)`, the measured no-input outcome, not a skip.
+3. **Heal the seam.** For every declared deletable-content slot with no owning gate/sign-off seam, wire
+   the seam (`org-design.md` § Seam-completeness) in the same run, or name the shipped rule that left
+   it unowned.
+
+**Rank a missing `## Sources` or an unowned deletable-content seam LOAD-BEARING — above every
+optimization finding**, exactly as a load-bearing dead-wiring finding outranks every optimization
+finding (§ Criticality decides how loudly). An org gaslit by its own reference material is a
+correctness failure, not a cleanup: the context an issue needs is present and undiscoverable, which is
+the disease this heal exists to end. An orphaned reference and an unowned seam both rank here.
+
+The run prints **`INV-SOURCES`** and **`INV-SEAM`** (`references/invariants.md` rows 28 and 29), all
+counts, always:
+
+```
+INV-SOURCES  producing 7 · wired 7 · orphaned roots 0 · healed 0 · (none) 2
+INV-SEAM     deletable slots 3 · seamed 3 · unowned 0 · healed 0 · 0 declined
+```
+
+A declined heal names the shipped rule that refused it — the uncited-refusal shape every other
+invariant forbids. `orphaned roots 0` / `unowned 0` on a fully wired org is the expected steady state
+and is printed, not skipped.
 
 ## Step 6 — Execute
 

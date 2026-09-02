@@ -1,6 +1,6 @@
 # Org Config
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 32 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 34 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- SHIPPED TEMPLATE. `audit` instantiates this once into
      ${CLAUDE_PROJECT_DIR}/.claude/workforce/org-config.md and NEVER clobbers that copy.
      This template is refreshed on every `/workforce update`; your project copy is not.
@@ -481,3 +481,15 @@ the required gates are yours to author. Empty is legal.
 retired-direction marker (a grep, like palette-drift), or on a missing gate-pass record — never on a
 taste judgment about whether it "looks right". That judgment stays the critic's, and must not enter a
 mechanical check.)*
+
+### The Sources map is derived, never re-listed here (anti-drift, load-bearing)
+
+**The handbook's `## Sources` is the ONE authored record of what each craft reads.** The reverse Sources
+census (`discovery.md` § Both directions, always — the sources row), the `INV-SOURCES` count
+(`invariants.md`), and the Sources `## Coverage set` check (`procedures/verify.md` § The Sources
+coverage set) all DERIVE the reference roots by reading the handbooks plus the filesystem each run.
+**The coverage check MUST NOT require the roots re-listed in `org-config.md`** — that re-listing is the
+two-canonical-texts failure this project refuses, and a coverage set that duplicated the roots would
+drift from the handbooks the instant either side changed. So the Sources coverage set names the
+derivation, not a static member list: its members are computed from `## Sources` plus the inventory each
+run, and `org-config.md` carries no second copy of them.

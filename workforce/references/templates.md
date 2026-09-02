@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -109,6 +109,10 @@ what success depends on, and what it will not do.>
 9. Communicate a complex issue or a visual asset example in ONE shareable artifact — reused and
    updated across the whole session, with the examples inside it kept as a labeled progression,
    never overwritten (`references/session-artifact.md`).
+10. Do not report information as missing, deleted, or unrecoverable — and do not act on context you
+    lack — before searching your `## Sources`. If it is still unresolved, that is a `QUESTION:` up the
+    chain, never a fabricated absence and never a guess. A wrong conclusion reported as fact is the
+    failure this closes (`references/handbook-templates.md` § Sources).
 <n>. <project-specific principles, added as they surface>
 <!-- /origin -->
 ```

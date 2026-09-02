@@ -5,6 +5,7 @@ disallowedTools: Agent
 ---
 <!-- ORG-RECORD START -->
 <!-- tier: 3 (IC) | department: content | reports-to: content-lead -->
+<!-- hired: 2026-09-02 | workforce-version: 1.7.0 -->
 <!-- ORG-RECORD END -->
 ## Role
 Owns fixture prose, one job only.
@@ -12,6 +13,8 @@ Owns fixture prose, one job only.
 - IN: fixture work
 ## Directives
 (none bound)
+## Sources
+(none)
 ## Chain of Command
 Terminal tier.
 ## Procedure
@@ -29,7 +32,7 @@ Return ESCALATE.
 ## Probe
 Run the fixture.
 ## Reporting
-Write OUTPUT.md.
+Open OUTPUT.md with the `REQUEST (verbatim)` block quoted unchanged.
 
 
 padding line 0
@@ -144,7 +147,4 @@ padding line 108
 padding line 109
 padding line 110
 padding line 111
-padding line 112
-padding line 113
-padding line 114
 padding line 127
