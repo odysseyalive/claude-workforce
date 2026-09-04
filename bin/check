@@ -3341,7 +3341,17 @@ _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thi
               "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
               "twenty-two": 22, "twenty-three": 23, "twenty-four": 24,
               "twenty-five": 25, "twenty-six": 26, "twenty-seven": 27,
-              "twenty-eight": 28, "twenty-nine": 29, "thirty": 30}
+              "twenty-eight": 28, "twenty-nine": 29, "thirty": 30,
+              "thirty-one": 31, "thirty-two": 32, "thirty-three": 33,
+              "thirty-four": 34, "thirty-five": 35, "thirty-six": 36,
+              "thirty-seven": 37, "thirty-eight": 38, "thirty-nine": 39,
+              "forty": 40}
+# The map ended at "thirty" and row 31 was added 2026-09-04, so a CORRECT file
+# failed the count check with a message that read as agreement — "declares
+# Thirty-one and the table holds 31 parseable rows". The lookup had returned
+# None; the message printed the raw captured word and never said it was
+# unrecognised. Extended to forty so the next nine additions do not repeat it,
+# and the message below now distinguishes the two failures.
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.
@@ -3367,9 +3377,12 @@ check(
 check(
     "invariants: the enumerated set matches the count it declares",
     _inv_declared is not None and len(inv_rows) == _inv_declared,
-    f"invariants.md declares {_inv_decl.group(1) if _inv_decl else '<no declaration found>'} "
-    f"and the table holds {len(inv_rows)} parseable rows — adding one means adding a row, "
-    "wiring its token, AND updating the declaration, in the same change",
+    (f"invariants.md declares {_inv_decl.group(1)!r}, which is not a word _INV_WORDS knows — "
+     f"extend the map; the table holds {len(inv_rows)} rows"
+     if _inv_decl and _inv_declared is None else
+     f"invariants.md declares {_inv_decl.group(1) if _inv_decl else '<no declaration found>'} "
+     f"and the table holds {len(inv_rows)} parseable rows — adding one means adding a row, "
+     "wiring its token, AND updating the declaration, in the same change"),
 )
 
 # READ THE ROWS, do not merely count them. A doctrine audit replaced all ten line

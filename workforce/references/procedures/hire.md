@@ -13,6 +13,11 @@ High-risk; display by default. `/workforce hire [role] [--execute]`
 The greenfield path, and the primary one. `audit` arrives here with the evidence-backed roster
 (`references/org-design.md`); this authors it as a batch.
 
+0. **Prior art first, for the batch** (`references/prior-art.md`). The greenfield path does not pass
+   through Step 1's panel, so without this line it would skip the search entirely — the exact
+   one-path-only defect Core Principle 7c names, and the reason that principle exists. Search once
+   for the workspace, then match each proposed role against the result: a role whose capability a
+   sibling skill already provides is a **port**, not a hire, and is reported as one.
 1. **Confirm the roster is evidence-backed.** Every department cites the evidence that warranted it.
 2. **Order the batch: Leads before their ICs, CEO first if there is one.** An IC's `ORG-CHAIN`
    escalation target must exist before the IC does, or the first thing it learns is that its manager is
@@ -32,6 +37,22 @@ The greenfield path, and the primary one. `audit` arrives here with the evidence
 handbooks are nearly identical, that is one employee — merge them and report it. Discovering the
 overlap at authoring time is cheaper than discovering it after both have accumulated amendments.
 
+## Step 0 — Prior art, and it is BLOCKING
+
+**Before the panel runs, search the user's own sibling projects for a skill that already provides
+this capability.** Full procedure at `references/prior-art.md`; it is not restated here.
+
+A `PORT` hit **ends Step 1 before it starts** — the question "hire or extend" presumes the thing must
+be authored, and a hit says it must not be. `PARTIAL` becomes a named step in the work order and the
+panel runs on the remainder. `NONE` is recorded with its denominator and the panel runs.
+
+The run prints **`INV-PRIORART`** — siblings searched, how many carried skills, and the verdict.
+
+**Measured 2026-09-04 on `pythom-space`:** this step did not exist, and a run reached one action away
+from authoring a data skill the user had already built twice, in projects sitting beside the target.
+The user caught it in one sentence. **A product that depends on the user knowing their own inventory
+is not doing this job**, and the search costs a directory listing and a grep.
+
 ## Step 1 — Hire, or extend?
 
 **HR owns this decision; `/org` never does** — it hands over the verbatim ask.
@@ -42,11 +63,19 @@ A panel decides, defaulting to **extend**:
 |---|---|
 | an existing employee's scope already covers it | **extend** — amend its handbook |
 | the work is a different job, with different guardrails and a different check | **hire** |
+| **the work is MECHANISM — data acquisition, data management, an external connection — rather than judgment** | **neither** — it is a **skill**, authored per `data-skills.md` (Step 3b), and no employee is hired |
 | the work is rare and unlikely to recur | **neither** — it belongs in the General Operating Principles |
 
-That last row is the anti-bloat rule and it is the most commonly skipped. Carpenter: *"there is a
+The last row is the anti-bloat rule and it is the most commonly skipped. Carpenter: *"there is a
 danger of being inundated with a massive conglomeration of rarely used procedures."* An org that
 hires for every surprise drowns in headcount nobody remembers.
+
+**The mechanism row is the user's own organizing principle reaching this panel** (`SKILL.md`
+§ Directives, 2026-08-04): skills own data acquisition, data management, and connections to external
+tools; employees own judgment. The panel had three rows and none of them was "this is not a job" —
+so an ask for a *record store* had to be argued into "neither" via the anti-bloat rule, which is
+about rarity and says nothing about mechanism. **Measured 2026-09-04**: the correct disposition was
+reachable only by reading the directives directly, which a run cannot be relied on to do.
 
 **Check the budget before hiring.** A new employee changes worst-case fan-out. If it would breach the
 concurrency cap, **report the overage and convene the redesign panel — do not refuse the hire.**
