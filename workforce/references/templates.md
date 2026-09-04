@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -55,6 +55,10 @@ Load-bearing points the template must carry:
   simply does not exist here. **Do not port `/route`'s lane preflight.** Stated in the template so a
   maintainer does not add it back by reflex.
 - **`/org` never sets `context: fork`** — a forked skill consumes a delegation tier.
+- **`/org log` is a mode of the generated skill, not a project add-on.** The receptionist carries
+  `log` alongside `status` (`procedures/org.md` § The receptionist's `log` mode), because the telemetry it writes is what
+  `dev diagnose` reads to correct the audit process on later sessions. A project that adds the mode by
+  hand loses it at the next `org index`, and the feedback loop silently stops.
 - **Work-order contract:** every dispatch payload carries exactly REQUEST (verbatim — the user's ask,
   quoted unedited and forwarded unreplaced down every hop) / Task / Guardrails / Exit criteria /
   Verification, plus the artifact path. Never re-specify steps; the handbook owns the procedure. On

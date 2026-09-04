@@ -9842,6 +9842,78 @@ check(
     "invariants.md row 30 must carry INV-EVALS and its text — every judgment role has an "
     "eval set of recorded principal verdicts, or names the rule that refused it",
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# org log — the runtime surface (v1.11.0)
+# diagnose read four static surfaces and none that observed a run, so a deployed
+# org's real failures reached it only if a human noticed. These assertions pair the
+# emitter with its consumer: either alone is a write-only log or a missing input.
+# ─────────────────────────────────────────────────────────────────────────────
+_ol_org = read("workforce/references/procedures/org.md")
+_ol_dia = read("workforce/references/procedures/diagnose.md")
+_ol_tpl = read("workforce/references/templates.md")
+
+check(
+    "org log: org.md defines the mode and its telemetry path",
+    "The receptionist's `log` mode" in _ol_org
+    and ".claude/workforce/telemetry/<run-id>.jsonl" in _ol_org,
+    "procedures/org.md must carry the receptionist's log mode and name the in-project "
+    "telemetry path "
+    "the emitter writes",
+)
+check(
+    "org log: the emitter is derived — it records, it never assesses",
+    "RECORDS. It never assesses" in _ol_org
+    and "calibration check" in _ol_org,
+    "an emitter that scores its own rows is a judgment role and owes a calibration "
+    "check; org.md must state that it copies observed fields and classifies nothing",
+)
+check(
+    "org log: telemetry stays in the project, never a user-level collection dir",
+    "Never write it to" in _ol_org and "personal-install shadowing" in _ol_org,
+    "a ~/.claude collection point re-creates the shadowing failure bin/sync documents; "
+    "org.md must forbid it and point diagnose at a project instead",
+)
+check(
+    "org log: diagnose reads the runtime surface and owns the four lenses",
+    "telemetry" in _ol_dia
+    and "inefficiency" in _ol_dia
+    and "orchestrator error" in _ol_dia
+    and "agent malfunction" in _ol_dia,
+    "diagnose.md must register org log's telemetry as a surface and name the four "
+    "lenses -- an emitter nothing reads is a write-only log",
+)
+check(
+    "org log: diagnose names the project explicitly, never discovers it",
+    "--telemetry" in _ol_dia and "never discovered" in _ol_dia,
+    "telemetry is written by OTHER repos; diagnose must take an explicit project path "
+    "-- a scan or a user-level registry re-creates the shadowing failure",
+)
+check(
+    "org log: absent telemetry is NOT MEASURED, never a pass",
+    "NOT MEASURED" in _ol_dia
+    and "never skipped, and never folded into a pass" in _ol_dia,
+    "an org that never ran org log has told diagnose nothing; reporting that is the "
+    "difference between a clean bill and an unexamined one",
+)
+check(
+    "org log: the generated receptionist carries the mode",
+    "org log" in _ol_tpl.lower() and "org index" in _ol_tpl,
+    "templates.md must make log a generated mode -- a hand-added one is erased at the "
+    "next org index and the feedback loop stops silently",
+)
+check(
+    "org log: principal_verdict resolves to the same source as INV-EVALS",
+    "principal_verdict" in _ol_org and "row 30" in _ol_org,
+    "the log's principal_verdict is filled by the PERF filing step so telemetry and "
+    "INV-EVALS cannot disagree about whether the principal rejected the work",
+)
+check(
+    "org log: the retention rule that makes work/ collapsible is stated",
+    "reclaimable" in _ol_org and "eval case" in _ol_org,
+    "org.md must state that a run whose telemetry exists and whose captures no eval "
+    "case cites is reclaimable -- otherwise evals.md's keep-the-captures argument "
+    "leaves work/ growing without bound",
+)
 check(
     "judgment roles: audit.md emits INV-EVALS with its counts",
     "INV-EVALS" in _cw_aud and "Step 5f" in _cw_aud and "agreement" in _cw_aud,

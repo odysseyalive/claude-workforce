@@ -1,12 +1,13 @@
 # diagnose — turn the audit inward and drain what blocks workforce itself
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Dev-only. Decides things, so it runs in **display mode** by default and acts on `--execute`
 (`SKILL.md` § Display vs. Execute).
 
 ```
-/workforce dev diagnose            report the blocks and the plan; write nothing
-/workforce dev diagnose --execute  drain them to a fixpoint — apply, or dispatch the fix, and loop
+/workforce dev diagnose                     report the blocks and the plan; write nothing
+/workforce dev diagnose --execute           drain them to a fixpoint — apply, or dispatch the fix, and loop
+/workforce dev diagnose --telemetry <path>  ALSO read that project's run telemetry (repeatable)
 ```
 
 ## Why this command exists
@@ -41,6 +42,53 @@ output through the install/update/streamline lens:
 | `verify` | the silent-failure classes — install/scope drift, canary, ghosts, contract-drift | install · update · streamline |
 | `preflight` (`wf-preflight`) | settings blockers — deny/ask/classifier/missing grant | install · streamline |
 | `invariants.md` | the vocabulary every finding is named against | all three |
+| `.claude/workforce/telemetry/*.jsonl` (`org log`) | **what a run actually did** — the four lenses below | streamline · update |
+
+**Four of those five surfaces are static, and until 2026-09-03 all of them were.** `audit --review`,
+`verify`, `preflight` and `invariants.md` read documents; not one observed a run. So the failures a
+deployed org actually suffers — a Lead that dispatched at the wrong rung, an IC that reported PASS on a
+check it never ran, an agent that burned its turn limit and had to be resumed — reached this command
+only if a human noticed and said so. `org log` (`procedures/org.md` § The receptionist's `log` mode) is the runtime
+surface, and it is read through four lenses. **The log asserts none of these; it records fields and
+this command classifies them**, which is why the emitter stays derived and this stays the judgment:
+
+| Lens | Read from | A finding looks like |
+|---|---|---|
+| **inefficiency** | `dur_ms`, `tool_uses`, `subagent_tokens`, `turn_limit_hit`, `resumes`, `operator` rows | a role whose every run exhausts its turn limit is under-budgeted or over-specified — a `maxTurns` fix or a `## Procedure` that asks for too much |
+| **orchestrator error** | `rung`, `request_present`, `exit_criteria_present`, `artifact_declared` | edges carrying no exit criteria mean the dispatch contract is stated and unenforced — an `audit` step, not a reminder |
+| **agent malfunction** | `verdict`, `checks_declared` vs `checks_run`, `question_returned`, `writes_outside_scope` | declared > run means a handbook reports verdicts on unrun checks; scope writes mean an `IN-WRITE` root that does not match the work |
+| **failure** | `verdict` against `principal_verdict` | a gate that disagrees with the principal is a broken instrument — the condition `INV-EVALS` (`invariants.md` row 30) exists to count |
+
+### Naming the project whose telemetry to read
+
+`diagnose` inspects **workforce itself** — that is the Self-Exclusion escape it runs under. The
+telemetry it needs is the opposite: it was written by orgs in **other** repos, which is the whole
+reason it is evidence about the package rather than about this one. So the project is **named on the
+command line and never discovered**:
+
+```
+/workforce dev diagnose --telemetry ~/lab/some-project --telemetry ~/lab/another
+```
+
+Each path is a project root; the run reads `<path>/.claude/workforce/telemetry/*.jsonl` and nothing
+else under it. Repeat the flag to pool several orgs, which is when the surface is most useful — one
+project's log says what happened there, and three say which of it is the *package*.
+
+**No path is inferred, and no registry of installs is kept.** A scan for workforce installs, or a
+user-level directory that every project reports into, re-creates the shadowing failure this same file
+warns about for the personal install: a stale or foreign copy silently becoming the thing that gets
+read. An explicit path is auditable in the run report and wrong in a way somebody can see.
+
+**A path that is absent, unreadable, or holds no telemetry is reported as `NOT MEASURED` naming the
+path** — never skipped, and never folded into a pass. A dev session that meant to read three orgs and
+silently read one would draw package-level conclusions from a third of the evidence, which is worse
+than drawing none.
+
+**Every one of these is a targeted change to the audit process, which is the point.** A lens that
+produces only "the org should try harder" is not a lens; each row above names a defect whose fix is a
+step, an invariant, a budget, or a scope line. Absent telemetry is `NOT MEASURED`, never a pass: an org
+that has never run `org log` has told this command nothing, and reporting that honestly is the
+difference between a clean bill and an unexamined one.
 
 The data these return answers the classification directly, so no agent is spawned to *acquire* it — a
 spawn is spent only to *author a fix* (below). This is the second standing directive: hand data back

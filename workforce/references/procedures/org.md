@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -450,6 +450,92 @@ restore from the pre-edit content and report — never move on silently.
 Run `index` afterwards to refresh the chart.
 
 ---
+
+## The receptionist's `log` mode — run telemetry
+
+**This is a mode of the GENERATED `/org` skill, not of `/workforce org`.** `index`, `embed` and
+`status` above maintain the chart and the receptionist; `log` is something the receptionist itself
+does when a user dispatches through it. It is specified here because `index` is what writes the
+receptionist, so this is the file that has to carry the contract (`references/templates.md` § `/org`
+makes it a generated mode rather than a project add-on).
+
+```
+/org log <ask>    dispatch the ask exactly as `/org` would, with run telemetry ON
+/org log          read-only — summarize this project's telemetry, write nothing
+```
+
+**Why this mode exists.** `diagnose` measures whether workforce is still fit to staff other projects,
+and every surface it reads is **static** — `audit --review`, `verify`, `preflight`, `invariants.md`.
+None of them observed a run. So inefficiency, orchestrator error, agent malfunction and outright
+failure are invisible to the one command whose job is to find them, and the audit process gets
+corrected from documents rather than from what happened. This mode writes the missing surface.
+
+**The log is a dedicated, durable file, not a run artifact.** Run directories are written by the
+employee and describe the *work*; this describes the *dispatch* and is written by the caller. One
+append-only JSON-per-line file per run:
+
+```
+.claude/workforce/telemetry/<run-id>.jsonl
+```
+
+It stays in the project, beside the `work/` dirs whose relative paths it cites. **Never write it to
+`~/.claude` or any user-level collection point** — that is the personal-install shadowing failure in a
+new coat (`bin/sync` § why `--personal` exists). `diagnose` is pointed at a project; it does not go
+hunting.
+
+### The emitter RECORDS. It never assesses.
+
+Every field below is copied from something that already exists — the `.spawn` edge rung 1 already
+requires at every depth, the harness's own completion notification, or the returned `OUTPUT.md`.
+**Nothing here is computed, scored, or judged.** The moment a field means "was this good", the emitter
+has become a judgment role and owes a calibration check (`verification.md` § Judgment roles). Write
+what was observed; let `diagnose` do the reading. A field that cannot be read is written `null`, never
+guessed — `null` is a measurement and an invented value is a lie the next session cannot detect.
+
+### Rows
+
+**`spawn`** — written in the same act as the edge file and the `Agent` call (rung 1). Read off the edge:
+
+`ts` · `run_id` · `caller` · `callee` · `rung` · `depth` · `edge_path` · `request_present` ·
+`exit_criteria_present` · `artifact_declared`
+
+Those last three are the org's own recorded defect made countable: measured 2026-09-01, **252 edges,
+mean 3.5 lines, 2% carrying exit criteria** (§ rung 1a). That number took a bespoke investigation. It
+should have been a query.
+
+**`return`** — written when the agent completes. The first three come verbatim from the harness's
+`<usage>` block, which hands them to the caller unasked:
+
+`ts` · `run_id` · `callee` · `dur_ms` · `tool_uses` · `subagent_tokens` · `turn_limit_hit` ·
+`resumes` · `verdict` · `output_path` · `output_present` · `question_returned` · `escalated` ·
+`checks_declared` · `checks_run` · `writes_outside_scope` · `principal_verdict`
+
+`checks_declared`/`checks_run` are read from the report's own `## Verification` reporting, `null` when
+it states neither — a report that does not say is itself the finding. `writes_outside_scope` counts
+paths the run touched outside the callee's `IN-WRITE` root, from `git status`. **`principal_verdict`
+is `null` at write time and is filled by the PERF filing step**, so this log and `INV-EVALS`
+(`invariants.md` row 30) resolve to one source rather than two that can disagree.
+
+**`operator`** — the gestures only the caller can see, and the reason a log beats reading artifacts
+afterward: `question_rejected` (an `AskUserQuestion` the user declined), `interrupt`, `resume`. A
+subagent that exhausted its turn limit and had to be resumed leaves **no trace in any artifact** — the
+finished `OUTPUT.md` looks identical either way. That is a pure inefficiency signal and it is lost
+unless it is caught as it happens.
+
+### Reading it back
+
+`/org log` with no ask prints the run history and writes nothing — same read-only contract as
+`status`. It classifies nothing on its own; the four lenses (inefficiency · orchestrator error · agent
+malfunction · failure) belong to `diagnose`, which owns the vocabulary findings are named against.
+
+### Retention — the log is what makes `work/` collapsible
+
+A run directory is large and permanent today because it is the only record that the run happened.
+Once its telemetry rows exist, that stops being true: **a run whose telemetry is recorded, and whose
+captures are not cited by any eval case, is reclaimable** — the row survives, the megabytes do not.
+The exception is exactly the captures an eval case names (`evals.md` § Judgment roles), which are
+ground truth and are never reaped. This is the standing answer to a `work/` tree that grows without
+bound and to the tension `evals.md` otherwise creates by arguing those directories must be kept.
 
 ## Mode: `status`
 
