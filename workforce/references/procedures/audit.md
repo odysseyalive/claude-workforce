@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 65 assertion(s) in bin/check name this file; 136 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 67 assertion(s) in bin/check name this file; 140 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1903,7 +1903,7 @@ lost.
 **Print the spawn ledger, and print it even when it disagrees with itself:**
 
 ```
-EDGES      7 spawns this run · 7 edge files recorded · 0 unrecorded
+EDGES      7 spawns this run · 7 edge files recorded · 14 telemetry rows · 0 unrecorded
 ```
 
 **The third number is the whole point.** Every spawn writes
@@ -1911,6 +1911,28 @@ EDGES      7 spawns this run · 7 edge files recorded · 0 unrecorded
 `staging.md` § Phase B for probes), and `review` diffs those edges against the chart to find a
 dispatch the org chart never authorized. **An unrecorded spawn is invisible to that check forever** —
 it cannot be reconstructed after the run.
+
+**The same act writes the telemetry row, and on an audit it is ALWAYS ON.** Every spawn appends a
+`spawn` row and every return appends a `return` row to
+`.claude/workforce/telemetry/<run-id>.jsonl`, in the schema `procedures/org.md`
+§ The receptionist's `log` mode defines — one format, because `dev diagnose` reads them all through
+one set of lenses. `telemetry rows` above is therefore normally **twice** the spawn count, and a
+count below that names which returns never arrived, which is itself the finding.
+
+**Why always-on here when `/org log` is opt-in.** Ordinary dispatch is frequent and the flag keeps it
+cheap. An audit is rare, deliberate, and the most complex multi-agent run this skill performs — it
+already writes a durable `report.md` per run, so one more file per run is proportionate, and asking a
+maintainer to remember a flag on the one run most worth instrumenting gets it remembered exactly
+never. **This is the run whose telemetry is worth the most and the run least likely to be repeated for
+diagnosis.**
+
+**And it records what `report.md` structurally cannot.** The report says what the run concluded; the
+telemetry says how it got there — `dur_ms`, `tool_uses`, `checks_declared` against `checks_run`, and
+the `operator` rows for an interrupt or a turn-limit resume. A sub-agent that exhausted its turns and
+was resumed returns work that looks **identical** to work done in one pass, so a partial result reads
+as a complete one and the report faithfully records the wrong thing. Measured 2026-09-03 on this
+project: a records agent hit its 40-turn limit mid-run, was resumed, and finished correctly — and no
+artifact anywhere shows that it happened.
 
 *Measured 2026-08-03, first real audit: at least five spawns, **zero edge files**. The rule had been
 stated in the Chain-of-Command Gate since the beginning and nothing wrote one, so the org chart's only

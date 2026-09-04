@@ -1,6 +1,6 @@
 # diagnose — turn the audit inward and drain what blocks workforce itself
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Dev-only. Decides things, so it runs in **display mode** by default and acts on `--execute`
 (`SKILL.md` § Display vs. Execute).
 
@@ -71,7 +71,10 @@ command line and never discovered**:
 ```
 
 Each path is a project root; the run reads `<path>/.claude/workforce/telemetry/*.jsonl` and nothing
-else under it. Repeat the flag to pool several orgs, which is when the surface is most useful — one
+else under it. **`audit-*` run-ids in that directory are audits instrumenting themselves**
+(`procedures/audit.md` § Step 7 — Close: always-on there, not opt-in), and they are the
+highest-value rows this command reads: an audit is the most complex multi-agent run the skill performs,
+so its inefficiency and agent-malfunction signals are the package's, not the project's. Repeat the flag to pool several orgs, which is when the surface is most useful — one
 project's log says what happened there, and three say which of it is the *package*.
 
 **No path is inferred, and no registry of installs is kept.** A scan for workforce installs, or a

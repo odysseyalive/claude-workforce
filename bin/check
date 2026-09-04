@@ -9844,6 +9844,45 @@ check(
     "eval set of recorded principal verdicts, or names the rule that refused it",
 )
 # ─────────────────────────────────────────────────────────────────────────────
+# audit instruments itself (v1.13.0)
+# The most complex multi-agent run in the skill had no runtime instrumentation.
+# report.md says what a run concluded; only telemetry says how it got there.
+# ─────────────────────────────────────────────────────────────────────────────
+_ai_aud = read("workforce/references/procedures/audit.md")
+_ai_dgn = read("workforce/references/procedures/diagnose.md")
+
+check(
+    "audit telemetry: the spawn act writes the row, always on",
+    "the telemetry row, and on an audit it is ALWAYS ON" in _ai_aud
+    and ".claude/workforce/telemetry/<run-id>.jsonl" in _ai_aud,
+    "audit.md must emit a telemetry row in the same act as the spawn edge, and say "
+    "it is not opt-in -- a flag on the run most worth instrumenting is never set",
+)
+# Bind to the ledger LINE, not the file. "telemetry rows" also appears in the prose
+# explaining the line, so a file-wide `in` stays true when the ledger is gutted --
+# measured VACUOUS by bin/prove 2026-09-03, the exact shape the payload-uniqueness
+# check guards one level down.
+_ai_edges = next((l for l in _ai_aud.splitlines() if l.startswith("EDGES")), "")
+check(
+    "audit telemetry: EDGES counts the rows so a missing return is visible",
+    "telemetry rows" in _ai_edges,
+    "the EDGES ledger LINE must carry the row count; normally twice the spawn count, "
+    "and a shortfall names which returns never arrived",
+)
+check(
+    "audit telemetry: one schema, defined once in org.md",
+    "The receptionist's `log` mode defines" in _ai_aud,
+    "audit must reuse the org log schema rather than define a second one -- diagnose "
+    "reads them all through one set of lenses",
+)
+check(
+    "audit telemetry: diagnose knows audit runs are the package's own signal",
+    "audits instrumenting themselves" in _ai_dgn,
+    "an audit's rows are evidence about the PACKAGE, not the project it ran on; "
+    "diagnose.md must say so or they read as one project's noise",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # recruit-remediate carries what it cannot mechanize (v1.12.0)
 # 5c ran correctly and made an org blinder: of two researched failure modes it kept
 # the greppable one and dropped the other, then stamped the handbook current. These
