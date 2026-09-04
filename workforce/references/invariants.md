@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Twenty-nine, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Thirty, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -126,6 +126,24 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 27 | every governed handbook is stamped at the installed version, or was refreshed to it and re-gated this run, or names the rule that declined | `INV-REFRESH` | references/procedures/audit.md |
 | 28 | every producing handbook carries a `## Sources` naming real path/glob or `Skill(...)` roots, not empty categories, or names the rule that made it `(none)` | `INV-SOURCES` | references/procedures/audit.md |
 | 29 | every declared deletable content slot is owned by a gate/sign-off seam, or names the rule that left it unowned | `INV-SEAM` | references/procedures/audit.md |
+| 30 | every judgment role has an eval set of recorded principal verdicts, or names the rule that refused it | `INV-EVALS` | references/procedures/audit.md |
+
+**Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
+was built for.** Every other row here counts something the run did. This one counts whether the org can
+tell that one of its own gates is wrong. A design gate returned `PASS-WITH-NOTES` on six consecutive
+builds of one page while the project's principal rejected all six; the org held 47 personnel records,
+193 run directories and 15 clean audits at the time, and **not one of them recorded the disagreement**.
+`evals.md` already said a `PERF` record is the best possible eval case — but no invariant required a
+set to exist, so none ever did, and the audit that would have caught it had nothing to count. A
+judgment role is enumerable (`verification.md` § Judgment roles — the calibration tier: its `## Role`
+states a verdict and its `owns-records` names an evaluator catalog), which is what makes this countable
+rather than aspirational.
+The escape hatch is the same one rows 19, 20, 22, 23 and 27 carry, and it is **measured rather than
+read**: a role that has produced **zero reports** names that precondition and the invariant holds,
+because the first run after a hire legitimately has nothing to calibrate against and a gate that blocks
+on its own newness gets deleted. A role with reports on disk and no eval set does **not** reach the
+hatch — worded any looser, the row is satisfied by the very state it was written for, since an org that
+recorded none of its disagreements looks identical to one that had none.
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run

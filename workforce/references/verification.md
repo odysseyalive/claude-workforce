@@ -1,6 +1,6 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 6 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 
@@ -27,6 +27,7 @@ own opinion.** Ranked, best first:
 | 3 | A **file/string assertion**, including **a grep against an evaluator catalog** | Mechanical, though it proves less |
 | 4 | A **second agent in a fresh context** judging **against a catalog** | Independent, and catalogued rather than tasteful |
 | — | *"Review the output for quality"* | **Not a check.** Reject it at authoring time |
+| **C** | For a **judgment role only** — the employee's own verdict scored against **recorded principal verdicts** on frozen past cases (§ Judgment roles — the calibration tier) | Mechanical, and calibrated against the one opinion the work exists to satisfy. For that role class it **outranks tier 4**, which cannot see a defect its catalog does not name |
 
 **Tiers 3 and 4 both depend on catalogs, and that is what makes them worth trusting.** A catalog converts
 a judgment into a checklist: "does this read as machine-written?" is taste, while "does this cluster three
@@ -40,6 +41,71 @@ dispatches the evaluator employee for independent review (tier 4), because ICs c
 **A handbook may not report PASS on an unrun check.** The section states the command, the expected
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
 the exact output — never a third silent retry, never a downgraded claim.
+
+---
+
+## Judgment roles — the calibration tier
+
+**A judgment role is one whose deliverable IS a judgment**: an employee whose verdict gates a ship
+decision on quality that no command can measure — "is this page professional enough to show a
+customer", "does this read as machine-written", "is this design on brand". It is a small class and it
+is named, not assumed: an employee is a judgment role when its `## Role` states a verdict rather than
+an artifact, and its `owns-records` names an evaluator catalog.
+
+**For this class, tiers 1 through 4 are necessary and none of them is sufficient**, and the reason is
+the one this file already gives: *a catalog converts a judgment into a checklist*. That conversion is
+lossy in one direction only. A catalog names the defects someone thought of; the check then passes on
+everything else — including the defect that is a **missing** element, because a rule written against a
+thing that exists cannot fire on its absence. So a judgment role gated only by catalog citation
+converges on a surface that satisfies every rule and satisfies nobody, and each pass makes it worse:
+removing the element removes the finding.
+
+**MEASURED 2026-09-03.** A design gate returned `PASS-WITH-NOTES` on six consecutive builds of one
+page while the project's principal rejected all six. Its catalog's five image rules all passed on a
+page with zero images — one tests broken images, one tests whether imagery is filler, one tests AI
+tells in imagery — and its recruiter dossier had named that exact failure mode ("misses ABSENT
+elements because it is grading a capture") one day before the last of those builds. The dossier's
+*other* bullet, that a critique must cite a criterion rather than assert taste, had been mechanized
+into the handbook as a grep. The absence bullet had not, because it was not greppable. **The handbook
+kept the failure mode it could automate and dropped the one that was about to happen.**
+
+### The rule for a judgment role
+
+> **A judgment role's `## Verification` names a calibration check, and its `## Guardrails` permit an
+> uncatalogued finding to reach the verdict.** A gate that can only repeat its catalog is not a gate.
+
+Three requirements, and a handbook missing any one of them is not released:
+
+1. **The calibration check.** The employee's verdict on a set of **frozen past cases** is compared to
+   the **principal's recorded verdict** on those same cases; the check exits non-zero when agreement
+   falls below the set's stated threshold. This is mechanical — a string comparison of two verdict
+   lines — and it is the only check in this file whose ground truth is the person the work is for.
+   The set lives at `${CLAUDE_PROJECT_DIR}/.claude/workforce/evals/<employee>.md` (`evals.md`
+   § Judgment roles), and `INV-EVALS` (`invariants.md` row 30) counts whether it exists.
+2. **An uncatalogued finding may block.** Where a rule exists, cite it — naming the criterion is what
+   makes a critique actionable, and it stays required. Where **no** rule covers what the employee
+   found, the finding stands **on its evidence** and is graded at the severity that evidence warrants,
+   up to and including BLOCK; the catalog amendment ships in the same report. "The catalog does not
+   name it" is a reason to grow the catalog, never a reason to pass.
+3. **No check may fail a report for the words it contains.** A `## Verification` that greps a
+   deliverable for subjective vocabulary — *"looks wrong"*, *"feels off"*, *"I don't like"* — and
+   fails the employee for using it is **forbidden**, and `handbook` refuses to release one. It does
+   not enforce rigor; it teaches the employee to withhold the finding, and the finding is the product.
+   Require evidence beside the sentence. Never ban the sentence.
+
+**This project already has the category and withheld it from one class of employee.**
+`procedure-for-procedures.md` gives Leads no `## Procedure` on the stated ground that *"their job is
+judgment, and a numbered script for a coordinator is the over-specification failure."* The same
+argument reaches an IC whose job is also judgment; what it does not reach is verification, which is
+why the answer here is a different check rather than no check.
+
+### What this does NOT relax
+
+Tier 1 still outranks everything for work a command can settle, and *"Review the output for quality"*
+is still not a check — an uncalibrated second opinion is still just an opinion. The exception is
+narrow and gated on the role class: if the employee produces an artifact rather than a verdict, or no
+principal verdicts have been recorded yet, this section does not apply and the authoring checklist
+below governs unchanged.
 
 ---
 
@@ -417,7 +483,9 @@ left the template untouched, so every later hire would have paid the same probe 
 3. State the retry budget and the failure action.
 4. Forbid PASS on an unrun check, in the handbook's own words.
 5. If the work is web-facing and the check is a judgment call, stop — a deterministic suite was
-   probably available.
+   probably available. **Unless the employee is a judgment role** (§ Judgment roles — the calibration
+   tier), in which case the deterministic suite covers behavior and the calibration check covers the
+   verdict, and both are named.
 6. Confirm every tool the check needs is in the default grant or loaded via `ToolSearch` in the
    procedure. `Grep`/`Glob`/`WebFetch` are **not** in the default grant and cannot be assumed (fact 4).
    If an explicit `tools:` field is present, confirm the check's tools are listed there.

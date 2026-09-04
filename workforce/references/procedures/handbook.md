@@ -1,6 +1,6 @@
 # handbook — author or refresh one employee's handbook
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Write a handbook that conforms to `references/procedure-for-procedures.md`, prove a stranger can
 follow it, and only then register it.**
 
@@ -185,6 +185,19 @@ goes to a panel when unclear.
 **`## Verification` must name a runnable check** — an exit code, a suite, a file assertion. Not a
 judgment. For web-facing work that usually means a scaffolded deterministic suite
 (`references/verification.md`).
+
+**One exception, and it is a role class rather than a case-by-case judgment.** Where the employee IS a
+judgment role — its `## Role` states a verdict rather than an artifact, and its `owns-records` names an
+evaluator catalog — the runnable check is a **calibration check** against recorded principal verdicts
+(`references/verification.md` § Judgment roles — the calibration tier). That is still an exit code, so
+the rule above is unrelaxed; what changes is what the exit code is computed from. Such a handbook is
+**refused** unless it also grants an uncatalogued finding a path to BLOCK.
+
+**And one thing `handbook` refuses outright, in any handbook.** A `## Verification` that greps the
+employee's own deliverable for subjective vocabulary — *"looks wrong"*, *"feels off"*, *"I don't
+like"* — and fails it for using those words is not a check on rigor. It is a check on phrasing, and
+what it actually trains is silence about the finding. Require evidence next to the sentence; never ban
+the sentence.
 
 **For a prose-producing employee, its `## Verification` also names the catalog self-check as a
 before-done gate.** Its prose is not done until it has

@@ -3341,7 +3341,7 @@ _INV_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thi
               "eighteen": 18, "nineteen": 19, "twenty": 20, "twenty-one": 21,
               "twenty-two": 22, "twenty-three": 23, "twenty-four": 24,
               "twenty-five": 25, "twenty-six": 26, "twenty-seven": 27,
-              "twenty-eight": 28, "twenty-nine": 29}
+              "twenty-eight": 28, "twenty-nine": 29, "thirty": 30}
 # The declaration word may be hyphenated ("Twenty-one") past twenty, so the capture
 # is `[\w-]+`, not `\w+` — a bare `\w+` stops at the hyphen and reads "twenty",
 # reporting 20 against a 21-row table and failing the count check on a correct file.
@@ -6482,7 +6482,7 @@ check(
 # that lags the table is the same defect this check was written for, one level up.
 _INV_COUNT_RX = re.compile(
     r"\b(?:eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen"
-    r"|nineteen|twenty)\s+"
+    r"|nineteen|twenty|thirty)\s+"
     r"(?:rows?|Run[- ]Invariants?)\b",
     re.I,
 )
@@ -9782,6 +9782,71 @@ check(
     "INV-SEAM" in _cw_inv and "every declared deletable content slot" in _cw_inv,
     "invariants.md row 29 must carry INV-SEAM and its text — every declared deletable "
     "content slot is owned by a gate/sign-off seam, or names the rule that left it unowned",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Judgment roles — the calibration tier (v1.10.0)
+# A gate whose verdict is checked only against its own catalog cannot see a defect
+# the catalog does not name, and absence is always such a defect. These assertions
+# pair the doctrine with its enforcement so the rule cannot ship unwired.
+# ─────────────────────────────────────────────────────────────────────────────
+_jr_ver = read("workforce/references/verification.md")
+_jr_evl = read("workforce/references/evals.md")
+_jr_tpl = read("workforce/references/handbook-templates.md")
+
+check(
+    "judgment roles: verification.md defines the calibration tier",
+    "Judgment roles — the calibration tier" in _jr_ver
+    and "recorded principal verdicts" in _jr_ver,
+    "verification.md must carry the calibration tier — a judgment role's verdict is "
+    "scored against recorded principal verdicts, not only against its own catalog",
+)
+check(
+    "judgment roles: an uncatalogued finding can reach the verdict",
+    "up to and including BLOCK" in _jr_ver
+    and "never a reason to pass" in _jr_ver,
+    "verification.md must state that a finding no catalog rule covers stands on its "
+    "evidence and may block — a gate that can only repeat its catalog is not a gate",
+)
+check(
+    "judgment roles: a check may not fail a report for the words it contains",
+    "No check may fail a report for the words it contains" in _jr_ver
+    and "Never ban the sentence." in _jr_ver
+    and "never ban the sentence." in " ".join(_cw_hbk.split()).lower(),
+    "verification.md must forbid greping a deliverable for subjective vocabulary, and "
+    "procedures/handbook.md must carry the matching refusal — the pairing is the wiring",
+)
+check(
+    "judgment roles: handbook.md carries the calibration exception at the refusal site",
+    "calibration check" in _cw_hbk and "judgment role" in _cw_hbk,
+    "procedures/handbook.md refuses a judgment-call `## Verification`; it must name the "
+    "judgment-role exception there, or the tier is written in verification.md and unwired",
+)
+check(
+    "judgment roles: the deterministic-suite template names the exception",
+    "judgment role" in _jr_tpl,
+    "handbook-templates.md tells a browser-driving employee to take a deterministic "
+    "suite rather than a judgment; the judgment-role exception must be named there too",
+)
+check(
+    "judgment roles: evals.md sources cases from recorded principal verdicts",
+    "Judgment roles — the principal is the ground truth" in _jr_evl
+    and "frozen captures" in _jr_evl
+    and "PERF" in _jr_evl,
+    "evals.md must state that a judgment role's cases are the principal's own recorded "
+    "verdicts on frozen captures, and that a rejection is filed as a PERF and a case",
+)
+check(
+    "judgment roles: INV-EVALS row names its text and token in invariants.md",
+    "INV-EVALS" in _cw_inv and "recorded principal verdicts" in _cw_inv,
+    "invariants.md row 30 must carry INV-EVALS and its text — every judgment role has an "
+    "eval set of recorded principal verdicts, or names the rule that refused it",
+)
+check(
+    "judgment roles: audit.md emits INV-EVALS with its counts",
+    "INV-EVALS" in _cw_aud and "Step 5f" in _cw_aud and "agreement" in _cw_aud,
+    "an invariant that cannot print its own evidence is not enforced — audit.md must "
+    "carry Step 5f and emit the INV-EVALS line, agreement rate included",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 37 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 38 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -527,7 +527,10 @@ a load.
 an absent server is dropped silently and the employee cannot tell (fact 13b).
 
 Its `## Verification` should be a scaffolded deterministic suite rather than a judgment
-(`verification.md`). MCP tools reach subagents; `Grep`/`Glob`/`WebFetch` do not.
+(`verification.md`) — **unless the employee is a judgment role**, whose verdict is verified by a
+calibration check against recorded principal verdicts instead (`verification.md` § Judgment roles —
+the calibration tier); a browser-driving gate is the common case of one, so check the role class
+before reaching for the suite. MCP tools reach subagents; `Grep`/`Glob`/`WebFetch` do not.
 
 *Rewritten 2026-08-04 after a cold read. This section read "Identical frontmatter — no `tools:` field"
 and opened its Procedure with a `ToolSearch` call — **so the shipped template produced a handbook the

@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 61 assertion(s) in bin/check name this file; 130 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 62 assertion(s) in bin/check name this file; 133 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1101,6 +1101,58 @@ INV-SEAM     deletable slots 3 · seamed 3 · unowned 0 · healed 0 · 0 decline
 A declined heal names the shipped rule that refused it — the uncited-refusal shape every other
 invariant forbids. `orphaned roots 0` / `unowned 0` on a fully wired org is the expected steady state
 and is printed, not skipped.
+
+## Step 5f — Calibrate the judgment roles: does each gate agree with the principal?
+
+**Enumerate the judgment roles.** An employee is one when its `## Role` states a **verdict** rather
+than an artifact and its `ORG-RECORD` `owns-records` names an **evaluator catalog**
+(`references/verification.md` § Judgment roles — the calibration tier). Both halves are read off the
+handbook, so the set is derived, never declared. Most orgs have none or one; an org with none prints
+the zero and moves on.
+
+**For each, answer one question: has this gate ever been checked against the principal?** The set
+lives at `.claude/workforce/evals/<employee>.md` and its cases are recorded principal verdicts on
+frozen captures (`references/evals.md` § Judgment roles). Three states, and only one of them is a
+finding:
+
+| State | Reading | Action |
+|---|---|---|
+| set exists, cases recorded | calibrated, or measurably not | count it, report the agreement rate |
+| no set, **and the gate has never produced a report** | a gate hired this run has nothing to calibrate against | **name that precondition** — the invariant holds |
+| no set, **and the principal has ruled on this gate's output** | the org discarded its own ground truth | **heal in-run** |
+
+**The heal seeds the set from what is already on disk.** Every past pass of that gate left its report
+and its captures under `.claude/workforce/work/<run-id>/<employee>/`; pair each with what the principal
+said about that surface and write the cases. Where the principal's words are in a conversation rather
+than a record, **file the `PERF` first** (`references/evals.md`: the rejection is recorded against the
+gate that passed it) — a case sourced from an unrecorded memory is a case nobody can audit. Never
+invent a verdict the principal did not give, and never seed a case from the gate's own reasoning: the
+whole point is a second source.
+
+**"Nothing to calibrate against" is measured, never read.** The middle row's precondition is
+satisfied by exactly one condition: the gate has produced **zero** `OUTPUT*.md` reports under
+`.claude/workforce/work/*/<employee>/`. Count them; do not infer the state from the absence of `PERF`
+records, because that inverts the invariant into one the failure satisfies. **A gate with N past
+reports, zero `PERF` records and no eval set has NOT escaped** — that is the disagreement going
+unrecorded, which is the condition this row exists to detect, and the run may not print `UPHELD` on
+it. It heals by asking the principal for a verdict on the surfaces already on disk and filing the
+`PERF`s, or it reports `NOT UPHELD` naming the count it found. An org whose gate has run twenty times
+and been checked zero times is the failure, not the exemption.
+
+**Rank a gate with recorded disagreement and no eval set LOAD-BEARING**, alongside a missing
+`## Sources`. A gate that passes what the principal rejects is not a quality problem in the surface it
+graded — it is a broken instrument, and every surface it clears afterward inherits the error.
+
+The run prints **`INV-EVALS`** (`references/invariants.md` row 30), all counts, always:
+
+```
+INV-EVALS    judgment roles 1 · sets present 1 · seeded 1 · agreement 0/6 · 0 declined
+```
+
+`judgment roles 0` is a measurement and is printed. A declined seed names the shipped rule that
+refused it. **An agreement rate is reported even when it is bad** — especially then: `0/6` is this
+mechanism working, and a run that quietly omits the number has reproduced the defect the row exists to
+catch.
 
 ## Step 6 — Execute
 
