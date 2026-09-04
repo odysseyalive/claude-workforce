@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Thirty-one, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -127,6 +127,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 28 | every producing handbook carries a `## Sources` naming real path/glob or `Skill(...)` roots, not empty categories, or names the rule that made it `(none)` | `INV-SOURCES` | references/procedures/audit.md |
 | 29 | every declared deletable content slot is owned by a gate/sign-off seam, or names the rule that left it unowned | `INV-SEAM` | references/procedures/audit.md |
 | 30 | every judgment role has an eval set of recorded principal verdicts, or names the rule that refused it | `INV-EVALS` | references/procedures/audit.md |
+| 31 | the user's sibling projects were searched for an existing implementation before any capability was authored, with the count reported | `INV-PRIORART` | references/prior-art.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

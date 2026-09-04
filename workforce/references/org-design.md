@@ -239,7 +239,10 @@ The user who wants to see before committing runs that first.
 
 ## Where the greenfield org comes from, concretely
 
-1. Gather evidence (above), and report what was found *and what was absent*.
+1. Gather evidence (above), and report what was found *and what was absent*. **Include prior art**
+   (`prior-art.md`): what the user's sibling projects already provide is evidence about this
+   project's roster, and it arrives before the roles are chosen rather than as a check applied to
+   roles already picked. A capability a sibling skill covers is not a role this org needs to staff.
 2. Panel proposes departments — domain reader, `headcount-skeptic`, premortem analyst. Disagreement
    resolves to **fewer roles per department, not fewer departments** — a department the evidence
    warrants is never cut by a panel vote.
