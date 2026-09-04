@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -122,7 +122,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
 | 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
 | 25 | every spawn edge recorded the REQUEST block and exit criteria, and every returned OUTPUT.md was read back against the REQUEST before the run reported | `INV-ASK` | references/procedures/org.md |
-| 26 | every existing employee's bar was re-researched and remediated, and every warranted-and-checkable missing role staffed, in-run | `INV-REMEDIATE` | references/procedures/audit.md |
+| 26 | every existing employee's bar was re-researched and remediated, **every researched failure mode carried into the handbook whether or not it could be mechanized**, and every warranted-and-checkable missing role staffed, in-run | `INV-REMEDIATE` | references/procedures/audit.md |
 | 27 | every governed handbook is stamped at the installed version, or was refreshed to it and re-gated this run, or names the rule that declined | `INV-REFRESH` | references/procedures/audit.md |
 | 28 | every producing handbook carries a `## Sources` naming real path/glob or `Skill(...)` roots, not empty categories, or names the rule that made it `(none)` | `INV-SOURCES` | references/procedures/audit.md |
 | 29 | every declared deletable content slot is owned by a gate/sign-off seam, or names the rule that left it unowned | `INV-SEAM` | references/procedures/audit.md |

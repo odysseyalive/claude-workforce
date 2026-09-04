@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 62 assertion(s) in bin/check name this file; 135 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 65 assertion(s) in bin/check name this file; 136 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -984,6 +984,28 @@ gate against`. A gap is **DOCUMENT-attributed** (`SKILL.md` § Sacred-Directive 
 Failure-Attribution): the handbook did not name a failure mode the standard gates against, so the cure is
 to **amend the handbook in the same run and re-probe** it — not to flag it, not to defer it.
 
+**1a. A failure mode that cannot be mechanized is CARRIED, never dropped — and this is the clause the
+step was missing.** Diffing against `## Verification` alone asks *"which researched modes became
+assertions?"*, and a mode that cannot be an assertion answers that question by disappearing. So diff
+against the **whole handbook**: a `mechanizable` mode is owed a `## Verification` bar entry, a
+`not-mechanizable` one is owed a literal `## Guardrails` obligation or `## Procedure` step held by the
+role's calibration check (`recruiter.md` § Mechanizable and not; `verification.md` § Judgment roles —
+the calibration tier). **Either absence is the same gap, DOCUMENT-attributed, amended in this run.**
+
+**MEASURED 2026-09-03 — this step ran correctly and made the org blinder.** A design critic's dossier
+named two failure modes; the mechanizable one became a grep in `## Verification`, the other became
+nothing, and the handbook was stamped current with `bars amended` incremented. The gate then passed six
+consecutive page builds that the project's principal rejected, on the dropped mode exactly. Nothing
+malfunctioned: `verification.md` rejects a non-mechanical check at authoring time, so of two true
+findings only one had anywhere to go. **Read the direction that creates.** Each pass adds what can be
+asserted and discards what cannot, then reports success — a ratchet toward a gate that is maximally
+checkable and progressively unable to see. A remediation that silently keeps only its mechanizable
+findings produces a bar that looks complete, which is worse than one that is visibly thin.
+
+**So the count is not optional.** `not mechanizable` is printed on every run, including zero. A drop
+nobody counted is indistinguishable from a mode nobody found, and telling those apart is what makes
+this step's own work auditable.
+
 **2. Staff the roles the org is missing.** Run the recruiter on the **project's own domain or type**
 (`org-design.md` § The expected roster comes from the project's domain) to derive the industry-standard
 expected roster — a marketing/web build implies front-end, a design critic, content, and QA/e2e — and
@@ -1011,11 +1033,14 @@ genuinely unavailable).
 The run prints **`INV-REMEDIATE`** (`references/invariants.md`), all four counts, always:
 
 ```
-INV-REMEDIATE  employees 7 · bars amended 3 · roles added 1 · design-critic added 1
+INV-REMEDIATE  employees 7 · bars amended 3 · modes gated 9 · not mechanizable 4 (carried 4, dropped 0) · roles added 1 · design-critic added 1
 ```
 
 `bars amended` is the count from step 1, `roles added` the count from step 2 (the design critic included
-in it), and `design-critic added` is `0` or `1`. A role the diff surfaced as warranted but whose check
+in it), and `design-critic added` is `0` or `1`. `modes gated` is every researched failure mode now
+carried by the handbook, and `not mechanizable` breaks out how many of those had no assertion available
+— **`dropped` above zero FAILS the invariant**, because step 1a leaves no legal path to a drop and a
+nonzero there means a researched finding left the run in nobody's handbook. A role the diff surfaced as warranted but whose check
 could not be named is **not** counted in `roles added`; it is named in the report as unstaffed with the
 reason, the same uncited-refusal honesty the other invariants carry.
 

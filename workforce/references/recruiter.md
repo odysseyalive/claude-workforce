@@ -1,6 +1,6 @@
 # Recruiter — research the role's standard before its handbook is written
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 
 **A role authored without knowing what the role's industry standard IS gets the bar its author already
 had in mind.** That is how this project shipped a website build with the right titles hired and the
@@ -75,7 +75,7 @@ stamped: <YYYY-MM-DD>          # when this dossier was researched or degraded
 ## Responsibilities              — what the role owns
 ## Competencies                  — what it must be able to do; feeds wf-skill-match keywords
 ## Quality bar — what good looks like    — the industry-standard bar, set high, never a floor
-## Failure modes to gate against ← each becomes a `## Verification` bar entry in the handbook
+## Failure modes to gate against ← each becomes a GATE in the handbook (§ Mechanizable and not)
 ## Matched skills                ← from wf-skill-match; each feeds the handbook's `## Procedure`
 ## Candidate chosen              — winning skills, model/effort tier, and any budget receipt
 ```
@@ -154,6 +154,40 @@ A seed dossier is a degraded state wearing its own label, exactly as `PASS (on r
 canary. What is forbidden is the *silent* substitution — using the seed while a working network went
 unqueried, or letting a present-but-unresearched bar pass as satisfied. The seed is the floor; research
 is the standard, and research is attempted every time it is due.
+
+---
+
+## Mechanizable and not — the classification that stops the silent drop
+
+**Every failure mode this section names is carried into the handbook. None is dropped.** Mark each one
+in the dossier:
+
+| Mark | Meaning | Where it lands in the handbook |
+|---|---|---|
+| `mechanizable` | it can be stated as an exit code, a count, a string assertion, a suite | a `## Verification` bar entry |
+| `not-mechanizable` | it is real, researched, and no assertion expresses it | a `## Guardrails` obligation or a `## Procedure` step, carried by the role's calibration check (`verification.md` § Judgment roles — the calibration tier) |
+
+**MEASURED 2026-09-03, and this section exists because of it.** A design critic's dossier named two
+failure modes. One — *"asserts taste in place of a cited criterion"* — was mechanizable, and became a
+grep in `## Verification`. The other — *"misses ABSENT elements because it is grading a capture, not an
+interaction"* — was not, **and became nothing.** The handbook was then stamped current and the run
+reported its bar amended. Six page builds later the gate had passed every one of them on the exact
+failure mode that had been dropped, because **you cannot grep for what is not there.**
+
+That is not a mistake anyone made. It is what this file said to do: *each becomes a `## Verification`
+bar entry*, and a failure mode that cannot be one had nowhere to go. So the remediation ran in one
+direction — toward whatever was expressible as an assertion — and every pass made the handbook more
+checkable and less able to see. **A research step that silently keeps only its mechanizable findings is
+worse than no research step, because it produces a bar that looks complete.**
+
+`not-mechanizable` is therefore a **classification, never a discard**, and it is not a soft tier: the
+mode is written into the handbook as a literal obligation, and the calibration check is what holds the
+employee to it. Before v1.10.0 there was no such check and dropping was the only legal move; there is
+one now, so there is no longer any reason to drop.
+
+**Never mark a mode `not-mechanizable` to avoid authoring the check.** The test is whether an assertion
+*exists*, not whether one is inconvenient — and the mark is auditable, because `procedures/audit.md`
+§ Step 5c prints the count and a run whose modes are all conveniently unmechanizable says so out loud.
 
 ---
 

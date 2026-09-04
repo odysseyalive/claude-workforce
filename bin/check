@@ -9475,10 +9475,11 @@ check(
     "staffs the roles the project's domain proves absent",
 )
 check(
-    "audit: Step 5c prints INV-REMEDIATE with all four counts",
+    "audit: Step 5c prints INV-REMEDIATE with every count",
     "INV-REMEDIATE  employees" in aud and "roles added" in aud
-    and "design-critic added" in aud,
-    "the four-count remediation line; a partial line hides whether remediation ran",
+    and "design-critic added" in aud and "not mechanizable" in aud,
+    "the remediation line; a partial line hides whether remediation ran, and omitting "
+    "the not-mechanizable count hides a researched finding that reached no handbook",
 )
 check(
     "evaluators: ui-design is a design employee's tier-3 gate",
@@ -9842,6 +9843,45 @@ check(
     "invariants.md row 30 must carry INV-EVALS and its text — every judgment role has an "
     "eval set of recorded principal verdicts, or names the rule that refused it",
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# recruit-remediate carries what it cannot mechanize (v1.12.0)
+# 5c ran correctly and made an org blinder: of two researched failure modes it kept
+# the greppable one and dropped the other, then stamped the handbook current. These
+# assertions pair the classification with the count that makes a drop visible.
+# ─────────────────────────────────────────────────────────────────────────────
+_rm_rec = read("workforce/references/recruiter.md")
+_rm_aud = read("workforce/references/procedures/audit.md")
+_rm_inv = read("workforce/references/invariants.md")
+
+check(
+    "recruit-remediate: the dossier classifies each failure mode mechanizable or not",
+    "Mechanizable and not" in _rm_rec
+    and "not-mechanizable" in _rm_rec
+    and "classification, never a discard" in _rm_rec,
+    "recruiter.md must mark each researched failure mode and say where a "
+    "not-mechanizable one lands -- otherwise it has nowhere to go and evaporates",
+)
+check(
+    "recruit-remediate: a failure mode is never dropped for lacking an assertion",
+    "cannot be mechanized is CARRIED, never dropped" in _rm_aud,
+    "audit.md Step 5c must carry an unmechanizable mode into Guardrails/Procedure "
+    "behind the calibration check, not discard it for having no bar entry",
+)
+check(
+    "recruit-remediate: the diff is against the whole handbook, not Verification alone",
+    "against the **whole handbook**" in _rm_aud,
+    "diffing only against ## Verification asks which modes became assertions, and a "
+    "mode that cannot be one answers by disappearing",
+)
+check(
+    "recruit-remediate: INV-REMEDIATE prints the not-mechanizable count",
+    "not mechanizable" in _rm_aud
+    and "dropped 0" in _rm_aud
+    and "carried into the handbook whether or not it could be mechanized" in _rm_inv,
+    "a drop nobody counted is indistinguishable from a mode nobody found; row 26 and "
+    "the emitted line must both carry the count, and dropped > 0 must fail",
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # org log — the runtime surface (v1.11.0)
 # diagnose read four static surfaces and none that observed a run, so a deployed
