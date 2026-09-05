@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -36,6 +36,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
 | `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
+| `wf-plain-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** Any question whose text, header, or option labels use a term from the banned list in `references/plain-output.md` — words a reader would have to look up. Exit 2 names the terms and the string they were found in. It checks words, never register: the coffee test is a human judgment and stays advisory. |
 | `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** A model or effort budget picker whose options are not one of the `LANE` blocks `wf-model-budget` / `wf-effort-budget` emit for this project: the pool rebuilt from prose or from the project's stale `## Model statics`, the current pin re-labelled `(Recommended)`, a five-rung ladder. Exit 2 hands the model the emitter's block and the command that produces it. § The budget guard below |
 | `wf-loop-guard` | `PostToolUse` | *(none)* | **advisory; PROPOSED, and not wired by this command's default set.** Behavioural repetition — the same tool called with byte-identical arguments 3+ times with no distinct edit between them. Nudges; halts only when `WF_LOOP_GUARD_STOP_AT > 0`. § The loop guard below |
 
@@ -52,7 +53,7 @@ exit 2 cannot undo an edit that already happened, so each is **detection, not pr
 `enforcement.md`'s table governs here as everywhere, and describing either as preventing a directive edit
 would be exactly the overclaim this project fails a run over. What they do is make the drift **loud at the
 moment it happens**, to the agent that just caused it, rather than at whatever later moment someone runs
-`verify`. **`wf-budget-guard` is the one shipped hook on `PreToolUse`**, because there the call has not
+`verify`. **The two guards are the shipped hooks on `PreToolUse`**, because there the call has not
 happened yet and a rendered picker has nothing to undo: exit 2 blocks the `AskUserQuestion` outright
 (§ The budget guard).
 

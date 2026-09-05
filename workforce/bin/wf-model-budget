@@ -21,9 +21,9 @@ a row carries is read: a lane is never recommended twice, but a model may be
 recommended for as many lanes as its Notes cell names.
 
 ONE SANCTIONED OUT-OF-POOL RECOMMENDATION. `creative-visual` is the one lane that MAY
-be recommended a model that is DELIBERATELY not a § Model statics row (as it was with
-`claude-fable-5` until 2026-09-02, when that model's successor entered the pool as row 1
-and the shipped template stopped exercising this path). When a lane is, its
+be recommended a model that is DELIBERATELY not a § Model statics row (as it was until
+2026-09-02, when the frontier model entered the pool as row 1 and the shipped template
+stopped exercising this path). When a lane is, its
 recommendation is annotated on a PROSE line inside § Model statics rather than on a
 table row. It is nonetheless OFFERED THE SAME WAY every other lane's recommendation
 is offered: it LEADS that lane's slate as a first-class option, marked
@@ -49,9 +49,9 @@ statics and from nowhere else"). A project's instantiated `org-config.md` record
 chosen values, not the pool. But an older instantiation copied a `## Model statics`
 section INTO the project file, and on a re-audit the agent reconstructing the picker
 read that co-located stale copy instead of the template — proposing the
-pre-`claude-sonnet-5` four (`claude-fable-5` present as a static, `claude-sonnet-5`
-absent) and marking `claude-opus-4-8` as the undifferentiated "analytical"
-recommendation instead of splitting Lead/IC. The template names this exact failure
+pre-`claude-sonnet-5` four (a since-deprecated frontier ID present as a static,
+`claude-sonnet-5` absent) and marking one Opus row as the undifferentiated
+"analytical" recommendation instead of splitting Lead/IC. The template names this exact failure
 twice (§ Model statics line 34, `audit-setup.md` line 393) and guarded it with PROSE
 ONLY, so it recurred: the picker showed the stale four on precisely the projects that
 carry the stale section — re-audits that predate the sonnet-5 split — and the right
@@ -73,7 +73,7 @@ WHAT IT DERIVES, and from where:
     "the budget question reads these cells and has no other source").
   * The ONE sanctioned out-of-pool recommendation, when the template carries one: the
     same `Recommended for <lane>` annotation, found on a PROSE line of § Model statics
-    beside a backticked model ID that is not a pool row. `claude-fable-5` reached
+    beside a backticked model ID that is not a pool row. A frontier model reached
     `creative-visual` this way until 2026-09-02, and no model ID for it was ever
     written here either.
   * The question HEADER and BODY per call — parsed from § Budget question wording,
@@ -108,6 +108,7 @@ caller has no trustworthy pool and must not fall back to reconstructing one.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -284,6 +285,140 @@ def parse_out_of_pool_recs(template_text, pool_ids):
                      % (lane, found[lane], model_id))
             found[lane] = model_id
     return found
+
+
+# THE ADVISOR IS NOT A LANE, AND IT IS STILL A BUDGET OBJECT. It reaches no
+# employee and has no effort rung, so it rides the backup call (audit-setup.md
+# § Step 0.2) rather than either budget call. What it DOES share with every lane is
+# the option set: the same pool, the same cost order, a `(recommended)` mark, and a
+# pre-selection. That set was the only budget object still assembled by hand, which
+# is the shape of every drift this script exists to end.
+_ADVISOR_ROW_RE = re.compile(r"session advisor", re.I)
+_ADVISOR_CELL_RE = re.compile(r"^\|\s*Advisor model\s*\|\s*`([^`]+)`\s*\|\s*$", re.M)
+
+# The literal a user types into the blank field to decline an advisor. It is not a
+# model ID and is never written as one: choosing it REMOVES the `advisorModel` key.
+_ADVISOR_DECLINE = "none"
+
+
+def parse_advisor_rec(statics, template_text):
+    """The advisor's recommended model, resolved from TWO statements that must agree.
+
+    The pool row whose Notes cell names the session advisor is the recommendation
+    (§ Model statics); § Session advisor's shipped-default cell restates it. Reading
+    only the cell would let a pool refresh strand the advisor on a dropped model;
+    reading only the row would let the two disagree unnoticed. Requiring agreement is
+    what makes either one trustworthy to quote."""
+    rows = [m for m, notes, _l in statics if _ADVISOR_ROW_RE.search(notes)]
+    cell = _ADVISOR_CELL_RE.search(template_text)
+
+    # NEITHER PRESENT IS NOT AN ERROR. A template that says nothing about an advisor
+    # has no advisor object to render, and refusing here would take the whole picker
+    # down with it — the lanes are independent of this and a caller with no
+    # trustworthy pool is the one failure this script must not manufacture. The
+    # SHIPPED template always carries both, and `bin/check` is what holds it to that;
+    # a fixture exercising lane behaviour alone is not obliged to.
+    if not rows and cell is None:
+        return None
+    # A DEFECT HERE IS REPORTED IN THE ADVISOR BLOCK, NEVER BY REFUSING THE PICKER.
+    # The five lanes do not depend on any of this, and killing their option set over a
+    # bad advisor cell would deny the caller a trustworthy pool for a reason that has
+    # nothing to do with the pool — manufacturing the one failure this script exists
+    # to prevent. The lane renderer already sets the precedent with its
+    # `!! no model is marked 'Recommended for <lane>'` line: say what is wrong, in the
+    # block where it is wrong, and keep emitting. `bin/check` is what holds the SHIPPED
+    # template to exactly one row and one agreeing cell.
+    if len(rows) > 1:
+        return ("!! %d pool rows name the session advisor (%s); exactly one must, so no "
+                "recommendation can be marked" % (len(rows), ", ".join(rows)))
+    if cell is None:
+        return ("!! § Model statics marks '%s' as the session advisor's pick, but the "
+                "template has no '| Advisor model | `<id>` |' cell in § Session advisor "
+                "to agree with it" % rows[0])
+    if not rows:
+        return ("!! § Session advisor's default cell carries '%s', but no § Model statics "
+                "row names the session advisor, so nothing marks it recommended"
+                % cell.group(1).strip())
+    if cell.group(1).strip() != rows[0]:
+        return ("!! the advisor's two statements disagree: § Model statics marks '%s' and "
+                "§ Session advisor's default cell carries '%s'" % (rows[0], cell.group(1).strip()))
+    return rows[0]
+
+
+def read_advisor_setting(root, settings_path=None):
+    """(recorded_model, source_path) from the project's settings, or (None, None).
+
+    Checked local-first, because `.claude/settings.local.json` is the more specific
+    scope and the template says the key is removed from `whichever carried it`. An
+    absent key, an absent file, and unparseable JSON are all NOT-RECORDED — this is a
+    first-run signal, never an error: a project that has never chosen an advisor is
+    the ordinary case, and refusing to render the picker would be refusing the very
+    question that fixes it."""
+    if settings_path is not None:
+        candidates = [settings_path]
+    else:
+        candidates = [os.path.join(root, ".claude", "settings.local.json"),
+                      os.path.join(root, ".claude", "settings.json")]
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            value = data.get("advisorModel")
+            if isinstance(value, str) and value.strip():
+                return value.strip(), path
+    return None, None
+
+
+def _advisor_block(statics, advisor_rec, recorded, recorded_src):
+    """The advisor object, rendered in the same shape as a lane block.
+
+    THE TWO MARKS ARE INDEPENDENT, and that is the whole point of rendering this
+    mechanically. `(recommended)` states what the template recommends and is printed
+    on EVERY run; `[pre-selected]` states what this project already chose. A re-audit
+    shows both — the recorded model pre-selected, the recommendation still marked
+    where the cost order puts it — so a user can always see what the current advice
+    is, not just what they picked last time. Prose said `pre-selects instead`, which
+    reads as the recommendation being replaced, and no reader could tell which was
+    meant without an emitter to point at."""
+    out = []
+    out.append('ADVISOR  (object: "An advisor for you?" — rides the BACKUP call, '
+               "audit-setup.md § Step 0.2; not a lane, and it has no effort object)")
+    out.append("  header/body copy: audit-setup.md § Step 0.2 — the advisor's one home, "
+               "because it rides that call and not a budget call")
+    if advisor_rec.startswith("!!"):
+        out.append("  " + advisor_rec)
+        advisor_rec = None
+    for model_id, _notes, _lanes in statics:
+        marks = []
+        if model_id == advisor_rec:
+            marks.append("(recommended)")
+        if model_id == (recorded if recorded is not None else advisor_rec):
+            marks.append("[pre-selected]")
+        out.append("  - %s%s" % (model_id, ("  " + " ".join(marks)) if marks else ""))
+    pool_ids = [m for m, _n, _l in statics]
+    if recorded is not None and recorded not in pool_ids:
+        if recorded.lower() == _ADVISOR_DECLINE:
+            out.append("  + Other (hand-typed model ID, or `%s` to decline an advisor) = %s  "
+                       "[pre-selected]" % (_ADVISOR_DECLINE, _ADVISOR_DECLINE))
+        else:
+            out.append("  + Other (hand-typed model ID, or `%s` to decline an advisor) = %s  "
+                       "[pre-selected, recorded pin, not a static]"
+                       % (_ADVISOR_DECLINE, recorded))
+    else:
+        out.append("  + Other (hand-typed model ID, or `%s` to decline an advisor)"
+                   % _ADVISOR_DECLINE)
+    out.append("    typing `%s` REMOVES the advisorModel key from settings entirely — "
+               "never an empty string, never a sentinel" % _ADVISOR_DECLINE)
+    if recorded is None:
+        out.append("  default source: recommended default (no advisorModel recorded)")
+    else:
+        out.append("  default source: recorded advisorModel = %s (%s)"
+                   % (recorded, recorded_src))
+    out.append("")
+    return out
 
 
 def parse_wording(template_text):
@@ -500,7 +635,8 @@ def _lane_block(lane_key, lane_label, prompt_label, statics, rec, defaults, pool
     return out
 
 
-def emit(statics, rec, defaults, stale, template_path, wording):
+def emit(statics, rec, defaults, stale, template_path, wording,
+         advisor_rec, advisor_recorded, advisor_src):
     pool_ids = [m for m, _n, _l in statics]
     pool_set = set(pool_ids)
     meta = {k: (lbl, prompt) for k, lbl, prompt in LANES}
@@ -511,6 +647,8 @@ def emit(statics, rec, defaults, stale, template_path, wording):
     out.append("pool (cost order, most expensive first): " + ", ".join(pool_ids))
     out.append("lanes: %d, rendered as %d AskUserQuestion calls (cap: %d objects per call)"
                % (len(LANES), len(CALL_GROUPS), _OBJECT_CAP))
+    if advisor_rec is not None:
+        out.append("plus 1 advisor object, which rides the backup call and is not a lane")
     out.append("")
     for call_name, call_desc, keys in CALL_GROUPS:
         ordered = [k for k in _LANE_KEYS if k in keys]
@@ -529,6 +667,8 @@ def emit(statics, rec, defaults, stale, template_path, wording):
             lane_label, prompt_label = meta[lane_key]
             out.extend(_lane_block(lane_key, lane_label, prompt_label,
                                    statics, rec, defaults, pool_set))
+    if advisor_rec is not None:
+        out.extend(_advisor_block(statics, advisor_rec, advisor_recorded, advisor_src))
     if stale:
         out.append("STALE-ARTIFACT: the project's org-config.md carries a '## Model statics' "
                    "heading. The pool was read from the template, never from that copy. "
@@ -551,6 +691,9 @@ def main(argv=None):
                     help="path to org-config.template.md (default: co-located references/ copy)")
     ap.add_argument("--config", default=None,
                     help="path to the project's org-config.md (re-audit defaults + stale-section check)")
+    ap.add_argument("--settings", default=None,
+                    help="path to the settings JSON carrying advisorModel (default: the "
+                         "project's .claude/settings.local.json, then .claude/settings.json)")
     args = ap.parse_args(argv)
 
     # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
@@ -586,7 +729,12 @@ def main(argv=None):
         defaults = parse_config_defaults(config_text)
         stale = config_has_stale_statics(config_text)
 
-    sys.stdout.write(emit(statics, rec, defaults, stale, template_path, wording) + "\n")
+    advisor_rec = parse_advisor_rec(statics, template_text)
+    advisor_recorded, advisor_src = read_advisor_setting(
+        args.root, _resolve(args.settings) if args.settings else None)
+
+    sys.stdout.write(emit(statics, rec, defaults, stale, template_path, wording,
+                          advisor_rec, advisor_recorded, advisor_src) + "\n")
     return 0
 
 

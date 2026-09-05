@@ -1,6 +1,6 @@
 # audit setup — the question budget and the gates before the survey
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 55 assertion(s) in bin/check name this file; 75 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 56 assertion(s) in bin/check name this file; 75 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every gate here runs before `audit` may write anything. Split out of
      procedures/audit.md, which owns Steps 1 through 7 and is the only caller of the full sequence;
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
@@ -185,21 +185,25 @@ from that list for a full commit and no run ever executed it; this gate does not
 
 ## How every question is worded — plain language, no exceptions
 
-**The six questions are the only part of this system a human reads.** Everything else in this
-distribution is written for an agent in a fresh context, and it is dense on purpose. **That register
-must not reach the questions.** A reader at question 2 of 6 has installed a skill and typed one
-command. They have not read `conversion-taxonomy.md`. They do not know what a sweep is.
+**The rule and the banned-word list live in `references/plain-output.md`.** Read it before wording any
+question here. It is not restated in this file: it applies to every question and every report a human
+reads, and a copy scoped to "the six questions" is exactly the narrowing that let the rest of the run
+talk however it liked.
 
-**Banned from the QUESTION TEXT and from every option label — this is a list, and it is checked
-against the specified wording:** `archive` (as a verb), `the tree`, `sweep`, `disposition`,
-`conversion` / `convert`, `degrade` / `degraded`, `orchestrator`, `IC`, `Lead`, `tier`, `census`,
-`preflight`, `invariant`, `canary`, `probe`, `handbook`, `employee`. Say what happens to **their
-project**, in words they already own.
+A reader at question 2 of 6 has installed a skill and typed one command. They have not read
+`conversion-taxonomy.md`. They do not know what a sweep is. Say what happens to **their project**, in
+words they already own.
+
+*Scope widened 2026-09-05. This section owned the rule and applied it to the six setup questions only.
+Everything else the run said to the user — findings, summaries, and any question asked outside setup —
+was ungoverned, and the user reported it: "your responses back to me and the choices you give back to
+me are too cryptic." The list moved to `plain-output.md` intact and grew six terms; nothing was
+relaxed.*
 
 *The doc's list and the check's list were different lengths until 2026-08-03 — the check omitted
 `IC`, `Lead`, `tier`, `probe`, `handbook`, `employee`, and `conversion`, while question 3's own option
 labels used three of them. "This is a list, and it is checked" was false in both directions. They are
-one list now.*
+one list now, in `plain-output.md`.*
 
 | Instead of | Write |
 |---|---|
@@ -253,7 +257,7 @@ defect above:
 
 It offers the same model pool as the model budget, in the same cost order, and **takes as its
 recommendation the pool row whose Notes cell names the session advisor** (`org-config.template.md`
-§ Model statics, row 1 as shipped, the same pick as code and creative-visual), marked `(recommended)` in
+§ Model statics, row 1 as shipped, the same pick as creative-visual), marked `(recommended)` in
 place and pre-selected on a first run; a recorded `advisorModel` pre-selects instead (Step 0.3). Typing
 **none** in the blank field removes the `advisorModel` key from settings
 entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is never written as an empty or

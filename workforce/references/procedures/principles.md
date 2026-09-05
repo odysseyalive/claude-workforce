@@ -24,7 +24,7 @@ procedure — it gets decided here. That is what keeps handbooks followable.
 2. **Ratify** — the user approves each item. Captured **verbatim** from their wording. Mechanics
    implementing a principle live in `references/`, never inside the immutable block.
 3. **Write** into `operating-principles/SKILL.md`, inside `<!-- origin: user | immutable: true -->`.
-4. **Assert four things on every write:**
+4. **Assert five things on every write:**
    - the skill does **not** set `disable-model-invocation: true` — such skills cannot be preloaded,
      and preloading is the entire delivery mechanism
    - the whole file stays under the length ceiling (`references/templates.md`)
@@ -34,6 +34,12 @@ procedure — it gets decided here. That is what keeps handbooks followable.
    - the written `operating-principles/SKILL.md` carries the session-artifact clause — a complex
      issue or a visual asset example is communicated in one shareable artifact, reused and updated
      across the session, with its examples kept as a labeled progression (`references/session-artifact.md`)
+   - the written `operating-principles/SKILL.md` carries the plain-output clause — anything a human
+     reads is written the way you would say it, and a question the reader must decode before they can
+     answer it is a broken question (`references/plain-output.md`). Double-guarded here for the same
+     reason the two clauses above are: it is the constitution's only carrier into an employee, and a
+     constitution written without it governs an org that talks to its owner in this distribution's
+     own vocabulary
 
 ## Growth and its limit
 

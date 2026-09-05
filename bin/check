@@ -1862,8 +1862,8 @@ check(
     "default. Item 8 makes refusing an instruction to misstate/omit/fabricate a shipped constitution rule",
 )
 check(
-    "principles: step 4 forces the integrity clause as a fourth assertion on every write",
-    "Assert four things on every write" in _prin_proc
+    "principles: step 4 forces the integrity clause as a standing assertion on every write",
+    re.search(r"\*\*Assert \w+ things on every write:\*\*", _prin_proc) is not None
     and "carries the integrity clause" in _prin_proc,
     "the template can ship item 8 and a later write still drop it; principles.md step 4 must assert the "
     "written operating-principles/SKILL.md carries the integrity clause, alongside the model-invocation "
@@ -5854,7 +5854,7 @@ for _ln in _stat_sec.splitlines():
     for _lane in re.findall(r"Recommended for ([\w -]+?)\*\*", _ln):
         _lane_recs[_lane.strip().lower()] = _mid.group(1)
 # THE SANCTIONED OUT IS PERMITTED, NOT REQUIRED. Until 2026-09-02 creative-visual's
-# recommended model (claude-fable-5) sat DELIBERATELY outside the statics pool and this
+# recommended model sat DELIBERATELY outside the statics pool and this
 # check REQUIRED it there. Its successor entered the pool as row 1, recommended for
 # code and creative-visual both, and the shipped template no longer carries an
 # out-of-pool annotation. The mechanism stays (wf-model-budget still leads a lane's
@@ -8255,6 +8255,75 @@ check("budget guard: hardcodes no model ID and no rung — it reads the emitters
       and "wf-model-budget" in _wbg_code and "wf-effort-budget" in _wbg_code,
       "a guard that carried its own copy of the pool or the ladder would be a third "
       "source that drifts; it must verify against the emitters and nothing else")
+
+# THE REGISTER WRITTEN FOR AGENTS STOPS AT THE USER. The rule existed twice and both
+# copies were scoped too narrow: audit-setup.md governed the six setup questions,
+# text-eval's coffee test governed prose authored into files, and a question asked
+# outside setup was governed by nothing. MEASURED 2026-09-05 — a budget question asked
+# whether a model should "stay in the statics pool as a selectable option" and the user
+# answered "I don't even understand what your asking". These assertions keep the rule
+# single-homed, carried by all three readers, and floored by a hook.
+_plo = read("workforce/references/plain-output.md")
+_tpl_t = read("workforce/references/templates.md")
+_org_p = read("workforce/references/procedures/org.md")
+_wpg = read("workforce/bin/wf-plain-guard")
+check("plain output: the banned-term list has one home, and the rule covers every reader",
+      "Banned from question text and from every option label" in _plo
+      and "Every question you ask a human, and every report you hand one" in _plo,
+      "plain-output.md is the single home of the wording rule and its banned-term list. "
+      "Scoped back to questions alone, it reverts to the narrow rule that let every "
+      "report and every non-setup question through")
+check("plain output: audit-setup points at the rule instead of restating a narrower copy",
+      "references/plain-output.md" in _asu
+      and "archive` (as a verb)" not in _asu,
+      "audit-setup.md must POINT at plain-output.md, not carry its own copy of the "
+      "list. Two lists is how the doc's and the check's diverged before 2026-08-03, and "
+      "a copy scoped to 'the six questions' is the narrowing this change undid")
+check("plain output: the principles write is double-guarded on the clause",
+      "Assert five things on every write" in read("workforce/references/procedures/principles.md")
+      and "carries the plain-output clause" in read("workforce/references/procedures/principles.md"),
+      "principles.md double-guards the integrity and session-artifact clauses on every write and must "
+      "guard this one the same way: operating-principles is the constitution's only carrier into an "
+      "employee, and one written without the clause governs an org that talks to its owner in this "
+      "distribution's vocabulary")
+check("plain output: every generated org carries it as a constitution item",
+      "Anything a human reads" in _tpl_t and "plain-output.md" in _tpl_t,
+      "operating-principles is preloaded into every employee and force-refreshed by "
+      "audit; without the item the rule reaches this repo and no org workforce builds")
+check("plain output: /org carries it on every routed ask, not just an audit's",
+      "Whatever reaches the user is written the way you would say it" in _org_p
+      and "plain-output.md" in _org_p,
+      "the dispatch checkpoint is injected on every routed ask. Without the rung the "
+      "rule governs audit's six questions again and nothing a dispatch says back")
+check("plain guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
+      "hook workforce/bin/wf-plain-guard" in read("manifest.txt")
+      and '"wf-plain-guard": ("PreToolUse", "AskUserQuestion")' in _wsa
+      and "wf-plain-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
+      and "| `wf-plain-guard` | `PreToolUse` | `AskUserQuestion` |" in _hks,
+      "a rule with three prose carriers and no floor is the shape that failed twice "
+      "already; an opt-in or unregistered hook is the dormant shape four inherited "
+      "hooks died in")
+check("plain guard: named in the enforcement table at its true strength",
+      "PREVENTS the call once wired" in enf and "wf-plain-guard" in enf
+      and "coffee test" in enf,
+      "enforcement.md must carry the row at its true strength and say what it does NOT "
+      "cover: the guard checks a word list, while register and length stay the coffee "
+      "test, a human judgment. Describing it as enforcing clarity would be Core "
+      "Principle 6's exact failure")
+_wpg_parts = _wpg.split('"""')
+_wpg_code = (_wpg_parts[0] + "".join(_wpg_parts[2:])) if len(_wpg_parts) >= 3 else _wpg
+_plo_terms = re.findall(r"`([a-z][a-z -]*)`",
+                        (re.search(r"\*\*Banned from question text and from every option label\*\*(.*?)\n\n",
+                                   _plo, re.S) or type("m", (), {"group": lambda s, n: ""})()).group(1))
+_plo_leaks = sorted({t for t in _plo_terms
+                     if re.search(r"""['"]%s['"]""" % re.escape(t), _wpg_code)})
+check("plain guard: hardcodes no banned term — it reads plain-output.md",
+      bool(_wpg) and bool(_plo_terms) and not _plo_leaks
+      and "plain-output.md" in _wpg_code,
+      "wf-plain-guard names a banned term in executable code (found: %s; %d term(s) read "
+      "from the reference). The list lives in plain-output.md; a second copy in the hook "
+      "makes adding a word a two-file hunt and drifts silently"
+      % (_plo_leaks, len(_plo_terms)))
 
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,

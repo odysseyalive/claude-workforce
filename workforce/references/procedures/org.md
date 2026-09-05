@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 27 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -346,6 +346,13 @@ someone can read instead of re-derive.
    documents already answer. When routing itself meets a conflict or an apparent contradiction,
    resolve it from the documents first; ask the user only when the sources genuinely conflict or
    none answers, and then with receipts.
+
+13. **Whatever reaches the user is written the way you would say it.** Answer first, one idea per
+   sentence, no explanation nobody asked for, and no word from this file's own vocabulary — a reader
+   never has to know what a rung, a lane, an invariant, or an emitter is to read your reply. When
+   rung 11 or 12 makes you ask, state the real choice and what changes on each answer; a question the
+   reader must decode before answering is a broken question, and the fix is the question, not their
+   patience (`references/plain-output.md`).
 <!-- ORG-DISPATCH-CHECKPOINT END -->
 ```
 

@@ -24,17 +24,21 @@ each budget renders as two calls, grouped identically to `audit-setup.md` § Ste
   (`org-config.template.md` § The four lanes). Each object offers the four statics from
   `org-config.template.md` § Model statics in cost order, plus a **blank field** for a hand-typed model
   ID, and marks its lane's recommended static `(recommended)` where the cost order puts it — never
-  promoted to the top (`audit-setup.md` § Step 0.4a) — except creative-visual's recommended model, which
-  sits outside the pool and therefore leads that lane's options as a first-class `(recommended)` choice
-  (the cheapest pool model is dropped from that lane's slate to fit the four-option cap). **No CEO
+  promoted to the top (`audit-setup.md` § Step 0.4a) — with one exception, which the shipped template
+  does not currently exercise: WHEN creative-visual's recommended model sits outside the pool, it leads
+  that lane's options as a first-class `(recommended)` choice and the cheapest pool model is dropped from
+  that lane's slate to fit the four-option cap. Creative-visual is the only lane that may point outside
+  the pool; since 2026-09-02 its pick has been row 1, so the path is available and unused. **No CEO
   question** — the CEO is the main session.
   **No separate tier question** — the analytical lane supplies the Lead and IC rows, which now differ in
   model as well as effort.
 - **Effort budget — two calls, six objects:** the same lanes grouped identically to the model budget,
   each marking its recommended rung `(recommended)` (`audit-setup.md` § Step 0.4b) and offering only rungs
   the lane's selected model supports — at most four, because `AskUserQuestion` caps options at four.
-- **Advisor — 1 object:** pre-selected from `advisorModel` in settings; same model pool, no
-  recommendation, and its **blank field is where the user types `none` to remove the `advisorModel` key
+- **Advisor — 1 object:** pre-selected from `advisorModel` in settings on a re-audit; same model pool,
+  and on a first run pre-selected from its recommendation — the pool row whose Notes cell names the
+  session advisor (`org-config.template.md` § Model statics), marked `(recommended)` in place in the cost
+  order like any lane's. Its **blank field is where the user types `none` to remove the `advisorModel` key
   entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
   full `audit` it is the second object of the backup call, `audit-setup.md` § Step 0.2), and because
   every budget call is already at its object cap.

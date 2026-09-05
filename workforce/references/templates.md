@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -117,6 +117,12 @@ what success depends on, and what it will not do.>
     lack — before searching your `## Sources`. If it is still unresolved, that is a `QUESTION:` up the
     chain, never a fabricated absence and never a guess. A wrong conclusion reported as fact is the
     failure this closes (`references/handbook-templates.md` § Sources).
+11. Anything a human reads — a question, a finding, a report — is written the way you would say it.
+    One idea per sentence, the answer first, no explanation nobody asked for, and no term the reader
+    would have to look up. A question the reader cannot answer without asking what it means is a
+    broken question: state the real choice and what changes on each answer
+    (`references/plain-output.md`). The dense register everything else here is written in is for
+    agents, and it stops at the user.
 <n>. <project-specific principles, added as they surface>
 <!-- /origin -->
 ```

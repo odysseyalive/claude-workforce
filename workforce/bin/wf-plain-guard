@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Block an `AskUserQuestion` written in this distribution's own vocabulary.
+
+WHY THIS EXISTS. Everything in this distribution is written for an agent reading
+cold, and it is dense on purpose. That register kept reaching the user. The rule
+against it existed twice and both copies were scoped too narrow: `audit-setup.md`
+covered the six setup questions, the text-eval catalog covered prose authored into
+files, and nothing covered a question asked outside setup or a report handed back in
+the terminal. MEASURED 2026-09-05, a budget question asked the user whether a model
+should "stay in the statics pool as a selectable option" and they answered "I don't
+even understand what your asking." `wf-budget-guard` saw that question and passed it
+through — correctly, by its own contract: it verifies which OPTIONS a budget picker
+offers, and this question's options were fine. Nothing verified the WORDS.
+
+WHAT IT DOES. Reads the PreToolUse payload for `AskUserQuestion` and checks every
+string a human will read — question text, option labels, option descriptions — against
+the banned-term list in `references/plain-output.md`. A hit blocks the call and names
+the terms found and the string they were found in. Whole-word, case-insensitive.
+
+WHAT IT DOES NOT DO. It does not judge register, length, or clarity. Those are the
+coffee test, which is a human judgment and stays advisory (`plain-output.md` § The
+test). This guard covers the mechanical half only: a fixed list of words a reader
+would have to look up. A guard that tried to score prose quality would fire on
+everything and be turned off, which is how a catalog stops being read.
+
+NO TERM IS WRITTEN HERE. The list lives in `references/plain-output.md` and is parsed
+from it, so adding a word is a one-line edit to the reference and never a two-file
+hunt (SKILL.md Principle 9a). A term list copied into this file would drift from the
+reference the moment either changed.
+
+EXIT CODES: 0 pass or could-not-verify (a guard bug never wedges a session); 2 block.
+"""
+
+import json
+import os
+import re
+import sys
+
+_REF = os.path.join("references", "plain-output.md")
+
+# The paragraph that owns the list. Everything backticked inside it is a banned term.
+_LIST_RE = re.compile(
+    r"\*\*Banned from question text and from every option label\*\*(.*?)(?:\n\n)", re.S)
+
+
+def _note(msg):
+    sys.stderr.write("wf-plain-guard: " + msg + "\n")
+
+
+def _read_payload():
+    try:
+        return json.loads(sys.stdin.read() or "{}")
+    except (ValueError, OSError):
+        return None
+
+
+def _ref_path(root):
+    """The shipped reference, resolved beside this script first.
+
+    A hook runs from the project root, but the rule ships with the skill — so the
+    co-located copy is authoritative and the project-root path is the fallback for a
+    test harness that stages one."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for cand in (os.path.join(os.path.dirname(here), _REF),
+                 os.path.join(root, _REF)):
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def parse_terms(text):
+    """The banned terms, read from the reference's own list paragraph.
+
+    Returns [] when the paragraph cannot be found, which is a PASS-THROUGH signal and
+    never a block: refusing every question because a reference moved would wedge a
+    session over the guard's own bookkeeping."""
+    m = _LIST_RE.search(text)
+    if not m:
+        return []
+    terms = []
+    for tok in re.findall(r"`([^`]+)`", m.group(1)):
+        tok = tok.strip().lower()
+        # `conversion` / `convert` arrives as two separate backticked tokens already.
+        if tok and re.match(r"^[a-z][a-z -]*$", tok):
+            terms.append(tok)
+    return sorted(set(terms), key=len, reverse=True)
+
+
+def _strings(payload):
+    """Every string a human reads in this call, as (where, text) pairs."""
+    out = []
+    for q in (payload.get("tool_input") or {}).get("questions") or []:
+        if not isinstance(q, dict):
+            continue
+        if q.get("question"):
+            out.append(("question text", str(q["question"])))
+        if q.get("header"):
+            out.append(("header", str(q["header"])))
+        for opt in q.get("options") or []:
+            if isinstance(opt, dict):
+                if opt.get("label"):
+                    out.append(("option label", str(opt["label"])))
+                if opt.get("description"):
+                    out.append(("option description", str(opt["description"])))
+    return out
+
+
+def hits(text, terms):
+    """Banned terms appearing as whole words in `text`, in list order."""
+    low = text.lower()
+    found = []
+    for term in terms:
+        if re.search(r"(?<![\w-])" + re.escape(term) + r"(?![\w-])", low):
+            found.append(term)
+    return found
+
+
+def main():
+    payload = _read_payload()
+    if payload is None:
+        _note("could not verify — stdin is not a JSON payload; passing through")
+        return 0
+    if payload.get("tool_name") not in (None, "AskUserQuestion"):
+        return 0
+    strings = _strings(payload)
+    if not strings:
+        return 0
+
+    root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    ref = os.environ.get("WF_PLAIN_GUARD_REF") or _ref_path(root)
+    if not ref or not os.path.exists(ref):
+        _note("could not verify — plain-output.md not found; passing through")
+        return 0
+    try:
+        with open(ref, "r", encoding="utf-8") as fh:
+            terms = parse_terms(fh.read())
+    except OSError as exc:
+        _note("could not verify — %s; passing through" % exc)
+        return 0
+    if not terms:
+        _note("could not verify — no banned-term list parsed from %s; passing through" % ref)
+        return 0
+
+    bad = [(where, text, hits(text, terms)) for where, text in strings]
+    bad = [b for b in bad if b[2]]
+    if not bad:
+        return 0
+
+    lines = ["BLOCKED — this question is written in words the reader would have to look up."]
+    for where, text, found in bad:
+        lines.append("  %s: %s" % (where, text if len(text) <= 160 else text[:157] + "..."))
+        lines.append("    reader would have to look up: " + ", ".join(found))
+    lines.append("")
+    lines.append("Rewrite it the way you would say it out loud. State the real choice and what "
+                 "changes on each answer. Name the thing, not the machinery.")
+    lines.append("The list and the rule: %s" % ref)
+    _note("\n".join(lines))
+    return 2
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # a guard bug must never wedge a session
+        _note("could not verify — %s: %s; passing through" % (type(exc).__name__, exc))
+        sys.exit(0)

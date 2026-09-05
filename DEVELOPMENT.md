@@ -113,7 +113,89 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-02
+## Open, as of 2026-09-05
+
+**Landed 2026-09-05 (dev session) — plain output: the register written for agents stops at the user
+(v1.16.0).** Trigger: the owner, mid-session — *"your responses back to me and the choices you give
+back to me are too cryptic"*, then *"the real issue is the communication style. I want all output to
+the user to be in a natural communication style and I want NO OVERBUILT explainations, sentences,
+etc."* The raising instance was a budget question in this same session asking whether a model should
+"stay in the statics pool as a selectable option", answered *"I don't even understand what your
+asking."*
+
+- **The rule existed twice and both copies were scoped too narrow.** `audit-setup.md` § How every
+  question is worded governed the six setup questions; text-eval's coffee test governed prose authored
+  into files. A question asked outside setup, and every report handed back in the terminal, were
+  governed by nothing. `wf-budget-guard` saw the offending question and passed it correctly — its
+  OPTIONS were fine; nothing checked the WORDS.
+- **One home:** `references/plain-output.md`. The banned-term list moved out of `audit-setup.md`
+  intact and gained six terms (`statics`, `pool`, `emitter`, `lane`, `object`, `pre-selected`).
+- **Four carriers, because no single one reaches every path.** `SKILL.md` Core Principle 8b covers
+  every `/workforce` invocation **including `dev`**, which routes through neither `/org` nor `audit`
+  and so was missed by the other three — it is the path the owner was on when they reported this.
+  `operating-principles` item 11 reaches every employee, double-guarded on write in `principles.md`
+  step 4 exactly as the integrity and session-artifact clauses are. `/org` dispatch rung 13 reaches
+  every routed ask. `audit-setup.md` now points at the rule instead of keeping a narrower copy.
+- **The floor:** `wf-plain-guard`, a `PreToolUse` hook on `AskUserQuestion` that BLOCKS a question
+  using a banned term and names the terms and the string they were in. It hardcodes no term — it
+  parses the list from `plain-output.md`. It checks WORDS only; register and length stay the coffee
+  test, a human judgment, and `enforcement.md` says so, because a checker that scored prose quality
+  would fire on everything and be turned off.
+- **Refresh cost for an existing project, measured, not assumed:** `/workforce update` alone activates
+  the `SKILL.md` principle and the reference — the main-session fix. The three project-side carriers
+  are one command each and NOT a re-audit: `hooks` wires the guard, `org index` regenerates the
+  dispatch rung, `principles` rewrites the constitution. An audit does all three as a side effect.
+
+**Also landed (v1.15.0, same session) — model defaults and the advisor object.** The analytical Lead
+and `code` moved to `claude-opus-5` by directive; the advisor was confirmed already on
+`claude-fable-5-1`. `claude-fable-5` is deprecated and no longer named anywhere in the shipped tree.
+`wf-model-budget` now emits the **advisor object** it never emitted — the last budget object still
+assembled by hand — and `wf-budget-guard` reads its `ADVISOR` block as comparable, so the advisor
+question is verified against its own block rather than against whichever lane happens to offer the
+same four models. **The advisor's `(recommended)` mark now prints on every run, beside whatever the
+project recorded**, which is what the owner asked for: prose had said the recorded value "pre-selects
+instead", which reads as the recommendation being replaced.
+
+- **Two bugs found and fixed in the same pass, both mine.** `parse_advisor_rec` first REFUSED the
+  whole picker when the advisor's two statements disagreed — killing five lanes over a cell unrelated
+  to them, which is the exact failure the emitter exists to prevent. It now reports `!!` inside the
+  advisor block and keeps emitting. And `bin/prove` gained `TPL`/`ORG` bindings that **already
+  existed** (`handbook-templates.md`, `org-doctrine.md`), silently retargeting 23 cases at the wrong
+  file; every one reported `SETUP-FAIL` rather than a false pass, so the harness caught its own
+  miswiring. Renamed to `TMPL`, and the pre-existing `ORGP` reused.
+- `principles.md` step 4's assertion count was pinned as a literal ("Assert four things"), so adding
+  a clause broke a check whose real subject is the integrity clause. The count is now read by shape —
+  it was a restated constant, and this was the second time it would have had to move.
+
+**Landed 2026-09-05 (dev session) — model defaults: the analytical Lead and `code` move to
+`claude-opus-5`; the advisor is confirmed on `claude-fable-5-1` (v1.15.0).** Requested by the user
+(`/workforce dev`): *"I would just like to confirm the budget questions include the following
+recommendations. Advisor recommendation: claude-fable-5-1, Coder recommendation: claude-opus-5, Lead
+recommendation: claude-opus-5.. in all budget qustions were applicable, replace cluade-opus-4-8 with
+claude-opus-5 amd claude-fable-5 with claude-fable-5-1"*. One of the three was already true — the
+advisor has been on `claude-fable-5-1` since 2026-09-02 — and is recorded as confirmed rather than
+changed. This is a directive, not a benchmark re-read, and § Model statics says so in the paragraph that
+records it: the prior Lead pick argued from steerability, which was a preference and never a measurement
+on this project's work.
+
+- **Pool.** `claude-opus-5` re-enters § Model statics as row 2, in place of `claude-opus-4-8`,
+  recommended for `analytical Lead` AND `code`. Same `$5/$25` tier, so the cost order is unchanged and
+  the swap is row-for-row. `claude-opus-4-8` becomes the "Other"-field worked example the outgoing pick
+  always becomes. Row 1 keeps `creative-visual` and the advisor; the two-lanes-on-one-row path stays
+  exercised, now by row 2.
+- **What the emitters render.** `wf-model-budget` marks `claude-opus-5 (recommended) [pre-selected]` on
+  both `analytical · Lead` and `code`, `claude-fable-5-1` on `creative-visual`, `claude-sonnet-5` on
+  `analytical · IC`, `claude-opus-4-6` on `creative-text`. `wf-effort-budget` resolves both changed lanes
+  to `claude-opus-5` and offers the same rungs as before, because the ladders are identical — the code
+  lane's repin changed no effort offer, and `platform.md` fact 12c now says that in the claim itself.
+- **A price correction rode along, and it was not cosmetic.** § Model statics carried `claude-sonnet-5`
+  at `$3/$15`, describing the analytical IC's saving as ~40%. The model reference (`claude-api`, cached
+  2026-06-24) has it at `$2/$10`, which is ~60%. Both statements of the figure are fixed, and the
+  arithmetic behind the whole pool ordering was re-read the same day.
+- **Not done here, and named:** this repository's own `.claude/workforce/org-config.md` still records the
+  Budget Receipt from its last audit — Leads on `claude-opus-4-8`, advisor on `claude-opus-4-6` — and
+  three registered handbooks are pinned to `claude-opus-4-8`. The never-clobber rule holds: a recorded
+  receipt is the user's, and `/workforce dev model-map` is what changes it.
 
 **Landed 2026-09-02 (dev session) — `wf-budget-guard`: a hand-built budget picker is blocked, not
 restated (v1.9.0).** Trigger: the owner showed a screenshot from a re-audit of `apps-odyssey-alive`

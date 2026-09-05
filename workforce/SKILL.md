@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 70 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 73 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.14.0"
+version: "1.16.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -345,6 +345,32 @@ not left. Mechanics at `references/handbook-templates.md` § Sources, `reference
 reporting truth as missing before searching it, seam every deletable concern to an owner, and let the
 audit heal all three into the orgs that already exist.***
 
+> **"I'm having a real issue where your responses back to me and the choices you give back to me are
+> too cryptic and don't represent well enough what the issue on the table is."**
+
+> **"I'm tired of asking your to clarify things and arguing with you when in reality the real issue is
+> the communication style. I want all output to the user to be in a natural communication style and I
+> want NO OVERBUILT explainations, sentences, etc."**
+
+*— Added 2026-09-05, source: user directive, stated during `/workforce dev` after a budget question
+asked whether a model should "stay in the statics pool as a selectable option" and the user answered
+*"I don't even understand what your asking."* **The rule already existed twice and both copies were
+scoped too narrow to reach it**: `audit-setup.md` § How every question is worded governed the six setup
+questions, and the text-eval catalog's coffee test governed prose authored into files. A question asked
+outside setup, and every report handed back in the terminal, were governed by nothing — so the dense
+register this distribution writes for cold-reading agents reached the one reader it was never for.
+Mechanics at `references/plain-output.md`, which is now the single home of the rule and of the
+banned-term list `audit-setup.md` used to own. It reaches the user through three carriers and one
+floor: operating-principles item 11 (`references/templates.md`), so every org workforce builds carries
+it; `/org` dispatch rung 13 (`references/procedures/org.md`), so it governs every routed reply and not
+just an audit's; `audit-setup.md`, which now points at it instead of restating a narrower copy; and
+`wf-plain-guard`, a `PreToolUse` hook that BLOCKS an `AskUserQuestion` using a banned term. The
+operational reading is — **say it the way you would say it out loud, answer first, one idea per
+sentence, and never make the reader decode a question before they can answer it.** The guard covers the
+mechanical half, a fixed word list; register and length are the coffee test, which is a human judgment
+and stays advisory, because a checker that scored prose quality would fire on everything and be turned
+off.*
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
@@ -535,6 +561,16 @@ never let a run decline one it staged (`references/invariants.md` row 20, `INV-S
    dominant failure mode there. Employee handbooks run in a fresh isolated context with no history
    and nobody watching: there, "do not assume anything" earns its keep. Leads get charters, ICs get
    procedures, and audit-side reference files get principles rather than decision trees.
+8b. **Everything a human reads is written the way you would say it.** Answer first, one idea per
+   sentence, no explanation nobody asked for, and no word from this distribution's own vocabulary — a
+   reader never has to know what a lane, a pool, an invariant, or an emitter is to read your reply. A
+   question the reader must decode before they can answer it is a broken question: state the real
+   choice and what changes on each answer. Full rule and the checked word list:
+   `references/plain-output.md`; the floor is `wf-plain-guard`.
+   **This principle governs every `/workforce` invocation, `dev` included**, and that is why it lives
+   here rather than only in the three carriers. Principle 8 above calibrates scaffolding to an AGENT
+   reading cold; this one is its counterpart for the one reader who is not an agent. They do not
+   conflict — a handbook stays dense, and what you say back to the user does not.
 9. **Build for the next model, not this one.** The harness and the models change every few months and
    this project is expected to move with them. Three consequences, all mandatory:
    (a) **Constants are stated once.** Tier limits, caps, and model IDs live in exactly one file and
