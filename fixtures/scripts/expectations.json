@@ -3383,5 +3383,102 @@
   "not": [
    "BLOCKED"
   ]
+ },
+ "stamp-absent-line": {
+  "_why": "THE CASE A PLACEHOLDER-ONLY PRODUCER WOULD MISS. `engineering-lead.md` on playwright-mcp carried no `contract-stamp` line at all — the template ships one and the authoring path does not reliably emit it, so 1 handbook in 6 had nothing to replace. A producer that only substituted the placeholder would have reported a clean run over it.",
+  "script": "wf-stamp",
+  "exit": 0,
+  "want": [
+   "no stamp line",
+   "would stamp",
+   "unstamped 1"
+  ]
+ },
+ "stamp-adopted": {
+  "_why": "An ADOPTED agent was censused into the chart with zero bytes changed (conversion-taxonomy.md ADOPT). It carries no ORG-RECORD, and stamping one would write workforce's own field into a file workforce does not own. Skipped BY NAME, never silently — `adopted 1` and `stamped 0` are different claims from a run that saw nothing.",
+  "script": "wf-stamp",
+  "exit": 0,
+  "want": [
+   "no ORG-RECORD",
+   "adopted 1",
+   "stamped 0"
+  ]
+ },
+ "stamp-drift": {
+  "_why": "THE NEGATIVE. A real digest that no longer matches the sections is MISMATCH: reported, exit 1, and NEVER rewritten. checksums.md § On mismatch — a legitimate amendment and an unauthorized edit are indistinguishable from the hash, so re-stamping erases the only evidence that something changed. `not` asserts the file is not silently repaired by holding the stale digest in the output; the --execute half of the same guarantee is stamp-drift-execute.",
+  "script": "wf-stamp",
+  "exit": 1,
+  "want": [
+   "MISMATCH",
+   "NEVER REPAIRED",
+   "mismatch 1"
+  ],
+  "not": [
+   "restamped"
+  ]
+ },
+ "stamp-drift-execute": {
+  "_why": "`--execute` alone must not touch a MISMATCH — the refusal is the behaviour, not the display mode. Same tree as stamp-drift with the write flag on: still exit 1, still no write, and `after` proves the stale digest is still on disk. Without this row the refusal lives only in display mode and a regression that repaired on --execute would pass every other case.",
+  "args": [
+   "--execute"
+  ],
+  "script": "wf-stamp",
+  "exit": 1,
+  "want": [
+   "MISMATCH",
+   "mismatch 1"
+  ],
+  "not": [
+   "restamped"
+  ],
+  "after": {
+   ".claude/agents/g.md": {
+    "want": [
+     "contract-stamp: sha256:de1e7ed"
+    ]
+   }
+  }
+ },
+ "stamp-execute": {
+  "_why": "The write path, asserted on the ARTIFACT and not only on stdout — script-conformance's `after` exists because a script that writes the wrong thing while reporting fine is invisible to want/not. The placeholder must be GONE and a real 64-hex digest present, because a producer that appends a second stamp line beside the first leaves two contract-stamps and every reader takes whichever it finds first.",
+  "args": [
+   "--execute"
+  ],
+  "script": "wf-stamp",
+  "exit": 0,
+  "want": [
+   "stamped",
+   "stamped 1"
+  ],
+  "after": {
+   ".claude/agents/g.md": {
+    "want": [
+     "contract-stamp: sha256:"
+    ],
+    "not": [
+     "(set at registration)"
+    ]
+   }
+  }
+ },
+ "stamp-placeholder": {
+  "_why": "DISPLAY IS THE DEFAULT and it writes nothing. The shipped template placeholder `(set at registration)` is what five of six real handbooks carried; it is not a digest, so it classifies UNSTAMPED rather than MISMATCH — writing a first stamp over it erases no prior claim and is not the repair checksums.md forbids. `after` proves the display run left the file alone.",
+  "script": "wf-stamp",
+  "exit": 0,
+  "want": [
+   "placeholder",
+   "would stamp",
+   "unstamped 1"
+  ],
+  "after": {
+   ".claude/agents/g.md": {
+    "want": [
+     "(set at registration)"
+    ],
+    "not": [
+     "sha256:"
+    ]
+   }
+  }
  }
 }

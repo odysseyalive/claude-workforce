@@ -124,7 +124,10 @@ tell you the check works — only running it does.
 ## Step 7 — Record
 
 Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`
-(`references/deferred.md` — the queue, and who drains it).
+(`references/deferred.md` — the queue, and who drains it). **This is the one caller that may overwrite
+a stamp** — `wf-stamp --root <tree> --execute --restamp` (`procedures/checksums.md` § Where it runs).
+Everywhere else a differing stamp is `MISMATCH` and is reported rather than repaired; here the
+amendment IS the authorization, which is why the flag exists and why it is not the default.
 Update the `EMP` amendment history with both keys and the real latency. Close the triggering record.
 
 ---

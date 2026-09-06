@@ -321,8 +321,8 @@ Same steps, plus:
   untouched.
 - **Any amendment returns the handbook to UNRELEASED** until it re-passes its probe. An
   amended-but-unprobed handbook may not be delegated to.
-- **Recompute the `contract-stamp`.** A changed stamp means the eval baseline is stale; queue a
-  `review` (`references/deferred.md`).
+- **Recompute the `contract-stamp`** with `wf-stamp` (`procedures/checksums.md` § Where it runs). A
+  changed stamp means the eval baseline is stale; queue a `review` (`references/deferred.md`).
 - **Never reword hand-authored text.** Append only.
 
 ---

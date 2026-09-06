@@ -129,3 +129,29 @@ Report the target, the section, and both hashes. Resolution is a human or `amend
 `${CLAUDE_PROJECT_DIR}/.claude/workforce/.directives.sha`** — named here because an inherited hook
 once read a sidecar that no procedure wrote, and reported `NO-COVERAGE` forever. A generator with no
 named destination is not a generator.
+
+**The `contract-stamp` half has a script, and until 2026-09-05 it had none.**
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}"            # report
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute  # write a FIRST stamp
+```
+
+It hashes the normalized `## Procedure` + `## Verification` of every **governed** handbook — an
+adopted agent has no `ORG-RECORD` and is skipped by name — writes
+`<!-- contract-stamp: sha256:… -->` where the template puts it, re-reads its own output before
+counting a write, and stamps the staged copy with the same digest so `hire.md` T6 and `wf-conform`'s
+staged-matches-registered check keep agreeing.
+
+**`--execute` writes a FIRST stamp only.** A placeholder or an absent line has no prior claim to
+erase. A stamp that is a real digest and no longer matches is `MISMATCH`, and § On mismatch above
+governs: reported, exit 1, never rewritten. `--restamp` is the separate gesture, and `amend` is what
+makes it — the amendment is the authorization.
+
+*The row for `contract-stamp` in § What is stamped is four days older than this paragraph and the
+whole time nothing wrote the field. Six surfaces recomputed the hash and compared it against the
+shipped placeholder, so `CONTRACT-DRIFT` — the state that says an employee's contract moved out from
+under its evals — could not fire on any org this product had ever built. Measured 2026-09-05 by
+`/workforce verify` on playwright-mcp: five handbooks carrying `(set at registration)` and a sixth
+carrying no stamp line at all. A consumer named and a producer assumed, for the fourth recorded time.*

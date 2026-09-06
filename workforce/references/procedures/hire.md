@@ -238,6 +238,31 @@ there is no handbook, no registration, and no reduction.
 most safety-critical constant; nothing above moved, and T7 keeps doing exactly what it did minus the
 mark.
 
+### T1 writes the `contract-stamp`, and this is not a new T-step
+
+**Stamping is part of producing the staged artifact, not a transaction of its own** — the T-order is
+this project's most safety-critical constant and nothing above moved. After the handbook is staged and
+before T3 lints it, run:
+
+```bash
+wf-stamp --root <tree> --execute
+```
+
+`contract-stamp` hashes the normalized `## Procedure` + `## Verification`, and the field lives in the
+`ORG-RECORD` block, which is **not** part of either section — so writing it cannot change the digest it
+records. There is no second pass and no recursion.
+
+**It goes at T1 rather than after T5 because of T6.** T6 verifies that the registered file's sha equals
+the staged handbook's. A stamp written after registration would change the registered bytes and leave
+T6's recorded sha describing a file that no longer exists — which is precisely the divergence T6 is
+there to catch, manufactured by the step meant to close a gap. Stamp the staged copy, let T5 copy it,
+and the sha covers the stamp for free.
+
+*Added 2026-09-05. No T-step named a stamping action, `handbook-templates.md` shipped the field as a
+literal placeholder, and six surfaces read it — so `CONTRACT-DRIFT` was unreachable on every org this
+product had built. `procedures/checksums.md` § Where it runs is the producer's home; this line is the
+lifecycle hook, and it is one line because the order is not the thing being changed.*
+
 **T7b — the reduction, and it is BLOCKING.** Under the user's directive that skills own mechanism and
 employees own judgment (`SKILL.md` § Directives), a conversion **separates** a skill rather than
 absorbing it. So the judgment that became handbook text is removed from `SKILL.md` here, in the same

@@ -1,0 +1,291 @@
+#!/usr/bin/env python3
+"""wf-stamp — the producer for `contract-stamp`, which had six readers and none.
+
+    wf-stamp --root <dir>              report every handbook's stamp state, write nothing
+    wf-stamp --root <dir> --execute    write the stamp where there is not one yet
+    wf-stamp --root <dir> --execute --restamp
+                                       ALSO overwrite a stamp that no longer matches —
+                                       the authorized-amendment path, and only that
+
+WHY THIS EXISTS. `contract-stamp` hashes a handbook's normalized `## Procedure` +
+`## Verification` sections, and a recomputation that differs means the employee's
+contract moved and its eval baseline is stale. Six shipped surfaces read it:
+
+    org.md § Mode: `index` step 4     classifies CONTRACT-DRIFT from it
+    verify.md § Org integrity         reports CONTRACT-DRIFT from it
+    review.md step 1                  opens on recomputing it
+    checksums.md § What is stamped    lists it as a stamped target
+    amend.md, handbook.md             each say "recompute the contract-stamp"
+    org-chart-format.md               documents the field and its drift meaning
+
+NOTHING WROTE IT. `handbook-templates.md` ships the line as the literal placeholder
+`<!-- contract-stamp: sha256:<of ## Procedure + ## Verification, normalized> -->`,
+`checksums` is executor-followed and its directive-sidecar half is the half that ever
+got performed, and no T-step in `hire.md` named a stamping action. So every reader
+above compared a recomputation against a placeholder, and CONTRACT-DRIFT — the state
+that says an employee's contract changed underneath its evals — was unreachable on
+every org this product has ever built.
+
+MEASURED 2026-09-05 by `/workforce verify` on playwright-mcp: six live employees,
+five carrying the literal string `(set at registration)` and `engineering-lead.md`
+carrying no stamp line at all. The sixth case matters on its own — the template line
+is not even reliably emitted, so a producer that only replaced a placeholder would
+have missed one handbook in six and reported a clean run.
+
+This is the shape `audit.md` names for `.directives.sha` ("a generator with no named
+destination is not a generator") and `wf-settings-apply` names for the settings write:
+a consumer named and a producer assumed. It is the fourth recorded instance.
+
+MISMATCH IS FLAGGED AND NEVER SILENTLY REPAIRED, per `checksums.md` § On mismatch: a
+differing stamp is either a legitimate amendment that did not restamp or an edit
+nobody authorized, and the hash cannot tell them apart. Re-stamping erases the only
+evidence that something changed. So the default REFUSES to overwrite and exits 1, and
+`--restamp` is the separate, explicit gesture `amend` makes when the amendment is the
+authorization. Writing a FIRST stamp over a placeholder or an absent line is not a
+repair — there is no prior claim to erase — so that happens under plain `--execute`.
+
+GOVERNED ONLY, by the ORG-RECORD marker, the same discriminator `wf-conform` uses. An
+adopted agent was censused into the chart with zero bytes changed
+(`conversion-taxonomy.md` ADOPT); stamping one would write workforce's field into a
+file workforce does not own.
+
+THE STAGED COPY IS WRITTEN TOO, and this is not an extra. `wf-conform` asserts that
+the staged draft still matches the registered bytes, and `hire.md` T6 verifies the
+registered file's sha against the staged handbook's — so stamping one and not the
+other manufactures a divergence in the very record that proves a registration was
+verified. The stamp value depends only on `## Procedure` + `## Verification`, which
+are identical in both copies, so both receive the same line and stay byte-equal.
+"""
+
+import argparse
+import glob
+import hashlib
+import os
+import re
+import sys
+
+# CANONICAL GRAMMAR, COPIED VERBATIM FROM `wf-conform`, NOT IMPORTED. `checksums.md`
+# rule 1 — "two readers of one artifact must share one grammar and one normalization,
+# or they cannot both be right" — and this distribution expresses that by copying the
+# reader with a comment naming its source, exactly as `wf-protect-directives` copies
+# `BLOCK_RX`/`ROW_RX` from `wf-conform`. `bin/check` cross-tests the copies.
+ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
+ORG_RECORD_END_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+END\b.*$", re.I | re.M)
+
+# The field, and every spelling of it that is on disk today: a real digest, the
+# shipped template placeholder, and the `(set at registration)` form real orgs carry.
+# Readers are liberal (`checksums.md` rule 1) — this matches the LINE, and the value
+# is classified afterwards, so an unrecognised value is reported rather than skipped.
+STAMP_LINE_RX = re.compile(r"^[ \t]*<!--\s*contract-stamp:\s*(.*?)\s*-->[ \t]*$", re.M)
+DIGEST_RX = re.compile(r"^sha256:([0-9a-f]{64})$")
+
+# Anchored on the line the stamp belongs after, so a first stamp lands in the same
+# position the template puts it rather than at the top or bottom of the block.
+OWNS_RECORDS_RX = re.compile(r"^[ \t]*<!--\s*owns-records:.*-->[ \t]*$", re.M)
+
+
+def normalize(text):
+    """Trailing whitespace and final newline. Same rule every reader here applies."""
+    return "\n".join(line.rstrip() for line in text.strip().splitlines())
+
+
+def section(body, heading):
+    """Text under a HEADING — line-anchored, never a bare substring search.
+
+    Copied from `wf-conform`, whose docstring records why: splitting on the first
+    occurrence anywhere hands back the tail of the PREVIOUS section when the heading
+    is also mentioned in prose, and a non-empty wrong segment passes every emptiness
+    check. Returns None when the heading is absent — distinct from an empty section.
+    """
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*[^\n]*$(.*?)(?=^## |\Z)",
+                  body, re.S | re.M)
+    return m.group(1) if m else None
+
+
+def contract_digest(body):
+    """sha256 over the normalized `## Procedure` + `## Verification` sections.
+
+    Returns None when either section is absent: a handbook missing one of them has no
+    contract to stamp, and `wf-conform` already owns that verdict. The two normalized
+    sections are joined by a single newline so that moving a line from the end of one
+    to the start of the other CHANGES the digest — concatenating them bare would make
+    that edit invisible, and it is exactly the kind of edit a drift check exists for.
+    """
+    proc, ver = section(body, "## Procedure"), section(body, "## Verification")
+    if proc is None or ver is None:
+        return None
+    payload = normalize(proc) + "\n" + normalize(ver)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def classify(body):
+    """(state, recomputed, recorded) for one handbook body.
+
+    States: NO-RECORD (not governed), NO-SECTIONS, UNSTAMPED (placeholder or no line
+    at all), OK, MISMATCH.
+    """
+    if not ORG_RECORD_RX.search(body):
+        return "NO-RECORD", None, None
+    want = contract_digest(body)
+    if want is None:
+        return "NO-SECTIONS", None, None
+    m = STAMP_LINE_RX.search(body)
+    if m is None:
+        return "UNSTAMPED", want, None          # engineering-lead's case: no line
+    recorded = m.group(1)
+    hit = DIGEST_RX.match(recorded)
+    if not hit:
+        return "UNSTAMPED", want, recorded      # the placeholder, or any non-digest
+    if hit.group(1) == want:
+        return "OK", want, recorded
+    return "MISMATCH", want, recorded
+
+
+def write_stamp(body, digest):
+    """Return body with the stamp line set to `digest`, or None if it cannot be placed.
+
+    Replaces the line in place when one exists. When none does, inserts it where the
+    template puts it — after `owns-records:`, else immediately before `ORG-RECORD END`
+    — so a handbook that never had the line ends up shaped like one that did. The line
+    is NEVER written outside the ORG-RECORD block: the block is what marks the fields
+    as machine-owned and safe to replace.
+    """
+    line = f"<!-- contract-stamp: sha256:{digest} -->"
+    if STAMP_LINE_RX.search(body):
+        return STAMP_LINE_RX.sub(lambda _m: line, body, count=1)
+    anchor = OWNS_RECORDS_RX.search(body)
+    if anchor:
+        return body[:anchor.end()] + "\n" + line + body[anchor.end():]
+    end = ORG_RECORD_END_RX.search(body)
+    if end:
+        return body[:end.start()] + line + "\n" + body[end.start():]
+    return None
+
+
+def staged_path(root, name):
+    return os.path.join(root, ".claude", "workforce", "staging", name, "HANDBOOK.md")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--execute", action="store_true")
+    ap.add_argument("--restamp", action="store_true",
+                    help="also overwrite a MISMATCH — the authorized-amendment path")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    agents = os.path.join(root, ".claude", "agents")
+    if not os.path.isdir(agents):
+        # NEVER 0 ON AN UNREADABLE TARGET. A validator exiting clean on a tree it could
+        # not open reports health it did not measure (`verify.md` § Handbook conformance).
+        print(f"wf-stamp: no .claude/agents under {root}", file=sys.stderr)
+        return 2
+
+    print(f"wf-stamp — {root}")
+    counts = {k: 0 for k in
+              ("OK", "MISMATCH", "UNSTAMPED", "NO-SECTIONS", "NO-RECORD", "STAMPED", "UNREADABLE")}
+    refused = []
+
+    for path in sorted(glob.glob(os.path.join(agents, "*.md"))):
+        name = os.path.basename(path)[:-3]
+        try:
+            body = open(path, encoding="utf-8").read()
+        except OSError as exc:
+            counts["UNREADABLE"] += 1
+            print(f"  ! UNREADABLE  {name}  ({exc.strerror})")
+            continue
+
+        state, want, recorded = classify(body)
+
+        if state == "NO-RECORD":
+            counts[state] += 1
+            print(f"  . adopted     {name}  no ORG-RECORD — workforce did not author it, not stamped")
+            continue
+        if state == "NO-SECTIONS":
+            counts[state] += 1
+            print(f"  ~ NO-SECTIONS {name}  ## Procedure or ## Verification absent — "
+                  f"nothing to hash; wf-conform owns that verdict")
+            continue
+        if state == "OK":
+            counts[state] += 1
+            print(f"  + OK          {name}  sha256:{want[:12]}…")
+            continue
+
+        if state == "MISMATCH" and not args.restamp:
+            counts[state] += 1
+            refused.append(name)
+            print(f"  ✗ MISMATCH    {name}")
+            print(f"      recorded sha256:{recorded[7:19]}… · recomputed sha256:{want[:12]}…")
+            print(f"      the contract moved since this stamp was written, so the eval baseline "
+                  f"is stale. FLAGGED, NEVER REPAIRED (checksums.md § On mismatch): a legitimate "
+                  f"amendment and an unauthorized edit are indistinguishable from the hash, and "
+                  f"re-stamping erases the only evidence. Run `review {name}`; where the "
+                  f"amendment IS the authorization, `wf-stamp --execute --restamp`.")
+            continue
+
+        verb, future = ("restamped", "restamp") if state == "MISMATCH" else ("stamped", "stamp")
+        if not args.execute:
+            counts["UNSTAMPED" if state == "UNSTAMPED" else "MISMATCH"] += 1
+            had = "placeholder" if recorded else "no stamp line"
+            if state == "MISMATCH":
+                had = f"sha256:{recorded[7:19]}…"
+            print(f"  ~ would {future:9s} {name}  {had} -> sha256:{want[:12]}…")
+            continue
+
+        updated = write_stamp(body, want)
+        if updated is None:
+            counts["UNREADABLE"] += 1
+            print(f"  ! {name}  ORG-RECORD has no END marker and no owns-records line; "
+                  f"refusing to place a stamp outside the block")
+            continue
+        open(path, "w", encoding="utf-8").write(updated)
+
+        # READ BACK AND RE-PARSE WITH THIS SCRIPT'S OWN READER. `checksums.md` rule 2:
+        # a generator that cannot verify its own output has not finished, and the
+        # inherited incident it cites is a generator whose parser could not read its
+        # own rows. `STAMPED` is never printed on a write that was not re-read.
+        back, _, _ = classify(open(path, encoding="utf-8").read())
+        if back != "OK":
+            counts["UNREADABLE"] += 1
+            print(f"  ! {name}  wrote the stamp and read back {back} — not counted as stamped")
+            continue
+
+        also = ""
+        sp = staged_path(root, name)
+        if os.path.isfile(sp):
+            staged = open(sp, encoding="utf-8").read()
+            s_updated = write_stamp(staged, want)
+            if s_updated is not None and s_updated != staged:
+                open(sp, "w", encoding="utf-8").write(s_updated)
+                also = " (staged copy too)"
+            elif s_updated == staged:
+                also = " (staged copy already agreed)"
+        counts["STAMPED"] += 1
+        print(f"  + {verb}   {name}  sha256:{want[:12]}…{also}")
+
+    total = sum(counts.values())
+    print(f"\nINV-STAMP  {total} handbook(s) · stamped {counts['STAMPED']} · ok {counts['OK']} · "
+          f"unstamped {counts['UNSTAMPED']} · mismatch {counts['MISMATCH']} · "
+          f"no-sections {counts['NO-SECTIONS']} · adopted {counts['NO-RECORD']} · "
+          f"unreadable {counts['UNREADABLE']}")
+
+    # THE HINT NAMES THE FLAG THAT WOULD ACTUALLY DO IT. `--execute` alone never
+    # touches a MISMATCH, so printing it under a drift-only run sends the reader to a
+    # command that will refuse — the "remedy with no producer" shape `verify.md`
+    # § Hook wiring records itself shipping once.
+    if not args.execute and counts["UNSTAMPED"]:
+        print("Re-run with --execute to write the stamps. Until a handbook carries a real "
+              "digest, CONTRACT-DRIFT cannot fire for it — org index, verify and review all "
+              "compare a recomputation against a placeholder and find nothing.")
+    if counts["MISMATCH"] and not args.restamp:
+        print("A MISMATCH is not written by --execute. Resolve it with `review <employee>`, "
+              "or, where an authorized amendment is what moved the contract, "
+              "`wf-stamp --execute --restamp`.")
+    if refused:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
