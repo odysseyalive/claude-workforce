@@ -708,6 +708,49 @@
    "playwright-mcp"
   ]
  },
+ "conform-mcp-slug-bare": {
+  "_why": "THE NEGATIVE FOR THE THREE EXCLUSIONS ABOVE. A bare `widget-mcp` that is not a skill, not the project's name and not inside a path is still a dependency and still fails. Without this row the exclusions could be widened to nothing and every fixture would stay green — a check discounted into silence is the failure `verify.md` § BLOCKING names.",
+  "exit": 1,
+  "script": "wf-conform",
+  "want": [
+   "every MCP server its body uses is named in tools:",
+   "widget-mcp",
+   "1 failed"
+  ]
+ },
+ "conform-mcp-slug-in-path": {
+  "_why": "A slug with a `/` on either side is a directory, not an invocation — the same mention-is-not-use rule the `/skill` branch already applies to path fragments.",
+  "exit": 0,
+  "script": "wf-conform",
+  "want": [
+   "0 failed"
+  ],
+  "not": [
+   "widget-mcp"
+  ]
+ },
+ "conform-mcp-slug-is-skill": {
+  "_why": "A bare `<name>-mcp` that resolves to `.claude/skills/<name>-mcp/SKILL.md` is a SKILL, reached through `Skill()`, and a skill grants nothing and needs nothing in `tools:`. MEASURED 2026-09-05 on playwright-mcp: `build-mcp` is a skill and it produced a BLOCKING failure in 4 of 6 handbooks. The `mcp__` invocation form is untouched, so this exclusion cannot hide a dependency an employee actually calls.",
+  "exit": 0,
+  "script": "wf-conform",
+  "want": [
+   "0 failed"
+  ],
+  "not": [
+   "helper-mcp"
+  ]
+ },
+ "conform-slug-is-project-mcp": {
+  "_why": "A repository whose own name ends in `-mcp` writes that name in every absolute path its handbooks quote, and in the sentence saying what the employee maintains. The fixture's directory name IS the project name, which is what the check reads. MEASURED 2026-09-05: `playwright-mcp` named itself in 5 of 6 handbooks and every mention was a blocking failure.",
+  "exit": 0,
+  "script": "wf-conform",
+  "want": [
+   "0 failed"
+  ],
+  "not": [
+   "MCP server"
+  ]
+ },
  "conform-no-ceiling": {
   "exit": 1,
   "script": "wf-conform",
@@ -2403,7 +2446,7 @@
   ]
  },
  "sa-hook-optin-not-default": {
-  "_why": "The opt-in guarantee, made mechanically checkable. wf-loop-guard is WIREABLE by name and is never in the default set (hooks.md § What is wired: 'PROPOSED, and not wired by this command's default set'). The unknown-hook error prints both sets, so this near-miss name pins the membership: `want` carries the default set verbatim and `not` fires if wf-loop-guard is ever sorted into it. A regression that promotes it to the default set fails this case; a regression that removes it from SHIPPED_HOOKS altogether fails the three cases above. Exit 2 also keeps the negative half honest — a name that is not a shipped hook is refused rather than registered as dead wiring.",
+  "_why": "The opt-in guarantee, made mechanically checkable. wf-loop-guard is WIREABLE by name and is never in the default set (hooks.md § What is wired: 'PROPOSED, and not wired by this command's default set'). The unknown-hook error prints both sets, so this near-miss name pins the membership: `want` carries the default set verbatim and `not` fires if wf-loop-guard is ever sorted into it. A regression that promotes it to the default set fails this case; a regression that removes it from SHIPPED_HOOKS altogether fails the three cases above. Exit 2 also keeps the negative half honest — a name that is not a shipped hook is refused rather than registered as dead wiring. Updated 2026-09-05: this row still named the four-hook default set from before `wf-plain-guard` shipped, so it was red at v1.16.0 HEAD — the release that added the hook updated the script and not its expectation. The membership list is the whole point of the case, so a stale copy of it is the one thing here that must never drift.",
   "args": [
    "--wire-hook",
    "wf-loopguard"
@@ -2415,7 +2458,7 @@
   "script": "wf-settings-apply",
   "want": [
    "not a shipped hook",
-   "Default set: wf-budget-guard, wf-protect-directives, wf-standing-request, wf-unique-persona",
+   "Default set: wf-budget-guard, wf-plain-guard, wf-protect-directives, wf-standing-request, wf-unique-persona",
    "Opt-in only, PROPOSED and never wired by the default set: wf-loop-guard"
   ]
  },

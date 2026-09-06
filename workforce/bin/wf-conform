@@ -724,12 +724,49 @@ def check_handbook(path, body, res, ceiling):
 
     granted = fm.get("tools")
     if granted is not None:
+        # THE BARE SLUG IS THE WEAK FORM, AND IT LACKED THE MENTION-IS-NOT-USE FILTER
+        # THE REST OF THIS FUNCTION ALREADY CARRIES. `mcp__<server>` is an invocation and
+        # is exact. A bare `<name>-mcp` is just a WORD, and three things in an ordinary
+        # tree are spelled exactly like a server and are not one:
+        #   a project SKILL     — `.claude/skills/build-mcp/SKILL.md`, reached through
+        #                         `Skill()`, which grants nothing and needs nothing
+        #   the PROJECT ITSELF  — a repository named `playwright-mcp` puts its own name
+        #                         in every absolute path its handbooks quote, and in the
+        #                         sentence saying what the employee maintains
+        #   a PATH SEGMENT      — `/home/u/lab/foo-mcp/src/index.ts` names a directory
+        #
+        # MEASURED 2026-09-05 by `/workforce verify` on playwright-mcp: 5 of 5 failures
+        # were one of the three, across 5 of the 6 handbooks — `build-mcp` (a skill,
+        # written as a path every time it appears) and `playwright-mcp` (the repository's
+        # own name). The org was correct and the gate was red. `verify.md` § BLOCKING
+        # forbids a report arguing a failure away in prose, and rightly, so the exclusion
+        # has to be structural: made once here, where a fixture can prove it fires.
+        #
+        # ONE-SIDED, deliberately. Each exclusion drops a slug from the WEAK form only.
+        # `MCP_TOOL_RX` is untouched, so an employee that actually writes
+        # `mcp__foo-mcp__thing` is still caught even where the slug is also its project's
+        # name. The residual miss is a project named after a server it consumes and never
+        # invokes by tool name — one advisory-grade gap, traded against a BLOCKING false
+        # positive on every project whose own name ends in `-mcp`.
+        _project = os.path.basename(_root).lower()
+
+        def _is_server_slug(slug, line):
+            if slug == _project:
+                return False      # the project's own name, not a server it reaches
+            if re.search(r"/" + re.escape(slug) + r"\b|\b" + re.escape(slug) + r"/", line):
+                return False      # a path segment, not an invocation
+            for _base in (_root, os.path.expanduser("~")):
+                if os.path.isfile(os.path.join(_base, ".claude", "skills", slug, "SKILL.md")):
+                    return False  # a SKILL with a server-shaped name, reached by Skill()
+            return True
+
         wanted = set()
         for line in FM_RX.sub("", body, count=1).splitlines():
             if PROHIBITION_RX.search(line):
                 continue          # named to forbid it, not to use it
             wanted |= {s.lower() for s in MCP_TOOL_RX.findall(line)}
-            wanted |= {s.lower() for s in MCP_SLUG_RX.findall(line)}
+            wanted |= {s.lower() for s in MCP_SLUG_RX.findall(line)
+                       if _is_server_slug(s.lower(), line)}
         have = {s.lower() for s in MCP_TOOL_RX.findall(granted)}
         missing = sorted(wanted - have)
         res.add(
