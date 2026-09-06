@@ -10083,6 +10083,131 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# contract-stamp had six readers and one writer, reachable only from hire (v1.18.0)
+# MEASURED on odyssey-alive 2026-09-05, the day after its audit amended all 19
+# handbooks: ok 0 - mismatch 13 - unstamped 2. No audit had ever restamped, because
+# wf-stamp was named in exactly one shipped file. And wf-conform stamped the
+# authoring version but never COMPARED it, so four minor releases of drift were
+# silent in the one script whose advisory rows two procedures call the detector.
+# ─────────────────────────────────────────────────────────────────────────────
+_st_aud = read("workforce/references/procedures/audit.md")
+_st_inv = read("workforce/references/invariants.md")
+_st_cnf = read("workforce/bin/wf-conform")
+
+check(
+    "contract-stamp: audit restamps what Step 5 amended",
+    "Step 5-STAMP" in _st_aud and "--execute --restamp" in _st_aud,
+    "audit.md Step 5 amends contract sections in 5c, 5d and 5e; without a restamp step "
+    "every handbook it touches ends the run carrying a stamp for bytes that are gone. "
+    "Step 5-STAMP must exist and must name the restamp invocation",
+)
+
+check(
+    "contract-stamp: INV-STAMP row names its text and token in invariants.md",
+    "INV-STAMP" in _st_inv and "contract-stamp" in _st_inv,
+    "invariants.md row 32 must carry INV-STAMP and its text - every governed handbook's "
+    "contract-stamp matches its current Procedure + Verification, restamped in the run "
+    "that amended it, or names the rule that declined",
+)
+
+check(
+    "contract-stamp: audit emits INV-STAMP with its counts",
+    "INV-STAMP" in _st_aud and "mismatch" in _st_aud and "blocks the sweep" in _st_aud,
+    "an invariant that cannot print its own evidence is not enforced - audit.md must emit "
+    "the INV-STAMP line and say that a nonzero mismatch blocks the sweep",
+)
+
+check(
+    "version stamp: wf-conform compares it, not merely records it",
+    "def installed_version" in _st_cnf and "superseded doctrine" in _st_cnf,
+    "verify.md and audit.md Step 5d both name wf-conform's advisory rows as the "
+    "between-audit staleness detector. The absent-stamp row existed; the present-and-OLDER "
+    "comparison did not, so a handbook four releases behind was silent",
+)
+
+check(
+    "version stamp: the comparison is numeric, never a string compare",
+    "def version_tuple" in _st_cnf and "1.9.0" in _st_cnf,
+    "a string compare calls 1.9.0 newer than 1.13.0. version_tuple must exist and the "
+    "docstring must name the case, because the fixture that proves it uses exactly that pair",
+)
+
+check(
+    "version stamp: the installed version is read from its anchor, never restated",
+    'references", "version.md"' in _st_cnf,
+    "Core Principle 9a - the release number is authored in references/version.md and "
+    "nowhere else. A literal in the script is a restated constant and the exact thing "
+    "that makes an upgrade a fifty-file hunt",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ## Interface had a checker and a spec and no writer at all (v1.18.0)
+# MEASURED on odyssey-alive 2026-09-05: 33 reduced skills, five audits, 33 without
+# the section. conversion-taxonomy.md required it, verify.md checked it, and no
+# shipped script contained the string. A requirement no run could satisfy.
+# ─────────────────────────────────────────────────────────────────────────────
+_if_rem = read("workforce/bin/wf-remainder")
+_if_aud = read("workforce/references/procedures/audit.md")
+_if_inv = read("workforce/references/invariants.md")
+
+check(
+    "interface: wf-remainder WRITES the section, not merely checks for it",
+    "def add_interface" in _if_rem and "--interface-invoke" in _if_rem,
+    "conversion-taxonomy.md has required `## Interface` on every reduced skill since "
+    "2026-08-04 and nothing wrote one. wf-remainder must carry the writer and its flags",
+)
+
+check(
+    "interface: a reduction that would leave no ## Interface is REFUSED",
+    "if not has_interface(after)" in _if_rem and "Nothing was written" in _if_rem,
+    "the requirement is blocking for the reason the surface check is - an employee that "
+    "cannot tell 'no data' from 'broken' treats one as the other. A reduction with no "
+    "declared contract must refuse and write nothing",
+)
+
+check(
+    "interface: the run supplies the three strings, the script never invents them",
+    "The strings are the RUN'S judgment" in _if_rem,
+    "a generated placeholder is the 'declaration nobody can write wrongly' the taxonomy "
+    "warns about. The script writes the section; the run authors the rows",
+)
+
+check(
+    "interface: audit T7b passes the flags",
+    "<the shape of what comes back, and whether it is stable>" in _if_aud,
+    "T7b is the only caller of --apply. A producer the procedure never invokes is the "
+    "same defect one step further along",
+)
+
+check(
+    "interface: --interface-only exists, so a fully reduced skill can be reached",
+    'argv[1] == "--interface-only"' in _if_rem,
+    "--apply is a no-op when there is nothing left to cut, so most backfill candidates "
+    "could never gain the section through it. The backfill mode has to exist",
+)
+
+check(
+    "interface: Step 5-IFACE calls the backfill mode, not --apply",
+    "wf-remainder --interface-only <SKILL.md>" in _if_aud,
+    "a heal step wired to --apply names a number it cannot reach - most of the skills "
+    "it exists to backfill have nothing left to cut",
+)
+
+check(
+    "interface: the audit backfills skills reduced before the producer existed",
+    "Step 5-IFACE" in _if_aud and "INV-IFACE" in _if_aud,
+    "5c/5d's in-run heal clause governs: an existing org is repaired in the run that "
+    "finds it. Without Step 5-IFACE the fix reaches only future conversions",
+)
+
+check(
+    "interface: INV-IFACE row names its text and token in invariants.md",
+    "INV-IFACE" in _if_inv and "undeclarable" in _if_inv,
+    "invariants.md row 33 must carry INV-IFACE and its honest residual - a skill whose "
+    "own text names no invocation is NAMED, never filled with a placeholder",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")

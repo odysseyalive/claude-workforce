@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 67 assertion(s) in bin/check name this file; 140 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 72 assertion(s) in bin/check name this file; 148 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1075,6 +1075,52 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    that pre-contract handbooks do not drown a `verify`; it is NEVER a license for an audit to report
    and move on. A detector ships with its fix (`SKILL.md` § Directives), and this step is the fix.
 
+### Step 5-STAMP — restamp what Step 5 amended, before Step 6 begins
+
+**BLOCKING, and it runs once for the whole of Step 5** — not per handbook, because 5c, 5d and 5e each
+amend, and any one of them alone leaves the org in this state.
+
+```bash
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute            # stamp the unstamped
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute --restamp  # clear what THIS run moved
+```
+
+**`contract-stamp` is not `workforce-version:`, and step 3 above only ever set the second one.** The
+contract stamp is a sha over the normalized `## Procedure` + `## Verification` sections. It is what
+`org index`, `verify` and `review` compare a recomputation against to raise `CONTRACT-DRIFT`, and it
+is the eval baseline. Step 5 rewrites contract sections by design, so every handbook it touches ends
+the run carrying a stamp that describes bytes which are gone.
+
+**`--restamp` is authorized HERE and almost nowhere else.** `procedures/checksums.md` § On mismatch is
+right that a `MISMATCH` is normally flagged and never repaired: a legitimate amendment and an
+unauthorized edit are indistinguishable from the hash, and re-stamping erases the only evidence. What
+makes this the exception is that **the run performing the amendment is the authorization**. It knows
+which handbooks it just amended, it took a verified backup before its first write, and it re-probed
+each one at step 3. Outside an audit the answer stays `/workforce review <employee>`.
+
+*Added 2026-09-05. `wf-stamp` was named in exactly one shipped file, `procedures/hire.md:248`, so
+**no audit had ever restamped anything** — in a procedure whose Step 5 exists to amend handbooks.
+MEASURED on `odyssey-alive` the day after its 2026-09-04 audit amended all 19 of them:
+`ok 0 · mismatch 13 · unstamped 2`. Contract-drift detection was off for the entire org, and every
+surface that reads the stamp — `org index`, `verify`, `review` — was comparing against a hash of bytes
+that no longer existed. The chart even carried a detail cell reading "(PENDING recompute ... next
+`org index` restamps)", pointing at a step that did not exist. This is the producer/consumer defect
+this project records more than any other: six readers of `contract-stamp`, and until now one writer,
+reachable only from `hire`.*
+
+The run prints **`INV-STAMP`** (`references/invariants.md` row 32), all counts, always. The script
+already emits this line, so the work here is wiring it into the report rather than composing one:
+
+```
+INV-STAMP  22 handbook(s) · stamped 2 · ok 15 · unstamped 0 · mismatch 0 · no-sections 4 · adopted 3
+```
+
+**`mismatch` above zero at the end of an audit is `NOT UPHELD` and blocks the sweep.** A stamp the run
+could not resolve means a handbook moved for a reason the run cannot account for, and a sweep that
+deletes on that footing is deleting against a tree nobody read. `no-sections` and `adopted` are not
+failures and never block: a Lead carries a charter with no `## Procedure`, so there is nothing to
+hash, and an adopted agent was never placed under this contract.
+
 The run prints **`INV-REFRESH`** (`references/invariants.md` row 27), all counts, always:
 
 ```
@@ -1084,6 +1130,43 @@ INV-REFRESH  governed 9 · refresh-due 9 · amended 9 · re-probed 9 (2 DEGRADED
 A declined refresh names the shipped rule that refused it — the uncited-refusal shape every other
 invariant forbids. `refresh-due 0` on a stamped, current org is the expected steady state and is
 printed, not skipped.
+
+## Step 5-IFACE — backfill `## Interface` on skills reduced before the producer existed
+
+**On a re-audit this is what reaches the skills already reduced.** Step 5c/5d's in-run clause governs
+unchanged: healed in this same run, never deferred, never handed back as an optional refinement.
+
+1. **Census.** Every skill the conversion journal shows a COMMITTED `T7b` row for, and every skill the
+   chart's `### Reduced skills` names. A reduced skill with no `## Interface` heading is **backfill-due**.
+2. **Author the three rows from what the skill already declares** — its `## Usage` or `## Modes`
+   section is the `Invoke` row, its `## Exit codes` section is the `Fails` row, and `Returns` is read
+   from what the skill actually prints. **This is reading, not inventing.** A skill that declares none of
+   these is NOT backfilled with a guess: mark it, name the missing declaration, and let it stay honest.
+3. **Apply with `--interface-only`**, never by hand:
+
+   ```
+   wf-remainder --interface-only <SKILL.md> \
+     --interface-invoke "..." --interface-returns "..." --interface-fails "..."
+   ```
+
+   **This is a different mode from T7b's `--apply`, and the difference is the whole reason it exists.**
+   `--apply` cuts and then declares; a cut with no removable heading is a no-op that returns before the
+   write, so a **fully reduced** skill — which most backfill candidates are — can never gain the
+   section through it. `--interface-only` adds the section and nothing else, verifies the invocable
+   surface is unchanged, and **REFUSES a skill that already declares one** rather than overwriting it:
+   an existing `## Interface` is somebody's contract, and replacing it silently is the two-canonical-texts
+   failure wearing a repair's clothes.
+
+The run prints **`INV-IFACE`** (`references/invariants.md` row 33), all counts, always:
+
+```
+INV-IFACE    reduced 33 · declared 33 · backfilled 33 · 0 undeclarable · 0 declined
+```
+
+`undeclarable` is the honest residual: a skill whose own text names no invocation, no return shape and
+no exit codes, so the three rows cannot be read off it. It is NAMED, never filled with a placeholder,
+and it is not a failure — it is a skill whose contract nobody ever wrote down, which is a finding about
+that skill and not about this step. `reduced 0` on a project with no conversions is printed, not skipped.
 
 ## Step 5e — Wire the org to its reference material: the Sources + seam heal
 
@@ -1212,13 +1295,32 @@ Per skill, immediately after T6 verifies the registration:
 2. **Apply it mechanically**, never by hand-editing:
 
    ```
-   wf-remainder --apply <SKILL.md> --drop "<heading>" [--drop "<heading>" …]
+   wf-remainder --apply <SKILL.md> --drop "<heading>" [--drop "<heading>" …] \
+     --interface-invoke  "<the literal invocation, runnable as written>" \
+     --interface-returns "<the shape of what comes back, and whether it is stable>" \
+     --interface-fails   "<each non-zero exit and what it means>"
    ```
 
    It removes the named sections, recomputes the invocation manifest, and **writes only if the surface
    is unchanged**. A cut that would drop a command, a script path, a fenced command line, a mechanism
    heading, or a declared verb is REFUSED with the lost tokens named and **the file left untouched** —
    which means the cut named a mechanism section, so re-cut and apply again.
+
+   **The three `--interface-*` strings are REQUIRED, and they are the run's judgment.** A reduction
+   whose result carries no `## Interface` is refused exactly as a cut that narrows the surface is
+   refused (`conversion-taxonomy.md` § The remainder test). The script writes the section; it cannot
+   compose the strings, because it cannot know what a skill returns — and a generated placeholder
+   would be the "declaration nobody can write wrongly" that the taxonomy already warns about. Where
+   the skill already carries an `## Interface` the flags are accepted and ignored, so re-running is
+   safe.
+
+   *Added 2026-09-05. `## Interface` had been required of every reduced skill since 2026-08-04 and
+   checked by `procedures/verify.md`, and **nothing in the distribution wrote one** — no shipped
+   script contained the string and this step never named it, so no run following this procedure
+   could produce it. MEASURED on odyssey-alive: 33 reduced skills, five audits, 33 without the
+   section. A requirement with no producer is the defect this project records more than any other,
+   and it is recorded here, in the step that should have carried the producer from the day the rule
+   shipped.*
 3. **T7c** — mark for the sweep only if the remainder is now empty.
 
 **Exit 1 from `--apply` is a re-cut, not a stop.** The skill stays ✓; the run tries the corrected cut.

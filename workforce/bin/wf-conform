@@ -64,6 +64,46 @@ def _load_census():
         sys.dont_write_bytecode = _prev
     return mod
 
+
+def installed_version():
+    """The WORKFORCE-VERSION of the install this script runs from, or None.
+
+    `references/version.md` is the single place the number is AUTHORED (SKILL.md
+    Core Principle 9a) and `SKILL.md`'s frontmatter is a mirror. Read the anchor,
+    never the mirror, and never a literal written here — a restated constant is what
+    turns an upgrade into a fifty-file hunt.
+
+    None on any failure, and None means NO ROW rather than a guessed one: a script
+    that cannot read its own version has no business telling a project its handbooks
+    are stale.
+    """
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "references", "version.md")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            m = re.search(r"^WORKFORCE-VERSION:\s*(\d+(?:\.\d+)*)\s*$", fh.read(), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
+
+
+def version_tuple(s):
+    """`1.13.0` -> (1, 13, 0); None if it is not a dotted numeric version.
+
+    Compared as INTEGERS. `1.9.0` is older than `1.13.0` and a string compare says
+    the opposite — that is the whole reason this is a function and not an inline
+    `<`.  Unequal lengths compare correctly because Python pads nothing: (1, 13) <
+    (1, 13, 0) is False and (1, 13) < (1, 14, 0) is True, which is the intent.
+    """
+    if not s:
+        return None
+    parts = s.strip().split(".")
+    if not parts or not all(p.isdigit() for p in parts):
+        return None
+    return tuple(int(p) for p in parts)
+
+
 # Section order is fixed and asserted (procedure-for-procedures.md § File shape).
 # Leads carry no `## Procedure`; everyone else carries every row.
 SECTIONS = [
@@ -608,6 +648,40 @@ def check_handbook(path, body, res, ceiling):
             "(handbook-templates.md). A handbook that cannot state which release "
             "authored it cannot be flagged as stale when the doctrine moves.",
         )
+    else:
+        # PRESENT AND OLDER — the half the stamp exists FOR, and it was never written.
+        #
+        # The clause above lands the stamp so staleness *can* be computed; nothing
+        # computed it. `procedures/verify.md` § Handbook conformance has stated the
+        # consumer since the stamp shipped — "where it is present and older than the
+        # installed WORKFORCE-VERSION, report the handbook as authored under
+        # superseded doctrine" — and `procedures/audit.md` Step 5d step 4 names this
+        # script's advisory rows as "the between-audit detector" that Step 5d is the
+        # fix for. Both pointed at a row that did not exist.
+        #
+        # MEASURED 2026-09-05 on odyssey-alive: 19 governed handbooks, every one
+        # stamped 1.13.0, against an installed 1.17.0 — four minor releases, and
+        # `wf-conform` reported 34 advisories, none of them this. The drift surfaced
+        # only because a `/org` dispatch block was found six clauses behind BY HAND.
+        # A stamp nobody compares is a stamp that records staleness without
+        # reporting it.
+        #
+        # ADVISORY, never blocking, for the reason every other row here is: an org
+        # one release behind is ordinary, and failing all of them at once reproduces
+        # the run that taught this script "a check that always fails stops being read."
+        inst = installed_version()
+        m_stamp = re.search(r"workforce-version:\s*([0-9.]+)", body)
+        have = version_tuple(m_stamp.group(1)) if m_stamp else None
+        want = version_tuple(inst)
+        if have is not None and want is not None and have < want:
+            res.advise(
+                f"{n}: authored under superseded doctrine "
+                f"(stamped {m_stamp.group(1)}, installed {inst})",
+                f"the contract this handbook was written against is {m_stamp.group(1)}; "
+                f"the installed release is {inst}. Contract sections shipped since then "
+                "have not reached it. `/workforce audit` Step 5d is the fix and applies "
+                "the deltas in-run; this row is only the between-audit detector.",
+            )
 
     # BODY-vs-GRANT COHERENCE — the first check here that compares the text to the
     # capability rather than to another piece of text.

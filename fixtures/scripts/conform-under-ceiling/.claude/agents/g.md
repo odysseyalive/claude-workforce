@@ -5,7 +5,7 @@ disallowedTools: Agent
 ---
 <!-- ORG-RECORD START -->
 <!-- tier: 3 (IC) | department: content | reports-to: content-lead -->
-<!-- hired: 2026-09-02 | workforce-version: 1.7.0 -->
+<!-- hired: 2026-09-02 | workforce-version: 99.0.0 -->
 <!-- ORG-RECORD END -->
 ## Role
 Owns fixture prose, one job only.

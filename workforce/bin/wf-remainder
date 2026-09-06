@@ -5,6 +5,11 @@
     wf-remainder --diff <before> <after>        exit 1 on ANY surface change
     wf-remainder --diff-manifest <a.txt> <b.txt>  same, for saved manifests
     wf-remainder --root <tree> --dead-scripts   script: tokens that do not resolve
+    wf-remainder --apply <SKILL.md> --drop "<h>" [—] \
+        --interface-invoke <s> --interface-returns <s> --interface-fails <s>
+                                                reduce, and declare the contract
+    wf-remainder --interface-only <SKILL.md> --interface-invoke <s> —
+                                                backfill the contract, cut nothing
 
 WHY THIS EXISTS. The user's directive (`SKILL.md` § Directives) makes skills the
 mechanism layer: conversion SEPARATES a skill rather than absorbing it. Judgment
@@ -267,6 +272,41 @@ def manifest(text):
     return sorted(out)
 
 
+INTERFACE_HEADING = "## Interface"
+
+
+def has_interface(text):
+    """True when the text already declares `## Interface` as a heading of its own."""
+    return any(m.group(2).strip().rstrip(":").lower() == "interface"
+               for m in HEADING_RX.finditer(text))
+
+
+def add_interface(text, invoke, returns, fails):
+    """Insert the three-row `## Interface` section. Returns the new text.
+
+    Placement is BEFORE the first `##` heading, so the contract is the first thing a
+    caller reads. `conversion-taxonomy.md` § The remainder test specifies the section as
+    three rows and no prose, so this writes exactly three rows and no prose: an
+    author with a fourth thing to say has something that belongs in the handbook.
+
+    The strings are the RUN'S judgment, never this script's. It cannot know what a
+    skill returns, and a generated placeholder here would be the "declaration nobody
+    can write wrongly" that the taxonomy already warns about.
+    """
+    block = (INTERFACE_HEADING + "\n\n"
+             "| Row | Contract |\n"
+             "|---|---|\n"
+             f"| `Invoke` | {invoke} |\n"
+             f"| `Returns` | {returns} |\n"
+             f"| `Fails` | {fails} |\n\n")
+    for m in HEADING_RX.finditer(text):
+        if m.group(1) == "##":
+            return text[:m.start()] + block + text[m.start():]
+    # No `##` heading at all: a title-plus-prose skill. Append rather than refuse —
+    # the section still has to exist, and where is a style question.
+    return text.rstrip("\n") + "\n\n" + block
+
+
 def read(path):
     with open(path, encoding="utf-8") as fh:
         return fh.read()
@@ -385,12 +425,70 @@ def main(argv):
         b = [l.strip() for l in read(rel(argv[3])).splitlines() if l.strip()]
         return _emit_diff(a, b, argv[2], argv[3])
 
+    if len(argv) >= 3 and argv[1] == "--interface-only":
+        # BACKFILL for a skill reduced before the producer existed. `--apply` cannot do
+        # this: a cut with no removable heading is a no-op and returns before the write,
+        # so a fully-reduced skill — which most of them are — can never gain the section
+        # through it. audit.md Step 5-IFACE is the caller.
+        #
+        # It adds the section and NOTHING else. The surface must come out identical, and
+        # a skill that already declares one is REFUSED rather than overwritten: an
+        # existing `## Interface` is somebody's contract, and silently replacing it is
+        # the two-canonical-texts failure wearing a repair's clothes.
+        path = rel(argv[2])
+
+        def _o(flag):
+            for i, a in enumerate(argv):
+                if a == flag and i + 1 < len(argv):
+                    return argv[i + 1]
+            return None
+
+        inv, ret, fail = _o("--interface-invoke"), _o("--interface-returns"), _o("--interface-fails")
+        if not (inv and ret and fail):
+            print("--interface-only needs --interface-invoke, --interface-returns and "
+                  "--interface-fails. The three rows are the run's judgment; this script "
+                  "cannot compose them.", file=sys.stderr)
+            return 2
+        before = read(path)
+        if has_interface(before):
+            print(f"REFUSED — {path} already declares `## Interface`. Backfill adds the "
+                  f"section; it never rewrites one. Amend it deliberately instead.")
+            return 1
+        after = add_interface(before, inv, ret, fail)
+        ma, mb = manifest(before), manifest(after)
+        lost = [t for t in ma if t not in set(mb)]
+        if lost:
+            print(f"REFUSED — writing `## Interface` into {path} lost {len(lost)} token(s):")
+            for t in lost:
+                print(f"  LOST    {t}")
+            print("")
+            print("Nothing was written.")
+            return 1
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(after)
+        gained = [t for t in mb if t not in set(ma)]
+        print(f"backfilled {path} — wrote {INTERFACE_HEADING} (Invoke / Returns / Fails), "
+              f"surface preserved ({len(ma)} token(s))")
+        for t in gained:
+            print(f"  declared {t}  (named by ## Interface; a surface gain, never a loss)")
+        return 0
+
     if len(argv) >= 3 and argv[1] == "--apply":
         path = rel(argv[2])
         drops = [argv[i + 1] for i, a in enumerate(argv) if a == "--drop" and i + 1 < len(argv)]
         if not drops:
             print("--apply needs at least one --drop <heading>", file=sys.stderr)
             return 2
+
+        def _opt(flag):
+            for i, a in enumerate(argv):
+                if a == flag and i + 1 < len(argv):
+                    return argv[i + 1]
+            return None
+
+        if_invoke = _opt("--interface-invoke")
+        if_returns = _opt("--interface-returns")
+        if_fails = _opt("--interface-fails")
         before = read(path)
         after, removed, missing = apply_cut(before, drops)
         ma, mb = manifest(before), manifest(after)
@@ -434,6 +532,54 @@ def main(argv):
         if not removed:
             print(f"no-op — nothing removed from {path} ({len(ma)} token(s) unchanged)")
             return 0
+
+        # THE INTERFACE IS PART OF THE REDUCTION, NOT A FOLLOW-UP.
+        #
+        # `conversion-taxonomy.md` § The remainder test has required `## Interface` on
+        # every reduced skill since 2026-08-04, and `procedures/verify.md` checks for it.
+        # Between those two, NOTHING WROTE ONE: no shipped script contained the string and
+        # `procedures/audit.md` never named it, so the requirement could not be met by any
+        # run that followed the procedure. MEASURED on odyssey-alive 2026-09-05, five
+        # audits after its conversion: 33 reduced skills, 33 without the section.
+        #
+        # A detector ships with its fix (`SKILL.md` § Directives). This is the fix, and it
+        # is BLOCKING for the reason the surface check is: an employee that cannot tell
+        # "no data" from "broken" treats one as the other, which is the silent wrong
+        # answer the mechanism layer exists to remove.
+        if not has_interface(after):
+            if not (if_invoke and if_returns and if_fails):
+                print(f"REFUSED — reducing {path} would leave it with no `## Interface`.")
+                print("A reduced skill declares how it is invoked, what it returns, and how")
+                print("it fails, or the employee calling it infers the contract — which")
+                print("reintroduces the variance the mechanism layer removes")
+                print("(conversion-taxonomy.md § The remainder test).")
+                print("")
+                print("Supply all three, in the run's own words:")
+                print('  --interface-invoke  "the literal invocation, runnable as written"')
+                print('  --interface-returns "the shape of what comes back, and whether it is stable"')
+                print('  --interface-fails   "each non-zero exit and what it means"')
+                print("")
+                print("Nothing was written.")
+                return 1
+            after = add_interface(after, if_invoke, if_returns, if_fails)
+            mc = manifest(after)
+            lost_by_iface = [t for t in mb if t not in set(mc)]
+            if lost_by_iface:
+                # Unreachable by construction: the section is an INSERT and removes
+                # nothing. Asserted anyway, because the whole contract of this script is
+                # that it never narrows a surface, and a writer trusted on its own
+                # account is what directive one refuses.
+                print(f"REFUSED — writing `## Interface` into {path} lost "
+                      f"{len(lost_by_iface)} token(s):")
+                for t in lost_by_iface:
+                    print(f"  LOST    {t}")
+                print("")
+                print("Nothing was written.")
+                return 1
+            gained = [t for t in mc if t not in set(mb)]
+        else:
+            gained = []
+
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(after)
         total = sum(n for _, n in removed)
@@ -441,10 +587,17 @@ def main(argv):
               f"surface identical ({len(ma)} token(s))")
         for h, n in removed:
             print(f"  dropped  {h}  ({n} lines)")
+        if if_invoke and if_returns and if_fails:
+            print(f"  wrote    {INTERFACE_HEADING}  (Invoke / Returns / Fails)")
+        for t in gained:
+            print(f"  declared {t}  (named by ## Interface; a surface gain, never a loss)")
         return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
     print("usage: wf-remainder --manifest <file> | --diff <before> <after> | "
-          "--diff-manifest <a> <b> | --root <tree> --dead-scripts", file=sys.stderr)
+          "--diff-manifest <a> <b> | --root <tree> --dead-scripts | "
+          "--apply <SKILL.md> --drop <h> --interface-invoke/-returns/-fails <s> | "
+          "--interface-only <SKILL.md> --interface-invoke/-returns/-fails <s>",
+          file=sys.stderr)
     return 2
 
 

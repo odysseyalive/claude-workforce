@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-one, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Thirty-three, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -128,6 +128,8 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 29 | every declared deletable content slot is owned by a gate/sign-off seam, or names the rule that left it unowned | `INV-SEAM` | references/procedures/audit.md |
 | 30 | every judgment role has an eval set of recorded principal verdicts, or names the rule that refused it | `INV-EVALS` | references/procedures/audit.md |
 | 31 | the user's sibling projects were searched for an existing implementation before any capability was authored, with the count reported | `INV-PRIORART` | references/prior-art.md |
+| 32 | every governed handbook's `contract-stamp` matches its current `## Procedure` + `## Verification`, restamped in the run that amended it, or names the rule that declined | `INV-STAMP` | references/procedures/audit.md |
+| 33 | every reduced skill declares `## Interface` with its Invoke / Returns / Fails rows, or is named as undeclarable | `INV-IFACE` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

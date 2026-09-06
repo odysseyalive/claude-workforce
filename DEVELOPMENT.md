@@ -115,6 +115,51 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-05
 
+**Landed 2026-09-05 (from a `/workforce verify` on `odyssey-alive`) — three requirements that shipped
+with no producer (v1.18.0).** Trigger: a routine health check on a real org, then the owner asking for
+the fixes. All three have the same shape — a rule written, a checker pointed at it, and **nothing that
+could ever satisfy it** — which is the defect this file records more than any other. What made this run
+different is that all three were found in ONE project in ONE pass, because `verify` was read end to end
+against a tree instead of against this repository.
+
+- **`## Interface` had a spec, a checker, and no writer at all.** `conversion-taxonomy.md` § The
+  remainder test has required it on every reduced skill since 2026-08-04 and `procedures/verify.md`
+  checks for it. No shipped script contained the string and `audit.md` never named it. MEASURED:
+  **33 reduced skills on odyssey-alive, five audits, 33 without the section.** `wf-remainder --apply`
+  now WRITES it from three run-supplied strings and REFUSES a reduction that would leave none;
+  T7b passes the flags; **Step 5-IFACE** backfills the skills reduced before the producer existed,
+  because a fix that reaches only future conversions leaves every existing org where it was.
+  `INV-IFACE` (row 33) counts it, and its `undeclarable` residual is the honest one: a skill whose own
+  text names no invocation is NAMED, never filled with a placeholder.
+- **No audit had ever restamped a contract-stamp.** `wf-stamp` was named in exactly one shipped file,
+  `hire.md:248`, in a procedure whose Step 5 exists to amend handbooks. MEASURED on odyssey-alive the
+  day after its 2026-09-04 audit amended all 19: `ok 0 · mismatch 13 · unstamped 2`. Contract-drift
+  detection was off for the whole org, and `org index`, `verify` and `review` were all comparing
+  against a hash of bytes that no longer existed — the chart even carried a cell reading "(PENDING
+  recompute ... next `org index` restamps)", pointing at a step that did not exist. **Step 5-STAMP**
+  runs once for the whole of Step 5; `INV-STAMP` (row 32) counts it and a nonzero mismatch blocks the
+  sweep. Six readers of that stamp, and until now one writer, reachable only from `hire`.
+- **The authoring-version stamp was recorded and never compared.** The absent-stamp advisory shipped
+  2026-09-01 so staleness COULD be computed; nothing computed it, while `verify.md` and `audit.md`
+  Step 5d both named this script's advisory rows as the between-audit detector. MEASURED: 19 handbooks
+  stamped `1.13.0` against an installed `1.17.0`, `wf-conform` silent, and the drift surfaced only
+  because a `/org` dispatch block was found six clauses behind BY HAND. `wf-conform` now reads
+  `references/version.md` — the anchor, never a literal — and compares numerically, because a string
+  compare calls `1.9.0` newer than `1.13.0`. The stale fixture uses exactly that pair.
+
+**Twelve `bin/check` assertions, each proven by breaking it. Three new script fixtures, two amended.**
+The loop caught three defects in the patch itself and each is worth keeping: an assertion phrase that
+only matched across a line wrap (so it tested nothing), a `bin/prove` `del` payload that became
+ambiguous once Step 5-IFACE restated T7b's command (fixed by NOT restating it — a command in two
+places is two canonical texts), and six existing fixtures whose advisory counts my new row silently
+changed. Those six are now stamped `99.0.0`: a fixture pinned to a real release re-breaks on every
+bump, and pinning the current number would make the fixture tree a second place the release is
+authored.
+
+*Not done here, and named:* `odyssey-alive`'s 33 skills are NOT backfilled by this change. Step 5-IFACE
+is what does it, on that project's next `/workforce audit`, which is owed anyway — its handbooks are
+stamped 1.13.0 against an installed 1.18.0, and `wf-conform` will now say so on every run.
+
 **Landed 2026-09-05 (dev session) — plain output: the register written for agents stops at the user
 (v1.16.0).** Trigger: the owner, mid-session — *"your responses back to me and the choices you give
 back to me are too cryptic"*, then *"the real issue is the communication style. I want all output to
