@@ -1,6 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
@@ -95,13 +95,47 @@ Three rules, and they are the whole of it:
 **Workforce cannot lift a host constraint and must never describe itself as having done so.** This row
 belongs in the DETECTS column with everything else here.
 
+## Three paths, or it does not propagate
+
+**A shipped mechanism needs all three of these, and the missing one is never obvious from the machine
+you are sitting at.**
+
+| Path | Reaches | Missing it means |
+|---|---|---|
+| the **installer** wires it | a machine installing for the first time | every new server is unwired, and looks installed |
+| **`audit`** wires it again | a machine that installed BEFORE the mechanism existed | every existing install stays exactly where it was |
+| **`verify`** reports it absent | anybody asking "is this on?" | nobody finds out either way |
+
+**The second row is the one that gets skipped, and it is the one that matters most.** A fix reaching
+only future installs leaves every org that already exists where it was — which is the same failure the
+2026-09-02 directive names for handbooks (*"This has to be fixed in workforce, and how the audit
+process heals broken structures like this"*), and the reason `audit` Step 5d exists. An already-installed
+machine is not a fresh install with older files; it is a tree nobody will re-install, because it does
+not look broken.
+
+**A per-machine command is not a path.** It reaches exactly the machines somebody typed it on, and it is
+indistinguishable from dormancy everywhere else. `hooks --execute` and `! wf-settings-apply …` remain
+legitimate as the manual hatch and as the remedy for a classifier-refused write; neither is how a
+mechanism arrives. *This is the 2026-09-07 directive: "I can't have manual commands being run ... no
+user will want to do that", and its companion — a change like this must be made "in such a way that the
+next use of workforce will heal the situation, even if it needs ran through an audit again."*
+
+**Where each path lives:** `install` and `install.ps1` call `wf-settings-apply --wire-defaults
+--execute` after the files land; `audit` Step 6-G calls the same thing, which is what makes it a heal
+rather than a fresh-install-only improvement; `verify` § Hook wiring and § Output style report the state
+of both. All three write through **one producer**, so the wired set cannot drift between them.
+
 ## Nothing ships dormant — the rule the hook findings actually support
 
-**claude-workforce ships exactly two hooks, and the count is a current fact rather than a
-prohibition** — `wf-protect-directives` and `wf-unique-persona`, both `PostToolUse` on `Edit|Write`,
-guarding immutable directive blocks and agent-name uniqueness respectively (`manifest.txt` § Hooks;
-`procedures/hooks.md`). Getting from "ships zero executables" to a stated count took two corrections on
-the same day.
+**claude-workforce ships six hooks in its default set and one opt-in, and the count is a current fact
+rather than a prohibition** — `wf-protect-directives` and `wf-unique-persona` (`PostToolUse` on
+`Edit|Write`), `wf-standing-request` (`UserPromptSubmit`), `wf-budget-guard` and `wf-plain-guard`
+(`PreToolUse` on `AskUserQuestion`), `wf-speak-guard` (`Stop`), plus `wf-loop-guard`, which is
+PROPOSED and wired only when a human names it (`manifest.txt` § Hooks; `procedures/hooks.md` § What is
+wired, which is the authority on the set). Getting from "ships zero executables" to a stated count took
+two corrections on the same day. *The number was stale from 2026-08-19 to 2026-09-07 — it read "exactly
+two" against four more on disk. A count restated outside the file that owns it is Principle 9a's exact
+case, and the fix is that this sentence now points at the table rather than trying to be one.*
 
 *The second landed 2026-08-04, and it closes a gap this file had already named against itself.* Under
 declared succession `procedures/hooks.md` holds that **workforce owes a predecessor's capability**, and

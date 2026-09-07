@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 72 assertion(s) in bin/check name this file; 148 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 73 assertion(s) in bin/check name this file; 151 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1494,10 +1494,48 @@ Then refresh the house rules (§ Step 4, "Refresh the house rules in every insta
 carries the RULES the evaluator applies them under — both are "never skipped, never offered, never a
 question," and both run here before `verify` so `verify` checks their result.
 
+### Step 6-H — Wire the shipped hooks and select the output style (the heal path)
+
+**This step is what makes a shipped mechanism reach a machine that installed before it existed.** The
+installer wires the default set on a fresh install; nothing reached an install that already existed, so
+every improvement to the hook set was a fresh-install-only improvement and every org already in the
+world stayed exactly where it was. `enforcement.md` § Three paths, or it does not propagate is the rule;
+this step is the second row of its table.
+
+*Added 2026-09-07. Step 6-G above has read "this sits alongside the settings-hook wiring of the same
+run" since it was written, and **no step performed that wiring** — the phrase pointed at a sibling that
+did not exist. `audit.md` § Step 6 named `! wf-settings-apply --wire-hook <name>` only as the ONE
+classifier-refused write a run may surface, which is a remedy for a blocked write, not a path a
+mechanism arrives by.*
+
+Per target:
+
+```bash
+wf-settings-apply --root <tree> --wire-defaults --execute
+```
+
+**One call, one producer.** It registers every hook in `DEFAULT_HOOKS` and selects the `Plain Speak`
+output style, and it is the same call both installers make — so the wired set cannot drift between
+install-time and audit-time, which two separate lists would guarantee within one release.
+
+**Every write is idempotent and reversible.** A hook already registered is a reported NOOP; a style
+already selected is a reported NOOP. Each write records itself in `.claude/workforce/.settings-owned.json`,
+so `disband` and `/workforce hooks --remove` reverse exactly these and nothing else.
+
+**`OPT_IN_HOOKS` is never wired here.** `wf-loop-guard` is PROPOSED and reaches a settings file only
+when a human names it (`procedures/hooks.md` § What is wired). A heal step that quietly widened the set
+would be a decision the user never made, arriving through a command they ran for a different reason.
+
+**The classifier may refuse this write, and that is the one legitimate hand-back.** When it does, surface
+the single `!` command at Step 0.05 exactly as § Step 6 requires, and never as a closing to-do list.
+
+**Under `--review`: print what would be wired and what the output style would become, and write
+nothing.**
+
 ### Step 6-G — Wire the git pre-commit pin guard (installed WITH audit, alongside the hooks)
 
 **The commit-time pin-and-dependabot guard is installed here, in this run, when the target is a git
-repository.** This sits alongside the settings-hook wiring of the same run and follows the same
+repository.** This sits alongside the settings-hook wiring of the same run — Step 6-H above — and follows the same
 make-before-break discipline: the guard is wired (make) before `verify` reports it and long before the
 sweep (break), so a `verify` row reporting it can only read the state this step just wrote. Its lifecycle
 home — wire, report, unwire — is `procedures/hooks.md` § The git pre-commit pin guard; this step is only

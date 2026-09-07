@@ -115,6 +115,39 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-07
 
+**Landed 2026-09-07 (v1.21.0) — the fix from v1.20.0 shipped with one propagation path, which is
+none.** Trigger: the v1.20.0 report handed the user two `!` commands to run. Their answer: *"This
+project is on different servers. I can't have manual commands being run ... no user will want to do
+that"*, and then the harder half — *"there needs to be a directive where needed changes like this need
+to be done in such a way that the next use of workforce will heal the situation, even if it needs ran
+through an audit again."*
+
+- **A per-machine command is not a propagation path.** It reaches exactly the machines somebody typed
+  it on, and everywhere else it is indistinguishable from dormancy — which is the state four inherited
+  hooks were deleted for, arriving through the gesture rather than through the file. `wf-plain-guard`
+  shipped 2026-09-05 wired by nothing but a human running `hooks --execute`.
+- **`audit.md` Step 6-G had claimed a sibling that did not exist.** It has read *"this sits alongside
+  the settings-hook wiring of the same run"* since it was written, and **no step performed that
+  wiring.** Same shape as the three v1.18.0 findings: a rule written, a reader pointed at it, nothing
+  that could satisfy it. `Step 6-H` is the producer, and it is a HEAL step rather than a fresh-install
+  improvement, which is the second clause of the directive.
+- **Three paths, or it does not propagate** (`enforcement.md`): the installer wires it, `audit` wires
+  it again, `verify` reports it absent. The second row is the one that gets skipped and the one that
+  matters most — an already-installed machine is not a fresh install with older files, it is a tree
+  nobody will re-install, because it does not look broken.
+- **One producer for all three.** `wf-settings-apply --wire-defaults` registers every `DEFAULT_HOOKS`
+  entry and selects the output style in one call, and `install`, `install.ps1` and Step 6-H all call
+  it. Two lists instead of one producer drift inside a single release, and the drifting copy is the
+  one a user installs. `OPT_IN_HOOKS` stays out: a heal step that quietly widened the set would be a
+  decision the user never made, arriving through a command they ran for another reason.
+- **`enforcement.md` had said "ships exactly two hooks" since 2026-08-19**, against six on disk. A
+  count restated outside the file that owns it is Principle 9a's exact case; the sentence now points
+  at `hooks.md` § What is wired instead of trying to be a fresher number.
+- **`bin/sync` did not know where an output style goes**, so a maintainer edit to the style stayed in
+  source while the personal copy — the one a session actually loads — kept the old text. It now places
+  a `style` entry beside each settings file, and `bin/check` compares it there rather than reporting a
+  permanent phantom absence inside the skill tree.
+
 **Landed 2026-09-07 (v1.20.0) — the plain-output rule had three carriers and all three decay.**
 Trigger: the user, two days after the 2026-09-05 plain-output batch, saying *"We've dealt with it in
 the past, but it appears nothing came of it. So the implemented solution obviously doesn't work."*

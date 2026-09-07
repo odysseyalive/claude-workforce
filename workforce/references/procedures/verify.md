@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 31 assertion(s) in bin/check name this file; 62 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 32 assertion(s) in bin/check name this file; 63 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -121,6 +121,35 @@ it is that `/workforce hooks` wires it and this row says whether it is wired.
 --execute`. `DEAD WIRING` → `wf-apply --root <tree> --execute` (`references/passes.md`
 § `PASS-DEAD-HOOK`), which removes registrations that do not resolve, records each whole prior entry in
 `.settings-owned.json` § `hooks_removed`, and refuses any hook under declared succession.
+
+**`ORPHANED` also has a producer now, and it is not only that command.** `install` and `install.ps1`
+wire the default set after the files land, and `audit` Step 6-H wires it again — so an `ORPHANED` row on
+a tree that has been audited since 2026-09-07 means the write was refused or reversed, not that nobody
+got around to it. Report which: name the settings file the registration is missing from.
+
+## Output style
+
+**One row, and it is the only carrier of the plain-output rule that a check can see.** The rule that
+everything a human reads is written the way you would say it has six carriers, and five of them are
+prose read at the head of a context (`references/plain-output.md` § Where the rule is carried). The
+`Plain Speak` output style is added to the system prompt, so it is the one that does not decay — and it
+is a settings key, so its state is readable.
+
+| State | Meaning |
+|---|---|
+| `SELECTED` | `outputStyle` is `Plain Speak` in the resolved settings file **and** `plain-speak.md` is on disk in an `output-styles/` directory the host reads |
+| `NOT SELECTED` | no `outputStyle` key, or another style — the rule reaches this session only through the five carriers that decay |
+| `SELECTED, FILE ABSENT` | the key names a style the host cannot find. **Worse than not selected**, because it reads as configured and the host silently falls back to Default — the same shape as `DEAD WIRING` above |
+| `OVERRIDDEN` | a different style is selected. **Report, never change it**: a style the user picked is a preference, and `audit` Step 6-H reports the same rather than overwriting |
+
+**The fix for `NOT SELECTED` and for `SELECTED, FILE ABSENT` is one command**, and it is the same one
+both installers and Step 6-H run: `wf-settings-apply --root <tree> --wire-defaults --execute`. Naming a
+settings fragment for the user to paste is forbidden here for the same reason it is forbidden in
+`audit.md` § Step 6 — the producer exists.
+
+**Say what it does not cover.** An output style reaches the main conversation only; a subagent runs its
+own system prompt. This row says nothing about how an employee reports, and describing it as governing
+employee output is the overclaim Core Principle 6 exists for.
 
 *Corrected 2026-08-05. This line named `/workforce hooks --execute` for both, and that command
 **could not do the second one**: `hooks.md` § Unwiring scopes `--remove --execute` to the entries

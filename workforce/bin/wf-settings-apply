@@ -198,8 +198,19 @@ def union_allow(root):
     return seen
 
 
-def load_owned(root):
-    owned_path = os.path.join(root, OWNED_REL)
+def owned_root(root, scope):
+    """Where the reversal record lives, by scope.
+
+    A user-scope write has no project tree to record into, and putting its record in
+    whatever directory the installer happened to run from would make `disband` in a
+    DIFFERENT project the only thing that could reverse it. Under the config root the
+    record sits beside the settings file it describes."""
+    return config_root() if scope == "user" else os.path.join(root, ".claude")
+
+
+def load_owned(root, scope="project"):
+    owned_path = (os.path.join(owned_root(root, scope), "workforce", ".settings-owned.json")
+                  if scope == "user" else os.path.join(root, OWNED_REL))
     data, _ = load(owned_path)
     if not isinstance(data, dict):
         data = {}
@@ -433,7 +444,47 @@ def do_stamp(root, name, execute):
     return 0, False
 
 
-def do_wire_hook(root, name, execute):
+def settings_for_scope(root, scope):
+    """The settings file the two wiring writers target, by scope.
+
+    A `--user` install has no project root at all, so the project resolver cannot be
+    the only path: an installer that could wire a hook only into the tree it was run
+    from would leave every OTHER project on that machine unwired, which is the manual
+    per-project step this scope exists to remove."""
+    return user_settings_path() if scope == "user" else resolve_project_settings(root)
+
+
+def do_wire_defaults(root, scope, execute):
+    """Wire every DEFAULT hook and select the output style, in one call.
+
+    WHY THIS EXISTS. Wiring was one `--wire-hook` invocation per hook, typed by a human
+    per machine and per project. On a single workstation that is a chore; across
+    servers it is a mechanism that does not propagate, and a mechanism that does not
+    propagate is dormant everywhere it was not typed — the exact failure four inherited
+    hooks died of, arriving through the gesture rather than through the file. The
+    installer calls this, and so does `audit`, so a fresh machine is wired by the
+    install and an already-installed machine is HEALED by the next audit.
+
+    IT IS NOT A NEW DECISION SURFACE. The set is `DEFAULT_HOOKS` — exactly what
+    `/workforce hooks --execute` wires, no more — and `OPT_IN_HOOKS` stays out of it.
+    Each write is the same idempotent NOOP-if-present write `--wire-hook` performs, so
+    running it twice registers nothing twice and reverses through the same
+    `.settings-owned.json` record."""
+    spath = settings_for_scope(root, scope)
+    print(f"WIRE   {spath}          <- resolved, not assumed")
+    print(f"  {len(DEFAULT_HOOKS)} default hook(s) + the output style"
+          f"{'' if execute else '  (nothing written — add --execute)'}")
+    rc = 0
+    for name in DEFAULT_HOOKS:
+        rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
+    rc = max(rc, do_output_style(root, execute, scope=scope, quiet=True))
+    if not execute:
+        print("  apply with: --execute   (run it yourself via `!` if the classifier "
+              "refused the agent's write)")
+    return rc
+
+
+def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if name not in SHIPPED_HOOKS:
         print(f"wf-settings-apply: {name} is not a shipped hook. "
               f"Default set: {', '.join(DEFAULT_HOOKS)}. "
@@ -443,8 +494,9 @@ def do_wire_hook(root, name, execute):
     event, matcher = SHIPPED_HOOKS[name]
     command, resolved = hook_command(name)
 
-    spath = resolve_project_settings(root)
-    print(f"HOOKS  {spath}          <- resolved, not assumed")
+    spath = settings_for_scope(root, scope)
+    if not quiet:
+        print(f"HOOKS  {spath}          <- resolved, not assumed")
     if resolved.startswith("${CLAUDE_PROJECT_DIR}"):
         print(f"  note: no personal install found; registering the project-scope path "
               f"for {name}.")
@@ -487,13 +539,14 @@ def do_wire_hook(root, name, execute):
           f"{'registered' if execute else 'would register'}")
     if not execute:
         rc, _pending = do_stamp(root, name, execute)
-        print("  apply with: --execute   (run it yourself via `!` if the classifier "
-              "refused the agent's write)")
+        if not quiet:
+            print("  apply with: --execute   (run it yourself via `!` if the classifier "
+                  "refused the agent's write)")
         return rc
 
     # Sidecar reversal FIRST — the exact event/matcher/command, so `disband`/`hooks
     # --remove` removes those and nothing else.
-    owned_path, owned = load_owned(root)
+    owned_path, owned = load_owned(root, scope)
     added = owned.setdefault("hooks_added", [])
     if not isinstance(added, list):
         added = owned["hooks_added"] = []
@@ -598,7 +651,7 @@ def do_automode(execute):
 OUTPUT_STYLE = "Plain Speak"
 
 
-def do_output_style(root, execute):
+def do_output_style(root, execute, scope="project", quiet=False):
     """Select the shipped plain-speak output style in the project settings file.
 
     WHY A SETTING AND NOT A REFERENCE. An output style is added to the SYSTEM PROMPT
@@ -612,8 +665,9 @@ def do_output_style(root, execute):
     subagent runs its own system prompt. Employee reports are covered by the handbook
     clause and by `wf-speak-guard`, never by this. Saying otherwise would be the
     overclaim this project fails a run over."""
-    spath = resolve_project_settings(root)
-    print(f"STYLE  {spath}          <- resolved, not assumed")
+    spath = settings_for_scope(root, scope)
+    if not quiet:
+        print(f"STYLE  {spath}          <- resolved, not assumed")
 
     # Both scopes, precedence order, exactly as references/scopes.md defines for the
     # skill itself: a `--user` install puts the style under the config root, a project
@@ -649,11 +703,12 @@ def do_output_style(root, execute):
     print(f"  {'+' if execute else '~'} outputStyle = {OUTPUT_STYLE!r}  "
           f"{'written' if execute else 'would write'}")
     if not execute:
-        print("  apply with: --execute   (run it yourself via `!` if the classifier "
-              "refused the agent's write)")
+        if not quiet:
+            print("  apply with: --execute   (run it yourself via `!` if the classifier "
+                  "refused the agent's write)")
         return 0
 
-    owned_path, owned = load_owned(root)
+    owned_path, owned = load_owned(root, scope)
     owned["output_style_previous"] = current
     owned["output_style_set"] = OUTPUT_STYLE
     dump(owned_path, owned)
@@ -682,17 +737,27 @@ def main(argv=None):
                     help="write autoMode entries into ~/.claude/settings.json (user scope)")
     ap.add_argument("--output-style", action="store_true",
                     help="select the shipped plain-speak output style for this project")
+    ap.add_argument("--wire-defaults", action="store_true",
+                    help="wire every default hook AND select the output style, in one call")
+    ap.add_argument("--scope", choices=("project", "user"), default="project",
+                    help="which settings file to write (user scope needs no --root)")
     args = ap.parse_args(argv)
 
     modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
-             bool(args.output_style)]
+             bool(args.output_style), bool(args.wire_defaults)]
     if sum(modes) != 1:
         print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
-              "--automode, --output-style.", file=sys.stderr)
+              "--automode, --output-style, --wire-defaults.", file=sys.stderr)
+        return 2
+    if args.scope == "user" and (args.grants or args.wire_hook):
+        print("wf-settings-apply: --scope user applies to --wire-defaults and "
+              "--output-style only.", file=sys.stderr)
         return 2
 
-    # --automode writes only the user file and needs no --root. Every other mode does.
-    if not args.automode:
+    # --automode writes only the user file and needs no --root, and neither does any
+    # user-scope write. Every other mode does.
+    root = ""
+    if not args.automode and args.scope != "user":
         # ${CLAUDE_PROJECT_DIR} is unset in the Bash tool, so a shipped `--root
         # "${CLAUDE_PROJECT_DIR}"` expands to `--root ""`; abspath("") is the CWD, a
         # tree nobody named. This script WRITES, so refuse rather than retarget.
@@ -710,7 +775,9 @@ def main(argv=None):
     if args.wire_hook:
         return do_wire_hook(root, args.wire_hook, args.execute)
     if args.output_style:
-        return do_output_style(root, args.execute)
+        return do_output_style(root, args.execute, scope=args.scope)
+    if args.wire_defaults:
+        return do_wire_defaults(root, args.scope, args.execute)
     return do_automode(args.execute)
 
 

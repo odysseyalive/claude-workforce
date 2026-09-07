@@ -21,8 +21,13 @@
 # The list of shipped files lives in manifest.txt (shared with the bash installer).
 
 function Install-ClaudeWorkforce {
-    param([string]$ConfigDir = '', [switch]$Force)
+    param([string]$ConfigDir = '', [switch]$Force, [switch]$NoWire)
     $ErrorActionPreference = 'Stop'
+
+    # Wiring is ON by default -- the point of doing it here is that no human types a
+    # command per machine. `-NoWire`, or $env:WORKFORCE_NO_WIRE for the `irm | iex`
+    # form that cannot take parameters, opts out.
+    $script:WantsWire = -not ($NoWire -or $env:WORKFORCE_NO_WIRE)
 
     # ── Version helpers ───────────────────────────────────────────────────────
     #
@@ -546,6 +551,38 @@ function Install-ClaudeWorkforce {
             }
             [System.IO.File]::WriteAllText($fullPath, $json, (New-Object System.Text.UTF8Encoding($false)))
             Write-Host "  Settings saved to $settingsFile"
+        }
+
+        # WIRE WHAT WAS JUST INSTALLED. Same reasoning as the bash installer: a shipped
+        # hook nobody registers is dormant, and until 2026-09-07 the only thing that
+        # registered one was a human typing a command per machine and per project. That
+        # is a mechanism that does not propagate, and a mechanism that does not
+        # propagate is dormant everywhere nobody typed it. User directive, 2026-09-07:
+        # "I can't have manual commands being run ... no user will want to do that."
+        #
+        # NOT A NEW DECISION SURFACE: the set is DEFAULT_HOOKS, exactly what
+        # `/workforce hooks --execute` wires. `-NoWire` opts out. NEVER FATAL -- an
+        # install whose files all landed must not fail over a registration; `verify`
+        # reports an unwired hook.
+        if (-not $script:WantsWire) {
+            Write-Host '  Skipping hook wiring and output style (-NoWire).'
+        } elseif (-not (Get-Command python -ErrorAction SilentlyContinue) -and
+                  -not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+            Write-Host '  Warning: python not found; hooks are installed but NOT wired.'
+            Write-Host '  Wire them later with: /workforce hooks --execute'
+        } else {
+            $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
+            $applier = Join-Path $skillDir 'bin/wf-settings-apply'
+            Write-Host 'Wiring hooks and selecting the output style...'
+            $wireArgs = if ($scope -eq 'user') {
+                @($applier, '--scope', 'user', '--wire-defaults', '--execute')
+            } else {
+                @($applier, '--root', (Get-Location).Path, '--wire-defaults', '--execute')
+            }
+            & $py @wireArgs 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host '  Warning: wiring reported a problem. Run `/workforce verify` to see what is unwired.'
+            }
         }
     }
 

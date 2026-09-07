@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 75 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 77 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.20.0"
+version: "1.21.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -399,6 +399,34 @@ strength on every turn) and `wf-speak-guard` (a `Stop` hook reading the finished
 turn). The operational reading is — **lead with the answer, decide the small reversible things
 instead of asking, never open with agreement, and never concede because someone objected: say what
 you still think and let them decide.***
+
+> **"I don't mind running the python3 command when you are ready, as long as it only needs to run
+> once and gets committed somehow to propagate everywhere else? The honest issue is that item #2 needs
+> to happen the same way. This project is on different servers. I can't have manual commands being run
+> ... no user will want to do that."**
+
+> **"so there needs to be a directive where needed changes like this need to be done in such a way that
+> the next use of workforce will heal the situation, even if it needs ran through an audit again."**
+
+*— Added 2026-09-07, source: user directive, stated on being handed two `!` commands to wire the fix
+above. **This is one directive in two clauses, and the second is the harder one.** The first says a
+mechanism must arrive through something that propagates — a commit, an installer — never through a
+command typed per machine and per project. The second says that is not enough on its own: **a machine
+that installed BEFORE the mechanism existed must be healed by the next use of workforce**, an audit
+included. Note what makes the second clause necessary rather than redundant: a fresh-install path
+reaches new servers, and every org already in the world stays exactly where it was, on a tree that does
+not look broken. It generalizes the 2026-09-02 directive — *"This has to be fixed in workforce, and how
+the audit process heals broken structures like this"* — from handbook structure to **every** shipped
+mechanism. The measured case: `wf-plain-guard` shipped 2026-09-05 wired by nothing but a human typing
+`hooks --execute`, and `audit.md` Step 6-G had read "this sits alongside the settings-hook wiring of the
+same run" the whole time while **no step performed that wiring**. Mechanics at `references/enforcement.md`
+§ Three paths, or it does not propagate, `references/procedures/audit.md` § Step 6-H,
+`references/procedures/verify.md` § Output style, and `wf-settings-apply --wire-defaults`, which is the
+single producer all three paths call so the wired set cannot drift between them. The operational reading
+is — **three paths or it does not propagate: the installer wires it, `audit` wires it again, and
+`verify` reports it absent. A per-machine command is not a path** — it reaches exactly the machines
+somebody typed it on and is indistinguishable from dormancy everywhere else. It survives as the manual
+hatch and as the remedy for a classifier-refused write, and never as how a mechanism arrives.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

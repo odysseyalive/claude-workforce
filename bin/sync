@@ -82,7 +82,7 @@ def manifest_entries():
     """Every shipped source path, with its executable flag. Parsed BEFORE anything is
     removed, because the runtime-first scan below has to read the copies this script
     is about to delete."""
-    out, bad = [], []
+    out, bad, styles = [], [], []
     for line in open("manifest.txt", encoding="utf-8"):
         s = line.strip()
         if not s or s.startswith("#"):
@@ -98,6 +98,20 @@ def manifest_entries():
             if not os.path.isfile(s):
                 bad.append(f"{s} (declared canary, not on disk)")
             continue
+        # `style ` lands in an `output-styles/` directory, never in the skill tree —
+        # the host looks for an output style in exactly two places and neither is
+        # under `skills/`. Collected separately so the copy loop below can place it,
+        # rather than skipped like `canary`: a canary is an agent definition the
+        # INSTALLER registers, while a style the maintainer edits and never syncs is
+        # stale in the copy a session actually loads, which is the drift this script
+        # exists to remove.
+        if s.startswith("style "):
+            s = s[len("style "):].strip()
+            if not os.path.isfile(s):
+                bad.append(f"{s} (declared style, not on disk)")
+            else:
+                styles.append(s)
+            continue
         if not s.startswith(PREFIX):
             bad.append(f"{s} (path does not start with {PREFIX!r})")
             continue
@@ -105,10 +119,10 @@ def manifest_entries():
             bad.append(f"{s} (declared, not on disk)")
             continue
         out.append((s, executable))
-    return out, bad
+    return out, bad, styles
 
 
-ENTRIES, missing = manifest_entries()
+ENTRIES, missing, STYLES = manifest_entries()
 
 # ── REFUSE to destroy a runtime-first edit ───────────────────────────────────
 # This script is delete-then-rebuild, so every byte in a target that is not in source
@@ -194,8 +208,23 @@ for s, executable in ENTRIES:
             os.chmod(dest, os.stat(dest).st_mode | 0o111)
     copied += 1
 
+# Output styles, placed beside the settings file rather than inside the skill tree.
+# The target is derived from each skill target: `<X>/skills/workforce` implies `<X>`,
+# which is the config root for the personal copy and the project's `.claude` for the
+# project copy — the same two directories both installers write to.
+styled = 0
+for src in STYLES:
+    for target in targets:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(target)))
+        dest = os.path.join(base, "output-styles", os.path.basename(src))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(src, dest)
+    styled += 1
+
 for t in targets:
     print(f"synced {copied} files to {t}")
+if styled:
+    print(f"synced {styled} output style(s) beside each settings file")
 
 if missing:
     print("\nmanifest problems:")

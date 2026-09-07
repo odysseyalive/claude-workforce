@@ -113,6 +113,11 @@ NO_AUTOMODE=""
 CONFIG_DIR_EXPLICIT=""
 FORCE=""
 [ -n "$WORKFORCE_NO_AUTOMODE" ] && NO_AUTOMODE="yes"
+# Wiring is ON by default: a hook that ships unwired is dormant, and the whole point of
+# doing it here is that no human types a command per machine. `--no-wire` (or
+# WORKFORCE_NO_WIRE, for the curl-pipe form that cannot take flags) opts out.
+WANTS_WIRE="yes"
+[ -n "$WORKFORCE_NO_WIRE" ] && WANTS_WIRE="no"
 # WORKFORCE_FORCE is the env twin of --force, for the curl-pipe form that cannot take
 # positional flags (mirrors WORKFORCE_SCOPE). Either overrides the downgrade guard.
 [ -n "$WORKFORCE_FORCE" ] && FORCE="yes"
@@ -121,6 +126,7 @@ while [ $# -gt 0 ]; do
         --project|--local) SCOPE_EXPLICIT="project"; shift ;;
         --user|--personal) SCOPE_EXPLICIT="user"; shift ;;
         --no-automode) NO_AUTOMODE="yes"; shift ;;
+        --no-wire) WANTS_WIRE="no"; shift ;;
         --force) FORCE="yes"; shift ;;
         # A specific CLAUDE_CONFIG_DIR to install the personal copy into. Takes a
         # path value (space- or =-separated). Guard the value: `shift` on an empty
@@ -131,11 +137,12 @@ while [ $# -gt 0 ]; do
             CONFIG_DIR_EXPLICIT="$2"; shift 2 ;;
         --config-dir=*) CONFIG_DIR_EXPLICIT="${1#--config-dir=}"; shift ;;
         --help|-h)
-            echo "Usage: install [--user|--project] [--config-dir <path>] [--no-automode] [--force]"
+            echo "Usage: install [--user|--project] [--config-dir <path>] [--no-automode] [--no-wire] [--force]"
             echo
             echo "With no flag, existing installs are found and updated in place."
             echo "A first-time install asks where to go."
             echo
+            echo "  --no-wire         install the hooks without registering them"
             echo "  --user            force the personal install"
             echo "  --project         force ./.claude/skills/workforce"
             echo "  --config-dir DIR  install the personal copy into DIR instead of ~/.claude"
@@ -629,6 +636,42 @@ if changed:
         echo '  { "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3" },'
         echo '    "permissions": { "allow": ["Agent", "SendMessage", "TaskCreate", "TaskUpdate",'
         echo '                               "TaskList", "TaskGet", "WebSearch", "WebFetch"] } }'
+    fi
+
+    # WIRE WHAT WAS JUST INSTALLED. A shipped hook that nobody registers is dormant,
+    # and until 2026-09-07 the only thing that registered one was a human typing
+    # `/workforce hooks --execute` or `! wf-settings-apply --wire-hook <name>` once per
+    # machine and once per project. On one workstation that is a chore. Across servers
+    # it is a mechanism that DOES NOT PROPAGATE, and a mechanism that does not
+    # propagate is dormant everywhere nobody typed it -- which is the exact state the
+    # four inherited hooks were deleted for, reached through the gesture instead of
+    # through the file. User directive, 2026-09-07: "I can't have manual commands being
+    # run ... no user will want to do that."
+    #
+    # NOT A NEW DECISION SURFACE. The set is DEFAULT_HOOKS, which is precisely what
+    # `/workforce hooks --execute` wires; OPT_IN_HOOKS stays out of it. Every write is
+    # the same idempotent NOOP-if-present write, recorded in `.settings-owned.json`, so
+    # `disband` reverses exactly these and nothing else. `--no-wire` opts out.
+    #
+    # NEVER FATAL. A wiring failure must not fail an install whose files all landed:
+    # `verify` reports an unwired hook, and an install that aborts here leaves a tree
+    # that is complete and looks broken.
+    if [ "$WANTS_WIRE" = "no" ]; then
+        echo "  Skipping hook wiring and output style (--no-wire)."
+    elif ! command -v python3 &>/dev/null; then
+        echo "  Warning: python3 not found; hooks are installed but NOT wired."
+        echo "  Wire them later with: /workforce hooks --execute"
+    else
+        echo "Wiring hooks and selecting the output style..."
+        if [ "$scope" = "user" ]; then
+            python3 "$skill_dir/bin/wf-settings-apply" --scope user \
+                --wire-defaults --execute 2>&1 | sed 's/^/  /' || \
+                echo "  Warning: wiring reported a problem. Run \`/workforce verify\` to see what is unwired."
+        else
+            python3 "$skill_dir/bin/wf-settings-apply" --root "$(pwd)" \
+                --wire-defaults --execute 2>&1 | sed 's/^/  /' || \
+                echo "  Warning: wiring reported a problem. Run \`/workforce verify\` to see what is unwired."
+        fi
     fi
 }
 

@@ -162,6 +162,14 @@ def manifest_hook_paths():
     return _flagged("hook")
 
 
+def manifest_style_paths():
+    """Declared `style ` paths. They install to an `output-styles/` directory, never
+    into the skill tree, so every skill-tree comparison must exclude them."""
+    return [l.strip()[len("style "):].strip()
+            for l in read("manifest.txt").splitlines()
+            if l.strip().startswith("style ")]
+
+
 def manifest_canary_paths():
     """Paths carrying `canary` — agent definitions installed to `.claude/agents/`."""
     return _flagged("canary")
@@ -7552,8 +7560,13 @@ if os.path.isdir(_personal):
     # they are legitimately absent from the personal SKILL copy and comparing
     # them there reports 4 permanent phantom absences.
     _canary_set = set(manifest_canary_paths())
+    # `style` files install to `<config-root>/output-styles/`, never into the skill
+    # tree, for the same reason and with the same consequence: comparing one there
+    # reports a permanent phantom absence and sends the reader to `bin/sync` for a
+    # file sync already placed correctly. Compared in their own row below.
+    _style_set = set(manifest_style_paths())
     for _src in sorted(declared):
-        if _src in _canary_set:
+        if _src in _canary_set or _src in _style_set:
             continue
         # manifest paths are repo-relative and ALREADY begin with "workforce/".
         # Joining "workforce" onto them again produced workforce/workforce/... ,
@@ -7586,6 +7599,26 @@ if os.path.isdir(_personal):
           _compared > 0,
           f"compared {_compared} files — the check reported a pass without reading anything, "
           "which is how eleven stale reference files sat behind a green run")
+
+    # The style, compared where it actually lands. It is the one carrier of the
+    # plain-output rule that does not decay with context, so a stale copy in the
+    # personal tree is a rule the session is not actually running.
+    _style_bad = []
+    for _src in sorted(_style_set):
+        if not os.path.exists(_src):
+            continue
+        _b = os.path.join(os.path.dirname(_personal.rstrip("/")), "..", "output-styles",
+                          os.path.basename(_src))
+        _b = os.path.normpath(_b)
+        if not os.path.exists(_b):
+            _style_bad.append(f"{os.path.basename(_src)} (absent at {_b})")
+        elif read(_src) != read(_b):
+            _style_bad.append(f"{os.path.basename(_src)} (stale at {_b})")
+    check("the shipped output style is current where the host reads it",
+          not _style_bad,
+          "%s — an output style is read from <config-root>/output-styles/, and a stale "
+          "copy there is a rule this session is not running while every other check "
+          "says it ships. FIX: `bin/sync --personal`" % ("; ".join(_style_bad) or "ok"))
 
     _n = len(_drift) + len(_missing)
     _shown = ", ".join((_drift + _missing)[:6]) + (" …" if _n > 6 else "")
@@ -8429,6 +8462,71 @@ check("text-eval: the conversational-register row no longer exempts what the use
       "the one written test that would have caught a formal report excluded the report. "
       "The rest of the exemption stays — what an agent AUTHORS into a reference and what "
       "it SAYS to a person are different corpora with different correct registers")
+
+# ── three paths, or it does not propagate (2026-09-07) ──────────────────────────────
+# A mechanism wired only by a human typing a command reaches exactly the machines
+# somebody typed it on. MEASURED: `audit.md` Step 6-G read "this sits alongside the
+# settings-hook wiring of the same run" from the day it was written, and NO STEP
+# PERFORMED THAT WIRING. These assertions require all three paths to exist and to go
+# through one producer, so the wired set cannot drift between install and audit.
+_ins = read("install")
+_insp = read("install.ps1")
+_aud_h = read("workforce/references/procedures/audit.md")
+_vfy_h = read("workforce/references/procedures/verify.md")
+check("wire-defaults is one producer, and it never widens to the opt-in set",
+      "def do_wire_defaults" in _wsa and "--wire-defaults" in _wsa
+      and "for name in DEFAULT_HOOKS" in _wsa
+      and "do_output_style(root, execute, scope=scope, quiet=True)" in _wsa,
+      "install, install.ps1 and audit Step 6-H all call this. Two lists instead of one "
+      "producer drift inside a single release, and the drifting copy is the one a user "
+      "installs. Iterating DEFAULT_HOOKS rather than a literal list is what keeps "
+      "OPT_IN_HOOKS out of every caller at once")
+# EACH SUBSTRING UNIQUE IN ITS FILE. The first form of this check named `WANTS_WIRE`
+# and `--wire-defaults`, both of which appear three or four times per installer — so
+# `bin/prove` deleted one and the remaining copies kept the check green, and the case
+# reported on a mutation that changed nothing. Anchor on the single initialization and
+# on the single opt-out branch, which is what a regression would actually remove.
+check("path 1: both installers wire what they just installed",
+      '--wire-defaults --execute' in _ins and "'--wire-defaults', '--execute'" in _insp
+      and 'WANTS_WIRE="yes"' in _ins and "$script:WantsWire = -not" in _insp
+      and '--no-wire) WANTS_WIRE="no"' in _ins and "[switch]$NoWire" in _insp,
+      "a hook nobody registers is dormant, and a per-machine command reaches only the "
+      "machines somebody typed it on. Both installers, because a rule landing in one "
+      "is the two-implementations problem manifest.txt exists to prevent")
+check("path 1 is never fatal, and says so when it cannot run",
+      "hooks are installed but NOT wired" in _ins
+      and "hooks are installed but NOT wired" in _insp,
+      "an install whose files all landed must not fail over a registration. Silence is "
+      "the other wrong answer: a tree that is wired and a tree that is not must not "
+      "print the same thing")
+check("path 2: audit heals a tree that installed before the mechanism existed",
+      "### Step 6-H" in _aud_h
+      and "--wire-defaults --execute" in _aud_h
+      and "Three paths, or it does not propagate" in _aud_h,
+      "THE ROW THAT GETS SKIPPED. A fix reaching only future installs leaves every org "
+      "already in the world where it was, on a tree that does not look broken. Step "
+      "6-G has claimed a sibling wiring step since it was written and there was none")
+check("path 3: verify reports both the hook state and the style state",
+      "## Output style" in _vfy_h
+      and "| `SELECTED, FILE ABSENT` |" in _vfy_h
+      and "main conversation only" in _vfy_h,
+      "the third path is what makes the first two checkable from outside. And the "
+      "file-absent state must be its own row: a key naming a style the host cannot "
+      "find reads as configured and silently falls back to Default, which is DEAD "
+      "WIRING one file over")
+check("the three paths are stated once, where the rule lives",
+      "## Three paths, or it does not propagate" in enf
+      and "A per-machine command is not a path" in enf
+      and "the missing one is never obvious from the machine" in enf,
+      "enforcement.md is the file a reader checks before claiming a mechanism is on. "
+      "Without the rule stated here, the next mechanism ships with one path and nobody "
+      "has anything to check it against")
+check("enforcement.md's hook count points at the table instead of restating it",
+      "ships exactly two hooks" not in enf
+      and "which is the authority on the set" in enf,
+      "the count read 'exactly two' against six on disk from 2026-08-19 to 2026-09-07. "
+      "A constant restated outside the file that owns it is Principle 9a's exact case, "
+      "and the fix is a pointer, never a fresher number")
 
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,
