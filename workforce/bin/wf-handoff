@@ -100,8 +100,10 @@ import argparse
 import datetime
 import glob
 import json
+import hashlib
 import math
 import os
+import re
 import sys
 import time
 
@@ -124,6 +126,25 @@ MIN_SAMPLE = 20
 # Measured: largest observed gap between records inside a still-working run was
 # 1,282.7 s. Evidence: measurements/2026-09-07-live-agent-telemetry.md.
 STALE_SECONDS = 1800
+
+# THE CLAUSE, stated here ONCE and nowhere else in this file. `--wire` appends exactly
+# this and `--unwire` removes exactly this, so the two can never drift apart into a
+# write with no matching way back.
+# Line-anchored, because an unanchored marker test reads documentation ABOUT the marker
+# as the marker itself — and this file's own docstring names it.
+CLAUSE_MARKER_RX = re.compile(r"^.*<!--\s*wf-handoff:clause\s*-->\s*$", re.M)
+
+CLAUSE = (
+    "- AT EVERY PHASE BOUNDARY, before starting the next phase, run `wf-handoff --self`. If the\n"
+    "  verdict is `HANDOFF`, do not start the next phase: run `wf-handoff --brief <your-id>`, fill\n"
+    "  sections 3-7, and return the brief to your manager. Never replace yourself; your manager\n"
+    "  spawns your successor. <!-- wf-handoff:clause -->\n"
+)
+
+# The reversal record. `--wire` PRODUCES it, `--unwire` CONSUMES it, and neither is a
+# documented procedure a human executes by hand: a path in needs a path out, and the way
+# out needs a producer (references/enforcement.md).
+RECORD = os.path.join(".claude", "workforce", ".handoff-wired.json")
 
 # Tool names whose calls are file writes. Used only to list what a successor
 # inherits; nothing gates on this set.
@@ -344,6 +365,122 @@ def identify_self(agents, argv_needle):
     return None, f"{len(hits)} transcripts carry this command text; pass --agent <id>"
 
 
+
+def _handbooks(root):
+    """Every registered handbook, with its tier read from the ORG-RECORD block."""
+    out = []
+    for p in sorted(glob.glob(os.path.join(root, ".claude", "agents", "**", "*.md"),
+                              recursive=True)):
+        try:
+            with open(p, encoding="utf-8", errors="replace") as fh:
+                body = fh.read()
+        except OSError:
+            continue
+        m = re.search(r"<!--\s*tier:\s*(\d+)", body)
+        out.append((p, int(m.group(1)) if m else None, body))
+    return out
+
+
+def _insert_clause(body):
+    """Append CLAUSE to the LAST `## Guardrails` block, or return None if there is none."""
+    idx = body.rfind("\n## Guardrails")
+    if idx == -1:
+        return None
+    nxt = body.find("\n## ", idx + 1)
+    end = len(body) if nxt == -1 else nxt
+    seg = body[:end].rstrip("\n")
+    return seg + "\n" + CLAUSE + body[end:]
+
+
+def wire(root, execute):
+    """Install the boundary clause into every delegating handbook; write the record.
+
+    Tiers 1 and 2 delegate, so they are the ones that can hand work to a successor. A
+    handbook that already carries the clause is recorded as PRE-EXISTING and never
+    touched, which is what makes --unwire safe: it removes only what this wrote.
+    """
+    rows, skipped = [], []
+    for path, tier, body in _handbooks(root):
+        if tier not in (1, 2):
+            continue
+        rel = os.path.relpath(path, root)
+        if CLAUSE_MARKER_RX.search(body):
+            rows.append({"path": rel, "preexisting": True})
+            continue
+        new = _insert_clause(body)
+        if new is None:
+            skipped.append((rel, "no `## Guardrails` section to append to"))
+            continue
+        if execute:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(new)
+        rows.append({"path": rel, "preexisting": False,
+                     "clause_sha": hashlib.sha256(CLAUSE.encode()).hexdigest()})
+    if execute and rows:
+        rp = os.path.join(root, RECORD)
+        os.makedirs(os.path.dirname(rp), exist_ok=True)
+        with open(rp, "w", encoding="utf-8") as fh:
+            json.dump({"clause_sha": hashlib.sha256(CLAUSE.encode()).hexdigest(),
+                       "wired": rows}, fh, indent=2)
+    return rows, skipped
+
+
+def unwire(root, execute):
+    """Remove exactly the clauses `--wire` recorded, and nothing else.
+
+    CONSERVATIVE IN BOTH DIRECTIONS. A handbook that carried the clause BEFORE the wire
+    is left alone (it was not ours to add, so it is not ours to remove). A clause the
+    user has since edited no longer matches byte-for-byte and is REPORTED, never
+    removed — the case that matters is the tree where somebody changed the thing you
+    wrote, and the right behaviour there is to keep their edit and say so.
+    """
+    rp = os.path.join(root, RECORD)
+    if not os.path.isfile(rp):
+        _die(f"no reversal record at {rp} — nothing was wired by this mechanism, "
+             f"or it was already unwired")
+    with open(rp, encoding="utf-8", errors="replace") as fh:
+        rec = json.load(fh)
+    removed, kept = [], []
+    for row in rec.get("wired", []):
+        path = os.path.join(root, row["path"])
+        if row.get("preexisting"):
+            kept.append((row["path"], "pre-existing before the wire — not ours to remove"))
+            continue
+        if not os.path.isfile(path):
+            kept.append((row["path"], "handbook no longer on disk"))
+            continue
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            body = fh.read()
+        if CLAUSE not in body:
+            kept.append((row["path"], "clause edited since it was written — left as the user has it"))
+            continue
+        want = (body.replace("\n" + CLAUSE, "\n", 1) if "\n" + CLAUSE in body
+                else body.replace(CLAUSE, "", 1))
+        # READ BACK WHAT WAS WRITTEN. The removal must change the file by EXACTLY the
+        # clause and nothing else — a reversal is believed, so one that cannot show its
+        # own delta is worse than none. Everything the user owns sits in the same
+        # bulleted list, so "only the clause left" is the property that matters and it
+        # is asserted here rather than assumed from the replace() call.
+        delta = len(body) - len(want)
+        if execute:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(want)
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                back = fh.read()
+            if back != want:
+                kept.append((row["path"], "read-back mismatch after removal — left as found"))
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(body)
+                continue
+        surviving = len([l for l in want.splitlines()
+                         if l.startswith("- ") and "wf-handoff" not in l])
+        removed.append((row["path"], delta, surviving))
+    if execute and removed and len(removed) == len([r for r in rec.get("wired", [])
+                                                    if not r.get("preexisting")]):
+        os.remove(rp)
+    return removed, kept
+
+
 def _own_open_calls(a, argv_needle):
     """How many of this agent's still-open tool calls are THIS invocation."""
     n = 0
@@ -474,6 +611,12 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--json")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--wire", action="store_true",
+                    help="install the boundary clause into delegating handbooks")
+    ap.add_argument("--unwire", action="store_true",
+                    help="remove exactly the clauses --wire recorded, and nothing else")
+    ap.add_argument("--execute", action="store_true",
+                    help="required by --wire and --unwire; without it they display only")
     args = ap.parse_args()
 
     # An empty --root is a caller error, never a silent retarget to the CWD. A shipped
@@ -485,6 +628,41 @@ def main():
     args.root = os.path.abspath(args.root)
     if args.limit is not None and args.limit <= 0:
         _die("--limit must be a positive token count")
+
+    if args.wire or args.unwire:
+        # These two never read the transcript store: they are the wiring half, not the
+        # measuring half, and a store that cannot be resolved must not stop a reversal.
+        verb = "wire" if args.wire else "unwire"
+        if args.wire and args.unwire:
+            _die("--wire and --unwire are opposites; pass one")
+        if verb == "wire":
+            rows, skipped = wire(args.root, args.execute)
+            new = [r for r in rows if not r.get("preexisting")]
+            pre = [r for r in rows if r.get("preexisting")]
+            print(f"wf-handoff --wire{'' if args.execute else ' (display only)'} — {args.root}")
+            for r in new:
+                print(f"  + {r['path']}")
+            for r in pre:
+                print(f"  = {r['path']}  already carried the clause; not touched")
+            for rel, why in skipped:
+                print(f"  ! {rel}  {why}")
+            print(f"\n  {len(new)} to write · {len(pre)} already present · {len(skipped)} skipped")
+            if args.execute and new:
+                print(f"  reversal record: {RECORD} — undo with `wf-handoff --unwire --execute`")
+            elif not args.execute:
+                print("  nothing written. Re-run with --execute.")
+            return 0
+        removed, kept = unwire(args.root, args.execute)
+        print(f"wf-handoff --unwire{'' if args.execute else ' (display only)'} — {args.root}")
+        for rel, delta, surviving in removed:
+            print(f"  - {rel}  (-{delta} bytes: the clause only; "
+                  f"{surviving} other guardrail(s) intact)")
+        for rel, why in kept:
+            print(f"  = {rel}  KEPT: {why}")
+        print(f"\n  {len(removed)} to remove · {len(kept)} kept untouched")
+        if not args.execute:
+            print("  nothing written. Re-run with --execute.")
+        return 0
 
     store, how = resolve_store(args)
     metas = sorted(glob.glob(os.path.join(store, "subagents", "*.meta.json")))

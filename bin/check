@@ -7932,6 +7932,7 @@ PRODUCERS = {
     ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
     ".claude/workforce/pass-baseline.md": "workforce/references/procedures/audit.md",
     ".claude/workforce/loop-guard.json": "workforce/references/procedures/hooks.md",
+    ".claude/workforce/.handoff-wired.json": "workforce/references/handoff.md",
 }
 
 _artifacts = set()
@@ -10490,6 +10491,34 @@ check("handoff: the self-check discounts its OWN open tool call",
       "wf-handoff --self must discount the in-flight call that IS this invocation. Without it "
       "every self-check sees one open tool call and can never report a safe boundary, which "
       "makes the whole boundary clause dead on arrival.")
+
+_vfy2 = read("workforce/references/procedures/verify.md")
+check("handoff: three paths - installer, audit heal, and a verify absence report",
+      "HANDOFF-UNWIRED" in _vfy2 and "EDGE-MISMATCH" in _vfy2
+      and "the measurement ships with nothing calling it" in _vfy2
+      and "Three paths, so the clause reaches every host" in _hnd,
+      "The boundary clause is handbook text a host must CARRY, so a template plus an audit step "
+      "reaches only orgs somebody re-audited. verify must report both HANDOFF-UNWIRED and "
+      "EDGE-MISMATCH, and handoff.md must name all three paths (enforcement.md § Three paths).")
+
+_aud_h = read("workforce/references/procedures/audit.md")
+check("handoff: the way out is a command, and --wire produces the record --unwire reads",
+      "--unwire" in _hoff and "RECORD = os.path.join" in _hoff
+      and "CLAUSE = (" in _hoff
+      and "The way out is a command, and something produces the record it reads" in _hnd
+      and "wf-handoff --wire" in _aud_h,
+      "--wire is the only thing here that writes to a host, so it must ship a REVERSAL COMMAND, not "
+      "a documented procedure. One CLAUSE constant feeds both halves so a write cannot drift out of "
+      "reach of its own undo, and audit Step 5g must INVOKE --wire rather than hand-edit handbooks.")
+
+check("handoff: the reversal is conservative in both directions, and reads back what it wrote",
+      "pre-existing before the wire" in _hoff
+      and "clause edited since it was written" in _hoff
+      and "READ BACK WHAT WAS WRITTEN" in _hoff
+      and "A clause the user has **since edited**" in _hnd,
+      "A reversal that removes by position or by pattern deletes edits somebody made on purpose. "
+      "--unwire must KEEP a pre-existing clause and KEEP an edited one, each with its reason, and "
+      "handoff.md must state both. The case that matters is the tree with a competing value in it.")
 
 check("handoff: age is read from the last RECORD, never the file mtime",
       "AGE IS MEASURED FROM THE LAST RECORD, NOT FROM THE FILE MTIME" in _hoff

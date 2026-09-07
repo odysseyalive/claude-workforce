@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 32 assertion(s) in bin/check name this file; 63 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 64 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -253,6 +253,22 @@ agreeing against the third is a finding, not a tiebreak.
 | Personas unique, paraphrase included | a panel whose members cannot disagree |
 | Every retained playbook has exactly one Records Owner | unowned shared data |
 | Each domain-overseeing Lead has a domain-model critic IC, or a recorded repin | `LANE-DRIFT` — a Lead judging what it cannot see |
+| Every edge re-derived from the child's `reports-to`, and each parent's `direct-reports` agrees | `EDGE-MISMATCH` — a real edge the chart does not draw |
+| Every Lead handbook carries the handoff boundary clause | `HANDOFF-UNWIRED` — the measurement ships with nothing calling it |
+
+**`EDGE-MISMATCH` is the missing-edge direction, and that is why it is checked here rather than
+left to `index`.** An extra edge is visible to anyone reading the chart; an omitted one reads as a
+correct chart of a smaller org, and `/org` then routes around an employee that exists and is
+staffed. Report both handbooks by name. The remedy is `org index`, which rewrites every
+`direct-reports` from the edge set (`org-chart-format.md` § Regeneration), or `audit` Step 5g when
+the org needs the rest of the heal too.
+
+**`HANDOFF-UNWIRED` is the `verify` leg of the three-paths rule** (`enforcement.md`):
+the installer ships `wf-handoff` and the templates carry the clause for new hires, `audit` Step 5g
+writes it into orgs installed before it existed, and this row reports a Lead that still lacks it.
+Without this row the clause reaches exactly the orgs somebody re-audited. Name each Lead; the
+remedy is `audit`, or `amend <lead> --execute` for a single one. **Read-only, like every row above
+— `verify` reports and never writes.**
 
 **`LANE-DRIFT` is read-only, narrated like the reconciliation above.** For each Lead, IF its
 handbook describes domain judgment (visual or code seeing) AND no domain-model critic IC reports

@@ -1,6 +1,6 @@
 # Handoff — replacing a long-running employee without losing the work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — Lead handbooks carry the boundary clause; `wf-handoff` measures; `audit` Step 5f installs it. -->
 
 A Lead's context grows for the whole run and nothing was watching it. The observation this file
@@ -102,6 +102,45 @@ acted on.
 fire on **every tool call** — hundreds per agent — which is a poll wearing a hook's clothes, and it
 is the thing the user ruled out. It also fires after the tool has already run, so it could not stop
 anything, and it cannot read context size (fact 22 again).
+
+### Three paths, so the clause reaches every host
+
+The measurement is a script the installer fetches, so it needs nothing wired. **The boundary clause
+does** — it is handbook text a host must carry — so it takes all three paths
+(the three-paths rule, `enforcement.md`):
+
+| Path | Where |
+|---|---|
+| the installer ships it | `manifest.txt` fetches `wf-handoff`; `handbook-templates.md` § Lead and § CEO carry the clause, so every new hire is authored with it |
+| `audit` wires it again | Step 5g writes it into Leads in orgs installed before it existed, and prints `INV-HANDOFF` |
+| `verify` reports it absent | `HANDOFF-UNWIRED`, per Lead, read-only |
+
+### The way out is a command, and something produces the record it reads
+
+`--wire` is the only thing here that writes to a host, so it ships with its reversal rather than with
+a paragraph describing one:
+
+    wf-handoff --wire   --execute     installs the clause; WRITES .claude/workforce/.handoff-wired.json
+    wf-handoff --unwire --execute     removes exactly what that record names, and nothing else
+
+**Conservative in both directions**, which is the half that matters:
+
+- A handbook that carried the clause **before** the wire is recorded `preexisting` and never removed.
+  It was not ours to add, so it is not ours to take away.
+- A clause the user has **since edited** no longer matches byte-for-byte. It is **KEPT**, and the
+  report says why. Removing it would delete an edit somebody made on purpose.
+- Nothing else in the handbook is touched — the user's own guardrails sit in the same list and come
+  through both directions unchanged.
+- Both halves display by default and write only under `--execute`.
+
+The clause text is a single constant that both halves read, so a write can never drift out of reach
+of its own undo. Proven against a tree where a user has edited one of two wired clauses: the
+untouched one is removed, the edited one survives, and the handbook that was never wired is never
+opened.
+
+**`wf-handoff` otherwise registers nothing** — no hook, no settings entry, no output style, nothing a
+host opts into. It is fetched, marked executable, and called by name, so its absence is loud on the
+next invocation rather than silent.
 
 ---
 

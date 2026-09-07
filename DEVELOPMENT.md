@@ -115,6 +115,52 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-07
 
+**Landed 2026-09-07 — live agent telemetry and the handoff mechanism (v1.22.0).** Trigger: a user
+report, on a screenshot of a backgrounded `platform-engineer` at `35m 10s / 259.2k tokens` with the
+main session waiting on it — *"lead engineers context length keep growing exponentially… is there a
+way to hand off long running agents… propose handoffs? It's not that I want to poll that question
+continuously."*
+
+- **A running agent's size and age were readable the whole time and nothing read them.** `platform.md`
+  fact 22 had asked whether a *hook* exposes live context and correctly answered no; **nothing had
+  asked the filesystem.** Every subagent appends a transcript while it runs, carrying per-turn
+  `message.usage` and timestamps. MEASURED on 2.1.263 (`measurements/2026-09-07-live-agent-telemetry.md`):
+  102 agents in this project's own store, the largest a `runtime-lead` at **299,201 tokens over 41
+  minutes** — the user's report reproduced here, unprompted. New facts **23** (live telemetry), **23b**
+  (`CLAUDE_CODE_SESSION_ID` names the store exactly, so the path-encoding heuristic is unnecessary, and
+  an agent identifies itself exactly from its own argv) and **23c** (`CLAUDE_EFFORT` reports the applied
+  rung — one reading, not a canary; fact 12b stays DOCUMENTED).
+- **`wf-handoff` is the mechanism and `references/handoff.md` is the judgment**, which is the
+  2026-08-04 directive's split applied to a new capability rather than to a conversion. The gate has
+  **two halves and the number is the weaker one**: over-threshold AND at a safe boundary (nothing open,
+  every child finished, no journal row at WRITE-INTENT). An agent over threshold mid-work reports
+  `HANDOFF-WAIT` and is left alone.
+- **Two defects found by running it, both fixed in the same pass.** Nearest-rank p90 over n=1 returns
+  that agent's own peak, so a self-checking agent set its threshold *to itself* and could never cross
+  it (`MIN_SAMPLE = 20`). And a `--self` call is itself an open tool call, so the self-check could
+  never see a safe boundary — the discount is exact, keyed on the record carrying this argv.
+- **The check-in is event-driven and both carriers are wired**, Lead phase boundary and CEO on a task
+  notification. A `PostToolUse` hook is REFUSED with its reason recorded, because fact 22 makes it
+  buildable and it will be re-proposed: it fires per tool call, which is a poll wearing a hook's
+  clothes, and it is what the user ruled out.
+- **A handoff CONTINUES the run.** `conversion-taxonomy.md` retracted the session split because *"it
+  named no threshold, so it was never computable, and every run resolved it as stop"*. This names one,
+  prints it, and hands the work to a successor in the same session under the same manager.
+- **Three paths, and a way out.** The clause is handbook text a host must carry, so it takes all
+  three: the templates carry it for new hires, `audit` Step 5g runs `wf-handoff --wire --execute`
+  against orgs installed before it existed, and `verify` reports `HANDOFF-UNWIRED` per Lead. `--wire`
+  is the only thing here that writes to a host, so it ships `--unwire` — a command, reading a record
+  `--wire` produces — rather than a paragraph describing an undo. It is **conservative in both
+  directions**, proven against a tree where a user had edited one of two wired clauses: the untouched
+  one is removed, the edited one is KEPT with the reason, a pre-existing clause is never ours to
+  remove, and the handbook that was never wired is never opened. `wf-handoff` registers nothing else
+  — no hook, no settings entry, no manifest flag beyond the existing `exec`.
+- **The chain-of-command edge was stored twice with nothing reconciling the copies.** Reported from the
+  same run: `test-engineer` reported to `platform-engineer` on disk while the tree drew that Lead with
+  no reports. The child's `reports-to` is now the sole authority and `direct-reports` is rewritten from
+  it, so the disagreement is unreachable rather than detected. **Step 5g** heals orgs that already
+  exist; `INV-EDGES` (row 34) and `INV-HANDOFF` (row 35) count both halves.
+
 **Landed 2026-09-07 (v1.21.0) — the fix from v1.20.0 shipped with one propagation path, which is
 none.** Trigger: the v1.20.0 report handed the user two `!` commands to run. Their answer: *"This
 project is on different servers. I can't have manual commands being run ... no user will want to do
@@ -229,7 +275,6 @@ They were right, and the reason is measurable.
   **the user has not typed this session**, which executes the rule the reference already stated — say
   it in words the reader already owns — and is near-zero false-positive by construction. An unreadable
   transcript disables the check rather than firing it.
-
 
 **Landed 2026-09-05 (from a `/workforce verify` on `odyssey-alive`) — three requirements that shipped
 with no producer (v1.18.0).** Trigger: a routine health check on a real org, then the owner asking for
