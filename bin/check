@@ -10460,6 +10460,110 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Handoff (2026-09-07) — replacing a long-running employee without losing the work.
+#
+# `wf-handoff` measures a RUNNING agent from the transcript store (platform.md fact
+# 23); `references/handoff.md` decides what to do about it. Six normative claims here
+# would each regress silently, and each is the difference between a working design and
+# the flag this project refuses.
+_hnd = read("workforce/references/handoff.md")
+_hoff = read("workforce/bin/wf-handoff")
+_tpl2 = read("workforce/references/handbook-templates.md")
+_plat2 = read("workforce/references/platform.md")
+
+check("handoff: the gate has TWO halves and the number alone never authorizes one",
+      "the boundary    zero open tool calls" in _hnd
+      and "HANDOFF-WAIT" in _hnd and "Both, or nothing happens." in _hnd,
+      "handoff.md must state both gate halves and that an over-threshold agent mid-work is "
+      "left alone. The number alone firing a handoff is the user's 'only when the handoff "
+      "makes sense' lost, and it is the failure that costs more than the context it saves.")
+
+check("handoff: the threshold is derived from the project's own history, never a constant",
+      "derived from the project's own history, never written down as a constant" in _hnd
+      and "MIN_SAMPLE = 20" in _hoff,
+      "handoff.md must state the threshold comes from the store's own distribution, and "
+      "wf-handoff must keep MIN_SAMPLE. Nearest-rank p90 on n=1 returns that run's own peak, "
+      "so an agent would set its threshold to itself and could never cross it.")
+
+check("handoff: the self-check discounts its OWN open tool call",
+      "self_discount" in _hoff and "could never report a safe boundary" in _hoff,
+      "wf-handoff --self must discount the in-flight call that IS this invocation. Without it "
+      "every self-check sees one open tool call and can never report a safe boundary, which "
+      "makes the whole boundary clause dead on arrival.")
+
+check("handoff: age is read from the last RECORD, never the file mtime",
+      "AGE IS MEASURED FROM THE LAST RECORD, NOT FROM THE FILE MTIME" in _hoff
+      and "WF_HANDOFF_NOW" in _hoff,
+      "git checkout stamps every fixture file with the checkout time, so an mtime-based age "
+      "reports a two-day-old fixture agent as seconds fresh and the IDLE case silently stops "
+      "testing anything on every clone. The timestamps live in the file content and survive.")
+
+check("handoff: the per-tool-call hook is refused, with its reason recorded",
+      "A `PostToolUse` hook is rejected" in _hnd and "poll wearing a hook's clothes" in _hnd,
+      "handoff.md must record WHY the hook carrier is refused (fact 22 makes it buildable, so "
+      "it will be re-proposed). The user ruled out polling; a per-tool-call hook is a poll.")
+
+check("handoff: the brief's work order is generated verbatim, and the successor proves it",
+      "Section 1 is never summarized" in _hnd
+      and "ESCALATE: brief disagrees with verification" in _hnd
+      and "ESCALATE: brief disagrees with verification" in _hoff,
+      "The verbatim work order is directive one reaching one file further down, and the "
+      "successor's section-6 re-run is the proof the work continued correctly. Both the "
+      "doctrine and the generated skeleton must carry the escalation sentence.")
+
+check("handoff: a manager spawns the successor; an employee never replaces itself",
+      "A manager spawns the successor. An employee never replaces itself." in _hnd
+      and "cannot spawn" in _hoff,
+      "A self-replacing employee spawns from inside itself and costs a delegation tier the "
+      "org already spent (delegation-budget.md § Depth). The script must also state it cannot "
+      "spawn - that is the tier model holding, not a missing feature.")
+
+check("handoff: a handoff CONTINUES the run and is never a reason to stop",
+      "A handoff is never a reason to stop." in _hnd
+      and "It named no threshold" in _hnd,
+      "conversion-taxonomy.md retracted the session split BECAUSE it named no threshold and "
+      "every run resolved it as stop. handoff.md must name the threshold and state that a "
+      "handoff continues the run, or this reopens the retracted defect under a new name.")
+
+check("handoff: BOTH wired carriers are in the templates, and the table names where",
+      "wf-handoff --root" in _tpl2 and "--self`" in _tpl2
+      and "Never replace yourself" in _tpl2
+      and "WHEN A BACKGROUNDED AGENT REPORTS BACK" in _tpl2
+      and "Both are wired, and there is no third." in _hnd,
+      "Both carriers must exist in the templates AND handoff.md must claim exactly the two it "
+      "wired. A carrier named in the table and installed nowhere is the written-and-unwired "
+      "pattern; a measurement with nothing calling it is the same defect from the other end.")
+
+check("handoff: fact 23 is MEASURED and does not contradict fact 22",
+      "### Fact 23 — a RUNNING agent's context size and wall time are readable live" in _plat2
+      and "is NOT contradicted by fact 23" in _plat2,
+      "platform.md must carry fact 23 AND fact 22's cross-reference. Fact 22 (no hook exposes "
+      "live context) is correct and stands; a reader hitting both without the pointer reads a "
+      "contradiction and has no way to tell which one to trust.")
+
+# The chain-of-command edge is written down TWICE - the child's `reports-to` and the
+# parent's `direct-reports` - and until 2026-09-07 nothing reconciled the copies, so a
+# real edge could be missing from the tree. Reported from a live org.
+_ocf2 = read("workforce/references/org-chart-format.md")
+_aud2 = read("workforce/references/procedures/audit.md")
+_inv2 = read("workforce/references/invariants.md")
+
+check("edges: the child's `reports-to` is the authority; `direct-reports` is a derived mirror",
+      "is the source of truth\nfor an edge" in _ocf2
+      and "never from `direct-reports`" in _ocf2
+      and "EDGE-MISMATCH" in _ocf2,
+      "org-chart-format.md must name ONE authority for an edge and build the tree from it. Two "
+      "encodings with no reconciliation is how a staffed employee stays off the chart and "
+      "/org routes around it - a chart that reads as a correct chart of a smaller org.")
+
+check("edges: audit Step 5g heals existing orgs, and prints INV-EDGES + INV-HANDOFF",
+      "## Step 5g" in _aud2 and "INV-EDGES" in _aud2 and "INV-HANDOFF" in _aud2
+      and "INV-EDGES" in _inv2 and "INV-HANDOFF" in _inv2,
+      "The fix must reach orgs that ALREADY EXIST, in-run, per Step 5c's heal clause - a "
+      "template-only change reaches new hires and leaves every live org broken. Both invariant "
+      "rows must exist for the run to be able to print what it healed.")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")

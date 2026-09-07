@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -8,6 +8,24 @@ skill (`scopes.md`), so one installed skill can serve many projects.
 
 **The files are the source of truth; the chart is a derived cache.** `org index` rebuilds it from
 `.claude/agents/**/*.md`. When they disagree, the file on disk wins and the chart is stale.
+
+**Inside the files, one more level of the same rule: the CHILD's `reports-to` is the source of truth
+for an edge, and the parent's `direct-reports` is a derived mirror of it.** An edge is written down
+twice, in two handbooks, and until 2026-09-07 nothing reconciled the two copies — so a `reports-to`
+naming a manager whose `direct-reports` omitted the child produced a real edge that the Chain of
+Command tree did not draw. Reported from a live org: `test-engineer` reported to `platform-engineer`
+on disk while the tree showed `platform-engineer` with no reports.
+
+**The tree is built from the union of every `reports-to`, never from `direct-reports`.** A mirror can
+be short; the child's own statement of who it answers to cannot be, because it is the field the
+employee itself was authored with. `direct-reports` is then *rewritten* from that union rather than
+read, which makes the whole class of disagreement unreachable instead of detected — the same move
+`Covers` makes below, one artifact further in.
+
+**A missing edge is the dangerous direction.** An extra one is visible to anybody reading the chart;
+an omitted one reads as a correct chart of a smaller org, and `/org` then routes around an employee
+that exists, is staffed, and is never dispatched to. That is the "reads as success" failure this file
+exists to refuse.
 
 ---
 
@@ -216,6 +234,8 @@ what it could not parse is the "reads as success" failure.
 | Frontmatter or ORG-RECORD unparseable | `QUARANTINED: <error>` — `/org` answers matching asks with "exists but unreadable; `/workforce audit` has a repair task" rather than a false no-match |
 | Chart row with no file on disk | `GHOST` — dropped; any `ORG-CHAIN` still naming it is a reported finding |
 | `reports-to` names nobody | `ORPHAN → provisionally under ceo (flagged)` — never silently reparented in the file |
+| `reports-to` names a manager whose `direct-reports` omits the child | `EDGE-MISMATCH` — the edge is REAL and is drawn; the manager's mirror is rewritten from it, and both handbooks are named in the report |
+| `direct-reports` names a child whose `reports-to` names someone else | `EDGE-MISMATCH` — the child's `reports-to` wins and the stale mirror entry is dropped; never reparent the child to satisfy a mirror |
 | `contract-stamp` ≠ recomputed hash | `CONTRACT-DRIFT` — queues a `review` (`references/deferred.md`); the eval baseline is stale |
 | Registered on disk but not loaded this session | `PENDING-RESTART` — see below |
 
@@ -237,6 +257,10 @@ chart, and reports **NEW / REMOVED / UPDATED / UNCHANGED**.
 - Written **last**, and **only from COMMITTED conversion-journal rows** — never from the plan. A
   half-converted project gets an honest chart, not an aspirational one.
 - Recomputes worst-case fan-out (`delegation-budget.md`) into the header.
+- **Re-derives every edge from `reports-to` and rewrites `direct-reports` to match**, printing
+  `INV-EDGES` (`references/invariants.md` row 34) with every count and reporting each
+  `EDGE-MISMATCH` it healed. This runs on every `index`, so an org repaired once cannot silently
+  drift back — and `audit` Step 5f runs it against orgs that already exist rather than only new ones.
 - Never invents a row. An employee absent from disk is absent from the chart.
 - Zero employees is valid, not a failure: write the chart with an explicit "no employees yet" notice
   so `/org` can answer cleanly.

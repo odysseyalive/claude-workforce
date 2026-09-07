@@ -1349,6 +1349,123 @@
       "The recommendation is the forced first-run default and cannot be offered"
     ]
   },
+  "handoff-brief": {
+    "_why": "THE BRIEF IS THE DELIVERABLE, not the detector, so it gets its own case. Section 1 must reproduce the work order VERBATIM from the transcript -- directive one is retention, and a paraphrased work order is how a successor quietly changes scope. Sections 3-7 must ship as EMPTY headed prompts so an unfilled brief is visibly unfinished; `not` forbids the successor-proof line going missing, because a brief nobody verifies against is the degrading handoff the whole design exists to prevent. The generated header carries the context/peak/wall figures so the brief records the condition that triggered it.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--brief",
+      "bigclean0000000001"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "# Continuation brief \u2014 platform-engineer",
+      "Build phase 16 of the thing.",
+      "## 1. The work order, verbatim",
+      "Never summarize this section",
+      "/p/a.ts",
+      "## 4. Decisions made, and why",
+      "## 5. Tried and rejected",
+      "## 6. Verification state",
+      "ESCALATE: brief disagrees with verification"
+    ]
+  },
+  "handoff-emptyroot": {
+    "_why": "AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD. ${CLAUDE_PROJECT_DIR} is unset in the Bash tool, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`; abspath(\"\") is the CWD, a real directory, so an is-it-a-directory guard passes and the script would census a store belonging to whatever tree it happened to be run from. The sibling scripts all refuse this and so must this one.",
+    "args": [
+      "--root",
+      ""
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null
+    },
+    "exit": 2,
+    "not": [
+      "verdict",
+      "Traceback"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "--root was passed an empty string",
+      "CLAUDE_PROJECT_DIR"
+    ]
+  },
+  "handoff-emptystore": {
+    "_why": "A STORE THAT EXISTS AND IS EMPTY IS A MEASUREMENT, and it must not read like the could-not-find-it case -- wf-runlength's sibling rule. It reports n=0 at exit 0 and says nothing is due; `not` forbids a HANDOFF verdict and forbids the derived-threshold wording, because a threshold announced as a percentile over an empty store is a claim that runs were measured.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--all"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null
+    },
+    "exit": 0,
+    "not": [
+      "HANDOFF \u2014",
+      "store p90/p99",
+      "Traceback"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "no agent transcripts",
+      "not an error",
+      "nothing due for handoff"
+    ]
+  },
+  "handoff-nostore": {
+    "_why": "FAILS CLEAN AND NAMES THE RECOURSE. With CLAUDE_CODE_SESSION_ID unset and no derivable store, censusing nothing would print n=0 and exit 0 -- indistinguishable from handoff-emptystore above, a clean-reading report about a store nobody found. It must exit 2, say the variable was unset, print the derived path AND call the encoding a heuristic, and name --transcripts.",
+    "args": [],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null
+    },
+    "exit": 2,
+    "not": [
+      "verdict",
+      "Traceback"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "no store found",
+      "was unset",
+      "harness-internal encoding",
+      "--transcripts"
+    ]
+  },
+  "handoff-store": {
+    "_why": "THE POSITIVE HALF, and the case that pins the TWO-HALF GATE rather than the exit code. Six hand-built agents make every verdict derivable by hand against the 220,000 floor: bigclean is 250,000 with nothing open and no children -> HANDOFF; bigopen is 260,000 with one unmatched tool_use -> HANDOFF-WAIT; parentwaiting is 240,000 with nothing of its own open but a fresh non-end_turn child -> HANDOFF-WAIT, which is the ONLY case proving the children half of the gate is not vacuous; idle is 300,000 with an mtime forced two days old -> IDLE, proving age and not stop_reason decides liveness (its last stop_reason is tool_use, the exact reading that would call a dead store live); small is 20,000 -> OK. Exit 3 means one agent is due AND safe, so a gate that ignored either half would return a different code. n=4 finished peaks is under MIN_SAMPLE, so the thresholds must announce the floors rather than deriving a percentile from a handful. THE CLOCK IS PINNED with WF_HANDOFF_NOW, and every fixture timestamp is a FIXED absolute instant, because IDLE is a claim about elapsed time and this case decayed within 30 minutes of being written when it was relative. Age is read from the LAST RECORD, never the file mtime: git checkout stamps every fixture file with the checkout time, so an mtime-based age would report this two-day-old agent as seconds fresh and the IDLE assertion would silently stop testing anything on every clone.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--all"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 3,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "HANDOFF-WAIT \u2014 1 open tool call(s)",
+      "HANDOFF-WAIT \u2014 1 child agent(s) still running",
+      "too few for a percentile to be one",
+      "IDLE",
+      "wf-handoff --brief bigclean0000000001",
+      "The successor spawn is the MANAGER's act",
+      "REPORTS; NEVER REPAIRS"
+    ]
+  },
   "hook-badstdin": {
     "exit": 0,
     "script": "wf-protect-directives",

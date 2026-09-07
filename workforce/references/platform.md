@@ -1,6 +1,6 @@
 # Platform Facts
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 25 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before designing any delegation, tier, or handbook frontmatter. -->
 
 ## Header — the constants, stated once
@@ -352,6 +352,62 @@ the tail reaches 317k. **Main sessions run very large** — the median already p
 real minority of subagents too. Any delegation-budget or handoff design must treat the main loop as the
 primary lever and must **not** assume employees are uniformly cheap. See `delegation-budget.md`.
 
+### Fact 23 — a RUNNING agent's context size and wall time are readable live, from disk ✅ MEASURED
+
+Evidence: `measurements/2026-09-07-live-agent-telemetry.md` (2026-09-07, Claude Code 2.1.263).
+
+**Fact 22 asked this of hooks and correctly answered no. Nothing had asked it of the filesystem.**
+Every subagent, at every depth, appends a transcript *while it runs*:
+
+```
+<store>/<session-id>/subagents/agent-<agentId>.jsonl     turn-by-turn, appended per turn
+<store>/<session-id>/subagents/agent-<agentId>.meta.json  agentType, description, spawnDepth,
+                                                          toolUseId, parentAgentId, model
+```
+
+Live context is fact 21's three fields — `input_tokens + cache_read_input_tokens +
+cache_creation_input_tokens` — read from the **latest** assistant record instead of maximized over a
+finished run. Wall time is last timestamp minus first. Read from inside a running agent by its own
+author, at 84 KB and still growing.
+
+**The tree is flat and complete.** All 30 `subagents/` directories sit one level under a session
+directory; depth-2 and depth-3 agents write beside the depth-1 agents that spawned them, and
+`parentAgentId` carries the edge. One directory read reconstructs the whole live spawn tree.
+
+**Liveness is file age, and `stop_reason` is not a liveness test** — 20 of 102 long-dead agents end on
+`stop_reason: tool_use`, so reading that as "still working" reports a third of a dead store as live.
+The staleness window is **1,800 s**, measured: the largest gap ever seen between records inside a
+still-working run was 1,282.7 s (n=11,200 gaps, p99 = 82.6 s). Past it the verdict is IDLE, never
+DEAD — nothing observes a process, only a file that stopped growing.
+
+Consumed by `wf-handoff`; the design that acts on it is `references/handoff.md`. Same standing caveat
+as fact 21: transcript JSONL is internal and version-unstable.
+
+### Fact 23b — `CLAUDE_CODE_SESSION_ID` names the store exactly, and an agent can identify itself ✅ MEASURED
+
+Evidence: same file.
+
+`CLAUDE_CODE_SESSION_ID` is the session directory name, so **the path-encoding heuristic
+`wf-runlength` documents is not needed where this variable is set.** `CLAUDE_CODE_CHILD_SESSION=1`
+says the code is running inside a subagent; `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=3` reports the depth
+ceiling from the harness itself, agreeing with § header `TIER-LIMIT`.
+
+Self-identification is **exact rather than inferred**: the calling agent wrote a `tool_use` record
+carrying the command text *before* the command ran, so a script finds itself by searching that
+session's transcripts for its own argv. Run live, one hit, unambiguous.
+
+**Negative finding, so it is not re-hunted:** none of these names the agent's *model*. Fact 12's
+negative result stands.
+
+### Fact 23c — `CLAUDE_EFFORT` reports the applied effort rung ✅ MEASURED (one reading)
+
+Evidence: same file. `CLAUDE_EFFORT=medium` inside a live spawn. Fact 12b marks `effort:` unverified
+because nothing could observe the applied value; this variable observes it.
+
+**One reading is not a canary.** It says what this spawn's effort was, not that a frontmatter `effort:`
+pin caused it — that needs the forced-spawn pair fact 12 used for `model:`. **Fact 12b stays
+DOCUMENTED and non-blocking** until that runs.
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
@@ -375,7 +431,7 @@ primary lever and must **not** assume employees are uniformly cheap. See `delega
 | 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. `wf-canary-ic` is the fixture |
 | 20 | **`All tools` is a DISPLAY string the harness generates when `tools:` is empty — it is not a value.** Written literally into frontmatter it parses as a one-entry allowlist naming a tool that does not exist | **The failure presents as the opposite of what it is:** the frontmatter reads maximally permissive and the agent can call **nothing**. Fact 14 is the correct expression of "everything" — *omit* `tools:` — and `wf-conform` now refuses the literal on every tier. It is the delegating tiers, which carry no `tools:` line, whose display output says `All tools`, so a round-trip through a human or an agent reading that output is exactly how the phrase gets written back | reported 2026-08-05 by an authoring agent that **declined the instruction** and checked the harness rather than executing it; not canaried here. Treated as DOCUMENTED, and the guard is defensive either way — refusing the literal costs nothing if the fact is wrong |
 | 19 | **A dispatched author works in its OWN context window: N handbooks cost N spawns and accumulate NOTHING in the caller.** Only the returned result reaches the dispatcher | **The fact the conversion batch rests on.** A run that authors INLINE makes its own context the bottleneck and will correctly conclude a large roster is impossible — which is what happened on 2026-08-04, 0 of 40 converted with 192 of 200 spawns unspent. `procedures/audit.md` § Step 5 dispatches for this reason, and `conversion-taxonomy.md` bars context capacity from ever deferring a run | ✅ **MEASURED 2026-08-04** — 4 handbooks authored in one parallel wave: **411,014 subagent tokens and 104 tool calls outside the caller**, 4 of 4 returned complete, wall-clock the slowest author rather than the sum. Evidence `measurements/2026-08-04-dispatched-authoring.md` |
-| 22 | **Hook observability for runtime monitoring.** **`PostToolUse` fires for tool calls made *inside* subagents when the hook is registered at `settings.json` scope** — not only in the main loop. It receives `tool_name` + `tool_input`, so identical-call repetition is detectable; it may emit `additionalContext` or `{"continue": false}` but **cannot block a call — it runs *after* the tool executes.** And **no hook exposes live per-step context size or %-of-window**; the only "context is now large" signal is `PreCompact` with `trigger="auto"` | This is what makes a **loop-guard hook** buildable — a guard watching for repeated identical calls inside an employee can fire, because PostToolUse reaches subagents and sees `tool_input`. That line is the load-bearing one. But such a guard can only observe-and-inject, never prevent (it is post-execution), and it cannot gate on context size — a "context is getting large" guard has only `PreCompact(auto)` to key on, not a live percentage. Bears on fact 21's context-rot risk and on any runtime monitor | documented, not measured — read from the Claude Code hooks documentation and verified 2026-08-19 (running harness 2.1.233); not canaried. Three documented claims in this file have already lost to measurement (facts 2, 3, 4), so the load-bearing "PostToolUse fires in subagents" line earns a canary before any gate rests on it |
+| 22 | **Hook observability for runtime monitoring.** **`PostToolUse` fires for tool calls made *inside* subagents when the hook is registered at `settings.json` scope** — not only in the main loop. It receives `tool_name` + `tool_input`, so identical-call repetition is detectable; it may emit `additionalContext` or `{"continue": false}` but **cannot block a call — it runs *after* the tool executes.** And **no hook exposes live per-step context size or %-of-window**; the only "context is now large" signal is `PreCompact` with `trigger="auto"` | This is what makes a **loop-guard hook** buildable — a guard watching for repeated identical calls inside an employee can fire, because PostToolUse reaches subagents and sees `tool_input`. That line is the load-bearing one. But such a guard can only observe-and-inject, never prevent (it is post-execution), and it cannot gate on context size — a "context is getting large" guard has only `PreCompact(auto)` to key on, not a live percentage. Bears on fact 21's context-rot risk and on any runtime monitor. **The no-live-context-size half is correct and is NOT contradicted by fact 23**: that fact reads the transcript on disk, which no hook does and which something must call. The two answer different questions and both stand | documented, not measured — read from the Claude Code hooks documentation and verified 2026-08-19 (running harness 2.1.233); not canaried. Three documented claims in this file have already lost to measurement (facts 2, 3, 4), so the load-bearing "PostToolUse fires in subagents" line earns a canary before any gate rests on it |
 
 **Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
 that review **reports rather than blocks**. Three documented claims in this file have already lost to

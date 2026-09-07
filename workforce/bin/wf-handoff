@@ -1,0 +1,586 @@
+#!/usr/bin/env python3
+"""wf-handoff — how big and how old a RUNNING agent is, and whether it may hand off.
+
+THE LIVE TWIN OF `wf-runlength`. That script censuses finished runs; this one reads
+the same store while the work is still happening, and answers a different question:
+*should this employee be replaced by a successor right now, and is it safe to?*
+
+It exists because a Lead's context grows all run and nothing was watching it. A real
+observation: a backgrounded Lead at `35m 10s / 259.2k tokens` with the main session
+waiting on it, and no way to see that number from anywhere but the statusline. This
+project's own store holds a `runtime-lead` that reached 299,201 tokens over 41
+minutes. See `references/handoff.md` for what to DO with a verdict; this script only
+measures and never decides.
+
+WHAT IS MEASURED, and every field is read, never inferred — `platform.md` fact 23,
+evidence `measurements/2026-09-07-live-agent-telemetry.md`:
+
+    context     the LATEST assistant turn's input + cache_read + cache_creation
+                (`message.usage`). Fact 21's three fields, read at the current end of
+                a growing file instead of summed over a finished one. This is the
+                number a window limit sees NOW; `peak` is reported beside it because
+                a compaction that already happened makes current < peak, and the two
+                disagreeing is information rather than an error.
+    age         seconds since the transcript was last appended to. The ONLY liveness
+                signal. `stop_reason` is NOT one: 20 of 102 long-dead agents in the
+                measured store end on `stop_reason: tool_use`, so reading that as
+                "still working" reports a third of a dead store as live.
+    wall        last timestamp minus first timestamp, from the records themselves.
+    open        `tool_use` ids with no matching `tool_result`. A non-zero count is
+                the agent mid-action, and it is the hard half of the boundary gate.
+
+THE STALENESS WINDOW IS MEASURED, NOT CHOSEN. 1,800 s, because the largest gap ever
+observed between consecutive records inside a still-working run was 1,282.7 s
+(n=11,200 gaps; p99 was 82.6 s and 177 gaps exceeded a minute). A shorter window
+reports a slow agent as gone. Past it the verdict is IDLE, never DEAD — nothing here
+observes a process, only a file that stopped growing.
+
+    ** A "stuck" agent is usually slow, or finished quietly. Read this before
+       aborting one. That is the first thing this script is for. **
+
+THE TWO-HALF GATE, and both halves must pass before HANDOFF is the verdict:
+
+    the number      context at or above the HANDOFF threshold
+    the boundary    zero open tool calls, AND every child of this agent has
+                    finished, AND no conversion-journal row sits at WRITE-INTENT
+
+An agent over the threshold but mid-work reports HANDOFF-WAIT and is left alone. A
+handoff inside a half-finished transaction is worse than a large context, so the
+number alone never authorizes one.
+
+THRESHOLDS COME FROM THE DISTRIBUTION, NOT FROM A CONSTANT WRITTEN HERE. WATCH is
+this store's own subagent p90 and HANDOFF its p99, each floored at fact 21's measured
+figures (130,000 / 220,000) so a thin store cannot produce a silly-low threshold. A
+project whose agents routinely run to 500k gets 500k-shaped thresholds from its own
+history, which a hardcoded number could never do. `--limit N` overrides both with
+fractions of a stated context window (0.60 / 0.80) — N is an INPUT, because no
+model's window is readable from any of this and inventing one is forbidden
+(SKILL.md Principle 5).
+
+    ** The floors are a FLOOR, not a target. A store with almost no history reports
+       its own n so a reader can see the thresholds are resting on the floors. **
+
+WHAT IT DOES NOT MEASURE, stated because a report that reads clean about something it
+never examined is this project's signature defect:
+
+  - No hook exposes any of this (`platform.md` fact 22, unchanged). Something must
+    CALL this script; it never fires on its own, which is exactly the no-polling
+    property the design wants.
+  - Not a percentage of a window unless `--limit` is given.
+  - Not the statusline's number. Whether the statusline computes the identical sum is
+    unmeasured and is not claimed.
+  - Not a process. IDLE means the file stopped growing.
+  - The working tree is not inspected. A half-written FILE is invisible here; the
+    boundary gate covers open tool calls, unfinished children, and the journal, and
+    those three are what it says it covers.
+
+REPORTS; NEVER REPAIRS, and never spawns. Read-only apart from the `--json` file it
+is asked for. The successor spawn is a manager's act (`references/handoff.md`), so
+this script cannot perform one even in principle — which is the tier model holding,
+not a missing feature.
+
+    exit 0  measured; nothing is due for handoff, INCLUDING an empty store, which
+            reports n=0 rather than silently omitting the layer
+    exit 3  measured; at least one agent is due AND at a safe boundary — act
+    exit 2  the store could not be read at all
+
+WHERE THE STORE IS, in priority order. `CLAUDE_CODE_SESSION_ID` names the session
+directory EXACTLY and needs no path encoding (fact 23b) — it is why this script does
+not inherit `wf-runlength`'s derivation as its primary path. Then `--transcripts DIR`
+naming a session directory. Then `--root PATH`, the same harness-internal encoding
+`wf-runlength` documents, which may change without notice and FAILS CLEAN rather than
+guessing. Relative `--transcripts` and `--json` resolve against `--root`.
+
+Usage
+    wf-handoff [--root DIR] [--transcripts DIR] [--self | --agent ID]
+               [--limit N] [--brief AGENTID] [--all] [--json PATH] [--quiet]
+"""
+
+import argparse
+import datetime
+import glob
+import json
+import math
+import os
+import sys
+import time
+
+# Measured floors — platform.md fact 21's subagent p90 and p99, rounded down.
+# Stated here ONCE and nowhere else in this file.
+FLOOR_WATCH = 130_000
+FLOOR_HANDOFF = 220_000
+
+# Fractions of a stated window, used only when --limit is given.
+FRAC_WATCH = 0.60
+FRAC_HANDOFF = 0.80
+
+# Below this many finished runs a percentile is not a percentile. Nearest-rank p90 on
+# n=1 returns that one run's own peak, so an agent checking itself would set its
+# threshold TO ITSELF and could never cross it. Found by running this script against a
+# fresh session with one agent in it. 20 is the first n at which p99 is not simply the
+# maximum.
+MIN_SAMPLE = 20
+
+# Measured: largest observed gap between records inside a still-working run was
+# 1,282.7 s. Evidence: measurements/2026-09-07-live-agent-telemetry.md.
+STALE_SECONDS = 1800
+
+# Tool names whose calls are file writes. Used only to list what a successor
+# inherits; nothing gates on this set.
+WRITE_TOOLS = {"Write", "Edit", "NotebookEdit", "MultiEdit"}
+
+
+def _die(msg):
+    print(f"wf-handoff: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def _reference_now():
+    """Seconds since the epoch, overridable so a fixture can pin the clock.
+
+    `WF_HANDOFF_NOW` exists because IDLE is a statement about elapsed time, so a case
+    asserting it cannot be deterministic against a moving clock. It is a TEST SEAM and
+    nothing else: unset — which is every real invocation — this is the wall clock.
+    """
+    v = os.environ.get("WF_HANDOFF_NOW", "").strip()
+    if v:
+        try:
+            return float(v)
+        except ValueError:
+            _die(f"WF_HANDOFF_NOW is not a number: {v!r}")
+    return time.time()
+
+
+def _parse_ts(s):
+    try:
+        return datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def resolve_store(args):
+    """Return (session_dir, how_it_was_found). Fails clean; never guesses."""
+    if args.transcripts:
+        p = args.transcripts
+        if not os.path.isabs(p):
+            p = os.path.join(args.root, p)
+        p = os.path.abspath(p)
+        if not os.path.isdir(p):
+            _die(f"--transcripts is not a directory: {p}")
+        return p, f"--transcripts {p}"
+
+    sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip()
+    if sid:
+        base = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+        hits = [d for d in glob.glob(os.path.join(base, "*", sid)) if os.path.isdir(d)]
+        if len(hits) == 1:
+            return hits[0], "CLAUDE_CODE_SESSION_ID (exact; no path encoding)"
+        if len(hits) > 1:
+            _die(f"CLAUDE_CODE_SESSION_ID {sid} matched {len(hits)} directories; pass --transcripts")
+
+    # Last resort: the same harness-internal encoding wf-runlength documents.
+    enc = os.path.abspath(args.root).replace("/", "-").replace(".", "-")
+    base = os.path.join(os.path.expanduser("~"), ".claude", "projects", enc)
+    if not os.path.isdir(base):
+        _die(
+            f"no store found.\n"
+            f"  CLAUDE_CODE_SESSION_ID was {'unset' if not sid else 'set but unmatched'}\n"
+            f"  derived path (harness-internal encoding, may change): {base}\n"
+            f"  pass --transcripts <session-dir> to name it directly"
+        )
+    sess = sorted(glob.glob(os.path.join(base, "*", "subagents")), key=os.path.getmtime)
+    if not sess:
+        _die(
+            f"derived project store {base} holds no session with a subagents/ directory; "
+            f"pass --transcripts <session-dir>"
+        )
+    return os.path.dirname(sess[-1]), f"derived from --root (heuristic) {base}"
+
+
+def read_agent(meta_path):
+    """One agent's record. A line that will not parse is skipped and counted."""
+    tpath = meta_path[: -len(".meta.json")] + ".jsonl"
+    if not os.path.isfile(tpath):
+        return None
+    try:
+        with open(meta_path, encoding="utf-8", errors="replace") as fh:
+            meta = json.load(fh)
+    except Exception:
+        meta = {}
+
+    a = {
+        "agent_id": os.path.basename(tpath)[len("agent-"):-len(".jsonl")],
+        "type": meta.get("agentType") or "(unknown)",
+        "description": meta.get("description") or "",
+        "depth": meta.get("spawnDepth"),
+        "parent_agent": meta.get("parentAgentId"),
+        "model": meta.get("model"),
+        "path": tpath,
+        "context": 0, "peak": 0, "turns": 0, "tool_calls": 0,
+        "unparsed": 0, "first_ts": None, "last_ts": None,
+        "order": None, "files": [], "open": 0, "last_stop": None,
+    }
+    opened, closed = {}, set()
+
+    with open(tpath, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                r = json.loads(ln)
+            except Exception:
+                a["unparsed"] += 1
+                continue
+            ts = _parse_ts(r.get("timestamp") or "")
+            if ts:
+                if a["first_ts"] is None:
+                    a["first_ts"] = ts
+                a["last_ts"] = ts
+            msg = r.get("message") or {}
+            content = msg.get("content")
+            role = msg.get("role")
+
+            if role == "assistant":
+                a["turns"] += 1
+                u = msg.get("usage") or {}
+                cur = ((u.get("input_tokens") or 0)
+                       + (u.get("cache_read_input_tokens") or 0)
+                       + (u.get("cache_creation_input_tokens") or 0))
+                # A turn with no usage block contributes 0 and must not erase the
+                # last real reading: `context` tracks the newest NON-ZERO turn.
+                if cur:
+                    a["context"] = cur
+                    a["peak"] = max(a["peak"], cur)
+                a["last_stop"] = msg.get("stop_reason")
+                if isinstance(content, list):
+                    for it in content:
+                        if it.get("type") == "tool_use":
+                            a["tool_calls"] += 1
+                            opened[it.get("id")] = it.get("name")
+                            if it.get("name") in WRITE_TOOLS:
+                                fp = (it.get("input") or {}).get("file_path")
+                                if fp and fp not in a["files"]:
+                                    a["files"].append(fp)
+            else:
+                if a["order"] is None and role == "user" and isinstance(content, str):
+                    a["order"] = content
+                if isinstance(content, list):
+                    for it in content:
+                        if it.get("type") == "tool_result":
+                            closed.add(it.get("tool_use_id"))
+                        elif a["order"] is None and it.get("type") == "text" and role == "user":
+                            a["order"] = it.get("text")
+
+    a["open_ids"] = [k for k in opened if k not in closed]
+    a["open"] = len(a["open_ids"])
+    # AGE IS MEASURED FROM THE LAST RECORD, NOT FROM THE FILE MTIME. In production the
+    # two agree — the file is appended when the record is written. They diverge exactly
+    # where it matters for a test: `git checkout` stamps every fixture file with the
+    # checkout time, so an mtime-based age reports a two-year-old fixture agent as
+    # seconds fresh, and the IDLE case silently stops being tested. The timestamps live
+    # in the file CONTENT and survive a clone unchanged. mtime is the fallback for a
+    # transcript with no parseable timestamp at all.
+    ref = _reference_now()
+    if a["last_ts"] is not None:
+        a["age"] = max(0.0, ref - a["last_ts"].timestamp())
+    else:
+        try:
+            a["age"] = max(0.0, ref - os.path.getmtime(tpath))
+        except OSError:
+            a["age"] = None
+    a["wall"] = ((a["last_ts"] - a["first_ts"]).total_seconds()
+                 if a["first_ts"] and a["last_ts"] else 0.0)
+    return a
+
+
+def nearest_rank(vals, q):
+    if not vals:
+        return 0
+    s = sorted(vals)
+    return s[min(len(s) - 1, max(0, math.ceil(q * len(s)) - 1))]
+
+
+def thresholds(agents, limit):
+    """(watch, handoff, how). Distribution-derived and floored, or window fractions."""
+    if limit:
+        return int(limit * FRAC_WATCH), int(limit * FRAC_HANDOFF), \
+            f"{int(FRAC_WATCH*100)}% / {int(FRAC_HANDOFF*100)}% of --limit {limit:,}"
+    peaks = [a["peak"] for a in agents if a["peak"]]
+    if len(peaks) < MIN_SAMPLE:
+        return FLOOR_WATCH, FLOOR_HANDOFF, (
+            f"measured floors — n={len(peaks)} is under {MIN_SAMPLE}, too few for a "
+            f"percentile to be one")
+    w, h = nearest_rank(peaks, 0.90), nearest_rank(peaks, 0.99)
+    fw, fh = max(w, FLOOR_WATCH), max(h, FLOOR_HANDOFF)
+    how = f"store p90/p99 over n={len(peaks)}"
+    raised = [n for n, d, f in (("watch", w, fw), ("handoff", h, fh)) if d != f]
+    if raised:
+        how += f" ({' and '.join(raised)} raised to the measured floor)"
+    return fw, fh, how
+
+
+def identify_self(agents, argv_needle):
+    """Exact self-identification (fact 23b), or (None, reason).
+
+    The calling agent wrote a tool_use record containing this command text BEFORE
+    the command ran, so this is a lookup rather than an inference. Ambiguity is
+    reported, never resolved by guessing.
+    """
+    hits = []
+    for a in agents:
+        try:
+            with open(a["path"], encoding="utf-8", errors="replace") as fh:
+                for ln in fh:
+                    if argv_needle in ln and '"tool_use"' in ln:
+                        hits.append(a)
+                        break
+        except OSError:
+            continue
+    if len(hits) == 1:
+        return hits[0], "exact (own command text in own transcript)"
+    if not hits:
+        return None, "no transcript carries this command text — not running as a subagent?"
+    return None, f"{len(hits)} transcripts carry this command text; pass --agent <id>"
+
+
+def _own_open_calls(a, argv_needle):
+    """How many of this agent's still-open tool calls are THIS invocation."""
+    n = 0
+    try:
+        with open(a["path"], encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if argv_needle not in ln:
+                    continue
+                r = json.loads(ln)
+                for it in ((r.get("message") or {}).get("content") or []):
+                    if (it.get("type") == "tool_use"
+                            and it.get("id") in a["open_ids"]
+                            and argv_needle in json.dumps(it.get("input") or {})):
+                        n += 1
+    except Exception:
+        return 0
+    return n
+
+
+def verdict(a, watch, handoff, children):
+    """(verdict, [reasons the boundary is unsafe]). Both gate halves, separately."""
+    unsafe = []
+    if a["open"]:
+        unsafe.append(f"{a['open']} open tool call(s)")
+    running_kids = [c for c in children
+                    if c["age"] is not None and c["age"] < STALE_SECONDS
+                    and c["last_stop"] != "end_turn"]
+    if running_kids:
+        unsafe.append(f"{len(running_kids)} child agent(s) still running")
+    if a["age"] is not None and a["age"] >= STALE_SECONDS:
+        return "IDLE", unsafe
+    if a["context"] >= handoff:
+        return ("HANDOFF" if not unsafe else "HANDOFF-WAIT"), unsafe
+    if a["context"] >= watch:
+        return "WATCH", unsafe
+    return "OK", unsafe
+
+
+def fmt_dur(s):
+    if s is None:
+        return "?"
+    s = int(s)
+    return f"{s//3600}h{(s%3600)//60:02d}m" if s >= 3600 else f"{s//60}m{s%60:02d}s"
+
+
+def write_brief(a, store, watch, handoff):
+    """The continuation brief SKELETON — mechanical sections filled, judgment left open.
+
+    A transcript dump is not a brief: a successor reading one pays exactly the tokens
+    the handoff exists to avoid. The generated sections are the facts a fresh context
+    cannot recover; the empty ones are what only the outgoing agent knows, and they
+    are left as headed prompts so an unfilled brief is VISIBLY unfinished rather than
+    quietly thin. references/handoff.md § The continuation brief is the contract.
+    """
+    out = []
+    w = out.append
+    w(f"# Continuation brief — {a['type']} ({a['agent_id']})")
+    w("")
+    w(f"<!-- generated by wf-handoff from {a['path']} -->")
+    w(f"<!-- context {a['context']:,} · peak {a['peak']:,} · wall {fmt_dur(a['wall'])} "
+      f"· {a['turns']} turns · {a['tool_calls']} tool calls -->")
+    w("")
+    w("## 1. The work order, verbatim")
+    w("")
+    w("*Generated. Never summarize this section — the successor is entitled to the words its "
+      "predecessor was given.*")
+    w("")
+    if a["order"]:
+        for line in a["order"].splitlines():
+            w("> " + line if line.strip() else ">")
+    else:
+        w("> (no opening user record found in the transcript)")
+    w("")
+    w("## 2. Files written this run")
+    w("")
+    if a["files"]:
+        for f in a["files"]:
+            w(f"- `{f}`")
+    else:
+        w("- (none recorded)")
+    w("")
+    w("*Generated from Write/Edit calls. It is what was TOUCHED, not what is correct — "
+      "section 6 is where the successor learns which of these are trustworthy.*")
+    w("")
+    for heading, prompt in (
+        ("3. Done, and not done",
+         "Every numbered item of the order above, marked done or not done. An item not "
+         "mentioned reads as done and will not be revisited."),
+        ("4. Decisions made, and why",
+         "Rulings that are NOT recoverable from the files — an ambiguity resolved, an "
+         "option ruled out, a question answered by the manager mid-run. This is the "
+         "section whose absence makes a successor re-litigate settled questions."),
+        ("5. Tried and rejected",
+         "Dead ends, with what made each one dead. The most expensive thing a fresh "
+         "context lacks: without it the successor pays again for every path already "
+         "walked."),
+        ("6. Verification state",
+         "Which checks pass RIGHT NOW, by name, with their output. The successor re-runs "
+         "these first, so it can tell inherited damage from its own."),
+        ("7. The next concrete action",
+         "One action, specific enough to start on without re-reading anything above."),
+    ):
+        w(f"## {heading}")
+        w("")
+        w(f"*{prompt}*")
+        w("")
+        w("- ")
+        w("")
+    w("---")
+    w("")
+    # The phrase is kept on ONE line deliberately: bin/check greps this source for it,
+    # and a string split across a concatenation is invisible to that assertion.
+    w("**Successor's first act is section 6, before any new work.** If a check disagrees with"
+      " what this brief claims, the brief is wrong: return"
+      " `ESCALATE: brief disagrees with verification`"
+      " to your manager rather than building on it.")
+    return "\n".join(out) + "\n"
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--transcripts")
+    ap.add_argument("--agent")
+    ap.add_argument("--self", dest="self_", action="store_true")
+    ap.add_argument("--brief")
+    ap.add_argument("--limit", type=int)
+    ap.add_argument("--all", action="store_true")
+    ap.add_argument("--json")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    # An empty --root is a caller error, never a silent retarget to the CWD. A shipped
+    # `--root "${CLAUDE_PROJECT_DIR}"` expands to `--root ""` when that variable is
+    # unset, and abspath("") is a real directory, so an is-it-a-directory guard passes.
+    if args.root == "":
+        _die('--root was passed an empty string (an unset ${CLAUDE_PROJECT_DIR} '
+             'expands to this). Pass a real directory, or --transcripts.')
+    args.root = os.path.abspath(args.root)
+    if args.limit is not None and args.limit <= 0:
+        _die("--limit must be a positive token count")
+
+    store, how = resolve_store(args)
+    metas = sorted(glob.glob(os.path.join(store, "subagents", "*.meta.json")))
+    agents = [x for x in (read_agent(m) for m in metas) if x]
+
+    if args.self_:
+        me, why = identify_self(agents, " ".join(sys.argv))
+        if not me:
+            _die(f"--self could not identify this agent: {why}")
+        # THIS CALL IS ITSELF AN OPEN TOOL CALL. An agent checking its own boundary has
+        # written a tool_use for this very command and has not received its result, so
+        # without this discount --self could never report a safe boundary and the whole
+        # self-check would be dead on arrival. Found by running it. The discount is
+        # exact, not a fudge: the record discounted is the one carrying this argv.
+        me["open"] = max(0, me["open"] - _own_open_calls(me, " ".join(sys.argv)))
+        me["self_discount"] = True
+        args.agent = me["agent_id"]
+
+    watch, handoff, how_thr = thresholds(agents, args.limit)
+    kids = {}
+    for a in agents:
+        kids.setdefault(a["parent_agent"], []).append(a)
+    for a in agents:
+        a["verdict"], a["unsafe"] = verdict(a, watch, handoff, kids.get(a["agent_id"], []))
+
+    if args.brief:
+        match = [a for a in agents if a["agent_id"] == args.brief]
+        if not match:
+            _die(f"no agent {args.brief} in {store}/subagents/")
+        sys.stdout.write(write_brief(match[0], store, watch, handoff))
+        return 0
+
+    shown = [a for a in agents if args.agent is None or a["agent_id"] == args.agent]
+    if args.agent and not shown:
+        _die(f"no agent {args.agent} in {store}/subagents/")
+    if not args.all and not args.agent:
+        shown = [a for a in shown if a["age"] is not None and a["age"] < STALE_SECONDS]
+    shown.sort(key=lambda a: -a["context"])
+
+    due = [a for a in agents if a["verdict"] == "HANDOFF"]
+
+    if not args.quiet:
+        print(f"wf-handoff — {store}")
+        print(f"  store      {how}")
+        print(f"  thresholds watch {watch:,} · handoff {handoff:,}   ({how_thr})")
+        print(f"  liveness   IDLE past {STALE_SECONDS}s without a write; "
+              f"measured, not chosen — largest observed gap inside a working run was 1,283s")
+        print(f"  scope      {len(agents)} agent transcript(s) in this session"
+              + ("" if args.all or args.agent else f"; {len(shown)} active, "
+                 f"{len(agents)-len(shown)} idle (--all to include)"))
+        print()
+        if not agents:
+            print("  no agent transcripts — nothing to report (n=0, not an error)")
+        elif not shown:
+            print("  no active agents — nothing to report (n=0, not an error)")
+        else:
+            print(f"  {'agent':19}{'type':20}{'context':>10}{'peak':>10}{'wall':>8}"
+                  f"{'age':>8}  verdict")
+            for a in shown:
+                print(f"  {a['agent_id'][:18]:19}{a['type'][:19]:20}{a['context']:>10,}"
+                      f"{a['peak']:>10,}{fmt_dur(a['wall']):>8}{fmt_dur(a['age']):>8}"
+                      f"  {a['verdict']}"
+                      + (f" — {'; '.join(a['unsafe'])}" if a["unsafe"] else ""))
+        print()
+        if due:
+            print(f"  {len(due)} agent(s) DUE and at a safe boundary. For each:")
+            for a in due:
+                print(f"    wf-handoff --brief {a['agent_id']}")
+            print("  The successor spawn is the MANAGER's act, never this script's "
+                  "(references/handoff.md).")
+        else:
+            waiting = [a for a in agents if a["verdict"] == "HANDOFF-WAIT"]
+            if waiting:
+                print(f"  {len(waiting)} agent(s) over the threshold but mid-work — "
+                      f"left alone. A handoff inside a half-finished unit is worse than "
+                      f"a large context.")
+            else:
+                print("  nothing due for handoff")
+        print()
+        print("  REPORTS; NEVER REPAIRS — no transcript was modified, and this script "
+              "cannot spawn")
+
+    if args.json:
+        p = args.json if os.path.isabs(args.json) else os.path.join(args.root, args.json)
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump({
+                "store": store, "resolved_by": how,
+                "watch": watch, "handoff": handoff, "threshold_source": how_thr,
+                "stale_seconds": STALE_SECONDS,
+                "agents": [{k: v for k, v in a.items()
+                            if k not in ("first_ts", "last_ts", "order", "path")}
+                           for a in agents],
+            }, fh, indent=2, default=str)
+
+    return 3 if due else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

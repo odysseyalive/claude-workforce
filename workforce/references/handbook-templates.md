@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 38 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 39 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -181,6 +181,11 @@ partial success.
 - NEVER dispatch the same work order to both a Lead and one of its ICs.
 - NEVER exceed the spawn budget above. If the work needs more, split it into sequential waves.
 - NEVER write code, tests, or documentation yourself.
+- WHEN A BACKGROUNDED AGENT REPORTS BACK, run `wf-handoff --root "<project>"` before you
+  dispatch the next order. A Lead at `HANDOFF` gets a successor, not another work order: ask it
+  for its brief (`wf-handoff --brief <id>`), then spawn a fresh employee of the same type on the
+  same handbook with that brief as its order. You spawn the successor; the Lead never replaces
+  itself. `references/handoff.md` carries the gate and the brief contract.
 - Every decision MUST conform upward to the General Operating Principles and the Strategic Objective.
 - COMPLETENESS is yours as the directing node — the work order is the single point of failure, and you
   are the one who writes it. Whatever you scope out of an order comes back missing, exactly as ordered.
@@ -268,7 +273,27 @@ Lead-specific guardrails, **in addition to** the CEO set (which applies unchange
   from the order you received, byte-for-byte — your Task is your decomposition, the REQUEST is not
   yours to edit. And before you report an IC's return upward, Read its OUTPUT.md against that block
   and name any in-scope item it does not cover (dispatch CHECKPOINT clauses 6c and 6d).
+- AT EVERY PHASE BOUNDARY, before starting the next phase, run
+  `wf-handoff --root "<project>" --self`. If the verdict is `HANDOFF`, do not start the next phase:
+  run `wf-handoff --brief <your-id>`, fill sections 3-7, and return the brief to your manager. If it
+  is `HANDOFF-WAIT` or anything else, continue — you are not over threshold, or you are not at a
+  boundary. Never replace yourself; your manager spawns your successor.
 ```
+
+### The boundary clause — where the check-in actually fires
+
+**A Lead's context grows all run, and this is the one place a check on it costs nothing and can be
+acted on.** At a phase boundary the Lead has just closed a unit of work and its ICs have reported, so
+the safe-boundary half of the gate passes by construction; anywhere else the answer is usually
+`HANDOFF-WAIT` and the question was wasted. `references/handoff.md` § When to look carries the
+reasoning, the two other carriers, and why a `PostToolUse` hook is refused rather than merely unused.
+
+**A Lead with no phases still carries the clause.** Read "phase boundary" as *after each IC returns
+and before the next dispatch*, which is the same shape at a finer grain.
+
+**The clause is one `Bash` call, and it does not fire on its own.** No hook can read live context
+(`platform.md` fact 22), so the employee asking is what makes the measurement happen — which is the
+property that keeps it off a poll loop rather than a limitation to work around.
 
 ---
 

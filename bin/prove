@@ -150,6 +150,8 @@ OCF  = "workforce/references/org-chart-format.md"
 PFL  = "workforce/references/procedures/preflight.md"
 RVW  = "workforce/references/procedures/review.md"
 ORGD = "workforce/references/org-design.md"
+HND  = "workforce/references/handoff.md"
+HOFF = "workforce/bin/wf-handoff"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
@@ -1417,6 +1419,64 @@ CASES = [
      AUD, "del", "<the shape of what comes back, and whether it is stable>"),
     ("interface: the audit backfills skills reduced before the producer existed",
      AUD, "del", "Step 5-IFACE"),
+    # ── handoff (2026-09-07) ─────────────────────────────────────────────────
+    # Each case breaks a DIFFERENT way the design silently degrades into the flag it
+    # exists to replace. A detector that fires and hands the finding back is precisely
+    # what "a detector ships with its fix" forbids, so the deletions target the fix
+    # half, not the detection half.
+    #
+    # Drop the boundary half of the gate and the number alone authorizes a handoff —
+    # a replacement mid-transaction, which costs more than the context it saved.
+    ("handoff: the gate has TWO halves and the number alone never authorizes one",
+     HND, "del", "Both, or nothing happens."),
+    # Drop MIN_SAMPLE and nearest-rank p90 over n=1 returns that one agent's own peak,
+    # so a self-checking agent sets its threshold TO ITSELF and can never cross it.
+    ("handoff: the threshold is derived from the project's own history, never a constant",
+     HOFF, "del", "MIN_SAMPLE = 20"),
+    # Drop the self-discount and every --self call sees its own in-flight tool_use as an
+    # open call: the boundary never reads safe and the whole clause is dead on arrival.
+    ("handoff: the self-check discounts its OWN open tool call",
+     HOFF, "del", "self_discount"),
+    # Fact 22 makes a PostToolUse hook buildable, so it WILL be re-proposed. Delete the
+    # recorded reason and nothing in the tree says why it was refused.
+    # Delete the age rule and the IDLE verdict goes back to reading file mtime, which a
+    # clone resets — the case would pass while asserting nothing.
+    ("handoff: age is read from the last RECORD, never the file mtime",
+     HOFF, "del", "AGE IS MEASURED FROM THE LAST RECORD, NOT FROM THE FILE MTIME"),
+    ("handoff: the per-tool-call hook is refused, with its reason recorded",
+     HND, "del", "poll wearing a hook's clothes"),
+    # Delete the escalation sentence from the GENERATED skeleton and a successor builds
+    # on a brief nothing checked — inherited damage indistinguishable from its own.
+    ("handoff: the brief's work order is generated verbatim, and the successor proves it",
+     HOFF, "del", "ESCALATE: brief disagrees with verification"),
+    # Delete the manager rule and an employee respawns itself, spending a delegation
+    # tier the org has already spent (delegation-budget.md § Depth).
+    ("handoff: a manager spawns the successor; an employee never replaces itself",
+     HND, "del", "A manager spawns the successor. An employee never replaces itself."),
+    # The retracted session-split died because it named no threshold and every run
+    # resolved it as STOP. Delete the continue-the-run rule and this reopens it.
+    ("handoff: a handoff CONTINUES the run and is never a reason to stop",
+     HND, "del", "A handoff is never a reason to stop."),
+    # Delete the Lead guardrail and the measurement ships with nothing calling it —
+    # written and unwired, the pattern this project keeps finding in its own work.
+    ("handoff: BOTH wired carriers are in the templates, and the table names where",
+     TPL, "del", "Never replace yourself"),
+    # Delete the CEO half and a backgrounded Lead at 400k gets another work order instead
+    # of a successor — the exact situation the screenshot showed.
+    ("handoff: BOTH wired carriers are in the templates, and the table names where",
+     TPL, "del", "WHEN A BACKGROUNDED AGENT REPORTS BACK"),
+    # Delete fact 22's cross-reference and a reader hits two facts that look like a
+    # contradiction with no way to tell which governs.
+    ("handoff: fact 23 is MEASURED and does not contradict fact 22",
+     PL, "del", "is NOT contradicted by fact 23"),
+    # Two encodings of one edge with no named authority is how a staffed employee stays
+    # off the chart and /org routes around it.
+    ("edges: the child's `reports-to` is the authority; `direct-reports` is a derived mirror",
+     OCF, "del", "never from `direct-reports`"),
+    # A template-only fix reaches new hires and leaves every live org broken. Delete the
+    # heal step and the repair never reaches an org that already exists.
+    ("edges: audit Step 5g heals existing orgs, and prints INV-EDGES + INV-HANDOFF",
+     AUD, "del", "## Step 5g"),
     ("interface: INV-IFACE row names its text and token in invariants.md",
      INV, "del", "INV-IFACE"),
 

@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-three, and the list is closed: adding a procedural invariant means adding a row here and a line to
+Thirty-five, and the list is closed: adding a procedural invariant means adding a row here and a line to
 the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -130,6 +130,8 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 31 | the user's sibling projects were searched for an existing implementation before any capability was authored, with the count reported | `INV-PRIORART` | references/prior-art.md |
 | 32 | every governed handbook's `contract-stamp` matches its current `## Procedure` + `## Verification`, restamped in the run that amended it, or names the rule that declined | `INV-STAMP` | references/procedures/audit.md |
 | 33 | every reduced skill declares `## Interface` with its Invoke / Returns / Fails rows, or is named as undeclarable | `INV-IFACE` | references/procedures/audit.md |
+| 34 | every chain-of-command edge was re-derived from the child's `reports-to`, and every `direct-reports` mirror that disagreed was healed, or names the rule that declined | `INV-EDGES` | references/org-chart-format.md |
+| 35 | every Lead handbook carries the handoff boundary clause, or names the rule that declined | `INV-HANDOFF` | references/handoff.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can
@@ -270,6 +272,8 @@ Run Invariants
   INV-PINS        unpinned 3 · pinnable 2 · unpinnable 1 · dependabot PARTIAL
   INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
   INV-COMPANIONS  6 of 6 materialized · org (org index) · operating-principles · personnel-ledger · code-evaluator · text-eval · security-evaluator · 0 absent
+  INV-EDGES       employees 9 · edges 8 · mismatched 1 · healed 1 · 0 declined
+  INV-HANDOFF     leads 3 · clause present 3 · installed 1 · 0 declined
   …every remaining row, always all of them…
 ```
 
