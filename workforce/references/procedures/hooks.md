@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -218,6 +218,13 @@ different matcher survives, and an entry holding other hooks beside ours keeps t
 restored to `output_style_previous` — and when that is `None`, meaning the key was absent before, the
 key is **deleted** rather than set to a default this project invented. A style the user changed after we
 set it is reported and left alone. A second run is a reported NOOP, never a second attempt.
+
+**Fixtures:** `saunwire-userhook`, `saunwire-absentstyle`, `saunwire-userchanged`, `saunwire-norecord`.
+**The first one is the case worth having**, and the clean tree is not it: that fixture carries the
+user's own `Stop` hook and a `wf-plain-guard` on a matcher the record does not name, so a reversal that
+removed by event alone fails it. `saunwire-absentstyle` fails if a default is ever written back.
+Verified by hand first, which is one observation — this repository's own harness holds that a fixture
+which works once is not a regression test.
 
 *Added 2026-09-07, and it closes a gap the wiring shipped with two hours earlier. `--wire-defaults`
 recorded every registration and set `output_style_previous`, **and nothing read either.** This section

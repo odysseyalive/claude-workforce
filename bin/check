@@ -1165,6 +1165,16 @@ _vend_code = [p_ for p_ in VENDORED if "/code/" in p_]
 # that can be compared." Proven by regressing wf-conform's ORG-RECORD discriminator
 # and wf-census's symlink dedupe and watching the harness fail.
 _fix_spec = "fixtures/scripts/expectations.json"
+# DEFENSIVELY. `read()` returns "" for an absent file and a mutation can leave this
+# file mid-edit, and a bare json.loads here CRASHED bin/check outright — every
+# assertion in the file became unrunnable because one input was malformed, which is
+# strictly worse than the check it was guarding. A check that cannot parse its input
+# FAILS that check; it never takes the run down with it. Found 2026-09-07 by bin/prove,
+# which mutates exactly this file.
+try:
+    _fix_json = json.loads(read(_fix_spec))
+except ValueError:
+    _fix_json = {}
 _fix_cases = json.loads(read(_fix_spec)) if os.path.exists(_fix_spec) else {}
 _covered = {c["script"] for c in _fix_cases.values()}
 check(
@@ -8530,6 +8540,21 @@ check("restoring a style that was absent DELETES the key",
       "prev is None means the key did not exist before we wrote it. Writing a default "
       "back would be this project inventing a preference the user never had, which is "
       "the same move Absence is not a gap forbids everywhere else")
+check("the reversal is proven against competing user values, not a clean tree",
+      all(k in _fix_json for k in ("saunwire-userhook", "saunwire-absentstyle",
+                                   "saunwire-userchanged", "saunwire-norecord"))
+      and any("matcher" in _w for _w in
+              ((_fix_json.get("saunwire-userhook", {}).get("after") or {})
+               .get(".claude/settings.local.json", {}).get("want") or []))
+      and any("my-own-stop-hook" in _w for _w in
+              ((_fix_json.get("saunwire-userhook", {}).get("after") or {})
+               .get(".claude/settings.local.json", {}).get("want") or []))
+      and "saunwire-userhook" in _hks,
+      "a clean-tree fixture proves nothing about a conservative reversal — every "
+      "implementation passes it. The tree must already carry the user's own Stop hook "
+      "and a registration on a matcher the record does not name, or `remove by event "
+      "alone` passes. Both regressions were run against these fixtures on 2026-09-07 "
+      "and each failed exactly the case that should catch it")
 check("path 3: verify reports both the hook state and the style state",
       "## Output style" in _vfy_h
       and "| `SELECTED, FILE ABSENT` |" in _vfy_h

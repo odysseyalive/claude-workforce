@@ -148,6 +148,27 @@ through an audit again."*
   a `style` entry beside each settings file, and `bin/check` compares it there rather than reporting a
   permanent phantom absence inside the skill tree.
 
+**Landed 2026-09-07 (v1.21.2) — the reversal was verified by hand, which is one observation.** Trigger:
+the peer session again, on v1.21.1: *"That's the case worth having a prove row for, not the clean-tree
+case."* Correct. The conservative behaviour had been checked once, in a scratch directory, and this
+repository's own harness holds that a fixture which works once is not a regression test.
+
+- **Four fixtures, and the first is the only one that discriminates.** `saunwire-userhook` seeds the
+  user's own `Stop` hook AND a `wf-plain-guard` on a matcher the record does not name; `saunwire-absentstyle`
+  has `output_style_previous` null; `saunwire-userchanged` has a style the user picked after ours;
+  `saunwire-norecord` has no sidecar. A clean tree proves nothing here — every implementation passes it.
+- **Two deliberate regressions were run against them.** "Remove by event alone" fails `saunwire-userhook`
+  on the missing `Edit` matcher; "write a default back" fails `saunwire-absentstyle`. Four cases that pass
+  with no evidence any of them CAN fail is not a test suite, it is four observations.
+- **The fixtures were untracked, and would have been absent from every clone.** A common global ignore
+  (`~/.config/git/ignore`) excludes `**/.claude/settings.local.json`, and a settings file is exactly what
+  these fixtures ARE. `.gitignore` already carried an anchored note about this failure one directory
+  shallower — twelve fixtures committed as descriptions of content that was never in the repo — and this
+  is the same thing at `fixtures/scripts/<name>/.claude/`.
+- **`bin/check` crashed instead of failing.** A prove mutation left `expectations.json` mid-edit and a bare
+  `json.loads` took the whole file down, so every assertion became unrunnable because one input was
+  malformed. A check that cannot parse its input fails that check; it never takes the run with it.
+
 **Landed 2026-09-07 (v1.21.1) — the wiring shipped with a reversal record nobody could read.** Trigger:
 a peer session reviewing the user-scope write two hours after v1.21.0 landed. It flagged that
 `wf-settings-apply --scope user --wire-defaults --execute` changes `~/.claude/settings.json` and reaches

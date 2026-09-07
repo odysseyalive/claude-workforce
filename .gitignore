@@ -12,6 +12,19 @@
 # run the one gate that says so.
 !fixtures/*/.claude/
 
+# AND the settings files inside a script fixture's tree, which sit one level deeper
+# at `fixtures/scripts/<name>/.claude/`. A settings file is exactly what several of
+# these fixtures ARE — `saunwire-*` seeds one with the user's own hooks and style so
+# the reversal can be proven conservative — and a very common GLOBAL ignore
+# (`~/.config/git/ignore`) excludes `**/.claude/settings.local.json` on developer
+# machines. A repo `.gitignore` is read after the global one and wins, so the
+# negation belongs here. Without it the trees are untracked, absent from every
+# clone, and `bin/script-conformance` reports "fixture tree missing" there while
+# passing on the machine that wrote them — the same failure the anchor above
+# records, one directory deeper. Measured 2026-09-07.
+!fixtures/*/*/.claude/
+!fixtures/*/*/.claude/**
+
 # NOTE: CLAUDE.md is deliberately NOT ignored here, diverging from claude-enforcer.
 # Anyone working on this repo needs the orientation, and for a repo-only session —
 # remote execution, a collaborator's checkout — the clone is the only copy there is.
