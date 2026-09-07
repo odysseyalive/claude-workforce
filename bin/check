@@ -119,10 +119,12 @@ CANCEL_RX = re.compile(
 def manifest_paths():
     """Shipped files.
 
-    `exec `, `hook ` and `canary ` are in use and are stripped here so every
+    `exec `, `hook `, `canary ` and `style ` are in use and are stripped here so every
     downstream check sees a plain path. `keep ` remains unused and is caught below
     rather than silently parsed.
 
+    `style ` files are OUTPUT STYLES: they install to `<config-root>/output-styles/`
+    or `.claude/output-styles/`, which are the only two places a host looks for one.
     `canary ` files are agent DEFINITIONS: they install to `.claude/agents/`, not
     into the skill directory, because an agent type is only registered from there.
     Shipping them means they are already registered when the first audit runs --
@@ -134,7 +136,7 @@ def manifest_paths():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        for flag in ("exec ", "hook ", "canary "):
+        for flag in ("exec ", "hook ", "canary ", "style "):
             if s.startswith(flag):
                 s = s[len(flag):].strip()
                 break
@@ -8324,6 +8326,109 @@ check("plain guard: hardcodes no banned term — it reads plain-output.md",
       "from the reference). The list lives in plain-output.md; a second copy in the hook "
       "makes adding a word a two-file hunt and drifts silently"
       % (_plo_leaks, len(_plo_terms)))
+
+# ── the speak guard, the output style, and the two clauses they carry (2026-09-07) ──
+# The 2026-09-05 batch above shipped ONE enforced check — a word list on a question —
+# and the register the user objected to lives in REPORTS, which had none. Its three
+# prose carriers are all read at the head of a context, so each was faintest exactly
+# when a long run was writing its longest report. These assertions guard the two
+# carriers that do NOT decay, and the two clauses (openers, decide-the-small-things)
+# that had no carrier at all. MEASURED: the reply the user quoted opens "You're right".
+_wsg = read("workforce/bin/wf-speak-guard")
+# THE CODE, not the file. Every claim below is about what the script DOES, and this
+# script explains itself at length — so `"stop_hook_active" in _wsg` was satisfied by
+# the docstring that describes the loop guard, and stayed green with the guard deleted.
+# Caught by bin/prove reporting the case VACUOUS, which is exactly what it is for.
+_wsg_parts = _wsg.split('"""')
+_wsg_code = (_wsg_parts[0] + "".join(_wsg_parts[2:])) if len(_wsg_parts) >= 3 else _wsg
+_sty = read("workforce/output-styles/plain-speak.md")
+_ttl = read("workforce/references/evaluator-additions/text-tells.md")
+check("speak guard: ships as a hook, in the default set, wired to Stop",
+      "hook workforce/bin/wf-speak-guard" in read("manifest.txt")
+      and '"wf-speak-guard": ("Stop", None)' in _wsa
+      and "wf-speak-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
+      and "| `wf-speak-guard` | `Stop` | *(none)* |" in _hks,
+      "a REPORT had no floor at all, which is why the rule was written three times and "
+      "still reached the user. An opt-in or unregistered hook is the dormant shape four "
+      "inherited hooks died in")
+check("speak guard: reads the finished reply, and its verdict is JSON not an exit code",
+      "last_assistant_message" in _wsg_code and '"decision": "block"' in _wsg_code
+      and "sys.exit(0)" in _wsg_code,
+      "on Stop a non-zero exit is indistinguishable from a crash, so the verdict must "
+      "travel as JSON on stdout. Reading last_assistant_message rather than parsing a "
+      "transcript is what makes this check about the text the user will actually read")
+check("speak guard: the vocabulary check is scoped to the user's own words",
+      "def user_words" in _wsg_code and "transcript_path" in _wsg_code
+      and "isMeta" in _wsg_code and "toolUseResult" in _wsg_code
+      and "return None" in _wsg_code,
+      "a FLAT list applied to a report fires on nearly every reply in a repository whose "
+      "subject is handbooks and tiers, and a guard that fires on everything is one "
+      "somebody turns off. Scoping to the transcript executes the rule the reference "
+      "states — say it in words the reader already owns — and an unreadable transcript "
+      "must DISABLE the check, never fire it")
+check("speak guard: an opener blocks and nothing else does",
+      "def opener_hit" in _wsg_code
+      and '"decision": "block"' in _wsg_code
+      and "additionalContext" in _wsg_code
+      and 'if payload.get("stop_hook_active"):' in _wsg_code,
+      "blocking costs a round trip. An opening agreement earns it — it is the observable "
+      "surface of caving under pushback and the fix is deleting one sentence. A buried "
+      "question does not: the reply is correct, only badly ordered. And stop_hook_active "
+      "must pass through, or a guard and a model that disagree spin")
+check("speak guard: hardcodes no banned term — it reads plain-output.md",
+      bool(_plo_terms)
+      and not sorted({t for t in _plo_terms
+                      if re.search(r'''[\'"]%s[\'"]''' % re.escape(t), _wsg_code)})
+      and "plain-output.md" in _wsg_code,
+      "same single-home rule the plain guard carries. The OPENERS list is written in the "
+      "script on purpose — it is a property of position, not of vocabulary — and "
+      "plain-output.md § Openers says so; the banned list is not")
+check("speak guard: named in the enforcement table at both its strengths",
+      "wf-speak-guard" in enf and "PREVENTS an opener once wired" in enf
+      and "DETECTS the other two" in enf,
+      "the guard PREVENTS one thing and DETECTS two, and Core Principle 6 forbids "
+      "reporting the pair at the stronger of the two")
+check("output style: ships to output-styles/, is selectable, and keeps the coding rules",
+      "style workforce/output-styles/plain-speak.md" in read("manifest.txt")
+      and "keep-coding-instructions: true" in _sty
+      and "--output-style" in _wsa and "OUTPUT_STYLE" in _wsa
+      and "output-styles" in read("install") and "output-styles" in read("install.ps1"),
+      "an output style is only found in <config-root>/output-styles/ or "
+      ".claude/output-styles/, so the manifest needs its own flag and BOTH installers "
+      "need to route it. Without keep-coding-instructions the style would silently drop "
+      "the host's software-engineering instructions, which is a far larger change than "
+      "the one being made")
+check("output style: its reach is stated, and it is the main conversation only",
+      "main conversation only" in _hks and "own system prompt" in _hks
+      and "main conversation only" in _plo,
+      "output styles do not reach a subagent — it runs its own system prompt. Describing "
+      "the style as fixing employee reports is the overclaim Core Principle 6 exists for, "
+      "and it is the natural thing to say once the style demonstrably fixes the CEO's voice")
+check("plain output: the two non-decaying carriers are named, and so is why the rest decay",
+      "## Where the rule is carried" in _plo
+      and "the system prompt, every turn" in _plo
+      and "every finished reply, every turn" in _plo,
+      "the FINDING is not that the rule was unwritten — it was written three times. It is "
+      "that every copy is read at the head of a context. A reader who cannot see which "
+      "carriers survive a full context will add a fourth head-of-context copy next time")
+check("plain output: openers and decide-the-small-things have carriers, not just a rule",
+      "## Openers" in _plo and "Decide the small things" in _plo
+      and "Never open a reply with agreement" in _tpl_t
+      and "Never open with agreement" in _org_p
+      and "no reply opens with agreement" in read("workforce/references/procedures/principles.md"),
+      "these two clauses are what the 2026-09-07 directive adds beyond the 2026-09-05 "
+      "one. A clause in plain-output.md alone reaches this repo and no org workforce "
+      "builds — the constitution item and the dispatch rung are its only carriers into "
+      "an employee, and principles.md is what forces the constitution to carry it")
+check("text-eval: the conversational-register row no longer exempts what the user reads",
+      "`DEVELOPMENT.md`, and run deliverables)" not in _ttl
+      and "and to anything a human reads in the terminal" in _ttl
+      and "run deliverables" in _ttl,
+      "this row IS the coffee test, and plain-output.md § The test cites it as its own "
+      "authority. Exempting 'run deliverables' cancelled that inheritance at the source: "
+      "the one written test that would have caught a formal report excluded the report. "
+      "The rest of the exemption stays — what an agent AUTHORS into a reference and what "
+      "it SAYS to a person are different corpora with different correct registers")
 
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,

@@ -388,10 +388,13 @@ verify_scope() {
             "hook "*) vflag="hook"; vpath="${vline#hook }" ;;
             "exec "*) vflag="hook"; vpath="${vline#exec }" ;;
             "canary "*) vflag="canary"; vpath="${vline#canary }" ;;
+            "style "*) vflag="style"; vpath="${vline#style }" ;;
         esac
 
         if [ "$vflag" = "canary" ]; then
             vdest="$agents_dir/$(basename "$vpath")"
+        elif [ "$vflag" = "style" ]; then
+            vdest="$styles_dir/$(basename "$vpath")"
         else
             vdest="$vdir/${vpath#workforce/}"
         fi
@@ -425,12 +428,14 @@ install_to_scope() {
         user)
             skill_dir="$PERSONAL_SKILL_DIR"
             agents_dir="$CONFIG_ROOT/agents"
+            styles_dir="$CONFIG_ROOT/output-styles"
             settings_file="$CONFIG_ROOT/settings.json"
             scope_label="personal ($CONFIG_ROOT/skills)"
             ;;
         project)
             skill_dir="$PROJECT_SKILL_DIR"
             agents_dir="$(pwd)/.claude/agents"
+            styles_dir="$(pwd)/.claude/output-styles"
             settings_file=".claude/settings.local.json"
             scope_label="project ($(pwd)/.claude/skills)"
             ;;
@@ -463,10 +468,18 @@ install_to_scope() {
             # a run cannot resolve in that run, which forced a restart to clear
             # every DEGRADED tier-ceiling mark.
             "canary "*) flag="canary"; path="${line#canary }" ;;
+            # `style` files do NOT live in the skill directory either: an output
+            # style is read from `<config-root>/output-styles/` or the project's
+            # `.claude/output-styles/`, and nowhere else. It modifies the system
+            # prompt, which is why the plain-speak rule lands here rather than in
+            # a reference the model has to still be paying attention to.
+            "style "*) flag="style"; path="${line#style }" ;;
         esac
 
         if [ "$flag" = "canary" ]; then
             dest="$agents_dir/$(basename "$path")"
+        elif [ "$flag" = "style" ]; then
+            dest="$styles_dir/$(basename "$path")"
         else
             dest="$skill_dir/${path#workforce/}"
         fi

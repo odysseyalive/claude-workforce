@@ -299,12 +299,14 @@ function Install-ClaudeWorkforce {
             'user' {
                 $skillDir     = $personalSkillDir
                 $agentsDir    = Join-Path $configRoot 'agents'
+                $stylesDir    = Join-Path $configRoot 'output-styles'
                 $settingsFile = Join-Path $configRoot 'settings.json'
                 $scopeLabel   = "personal ($configRoot\skills)"
             }
             'project' {
                 $skillDir     = $projectSkillDir
                 $agentsDir    = Join-Path (Get-Location).Path '.claude/agents'
+                $stylesDir    = Join-Path (Get-Location).Path '.claude/output-styles'
                 $settingsFile = '.claude/settings.local.json'
                 $scopeLabel   = "project ($(Get-Location)\.claude\skills)"
             }
@@ -331,10 +333,19 @@ function Install-ClaudeWorkforce {
             # REGISTERED by the first audit: fixtures written during a run cannot
             # resolve in that run, which forced a restart to clear DEGRADED marks.
             elseif ($line.StartsWith('canary ')) { $flag = 'canary'; $path = $line.Substring(7).Trim() }
+            # `style` files are OUTPUT STYLES and must land in <config-root>/output-styles/
+            # or the project's .claude/output-styles/ to be selectable at all. A style
+            # modifies the system prompt, which is why the plain-speak rule ships here
+            # rather than in a reference the model has to still be paying attention to.
+            elseif ($line.StartsWith('style ')) { $flag = 'style'; $path = $line.Substring(6).Trim() }
 
             if ($flag -eq 'canary') {
 
                 $dest = Join-Path $agentsDir (Split-Path $path -Leaf)
+
+            } elseif ($flag -eq 'style') {
+
+                $dest = Join-Path $stylesDir (Split-Path $path -Leaf)
 
             } else {
 
@@ -377,11 +388,13 @@ function Install-ClaudeWorkforce {
             if (-not $line -or $line.StartsWith('#')) { continue }
             $vPath = $line
             $vFlag = ''
-            foreach ($pre in @('keep ', 'hook ', 'exec ', 'canary ')) {
+            foreach ($pre in @('keep ', 'hook ', 'exec ', 'canary ', 'style ')) {
                 if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim(); $vFlag = $pre.Trim() }
             }
             if ($vFlag -eq 'canary') {
                 $vDest = Join-Path $agentsDir (Split-Path $vPath -Leaf)
+            } elseif ($vFlag -eq 'style') {
+                $vDest = Join-Path $stylesDir (Split-Path $vPath -Leaf)
             } else {
                 $vDest = Join-Path $skillDir ($vPath -replace '^workforce/', '')
             }

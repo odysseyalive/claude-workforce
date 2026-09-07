@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -38,6 +38,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
 | `wf-plain-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** Any question whose text, header, or option labels use a term from the banned list in `references/plain-output.md` — words a reader would have to look up. Exit 2 names the terms and the string they were found in. It checks words, never register: the coffee test is a human judgment and stays advisory. |
 | `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** A model or effort budget picker whose options are not one of the `LANE` blocks `wf-model-budget` / `wf-effort-budget` emit for this project: the pool rebuilt from prose or from the project's stale `## Model statics`, the current pin re-labelled `(Recommended)`, a five-rung ladder. Exit 2 hands the model the emitter's block and the command that produces it. § The budget guard below |
+| `wf-speak-guard` | `Stop` | *(none)* | **blocks an opener; notes the rest.** The finished reply, read once per turn. A reply opening with an agreement phrase — "You're absolutely right", "Good catch", "I apologize" — is returned to the model with one instruction. A banned term the USER has never typed this session, or a long reply whose only question sits in its last quarter, comes back as `additionalContext`: the user reads the reply, the model carries the note into the next one. § The speak guard below |
 | `wf-loop-guard` | `PostToolUse` | *(none)* | **advisory; PROPOSED, and not wired by this command's default set.** Behavioural repetition — the same tool called with byte-identical arguments 3+ times with no distinct edit between them. Nudges; halts only when `WF_LOOP_GUARD_STOP_AT > 0`. § The loop guard below |
 
 **`wf-standing-request` is the one hook that adds context instead of checking something**, and it is
@@ -47,6 +48,14 @@ rather than whenever some component loads. It is also strictly better off here �
 once at the head of a conversation, so the request was faintest exactly when a long audit was doing its
 spawning. It exits `0` unconditionally: a hook that fails a turn because it could not phrase a request
 would break the session it exists to help.
+
+**`wf-speak-guard` is the only hook on `Stop`, and it is the only one that reads what the USER will
+read.** Everything else in the table watches a tool call. This one receives `last_assistant_message`
+— the finished reply text — because the rule it enforces is about the reply, not about anything the
+reply did. It is also the only carrier of the plain-output rule that does not decay with context
+(`references/plain-output.md` § Where the rule is carried): the other five are read at the head of a
+context and then compete with everything newer, which is why the rule was written three times and
+still reached the user in the register it forbids.
 
 **The two edit hooks are `PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse`
 exit 2 cannot undo an edit that already happened, so each is **detection, not prevention** —
@@ -229,6 +238,67 @@ a picker rendered from no trustworthy pool is the thing being prevented.
 **Fixtures:** `budgetguard-handbuilt`, `budgetguard-verbatim`, `budgetguard-unrelated`,
 `budgetguard-badstdin`, `budgetguard-effort-handbuilt`, `budgetguard-effort-verbatim`,
 `sa-hook-budget-guard`.
+
+## The speak guard
+
+**What it reads.** `last_assistant_message` — the reply text, finished, exactly as the user is about
+to see it. `Stop` hands it over directly, so nothing parses a transcript to reconstruct it.
+
+**Three checks, one of which blocks.**
+
+| Check | What fires | Verdict |
+|---|---|---|
+| Opener | The reply's first sentence is an agreement or apology phrase — the list is in the script, because it is a property of position rather than of vocabulary (`references/plain-output.md` § Openers) | `decision: block` |
+| Unowned term | A banned term from `plain-output.md` that **the user has not typed in this session** | `additionalContext` |
+| Buried ask | 12+ lines of prose whose only `?` sits in the last quarter | `additionalContext` |
+
+**Why the vocabulary check is scoped to the user's own words, and not to a flat list.** The list
+`wf-plain-guard` applies to a QUESTION cannot be applied to a REPORT unchanged: in a repository whose
+subject is handbooks and tiers, a flat list fires on nearly every reply, and a guard that fires on
+everything is a guard somebody turns off. Scoping it to the transcript makes it execute the rule the
+reference actually states — *say it in words the reader already owns* — and it is near-zero
+false-positive by construction: the user said the word, so the word is theirs. An unreadable
+transcript **disables** the check rather than firing it, because every term looks unfamiliar when
+there is nothing to compare against.
+
+**Why an opener blocks and nothing else does.** Blocking costs the user a round trip. An opening
+agreement is worth it: it is the observable surface of caving under pushback, it is the first thing
+the reader sees, and the fix is deleting one sentence. A buried question is not worth it — the reply
+is already correct, only badly ordered, and the note reaches the next turn. `plain-output.md`
+§ Openers carries the rule; this carries the mechanism.
+
+**Loop safety.** `stop_hook_active` true means this guard blocked already this turn, and it passes
+through unconditionally. Combined with the host's eight-continuation cap, a guard and a model that
+disagree end the turn rather than spinning. And a verdict travels as JSON on stdout, never as exit 2:
+on `Stop`, a non-zero exit is indistinguishable from a crash.
+
+**What it does not check.** Register, length, and whether the prose is overbuilt. Those are the coffee
+test (`plain-output.md` § The test), which is a human judgment. This is the mechanical half only.
+
+**Fixtures:** `speakguard-opener`, `speakguard-clean`, `speakguard-unowned`,
+`speakguard-owned-term`, `speakguard-buried-ask`, `speakguard-active`, `speakguard-badstdin`.
+
+## The output style
+
+**Not a hook, wired by the same command.** `/workforce hooks --execute` also selects the shipped
+`Plain Speak` output style, by writing `outputStyle` into the resolved project settings file
+(`workforce/bin/wf-settings-apply --output-style --execute`). The style FILE is placed by the
+installer — `manifest.txt`, flag `style` — into `<config-root>/output-styles/` or
+`.claude/output-styles/`, which are the only two places a host looks for one.
+
+**Why it belongs to this command.** An output style is added to the system prompt, so it is the one
+carrier of the plain-output rule that is present at full strength on every turn regardless of how
+full the context is. That is the same property `hooks` exists to deliver, reached by a different
+mechanism, and splitting it into its own command would give the user two gestures for one guarantee.
+
+**What it does not reach.** The main conversation only. A subagent runs its own system prompt, so no
+employee is governed by this; a fork is the exception, because it inherits the parent's. Employee
+reports are covered by the handbook clause and by `wf-speak-guard`. **Describing the style as fixing
+employee output is an overclaim and `verify` reports it as one.**
+
+**When it takes effect.** The next session, or after `/clear` — the system prompt is read once at
+session start. The report says so, because a user who selects a style and sees no change in the
+current turn will reasonably conclude it did not work.
 
 ## The loop guard
 

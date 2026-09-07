@@ -12,6 +12,10 @@
 #              `/workforce hooks --execute`; `verify` reports whether it is wired
 #   exec       fetch unconditionally; chmod +x. Invoked by a procedure for its
 #              exit code; registered to nothing
+#   style      fetch unconditionally into <config-root>/output-styles/ (personal) or
+#              .claude/output-styles/ (project) — NOT the skill directory. An output
+#              style is only found there. Selected by `outputStyle` in a settings
+#              file, which `/workforce hooks --execute` writes
 #
 # NOTE on `hook` vs `exec`. Mechanically identical — both chmod +x — and two words
 # because the DISTINCTION IS THE THING BEING TRACKED, not the file mode. A `hook`
@@ -78,7 +82,17 @@ hook workforce/bin/wf-unique-persona
 hook workforce/bin/wf-standing-request
 hook workforce/bin/wf-budget-guard
 hook workforce/bin/wf-plain-guard
+hook workforce/bin/wf-speak-guard
 hook workforce/bin/wf-loop-guard
+
+# ── Output styles ─────────────────────────────────────────────────────────────
+#
+# The plain-speak rule, carried where it cannot decay. Output styles modify the
+# system prompt, so the rule is present at full strength on turn 200 exactly as
+# on turn 2 — unlike CLAUDE.md, a constitution item, or a dispatch rung, each of
+# which is read once at the head of a context and then competes with everything
+# newer. references/plain-output.md § Where the rule is carried.
+style workforce/output-styles/plain-speak.md
 
 # ── References ────────────────────────────────────────────────────────────────
 workforce/references/principles.md

@@ -3480,6 +3480,113 @@
       "role frontend-design \u2014 2 skill(s) read, 0 quarantined, 0 unresolved source(s), 2 matched"
     ]
   },
+  "speakguard-active": {
+    "_why": "LOOP SAFETY, and it is the case that keeps a disagreement from becoming a spin. stop_hook_active true means this guard blocked already this turn, so it passes an opener through unconditionally rather than blocking the same reply twice. Combined with the host's eight-continuation cap, a guard and a model that disagree end the turn in the user's favour.",
+    "exit": 0,
+    "not": [
+      "decision",
+      "additionalContext"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"stop_hook_active\": true, \"last_assistant_message\": \"You're absolutely right, I was wrong about that.\"}",
+    "want": []
+  },
+  "speakguard-badstdin": {
+    "_why": "FAILS OPEN, LOUDLY \u2014 the same contract wf-plain-guard and wf-budget-guard carry. Stdin that is not JSON says so on stderr and exits 0. A guard that wedged a turn over its own bookkeeping would be worse than the register it exists to fix, and one that is not guarding must not look identical to one that is.",
+    "exit": 0,
+    "not": [
+      "decision",
+      "additionalContext"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "not json at all",
+    "want": [
+      "could not verify",
+      "not a JSON payload"
+    ]
+  },
+  "speakguard-buried-ask": {
+    "_why": "The shape the user named: twenty lines of narration with the one real ask on the last line \u2014 'Say go and I'll start it.' The reader had to read everything to find out what was wanted from them. NOTED, not blocked: the reply is already correct and only badly ordered, so the note reaches the next turn instead of costing a round trip. No transcript, which disables the vocabulary check and leaves this case measuring one thing.",
+    "env": {
+      "WF_SPEAK_GUARD_REF": "plain-output.md"
+    },
+    "exit": 0,
+    "not": [
+      "decision"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Line 1 of what shipped.\\nLine 2 of what shipped.\\nLine 3 of what shipped.\\nLine 4 of what shipped.\\nLine 5 of what shipped.\\nLine 6 of what shipped.\\nLine 7 of what shipped.\\nLine 8 of what shipped.\\nLine 9 of what shipped.\\nLine 10 of what shipped.\\nLine 11 of what shipped.\\nLine 12 of what shipped.\\nLine 13 of what shipped.\\nLine 14 of what shipped.\\nLine 15 of what shipped.\\nSay go and I'll start it?\"}",
+    "want": [
+      "additionalContext",
+      "last quarter",
+      "Put the ask first"
+    ]
+  },
+  "speakguard-clean": {
+    "_why": "THE POSITIVE HALF: a reply that leads with what happened, in words the user owns, with no question buried in it, costs nothing. Same frozen list and same transcript as the unowned case, so the only difference between silent and noted is the wording \u2014 which is the whole claim. No stdout at all, because a guard that fires on every reply is a guard somebody turns off.",
+    "env": {
+      "WF_SPEAK_GUARD_REF": "plain-output.md"
+    },
+    "exit": 0,
+    "not": [
+      "decision",
+      "additionalContext",
+      "could not verify"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"Four commits landed and the tests pass. The handbook renders.\"}",
+    "want": []
+  },
+  "speakguard-opener": {
+    "_why": "THE ONE BLOCK, and it is the reply that raised the rule. Asked to stop asking about small things, the run answered \"You're right. Those were small and I should have just decided them.\" \u2014 agreement first, correction reframed as an addition, which is the sycophantic-opener pattern documented for Opus at launch and the observable surface of caving under pushback. Nothing checked a REPORT before this: wf-plain-guard reads a question and only its words. The verdict travels as JSON on stdout with exit 0, because on Stop a non-zero exit is indistinguishable from a crash.",
+    "env": {
+      "WF_SPEAK_GUARD_REF": "plain-output.md"
+    },
+    "exit": 0,
+    "not": [
+      "additionalContext",
+      "passing through"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"last_assistant_message\": \"You're right. Those were small and I should have just decided them.\\n\\nI'm taking both.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "you're right",
+      "Agreement carries no information"
+    ]
+  },
+  "speakguard-owned-term": {
+    "_why": "THE OTHER HALF OF THE SAME CLAIM, and the reason a flat list cannot be applied to a report. 'handbook' is on the banned list and the user typed it twice in this transcript, so it is theirs and the reply may use it. Without this case the guard would be indistinguishable from wf-plain-guard's flat list, which in a repository whose subject IS handbooks would fire on nearly every reply.",
+    "env": {
+      "WF_SPEAK_GUARD_REF": "plain-output.md"
+    },
+    "exit": 0,
+    "not": [
+      "additionalContext",
+      "decision"
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"The handbook is written and it renders.\"}",
+    "want": []
+  },
+  "speakguard-unowned": {
+    "_why": "The vocabulary check, scoped to the transcript. 'canary' appears in this session only inside a system-reminder and a tool result \u2014 neither is the user speaking \u2014 so it is NOT the user's word and the reply is noted for using it. This is the rule 'say it in words the reader already owns', stated so it can be executed. It NOTES rather than blocks: the reply is correct, only over the reader's head, and a round trip costs more than the note.",
+    "env": {
+      "WF_SPEAK_GUARD_REF": "plain-output.md"
+    },
+    "exit": 0,
+    "not": [
+      "decision",
+      "\"handbook\""
+    ],
+    "script": "wf-speak-guard",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"The canary returned PASS, so the tier ceiling is measured for this host.\"}",
+    "want": [
+      "additionalContext",
+      "canary",
+      "words they already own"
+    ]
+  },
   "stamp-absent-line": {
     "_why": "THE CASE A PLACEHOLDER-ONLY PRODUCER WOULD MISS. `engineering-lead.md` on playwright-mcp carried no `contract-stamp` line at all \u2014 the template ships one and the authoring path does not reliably emit it, so 1 handbook in 6 had nothing to replace. A producer that only substituted the placeholder would have reported a clean run over it.",
     "exit": 0,

@@ -1,5 +1,5 @@
-<!-- text-additions-version: 6 -->
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- text-additions-version: 7 -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- origin: workforce | modifiable: true -->
 # Text-tells additions — authored by workforce
 
@@ -113,10 +113,20 @@ prose is already off-key.
 
 **Scope — where a conversational voice is the target.** Sentence and passage alike, this applies at
 full strength to prose whose intended register is conversational: articles, posts, newsletters,
-marketing and body copy. It does **not** fire on formal technical or reference prose, where a formal
-register is correct — the same corpus the em-dash rule exempts (`workforce/references/**`,
-`.claude/agents/**`, `.claude/workforce/**`, handbooks, `DEVELOPMENT.md`, and run deliverables).
-That scope is what keeps the test sharp, not a softening of it. § Ineffective indicators bars
+marketing and body copy — **and to anything a human reads in the terminal**: a report, a finding, an
+execution summary, a question. It does **not** fire on formal technical or reference prose, where a
+formal register is correct — the same corpus the em-dash rule exempts (`workforce/references/**`,
+`.claude/agents/**`, `.claude/workforce/**`, handbooks, and `DEVELOPMENT.md`).
+That scope is what keeps the test sharp, not a softening of it.
+
+*Amended 2026-09-07. This exemption used to end "and run deliverables", which excused **the report
+handed to the user** — the one surface where a formal register has no defence, because the reader is
+a person rather than an agent reading cold. The exemption's own logic never covered it: the corpus it
+names is read by agents, and it is exempt for that reason. `plain-output.md` § The test cites this
+row as the rule for live output, so the exemption was also cancelling an inheritance that had already
+been written. Files under `workforce/references/**` stay exempt and this row does not reach them;
+what an agent AUTHORS into a file and what it SAYS to a person are different corpora with different
+correct registers.* § Ineffective indicators bars
 treating formality as an AI tell *in general*, and that holds for formal genres; but in
 conversational-target content a non-conversational register is not "formality in general," it is the
 piece missing its own register, which is exactly the signal. The owning skill's content-type

@@ -113,7 +113,45 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-05
+## Open, as of 2026-09-07
+
+**Landed 2026-09-07 (v1.20.0) — the plain-output rule had three carriers and all three decay.**
+Trigger: the user, two days after the 2026-09-05 plain-output batch, saying *"We've dealt with it in
+the past, but it appears nothing came of it. So the implemented solution obviously doesn't work."*
+They were right, and the reason is measurable.
+
+- **The 2026-09-05 fix shipped exactly one enforced check, and it was pointed at the wrong surface.**
+  `wf-plain-guard` reads an `AskUserQuestion` and only its words. The register the user objects to
+  lives in **reports** — a 20-line execution summary with its one real ask on the last line — and
+  nothing read a report at all. The rule's three carriers (operating-principles item 11, `/org` rung
+  13, SKILL.md principle 8b) are each read at the **head** of a context, so every one of them was
+  faintest exactly when a long run was writing its longest report. That is the same decay the
+  2026-08-05 CLAUDE.md directive names, arriving at a rule instead of at a file.
+- **`text-eval` had the test and excluded the corpus.** § Conversational register — the coffee test,
+  the one written check that fires on formal register without waiting for a cluster — exempted
+  "run deliverables", which is the report handed to the user. `plain-output.md` § The test cited that
+  row as its own authority, so the inheritance had been cancelled at the source. The exemption now
+  names what it was always for (prose an AGENT reads: references, handbooks, `DEVELOPMENT.md`) and
+  explicitly includes anything a human reads in the terminal.
+- **Two carriers that do not decay.** The `Plain Speak` **output style** is added to the system
+  prompt, so it is present at full strength on turn 200 exactly as on turn 2, and the host re-reminds
+  the model of a non-Default style during the conversation. `wf-speak-guard` is a **`Stop` hook**: it
+  receives `last_assistant_message` — the finished reply — once per turn, forever. Neither competes
+  with newer context. **The style reaches the main conversation only**; a subagent runs its own system
+  prompt, so employee reports stay with the handbook clause and the guard.
+- **The second half of the directive is new: caving under pushback.** The reply the user quoted opens
+  *"You're right."* Anthropic's own measurement puts sycophantic agreement at **18% once a user has
+  pushed back against 9% when they have not**, so the moment a reply most feels like agreement is the
+  moment it is least likely to be earned. An opening agreement is the one thing `wf-speak-guard`
+  BLOCKS rather than notes — it is the first thing the reader sees and the fix is deleting one
+  sentence. `plain-output.md` § Openers, and the clause now rides operating-principles and `/org`.
+- **Why the report's word check is scoped to the transcript.** The flat banned list cannot be applied
+  to a report unchanged: in a repository whose subject IS handbooks and tiers it would fire on nearly
+  every reply, and a guard that fires on everything is one somebody turns off. It fires only on a term
+  **the user has not typed this session**, which executes the rule the reference already stated — say
+  it in words the reader already owns — and is near-zero false-positive by construction. An unreadable
+  transcript disables the check rather than firing it.
+
 
 **Landed 2026-09-05 (from a `/workforce verify` on `odyssey-alive`) — three requirements that shipped
 with no producer (v1.18.0).** Trigger: a routine health check on a real org, then the owner asking for

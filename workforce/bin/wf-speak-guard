@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+"""Check the reply the user is about to read, at the moment it is finished.
+
+WHY THIS EXISTS. `wf-plain-guard` checks a QUESTION, and only its words. Nothing
+checked a REPORT, which is where the register actually reaches the user. MEASURED
+2026-09-07: a run closed with twenty lines of stacked-clause narration whose one real
+ask sat on the last line, and the user answered "You're not making any sense at all."
+The reply to THAT opened with "You're right." — the sycophantic-opener pattern
+documented for Opus at launch: agreement signal first, correction reframed as an
+addition.
+
+WHY A `Stop` HOOK AND NOT MORE PROSE. The rule already existed in three places —
+operating-principles item 11, `/org` rung 13, and SKILL.md principle 8b. All three are
+loaded at the head of a context and compete with everything newer as the session grows.
+That is the same decay the 2026-08-05 CLAUDE.md directive names. A hook does not decay:
+`Stop` fires once per turn, at full strength, on turn 2 and on turn 200 alike, and it
+receives `last_assistant_message` — the finished text — so it reads what the user is
+about to read rather than a description of it.
+
+WHAT IT CHECKS. Three things, all mechanical, all about the SHAPE of the reply:
+
+  1. A sycophantic or retracting OPENER. Whole-phrase, anchored to the first sentence.
+     This is the one hard block. "You're absolutely right" carries no information; it
+     costs the user a line and it is the observable surface of flip-flopping under
+     pushback, which is measurably likelier exactly when the user has pushed back.
+  2. A word the USER HAS NEVER USED. The banned list in `references/plain-output.md`,
+     scoped by the session transcript: a term is a hit only when the user has not typed
+     it themselves. This is the rule "words the reader already owns", stated so that it
+     can be executed. It is why the list can be applied to reports at all — a flat list
+     would fire on every reply in a repository whose subject IS handbooks and tiers, and
+     a guard that fires on everything is a guard that gets turned off.
+  3. A BURIED ASK — a long reply whose only question sits in the last quarter.
+
+WHAT IT DOES NOT CHECK. Register, length, and whether the prose is overbuilt. Those are
+the coffee test (`plain-output.md` § The test), a human judgment. A checker scoring
+prose quality would fire on everything, which is failure mode 2 above.
+
+BLOCK VS NUDGE. An opener blocks: `decision: block` returns the reply to the model with
+one instruction, and the user never sees the draft. Everything else returns
+`additionalContext` — the turn ends, the user reads the reply, and the model carries the
+note into the next one. Blocking a whole turn over a buried question would cost more
+than the question did.
+
+LOOP SAFETY. `stop_hook_active` true means this hook already blocked once this turn;
+it passes through unconditionally. Combined with the host's 8-continuation cap, a
+disagreement between guard and model ends in the user's favour rather than in a spin.
+
+NO TERM IS WRITTEN HERE. The banned list lives in `references/plain-output.md` and is
+parsed from it, exactly as `wf-plain-guard` does, so adding a word stays a one-line edit
+to the reference (SKILL.md Principle 9a). The OPENERS list is written here, because it
+is a property of the reply's first sentence rather than of the vocabulary, and
+`plain-output.md` § Openers names it and points here.
+
+EXIT CODES: 0 always. A verdict travels as JSON on stdout, never as an exit code: a
+guard bug must never wedge a session, and exit 2 on `Stop` is indistinguishable from a
+crash.
+"""
+
+import json
+import os
+import re
+import sys
+
+_REF = os.path.join("references", "plain-output.md")
+
+_LIST_RE = re.compile(
+    r"\*\*Banned from question text and from every option label\*\*(.*?)(?:\n\n)", re.S)
+
+# Openers that carry no information. Anchored to the reply's opening — the same phrase
+# mid-paragraph is usually a real concession with a reason attached, and this guard has
+# no way to tell a reasoned one from a reflex except by position.
+OPENERS = (
+    "you're absolutely right",
+    "you are absolutely right",
+    "you're right",
+    "you are right",
+    "you're correct",
+    "you are correct",
+    "good catch",
+    "great catch",
+    "great question",
+    "excellent question",
+    "that's a great point",
+    "that's a fair point",
+    "you make a good point",
+    "you raise a good point",
+    "i apologize",
+    "i apologise",
+    "my apologies",
+    "i was wrong",
+    "i was completely wrong",
+    "you're right to",
+    "now that you mention it",
+    "good point",
+)
+
+# How much of the reply counts as "the opener". One sentence, generously measured.
+_OPENER_WINDOW = 120
+
+_SYSTEM_BLOCK = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+_FENCE = re.compile(r"```.*?```", re.S)
+
+
+def _note(msg):
+    sys.stderr.write("wf-speak-guard: " + msg + "\n")
+
+
+def _read_payload():
+    try:
+        return json.loads(sys.stdin.read() or "{}")
+    except (ValueError, OSError):
+        return None
+
+
+def _ref_path(root):
+    """The shipped reference, resolved beside this script first — see wf-plain-guard."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for cand in (os.path.join(os.path.dirname(here), _REF),
+                 os.path.join(root, _REF)):
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def parse_terms(text):
+    """The banned terms, read from the reference's own list paragraph.
+
+    [] means could-not-parse, which passes through. Refusing a reply because a
+    reference moved would wedge a session over the guard's own bookkeeping."""
+    m = _LIST_RE.search(text)
+    if not m:
+        return []
+    terms = []
+    for tok in re.findall(r"`([^`]+)`", m.group(1)):
+        tok = tok.strip().lower()
+        if tok and re.match(r"^[a-z][a-z -]*$", tok):
+            terms.append(tok)
+    return sorted(set(terms), key=len, reverse=True)
+
+
+def user_words(transcript_path):
+    """Everything the user has typed this session, lowercased, as one string.
+
+    Skips meta injections and tool results: neither is the user speaking, and counting
+    a system-reminder's vocabulary as the user's own would license every term in this
+    distribution the moment a hook mentioned one.
+
+    Returns None when the transcript cannot be read, which DISABLES the vocabulary
+    check rather than firing it — an unreadable transcript means every term looks
+    unfamiliar, and blocking on that would be the guard inventing a finding."""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return None
+    out = []
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if d.get("type") != "user" or d.get("isMeta") or d.get("toolUseResult"):
+                    continue
+                content = (d.get("message") or {}).get("content")
+                if isinstance(content, str):
+                    out.append(content)
+                elif isinstance(content, list):
+                    for blk in content:
+                        if isinstance(blk, dict) and blk.get("type") == "text":
+                            out.append(str(blk.get("text") or ""))
+    except OSError:
+        return None
+    return _SYSTEM_BLOCK.sub(" ", "\n".join(out)).lower()
+
+
+def opener_hit(message):
+    """The opening phrase, when it is one of OPENERS. Whole-phrase, position-anchored."""
+    head = message.lstrip().lower()[:_OPENER_WINDOW]
+    head = head.lstrip("*_#- \t")
+    for phrase in OPENERS:
+        if re.match(r"^\s*" + re.escape(phrase) + r"(?![\w'])", head):
+            return phrase
+    return None
+
+
+def unowned_terms(message, terms, owned):
+    """Banned terms in the reply that the user has never typed.
+
+    `owned is None` means the transcript was unreadable — see user_words."""
+    if owned is None or not terms:
+        return []
+    prose = _FENCE.sub(" ", message).lower()
+    found = []
+    for term in terms:
+        pat = r"(?<![\w-])" + re.escape(term) + r"(?![\w-])"
+        if re.search(pat, prose) and not re.search(pat, owned):
+            found.append(term)
+    return found
+
+
+def buried_ask(message):
+    """True when a long reply hides its only question at the bottom.
+
+    The threshold is lines of prose, not characters: a reply that fits on a screen has
+    no room to bury anything, and this fires on the shape the user named — twenty lines
+    of narration with "say go and I'll start it" on the last one."""
+    prose = _FENCE.sub("", message)
+    lines = [ln for ln in prose.splitlines() if ln.strip()]
+    if len(lines) < 12:
+        return False
+    marks = [i for i, ln in enumerate(lines) if "?" in ln]
+    if not marks:
+        return False
+    return min(marks) >= int(len(lines) * 0.75)
+
+
+def main():
+    payload = _read_payload()
+    if payload is None:
+        _note("could not verify — stdin is not a JSON payload; passing through")
+        return 0
+
+    # Already blocked once this turn. Never block again: the model and the guard
+    # disagreeing is not worth a spin the user has to interrupt.
+    if payload.get("stop_hook_active"):
+        return 0
+
+    message = payload.get("last_assistant_message") or ""
+    if not message.strip():
+        return 0
+
+    event = payload.get("hook_event_name") or "Stop"
+
+    phrase = opener_hit(message)
+    if phrase:
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                "Your reply opens with \"%s\". Delete that sentence and start with what "
+                "is true or what you did. Agreement carries no information, and opening "
+                "with it reads as folding rather than as thinking. If you changed your "
+                "mind, say what changed it in one sentence, then move on — no apology, "
+                "no tally of the mistake." % phrase),
+        }))
+        return 0
+
+    root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    ref = os.environ.get("WF_SPEAK_GUARD_REF") or _ref_path(root)
+    terms = []
+    if ref and os.path.exists(ref):
+        try:
+            with open(ref, "r", encoding="utf-8") as fh:
+                terms = parse_terms(fh.read())
+        except OSError as exc:
+            _note("could not read %s — %s; vocabulary check skipped" % (ref, exc))
+
+    owned = user_words(payload.get("transcript_path"))
+    unowned = unowned_terms(message, terms, owned)
+    buried = buried_ask(message)
+
+    notes = []
+    if unowned:
+        notes.append(
+            "The user has not used %s in this session, and this reply did. Say it in "
+            "words they already own, or name the thing instead of the machinery."
+            % " / ".join('"%s"' % t for t in unowned))
+    if buried:
+        notes.append(
+            "The only question in this reply is in its last quarter. The reader had to "
+            "get through everything else to find what you needed from them. Put the ask "
+            "first next time, or decide it yourself and say what you decided.")
+    if not notes:
+        return 0
+
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": event,
+            "additionalContext": " ".join(notes),
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # a guard bug must never wedge a session
+        _note("could not verify — %s: %s; passing through" % (type(exc).__name__, exc))
+        sys.exit(0)

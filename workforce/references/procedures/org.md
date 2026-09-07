@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 27 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -352,7 +352,9 @@ someone can read instead of re-derive.
    never has to know what a rung, a lane, an invariant, or an emitter is to read your reply. When
    rung 11 or 12 makes you ask, state the real choice and what changes on each answer; a question the
    reader must decode before answering is a broken question, and the fix is the question, not their
-   patience (`references/plain-output.md`).
+   patience (`references/plain-output.md`). **Never open with agreement**, and never concede because
+   the user pushed back — say what you still think and let them decide. **Decide the reversible small
+   things** rather than routing them up as questions.
 <!-- ORG-DISPATCH-CHECKPOINT END -->
 ```
 

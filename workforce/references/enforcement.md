@@ -1,6 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
@@ -17,6 +17,8 @@ The single most important table in this project:
 | Total spawns stay under the session cap | — | **CANNOT. Advisory only.** |
 | Two employees cannot share a name | Phase A lint + `verify` | **DETECTS** at author time and at review; the platform itself is silent |
 | A question a human reads uses no term from the banned list — the words this distribution writes for agents stop at the user | `wf-plain-guard` (`PreToolUse` on `AskUserQuestion`) | **PREVENTS the call once wired** — a `PreToolUse` exit 2 blocks the call. **Nothing when unwired.** Covers the mechanical half only: a fixed word list. Register and length are the coffee test, which is a human judgment and is ADVISORY, never checked. Measured need 2026-09-05: the rule existed in two places and both were scoped too narrow to reach a live question |
+| A reply a human reads does not open with agreement, does not use a word the user has never used, and does not bury its ask at the bottom | `wf-speak-guard` (`Stop`) | **PREVENTS an opener once wired** — `decision: block` returns the reply to the model and the user never sees the draft. **DETECTS the other two**: `additionalContext` reaches the next turn, the user reads the reply as written. **Nothing when unwired.** Register, length, and overbuilt prose stay the coffee test and are ADVISORY, never checked. This is the only carrier of the rule that does not decay with context — every other one is read at the head of a context (`references/plain-output.md` § Where the rule is carried) |
+| The plain-output rule is present at full strength on every turn, however full the context | the `Plain Speak` output style, selected by `outputStyle` | **STRUCTURAL for the main conversation once selected** — an output style is added to the system prompt, so it does not compete with newer context the way CLAUDE.md, a constitution item, or a dispatch rung does. **Reaches NO employee**: a subagent runs its own system prompt (a fork inherits the parent's). Claiming otherwise is an overclaim |
 | A budget picker offers the emitter's option set, never one rebuilt from prose or a stale project config | `wf-budget-guard` (`PreToolUse` on `AskUserQuestion`) | **PREVENTS once wired** — a `PreToolUse` exit 2 blocks the call (DOCUMENTED in the hooks reference, not yet canaried on this host). **Nothing when unwired**; `verify` § Hook wiring reports which. Measured need 2026-09-02: three prose restatements had not held |
 
 **Anything in a "cannot" row must never be described as enforced, guaranteed, prevented, or

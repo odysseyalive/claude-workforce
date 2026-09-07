@@ -73,6 +73,11 @@ SHIPPED_HOOKS = {
     "wf-unique-persona": ("PostToolUse", "Edit|Write"),
     "wf-budget-guard": ("PreToolUse", "AskUserQuestion"),
     "wf-plain-guard": ("PreToolUse", "AskUserQuestion"),
+    # `Stop` has no tool to match against, same as UserPromptSubmit. It fires once per
+    # turn and receives the finished reply, which is why the report half of the
+    # plain-output rule is enforceable at all: everything else that carries the rule is
+    # read at the head of a context (hooks.md § What is wired).
+    "wf-speak-guard": ("Stop", None),
     "wf-loop-guard": ("PostToolUse", None),
 }
 
@@ -584,6 +589,89 @@ def do_automode(execute):
     return 0
 
 
+# The shipped output style, and the settings key that selects it. `outputStyle` is a
+# plain string field, not a hook entry, so it gets its own writer rather than a fifth
+# branch inside do_wire_hook — and the STYLE FILE itself is placed by the installer
+# (`manifest.txt`, flag `style`), never by this script: writing a style into a scope
+# the installer did not target would leave a settings file naming a style that is not
+# on disk, which the host reports as no style at all.
+OUTPUT_STYLE = "Plain Speak"
+
+
+def do_output_style(root, execute):
+    """Select the shipped plain-speak output style in the project settings file.
+
+    WHY A SETTING AND NOT A REFERENCE. An output style is added to the SYSTEM PROMPT
+    (Claude Code docs, Output styles § How output styles work), so it is present at
+    full strength on every turn regardless of how full the context is, and the host
+    re-reminds the model of a non-Default style during the conversation. Every other
+    carrier of this rule — a constitution item, a dispatch rung, CLAUDE.md — is read
+    once at the head of a context and then competes with everything newer.
+
+    WHAT IT DOES NOT REACH. Output styles apply to the MAIN CONVERSATION ONLY: a
+    subagent runs its own system prompt. Employee reports are covered by the handbook
+    clause and by `wf-speak-guard`, never by this. Saying otherwise would be the
+    overclaim this project fails a run over."""
+    spath = resolve_project_settings(root)
+    print(f"STYLE  {spath}          <- resolved, not assumed")
+
+    # Both scopes, precedence order, exactly as references/scopes.md defines for the
+    # skill itself: a `--user` install puts the style under the config root, a project
+    # install puts it in the tree. Checking only one would print a "missing" note about
+    # a style that is installed, which teaches the reader to ignore the note.
+    config_root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+    candidates = (os.path.join(config_root, "output-styles", "plain-speak.md"),
+                  os.path.join(root, ".claude", "output-styles", "plain-speak.md"))
+    style_file = next((c for c in candidates if os.path.exists(c)), candidates[1])
+    if not os.path.exists(style_file):
+        print(f"  note: neither {candidates[0]} nor {candidates[1]} exists. "
+              f"Selecting the style still writes the "
+              f"key, but the host silently falls back to Default until the installer "
+              f"places the file. Re-run the installer for this scope.")
+    else:
+        print(f"  style file: {style_file}")
+
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        data = {}
+
+    current = data.get("outputStyle")
+    if current == OUTPUT_STYLE:
+        print(f"  . outputStyle already {OUTPUT_STYLE!r} — NOOP")
+        return 0
+    if current:
+        print(f"  note: outputStyle is currently {current!r}. It will be replaced; the "
+              f"previous value is recorded so `disband` can restore it.")
+
+    print(f"  {'+' if execute else '~'} outputStyle = {OUTPUT_STYLE!r}  "
+          f"{'written' if execute else 'would write'}")
+    if not execute:
+        print("  apply with: --execute   (run it yourself via `!` if the classifier "
+              "refused the agent's write)")
+        return 0
+
+    owned_path, owned = load_owned(root)
+    owned["output_style_previous"] = current
+    owned["output_style_set"] = OUTPUT_STYLE
+    dump(owned_path, owned)
+
+    data["outputStyle"] = OUTPUT_STYLE
+    dump(spath, data)
+
+    back, err = load(spath)
+    if err or not isinstance(back, dict) or back.get("outputStyle") != OUTPUT_STYLE:
+        print(f"wf-settings-apply: re-read of {spath} does not show the style; the "
+              f"write did not land.", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: outputStyle = {back['outputStyle']!r}")
+    print("  takes effect on the next session or after /clear — the system prompt is "
+          "read once at session start.")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
     ap.add_argument("--root", default="")
@@ -592,12 +680,15 @@ def main(argv=None):
     ap.add_argument("--wire-hook", metavar="NAME", help="a shipped workforce hook name")
     ap.add_argument("--automode", action="store_true",
                     help="write autoMode entries into ~/.claude/settings.json (user scope)")
+    ap.add_argument("--output-style", action="store_true",
+                    help="select the shipped plain-speak output style for this project")
     args = ap.parse_args(argv)
 
-    modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode)]
+    modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
+             bool(args.output_style)]
     if sum(modes) != 1:
-        print("wf-settings-apply: pick exactly one of --grants, --wire-hook, --automode.",
-              file=sys.stderr)
+        print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
+              "--automode, --output-style.", file=sys.stderr)
         return 2
 
     # --automode writes only the user file and needs no --root. Every other mode does.
@@ -618,6 +709,8 @@ def main(argv=None):
         return do_grants(root, args.grants, args.execute)
     if args.wire_hook:
         return do_wire_hook(root, args.wire_hook, args.execute)
+    if args.output_style:
+        return do_output_style(root, args.execute)
     return do_automode(args.execute)
 
 

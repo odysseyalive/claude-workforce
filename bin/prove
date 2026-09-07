@@ -113,6 +113,9 @@ DEV = "DEVELOPMENT.md"
 WCM = "workforce/bin/wf-claude-md"
 WBG = "workforce/bin/wf-budget-guard"
 WPG = "workforce/bin/wf-plain-guard"
+WSG = "workforce/bin/wf-speak-guard"
+STY = "workforce/output-styles/plain-speak.md"
+TTL = "workforce/references/evaluator-additions/text-tells.md"
 PLO = "workforce/references/plain-output.md"
 TMPL = "workforce/references/templates.md"
 WSA = "workforce/bin/wf-settings-apply"
@@ -474,6 +477,39 @@ CASES = [
      TMPL, "del", "Anything a human reads"),
     ("plain output: /org carries it on every routed ask, not just an audit's",
      ORGP, "del", "Whatever reaches the user is written the way you would say it"),
+    # ── the speak guard and the output style (2026-09-07): the report, not the question ──
+    ("speak guard: ships as a hook, in the default set, wired to Stop",
+     MAN, "del", "hook workforce/bin/wf-speak-guard\n"),
+    ("speak guard: ships as a hook, in the default set, wired to Stop",
+     WSA, "del", '    "wf-speak-guard": ("Stop", None),\n'),
+    ("speak guard: ships as a hook, in the default set, wired to Stop",
+     HKS, "del", "| `wf-speak-guard` | `Stop` | *(none)* |"),
+    ("speak guard: the vocabulary check is scoped to the user's own words",
+     WSG, "del", "def user_words"),
+    ("speak guard: an opener blocks and nothing else does",
+     WSG, "del", "def opener_hit"),
+    ("speak guard: an opener blocks and nothing else does",
+     WSG, "del", 'if payload.get("stop_hook_active"):'),
+    ("speak guard: hardcodes no banned term — it reads plain-output.md",
+     WSG, "append", '\n_LEAKED_TERM = "statics"\n'),
+    ("speak guard: named in the enforcement table at both its strengths",
+     ENF, "del", "DETECTS the other two"),
+    ("output style: ships to output-styles/, is selectable, and keeps the coding rules",
+     MAN, "del", "style workforce/output-styles/plain-speak.md"),
+    ("output style: ships to output-styles/, is selectable, and keeps the coding rules",
+     STY, "del", "keep-coding-instructions: true"),
+    ("output style: its reach is stated, and it is the main conversation only",
+     HKS, "del", "main conversation only"),
+    ("plain output: the two non-decaying carriers are named, and so is why the rest decay",
+     PLO, "del", "## Where the rule is carried"),
+    ("plain output: openers and decide-the-small-things have carriers, not just a rule",
+     TMPL, "del", "Never open a reply with agreement"),
+    ("plain output: openers and decide-the-small-things have carriers, not just a rule",
+     ORGP, "del", "Never open with agreement"),
+    ("plain output: openers and decide-the-small-things have carriers, not just a rule",
+     PRINP, "del", "no reply opens with agreement"),
+    ("text-eval: the conversational-register row no longer exempts what the user reads",
+     TTL, "del", "and to anything a human reads in the terminal"),
     ("org-config: the effort ladder is ordered most expensive first",
      CFG, "del", "`max`, `xhigh`, `high`, `medium`, `low`"),
     # ── per-employee lane classification reaches the Lead tier (2026-08-27):

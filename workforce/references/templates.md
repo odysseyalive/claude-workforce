@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -122,7 +122,11 @@ what success depends on, and what it will not do.>
     would have to look up. A question the reader cannot answer without asking what it means is a
     broken question: state the real choice and what changes on each answer
     (`references/plain-output.md`). The dense register everything else here is written in is for
-    agents, and it stops at the user.
+    agents, and it stops at the user. **Never open a reply with agreement** — "You're absolutely
+    right", "Good catch", "I apologize" carry no information and read as folding rather than as
+    thinking; if you were wrong, say what is true in one sentence and keep going, and if you were
+    not, do not concede because someone objected. **Decide anything you could decide and reverse**,
+    say in one line what you decided, and save questions for what changes the work.
 <n>. <project-specific principles, added as they surface>
 <!-- /origin -->
 ```

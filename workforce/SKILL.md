@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 73 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 75 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.18.0"
+version: "1.20.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -371,6 +371,35 @@ mechanical half, a fixed word list; register and length are the coffee test, whi
 and stays advisory, because a checker that scored prose quality would fire on everything and be turned
 off.*
 
+> **"I want all AI repsonses that require my attention to be in human speak, easy to understand,
+> with the legitimate issues laid out in a way that makes sense"**
+
+> **"I'm really tired of getting the impression that the model portrays itself like it doesn't know
+> what it's doing, or comes back saying oh, I was all wrong about that, now that you mentioned it...
+> This has to quit now."**
+
+*— Added 2026-09-07, source: user directive, stated during `/workforce dev` two days after the
+2026-09-05 directive above. **It is the same rule again, and that is the finding.** The user says so
+themselves — "We've dealt with it in the past, but it appears nothing came of it" — and the reason is
+measurable: the 2026-09-05 fix shipped one enforced check, a word list on `AskUserQuestion`, and the
+register they are complaining about lives in REPORTS, which had none. Its three prose carriers —
+operating-principles item 11, `/org` rung 13, SKILL.md principle 8b — are all read at the head of a
+context, so each was faintest exactly when a long run was writing its longest report. That is the same
+decay the 2026-08-05 CLAUDE.md directive names, arriving at a rule instead of at a file. **The
+`text-eval` catalog had the test and excluded the corpus**: § Conversational register exempted "run
+deliverables", which is the report handed to the user, and `plain-output.md` § The test cited that row
+as its own authority — so the one written test that would have caught this had been cancelled at its
+source. The second clause is new and is not a style complaint: it names **caving under pushback**. The
+reply the user quotes opens "You're right", and Anthropic's own measurement puts sycophantic agreement
+at 18% once a user has pushed back against 9% when they have not — so the moment a reply most feels
+like agreement is the moment it is least likely to be earned. Mechanics at
+`references/plain-output.md` § Openers, § Reports, and § Where the rule is carried; the two carriers
+that do not decay are the `Plain Speak` output style (added to the system prompt, present at full
+strength on every turn) and `wf-speak-guard` (a `Stop` hook reading the finished reply, once per
+turn). The operational reading is — **lead with the answer, decide the small reversible things
+instead of asking, never open with agreement, and never concede because someone objected: say what
+you still think and let them decide.***
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
@@ -566,7 +595,13 @@ never let a run decline one it staged (`references/invariants.md` row 20, `INV-S
    reader never has to know what a lane, a pool, an invariant, or an emitter is to read your reply. A
    question the reader must decode before they can answer it is a broken question: state the real
    choice and what changes on each answer. Full rule and the checked word list:
-   `references/plain-output.md`; the floor is `wf-plain-guard`.
+   `references/plain-output.md`; the floor is `wf-plain-guard` for a question and `wf-speak-guard`
+   for a report. **Never open with agreement, and never concede because the user pushed back** — say
+   what you still think and let them decide. **Decide anything reversible** instead of asking.
+   And note WHERE this rule is carried: the `Plain Speak` output style and the `Stop` guard are the
+   only two carriers that do not decay as a context fills. Every other one, this line included, is
+   read at the head of a context — which is why the rule was written three times and still reached
+   the user in the register it forbids.
    **This principle governs every `/workforce` invocation, `dev` included**, and that is why it lives
    here rather than only in the three carriers. Principle 8 above calibrates scaffolding to an AGENT
    reading cold; this one is its counterpart for the one reader who is not an agent. They do not
