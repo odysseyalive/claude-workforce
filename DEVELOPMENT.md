@@ -148,6 +148,30 @@ through an audit again."*
   a `style` entry beside each settings file, and `bin/check` compares it there rather than reporting a
   permanent phantom absence inside the skill tree.
 
+**Landed 2026-09-07 (v1.21.1) — the wiring shipped with a reversal record nobody could read.** Trigger:
+a peer session reviewing the user-scope write two hours after v1.21.0 landed. It flagged that
+`wf-settings-apply --scope user --wire-defaults --execute` changes `~/.claude/settings.json` and reaches
+every session on the machine, said the record in `.settings-owned.json` was the right shape, and left it
+alone. **The record was the right shape. Nothing could execute it.**
+
+- `--wire-defaults` wrote `hooks_added` and `output_style_previous`, and **no code read either**.
+  `hooks.md` § Unwiring described an agent reading the sidecar and hand-editing settings — which covers
+  the hooks and never mentioned the output style at all. So the one write that reaches every project on
+  a machine was the one with no runnable way back.
+- **A reversal you cannot run is not a reversal.** It is the same defect as a detector with no fix,
+  which this project has a directive against, and it slipped through because the artifact LOOKED like
+  the remedy. `--unwire-defaults` is the producer.
+- **Exactness is the contract.** A registration goes only when event, matcher AND command all match a
+  recorded row, so a hook the user wired themselves survives, and an entry holding other hooks beside
+  ours keeps them. Verified against a tree seeded with the user's own `Stop` hook and an `Explanatory`
+  style: both came back untouched.
+- **A style that was absent before is DELETED, never set to a default.** `output_style_previous` of
+  `None` means the key did not exist, and writing one back would be this project inventing a preference
+  the user never had. A style the user changed after we set it is reported and left alone.
+- **The general rule, in `enforcement.md`: a path in needs a path out, and the way out needs a producer
+  too.** A mechanism the installer and `audit` both wire is one the user never typed, so its reversal
+  cannot be a paragraph instructing an agent to hand-edit JSON.
+
 **Landed 2026-09-07 (v1.20.0) — the plain-output rule had three carriers and all three decay.**
 Trigger: the user, two days after the 2026-09-05 plain-output batch, saying *"We've dealt with it in
 the past, but it appears nothing came of it. So the implemented solution obviously doesn't work."*

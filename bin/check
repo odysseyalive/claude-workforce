@@ -8506,6 +8506,30 @@ check("path 2: audit heals a tree that installed before the mechanism existed",
       "THE ROW THAT GETS SKIPPED. A fix reaching only future installs leaves every org "
       "already in the world where it was, on a tree that does not look broken. Step "
       "6-G has claimed a sibling wiring step since it was written and there was none")
+check("a path in has a path out, and the reversal has a producer",
+      "def do_unwire_defaults" in _wsa and "--unwire-defaults" in _wsa
+      and "output_style_previous" in _wsa
+      and "--unwire-defaults --execute" in _hks
+      and "reversal record nobody can execute" in enf,
+      "`--wire-defaults` wrote a record of every registration and of the previous "
+      "output style, and NOTHING READ EITHER for two hours. hooks.md described an "
+      "agent hand-editing the sidecar, which covers the hooks and never mentioned the "
+      "style. A reversal you cannot run is not a reversal — same defect as a detector "
+      "with no fix, and a user-scope write reaching every session on the machine is "
+      "the worst place to have it")
+check("the reversal is exact: matcher and command, never event alone",
+      'if e.get("matcher") != matcher:' in _wsa
+      and 'h.get("command") == command' in _wsa
+      and "if inner:" in _wsa,
+      "removing a whole event key, or every entry under a matcher, would take a hook "
+      "the user wired beside ours. The contract is that unwiring touches exactly the "
+      "recorded rows — an entry holding other hooks keeps them")
+check("restoring a style that was absent DELETES the key",
+      "outputStyle removed (it was absent before)" in _wsa
+      and 'data.pop("outputStyle", None)' in _wsa,
+      "prev is None means the key did not exist before we wrote it. Writing a default "
+      "back would be this project inventing a preference the user never had, which is "
+      "the same move Absence is not a gap forbids everywhere else")
 check("path 3: verify reports both the hook state and the style state",
       "## Output style" in _vfy_h
       and "| `SELECTED, FILE ABSENT` |" in _vfy_h

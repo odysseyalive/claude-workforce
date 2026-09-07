@@ -1,6 +1,6 @@
 # hooks — wire, report, and unwire the shipped hooks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 19 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 High risk (edits the settings file); **display by default**, `--execute` writes.
 `/workforce hooks [--execute]`
 
@@ -205,6 +205,27 @@ names, and nothing else. An absent sidecar means workforce owns nothing here: re
 `disband` does the same as part of its wider sweep. **The hook file itself is not deleted by either** —
 removing a registration is reversible; deleting the file the user installed is not, and `restore` has
 nothing to restore from if the sweep took it.
+
+**The removal has a producer, and the output style is part of it:**
+
+```bash
+wf-settings-apply --root <tree> [--scope user] --unwire-defaults --execute
+```
+
+It reverses **exactly** what `--wire-defaults` wrote. A registration goes only when its event, matcher
+AND command all match a recorded row, so a hook the user wired themselves with the same command and a
+different matcher survives, and an entry holding other hooks beside ours keeps them. The style is
+restored to `output_style_previous` — and when that is `None`, meaning the key was absent before, the
+key is **deleted** rather than set to a default this project invented. A style the user changed after we
+set it is reported and left alone. A second run is a reported NOOP, never a second attempt.
+
+*Added 2026-09-07, and it closes a gap the wiring shipped with two hours earlier. `--wire-defaults`
+recorded every registration and set `output_style_previous`, **and nothing read either.** This section
+described an agent reading the sidecar and editing settings by hand, which covers the hooks and never
+mentioned the style at all — so a user-scope write that reaches every session on the machine had a
+reversal record in the right shape and no way to execute it. That is "a flag is not a fix" wearing a
+different hat: a reversal you cannot run is a reversal you do not have. Surfaced by a peer session
+reviewing the user-scope write, which called the record sound. The record was sound.*
 
 ---
 

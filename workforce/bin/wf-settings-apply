@@ -484,6 +484,133 @@ def do_wire_defaults(root, scope, execute):
     return rc
 
 
+def do_unwire_defaults(root, scope, execute):
+    """Reverse exactly what `--wire-defaults` wrote, and nothing else.
+
+    WHY THIS EXISTS. `--wire-defaults` recorded every registration in
+    `.settings-owned.json` and set `output_style_previous` -- and NOTHING READ EITHER.
+    `hooks.md` § Unwiring describes an agent reading the sidecar and editing the
+    settings by hand, which covers the hooks and never mentioned the style at all. So
+    the record was the right shape with no reader, which is this project's own
+    "a flag is not a fix" wearing a different hat: a reversal you cannot execute is a
+    reversal you do not have. Found 2026-09-07 when a peer session flagged the
+    user-scope write as reaching every session on the machine and called the record
+    sound. The record was sound. Nothing could run it.
+
+    EXACTNESS IS THE WHOLE CONTRACT. A registration is removed only when its event,
+    matcher AND command all match a recorded row, so a hook the user wired themselves
+    with the same command but a different matcher survives. The style is restored to
+    `output_style_previous` -- which may be None, and None means the key was absent
+    before and is DELETED rather than set to a default this script invented.
+
+    AN ABSENT SIDECAR MEANS WORKFORCE OWNS NOTHING HERE. Remove nothing and say so,
+    exactly as `hooks.md` § Unwiring requires."""
+    spath = settings_for_scope(root, scope)
+    owned_path, owned = load_owned(root, scope)
+    print(f"UNWIRE {spath}          <- resolved, not assumed")
+    print(f"  record: {owned_path}")
+
+    recorded = owned.get("hooks_added") or []
+    has_style = "output_style_set" in owned
+    if not recorded and not has_style:
+        print("  . the record names nothing — workforce owns no setting here. "
+              "Removing nothing.")
+        return 0
+
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        print(f"  . {spath} holds no object — nothing to remove.")
+        return 0
+
+    removed, absent = [], []
+    hooks = data.get("hooks")
+    for row in recorded:
+        if not isinstance(row, dict):
+            continue
+        event, matcher, command = row.get("event"), row.get("matcher"), row.get("command")
+        entries = hooks.get(event) if isinstance(hooks, dict) else None
+        if not isinstance(entries, list):
+            absent.append(f"{event}:{command}")
+            continue
+        keep, hit = [], False
+        for e in entries:
+            if not isinstance(e, dict):
+                keep.append(e)
+                continue
+            if e.get("matcher") != matcher:
+                keep.append(e)
+                continue
+            inner = [h for h in (e.get("hooks") or [])
+                     if not (isinstance(h, dict) and h.get("command") == command)]
+            if len(inner) == len(e.get("hooks") or []):
+                keep.append(e)
+                continue
+            hit = True
+            # An entry that held OTHER hooks keeps them; only an entry emptied by this
+            # removal goes. Dropping a whole entry to remove one command would take a
+            # registration the user added beside ours.
+            if inner:
+                e = dict(e, hooks=inner)
+                keep.append(e)
+        if hit:
+            removed.append(f"{event}:{os.path.basename(command.strip(chr(34)))}")
+            if execute:
+                if keep:
+                    hooks[event] = keep
+                else:
+                    hooks.pop(event, None)
+        else:
+            absent.append(f"{event}:{os.path.basename(command.strip(chr(34)))}")
+
+    prev = owned.get("output_style_previous")
+    style_now = data.get("outputStyle")
+    style_action = None
+    if has_style:
+        if style_now != owned.get("output_style_set"):
+            style_action = (f"outputStyle is {style_now!r}, not the {owned['output_style_set']!r} "
+                            f"this record set — leaving it alone")
+        elif prev is None:
+            style_action = "outputStyle removed (it was absent before)"
+            if execute:
+                data.pop("outputStyle", None)
+        else:
+            style_action = f"outputStyle restored to {prev!r}"
+            if execute:
+                data["outputStyle"] = prev
+
+    mark = "-" if execute else "~"
+    for r in removed:
+        print(f"  {mark} {r}  {'removed' if execute else 'would remove'}")
+    for a in absent:
+        print(f"  . {a}  already absent — NOOP")
+    if style_action:
+        print(f"  {mark} {style_action}")
+    if not execute:
+        print("  apply with: --execute   (run it yourself via `!` if the classifier "
+              "refused the agent's write)")
+        return 0
+
+    dump(spath, data)
+    # The record is cleared ONLY for what was actually reversed, so a second run is a
+    # reported NOOP rather than a second attempt at rows that are already gone.
+    owned["hooks_added"] = []
+    owned.pop("output_style_set", None)
+    owned.pop("output_style_previous", None)
+    dump(owned_path, owned)
+
+    back, err = load(spath)
+    if err or not isinstance(back, dict):
+        print(f"wf-settings-apply: re-read of {spath} failed; the write may not have "
+              f"landed.", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: outputStyle = {back.get('outputStyle')!r}, "
+          f"{len(recorded)} recorded registration(s) processed")
+    return 0
+
+
 def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if name not in SHIPPED_HOOKS:
         print(f"wf-settings-apply: {name} is not a shipped hook. "
@@ -739,15 +866,19 @@ def main(argv=None):
                     help="select the shipped plain-speak output style for this project")
     ap.add_argument("--wire-defaults", action="store_true",
                     help="wire every default hook AND select the output style, in one call")
+    ap.add_argument("--unwire-defaults", action="store_true",
+                    help="reverse exactly what --wire-defaults wrote, per the record")
     ap.add_argument("--scope", choices=("project", "user"), default="project",
                     help="which settings file to write (user scope needs no --root)")
     args = ap.parse_args(argv)
 
     modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
-             bool(args.output_style), bool(args.wire_defaults)]
+             bool(args.output_style), bool(args.wire_defaults),
+             bool(args.unwire_defaults)]
     if sum(modes) != 1:
         print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
-              "--automode, --output-style, --wire-defaults.", file=sys.stderr)
+              "--automode, --output-style, --wire-defaults, --unwire-defaults.",
+              file=sys.stderr)
         return 2
     if args.scope == "user" and (args.grants or args.wire_hook):
         print("wf-settings-apply: --scope user applies to --wire-defaults and "
@@ -778,6 +909,8 @@ def main(argv=None):
         return do_output_style(root, args.execute, scope=args.scope)
     if args.wire_defaults:
         return do_wire_defaults(root, args.scope, args.execute)
+    if args.unwire_defaults:
+        return do_unwire_defaults(root, args.scope, args.execute)
     return do_automode(args.execute)
 
 

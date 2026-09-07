@@ -1,6 +1,6 @@
 # Enforcement — what can actually be enforced, and what cannot
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before claiming any mechanism prevents anything. -->
 
 The single most important table in this project:
@@ -119,6 +119,12 @@ legitimate as the manual hatch and as the remedy for a classifier-refused write;
 mechanism arrives. *This is the 2026-09-07 directive: "I can't have manual commands being run ... no
 user will want to do that", and its companion — a change like this must be made "in such a way that the
 next use of workforce will heal the situation, even if it needs ran through an audit again."*
+
+**A path in needs a path out, and it needs a producer too.** A mechanism the installer and `audit` both
+wire is one a user did not type, so the reversal cannot be a paragraph telling an agent to hand-edit
+JSON — `wf-settings-apply --unwire-defaults` reverses exactly the recorded rows, style included. **A
+reversal record nobody can execute is not a reversal**; it is the same defect as a detector with no fix,
+and it shipped that way for two hours on 2026-09-07 because the record looked right.
 
 **Where each path lives:** `install` and `install.ps1` call `wf-settings-apply --wire-defaults
 --execute` after the files land; `audit` Step 6-G calls the same thing, which is what makes it a heal
