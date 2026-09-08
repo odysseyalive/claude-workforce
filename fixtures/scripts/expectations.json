@@ -714,7 +714,7 @@
     ],
     "script": "wf-conform",
     "want": [
-      "3 checks \u00b7 0 failed"
+      "4 checks \u00b7 0 failed"
     ]
   },
   "conform-canary-unavailable": {
@@ -968,7 +968,7 @@
     "script": "wf-conform",
     "want": [
       "1 governed",
-      "2 advisory",
+      "3 advisory",
       "0 failed",
       "~ docs-writer.md: Sources names Skill(project-journal), which its Procedure never invokes",
       "`## Procedure` never names project-journal",
@@ -988,7 +988,7 @@
     "script": "wf-conform",
     "want": [
       "1 governed",
-      "1 advisory",
+      "2 advisory",
       "0 failed"
     ]
   },
@@ -1463,6 +1463,113 @@
       "--transcripts"
     ]
   },
+  "handoff-self-collision": {
+    "_why": "A STALE SIBLING RECORD MUST NOT BE ABLE TO CLAIM THE CALLER. `identify_self` scanned every record in every transcript while `_own_open_calls` in the same file already filtered on `open_ids` — the asymmetry that let a CLOSED call from another agent match and be returned as `exact`, with no warning, and every verdict plus the follow-up command then computed on the wrong transcript. The clause says to run the printed line exactly as printed, so that agent's continuation brief would be written into this agent's run directory. Reported by a cold read 2026-09-08. THE FIXTURE IS THE EXACT SHAPE: `stalesibling` ran the literal command this runner execs and its call is CLOSED; `realcaller` had its root computed by the shell so its own record does NOT match its argv, and its call is OPEN. Only the open-call filter tells them apart, and the pre-fix code returns `stalesibling` as `exact` on these same bytes. `not` forbids the wrong id, forbids the `exact` label (this identification is honestly `flags only`), and forbids the silence: a NOTE must print whenever the match was not exact, because a safeguard scoped only to the failure that announces itself is not a safeguard.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--self"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 3,
+    "not": [
+      "Traceback",
+      "identified stalesibling000001",
+      "COULD NOT IDENTIFY"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "identified realcaller00000001",
+      "flags only",
+      "NOTE: this agent was identified by",
+      "--brief realcaller00000001"
+    ]
+  },
+  "handoff-self-as": {
+    "_why": "THE DEGRADATION THE UNION RULE CAUSES, AND THE DISCRIMINATOR THAT IS NOT COMMAND TEXT. Requiring both keys to agree on ONE agent is correct and it degrades exactly where a boundary check matters most: in a busy session several agents have the same self-check open, the answer is honestly ambiguous, and the reader falls back to a manual step. An employee knows its own NAME, which is the identity its handbook is written under and is carried as `agentType` in the meta record, so `--as <name>` separates concurrent agents of DIFFERENT roles — the common shape of a busy department. Same-role concurrency stays ambiguous, which is rarer and honest. THIS IS NOT THE DEFECT THE EARLIER REPAIR MADE: that one put an employee name where `--brief` needs a harness token and exited 2. `--as` matches a name against a name; `--brief` still takes only the id, copied from the printed line. The fixture is the same two-open-agents race as `handoff-self-openrace`, given different roles. `--as` is also dropped from the matching key — the first version shipped without that and made the candidate set EMPTY, because adding the disambiguator changed the argv being matched.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--self",
+      "--as",
+      "engineering-lead"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 3,
+    "not": [
+      "Traceback",
+      "COULD NOT IDENTIFY",
+      "identified opensibling000001",
+      "--brief opensibling000001"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "identified racedcaller000001",
+      "confirmed by --as engineering-lead, narrowed from 2 candidates",
+      "--brief racedcaller000001"
+    ]
+  },
+  "handoff-self-openrace": {
+    "_why": "THE OPEN SIBLING, which the `open_ids` filter does NOT exclude. Both Leads are live in one session so both calls are open; the caller's root was computed by the shell (`--root \"$(pwd)\"`) and `shlex.split` cannot undo a command substitution, so THE CALLER CANNOT MATCH ITS OWN RECORD while the sibling's literal matches the caller's argv exactly. The previous version returned the sibling as `exact` on these same bytes. THE RULE: one exact hit is not evidence the caller was identified, only that ONE agent typed these tokens — so both keys are computed always and a confident answer requires their UNION to hold exactly one agent. Here it holds two, so the run reports ambiguity WITH both ids and exits 4, and `--agent <id>` recovers from there. Ambiguous costs a re-run; wrong costs a successor briefed from another agent's transcript. `not` forbids either id being named as identified and forbids any `--brief` line, because a printed command is a command someone runs.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--self"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 4,
+    "not": [
+      "Traceback",
+      "identified opensibling000001",
+      "identified racedcaller000001",
+      "--brief opensibling000001",
+      "--brief racedcaller000001"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "COULD NOT IDENTIFY THIS AGENT",
+      "2 agents could be this caller",
+      "opensibling000001",
+      "racedcaller000001",
+      "re-run with `--agent <your id>`"
+    ]
+  },
+  "handoff-self": {
+    "_why": "THE ONLY EXERCISE `--self` HAS EVER HAD. A grep of every wf-handoff command ever recorded in this project showed that no --self invocation had ever run: the exercised paths were --wire and source reads, so the one path the shipped boundary clause TELLS EVERY LEAD TO RUN had no fixture at all. It was also broken. `identify_self` compared `\" \".join(sys.argv)` -- the POST-shell form -- against a transcript that records the command AS TYPED, and the clause tells the reader to type a tilde path with a quoted root, so the two could never match: --self reached `_die` and exited 2 before printing any verdict, which made the clause's next four sentences describe output that never appears. Found by a cold read of five Lead handbooks 2026-09-08, one turn after the clause shipped, and it is the SAME failure class as the exit-127 defect the clause was written to repair, one layer down: the command is spelled one way for the reader and needs another way to work. THIS FIXTURE RECORDS THE TYPED FORM -- tilde program, quoted argument -- while the runner execs the shell-expanded form of the same line, so it tests exactly the two transformations between them and nothing else. `want` covers the whole clause path in one run: the agent is identified, its own open tool call is discounted so the verdict is HANDOFF rather than HANDOFF-WAIT, and the follow-up line is printed WITH A PATH. The path assertion is a SUFFIX, never the absolute string, because argv[0] differs per machine and a fixture that pinned it would pass only here. exit 3 is `due and at a safe boundary`; a regression to the old matcher returns 4.",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--self"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 3,
+    "not": [
+      "Traceback",
+      "COULD NOT IDENTIFY",
+      "HANDOFF-WAIT",
+      "could not identify this agent"
+    ],
+    "script": "wf-handoff",
+    "want": [
+      "bigclean0000000001",
+      "HANDOFF",
+      "1 agent(s) DUE and at a safe boundary",
+      "bin/wf-handoff --root ",
+      "--brief bigclean0000000001"
+    ]
+  },
   "handoff-store": {
     "_why": "THE POSITIVE HALF, and the case that pins the TWO-HALF GATE rather than the exit code. Six hand-built agents make every verdict derivable by hand against the 220,000 floor: bigclean is 250,000 with nothing open and no children -> HANDOFF; bigopen is 260,000 with one unmatched tool_use -> HANDOFF-WAIT; parentwaiting is 240,000 with nothing of its own open but a fresh non-end_turn child -> HANDOFF-WAIT, which is the ONLY case proving the children half of the gate is not vacuous; idle is 300,000 with an mtime forced two days old -> IDLE, proving age and not stop_reason decides liveness (its last stop_reason is tool_use, the exact reading that would call a dead store live); small is 20,000 -> OK. Exit 3 means one agent is due AND safe, so a gate that ignored either half would return a different code. n=4 finished peaks is under MIN_SAMPLE, so the thresholds must announce the floors rather than deriving a percentile from a handful. THE CLOCK IS PINNED with WF_HANDOFF_NOW, and every fixture timestamp is a FIXED absolute instant, because IDLE is a claim about elapsed time and this case decayed within 30 minutes of being written when it was relative. Age is read from the LAST RECORD, never the file mtime: git checkout stamps every fixture file with the checkout time, so an mtime-based age would report this two-day-old agent as seconds fresh and the IDLE assertion would silently stop testing anything on every clone.",
     "args": [
@@ -1484,7 +1591,8 @@
       "HANDOFF-WAIT \u2014 1 child agent(s) still running",
       "too few for a percentile to be one",
       "IDLE",
-      "wf-handoff --brief bigclean0000000001",
+      "bin/wf-handoff --root ",
+      "--brief bigclean0000000001",
       "The successor spawn is the MANAGER's act",
       "REPORTS; NEVER REPAIRS"
     ]
@@ -3949,7 +4057,7 @@
     "want": [
       "+ .claude/agents/docs-lead.md",
       "+ .claude/agents/eng-lead.md",
-      "2 to write \u00b7 0 already present",
+      "2 to write \u00b7 0 to refresh \u00b7 0 already current \u00b7 0 stale (kept)",
       "nothing written. Re-run with --execute."
     ],
     "not": [

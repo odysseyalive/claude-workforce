@@ -299,11 +299,34 @@ def add_interface(text, invoke, returns, fails):
              f"| `Invoke` | {invoke} |\n"
              f"| `Returns` | {returns} |\n"
              f"| `Fails` | {fails} |\n\n")
+    # THE ANCHOR IS TESTED AGAINST THE SACRED SPANS BEFORE IT IS USED. "Before the first
+    # `##` heading" is a placement rule that never asked where that heading IS. Run
+    # against 21 skills it placed the section correctly in 20 and, in the 21st, inserted
+    # it one line INSIDE an `origin: user | immutable: true` span — the user's own words,
+    # the one thing in this file nothing may write into (module docstring).
+    #
+    # The detector already existed and already fired: the `.directives.sha` sidecar
+    # caught it, 1 failure in 435. This is the producer-side precondition, so the write
+    # is not attempted rather than caught after the fact. Carried from 2026-09-06.
+    sacred = [(m.start(), m.end()) for m in SACRED_RX.finditer(text)]
+    skipped = 0
     for m in HEADING_RX.finditer(text):
-        if m.group(1) == "##":
-            return text[:m.start()] + block + text[m.start():]
-    # No `##` heading at all: a title-plus-prose skill. Append rather than refuse —
-    # the section still has to exist, and where is a style question.
+        if m.group(1) != "##":
+            continue
+        if any(a <= m.start() < b for a, b in sacred):
+            skipped += 1
+            continue
+        if skipped:
+            print(f"  note: skipped {skipped} `##` heading(s) inside an immutable block — "
+                  f"`## Interface` placed at the first heading outside one")
+        return text[:m.start()] + block + text[m.start():]
+    # No usable `##` heading: either none at all (a title-plus-prose skill) or every one
+    # of them is sealed inside a sacred block. Append rather than refuse — the section
+    # still has to exist, where is a style question, and the end of the file is never
+    # inside a span that has been closed.
+    if skipped:
+        print(f"  note: all {skipped} `##` heading(s) sit inside immutable blocks — "
+              f"`## Interface` appended at the end instead")
     return text.rstrip("\n") + "\n\n" + block
 
 

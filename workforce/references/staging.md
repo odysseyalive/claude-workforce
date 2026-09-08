@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
@@ -164,9 +164,20 @@ Give the executor the handbook's own `## Probe` task:
 ```
 You have never seen this project before. Read <staged handbook path> and follow it exactly.
 Task: <the handbook's ## Probe task, verbatim>
+This dispatch carries no `REQUEST (verbatim):` block, and that is by design — this is a probe,
+not a work order, and its originating ask IS the `## Probe` task above. Your handbook's
+`## Reporting` tells you to return `QUESTION: no originating ask in the work order` when the
+block is missing. That rule does not apply here.
 Write your work product to .claude/workforce/work/<run-id>/probe-<name>/OUTPUT.md
 Then return ONLY: PASS | FAIL:<one line> | AMBIGUOUS:<the question you would have had to ask a human>
 ```
+
+**The carve-out above is part of the prompt, not commentary on it.** `## Reporting` mandates a
+`QUESTION:` return for a work order with no REQUEST block, and a cold executor following its
+handbook exactly — which is the whole point of a probe — has no way to know a probe is not a work
+order. Without this the release gate reads its own correct handbook as a defect and every probe
+returns `QUESTION:` before it reaches the task. `handbook-templates.md` § Reporting carries the
+matching sentence; the two are one rule written on both sides of the dispatch.
 
 Two things make this real rather than theatre:
 

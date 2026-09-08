@@ -580,8 +580,41 @@ def check_handbook(path, body, res, ceiling):
     # run PERFORMS the split instead: relocation into the grounding library, never
     # condensation (directive one is retention — a trimmed safety example is a lost
     # one), and never a longer handbook accepted as-is.
+    #
+    # THE CEILING IS AN IC MEASUREMENT AND DOES NOT TRANSFER TO A LEAD. 172 was measured
+    # once, by relocating ONE IC handbook (`engineering-site`) block by block until it
+    # would not shrink further. A Lead has no `## Procedure` to relocate at all and
+    # carries two sections an IC does not — a full `## Chain of Command` and a `## Probe`
+    # covering its whole department — so the thing that was measured is not the thing
+    # being checked. Measured 2026-09-08 across a live 22-handbook org: the smallest IC
+    # is 141 lines and four sit under 172, so the number is reachable and still binding
+    # there; the smallest LEAD is 233 and not one of the five is under 172, and seven
+    # independent relocation passes failed to bring any of them down.
+    #
+    # So the Lead line count is OBSERVED, not judged. `platform.md` § DOCUMENTED bars an
+    # unmeasured number from driving anyone's work, and an advisory that orders a
+    # relocation which provably cannot reach its target is worse than silence: doctrine
+    # says the split "is PERFORMED this run", so every audit spent effort on an
+    # unreachable goal and reported the same row again next time. The measurement that
+    # would make a Lead ceiling real is the `engineering-site` exercise repeated on a
+    # Lead; until someone runs it, this states the count and names what is owed.
     body_lines = len(body.splitlines())
-    if body_lines <= ceiling:
+    _tier_m = TIER_RX.search(body)
+    if _tier_m and _tier_m.group(1) == "2":
+        res.advise(
+            f"{n}: Lead handbook length OBSERVED, not judged",
+            # The message does NOT enumerate the sections a Lead carries and an IC does
+            # not. That reasoning is the doctrine's job, and naming those headings in
+            # every row put their literal text into output that other checks assert
+            # against — `conform-tier-sections` forbids exactly those strings, because
+            # its whole point is that an IC is never asked for a Lead's sections.
+            # A row should say what it measured and where the rule lives.
+            f"{body_lines} lines. The {ceiling}-line ceiling was measured on an IC "
+            f"handbook; no Lead floor has ever been measured, so none is asserted and "
+            f"no relocation is ordered here. Why, and what measurement is owed: "
+            f"delegation-budget.md § The handbook length ceiling. ADVISORY: this row "
+            f"blocks nothing")
+    elif body_lines <= ceiling:
         res.add(True, f"{n}: within the {ceiling}-line ceiling")
     else:
         res.advise(f"{n}: within the {ceiling}-line ceiling",
@@ -1522,6 +1555,107 @@ CORE_COMPANIONS = ("org", "operating-principles", "personnel-ledger",
                    "code-evaluator", "text-eval", "security-evaluator")
 
 
+# Bounded to a NAME, not to the next delimiter. `([^|>]+)` on
+# `<!-- ... reports-to: engineering-lead -->` captured `engineering-lead -`, and every
+# edge in a live org then failed as a mismatch against itself.
+REPORTS_TO_RX = re.compile(r"^[ \t]*<!--.*\breports-to:\s*([A-Za-z0-9][\w.-]*)", re.M)
+DIRECT_REPORTS_RX = re.compile(r"^[ \t]*<!--.*\bdirect-reports:\s*([^|>]+)", re.M)
+
+
+def org_edges(name, body):
+    """(parent, children) as the ORG-RECORD comment states them, or (None, set())."""
+    m = REPORTS_TO_RX.search(body)
+    parent = m.group(1).strip() if m else None
+    if parent and parent.lower() in ("none", "(none)", "-"):
+        parent = None
+    m = DIRECT_REPORTS_RX.search(body)
+    kids = set()
+    if m:
+        kids = {c.strip().rstrip("-").strip() for c in m.group(1).split(",")}
+        kids = {c for c in kids if c and c.lower() not in ("none", "(none)")}
+    return parent, kids
+
+
+def check_org_edges(edges, res):
+    """Every `reports-to` has a matching `direct-reports`, and the reverse.
+
+    THE ORG-RECORD COMMENT IS WHAT A ROUTING CHECK READS. `## Chain of Command` prose and
+    the org chart can both be right while the comment disagrees, and then a fully-staffed
+    seat is routed around by a tool that never looks at the prose. Measured on a live org
+    2026-09-08: two employees named a parent whose `direct-reports` did not list them, and
+    every other record of the org was correct — so nothing else could have caught it.
+
+    BOTH READINGS ARE REPORTED, never reconciled. This script does not know which side is
+    stale, and a check that silently picked one would be asserting a repair it cannot
+    justify. Naming the disagreement is the finding.
+    """
+    if not edges:
+        # Said out loud: a check that skips is indistinguishable from one that passed.
+        res.add(True, "org edges: no population (n=0, not a pass)")
+        return
+    for name, (parent, _kids) in sorted(edges.items()):
+        # SELF-PARENTING IS ITS OWN DEFECT and must not be reported as a missing edge.
+        # `reports-to: <self>` makes the node its own manager: an escalation from it
+        # terminates at itself, so nothing it raises ever leaves it. Caught in a shipped
+        # fixture 2026-09-08 by the edge diff, which described it only as "does not list
+        # it" — true, and the least interesting thing wrong with it.
+        if parent == name:
+            res.add(False, f"{name}: reports-to itself",
+                    f"`{name}` names itself as its own manager, so an escalation from "
+                    f"it terminates at itself and nothing it raises ever leaves it. "
+                    f"Name its real parent, or `ceo` if it is the root")
+            continue
+        if parent is None or parent not in edges:
+            continue          # a root, or a parent outside .claude/agents/ — not ours
+        if name not in edges[parent][1]:
+            res.add(False, f"{name}: reports-to {parent}, which does not list it",
+                    f"`{name}` names `{parent}` as its parent, but {parent}'s "
+                    f"`direct-reports` does not include `{name}`. A routing check reads "
+                    f"the ORG-RECORD comment, so this seat can be routed around even "
+                    f"though the chart and the `## Chain of Command` prose are correct. "
+                    f"Fix whichever of the two lines is stale")
+    for name, (_parent, kids) in sorted(edges.items()):
+        for kid in sorted(kids):
+            if kid not in edges:
+                res.add(False, f"{name}: direct-reports names {kid}, which has no handbook",
+                        f"`{name}` claims `{kid}` as a direct report and there is no "
+                        f"`.claude/agents/{kid}.md`. Either the report was retired "
+                        f"without amending its manager, or the name is misspelled")
+            elif edges[kid][0] != name:
+                res.add(False, f"{name}: direct-reports names {kid}, which reports elsewhere",
+                        f"`{name}` claims `{kid}`, but `{kid}` names "
+                        f"`{edges[kid][0] or '(nobody)'}` as its parent. Two managers or "
+                        f"none is the same defect: fix whichever line is stale")
+
+
+ANTI_GASLIGHT_RX = re.compile(r"fabricated absence", re.I)
+
+
+def check_anti_gaslight(n, body, res):
+    """The 2026-09-02 directive: never report information missing before searching Sources.
+
+    A one-line grep IS the whole detector, and it did not exist — the directive was
+    mandatory and unmeasured for six days. ADVISORY, deliberately: measured on a live org
+    2026-09-08, 18 of 23 handbooks predate the clause, and failing all of them at once is
+    the 9-false-failures run this script cites as the lesson it must not repeat.
+
+    Scoped to a handbook with REAL sources. One that measured itself `(none)` has nothing
+    to search before it reports an absence, so the clause would be an instruction with no
+    referent.
+    """
+    src = section(body, "## Sources")
+    if src is None or not src.strip() or src.strip().lower().startswith("(none)"):
+        return
+    if ANTI_GASLIGHT_RX.search(body):
+        return
+    res.advise(
+        f"{n}: no anti-gaslighting clause",
+        "the handbook names sources but never says to search them before reporting "
+        "something missing. Add the clause from `references/templates.md` GOP 10 — "
+        "an unresolved question is a `QUESTION:` up the chain, never a fabricated "
+        "absence and never a guess. ADVISORY: this row blocks nothing")
+
+
 def check_companions(root, res, governed_n):
     """INV-COMPANIONS — after an audit, every core companion skill is on disk.
 
@@ -1610,6 +1744,7 @@ def main():
     # Under `--strict-adopted` an adopted agent is held to the contract but was still
     # never staffed here, so it must not make the tree look audited.
     governed_n = 0
+    org_edge_map = {}
     for p in sorted(handbooks):
         body = read(p, res)
         if body is None:
@@ -1617,6 +1752,9 @@ def main():
         if ORG_RECORD_RX.search(body):
             governed_n += 1
             check_handbook(p, body, res, args.ceiling)
+            _name = os.path.basename(p)[:-3]
+            org_edge_map[_name] = org_edges(_name, body)
+            check_anti_gaslight(_name, body, res)
         elif args.strict_adopted:
             check_handbook(p, body, res, args.ceiling)
         else:
@@ -1705,6 +1843,7 @@ def main():
 
     check_sidecar(root, res)
     check_canary_record(root, res)
+    check_org_edges(org_edge_map, res)
     check_companions(root, res, governed_n)
     check_journal(root, res)
     check_defects(root, res)

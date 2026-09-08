@@ -4,7 +4,8 @@ tools: Read, Write, Bash
 disallowedTools: Agent
 ---
 <!-- ORG-RECORD START -->
-<!-- tier: 2 (Lead) | department: eng | reports-to: lead -->
+<!-- tier: 2 (Lead) | department: eng | reports-to: ceo -->
+<!-- direct-reports: ic | max-direct-spawns: 3 -->
 <!-- ORG-RECORD END -->
 ## Role
 R

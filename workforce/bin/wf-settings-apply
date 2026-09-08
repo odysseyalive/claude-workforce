@@ -336,6 +336,38 @@ def hook_command(name):
     return f'"{resolved}"', resolved
 
 
+def _norm_command(cmd, root=None):
+    """A hook command reduced to the one form two spellings of the same script share.
+
+    `hook_command` emits an absolute path today, but a registration written by an older
+    version, by hand, or by another scope may spell the SAME script as
+    `"$HOME/.claude/skills/workforce/bin/wf-protect-directives"` or with
+    `${CLAUDE_PROJECT_DIR}` unexpanded. A raw `==` cannot see through any of that, so the
+    tool could not recognise its own past work: measured on a live project 2026-09-08,
+    `--wire-defaults` reported `would register` for three hooks that were ALREADY wired,
+    and `--execute` would have written each a second time. The three-paths directive has
+    `audit` re-wire on every run, so that is one duplicate per audit, forever.
+
+    The unwire path (`do_unwire_defaults`) is the worse half and the reason this is not
+    cosmetic: an unwire that cannot match its own record leaves the hook wired while
+    reporting it removed.
+    """
+    if not isinstance(cmd, str):
+        return cmd
+    out = cmd.strip().strip('"').strip("'")
+    if root:
+        for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+            out = out.replace(var, root)
+    out = os.path.expandvars(os.path.expanduser(out))
+    return os.path.normpath(out) if os.path.isabs(out) else out
+
+
+def _same_command(h, command, root=None):
+    """Does this registered hook entry name the same command as `command`?"""
+    return (isinstance(h, dict)
+            and _norm_command(h.get("command"), root) == _norm_command(command, root))
+
+
 def hook_defaults(name):
     """The defaults a stamping hook DECLARES, imported from the hook itself.
 
@@ -454,6 +486,75 @@ def settings_for_scope(root, scope):
     return user_settings_path() if scope == "user" else resolve_project_settings(root)
 
 
+def count_registrations(root, name):
+    """How many times `name` is registered on its event, per scope.
+
+    Returns {scope: count}. Counting is `_same_command`'s job, so a registration
+    written in any spelling of the same path is seen.
+    """
+    event, _matcher = SHIPPED_HOOKS[name]
+    _q, command = hook_command(name)
+    out = {}
+    for scope in ("user", "project"):
+        spath = settings_for_scope(root, scope)
+        data, _ = load(spath)
+        n = 0
+        if isinstance(data, dict):
+            hooks = data.get("hooks")
+            entries = hooks.get(event) if isinstance(hooks, dict) else None
+            for e in (entries or []):
+                for h in (e.get("hooks", []) if isinstance(e, dict) else []):
+                    if _same_command(h, command, root):
+                        n += 1
+        out[scope] = n
+    return out
+
+
+def report_duplicate_firing(root):
+    """Say out loud when a hook is registered in BOTH scopes, or twice in one.
+
+    NOBODY REPORTED THIS AND IT IS VISIBLE IN A TRANSCRIPT. The installer wires user
+    scope so `/workforce` reaches every project on the machine; the three-paths
+    directive has `audit` wire project scope so a fix propagates with the repo. Both
+    are wanted, and neither knows about the other, so the hook fires twice per turn and
+    the standing-request context is injected twice. Measured 2026-09-08: five of the
+    six defaults were doubled on a live machine.
+
+    REPORTS, NEVER REPAIRS. Which scope should keep a registration is the user's call,
+    and a tool that silently unwired one of them would be deciding it — the same move
+    `--unwire`'s conservatism exists to refuse. Duplication is harmless for a guard
+    that is idempotent and wasteful for every hook, and the defect was that nothing
+    said so.
+    """
+    both, twice = [], []
+    for hook in DEFAULT_HOOKS:
+        name, counts = hook, count_registrations(root, hook)
+        if counts["user"] and counts["project"]:
+            both.append((name, counts))
+        for scope, n in counts.items():
+            if n > 1:
+                twice.append((name, scope, n))
+    if not both and not twice:
+        return 0
+    print()
+    print("  DOUBLE-FIRING — reported, not repaired:")
+    for name, c in both:
+        event = SHIPPED_HOOKS[name][0]
+        print(f"    ! {name} is registered at BOTH user and project scope "
+              f"(user {c['user']}, project {c['project']}) — it runs twice per "
+              f"{event}")
+    for name, scope, n in twice:
+        print(f"    ! {name} is registered {n} times in {scope} scope alone")
+    print("    Both scopes are wired on purpose — the installer does user scope so "
+          "/workforce")
+    print("    reaches every project, and audit does project scope so a fix travels "
+          "with the")
+    print("    repo. Neither knows about the other. Removing one is your call: "
+          "`--unwire-defaults")
+    print("    --scope user` or `--scope project`, whichever you want to keep.")
+    return 0
+
+
 def do_wire_defaults(root, scope, execute):
     """Wire every DEFAULT hook and select the output style, in one call.
 
@@ -478,6 +579,7 @@ def do_wire_defaults(root, scope, execute):
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
     rc = max(rc, do_output_style(root, execute, scope=scope, quiet=True))
+    report_duplicate_firing(root)
     if not execute:
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
               "refused the agent's write)")
@@ -544,7 +646,7 @@ def do_unwire_defaults(root, scope, execute):
                 keep.append(e)
                 continue
             inner = [h for h in (e.get("hooks") or [])
-                     if not (isinstance(h, dict) and h.get("command") == command)]
+                     if not _same_command(h, command, root)]
             if len(inner) == len(e.get("hooks") or []):
                 keep.append(e)
                 continue
@@ -647,7 +749,7 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if isinstance(existing, list):
         for e in existing:
             for h in (e.get("hooks", []) if isinstance(e, dict) else []):
-                if isinstance(h, dict) and h.get("command") == command:
+                if _same_command(h, command, root):
                     present = True
 
     # The stamp is a SECOND write with its own precondition, so registration and stamp
@@ -698,7 +800,7 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if isinstance(back, dict):
         for e in back.get("hooks", {}).get(event, []):
             for h in (e.get("hooks", []) if isinstance(e, dict) else []):
-                if isinstance(h, dict) and h.get("command") == command:
+                if _same_command(h, command, root):
                     count += 1
     if count != 1:
         print(f"wf-settings-apply: HOOK UNVERIFIED — re-read found {count} registrations "

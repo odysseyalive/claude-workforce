@@ -1,6 +1,6 @@
 # Delegation Budget — depth, fan-out, and the caps
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 5 assertion(s) in bin/check name this file; 15 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `/workforce budget` reports this; `audit` gates the org design on it. -->
 
 Three caps bound every org. **None of their values are written here** — they live in `platform.md`
@@ -172,6 +172,37 @@ neither of which any author can cut. A measured floor outranks an unmeasured bud
 Measure don't assume; `platform.md` § DOCUMENTED bars only the unmeasured from blocking), so 172 is
 the number and 150 is retired. Recorded 2026-08-25 from the live `engineering-site` audit
 (measurements stamped, Principle 9b).
+
+**172 IS AN IC NUMBER AND IS NOT APPLIED TO A LEAD.** It was measured once, on one IC handbook,
+by relocating it block by block until it would not shrink further. A Lead is a different document:
+it has no `## Procedure` to relocate at all, and it carries two sections an IC does not — a full
+`## Chain of Command` and a `## Probe` covering the whole department. The exercise that produced
+172 was never run on one, so applying the number to a Lead is exactly the unmeasured budget this
+section retired 150 for being.
+
+Measured 2026-09-08 across a live 22-handbook org carrying the current contract: the smallest IC is
+141 lines and four sit under 172, so the number is reachable and stays binding there. The smallest
+LEAD is 233 and not one of the five is under 172. Seven independent relocation passes were
+dispatched against the over-ceiling set and none reached the number; eight of those handbooks could
+not reach it even if every line of `## Scope`, `## Procedure` and `## Escalation` were relocated,
+and all the Leads are in that set.
+
+**So `wf-conform` OBSERVES a Lead's length and orders nothing.** It states the count, names 172 as
+an IC measurement, and stops. This is not an exemption from the doctrine above — it is the doctrine
+applied honestly: an advisory that orders a relocation which provably cannot reach its target is
+worse than silence, because the split "is PERFORMED this run" and the run then spends real effort
+on an unreachable goal and reports the same row again next audit. **What is owed is a measurement,
+not a guess**: repeat the `engineering-site` exercise on a Lead — relocate block by block, verify
+retention verbatim, re-probe cold — and write the floor it reaches here. Until someone runs it,
+there is no Lead ceiling, and inventing one would be Principle 4 broken in the file that states it.
+
+**A mandated section is allowance, not authored body.** The 154/18 split holds, but the 18 was
+never only `ORG-*`: it is *everything the contract requires and no author can relocate*. `## Sources`
+became mandatory in v1.7.0 and the say-the-state clause in v1.26.0, and both landed inside the
+authored-body half where they do not belong — measured as +9 lines on an IC and +13 on a Lead, all
+of it text the contract requires. When a new section is made mandatory, it grows the allowance. A
+ceiling that counts required text against an author's budget is measuring the contract and blaming
+the writer.
 
 **Over the ceiling still never blocks a sweep — but not-blocking is not not-acting.** Under the
 no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement the run can perform,

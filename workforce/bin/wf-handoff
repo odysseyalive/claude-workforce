@@ -81,7 +81,16 @@ not a missing feature.
 
     exit 0  measured; nothing is due for handoff, INCLUDING an empty store, which
             reports n=0 rather than silently omitting the layer
-    exit 3  measured; at least one agent is due AND at a safe boundary — act
+    exit 3  measured; at least one agent is due AND at a safe boundary — act.
+            NOTE THIS IS THE SUCCESS PATH AND IT IS NONZERO. The one outcome this
+            script exists to produce is the one a shell, a CI step, or a Bash tool
+            renders as a failed command. That is deliberate — a boundary that needs
+            acting on should not be silently swallowed by `&&` — but anything wrapping
+            this must treat 3 as "act", never as "it broke"
+    exit 4  `--self` could not identify the caller. NOT a usage error and NOT a clear
+            boundary: nothing about the caller was measured. The listing is still
+            printed, so the reader can find their own row rather than being left with
+            an exit code and no output
     exit 2  the store could not be read at all
 
 WHERE THE STORE IS, in priority order. `CLAUDE_CODE_SESSION_ID` names the session
@@ -104,6 +113,7 @@ import hashlib
 import math
 import os
 import re
+import shlex
 import sys
 import time
 
@@ -134,11 +144,52 @@ STALE_SECONDS = 1800
 # as the marker itself — and this file's own docstring names it.
 CLAUSE_MARKER_RX = re.compile(r"^.*<!--\s*wf-handoff:clause\s*-->\s*$", re.M)
 
+# Three cold readers, three disjoint batches, failed the predecessor of this text on the
+# same three defects: `wf-handoff` bare is not on PATH and exits 127; "phase boundary" was
+# defined nowhere a Lead reads, so the trigger was undeterminable; and "return the brief to
+# your manager" sat beside a `Return ONLY:` contract with no rule saying which wins. Each is
+# repaired inline below, because a reader who has to leave the handbook to run a clause is a
+# reader who does not run it. The `--brief` argument is SOURCED, never named: it matches on
+# `agent_id`, a harness token, so an employee name reaches `_die` and exits 2.
 CLAUSE = (
-    "- AT EVERY PHASE BOUNDARY, before starting the next phase, run `wf-handoff --self`. If the\n"
-    "  verdict is `HANDOFF`, do not start the next phase: run `wf-handoff --brief <your-id>`, fill\n"
-    "  sections 3-7, and return the brief to your manager. Never replace yourself; your manager\n"
-    "  spawns your successor. <!-- wf-handoff:clause -->\n"
+    "- AT EVERY PHASE BOUNDARY — that is, after each direct report RETURNS and before you\n"
+    "  dispatch the next one; if your work order names phases, at each of those instead. A report\n"
+    "  has RETURNED when both are true and you can see both: its verdict line is in your hands,\n"
+    "  AND the `OUTPUT.md` that line names exists on disk. An agent that looks finished, has gone\n"
+    "  quiet, or that you believe is wrapping up has NOT returned — wait. Then run\n"
+    "  `~/.claude/skills/workforce/bin/wf-handoff --root \"<project root>\" --self --as <your\n"
+    "  employee name>`, where `<project root>` is the directory your work order gives you as the\n"
+    "  project root and `<your employee name>` is the `name:` in your own handbook frontmatter.\n"
+    "  READ THE WHOLE OF THIS BULLET BEFORE ACTING ON ANY PART OF IT; the sentence that tells you\n"
+    "  to run something is not the sentence that tells you when not to.\n"
+    "  • IF IT PRINTS A VERDICT FOR YOU AND THAT VERDICT IS `HANDOFF`: do not dispatch again.\n"
+    "    The same run printed your follow-up command on a line ending `--brief <agent-id>`. If it\n"
+    "    also printed a NOTE saying it did not CONFIRM which agent you are, check that the id on\n"
+    "    that line is yours before using it — the brief records it and is read later by\n"
+    "    someone who cannot check. Then run that line exactly as printed with\n"
+    "    ` --out <your run directory>/handoff-brief.md` appended, where `<your run directory>` is\n"
+    "    the directory your `## Reporting` section tells you to write `OUTPUT.md` into. Never\n"
+    "    compose the id yourself: it is a harness token, not your employee name.\n"
+    "  • IF THE VERDICT IS `HANDOFF-WAIT`: keep working. You are past the threshold but\n"
+    "    mid-unit, and a handoff there is worse than a large context. Any other verdict, keep\n"
+    "    working.\n"
+    "  • IF IT PRINTS NO VERDICT FOR YOU — it says it COULD NOT IDENTIFY THIS AGENT, or it\n"
+    "    fails, or it prints an error and nothing else: that is NOT a clear boundary and you may\n"
+    "    not read it as one. If it listed candidate ids, find your own row and re-run with\n"
+    "    `--agent <the id from your row>` in place of `--self`. If it did not, or you cannot tell\n"
+    "    which row is yours, KEEP WORKING and say in one line in your report that the boundary\n"
+    "    check did not run and why. Never treat a failed check as permission to stop or as\n"
+    "    permission to continue silently.\n"
+    "  THE BRIEF IS AN EXTRA ARTIFACT, NOT A REPLACEMENT FOR YOUR `OUTPUT.md`. Fill sections 3-7\n"
+    "  of the brief, then write `OUTPUT.md` exactly as `## Reporting` and `## Exit criteria`\n"
+    "  already require, covering the work you finished, with every exit criterion you did not meet\n"
+    "  stated as `UNMET` rather than omitted, and name the brief's path in the `## Exceptions`\n"
+    "  list — the list of what failed, was deferred, or was scoped out; write the heading if\n"
+    "  your handbook has no such list — as the reason the rest is unfinished. Then return the\n"
+    "  normal `Return ONLY:` line with your `OUTPUT.md` path — never the brief's — and\n"
+    "  `HANDOFF` as the verdict. This bullet adds an artifact; it NEVER overrides the return\n"
+    "  contract. Never replace yourself; your manager spawns your successor.\n"
+    "  <!-- wf-handoff:clause -->\n"
 )
 
 # The reversal record. `--wire` PRODUCES it, `--unwire` CONSUMES it, and neither is a
@@ -149,6 +200,18 @@ RECORD = os.path.join(".claude", "workforce", ".handoff-wired.json")
 # Tool names whose calls are file writes. Used only to list what a successor
 # inherits; nothing gates on this set.
 WRITE_TOOLS = {"Write", "Edit", "NotebookEdit", "MultiEdit"}
+
+
+def _invocation():
+    """How to spell THIS script in a command a reader can paste.
+
+    Absolute, and abbreviated back to `~` when it is under the home directory, because
+    the handbooks that carry the boundary clause spell it that way and a reader
+    comparing the two should not have to decide whether they are the same file.
+    """
+    me = os.path.abspath(sys.argv[0])
+    home = os.path.expanduser("~")
+    return "~" + me[len(home):] if me.startswith(home + os.sep) else me
 
 
 def _die(msg):
@@ -238,13 +301,52 @@ def read_completions(store):
     transcript's last write rather than trusting it alone.
     """
     out = {}
-    parent = store.rstrip(os.sep) + ".jsonl"
+    # EVERY TRANSCRIPT THAT CAN CARRY A NOTICE, NOT ONLY THE SESSION FILE.
+    #
+    # "The signal lives one level up" is true and was written about a TWO-level
+    # relationship — session spawns agent — then applied in a three-level org. One level
+    # up from an IC is its LEAD, not the session, so a Lead's direct reports notify inside
+    # the Lead's own `subagents/agent-*.jsonl` and this function never opened those.
+    # `done_ts` was therefore populated for Leads and `None` for every IC by construction.
+    #
+    # THE CONSEQUENCE WAS THE GUARDRAIL ANSWERING WRONG AT THE MOMENT IT FIRES. `verdict`
+    # asks "are this agent's children still running?", `done_ts` was never collected for
+    # those children, so the only test left was `age < STALE_SECONDS and last_stop !=
+    # "end_turn"` — true for half an hour after a child legitimately finishes. A Lead
+    # reaches a phase boundary *because* its children just returned, so the check ran
+    # against freshly-finished children every time and returned HANDOFF-WAIT.
+    #
+    # MEASURED on this machine 2026-09-08: 122 subagent transcripts carry
+    # `task-notification` records, and their `<task-id>`s name real sibling agents.
+    #
+    # THIRD INSTANCE OF ONE SHAPE IN ONE DAY — with fact 23b and the handbook length
+    # ceiling. A fact measured at one depth, written as if depth were not a variable.
+    sources = [store.rstrip(os.sep) + ".jsonl"]
+    agent_files = sorted(glob.glob(os.path.join(store, "subagents", "agent-*.jsonl")))
+    sources += agent_files
+    for parent in sources:
+        _scan_notices(parent, out)
+    # A `task-notification` IS NOT ALWAYS ABOUT AN AGENT. The same record shape reports a
+    # backgrounded Bash command finishing, keyed by a short task id (`bpokrhd3e`) that
+    # names no transcript here. Found 2026-09-08 while checking a live store: those ids
+    # were being collected as agent completions, so `done` carried keys for things that
+    # are not agents.
+    #
+    # Harmless today because nothing joins on them, and that is exactly why it is worth
+    # removing: a key that matches nothing is invisible until the day it matches
+    # something. The store already says which ids are agents — the transcripts are right
+    # here — so the filter is free.
+    known = {os.path.basename(f)[len("agent-"):-len(".jsonl")] for f in agent_files}
+    return {k: v for k, v in out.items() if k in known}
+
+
+def _scan_notices(parent, out):
     if not os.path.isfile(parent):
-        return out
+        return
     try:
         fh = open(parent, encoding="utf-8", errors="replace")
     except OSError:
-        return out
+        return
     with fh:
         for line in fh:
             if "task-notification" not in line:
@@ -263,7 +365,6 @@ def read_completions(store):
                 continue
             aid = tid.group(1).strip()
             out[aid] = max(out.get(aid, 0.0), ts.timestamp())
-    return out
 
 def read_agent(meta_path):
     """One agent's record. A line that will not parse is skipped and counted."""
@@ -389,29 +490,267 @@ def thresholds(agents, limit):
     return fw, fh, how
 
 
-def identify_self(agents, argv_needle):
-    """Exact self-identification (fact 23b), or (None, reason).
+# Flags a reader ADDS after being told to, which by definition are absent from the
+# command already recorded in the transcript. They must not join the matching key: the
+# first `--as` shipped without this and made the candidate set EMPTY, because adding the
+# disambiguator changed the very argv being matched. Same class as the `--agent` recovery
+# bug — a recovery invocation is not the recorded one, and any key built from the whole
+# argv breaks the moment a reader follows the instruction.
+RECOVERY_FLAGS = {"--as", "--agent"}
 
-    The calling agent wrote a tool_use record containing this command text BEFORE
-    the command ran, so this is a lookup rather than an inference. Ambiguity is
-    reported, never resolved by guessing.
+
+def _argv_shape(argv):
+    """argv reduced to the form that two spellings of ONE command have in common.
+
+    The command word keeps only its basename and every argument is `~`-expanded, which
+    is exactly the set of transformations that separate what a reader TYPES from what
+    `exec` receives. Recovery flags and their values are dropped entirely.
     """
-    hits = []
-    for a in agents:
-        try:
-            with open(a["path"], encoding="utf-8", errors="replace") as fh:
-                for ln in fh:
-                    if argv_needle in ln and '"tool_use"' in ln:
-                        hits.append(a)
-                        break
-        except OSError:
+    rest, skip = [], False
+    for t in argv[1:]:
+        if skip:
+            skip = False
             continue
-    if len(hits) == 1:
-        return hits[0], "exact (own command text in own transcript)"
-    if not hits:
-        return None, "no transcript carries this command text — not running as a subagent?"
-    return None, f"{len(hits)} transcripts carry this command text; pass --agent <id>"
+        if t in RECOVERY_FLAGS:
+            skip = True
+            continue
+        if any(t.startswith(f + "=") for f in RECOVERY_FLAGS):
+            continue
+        rest.append(os.path.expanduser(t))
+    return [os.path.basename(os.path.expanduser(argv[0]))] + rest
 
+
+def _recorded_commands(path):
+    """Every shell command string this transcript records, AS TYPED."""
+    out = []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if '"tool_use"' not in ln:
+                    continue
+                try:
+                    rec = json.loads(ln)
+                except ValueError:
+                    continue
+                for it in ((rec.get("message") or {}).get("content") or []):
+                    if not isinstance(it, dict) or it.get("type") != "tool_use":
+                        continue
+                    cmd = (it.get("input") or {}).get("command")
+                    if isinstance(cmd, str):
+                        out.append((cmd, it.get("id")))
+    except OSError:
+        pass
+    return out
+
+
+def _command_runs(recorded, shape):
+    """Would this recorded command line exec the argv described by `shape`?
+
+    A RAW SUBSTRING TEST CANNOT ANSWER THIS, and the previous one silently could not.
+    It compared `" ".join(sys.argv)` — the POST-shell form — against the transcript,
+    which holds the command AS TYPED. Two independent transformations sit between them
+    and either alone defeats the test:
+
+        typed      ~/.claude/skills/workforce/bin/wf-handoff --root "<root>" --self
+        argv       /home/francis/.claude/.../wf-handoff  --root  <root>  --self
+
+    `~` is expanded by the shell and the quotes are stripped by it. The shipped clause
+    tells the reader to type the tilde form with a quoted root, so the clause and the
+    matcher were guaranteed never to agree — `--self` reached `_die` and exited 2 before
+    printing any verdict, which made the clause's next four sentences describe output
+    that never appears. Found by a cold read of five Lead handbooks, 2026-09-08, and it
+    is the SAME failure class as the exit-127 defect the clause was written to repair,
+    one layer down: the command is spelled one way for the reader and needs another way
+    to work.
+
+    `shlex.split` is the inverse of the shell's word-splitting and quote removal, and
+    `expanduser` undoes the rest, so this compares two things that can actually be equal.
+    Scanning for a WINDOW rather than testing equality keeps a compound command
+    (`cd x && wf-handoff --self`) matchable.
+    """
+    try:
+        toks = shlex.split(recorded)
+    except ValueError:
+        toks = recorded.split()
+    toks = [os.path.expanduser(t) for t in toks]
+    n = len(shape)
+    for i in range(len(toks) - n + 1):
+        if os.path.basename(toks[i]) == shape[0] and toks[i + 1:i + n] == shape[1:]:
+            return True
+    return False
+
+
+def _command_runs_loosely(recorded, shape):
+    """Same, ignoring ARGUMENT VALUES — the flags and the program only.
+
+    A second, weaker key, tried only after the exact one finds nothing. A value the
+    shell computed before `exec` (`--root "$PWD"`, a command substitution) is recorded
+    unexpanded, and no amount of quote handling recovers it. Matching the flag set still
+    identifies the invocation, and because it is weaker it may only ever CONFIRM a
+    single candidate: two loose hits are reported as ambiguous, never resolved.
+    """
+    try:
+        toks = shlex.split(recorded)
+    except ValueError:
+        toks = recorded.split()
+    prog = [i for i, t in enumerate(toks)
+            if os.path.basename(os.path.expanduser(t)) == shape[0]]
+    if not prog:
+        return False
+    flags = [t for t in shape[1:] if t.startswith("-")]
+    after = set(toks[prog[0] + 1:])
+    return bool(flags) and all(f in after for f in flags)
+
+
+def _has_open_self_check(a, argv):
+    """Is this agent mid-`wf-handoff` right now? 1 or 0.
+
+    The recovery invocation is NOT the recorded one. A reader told to re-run with
+    `--agent <id>` types different flags than the `--self` call already open in their
+    transcript, so matching this argv finds nothing and the discount that makes a
+    boundary result possible never fires — which left `--agent` reporting HANDOFF-WAIT
+    forever and made the ambiguity message name a recovery that does not recover.
+    Found 2026-09-08 by running the recovery the message tells the reader to run.
+
+    So the test is the honest one: does this agent have an OPEN call to this same
+    program? That is true exactly while it is checking its own boundary, and false for
+    a manager inspecting a subordinate — which is the distinction the discount needs.
+    """
+    me = os.path.basename(os.path.expanduser(argv[0]))
+    for cmd, tid in _recorded_commands(a["path"]):
+        if tid not in a["open_ids"]:
+            continue
+        try:
+            toks = shlex.split(cmd)
+        except ValueError:
+            toks = cmd.split()
+        if any(os.path.basename(os.path.expanduser(t)) == me for t in toks):
+            return 1
+    return 0
+
+
+def identify_self(agents, argv, as_name=None):
+    """The one agent this invocation belongs to, or (None, reason naming the candidates).
+
+    ONLY AN OPEN TOOL CALL CAN BE THE CALLER. The calling agent wrote a tool_use record
+    for this command and has NOT received its result — that is what "running right now"
+    means in a transcript. So `open_ids` is not an optimisation, it is what makes this a
+    lookup instead of a guess. `_own_open_calls` already filtered on it; the function
+    whose entire job is identification did not, and a CLOSED sibling call could match and
+    be returned as `exact`.
+
+    THAT FILTER NARROWED THE WINDOW AND DID NOT CLOSE IT, and an earlier version of this
+    docstring claimed it did. The dangerous case is a sibling whose call is OPEN, which is
+    the ordinary multi-Lead shape rather than an exotic one:
+
+        Lead A's record:  --root "/abs/path" --self      (open)
+        Lead B's record:  --root "$(pwd)" --self         (open — B is the caller)
+        B's argv:         --root /abs/path --self
+
+    The shell computed B's root before exec and `shlex.split` cannot undo a command
+    substitution, so **B does not match its own record** while A's literal matches B's
+    argv exactly. One hit, wrong agent, labelled `exact`. Reported 2026-09-08 by a cold
+    read, after the `open_ids` fix.
+
+    THE RULE THIS LANDS ON: a single exact hit is not evidence that the caller was
+    identified — it is only evidence that ONE agent typed these tokens. The caller may be
+    unable to match its own record at all, so both keys are computed ALWAYS and the
+    candidate set is their union. A confident answer requires that the union hold exactly
+    one agent; anything else is reported as ambiguous WITH the ids, and `--agent <id>`
+    recovers a real verdict from there. Ambiguous is the better failure: it costs a
+    re-run, and being wrong costs a successor briefed from another agent's transcript.
+
+    IDENTITY IS NOT COMMAND TEXT, and this is the honest limit. `platform.md` fact 23b
+    measured self-identification with ONE agent in the session and read "one hit,
+    unambiguous"; that does not generalise, and no environment channel names the calling
+    agent (fact 23b's own negative finding covers the model, and there is no agent-id
+    variable either). Until one exists, exact identification is impossible in the general
+    case and this function's job is to say so rather than to return a confident hit.
+    """
+    shape = _argv_shape(argv)
+
+    def _open_cmds(a):
+        return [c for c, i in _recorded_commands(a["path"]) if i in a["open_ids"]]
+
+    exact = [a for a in agents if any(_command_runs(c, shape) for c in _open_cmds(a))]
+    loose = [a for a in agents
+             if any(_command_runs_loosely(c, shape) for c in _open_cmds(a))]
+    ids = {a["agent_id"]: a for a in exact}
+    ids.update({a["agent_id"]: a for a in loose})
+    if len(ids) == 1 and as_name:
+        # CONFIRMING EVIDENCE IS CONSULTED WHEREVER IT EXISTS, not only where it breaks a
+        # tie. `--as` was read only in the `len(ids) > 1` branch, so in the ordinary
+        # single-candidate case the caller handed over the one thing that could settle
+        # identity and it was discarded — while the row printed directly beneath showed
+        # `type` matching the `--as` the caller had just passed. Both agreed, on screen,
+        # and nothing looked.
+        #
+        # MEASURED IN A LIVE RUN 2026-09-08: two real Leads each passed `--as`, each was
+        # the sole candidate, and each was told `NOT proof this is you`. Because the NOTE
+        # is keyed to "not confirmed", that caveat then printed on EVERY run forever —
+        # and a caveat that always fires is one nobody reads by the third time.
+        #
+        # Same shape as `open_ids` and as the completion notices: a discriminator that
+        # exists, is available at the point of decision, and is not consulted.
+        only = next(iter(ids.values()))
+        if only["type"] == as_name:
+            return only, (f"confirmed by --as {as_name} against the sole candidate's "
+                          f"own agent type")
+        return None, (f"the only candidate is `{only['type']}`, not `{as_name}` — either "
+                      f"the name is wrong or this agent is not in the listing")
+    if len(ids) == 1:
+        # ONE MEMBER IS NOT CERTAINTY, and calling it `exact` conflated them. The caller
+        # can be ABSENT from the candidate set entirely — the flush window this function's
+        # last branch already names means its own tool_use may not be on disk yet — and a
+        # single sibling with an open matching call then forms a one-member union that
+        # gets labelled `exact`. Same wrong-agent shape as the `$(pwd)` case, arriving
+        # through the flush window instead. Reported 2026-09-08: the union rule made the
+        # confident answer rarer without making it honest.
+        #
+        # So the label now says what was actually established: ONE candidate was found.
+        # `--as` is the only key that gets to say `confirmed`, because it is the only one
+        # matched against something the caller knows about ITSELF rather than against
+        # text that any agent could have typed. Everything else keeps the NOTE, which is
+        # scoped to "not confirmed" for exactly this reason.
+        only = next(iter(ids.values()))
+        return only, ("sole candidate by exact command match — NOT proof this is you; "
+                      "the caller can be missing from its own transcript" if exact
+                      else "sole candidate by flags only (an argument value was computed "
+                           "before exec)")
+    if len(ids) > 1 and as_name:
+        # NARROWED BY WHAT THE CALLER KNOWS ABOUT ITSELF, NOT BY HOW IT TYPED A COMMAND.
+        # The union rule is correct and it degrades exactly where a boundary check matters
+        # most: in a busy session several agents have the same self-check open, so the
+        # answer is honestly ambiguous and the reader falls back to a manual `--agent`
+        # step. Reported as a property rather than a defect 2026-09-08 — and it is, but a
+        # discriminator was available that is not command text.
+        #
+        # An employee knows its own NAME; it is the identity its handbook is written
+        # under. `agentType` in the meta record carries the same name, so `--as <name>`
+        # separates concurrent agents of DIFFERENT roles, which is the common shape of a
+        # busy department. Two agents of the SAME role running at once stay ambiguous,
+        # which is rarer and is honest.
+        #
+        # NOT the defect the earlier repair made. That one put an employee NAME where
+        # `--brief` needs a harness token and exited 2. These are different flags with
+        # different keys: `--as` matches a name against a name, and `--brief` still takes
+        # only the id, still copied from the printed line and never composed.
+        narrowed = {i: a for i, a in ids.items() if a["type"] == as_name}
+        if len(narrowed) == 1:
+            only = next(iter(narrowed.values()))
+            return only, (f"confirmed by --as {as_name}, narrowed from {len(ids)} "
+                          f"candidates")
+        if not narrowed:
+            return None, (f"no agent among the {len(ids)} candidates is `{as_name}` — "
+                          f"check the name against the listing below")
+        ids = narrowed
+    if len(ids) > 1:
+        hint = ("" if as_name else
+                " (or re-run with `--as <your employee name>` to narrow by role)")
+        return None, (f"{len(ids)} agents could be this caller "
+                      f"({', '.join(sorted(ids))}); re-run with `--agent <your id>`{hint}")
+    return None, ("no agent has this command open — not running as a subagent, or the "
+                  "transcript has not been flushed yet")
 
 
 def _handbooks(root):
@@ -440,6 +779,34 @@ def _insert_clause(body):
     return seg + "\n" + CLAUSE + body[end:]
 
 
+def _strip_marked_bullet(body):
+    """(body without the marked bullet, the bullet itself), or None if unmarked.
+
+    The marker sits on the bullet's LAST line, so the span is found by walking BACK from
+    it to the `- ` that opened it. The bullet is returned too because the CALLER decides
+    whether removing it is authorized, and it decides that by hashing these bytes.
+    """
+    m = CLAUSE_MARKER_RX.search(body)
+    if not m:
+        return None
+    lines = body.splitlines(keepends=True)
+    off, last = 0, None
+    for i, ln in enumerate(lines):
+        if off <= m.start() < off + len(ln):
+            last = i
+            break
+        off += len(ln)
+    if last is None:
+        return None
+    first = last
+    while first > 0 and not lines[first].lstrip().startswith("- "):
+        first -= 1
+    if not lines[first].lstrip().startswith("- "):
+        return None
+    return ("".join(lines[:first] + lines[last + 1:]),
+            "".join(lines[first:last + 1]))
+
+
 def wire(root, execute):
     """Install the boundary clause into every delegating handbook; write the record.
 
@@ -447,13 +814,71 @@ def wire(root, execute):
     handbook that already carries the clause is recorded as PRE-EXISTING and never
     touched, which is what makes --unwire safe: it removes only what this wrote.
     """
-    rows, skipped = [], []
+    # WHAT THIS RUN ALREADY WROTE HERE, by path. `wire` is the only producer of these
+    # shas, so a bullet still hashing to one is text this mechanism wrote and has not
+    # been touched since — which is the whole basis for replacing it without asking.
+    known = {}
+    _rp = os.path.join(root, RECORD)
+    if os.path.isfile(_rp):
+        try:
+            with open(_rp, encoding="utf-8", errors="replace") as fh:
+                for _r in (json.load(fh).get("wired") or []):
+                    if _r.get("clause_sha"):
+                        known[_r["path"]] = _r["clause_sha"]
+        except (ValueError, OSError):
+            known = {}
+
+    rows, skipped, refreshed, stale, current = [], [], [], [], []
     for path, tier, body in _handbooks(root):
         if tier not in (1, 2):
             continue
         rel = os.path.relpath(path, root)
         if CLAUSE_MARKER_RX.search(body):
-            rows.append({"path": rel, "preexisting": True})
+            # PRESENT IS NOT UP TO DATE, and testing only the marker made those the same
+            # thing. A handbook carrying ANY marked bullet was recorded `preexisting` and
+            # skipped with no comparison against `CLAUSE`, so every project that ran
+            # `--wire` before a wording change was frozen on whatever the constant said
+            # that day — and the run reported `already present`, a number that reads like
+            # success. MEASURED 2026-09-08: the tool's clause was 1380 bytes and the
+            # deployed one 1006, missing a branch added to repair a defect, and `--wire`
+            # said `5 already present · 0 to write`. Reversing it by hand was
+            # `--unwire --execute` then `--wire --execute`, a dance nothing tells anyone
+            # to do, which a project that never hears from a maintainer never learns.
+            #
+            # THIS IS THE THREE-PATHS DISEASE ONE LEVEL IN (SKILL.md § Directives): the
+            # fix reaches the tool and stops at the door of every org that installed the
+            # previous one.
+            found = _strip_marked_bullet(body)
+            if found is None:
+                rows.append({"path": rel, "preexisting": True})
+                continue
+            rest, bullet = found
+            if bullet == CLAUSE:
+                # ALREADY CURRENT, and tracked separately from a fresh write. Counting it
+                # as "to write" made a second `--wire` claim work it would not do — the
+                # mirror of the bug this branch exists to fix, and caught by re-running.
+                current.append(rel)
+                rows.append({"path": rel, "preexisting": False,
+                             "clause_sha": hashlib.sha256(CLAUSE.encode()).hexdigest()})
+                continue
+            if hashlib.sha256(bullet.encode()).hexdigest() != known.get(rel):
+                # Either a human edited it, or it predates this mechanism. Both are the
+                # case `--unwire`'s conservatism exists for, so it is kept — but it is
+                # REPORTED stale rather than counted as present, because "we left your
+                # edit alone" and "you are up to date" are different facts.
+                stale.append(rel)
+                rows.append({"path": rel, "preexisting": True})
+                continue
+            new = _insert_clause(rest)
+            if new is None:
+                skipped.append((rel, "no `## Guardrails` section to append to"))
+                continue
+            if execute:
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(new)
+            refreshed.append(rel)
+            rows.append({"path": rel, "preexisting": False,
+                         "clause_sha": hashlib.sha256(CLAUSE.encode()).hexdigest()})
             continue
         new = _insert_clause(body)
         if new is None:
@@ -470,7 +895,7 @@ def wire(root, execute):
         with open(rp, "w", encoding="utf-8") as fh:
             json.dump({"clause_sha": hashlib.sha256(CLAUSE.encode()).hexdigest(),
                        "wired": rows}, fh, indent=2)
-    return rows, skipped
+    return rows, skipped, refreshed, stale, current
 
 
 def unwire(root, execute):
@@ -499,11 +924,27 @@ def unwire(root, execute):
             continue
         with open(path, encoding="utf-8", errors="replace") as fh:
             body = fh.read()
-        if CLAUSE not in body:
-            kept.append((row["path"], "clause edited since it was written — left as the user has it"))
-            continue
-        want = (body.replace("\n" + CLAUSE, "\n", 1) if "\n" + CLAUSE in body
-                else body.replace(CLAUSE, "", 1))
+        if CLAUSE in body:
+            want = (body.replace("\n" + CLAUSE, "\n", 1) if "\n" + CLAUSE in body
+                    else body.replace(CLAUSE, "", 1))
+        else:
+            # A CLAUSE THIS SCRIPT WROTE UNDER AN OLDER WORDING IS STILL OURS TO REMOVE;
+            # A CLAUSE A HUMAN EDITED IS NOT. Matching only the CURRENT `CLAUSE` string
+            # conflated the two, so the day the shipped wording changed (2026-09-08) every
+            # clause already in the field became irreversible — a path in with no path out
+            # (references/enforcement.md). The record already holds the answer: `wire`
+            # stamped each row with the sha of the exact text it wrote, so bytes that still
+            # hash to it have not been touched since, whatever this version now ships.
+            found = _strip_marked_bullet(body)
+            if found is None:
+                kept.append((row["path"],
+                             "no clause marker found — left as the user has it"))
+                continue
+            want, bullet = found
+            if hashlib.sha256(bullet.encode()).hexdigest() != row.get("clause_sha"):
+                kept.append((row["path"],
+                             "clause edited since it was written — left as the user has it"))
+                continue
         # READ BACK WHAT WAS WRITTEN. The removal must change the file by EXACTLY the
         # clause and nothing else — a reversal is believed, so one that cannot show its
         # own delta is worse than none. Everything the user owns sits in the same
@@ -529,23 +970,37 @@ def unwire(root, execute):
     return removed, kept
 
 
-def _own_open_calls(a, argv_needle):
-    """How many of this agent's still-open tool calls are THIS invocation."""
-    n = 0
-    try:
-        with open(a["path"], encoding="utf-8", errors="replace") as fh:
-            for ln in fh:
-                if argv_needle not in ln:
-                    continue
-                r = json.loads(ln)
-                for it in ((r.get("message") or {}).get("content") or []):
-                    if (it.get("type") == "tool_use"
-                            and it.get("id") in a["open_ids"]
-                            and argv_needle in json.dumps(it.get("input") or {})):
-                        n += 1
-    except Exception:
-        return 0
-    return n
+def _own_open_calls(a, argv):
+    """1 when one of this agent's still-open tool calls IS this invocation, else 0.
+
+    Matched the same way `identify_self` matches, and falling back to the same weaker
+    flags-only key, because a discount that used only the exact key silently did nothing
+    whenever identification had come from the loose one — the agent then reported
+    HANDOFF-WAIT against its own self-check and could never see a safe boundary. Found
+    by the `handoff-self` fixture, 2026-09-08.
+
+    CAPPED AT 1, DELIBERATELY. This invocation is exactly one open tool call, and the
+    loose key can match more than one record. Over-discounting is the dangerous
+    direction: it subtracts real open work and declares a boundary safe that is not.
+    Under-discounting only reports HANDOFF-WAIT when HANDOFF was available, which costs
+    a cycle and breaks nothing.
+    """
+    shape = _argv_shape(argv)
+    recorded = [(c, i) for c, i in _recorded_commands(a["path"]) if i in a["open_ids"]]
+    if any(_command_runs(c, shape) for c, _i in recorded):
+        return 1
+    return 1 if any(_command_runs_loosely(c, shape) for c, _i in recorded) else 0
+
+
+def is_done(x):
+    """Has this agent finished? A COMPARISON, never a lookup.
+
+    A completion notice older than the transcript's last write belongs to an earlier stop
+    that was then RESUMED, so the agent is running again and the notice must not silence
+    it. Extracted 2026-09-08 because the parent got this test and its CHILDREN did not.
+    """
+    return (x.get("done_ts") is not None and x.get("last_ts") is not None
+            and x["done_ts"] >= x["last_ts"].timestamp())
 
 
 def verdict(a, watch, handoff, children):
@@ -553,16 +1008,29 @@ def verdict(a, watch, handoff, children):
     unsafe = []
     if a["open"]:
         unsafe.append(f"{a['open']} open tool call(s)")
+    # A CHILD'S COMPLETION NOTICE COUNTS, AND IT DID NOT. `last_stop != "end_turn"` was
+    # the whole liveness test for a child, and 20 of 102 measured agents finish on
+    # `tool_use` rather than `end_turn` (module docstring). Such a child is recent, so
+    # `age < STALE_SECONDS`, and its stop reason is not `end_turn` — so it counted as
+    # STILL RUNNING for the full half hour after it legitimately finished.
+    #
+    # THE CLAUSE FIRES AT EXACTLY THE MOMENT THIS IS GUARANTEED WRONG. A Lead reaches a
+    # phase boundary *because* its children have just returned, so the boundary check ran
+    # against freshly-finished children every time, returned HANDOFF-WAIT, and the clause
+    # read that as "keep working" — dispatch again. Not a loud failure: a confident wrong
+    # answer at the one moment the guardrail exists to be right. Reported 2026-09-08.
+    #
+    # The agent's own `done_ts` was compared ten lines below and a child's never was, so
+    # the fix is to use the SAME test rather than a second liveness rule.
     running_kids = [c for c in children
                     if c["age"] is not None and c["age"] < STALE_SECONDS
-                    and c["last_stop"] != "end_turn"]
+                    and c["last_stop"] != "end_turn" and not is_done(c)]
     if running_kids:
         unsafe.append(f"{len(running_kids)} child agent(s) still running")
     # DONE OUTRANKS IDLE, AND IT IS A COMPARISON RATHER THAN A LOOKUP. A completion
     # notice older than the transcript's last write belongs to an earlier stop that was
     # then RESUMED, so the agent is running again and the notice must not silence it.
-    if a.get("done_ts") is not None and a["last_ts"] is not None \
-            and a["done_ts"] >= a["last_ts"].timestamp():
+    if is_done(a):
         return "DONE", unsafe
     if a["age"] is not None and a["age"] >= STALE_SECONDS:
         return "IDLE", unsafe
@@ -594,6 +1062,16 @@ def write_brief(a, store, watch, handoff):
     w(f"# Continuation brief — {a['type']} ({a['agent_id']})")
     w("")
     w(f"<!-- generated by wf-handoff from {a['path']} -->")
+    # WHICH AGENT THIS BRIEF IS ABOUT, AND ON WHOSE WORD. `--brief` is a separate
+    # invocation from `--self` and receives the id as an argument, so this process
+    # cannot know whether that id was matched exactly, matched on flags alone, or typed
+    # by hand. The brief OUTLIVES the session and is read by a successor who never saw
+    # the listing it came from, so it states the id's provenance rather than implying
+    # one. Raised 2026-09-08: an approximate identification a reader cannot tell from an
+    # exact one is how a wrong handoff gets written into an artifact.
+    w(f"<!-- subject `{a['agent_id']}` was NAMED ON THE COMMAND LINE, not verified as "
+      f"the caller by this run. If it came from a `--self` line reported `flags only`, "
+      f"confirm it against that listing before acting on this brief. -->")
     w(f"<!-- context {a['context']:,} · peak {a['peak']:,} · wall {fmt_dur(a['wall'])} "
       f"· {a['turns']} turns · {a['tool_calls']} tool calls -->")
     w("")
@@ -660,7 +1138,16 @@ def main():
     ap.add_argument("--transcripts")
     ap.add_argument("--agent")
     ap.add_argument("--self", dest="self_", action="store_true")
+    ap.add_argument("--as", dest="as_name",
+                    help="your employee name, to narrow --self when several agents "
+                         "are live; matched against the agent type, never against "
+                         "the harness id --brief needs")
     ap.add_argument("--brief")
+    ap.add_argument("--out",
+                    help="write the brief to this path instead of stdout. Without it the "
+                         "brief goes to stdout and a reader must invent a redirect and a "
+                         "filename, while the clause tells them to write it into their "
+                         "run directory")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--json")
@@ -690,18 +1177,39 @@ def main():
         if args.wire and args.unwire:
             _die("--wire and --unwire are opposites; pass one")
         if verb == "wire":
-            rows, skipped = wire(args.root, args.execute)
-            new = [r for r in rows if not r.get("preexisting")]
+            rows, skipped, refreshed, stale, current = wire(args.root, args.execute)
+            _done = set(refreshed) | set(current)
+            fresh = [r for r in rows
+                     if not r.get("preexisting") and r["path"] not in _done]
             pre = [r for r in rows if r.get("preexisting")]
             print(f"wf-handoff --wire{'' if args.execute else ' (display only)'} — {args.root}")
-            for r in new:
+            for r in fresh:
                 print(f"  + {r['path']}")
+            for rel in refreshed:
+                print(f"  ~ {rel}  REFRESHED — carried an older wording this tool wrote")
             for r in pre:
-                print(f"  = {r['path']}  already carried the clause; not touched")
+                if r["path"] in stale:
+                    print(f"  ! {r['path']}  STALE and KEPT — its clause differs from this "
+                          f"version and was NOT written by this tool, so it is a human "
+                          f"edit. Reconcile it by hand")
+                else:
+                    print(f"  = {r['path']}  already carried a clause this tool "
+                          f"did not write; not touched")
+            for rel in current:
+                print(f"  = {rel}  already current")
             for rel, why in skipped:
                 print(f"  ! {rel}  {why}")
-            print(f"\n  {len(new)} to write · {len(pre)} already present · {len(skipped)} skipped")
-            if args.execute and new:
+            # THE FIVE OUTCOMES ARE COUNTED SEPARATELY, never folded into one number.
+            # `already present` was a single count covering a clause that was current,
+            # one frozen on an older wording, and one a human had edited — three states
+            # needing three different actions, all reported as success. That is the whole
+            # defect. Any future tidy-up that sums two of these re-creates it, which is
+            # why `bin/check` asserts the five by name rather than by the shape of this
+            # line.
+            print(f"\n  {len(fresh)} to write · {len(refreshed)} to refresh · "
+                  f"{len(current)} already current · {len(stale)} stale (kept) "
+                  f"· {len(skipped)} skipped")
+            if args.execute and (fresh or refreshed):
                 print(f"  reversal record: {RECORD} — undo with `wf-handoff --unwire --execute`")
             elif not args.execute:
                 print("  nothing written. Re-run with --execute.")
@@ -725,18 +1233,57 @@ def main():
     for a in agents:
         a["done_ts"] = done.get(a["agent_id"])
 
+    self_failed = self_why = None
     if args.self_:
-        me, why = identify_self(agents, " ".join(sys.argv))
+        me, why = identify_self(agents, sys.argv, args.as_name)
         if not me:
-            _die(f"--self could not identify this agent: {why}")
-        # THIS CALL IS ITSELF AN OPEN TOOL CALL. An agent checking its own boundary has
-        # written a tool_use for this very command and has not received its result, so
-        # without this discount --self could never report a safe boundary and the whole
-        # self-check would be dead on arrival. Found by running it. The discount is
-        # exact, not a fudge: the record discounted is the one carrying this argv.
-        me["open"] = max(0, me["open"] - _own_open_calls(me, " ".join(sys.argv)))
-        me["self_discount"] = True
-        args.agent = me["agent_id"]
+            # NOT `_die`. A `--self` that cannot name the caller still holds everything
+            # the caller needs — the table, the verdicts, and the `--brief` line for
+            # every agent that is due — and throwing it away turned a recoverable miss
+            # into a dead end with no output at all. The boundary clause now has a
+            # branch for this, so the reader is told what to do instead of reading a
+            # bare exit code. Exits 4 — distinct from a usage error (2) and from
+            # `due, act` (3), which was already taken.
+            self_failed = why
+            args.all = True
+        else:
+            # WHICH KEY MATCHED IS EVIDENCE AND IS PRINTED. `flags only` means an
+            # argument value was computed before `exec` and could not be compared, so
+            # the identification is sound but weaker than an exact command match. A
+            # reader acting on a boundary verdict should be able to see that without
+            # reading this file.
+            self_why = why
+            # THIS CALL IS ITSELF AN OPEN TOOL CALL. An agent checking its own boundary
+            # has written a tool_use for this very command and has not received its
+            # result, so without this discount --self could never report a safe boundary
+            # and the whole self-check would be dead on arrival. Found by running it. The
+            # discount is exact, not a fudge: the record discounted is the one carrying
+            # this argv.
+            me["open"] = max(0, me["open"] - _own_open_calls(me, sys.argv))
+            me["self_discount"] = True
+            args.agent = me["agent_id"]
+
+    # THE DISCOUNT IS SELF-JUSTIFYING, so `--agent <id>` recovers a real boundary result
+    # and ambiguity stops being a dead end. It applies only when the NAMED agent has an
+    # open tool call that IS this invocation, which is true exactly when that agent is
+    # the caller — so a manager inspecting a subordinate with `--agent` gets no discount
+    # and nothing is weakened. Without it, the only recovery the ambiguity message could
+    # offer was one that reported `HANDOFF-WAIT` forever: `--agent` alone left this run's
+    # own in-flight Bash call counted against the agent it belongs to. Reported
+    # 2026-09-08 — "nothing reachable from the handbook recovers a boundary result".
+    if args.agent and not args.self_:
+        for a in agents:
+            if a["agent_id"] == args.agent and _has_open_self_check(a, sys.argv):
+                a["open"] = max(0, a["open"] - 1)
+                a["self_discount"] = True
+                # NOT "confirmed". `_has_open_self_check` tests only that this agent
+                # has SOME open call to a program with this basename, which is true of
+                # every Lead mid-check — the word was doing work the test does not do,
+                # which is the vacuous-assertion shape in a status line. Reported
+                # 2026-09-08.
+                self_why = ("named with --agent; it does have this program open, which "
+                            "does not establish that it is you")
+                break
 
     watch, handoff, how_thr = thresholds(agents, args.limit)
     kids = {}
@@ -749,7 +1296,24 @@ def main():
         match = [a for a in agents if a["agent_id"] == args.brief]
         if not match:
             _die(f"no agent {args.brief} in {store}/subagents/")
-        sys.stdout.write(write_brief(match[0], store, watch, handoff))
+        body = write_brief(match[0], store, watch, handoff)
+        if args.out:
+            # A PRODUCER FOR THE THING THE CLAUSE ASKS FOR. The brief went to stdout only,
+            # and the clause said "write the brief into your run directory" — so the one
+            # step the reader could not copy was the step that produces the artifact, and
+            # both the redirect syntax and the filename had to be invented. Reported
+            # 2026-09-08.
+            _p = args.out if os.path.isabs(args.out) else os.path.join(args.root, args.out)
+            os.makedirs(os.path.dirname(_p) or ".", exist_ok=True)
+            with open(_p, "w", encoding="utf-8") as fh:
+                fh.write(body)
+            # READ BACK, like every other write in this file.
+            with open(_p, encoding="utf-8", errors="replace") as fh:
+                if fh.read() != body:
+                    _die(f"brief read-back mismatch at {_p}")
+            print(f"wrote {_p} ({len(body.splitlines())} lines) — fill sections 3-7")
+        else:
+            sys.stdout.write(body)
         return 0
 
     shown = [a for a in agents if args.agent is None or a["agent_id"] == args.agent]
@@ -759,10 +1323,19 @@ def main():
         shown = [a for a in shown if a["age"] is not None and a["age"] < STALE_SECONDS]
     shown.sort(key=lambda a: -a["context"])
 
-    due = [a for a in agents if a["verdict"] == "HANDOFF"]
+    # Narrowed to the SHOWN agent when one was named, so a `--self` run prints exactly
+    # one `--brief` line and the clause's singular "that line" has a single referent. A
+    # whole-session listing still reports every agent that is due.
+    due = [a for a in (shown if args.agent else agents) if a["verdict"] == "HANDOFF"]
 
     if not args.quiet:
         print(f"wf-handoff — {store}")
+        if args.self_ and not self_failed:
+            print(f"  --self       identified {args.agent} — {self_why}")
+        if self_failed:
+            print(f"  --self       COULD NOT IDENTIFY THIS AGENT: {self_failed}")
+            print(f"               Every agent is listed below instead. Find your own "
+                  f"row and use its id.")
         print(f"  store      {how}")
         print(f"  thresholds watch {watch:,} · handoff {handoff:,}   ({how_thr})")
         print(f"  liveness   IDLE past {STALE_SECONDS}s without a write; "
@@ -776,22 +1349,81 @@ def main():
         elif not shown:
             print("  no active agents — nothing to report (n=0, not an error)")
         else:
-            print(f"  {'agent':19}{'type':20}{'context':>10}{'peak':>10}{'wall':>8}"
+            # THE ID COLUMN IS SIZED TO THE LONGEST ID, NEVER TRUNCATED. A fixed
+            # `[:18]` silently cut every longer id — 83 of 1,231 transcripts in this
+            # machine's store, 6.7%. The reader is told to find their own row and copy
+            # the id into `--agent`, so a truncated id is a recovery route that reaches
+            # `_die` and exits 2, which is the one branch the clause could not cover.
+            # An identifier a reader is instructed to COPY may never be abbreviated for
+            # layout. Reported 2026-09-08. The `type` column is still clipped: nothing
+            # tells anyone to retype it.
+            _idw = max(18, max((len(a["agent_id"]) for a in shown), default=18)) + 1
+            print(f"  {'agent':{_idw}}{'type':20}{'context':>10}{'peak':>10}{'wall':>8}"
                   f"{'age':>8}  verdict")
             for a in shown:
-                print(f"  {a['agent_id'][:18]:19}{a['type'][:19]:20}{a['context']:>10,}"
+                print(f"  {a['agent_id']:{_idw}}{a['type'][:19]:20}{a['context']:>10,}"
                       f"{a['peak']:>10,}{fmt_dur(a['wall']):>8}{fmt_dur(a['age']):>8}"
                       f"  {a['verdict']}"
                       + (f" — {'; '.join(a['unsafe'])}" if a["unsafe"] else ""))
         print()
-        if due:
+        if self_failed:
+            # NO `--brief` LINES ON THIS PATH. `args.agent` stays None when identification
+            # fails, so `due` spans every agent in the session and these lines belong to
+            # OTHER agents. The clause two sentences earlier says to run the printed line
+            # exactly as printed; a reader who reaches that sentence before the exit
+            # branch below it writes somebody else's brief. Raised 2026-09-08: a branch
+            # that fixes how a verdict is READ does not defuse the instruction above it.
+            others = [a for a in agents if a["verdict"] == "HANDOFF"]
+            if others:
+                print(f"  {len(others)} agent(s) in this session are due, but this run "
+                      f"could not tell which is you,")
+                print(f"  so no follow-up command is printed. Do NOT run one for an id "
+                      f"you have not confirmed is yours.")
+            else:
+                print("  nothing in this session is due for handoff")
+        elif due:
+            # SCOPED TO "NOT EXACT", NEVER TO ONE REASON. The first version fired only
+            # on `flags only`, which is the HONEST failure — and stayed silent on the
+            # dishonest one, where a stale sibling record matched and was labelled
+            # `exact`. A safeguard scoped to the case that announces itself is not a
+            # safeguard. Reported 2026-09-08.
+            if self_why and "confirmed" not in self_why:
+                print(f"  NOTE: this agent was identified by `{self_why}`, not by an "
+                      f"exact match on its own open call.")
+                print(f"        Confirm the id below is yours before running it — the "
+                      f"brief it writes")
+                print(f"        records the id and is read later by someone who cannot "
+                      f"check.")
             print(f"  {len(due)} agent(s) DUE and at a safe boundary. For each:")
             for a in due:
-                print(f"    wf-handoff --brief {a['agent_id']}")
+                # sys.argv[0] IS by construction a path that just worked — it is how
+                # this process was invoked. Printing the bare name instead told the
+                # reader to run something not on PATH, and `wf-checkrun` scores that
+                # exit 127 (2026-09-08). `--root` is echoed back because the follow-up
+                # has to reach the same store this run read.
+                # THE FOLLOW-UP CARRIES WHAT RESOLVED THE STORE, not just `--root`.
+                # `--root` alone re-derives the store through a harness-internal path
+                # encoding, so a run whose store came from `--transcripts` or from
+                # `CLAUDE_CODE_SESSION_ID` printed a command that could not find it and
+                # exited 2 — into the one branch the clause could not cover. The clause
+                # says to run the line EXACTLY AS PRINTED, so the line has to stand on
+                # its own. `store` is the path this run actually read, so passing it back
+                # is a fact rather than a re-derivation.
+                #
+                # FOUND BY RUNNING THE CHAIN (`bin/e2e-handoff` leg 7), not by reading it.
+                # Four cold reads over the clause and the tool did not surface this,
+                # because it only appears when the printed command is executed.
+                print(f"    {_invocation()} --root {shlex.quote(args.root)} "
+                      f"--transcripts {shlex.quote(store)} "
+                      f"--brief {a['agent_id']}")
             print("  The successor spawn is the MANAGER's act, never this script's "
                   "(references/handoff.md).")
         else:
-            waiting = [a for a in agents if a["verdict"] == "HANDOFF-WAIT"]
+            # Narrowed like `due`, for the same reason: a run asked about ONE agent
+            # must not report a count spanning the whole session as if it were about
+            # the agent on screen.
+            waiting = [a for a in (shown if args.agent else agents)
+                       if a["verdict"] == "HANDOFF-WAIT"]
             if waiting:
                 print(f"  {len(waiting)} agent(s) over the threshold but mid-work — "
                       f"left alone. A handoff inside a half-finished unit is worse than "
@@ -814,6 +1446,11 @@ def main():
                            for a in agents],
             }, fh, indent=2, default=str)
 
+    # 4 BEFORE 3. A run that could not identify the caller did not measure the caller,
+    # so it must not report the caller's boundary as clear — and it must not claim `due`
+    # either, since `due` here spans every agent in the session rather than this one.
+    if self_failed:
+        return 4
     return 3 if due else 0
 
 

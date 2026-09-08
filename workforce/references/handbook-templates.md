@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 41 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 42 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -511,6 +511,10 @@ Open it with the work order's `REQUEST (verbatim):` block quoted unchanged, then
 evidence table: one row per exit criterion, naming the line, file, or output that satisfies it —
 `UNMET` stated, never omitted, where one is not. A work order with no REQUEST block is not yours to
 fill in: return `QUESTION: no originating ask in the work order` instead of guessing.
+**A cold-read PROBE is the one exception, because it is not a work order.** The release gate
+dispatches it with no REQUEST block by design: its originating ask IS the `## Probe` task. When you
+were dispatched to execute `## Probe`, follow that section, write the `OUTPUT.md` it names, and
+return its verdict — do not return `QUESTION:` for the missing block.
 Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
 and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
 there is nothing; never drop the heading.

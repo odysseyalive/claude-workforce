@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 30 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 16 assertion(s) in bin/check name this file; 31 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -346,6 +346,25 @@ someone can read instead of re-derive.
    documents already answer. When routing itself meets a conflict or an apparent contradiction,
    resolve it from the documents first; ask the user only when the sources genuinely conflict or
    none answers, and then with receipts.
+
+12b. **A returned `HANDOFF` means SPAWN A SUCCESSOR — never ask the returning agent to continue.**
+   An agent that reached its context boundary writes a continuation brief, names its path in its
+   `OUTPUT.md` under `## Exceptions`, and returns `HANDOFF` with the `OUTPUT.md` path. You are the
+   manager that verdict is addressed to, and the whole mechanism ends here: **the boundary clause
+   forbids an agent from replacing itself, so if you do nothing the work simply stops.**
+
+   Read the brief. Spawn a **fresh** employee of the same role, and hand it three things: the brief,
+   the originating `REQUEST (verbatim):` block unchanged, and the `UNMET` rows from the predecessor's
+   `OUTPUT.md` as its work order. Never re-dispatch the agent that handed the brief back — its
+   context is the reason the brief exists, and asking it to carry on is the failure the boundary
+   check was built to prevent. Verify the brief the way rung 12 verifies any other return: sections
+   3-7 filled, the work order in section 1 reproduced verbatim rather than summarized.
+
+   **A `HANDOFF` you leave unread is worse than a stalled run**, because the predecessor already
+   stopped and reported success at stopping. *Added 2026-09-08: `wf-handoff` shipped, five Lead
+   handbooks carried the clause, and `HANDOFF` had no consumer anywhere in `.claude/` — an agent
+   could complete every step the clause asks and nothing downstream was instructed to do anything
+   with the result. Found by a cold read of the deployed org, not by any check here.*
 
 13. **Whatever reaches the user is written the way you would say it.** Answer first, one idea per
    sentence, no explanation nobody asked for, and no word from this file's own vocabulary — a reader

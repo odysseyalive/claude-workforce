@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 77 assertion(s) in bin/check name this file; 154 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 78 assertion(s) in bin/check name this file; 155 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1093,6 +1093,30 @@ amend, and any one of them alone leaves the org in this state.
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute            # cover new sacred blocks
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute --restamp  # and what THIS run moved
 ```
+
+**PRECONDITION — count the symlinks first, and never bulk-edit `.claude/agents/*.md` in place.**
+This step touches every registered handbook at once, and a registration may be a symlink into a
+skill directory rather than a regular file. Run the census before the first write and again after:
+
+```bash
+"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" | grep -E 'symlinks|aliases'   # before
+# ... the wf-stamp calls below ...
+"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" | grep -E 'symlinks|aliases'   # after
+```
+
+**If either count dropped, a write destroyed a link — STOP and restore from the pre-run backup.**
+The counts are already computed, so this costs two greps and catches the whole class.
+
+**Do NOT reach for `sed -i` here, or for any other rewrite-and-rename tool.** GNU `sed -i` writes a
+temp file and renames it over the target, so it replaces a symlink with a regular file *even when
+the pattern matched nothing* — `find -exec`, `perl -i` and their relatives all do. `wf-stamp` writes
+through the target and is the reason this step has a producer at all; a hand-rolled loop beside it
+is the thing that goes wrong. *Measured 2026-09-08 on `odyssey-alive`: a `sed -i` restamp across
+`.claude/agents/*.md` converted three symlinked adopted agents into frozen regular copies. None of
+them carried a `hired:` stamp, so nothing substituted and the edit was a no-op — and all three links
+died anyway. It was caught only because `wf-census`'s `aliases` count went 3 → 0 and somebody looked
+at the delta. the T5 symlink refusal in `SKILL.md` carries the matching rule.* Full record:
+`DEF-2026-09-08-bulk-sed-destroys-agent-symlinks`.
 
 **The `--directives` pair is the same step for the OTHER sidecar, and it is here for the same reason.**
 `.directives.sha` is what `wf-protect-directives` compares every edit against; a block with no row is

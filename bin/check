@@ -8574,11 +8574,22 @@ check("a path in has a path out, and the reversal has a producer",
       "the worst place to have it")
 check("the reversal is exact: matcher and command, never event alone",
       'if e.get("matcher") != matcher:' in _wsa
-      and 'h.get("command") == command' in _wsa
+      and "_same_command(h, command, root)" in _wsa
       and "if inner:" in _wsa,
       "removing a whole event key, or every entry under a matcher, would take a hook "
       "the user wired beside ours. The contract is that unwiring touches exactly the "
       "recorded rows — an entry holding other hooks keeps them")
+check("a hook command is matched after expansion, never as a raw string",
+      "def _norm_command" in _wsa
+      and "def _same_command" in _wsa
+      and "os.path.expandvars" in _wsa
+      and 'h.get("command") == command' not in _wsa,
+      "`\"$HOME/.claude/skills/workforce/bin/wf-protect-directives\"` and the absolute "
+      "form name the same script, and a raw `==` cannot see it. Measured 2026-09-08: "
+      "--wire-defaults reported `would register` for three hooks already wired, and the "
+      "three-paths directive has audit re-wire every run — one duplicate per audit, "
+      "forever. The unwire path is the worse half: it left the hook wired and reported "
+      "it removed")
 check("restoring a style that was absent DELETES the key",
       "outputStyle removed (it was absent before)" in _wsa
       and 'data.pop("outputStyle", None)' in _wsa,
@@ -9365,23 +9376,103 @@ try:
                 _fvar = getattr(_el[1], "id", None)
                 _mode = _el[2].value if isinstance(_el[2], _a2.Constant) else None
                 _pay = _el[3].value if isinstance(_el[3], _a2.Constant) else None
-                if _mode != "del" or not (_name and _fvar and _pay):
+                if _mode not in ("del", "append") or not (_name and _fvar and _pay):
                     continue
                 _target = _pconst.get(_fvar)
                 if not _target:
                     continue
                 _body = read(_target)
-                if _body and _body.count(_pay) > 1:
-                    _dupe_payloads.append(f"{_name!r} -> {_pay[:40]!r} x{_body.count(_pay)}")
+                if not _body:
+                    continue
+                _n_pay = _body.count(_pay)
+                if _mode == "append":
+                    # THE MIRROR CASE, and it is the same rule read the other way. An
+                    # `append` case adds a string and asserts a check fires; if that
+                    # string is ALREADY in the target, the append changes nothing that
+                    # was not already true and the case proves nothing — the exact
+                    # vacuity the `del` half guards against, arrived from the opposite
+                    # direction. None existed on 2026-09-08; the guard is here so the
+                    # next one cannot arrive silently, which is how the `del` one did.
+                    if _n_pay:
+                        _dupe_payloads.append(
+                            f"{_name!r} -> {_pay[:40]!r} is ALREADY in {_target}, so "
+                            f"appending it changes nothing and proves nothing")
+                    continue
+                if _n_pay > 1:
+                    _dupe_payloads.append(f"{_name!r} -> {_pay[:40]!r} x{_n_pay}")
+                elif _n_pay == 0:
+                    # ABSENT IS THE OTHER HALF, AND THIS CHECK DID NOT HAVE IT. Its title
+                    # said "exactly once" while it only ever tested `> 1`, so a payload
+                    # deleted or reworded out of its target passed silently and the case
+                    # mutated NOTHING — reporting a proven check that had not been
+                    # exercised. Found 2026-09-08 by running the cases directly: two were
+                    # vacuous, one of them created the same day by rewording the clause
+                    # a case pointed at. A check whose name claims more than it tests is
+                    # this project's own recurring defect, reproduced inside the guard
+                    # written to catch that class.
+                    _dupe_payloads.append(
+                        f"{_name!r} -> {_pay[:40]!r} NOT FOUND in {_target} — this case "
+                        f"mutates nothing and proves nothing")
 except Exception as _e:  # a diagnostic must not die on the input it diagnoses
     _dupe_payloads.append(f"could not parse bin/prove: {_e}")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# EVERY bin/prove CASE NAME MUST BE A CHECK NAME
+#
+# `bin/prove` attributes a case by EXACT name match: `if name in fails`. A case whose
+# name is a paraphrase of the check it breaks can never be attributed, so it reports
+# VACUOUS — "did NOT fire" — while the mutation is landing and the check IS going red.
+# The case then looks broken and the check looks untested, and both readings are wrong.
+#
+# MEASURED 2026-09-08: 43 of 543 cases, every one written the same day, every one a
+# freely-worded summary of its check. Reproduced by hand on a complete tree copy: the
+# named check fired exactly as intended and `prove` could not see it, because the two
+# strings differed. A CASE NAME IS NOT A LABEL, IT IS A JOIN KEY.
+#
+# This is the fourth costume of one shape today — a name claiming more than its body
+# tests, evidence selected by a filter narrower than the question, a fixture placed
+# where the code looks. Here the two halves of the same fact were written in two files
+# and never compared.
+# ─────────────────────────────────────────────────────────────────────────────
+_chk_src = read("bin/check")
+_check_names = set(re.findall(r'\ncheck\(\s*\n?\s*"((?:[^"\\]|\\.)*)"', _chk_src))
+# A CHECK NAME MAY BE AN f-STRING, and the literal scan cannot see one. `install: {_inst}
+# verifies every manifest file landed` names two real checks whose cases match at RUNTIME,
+# so a guard that only reads literals reports them as orphans — a false positive from a
+# filter narrower than its question, which is the very shape this guard exists to catch.
+# f-string names become patterns with `{...}` as a wildcard.
+_check_pats = [re.compile("^" + "".join(
+    ".*" if part.startswith("{") else re.escape(part)
+    for part in re.split(r"(\{[^}]*\})", _f)) + "$")
+    for _f in re.findall(r'\n\s*f"((?:[^"\\]|\\.)*)"\s*,\n', _chk_src) if "{" in _f]
+_orphan_cases = []
+try:
+    for _n in re.findall(r'\n    \(\s*"((?:[^"\\]|\\.)*)"\s*,\n', _prove_src):
+        if _n in _check_names:
+            continue
+        if any(_p.match(_n) for _p in _check_pats):
+            continue
+        _orphan_cases.append(_n)
+except Exception as _e:
+    _orphan_cases.append(f"could not parse bin/prove case names: {_e}")
 check(
-    "prove: every `del` payload occurs exactly once in its target",
+    "prove: every case name is exactly the name of the check it breaks",
+    not _orphan_cases,
+    f"{_orphan_cases[:6]}{'…' if len(_orphan_cases) > 6 else ''} — bin/prove attributes "
+    "a case by EXACT name match, so a paraphrase reports VACUOUS while the mutation "
+    "lands and the check goes red. The case looks broken, the check looks untested, and "
+    "both readings are wrong. A case name is a join key, not a label",
+)
+
+check(
+    "prove: every payload actually changes its target — `del` present once, "
+    "`append` absent",
     not _dupe_payloads,
     f"{_dupe_payloads} — bin/prove deletes the FIRST occurrence, so a payload that "
-    "appears twice hits the wrong copy and the assertion stays satisfied. The case "
-    "then reports on a mutation that changed nothing. Four instances in one session",
+    "appears twice hits the wrong copy and the assertion stays satisfied, and a payload "
+    "that appears ZERO times mutates nothing at all. Either way the case reports on a "
+    "change it did not make. Four duplicate instances in one session; the absent half "
+    "was unguarded until 2026-09-08, when two vacuous cases were found by running them",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -10832,7 +10923,8 @@ check("handoff: a finished agent is DONE, never IDLE, and the parent transcript 
       "fork was reported IDLE. A manager cleaning up on IDLE would kill work that succeeded.")
 
 check("handoff: DONE is a comparison against the last write, never a bare lookup",
-      'a["done_ts"] >= a["last_ts"].timestamp()' in _hoff
+      'x["done_ts"] >= x["last_ts"].timestamp()' in _hoff
+      and "def is_done(x):" in _hoff
       and "earlier stop that was then resumed" in _hnd,
       "A resumable agent notifies MORE THAN ONCE -- a turn-limit stop, then a real finish -- so a "
       "completion notice older than the transcript's last write belongs to a stop that was "
@@ -10903,6 +10995,432 @@ check("edges: audit Step 5g heals existing orgs, and prints INV-EDGES + INV-HAND
       "The fix must reach orgs that ALREADY EXIST, in-run, per Step 5c's heal clause - a "
       "template-only change reaches new hires and leaves every live org broken. Both invariant "
       "rows must exist for the run to be able to print what it healed.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE SIX AUDIT-FOUND DEFECTS (2026-09-08)
+#
+# Reported by a live `/workforce audit` on another project and each verified here with
+# line numbers. What they share is the reason none of them was caught: every one sat
+# behind a detector that tested for the PRESENCE of a string. `wf-conform` confirmed the
+# handoff clause present in five handbooks while it named a command that exits 127, and
+# printed the same green line either way. Presence and runnability are different
+# properties, and the assertions below are written against the second one.
+# ─────────────────────────────────────────────────────────────────────────────
+_h6 = read("workforce/bin/wf-handoff")
+_c6 = read("workforce/bin/wf-checkrun")
+_n6 = read("workforce/bin/wf-conform")
+_r6 = read("workforce/bin/wf-remainder")
+_s6 = read("workforce/SKILL.md")
+_a6 = read("workforce/references/procedures/audit.md")
+_t6 = read("workforce/references/handbook-templates.md")
+_g6 = read("workforce/references/staging.md")
+_w6 = read("workforce/bin/wf-settings-apply")
+_d6 = read("workforce/references/delegation-budget.md")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ASSERTIONS ABOUT THE CLAUSE TARGET ITS ALL-CAPS ANCHORS, NOT ITS SENTENCES.
+#
+# `CLAUSE` is a wrapped string literal that has been rewritten five times in one day,
+# and every rewrite silently invalidated assertions pointing at prose fragments — the
+# phrase survives in the text but is split across two source lines, so `in` is False
+# about a condition that is actually true. Two guards already catch that (the hard-wrap
+# check and the prove-payload check), and between them they caught every instance; this
+# note is so the next author does not re-create the work.
+#
+# The rule: match a SHORT contiguous fragment, and prefer the deliberate ALL-CAPS
+# anchors — `BEFORE YOU RUN THAT LINE`, `THE BRIEF IS AN EXTRA ARTIFACT`,
+# `COULD NOT IDENTIFY THIS AGENT`. They are placed to be matched, they say what the
+# clause is FOR rather than how it is worded, and a rewrite that removes one has changed
+# the contract rather than the prose — which is exactly when a check should go red.
+# ─────────────────────────────────────────────────────────────────────────────
+check("handoff clause: RETURNED is two things the reader can SEE, not a state to infer",
+      "its verdict line is in your hands" in _h6
+      and "exists on disk" in _h6
+      and "has NOT returned" in _h6,
+      "MEASURED IN A LIVE RUN 2026-09-08: a careful Lead following the bullet deliberately "
+      "ran its boundary check 1m57s BEFORE its child's last write, and diagnosed the "
+      "early timing about itself before either maintainer did. `after each direct report "
+      "returns` named a state the Lead has to INFER from a child that has gone quiet. Four "
+      "cold reads could not surface it — reading tests whether a trigger is "
+      "determinable, not whether it is observable at the moment it fires. So RETURNED is "
+      "now two things the reader can check: the verdict line is in hand AND the OUTPUT.md "
+      "it names exists on disk; looks-finished and gone-quiet are explicitly not returns")
+check("handoff clause: a cold reader can determine the trigger and run the command",
+      "after each direct report RETURNS and before you" in _h6
+      and "`~/.claude/skills/workforce/bin/wf-handoff --root" in _h6
+      and "it NEVER overrides the return" in _h6
+      and "a clear boundary" in _h6,
+      "three cold readers in three disjoint batches failed the predecessor on the same "
+      "three defects: `wf-handoff` bare exits 127, `phase boundary` is defined nowhere a "
+      "Lead reads, and `return the brief to your manager` sits beside a `Return ONLY:` "
+      "contract with no rule saying which wins. Each must be repaired IN the clause — a "
+      "reader who has to leave the handbook to run it does not run it")
+check("handoff: --wire REFRESHES a clause it wrote under an older wording",
+      "PRESENT IS NOT UP TO DATE" in _h6
+      and "REFRESHED — carried an older wording this tool wrote" in _h6
+      and "STALE and KEPT" in _h6
+      and "already current" in _h6,
+      "`wire` tested the marker and nothing else, so ANY marked bullet was recorded "
+      "preexisting and skipped with no comparison against `CLAUSE`. Every project that "
+      "ran --wire before a wording change was frozen on whatever the constant said that "
+      "day, and the run reported `already present` — a number that reads like success. "
+      "MEASURED 2026-09-08: tool clause 1380 bytes, deployed 1006, missing a branch "
+      "added to repair a defect, and --wire said `5 already present · 0 to write`. This "
+      "is the three-paths disease one level in: the fix reaches the tool and stops at "
+      "the door of every org that installed the previous one. Refreshed, stale and "
+      "already-current are counted SEPARATELY, because folding them together is what "
+      "made a frozen org look successful")
+_o6 = read("workforce/references/procedures/org.md")
+_p6 = read("workforce/references/platform.md")
+
+check("handoff: --as narrows by what the caller knows about ITSELF, not by command text",
+      "NARROWED BY WHAT THE CALLER KNOWS ABOUT ITSELF" in _h6
+      and 'narrowed = {i: a for i, a in ids.items() if a["type"] == as_name}' in _h6
+      and "--as <your employee name>" in _h6,
+      "the union rule is correct and it degrades exactly where a boundary check matters "
+      "most: in a busy session several agents have the same self-check open, so the "
+      "answer is honestly ambiguous and the reader falls back to a manual step. An "
+      "employee knows its own NAME — the identity its handbook is written under, carried "
+      "as `agentType` — so `--as` separates concurrent agents of DIFFERENT roles, the "
+      "common shape of a busy department. Same-role concurrency stays ambiguous, which is "
+      "rarer and honest. NOT the earlier defect: that put an employee name where `--brief` "
+      "needs a harness token; `--as` matches a name against a name")
+check("handoff: a recovery flag never joins the key it helps resolve",
+      "RECOVERY_FLAGS = {\"--as\", \"--agent\"}" in _h6
+      and "made the candidate set EMPTY" in _h6,
+      "a reader ADDS `--as` or `--agent` after being told to, so neither is in the "
+      "command already recorded in the transcript. The first `--as` shipped without this "
+      "and emptied the candidate set — adding the disambiguator changed the very argv "
+      "being matched. Same class as the `--agent` recovery bug: a recovery invocation is "
+      "not the recorded one, and any key built from the whole argv breaks the moment a "
+      "reader follows the instruction")
+check("handoff: one exact hit is not proof the CALLER was found",
+      "THE RULE THIS LANDS ON" in _h6
+      and "ids.update({a[\"agent_id\"]: a for a in loose})" in _h6
+      and "agents could be this caller" in _h6,
+      "the `open_ids` filter narrowed the window and did not close it, and the docstring "
+      "claimed it did. A sibling whose call is still OPEN is not excluded: the caller's "
+      "own argument may have been computed by the shell (`--root \"$(pwd)\"`) and "
+      "`shlex.split` cannot undo a command substitution, so THE CALLER CANNOT MATCH ITS "
+      "OWN RECORD while the sibling's literal matches the caller's argv exactly. One hit, "
+      "wrong agent, labelled `exact`. So both keys are computed ALWAYS and a confident "
+      "answer requires their UNION to hold exactly one agent. Ambiguous costs a re-run; "
+      "wrong costs a successor briefed from another agent's transcript. Fixture "
+      "handoff-self-openrace")
+check("platform: a claim about a relationship names the tiers it was measured between",
+      "MUST NAME THE TIERS IT WAS MEASURED BETWEEN" in _p6
+      and "written as if depth\nwere not a variable" in _p6,
+      "`the signal lives one level up` was measured on session-spawns-agent and stated "
+      "generally. One level up from an IC is its LEAD, so a Lead's reports notify inside "
+      "the Lead's own transcript and the collector never opened those — completion data "
+      "populated for Leads and None for every IC by construction, leaving the boundary "
+      "check with no signal for the very agents it asks about. Third instance in one day "
+      "of a fact measured at one depth and written as if depth were not a variable")
+check("handoff: --as is consulted wherever it exists, not only to break a tie",
+      "CONFIRMING EVIDENCE IS CONSULTED WHEREVER IT EXISTS" in _h6
+      and 'if only["type"] == as_name:' in _h6,
+      "`--as` was read only in the many-candidates branch, so in the ordinary "
+      "single-candidate case the caller handed over the one thing that could settle "
+      "identity and it was discarded — while the row printed directly beneath showed "
+      "`type` matching the `--as` just passed. MEASURED IN A LIVE RUN 2026-09-08: two "
+      "real Leads each passed `--as`, each was the sole candidate, and each was told "
+      "`NOT proof this is you`. Because the NOTE is keyed to not-confirmed, that caveat "
+      "then fires on EVERY run forever, and a caveat that always fires is one nobody "
+      "reads by the third time")
+check("handoff: a task-notification that names no agent is not an agent completion",
+      "A `task-notification` IS NOT ALWAYS ABOUT AN AGENT" in _h6
+      and "known = {os.path.basename(f)" in _h6,
+      "the same record shape reports a backgrounded Bash command finishing, keyed by a "
+      "short task id that names no transcript. Those were being collected as agent "
+      "completions. Harmless today because nothing joins on them, which is exactly why "
+      "it is worth removing: a key that matches nothing is invisible until the day it "
+      "matches something. The store already says which ids are agents, so the filter is "
+      "free")
+check("handoff: completion notices are collected from every transcript that carries them",
+      "EVERY TRANSCRIPT THAT CAN CARRY A NOTICE" in _h6
+      and 'glob.glob(os.path.join(store, "subagents", "agent-*.jsonl"))' in _h6,
+      "the fix is in COLLECTION, not comparison: `done_ts` was None for a Lead's children "
+      "by construction, so comparing it changed nothing. Measured: 122 subagent "
+      "transcripts on this machine carry `task-notification` records naming real sibling "
+      "agents. Without this the guardrail returns HANDOFF-WAIT for half an hour after a "
+      "child finishes — and a Lead reaches a phase boundary BECAUSE its children just "
+      "returned, so it was wrong at the one moment it fires")
+check("the boundary chain is EXECUTED, not only asserted about",
+      os.path.isfile("bin/e2e-handoff")
+      and "RUN the boundary check, RUN what it prints" in read("bin/e2e-handoff")
+      and "the printed command RUNS as printed" in read("bin/e2e-handoff"),
+      "nine defects came from four cold reads, each finding what the previous could not, "
+      "because every layer was sound in isolation and no two had met. `script-conformance` "
+      "runs ONE command; the clause is a CHAIN — identify, verdict, print a command, run "
+      "that command, produce a file. Running it found a defect four reads had missed: the "
+      "printed follow-up carried `--root` but not the `--transcripts` that had actually "
+      "resolved the store, so the command the clause says to run EXACTLY AS PRINTED could "
+      "not find it. Run `bin/e2e-handoff`")
+check("platform: MEASURED carries the conditions it was measured under",
+      "AND MAY NOT BE APPLIED OUTSIDE" in _p6
+      and "does not say the observation generalises" in _p6
+      and "positive universal from a single observation" in _p6,
+      "`MEASURED` said an observation was made and was read as saying it generalises. "
+      "Two instances a day apart: fact 23b's `one hit, unambiguous` taken with ONE agent "
+      "and carrying a design that only runs in multi-agent sessions, and the 172-line "
+      "ceiling measured on ONE IC handbook and applied to Leads. Neither was a wrong "
+      "measurement — both were correct measurements read as more general than the thing "
+      "measured, which no re-measurement fixes. The rule is that a fact states what it "
+      "covers, and a consumer whose situation is wider is using an assumption")
+check("platform: fact 23b records that single-hit self-identification does not generalise",
+      "WAS MEASURED WITH ONE AGENT IN THE SESSION" in _p6
+      and "Identity is not command text" in _p6
+      and "check on single-hit self-identification" in _p6,
+      "`one hit, unambiguous` was measured with ONE agent in the session and became the "
+      "basis of a design used in multi-agent ones. No environment channel names the "
+      "calling agent, so exact identification is impossible in the general case and a "
+      "tool returning a single confident hit claims what the platform does not offer. "
+      "The fact that a design rests on has to carry the limit of its own measurement")
+check("org: a returned HANDOFF has a consumer, and it spawns rather than re-dispatches",
+      "A returned `HANDOFF` means SPAWN A SUCCESSOR" in _o6
+      and "Never re-dispatch the agent that handed the brief back" in _o6,
+      "`wf-handoff` shipped, five Lead handbooks carried the clause, and `HANDOFF` had no "
+      "consumer anywhere: an agent could complete every step the clause asks and nothing "
+      "downstream was instructed to do anything with it. The clause forbids an agent from "
+      "replacing itself, so with no rung here the work simply stops — and the predecessor "
+      "has already reported success at stopping, which makes an unread HANDOFF worse than "
+      "a stalled run. Found by a cold read of a deployed org, not by any check here")
+# `.index()` RAISES; `.find()` RETURNS -1. The first version of this row used `.index()`
+# and a clause rewrite turned one missing phrase into a traceback that took the WHOLE run
+# down — 1,200 other assertions unreported because one string moved. An ordering check
+# must degrade to a failed row, never to a crashed suite.
+_ord_a = _h6.find("READ THE WHOLE OF THIS BULLET")
+_ord_b = _h6.find("run that line exactly as printed")
+check("handoff clause: the caveat precedes the instruction it governs",
+      _ord_a != -1 and _ord_b != -1 and _ord_a < _ord_b,
+      "`run it exactly as printed` sat fifteen sentences before the NOTE that governs it, "
+      "so a reader executing in written order ran the follow-up before reaching the "
+      "caveat. Same shape as the exit-4 case, where the fix worked because nothing was "
+      "left to obey early. A caveat downstream of its instruction is decoration")
+check("handoff clause: it defines the section it sends the reader to, and names UNMET",
+      "failed, was deferred, or was scoped out" in _h6
+      and "stated as `UNMET` rather than omitted" in _h6,
+      "`## Exceptions` is defined in `handbook-templates.md`, which a Lead never reads, "
+      "and an org authored before that sentence shipped has no such list at all — so the "
+      "clause referred to a section that might not exist. And `## Exit criteria` is a "
+      "conjunction of DONE conditions a mid-run stop cannot satisfy, so `write OUTPUT.md "
+      "as they require` reads as `satisfy them`; naming `UNMET` is the one word that "
+      "closes it")
+check("handoff: only an OPEN call can be the caller, so a stale sibling cannot claim it",
+      "ONLY AN OPEN TOOL CALL CAN BE THE CALLER" in _h6
+      and 'return [c for c, i in _recorded_commands(a["path"]) if i in a["open_ids"]]' in _h6
+      and "sole candidate by exact command match" in _h6,
+      "`_own_open_calls` already filtered on `open_ids`; the function whose ENTIRE JOB is "
+      "identification scanned every record in every transcript — the same asymmetry as "
+      "`_invocation` knowing argv[0] is absolute while the matcher compared it raw. A "
+      "CLOSED call from another agent could match and be returned as `exact`, silently, "
+      "with every verdict and the follow-up command computed on the wrong transcript. "
+      "The clause says to run the printed line exactly as printed, so that agent's "
+      "continuation brief lands in this agent's run directory. Reproduced on fixture "
+      "`handoff-self-collision`: pre-fix returns the sibling as `exact`")
+check("handoff: the not-exact NOTE covers every inexact key, not one named reason",
+      'if self_why and "confirmed" not in self_why:' in _h6
+      and "SCOPED TO \"NOT EXACT\", NEVER TO ONE REASON" in _h6,
+      "the first version fired only on `flags only` — the HONEST failure, which announces "
+      "itself — and was silent on the dishonest one where a stale record matched and was "
+      "labelled `exact`. A safeguard scoped to the case that announces itself is not a "
+      "safeguard")
+check("handoff: --agent recovers a real verdict, so ambiguity is not a dead end",
+      "def _has_open_self_check" in _h6
+      and "re-run with `--agent <your id>`" in _h6
+      and "THE DISCOUNT IS SELF-JUSTIFYING" in _h6,
+      "two agents with the same command genuinely open are indistinguishable by command "
+      "text, and inventing a tie-break would be guessing. So ambiguity is reported WITH "
+      "the candidate ids and a recovery that works — which it did not: `--agent` got no "
+      "self-discount, so its own in-flight call counted against it and the verdict was "
+      "HANDOFF-WAIT forever. The discount now applies whenever the NAMED agent has an "
+      "open call to this same program, true exactly when that agent is the caller and "
+      "false for a manager inspecting a subordinate. NOT fixed by making the clause "
+      "prescribe distinct spellings: a key that depends on readers spelling a command "
+      "differently from each other fails the first time two of them are careful")
+check("handoff clause: the recovery the tool names is the recovery the clause teaches",
+      "`--agent <the id from your row>` in place of `--self`" in _h6
+      and "COULD NOT IDENTIFY THIS AGENT" in _h6,
+      "the ambiguity message tells the reader to re-run with `--agent <your id>`, and a "
+      "Lead only ever reads the clause. A recovery named by the tool and absent from the "
+      "handbook reaches nobody")
+check("handoff --wire: the five outcomes are counted SEPARATELY and never summed",
+      all(t in _h6 for t in ("{len(fresh)} to write", "{len(refreshed)} to refresh",
+                             "{len(current)} already current",
+                             "{len(stale)} stale (kept)", "{len(skipped)} skipped"))
+      and "never folded into one number" in _h6,
+      "FOLDING THEM TOGETHER IS THE WHOLE DEFECT. `already present` was a single number "
+      "covering a clause that was current, one frozen on an older wording, and one a "
+      "human had edited — three states needing three different actions, reported as "
+      "success. Any future tidy-up that sums two of these re-creates the bug, so the "
+      "five are asserted here by name rather than by the shape of the line. Requested "
+      "2026-09-08 by the reader who found the original: this is the part to protect "
+      "hardest")
+check("handoff: a failed --self prints no `--brief` line for anyone else",
+      "NO `--brief` LINES ON THIS PATH" in _h6
+      and "could not tell which is you" in _h6,
+      "`args.agent` stays None when identification fails, so `due` spans every agent in "
+      "the session and those lines belong to OTHER agents. The clause says to run the "
+      "printed line exactly as printed, and a reader who reaches that sentence before "
+      "the exit branch below it writes somebody else's brief. A branch that fixes how a "
+      "verdict is READ does not defuse the instruction above it")
+check("handoff clause: the brief is an EXTRA artifact, never a substitute for OUTPUT.md",
+      "THE BRIEF IS AN EXTRA ARTIFACT" in _h6
+      and "never the brief's" in _h6,
+      "the first repair said `with the brief's path as your artifact path`, which "
+      "contradicts `## Reporting`'s `<path to OUTPUT.md>` and every `## Exit criteria` "
+      "requiring OUTPUT.md, while the same bullet claimed it never overrides the return "
+      "contract. It resolved the contradiction it named and created a quieter one. The "
+      "brief is now additive: OUTPUT.md is written as always and names the brief under "
+      "`## Exceptions`, so there is no precedence rule to get wrong")
+check("handoff: the nonzero SUCCESS exit is stated where a wrapper author will read it",
+      "NOTE THIS IS THE SUCCESS PATH AND IT IS NONZERO" in _h6,
+      "exit 3 means `due, act` — the one outcome this script exists to produce — and a "
+      "shell, a CI step or a Bash tool renders it as a failed command. Deliberate, so "
+      "`&&` cannot swallow a boundary that needs acting on, but anything wrapping this "
+      "must treat 3 as act rather than as broken")
+check("handoff: --self matches the command AS TYPED, not the post-shell argv",
+      "def _command_runs(recorded, shape):" in _h6 and "shlex.split" in _h6
+      and "identify_self(agents, sys.argv" in _h6
+      and "_own_open_calls(me, sys.argv)" in _h6,
+      "the transcript records the command a reader TYPED; `\" \".join(sys.argv)` is the "
+      "POST-shell form. `~` is expanded and quotes are stripped between them, and the "
+      "shipped clause tells the reader to type a tilde path with a quoted root — so the "
+      "matcher and the clause were guaranteed never to agree. `--self` reached `_die` "
+      "and exited 2 before printing any verdict, which made the clause's next four "
+      "sentences describe output that never appears. Found by a cold read of five Lead "
+      "handbooks 2026-09-08, one turn after the clause shipped. Same failure class as "
+      "the exit-127 defect the clause was written to repair, one layer down")
+check("handoff: a --self that cannot identify the caller prints the listing, never dies",
+      "COULD NOT IDENTIFY THIS AGENT" in _h6
+      and "if self_failed:\n        return 4" in _h6
+      and "exit 4  `--self` could not identify the caller" in _h6,
+      "throwing the run away turned a recoverable miss into a dead end with no output "
+      "at all — the reader got an exit code and nothing to act on. The listing still "
+      "holds every id and every `--brief` line, so it is printed and the run exits 4: "
+      "not a usage error (2) and not a clear boundary (0), because nothing about the "
+      "caller was measured")
+check("handoff: the brief states whose word its subject id is on",
+      "NAMED ON THE COMMAND LINE, not verified as" in _h6
+      and "exact match on its own open call." in _h6,
+      "`--brief` is a separate invocation from `--self` and receives the id as an "
+      "argument, so it cannot know whether that id was matched exactly, matched on "
+      "flags alone, or typed by hand. The brief OUTLIVES the session and is read by a "
+      "successor who never saw the listing, so an approximate identification a reader "
+      "cannot tell from an exact one is how a wrong handoff gets written into an "
+      "artifact. Both ends carry it: the follow-up line warns when the match was loose, "
+      "and the brief records that its subject was named rather than verified")
+check("handoff: the self-discount uses the same key that identified, and is capped at 1",
+      "def _own_open_calls" in _h6
+      and "_command_runs_loosely(c, shape) for c, _i in recorded" in _h6
+      and "CAPPED AT 1, DELIBERATELY" in _h6,
+      "a discount that used only the exact key silently did nothing whenever "
+      "identification came from the loose one, so the agent reported HANDOFF-WAIT "
+      "against its own self-check and could never see a safe boundary. Capped because "
+      "over-discounting subtracts real open work and declares a boundary safe that is "
+      "not; under-discounting only costs a cycle")
+check("conform: a node that reports to itself is named as that, not as a missing edge",
+      "reports-to itself" in _n6 and "terminates at itself" in _n6,
+      "`reports-to: <self>` makes the node its own manager, so an escalation from it "
+      "terminates at itself and nothing it raises ever leaves it. Caught in a shipped "
+      "fixture 2026-09-08 by the edge diff, which described it only as `does not list "
+      "it` — true, and the least interesting thing wrong with it")
+check("handoff: --self prints a command the reader can paste, not a bare name",
+      "def _invocation" in _h6 and "sys.argv[0]" in _h6,
+      "the script told the reader to run `wf-handoff --brief <id>` — the exact form it "
+      "now reports as exit 127 in a handbook. `sys.argv[0]` is by construction a path "
+      "that just worked")
+check("handoff: --self narrows `due` so the clause's singular 'that line' has one referent",
+      'due = [a for a in (shown if args.agent else agents)' in _h6,
+      "`due` was computed over every agent while the table was narrowed to self, so a "
+      "multi-agent session printed several candidate ids and the clause could not say "
+      "which was the reader's")
+check("handoff: unwire reverses a superseded wording and still keeps a human edit",
+      "def _strip_marked_bullet" in _h6
+      and 'hashlib.sha256(bullet.encode()).hexdigest() != row.get("clause_sha")' in _h6,
+      "matching only the CURRENT `CLAUSE` conflated two different things: text an older "
+      "version of this script wrote (ours, reversible) and text a human changed (theirs, "
+      "kept). The record stamps each row with the sha of what was written, so the bytes "
+      "answer it. Without this every clause in the field became irreversible the day the "
+      "shipped wording changed — a path in with no path out")
+check("settings-apply: a hook wired in both scopes is REPORTED, never silently unwired",
+      "def report_duplicate_firing" in _w6
+      and "def count_registrations" in _w6
+      and "report_duplicate_firing(root)" in _w6,
+      "the installer wires user scope so /workforce reaches every project; the "
+      "three-paths directive has audit wire project scope so a fix travels with the "
+      "repo. Both are wanted, neither knows about the other, and the hook fires twice "
+      "per turn — visible in a transcript as the standing-request context injected "
+      "twice. Measured 2026-09-08: all six defaults doubled on a live machine and "
+      "nothing said so. Reported and not repaired, because which scope keeps the "
+      "registration is the user's call and a tool that picked one would be deciding it")
+check("checkrun: only the row with a certain fix blocks; naming a command is not running it",
+      'cannot tell that from an instruction. This row blocks nothing' in _c6
+      and "may name a command in order to FORBID it" in _c6,
+      "a Guardrail that NAMES a command is not always instructing you to run it, and "
+      "this pass cannot tell which token is the sentence's imperative. Two live cases "
+      "2026-09-08, both correct prose: `./jstack.sh deploy` after a `NEVER` in a "
+      "prohibition whose whole job is to name what a reader must not run, and a "
+      "synthetic path inside a quoted printf payload. Both truly not on disk, both "
+      "irrelevant. The alternative was rewriting correct directive-backed prose to "
+      "satisfy a checker, which inverts what the checker is for. The bare `wf-*` row "
+      "still blocks: its fix is mechanical and certain")
+check("checkrun: a command wired into `## Guardrails` is resolved, not just counted present",
+      "def check_guardrails" in _c6 and "BARE_WF_RX" in _c6 and "GUARD_CMD_RX" in _c6,
+      "`## Verification` was the only section whose commands were resolved. A script "
+      "wrote a clause into `## Guardrails`, `wf-conform` confirmed it present, and the "
+      "first thing to read it as an instruction was a stranger who could not run it. "
+      "GUARD_CMD_RX exists because `CMDISH_RX` anchors on `[a-z]` and would skip every "
+      "absolute and `~`-relative invocation — which is the form the handbooks use")
+check("conform: the org chart's edges are diffed in both directions",
+      "def check_org_edges" in _n6
+      and "reports-to {parent}, which does not list it" in _n6
+      and "which has no handbook" in _n6,
+      "the ORG-RECORD comment is what a routing check reads. Measured 2026-09-08: two "
+      "employees named a parent whose `direct-reports` omitted them while the chart and "
+      "the `## Chain of Command` prose were both correct — so two fully-staffed seats "
+      "could be routed around and nothing else could have seen it")
+check("conform: the anti-gaslighting clause has a detector, and it is advisory",
+      "def check_anti_gaslight" in _n6 and "ANTI_GASLIGHT_RX" in _n6
+      and "no anti-gaslighting clause" in _n6,
+      "the 2026-09-02 directive made the clause mandatory and a one-line grep IS the "
+      "whole detector; it did not exist. Advisory because 18 of 23 live handbooks "
+      "predate it, and failing them all at once is the 9-false-failures run this "
+      "project cites as the lesson it must not repeat")
+check("conform: the IC ceiling is not applied to a Lead it was never measured on",
+      "Lead handbook length OBSERVED, not judged" in _n6
+      and "172 IS AN IC NUMBER AND IS NOT APPLIED TO A LEAD" in _d6,
+      "172 was measured by relocating ONE IC handbook until it would not shrink. A Lead "
+      "has no `## Procedure` to relocate and carries a department-wide `## Chain of "
+      "Command` and `## Probe`. Measured 2026-09-08 on a live org: smallest IC 141 "
+      "(reachable, still binding); smallest Lead 233, none of five under 172, seven "
+      "relocation passes reached it. Doctrine says the split is PERFORMED this run, so "
+      "an unreachable target spends real effort every audit and reports the same row")
+check("probe carve-out: both sides of the dispatch say a probe is not a work order",
+      "A cold-read PROBE is the one exception" in _t6
+      and "This dispatch carries no `REQUEST (verbatim):` block" in _g6,
+      "`## Reporting` mandates `QUESTION: no originating ask` for a work order with no "
+      "REQUEST block, and the release gate dispatches a probe without one BY DESIGN. A "
+      "cold executor following its handbook exactly — the whole point of a probe — reads "
+      "its own correct handbook as a defect and returns QUESTION: before reaching the "
+      "task. One rule, written on both sides of the dispatch")
+check("bulk sed: the T5 symlink refusal reaches a write that spans every handbook",
+      "THE REFUSAL IS ABOUT THE WRITE, NOT ABOUT T5" in _s6
+      and "never bulk-edit `.claude/agents/*.md` in place" in _a6,
+      "scoped to one registration write, T5 protected the write nobody was worried "
+      "about. GNU `sed -i` writes a temp file and renames it, so it replaces a symlink "
+      "with a regular file EVEN WHEN THE PATTERN MATCHED NOTHING. Measured 2026-09-08: "
+      "three symlinked adopted agents became frozen copies, silently, in a no-op edit. "
+      "The mechanical floor is free — wf-census already counts `symlinks` and `aliases`")
+check("remainder: the insertion anchor is tested against the sacred spans first",
+      "sacred = [(m.start(), m.end()) for m in SACRED_RX.finditer(text)]" in _r6
+      and "inside an immutable block" in _r6,
+      "'before the first `##` heading' never asked where that heading is. Against 21 "
+      "skills it placed the section correctly in 20 and inserted the 21st one line "
+      "INSIDE an `origin: user | immutable: true` span — the user's own words. The "
+      "detector already fired (`.directives.sha`, 1 failure in 435); what was missing is "
+      "the producer-side precondition, so the write is not attempted")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

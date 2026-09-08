@@ -113,7 +113,93 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-07
+## Open, as of 2026-09-08
+
+**Landed 2026-09-08 — six defects a live audit found in the distribution, and the two the repair
+introduced (v1.27.0).** Trigger: a peer session ran `/workforce audit` against a deployed project
+and reported six defects whose fix was in this tree rather than in the target. Every one was
+reproduced here before it was touched.
+
+- **What the six had in common is the finding.** Each sat behind a check that asked whether a
+  string was PRESENT — the right question for "did the section land", the wrong one for "can what
+  landed be RUN". Both print the same green line. `wf-conform` confirmed the handoff boundary
+  clause present in five handbooks while it named a command that exits 127.
+- **The clause was written by a script and read by nobody.** Three cold readers, three disjoint
+  batches, failed all five handbooks on the same three defects: `wf-handoff` named bare (not on
+  PATH, exit 127); "AT EVERY PHASE BOUNDARY" with "phase" defined nowhere a Lead reads; and
+  "return the brief to your manager" beside a `Return ONLY:` contract with no rule saying which
+  wins. `wf-checkrun` now resolves `## Guardrails`, not only `## Verification`.
+- **THE REPAIR HAD THE SAME DEFECT ONE LAYER DOWN, and this is the part worth keeping.**
+  `--self` compared `" ".join(sys.argv)` — the post-shell form — against a transcript that records
+  the command AS TYPED. The clause tells the reader to type a tilde path with a quoted root, so the
+  matcher and the clause could never agree: exit 2, no verdict, and the clause's next four
+  sentences described output that never appears. **It moved from 127 to 2.** The command was still
+  spelled one way for the reader and needed another way to work.
+- **It survived because `--self` had never run.** A grep of every recorded `wf-handoff` command in
+  the deployed project showed only `--wire` and source reads. `fixtures/scripts/handoff-self` is
+  its first exercise: it records the typed form while the runner execs the shell-expanded form of
+  the same line.
+- **Fixing it exposed a worse bug no cold read could have found.** The self-discount matched on the
+  exact key only, so identification could succeed while the discount silently did nothing — and the
+  agent then reported `HANDOFF-WAIT` against its own self-check, permanently unable to see a safe
+  boundary. A document review reads text against source; it does not run a tool across a state
+  transition. Capped at 1, because over-discounting subtracts real open work.
+- **A detector fired on its own author's clause**, one turn after the clause was written, because
+  the clause quoted a command shape as an example. And its first cut called `/timesheet pull` and
+  `I/we wrote about` dead commands. Both narrowed, and the path-based row is now heuristic and
+  non-blocking: a Guardrail may name a command in order to FORBID it, and rewriting correct
+  directive-backed prose to satisfy a checker inverts what the checker is for.
+- **The 172-line ceiling was an IC measurement applied to Leads.** Smallest live IC 141 (reachable,
+  still binding); smallest Lead 233, none of five under 172. `wf-conform` now observes a Lead's
+  length and orders nothing, and `delegation-budget.md` names the measurement that is owed rather
+  than inventing a number.
+- **`--wire` could never update a clause that already existed**, so the repair above reached the
+  tool and stopped at the door of every org that had installed the previous wording. It tested the
+  marker and skipped. Measured: tool clause 1380 bytes, deployed 1006, `--wire` reporting
+  `5 already present · 0 to write`. **This is the three-paths directive one level in** — that rule
+  exists because a fix only a human types reaches only the machines somebody typed it on; this is
+  the next layer, where a fix only a producer carries reaches only the trees that had not already
+  run the producer. It refreshes its own older wording now, keeps and NAMES a human edit, and
+  counts five outcomes separately because folding them into `already present` is the whole defect.
+- **The last finding is the one that hides the others: a checker lying about its own coverage.**
+  `bin/check`'s "every `del` payload occurs exactly once" tested only `count > 1`, so a mutation
+  case whose payload had been reworded out of its target deleted nothing and reported a check it
+  never exercised — which had already happened, hours earlier, to a case pointing at the clause.
+  The guard against vacuous cases contained one. **An assertion that can only fail in one direction
+  tests half of what its name says.** Read every assertion's name as a claim and ask which
+  directions of failure its body can detect. The mirror (`append` of a string already present) is
+  now guarded too, before an instance existed, and both directions are proven by mutation.
+- **The feature had never been executed, and that explains the whole shape of the exchange.** Four
+  cold reads, each finding what the previous could not, each earlier fix correct and incomplete in a
+  way only visible once it landed. `bin/e2e-handoff` now walks the chain — build a two-agent store,
+  run the check, read the printed command OFF THE OUTPUT, run it as printed, confirm the artifact
+  lands. Ten legs. **It failed on its first execution** on something four reads had missed: the
+  printed follow-up carried `--root` but not the `--transcripts` that had resolved the store, so the
+  command the clause says to run exactly as printed could not find its own store. A single-command
+  fixture cannot test a chain.
+- **A fixture placed to match the code instead of the harness tests the code against itself.** The
+  first version of that runner wrote the completion notice where the collector looks rather than
+  where the harness puts it, and the leg passed green while the defect was live.
+- **Third instance of one shape in one day: a fact measured at one depth, written as if depth were
+  not a variable.** `read_completions`'s "the signal lives one level up" was measured session-to-
+  agent; one level up from an IC is its Lead, so a Lead's reports notify inside the Lead's own
+  transcript and the collector never opened those. Completion data existed for Leads and was `None`
+  for every IC by construction, so the boundary check had no signal for the very agents it asks
+  about. With fact 23b and the length ceiling that is three. **A claim about a relationship must
+  name the tiers it was measured between.**
+- **Two rules about writing rules came out of this and are worth more than the patches.** First:
+  *remove the precedence question, do not answer it* — the first repair ranked the brief against
+  `## Reporting` and created a quieter contradiction than the one it fixed; making the brief
+  additive left nothing to rank. A precedence rule is what a tired reader gets wrong at 2am. Second:
+  *a result you were hoping for is exactly when to check that the test ran* — a verification of the
+  refresh silently matched nothing and reported the hoped-for answer, and a test that confirms what
+  you wanted is indistinguishable from a test that never executed.
+- Also: hook commands compared as raw strings (one duplicate registration per audit, forever);
+  no chart-to-handbook edge diff (two live seats routable-around) and no self-parent detection;
+  no detector for the anti-gaslighting clause; T5's symlink refusal not reaching a bulk edit
+  (`sed -i` destroys a symlink even when the pattern matches nothing); and `wf-remainder` inserting
+  `## Interface` inside an immutable block. Record:
+  `DEF-presence-checks-cannot-see-runnability`.
 
 **Landed 2026-09-07 — a finished agent was indistinguishable from a hung one (v1.23.0).** Trigger:
 the user, watching a live session — *"I've noticed there is an agent that has been alive here for 2h"*

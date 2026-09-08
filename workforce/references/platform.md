@@ -1,6 +1,6 @@
 # Platform Facts
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 26 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — read before designing any delegation, tier, or handbook frontmatter. -->
 
 ## Header — the constants, stated once
@@ -34,6 +34,46 @@ upgrade, and § Derived constants for why no other file restates these numbers.
 ---
 
 ## MEASURED — confirmed on this host
+
+**A MEASURED FACT CARRIES THE CONDITIONS IT WAS MEASURED UNDER, AND MAY NOT BE APPLIED OUTSIDE
+THEM.** `MEASURED` says an observation was made; it does not say the observation generalises. Every
+fact below must state what was true when it was taken — how many agents, how many spawns, which
+tier, which depth — and any consumer whose situation is *wider* than that is using a documented
+assumption, not a measurement, and is barred from blocking on it exactly as the `DOCUMENTED` section
+is.
+
+**Two instances found a day apart, which makes it a pattern rather than a coincidence:**
+
+- **Fact 23b** read *"Run live, one hit, unambiguous"* — taken with ONE agent in the session, and
+  then carried a self-identification design that only ever runs in multi-agent ones. Two silent
+  misidentifications followed. Corrected in place 2026-09-08.
+- **The handbook length ceiling** (`delegation-budget.md` § The handbook length ceiling, which owns
+  the number and is the only file that states it) was measured by relocating ONE IC handbook and was
+  applied to Leads, which have no `## Procedure` to relocate at all. No Lead could reach it and every
+  audit spent real effort trying. Corrected 2026-09-08.
+
+Neither was a wrong measurement. Both were correct measurements read as more general than the
+thing measured, which is a failure a re-measurement does not fix and a wider one does not either —
+the fix is that the fact says what it covers.
+
+**A CLAIM ABOUT A RELATIONSHIP MUST NAME THE TIERS IT WAS MEASURED BETWEEN.** This is the same rule
+one level in, and it produced the third instance the same day: `read_completions`'s *"an agent's own
+transcript carries no terminal record — the signal lives one level up"* was measured on
+session-spawns-agent and stated generally. One level up from an IC is its **Lead**, not the session,
+so a Lead's direct reports notify inside the Lead's own transcript and the collector never opened
+those files. Completion data was therefore populated for Leads and `None` for every IC *by
+construction*, and the boundary check — which asks whether an agent's CHILDREN are still running —
+had no signal at all for the agents it was asked about. Measured on this machine 2026-09-08: 122
+subagent transcripts carry those records.
+
+All three of the day's instances have one shape: **a fact measured at one depth, written as if depth
+were not a variable.** So write the tiers into the claim — "session to agent", "Lead to IC" — and a
+reader one tier down can see immediately whether it covers them.
+
+**A positive universal from a single observation is the shape to distrust**; a negative claim
+refuted by one counterexample (fact 2b) generalises correctly and needs no such caveat. When adding
+a fact here, write the conditions before writing the conclusion, and when consuming one, check its
+conditions against your situation rather than its verdict.
 
 ### Fact 1 — Delegation bottoms out three layers below main ✅
 
@@ -392,9 +432,31 @@ Evidence: same file.
 says the code is running inside a subagent; `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=3` reports the depth
 ceiling from the harness itself, agreeing with § header `TIER-LIMIT`.
 
-Self-identification is **exact rather than inferred**: the calling agent wrote a `tool_use` record
-carrying the command text *before* the command ran, so a script finds itself by searching that
-session's transcripts for its own argv. Run live, one hit, unambiguous.
+Self-identification is **by lookup rather than inference**: the calling agent wrote a `tool_use`
+record carrying the command text *before* the command ran, so a script finds itself by searching
+that session's transcripts for its own argv. Run live, one hit, unambiguous.
+
+**CORRECTED 2026-09-08 — "one hit, unambiguous" WAS MEASURED WITH ONE AGENT IN THE SESSION, AND IT
+DOES NOT GENERALISE.** Two independent failures were found in a multi-agent session, both by cold
+read against a deployed org:
+
+- A sibling that ran the same command earlier has a CLOSED call, and matching without filtering on
+  open tool calls returned it as the caller.
+- A sibling whose call is still OPEN is not excluded by that filter either. The caller's own
+  argument may have been computed by the shell (`--root "$(pwd)"`), and `shlex.split` cannot undo a
+  command substitution — so **the caller cannot match its own record** while the sibling's literal
+  matches the caller's argv exactly. One hit, wrong agent.
+
+**Identity is not command text.** No environment channel names the calling agent:
+`CLAUDE_CODE_CHILD_SESSION` says only *that* you are a subagent, and the negative finding below
+covers the model. So exact identification is **impossible in the general case**, and a tool that
+returns a single confident hit is claiming something the platform does not offer.
+
+What is sound: compute every key, take the UNION of the candidates, and answer confidently only
+when it holds exactly one agent. Anything else is ambiguity, reported with the candidate ids and a
+recovery that names an agent explicitly. `wf-handoff` does this; fixtures
+`handoff-self-collision` and `handoff-self-openrace` hold both failures. **Do not build a blocking
+check on single-hit self-identification.**
 
 **Negative finding, so it is not re-hunted:** none of these names the agent's *model*. Fact 12's
 negative result stands.

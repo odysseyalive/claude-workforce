@@ -494,6 +494,91 @@ def show(p, root):
     return os.path.relpath(p, root) if p.startswith(os.path.normpath(root) + os.sep) else p
 
 
+# A shipped `wf-*` script named with NO path. Every other wf-* invocation in a handbook
+# carries one, so a bare name is a wiring slip rather than a style: nothing puts the skill's
+# bin/ on PATH, and the reader gets exit 127.
+BARE_WF_RX = re.compile(r"^wf-[a-z][a-z0-9-]*$")
+
+# Command-shaped, for the `## Guardrails` pass only. `CMDISH_RX` anchors on `[a-z]`, so it
+# skips every absolute or `~`-relative invocation — which is exactly the form the handbooks
+# use, and would have left the pass resolving nothing at all. A leading `-` still fails to
+# match, so a quoted flag fragment (`--brief <agent-id>`, shown as the SHAPE of a printed
+# line rather than as a command to run) is not mistaken for an invocation. NOT `re.I`:
+# with it, the prose fragment `I/we wrote about` parsed as a command named `I/we`.
+GUARD_CMD_RX = re.compile(r"^(?:[~./]|[a-z])[\w./~-]*(?:\s+\S+)+$")
+
+
+def check_guardrails(path, body, masked, root, rep, governed):
+    """Resolve the command tokens a `## Guardrails` bullet tells the reader to RUN.
+
+    `## Verification` is not the only section that wires a command. The handoff boundary
+    clause is written into `## Guardrails` by a script, `wf-conform` confirmed it present,
+    and the first thing to read it as an instruction was a cold reader who could not run it:
+    the clause named `wf-handoff` bare and exited 127 in five handbooks at once
+    (2026-09-08). Presence and runnability are different properties and only one of them
+    was ever measured.
+
+    Deliberately NARROWER than the `## Verification` pass. There is no `Check:` contract
+    here, so `undeclared` and the unbound-placeholder heuristic would fire on ordinary
+    prose in every handbook in the population. Only two shapes are reported: a path-like
+    command that is not on disk, and a bare `wf-*` name. Anything undecidable is skipped.
+    """
+    span = section_span(masked, "## Guardrails")
+    if not span or span == "AMBIGUOUS":
+        # Presence of the section is wf-conform's verdict, and ambiguity already
+        # printed its own row against the whole file. Neither is repeated here.
+        return
+    seg = body[span[0]:span[1]]
+    seen = set()
+    for raw in BACKTICK_RX.findall(FENCE_RX.sub("", seg)):
+        raw = raw.strip()
+        if not GUARD_CMD_RX.match(raw):
+            continue
+        token = raw.split()[0].strip("'\"")
+        if token in seen:
+            continue
+        seen.add(token)
+        if BARE_WF_RX.match(token):
+            rep.add(show(path, root), "not-runnable", raw[:80],
+                    f"`{token}` is named with no path. The skill's bin/ is not on PATH, "
+                    f"so this exits 127. Write it as "
+                    f"`~/.claude/skills/workforce/bin/{token}`", blocking=governed)
+            continue
+        # ONLY AN EXPLICIT FILE INVOCATION IS RESOLVED. `git`, `pnpm` and friends live on
+        # PATH, which is not ours to police. And a leading slash is far more often a
+        # SLASH COMMAND than an absolute path: `/timesheet pull` and `/invest spend
+        # <stock_id>` are dispatched by the harness and have no file behind them, but a
+        # first draft of this pass resolved them and reported six dead commands that were
+        # all fine. So an absolute path must have at least two segments, and everything
+        # else has to say it is a file by starting `~/` or `./`.
+        if not (token.startswith(("~/", "./"))
+                or (token.startswith("/") and token.count("/") > 1)):
+            continue
+        abspath, exists = resolve_token(token, root)
+        if abspath is None:
+            continue          # undecidable: an unexpanded var or a placeholder
+        if not exists:
+            # NEVER BLOCKING, unlike the bare-name row above. A Guardrail that NAMES a
+            # command is not always INSTRUCTING you to run it, and this pass cannot tell
+            # the difference: the token is not necessarily the sentence's imperative.
+            # Reported 2026-09-08 from a live org, two cases, both correct prose —
+            # `./jstack.sh deploy` sitting after a `NEVER` in a prohibition whose whole
+            # job is to name the command a reader must not run, and a synthetic path
+            # inside a quoted `printf` payload. Both are truly "not on disk" and both are
+            # irrelevant, and the script named in the first is real in another repo.
+            #
+            # So this is "look here" evidence and stays that (discovery.md § Reliability
+            # tiers: a HEURISTIC finding may never recommend an action). The alternative
+            # was rewriting correct, directive-backed prose to satisfy a checker, which
+            # inverts what the checker is for. The bare `wf-*` row keeps blocking because
+            # its fix is mechanical and certain: prepend the path.
+            rep.add(show(path, root), "dead", raw[:80],
+                    f"named here and not on disk: {show(abspath, root)}. HEURISTIC: a "
+                    f"Guardrail may name a command in order to FORBID it, and this pass "
+                    f"cannot tell that from an instruction. This row blocks nothing",
+                    blocking=False)
+
+
 def check_handbook(path, body, root, rep, resolver):
     name = show(path, root)
     seen_dead = set()
@@ -521,6 +606,10 @@ def check_handbook(path, body, root, rep, resolver):
                 "comment terminator and a fence marker — so what this file declares "
                 "cannot be read reliably. Close it",
                 blocking=True)
+
+    # BEFORE the `## Verification` early returns. A handbook with no Verification section
+    # still carries Guardrails, and its wired commands still have to be runnable.
+    check_guardrails(path, body, masked, root, rep, governed)
 
     span = section_span(masked)
     if span == "AMBIGUOUS":

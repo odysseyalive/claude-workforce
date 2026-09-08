@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""END-TO-END: build a two-agent store, RUN the boundary check, RUN what it prints.
+
+WHY THIS EXISTS. Every defect found in `wf-handoff` over 2026-09-08 — nine in the last
+cold read alone — came from READING the tool or its clause. Four consecutive reads each
+found something the previous one could not have, and each time the earlier fix was
+correct and incomplete in a way only visible once it landed. That is what a feature looks
+like when it has never actually been run: every layer sound in isolation, no two of them
+ever having met.
+
+`script-conformance` runs ONE command and asserts on its output. The boundary clause is a
+CHAIN — identify, verdict, print a command, run that command, produce a file — and a chain
+is exactly what a single-command fixture cannot test. So this walks the chain the way the
+clause tells a Lead to walk it, and the assertion is that each step's OUTPUT is usable as
+the next step's INPUT. Nothing here is asserted from the source; the id is read off the
+printed line, and the follow-up command is executed as printed rather than reconstructed.
+
+Run it directly. Exits 0 when every leg passes.
+"""
+import json, os, shlex, subprocess, sys, tempfile, shutil
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WF = os.path.join(ROOT, "workforce", "bin", "wf-handoff")
+NOW = 1788782400
+FAILS = []
+
+
+def leg(name, ok, detail=""):
+    print(f"  {'ok  ' if ok else 'FAIL'}  {name}" + (f"  {detail}" if not ok else ""))
+    if not ok:
+        FAILS.append(name)
+
+
+def agent(d, aid, role, cmd, ctx, closed, ts="2026-09-07T11:59:00.000Z", parent=None):
+    meta = {"agentType": role, "parentAgentId": parent}
+    with open(f"{d}/agent-{aid}.meta.json", "w") as fh:
+        json.dump(meta, fh)
+    rows = [{"type": "user", "message": {"role": "user", "content": "Build phase 16."},
+             "timestamp": "2026-09-07T11:20:00.000Z"}]
+    if cmd is not None:
+        rows.append({"type": "assistant", "message": {"role": "assistant",
+                     "usage": {"input_tokens": 2, "cache_read_input_tokens": ctx - 3,
+                               "cache_creation_input_tokens": 1},
+                     "stop_reason": "tool_use",
+                     "content": [{"type": "tool_use", "id": f"t-{aid}", "name": "Bash",
+                                  "input": {"command": cmd}}]}, "timestamp": ts})
+        if closed:
+            rows.append({"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": f"t-{aid}"}]},
+                "timestamp": ts})
+    with open(f"{d}/agent-{aid}.jsonl", "w") as fh:
+        fh.write("\n".join(json.dumps(r) for r in rows) + "\n")
+
+
+def run(tree, *args):
+    env = dict(os.environ, HOME=tempfile.mkdtemp(), WF_HANDOFF_NOW=str(NOW))
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    p = subprocess.run([sys.executable, WF, "--root", tree,
+                        "--transcripts", os.path.join(tree, "store", "sess1"), *args],
+                       capture_output=True, text=True, env=env, cwd=tree)
+    return p.returncode, p.stdout + p.stderr
+
+
+def main():
+    tmp = tempfile.mkdtemp(prefix="wf-e2e-")
+    tree = os.path.join(tmp, "proj")
+    d = os.path.join(tree, "store", "sess1", "subagents")
+    os.makedirs(d)
+    rundir = os.path.join(tree, ".claude", "workforce", "work", "run1", "engineering-lead")
+    os.makedirs(rundir)
+
+    # A LEAD AT A REAL PHASE BOUNDARY. Its own check is open (it is running right now).
+    # A sibling Lead of a different role has the same check open — the concurrency the
+    # union rule reports as ambiguous and `--as` resolves.
+    # Its CHILD finished on `tool_use`, not `end_turn`, which is the 20-of-102 case that
+    # used to force HANDOFF-WAIT for half an hour.
+    self_cmd = ('~/.claude/skills/workforce/bin/wf-handoff --root "$(pwd)" '
+                '--transcripts "store/sess1" --self --as engineering-lead')
+    agent(d, "englead000000000001", "engineering-lead", self_cmd, 250000, False)
+    agent(d, "contlead0000000001", "content-lead", self_cmd, 250000, False)
+    agent(d, "engic00000000000001", "engineering-site", None, 90000, False,
+          parent="englead000000000001")
+    # the child's own last record is a finished tool_use
+    agent(d, "engic00000000000001", "engineering-site",
+          "pnpm build", 90000, True, ts="2026-09-07T11:58:00.000Z",
+          parent="englead000000000001")
+    # and the parent session records its completion notice
+    # THE NOTICE IS TAGGED TEXT INSIDE THE RECORD, not JSON fields. The first version of
+    # this fixture invented `{"task_id": ..., "status": ...}` and the child stayed
+    # "running" — the fixture was wrong, not the tool, and only running the chain showed
+    # which. `read_completions` matches `<task-id>` and `<status>` in the serialised
+    # record, so a fixture that does not carry them is testing nothing.
+    # THE NOTICE GOES WHERE THE HARNESS PUTS IT: inside the LEAD's transcript, because a
+    # Lead's direct report notifies its own parent, not the session. The first version of
+    # this fixture wrote it into the session file — where the code happened to look — and
+    # leg 3 passed while the defect was live. A fixture placed to match the code instead
+    # of the harness tests the code against itself. Measured on this machine: 122
+    # subagent transcripts carry these records.
+    notice = ("<task-notification>\n<task-id>engic00000000000001</task-id>\n"
+              "<status>completed</status>\n</task-notification>")
+    with open(f"{d}/agent-englead000000000001.jsonl", "a") as fh:
+        fh.write(json.dumps({"type": "user", "message": {"role": "user",
+                             "content": notice},
+                             "timestamp": "2026-09-07T11:58:30.000Z"}) + "\n")
+
+    print("E2E — the boundary chain, executed rather than asserted about\n")
+
+    # LEG 1 — the clause's own command, ambiguous without --as
+    rc, out = run(tree, "--self")
+    leg("1. two live agents with the same check open are reported ambiguous",
+        rc == 4 and "COULD NOT IDENTIFY" in out and "could be this caller" in out,
+        f"rc={rc}")
+
+    # LEG 2 — --as resolves it, which is what the clause tells the reader to type
+    rc, out = run(tree, "--self", "--as", "engineering-lead")
+    leg("2. --as resolves to the right agent and says it is CONFIRMED",
+        "identified englead000000000001" in out and "confirmed by --as" in out, f"rc={rc}")
+
+    # LEG 3 — the child finished on tool_use; it must not block the boundary
+    leg("3. a child that finished on tool_use does not force HANDOFF-WAIT",
+        "child agent(s) still running" not in out and "HANDOFF-WAIT" not in out,
+        [l for l in out.splitlines() if "englead" in l][:1])
+
+    # LEG 4 — the verdict the whole clause turns on
+    leg("4. the verdict is HANDOFF and the exit code says act",
+        rc == 3 and "HANDOFF" in out, f"rc={rc}")
+
+    # LEG 5 — the printed line is READ OFF THE OUTPUT, never reconstructed
+    line = next((l.strip() for l in out.splitlines() if "--brief" in l), None)
+    leg("5. exactly one follow-up command is printed", bool(line), repr(line))
+    if not line:
+        return 1
+
+    # LEG 6 — the id in it is not truncated
+    ident = line.split("--brief", 1)[1].strip().split()[0]
+    leg("6. the printed id is complete, not clipped to the column width",
+        ident == "englead000000000001", f"got {ident!r}")
+
+    # LEG 7 — RUN IT, exactly as printed, with the --out the clause tells them to append
+    brief = os.path.join(rundir, "handoff-brief.md")
+    argv = shlex.split(line) + ["--out", brief]
+    argv[0] = WF
+    env = dict(os.environ, HOME=tempfile.mkdtemp(), WF_HANDOFF_NOW=str(NOW))
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    p = subprocess.run([sys.executable, *argv], capture_output=True, text=True,
+                       env=env, cwd=tree)
+    leg("7. the printed command RUNS as printed and exits 0",
+        p.returncode == 0, (p.stdout + p.stderr).strip()[:200])
+
+    # LEG 8 — the artifact the clause promises actually exists
+    ok = os.path.isfile(brief)
+    body = open(brief).read() if ok else ""
+    leg("8. the brief lands in the run directory as a file", ok, brief)
+    leg("9. it is about the right agent and carries the unfilled sections",
+        "englead000000000001" in body and "## 3." in body and "## 7." in body)
+    leg("10. it names its subject's provenance rather than implying it",
+        "NAMED ON THE COMMAND LINE" in body)
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    print(f"\n{10 - len(FAILS)} of 10 legs passed")
+    return 1 if FAILS else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
