@@ -62,6 +62,19 @@ def run_case(name, spec):
 def _run_in(tree, script, spec):
     env = dict(os.environ, CLAUDE_PROJECT_DIR=tree)
 
+    # HOME IS PART OF THE FIXTURE TOO, and it leaks further than any other variable.
+    # wf-census counts every hook wired for a project, user-scope registrations in
+    # ~/.claude/settings.json included, which is correct behaviour for a census and
+    # fatal for a fixture: `census-deadhook` asserted "3 wired" and passed for months
+    # only because the maintainer's own settings happened to hold no hooks. The moment
+    # six were wired there on 2026-09-07 it read 9 and went red, having tested nothing
+    # about the tree it was given. A fixture must not be able to see the machine it
+    # runs on. Each case gets an empty HOME; a row that genuinely needs a populated one
+    # sets it explicitly through `env`, which still wins because it is applied below.
+    _home = tempfile.mkdtemp(prefix="wf-conformance-home-")
+    env["HOME"] = _home
+    env.pop("XDG_CONFIG_HOME", None)
+
     # THE CHILD ENV IS PART OF THE FIXTURE when the script reads it. wf-preflight's
     # runtime-override receipt reads CLAUDE_CODE_SUBAGENT_MODEL and CLAUDE_EFFORT out
     # of the live environment, so inheriting the maintainer's shell would make those
@@ -88,9 +101,16 @@ def _run_in(tree, script, spec):
         p = subprocess.run([sys.executable, script, "--root", tree] + spec.get("args", []),
                            text=True, capture_output=True, env=env)
 
+    shutil.rmtree(_home, ignore_errors=True)
+
     out = p.stdout + p.stderr
     problems = []
-    if p.returncode != spec["exit"]:
+    # A ROW MISSING A REQUIRED KEY FAILS THAT ROW; it never takes the run down. A bare
+    # spec["exit"] raised KeyError out of the loop, so one malformed row made every other
+    # case unrunnable -- the same defect bin/check fixed for its expectations parse.
+    if "exit" not in spec:
+        problems.append("row has no 'exit' key")
+    elif p.returncode != spec["exit"]:
         problems.append(f"exit {p.returncode}, expected {spec['exit']}")
     for s in spec.get("want", []):
         if s not in out:

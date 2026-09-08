@@ -10527,6 +10527,24 @@ check("handoff: age is read from the last RECORD, never the file mtime",
       "reports a two-day-old fixture agent as seconds fresh and the IDLE case silently stops "
       "testing anything on every clone. The timestamps live in the file content and survive.")
 
+check("handoff: a finished agent is DONE, never IDLE, and the parent transcript is what says so",
+      "Quiet is not finished" in _hnd
+      and "def read_completions" in _hoff
+      and "task-notification" in _hoff
+      and '"DONE", unsafe' in _hoff,
+      "An agent's own transcript has NO terminal record -- done and hung are byte-identical from "
+      "the file alone. The parent session transcript carries task-notification records with "
+      "<task-id> and <status>, and wf-handoff must read them. Measured 2026-09-07: a finished "
+      "fork was reported IDLE. A manager cleaning up on IDLE would kill work that succeeded.")
+
+check("handoff: DONE is a comparison against the last write, never a bare lookup",
+      'a["done_ts"] >= a["last_ts"].timestamp()' in _hoff
+      and "earlier stop that was then resumed" in _hnd,
+      "A resumable agent notifies MORE THAN ONCE -- a turn-limit stop, then a real finish -- so a "
+      "completion notice older than the transcript's last write belongs to a stop that was "
+      "resumed. Trusting the notice alone marks a running agent DONE and silences it. The "
+      "resumed case is the only one that discriminates; fixture handoff-done pins both.")
+
 check("handoff: the per-tool-call hook is refused, with its reason recorded",
       "A `PostToolUse` hook is rejected" in _hnd and "poll wearing a hook's clothes" in _hnd,
       "handoff.md must record WHY the hook carrier is refused (fact 22 makes it buildable, so "

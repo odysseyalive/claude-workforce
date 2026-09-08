@@ -1,6 +1,6 @@
 # Handoff — replacing a long-running employee without losing the work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 10 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — Lead handbooks carry the boundary clause; `wf-handoff` measures; `audit` Step 5f installs it. -->
 
 A Lead's context grows for the whole run and nothing was watching it. The observation this file
@@ -40,6 +40,35 @@ subagent appends a transcript while it runs, carrying per-turn token usage and t
 than a feature it lacks — the successor spawn is a manager's act (§ Who performs a handoff). Its
 docstring carries the method and the four things it does not measure; that list is not repeated here.
 
+
+### Quiet is not finished, and a manager must not confuse them
+
+**An agent's own transcript carries no terminal record. It simply stops.** A run that succeeded and a
+run that hung are byte-identical from the file alone, and `.meta.json` has no completion field either.
+MEASURED 2026-09-07: a fork that had finished hours earlier was reported `IDLE` against this project's
+own store — the detector working exactly as written, on a distinction it could not draw.
+
+The signal lives one level up. The **parent** session's transcript — the sibling `<session-id>.jsonl`
+beside the session directory — carries `task-notification` records naming `<task-id>` and `<status>`.
+`wf-handoff` reads it and returns **`DONE`** where it applies, and `DONE` is never `IDLE`.
+
+**It is a comparison, not a lookup.** A resumable agent notifies more than once — a turn-limit stop,
+then a real finish — so a completion notice OLDER than the transcript's last write belongs to an
+earlier stop that was then resumed. That agent is running again and the stale notice must not silence
+it. The rule is: finished when the latest notice is at or after the last write, running otherwise.
+
+**Why this is load-bearing rather than tidy.** A manager instructed to clean up on `IDLE` would kill
+work that had already succeeded. That is not a hypothetical: it is the 2026-08-27 stuck-employee
+incident — two ICs had completed and written correct output, the run read the silence as a hang, and
+the session invented a limit that did not exist and tried to end the wait by instruction. The standing
+rule from it is *investigate disk before aborting*. This is the mechanism that rule was missing, so
+`DONE` is a producer for an existing directive rather than a new safety claim.
+
+**What `DONE` still does not tell you.** It says the harness reported the agent finished. It does not
+say the work was correct, and it never licenses deleting anything. `IDLE` remains what it always was —
+the file stopped growing — and it is a reason to look, never a reason to act alone.
+
+---
 ---
 
 ## The gate has two halves, and the number is the weaker one

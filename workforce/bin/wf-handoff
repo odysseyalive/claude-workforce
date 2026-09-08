@@ -218,6 +218,53 @@ def resolve_store(args):
     return os.path.dirname(sess[-1]), f"derived from --root (heuristic) {base}"
 
 
+
+def read_completions(store):
+    """agent_id -> epoch seconds of its LATEST completion notice, from the PARENT.
+
+    An agent's own transcript carries NO terminal record. It simply stops, so a
+    finished agent and a hung one are byte-identical from the file alone, and
+    `.meta.json` has no completion field either. MEASURED 2026-09-07: a fork that
+    had finished hours earlier was reported IDLE by this script.
+
+    The signal lives one level up. The parent session's transcript — the sibling
+    `<session-id>.jsonl` beside the session directory — carries task-notification
+    records naming `<task-id>` and `<status>`. Reading it is what separates
+    "finished" from "stopped answering", and that distinction is the whole
+    licence for a manager to act on an idle agent at all.
+
+    A resumable agent notifies MORE THAN ONCE (a turn-limit stop, then a real
+    finish), so the latest notice wins and the caller compares it against the
+    transcript's last write rather than trusting it alone.
+    """
+    out = {}
+    parent = store.rstrip(os.sep) + ".jsonl"
+    if not os.path.isfile(parent):
+        return out
+    try:
+        fh = open(parent, encoding="utf-8", errors="replace")
+    except OSError:
+        return out
+    with fh:
+        for line in fh:
+            if "task-notification" not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            blob = json.dumps(rec)
+            tid = re.search(r"<task-id>(.*?)</task-id>", blob)
+            st = re.search(r"<status>(.*?)</status>", blob)
+            if not tid or not st or st.group(1).strip() != "completed":
+                continue
+            ts = _parse_ts(rec.get("timestamp"))
+            if ts is None:
+                continue
+            aid = tid.group(1).strip()
+            out[aid] = max(out.get(aid, 0.0), ts.timestamp())
+    return out
+
 def read_agent(meta_path):
     """One agent's record. A line that will not parse is skipped and counted."""
     tpath = meta_path[: -len(".meta.json")] + ".jsonl"
@@ -240,6 +287,7 @@ def read_agent(meta_path):
         "context": 0, "peak": 0, "turns": 0, "tool_calls": 0,
         "unparsed": 0, "first_ts": None, "last_ts": None,
         "order": None, "files": [], "open": 0, "last_stop": None,
+        "done_ts": None,
     }
     opened, closed = {}, set()
 
@@ -510,6 +558,12 @@ def verdict(a, watch, handoff, children):
                     and c["last_stop"] != "end_turn"]
     if running_kids:
         unsafe.append(f"{len(running_kids)} child agent(s) still running")
+    # DONE OUTRANKS IDLE, AND IT IS A COMPARISON RATHER THAN A LOOKUP. A completion
+    # notice older than the transcript's last write belongs to an earlier stop that was
+    # then RESUMED, so the agent is running again and the notice must not silence it.
+    if a.get("done_ts") is not None and a["last_ts"] is not None \
+            and a["done_ts"] >= a["last_ts"].timestamp():
+        return "DONE", unsafe
     if a["age"] is not None and a["age"] >= STALE_SECONDS:
         return "IDLE", unsafe
     if a["context"] >= handoff:
@@ -667,6 +721,9 @@ def main():
     store, how = resolve_store(args)
     metas = sorted(glob.glob(os.path.join(store, "subagents", "*.meta.json")))
     agents = [x for x in (read_agent(m) for m in metas) if x]
+    done = read_completions(store)
+    for a in agents:
+        a["done_ts"] = done.get(a["agent_id"])
 
     if args.self_:
         me, why = identify_self(agents, " ".join(sys.argv))

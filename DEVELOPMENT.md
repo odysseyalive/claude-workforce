@@ -115,6 +115,40 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-07
 
+**Landed 2026-09-07 — a finished agent was indistinguishable from a hung one (v1.23.0).** Trigger:
+the user, watching a live session — *"I've noticed there is an agent that has been alive here for 2h"*
+— and, before that, the question this whole batch answers: *"might this also help with idle agents that
+really have no business being idle when they're being cleaned up by the lead?"*
+
+- **The agent had finished hours earlier.** `wf-handoff` reported this project's own fork as `IDLE` at
+  316,811 tokens. It was not stuck; it was done. **An agent's own transcript carries no terminal
+  record** — it simply stops — so a run that succeeded and a run that hung are byte-identical from the
+  file alone, and `.meta.json` has no completion field either.
+- **The signal was one level up the whole time.** The parent session transcript carries
+  `task-notification` records naming `<task-id>` and `<status>`. `read_completions` reads them and the
+  verdict is `DONE`, which is never `IDLE`.
+- **It is a comparison, not a lookup.** A resumable agent notifies MORE THAN ONCE — a turn-limit stop,
+  then a real finish — so a notice older than the transcript's last write belongs to a stop that was
+  then resumed, and that agent is running again. Trusting the notice alone silences a live agent.
+  Fixture `handoff-done` pins both halves with two agents identical in size and shape, differing only
+  in the order of the two timestamps. Two deliberate regressions were run: trusting the notice alone
+  turns `resumedafter` DONE, never reading the parent turns `donesilent` IDLE.
+- **This is a producer for a directive that already existed.** The 2026-08-27 rule — *a "stuck"
+  background employee is usually slow or done-silent; investigate disk before aborting* — was written
+  from the symptom. This is the mechanism behind it. A manager told to clean up on `IDLE` would have
+  reproduced that incident mechanically, killing work that had already succeeded.
+- **`census-deadhook` had been passing because of a local absence.** It asserted `3 wired` and read
+  the maintainer's real `~/.claude/settings.json`; the moment six hooks were wired there it read 9. A
+  fixture must not be able to see the machine it runs on, so `script-conformance` now gives every case
+  an empty `HOME`. Same shape as the worktree baseline found earlier the same day: green for a reason
+  that had nothing to do with the tree under test.
+- **`script-conformance` crashed instead of failing a row.** A spec with no `exit` key raised
+  `KeyError` out of the loop and took every other case down with it — the defect `bin/check` had
+  already fixed for its own parse.
+- **A JSON round-trip is not an edit.** Re-dumping `expectations.json` to change two values rewrote
+  3,975 lines and moved the indentation a prove case deletes by literal, which reported as
+  `SETUP-FAIL` on a rule that was never broken. Redone as text: 24 insertions.
+
 **Landed 2026-09-07 — live agent telemetry and the handoff mechanism (v1.22.0).** Trigger: a user
 report, on a screenshot of a backgrounded `platform-engineer` at `35m 10s / 259.2k tokens` with the
 main session waiting on it — *"lead engineers context length keep growing exponentially… is there a

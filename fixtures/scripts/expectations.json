@@ -1378,6 +1378,29 @@
       "ESCALATE: brief disagrees with verification"
     ]
   },
+  "handoff-done": {
+    "_why": "DONE vs IDLE, and the RESUMED case is the only one that discriminates. An agent's own transcript carries NO terminal record -- it simply stops -- so a finished agent and a hung one are byte-identical from the file alone, and .meta.json has no completion field either. MEASURED 2026-09-07: a fork that had finished hours earlier was reported IDLE against this project's own store. The signal lives in the PARENT session transcript, the sibling <session>.jsonl, which carries task-notification records naming <task-id> and <status>. donesilent stops and is THEN reported completed -> DONE. resumedafter is reported completed and its transcript THEN moves, so the notice belongs to an earlier stop that was resumed, it is running again, and it must NOT be silenced -> IDLE. Both agents are identical in size and shape; ONLY the order of the two timestamps differs, which is what makes this a test of the comparison rather than of the lookup. Two deliberate regressions were run against it: trusting the notice alone turns resumedafter DONE, and never reading the parent turns donesilent IDLE. Each failed exactly the case that should catch it. This matters beyond tidiness -- a manager instructed to clean up on IDLE would kill work that had already succeeded, which is the 2026-08-27 stuck-employee incident reproduced mechanically and at scale.",
+    "script": "wf-handoff",
+    "args": [
+      "--transcripts",
+      "store/sess1",
+      "--all"
+    ],
+    "env": {
+      "CLAUDE_CODE_SESSION_ID": null,
+      "WF_HANDOFF_NOW": "1788782400"
+    },
+    "exit": 0,
+    "want": [
+      "donesilent00000000",
+      "DONE",
+      "resumedafter000000",
+      "IDLE"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
   "handoff-emptyroot": {
     "_why": "AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD. ${CLAUDE_PROJECT_DIR} is unset in the Bash tool, so a shipped `--root \"${CLAUDE_PROJECT_DIR}\"` block expands to `--root \"\"`; abspath(\"\") is the CWD, a real directory, so an is-it-a-directory guard passes and the script would census a store belonging to whatever tree it happened to be run from. The sibling scripts all refuse this and so must this one.",
     "args": [
@@ -3251,7 +3274,7 @@
     "script": "wf-settings-apply",
     "want": [
       "not a shipped hook",
-      "Default set: wf-budget-guard, wf-plain-guard, wf-protect-directives, wf-standing-request, wf-unique-persona",
+      "Default set: wf-budget-guard, wf-plain-guard, wf-protect-directives, wf-speak-guard, wf-standing-request, wf-unique-persona",
       "Opt-in only, PROPOSED and never wired by the default set: wf-loop-guard"
     ]
   },
