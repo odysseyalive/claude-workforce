@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 39 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 40 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -233,6 +233,12 @@ Write the integrated result to `.claude/workforce/work/<run-id>/ceo/OUTPUT.md`.
 Open it with the order's `REQUEST (verbatim):` block quoted unchanged, then a criterion → evidence
 table: one row per exit criterion, naming the line, file, or output that satisfies it — `UNMET`
 stated, never omitted, where one is not.
+Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
+and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
+there is nothing; never drop the heading. Narrative outside those three parts is a second work order
+nobody dispatched. Budget about three lines of evidence per exit criterion plus three per subordinate
+report you integrated.
+If a finding genuinely will not fit, return `ESCALATE:` rather than grow the file.
 Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.
 Only your summary reaches the human — anything not written to the file is lost.
 ```
@@ -496,6 +502,11 @@ Open it with the work order's `REQUEST (verbatim):` block quoted unchanged, then
 evidence table: one row per exit criterion, naming the line, file, or output that satisfies it —
 `UNMET` stated, never omitted, where one is not. A work order with no REQUEST block is not yours to
 fill in: return `QUESTION: no originating ask in the work order` instead of guessing.
+Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
+and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
+there is nothing; never drop the heading. Narrative outside those three parts is a second work order
+nobody dispatched. Budget about three lines of evidence per exit criterion.
+If a finding genuinely will not fit, return `ESCALATE:` rather than grow the file.
 Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.
 Anything not written to the file is lost — only the top-level summary reaches the human.
 Include one improvement observation when you have one (see the improvement quota in review.md).
