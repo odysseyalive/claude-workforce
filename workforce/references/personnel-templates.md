@@ -1,6 +1,6 @@
 # Personnel Record Templates
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 8 assertion(s) in bin/check name this file; 6 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the HR ledger's schema. `ledger`, `review`, `amend`, `defect` write these. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/` — project state.
@@ -14,6 +14,10 @@ personnel/
   AMD-<slug>.md                   handbook amendment
   RFI-<slug>.md                   improvement recommendation
   ORG-<slug>.md                   structural decision
+  DEC-<slug>.md                   project decision that was reached
+  INC-<slug>.md                   project incident and what came of it
+  PAT-<slug>.md                   project pattern, recurring
+  FLW-<slug>.md                   project flow, end to end
 ```
 
 **The layout is flat — one file per record, no subdirectories.** `ledger` and the index regeneration
@@ -49,13 +53,13 @@ are below; this is the artifact that holds them.
 
 | Section | For the personnel dataset |
 |---|---|
-| `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat (no subdirectories); types `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG`, each shaped by its template below |
-| `## Invariants` | the universal one, **plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`) |
+| `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat (no subdirectories); types `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG` (org family) and `DEC`, `INC`, `PAT`, `FLW` (project family), each shaped by its template below |
+| `## Invariants` | the universal one, **plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`); every project-family record carries a `Status:` of exactly `proposed`\|`accepted`\|`superseded` (`mechanical`); a `proposed` record is never returned by a `consult` (`mechanical`); every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value and a reported finding, never an absence (`mechanical`) |
 | `## Degradation` | absent → the org has no history and `review` says so rather than reporting a clean record; empty → same; stale → the index is rebuilt from the filesystem; corrupt → **stop, never rewrite** |
 | `## Owner` | HR. Exactly one Records Owner; its Lead is the second key |
 | `## Git policy` | tracked by default — an org's history is not disposable — and the rule's file is named by path |
-| `## Seed` | an empty `personnel/` directory and an index stating zero records |
-| `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it |
+| `## Seed` | an empty `personnel/` directory and an index stating zero records across both families |
+| `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it. It also fails any project-family record whose `Status:` is not `proposed`\|`accepted`\|`superseded` or that carries no `Subjects:` line |
 
 **Naming.** Data skills workforce *derives* are `records-<dataset>`; this one ships under a fixed name
 because the companion list installs it by that name. Stating the exemption here is the point — two
@@ -354,6 +358,119 @@ a conflict is not consent (`reconcile.md`). Unratified → `proposed`, never `ap
 **An `ORG` record is filed in the same change as the structural act, never after.** `hire`, `promote`,
 and `transfer` each list it beside the `EMP` write and the `org index`/`org embed` refresh; a run that
 performed the act and skipped the record left the org's history unable to say why its shape changed.
+
+---
+
+## The project family — DEC / INC / PAT / FLW
+
+**These four are about the project, not the org** (`procedures/ledger.md` § Two families, one
+ledger). They live in the same flat store as the org family and share one lifecycle: `proposed` on
+draft, `accepted` when the user confirms, `superseded` when a later record replaces them. **A
+`proposed` record is never returned by a `consult`** — the draft exists so nothing is lost while the
+user is busy, and it carries no authority until the user accepts it. This is what lets capture draft
+automatically without manufacturing a history nobody agreed to.
+
+**All four carry the same five field lines** — `Status`, `Subjects`, `Anchors`, `Recorded`,
+`Supersedes`. `Subjects:` is the tag that slices the store: it names the crafts a record belongs to,
+so a `consult` scoped to a craft reads only what matches. An untagged record is written
+`Subjects: (unclassified)` and REPORTED — a legal value and a finding, never a silent absence. The
+bodies differ per type; the field lines never do.
+
+## DEC
+
+```markdown
+# DEC-<slug>
+
+**Status:** proposed | accepted | superseded
+**Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
+**Anchors:** <path or glob>[, …] | (none)
+**Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
+**Supersedes:** <id> | (none)
+
+## What Was Decided
+> <the user's own words where they said it, verbatim>
+
+## Why
+<the reason given at the time, or `(not stated)`>
+
+## What It Rules Out
+<the alternatives the decision closes off, or `(none stated)`>
+
+## Evidence
+> <verbatim quote from the turn or file that settles it, or `(not stated)`>
+```
+
+## INC
+
+```markdown
+# INC-<slug>
+
+**Status:** proposed | accepted | superseded
+**Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
+**Anchors:** <path or glob>[, …] | (none)
+**Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
+**Supersedes:** <id> | (none)
+
+## What Happened
+<factual account of what went wrong>
+
+## Cause
+<the cause as understood, or `(not established)`>
+
+## What Changed
+<what the incident changed — a fix, a rule, a record, or `(nothing yet)`>
+
+## Evidence
+> <verbatim quote from the turn or file that settles it, or `(not stated)`>
+```
+
+## PAT
+
+```markdown
+# PAT-<slug>
+
+**Status:** proposed | accepted | superseded
+**Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
+**Anchors:** <path or glob>[, …] | (none)
+**Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
+**Supersedes:** <id> | (none)
+
+## The Pattern
+<the way this project does the thing, stated so it can be repeated>
+
+## When It Applies
+<the conditions under which this is the right move>
+
+## When It Does Not
+<the conditions under which it is the wrong move — the half that keeps it honest>
+
+## Evidence
+> <verbatim quote from the turn or file that settles it, or `(not stated)`>
+```
+
+## FLW
+
+```markdown
+# FLW-<slug>
+
+**Status:** proposed | accepted | superseded
+**Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
+**Anchors:** <path or glob>[, …] | (none)
+**Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
+**Supersedes:** <id> | (none)
+
+## The Steps
+<how the thing moves end to end, in order>
+
+## The Seams
+<where it hands off, and what can be dropped at each seam>
+
+## Who Owns Each
+<the owner of each step or seam, so a gap has a name>
+
+## Evidence
+> <verbatim quote from the turn or file that settles it, or `(not stated)`>
+```
 
 ---
 

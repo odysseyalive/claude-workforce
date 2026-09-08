@@ -1,6 +1,6 @@
 # ledger — the personnel records
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce ledger [record]`
 
 Creates and maintains `${CLAUDE_PROJECT_DIR}/.claude/workforce/personnel/`. Schema and literal
@@ -14,12 +14,23 @@ templates: `references/personnel-templates.md`.
 |---|---|
 | `ledger` | print the index — by department, by employee, by status, plus statistics |
 | `ledger <id>` | read one record and its linked records |
-| `ledger consult <topic>` | index-scan, then read only what matches — never read the whole ledger |
+| `ledger consult <topic> [--subjects <tag>…]` | index-scan, then read only what matches — never read the whole ledger; returns `accepted` records only |
 | `ledger new <type>` | create a record from its template |
+
+**Every mode runs through the gateway script `wf-ledger`** — `new`, `pending`, `accept`,
+`consult --subjects`, `index`, `check` are its subcommands, and the store is reached no other way
+(`personnel-templates.md` § `personnel-ledger` — the skill that holds these records).
 
 **`consult` is the important one.** The index carries enough to triage; records are read only when
 they match. A ledger that must be read whole to be useful stops being consulted at exactly the point
 it becomes valuable.
+
+**`consult` takes `--subjects <tag>[,…]` and returns `accepted` records only.** The tag slices
+the one store to a craft's own concern (`personnel-templates.md` § The project family — DEC / INC
+/ PAT / FLW, the `Subjects:` field), which is what lets every producing agent read the same store
+without reading everyone else's. A `proposed` draft is **never** returned — it carries no
+authority until the user accepts it — so nothing an agent reads through `consult` is a history
+the user did not confirm.
 
 ## Capture
 
@@ -31,6 +42,10 @@ it becomes valuable.
 | `maxTurns` or a cap hit | **PERF**, attribution ENVIRONMENT | yes |
 | handbook text changes | **AMD** | yes — no handbook changes without one |
 | "we should always…", a structural proposal | **RFI** / **ORG** | suggested; the user decides |
+| a decision was reached in conversation | **DEC** | drafted `proposed` automatically; accepted only by the user |
+| something went wrong and settled | **INC** | drafted `proposed` automatically; accepted only by the user |
+| a recurring way this project does a thing | **PAT** | drafted `proposed` automatically; accepted only by the user |
+| how a thing moves end to end | **FLW** | drafted `proposed` automatically; accepted only by the user |
 
 **Defect capture is automatic and unconditional**, diverging from claude-enforcer's awareness-ledger
 rule that capture is always user-confirmed. These are the org's own telemetry, not user knowledge —
@@ -53,11 +68,18 @@ keep straight.
 | Family | About | Capture |
 |---|---|---|
 | `DEF` `PERF` `AMD` `RFI` `ORG` | the org and its documents | per the table above — defects automatic |
-| `INC` `DEC` `PAT` `FLW` | the project itself | **user-confirmed, never automatic** |
+| `INC` `DEC` `PAT` `FLW` | the project itself | **drafting automatic, acceptance user-confirmed** |
 
-The project family keeps the predecessor's capture rule deliberately. A decision record is a claim about
-why something was chosen, and a system that writes those unprompted manufactures a history nobody
-agreed to.
+**Corrected 2026-09-08.** This row read *"user-confirmed, never automatic"*. The predecessor's
+reason still holds and is kept: a system that writes an *accepted* history unprompted
+manufactures a record nobody agreed to — so **acceptance stays user-confirmed and is never
+automatic**. What the old row got wrong is that it also blocked the *draft*, and that is the
+whole cost the project paid — decisions reached in conversation lived nowhere until a human
+remembered to file them, and agents hallucinated against the gap. The distinction that makes both
+true: a draft marked `proposed` carries no authority and is never served by a `consult`
+(`personnel-templates.md` § The project family), so drafting it automatically manufactures
+nothing — it only places evidence where the user can accept or reject it in one line.
+**Drafting is automatic; acceptance is not.**
 
 ### Migrating them in
 

@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,8 +39,8 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-five, and the list is closed: adding a procedural invariant means adding a row here and a line to
-the report, in the same change.
+Thirty-six, and the list is closed: adding a procedural invariant means adding a row here and a
+line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
 sixteen later the same day — rows 14, 15, and 16 landed together because they are one defect seen from
@@ -132,6 +132,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 33 | every reduced skill declares `## Interface` with its Invoke / Returns / Fails rows, or is named as undeclarable | `INV-IFACE` | references/procedures/audit.md |
 | 34 | every chain-of-command edge was re-derived from the child's `reports-to`, and every `direct-reports` mirror that disagreed was healed, or names the rule that declined | `INV-EDGES` | references/org-chart-format.md |
 | 35 | every Lead handbook carries the handoff boundary clause, or names the rule that declined | `INV-HANDOFF` | references/handoff.md |
+| 36 | the project ledger's records are counted by type and status, and no `proposed` record predates the run | `INV-KNOWLEDGE` | references/procedures/verify.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can
@@ -149,6 +150,17 @@ because the first run after a hire legitimately has nothing to calibrate against
 on its own newness gets deleted. A role with reports on disk and no eval set does **not** reach the
 hatch — worded any looser, the row is satisfied by the very state it was written for, since an org that
 recorded none of its disagreements looks identical to one that had none.
+
+**Row 36 landed 2026-09-08 with the project-knowledge family, and it is the counted line that keeps
+the family from shipping as doctrine nobody's org actually runs.** The four project types
+(`personnel-templates.md` § The project family) were declared in `ledger.md` and absent from the
+schema for as long as the file existed — specified in one place, unbuilt in another, the shape this
+whole file records. The row prints `proposed N · accepted N · superseded N · unclassified N` from
+the store, so a family present-but-empty behind two unwired capture hooks cannot read as healthy:
+the counts are all zero and the two hooks report `UNWIRED`. `unclassified N` is a reported figure,
+never an absence — an untagged record is a finding, not a gap. Owed by `verify`
+(`procedures/verify.md` § The project ledger — family, hooks, and stale drafts), which reports the
+family absent, the hooks unwired, and any `proposed` record older than the run.
 
 **Row 20 is row 19's consumer, and between the two of them is where every run that has ever staged a
 removal has stopped.** Row 19 proves the set was *written*; nothing proved it was *emptied*. So a run
@@ -274,6 +286,7 @@ Run Invariants
   INV-COMPANIONS  6 of 6 materialized · org (org index) · operating-principles · personnel-ledger · code-evaluator · text-eval · security-evaluator · 0 absent
   INV-EDGES       employees 9 · edges 8 · mismatched 1 · healed 1 · 0 declined
   INV-HANDOFF     leads 3 · clause present 3 · installed 1 · 0 declined
+  INV-KNOWLEDGE   proposed 2 · accepted 11 · superseded 1 · unclassified 0
   …every remaining row, always all of them…
 ```
 

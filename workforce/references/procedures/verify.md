@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 34 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 36 assertion(s) in bin/check name this file; 67 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -466,6 +466,30 @@ constraint here" rather than as a gap.
 | Every section `references/data-skills.md` § Required sections lists is present, in that order | a dataset whose degradation contract, git policy, or maintainer list was never written — a reader finds no rule and infers there is none |
 | Every data skill is named as a dependency by at least one handbook | an orphan (`references/data-skills.md` § Every data skill is reachable from a handbook) — either dead, or never ours to write |
 | Every invariant classed `mechanical` has a maintainer, and every maintainer row records a negative-test result | an invariant demoted to prose, and a validator nobody ever saw reject anything — indistinguishable from `exit 0` |
+
+## The project ledger — family, hooks, and stale drafts
+
+**The project-knowledge family can ship as doctrine and reach no running org**, the same
+written-and-unwired shape this file watches everywhere else. `verify` reports three things about it,
+each with its count and never a bare "present":
+
+| Check | Catches |
+|---|---|
+| The store supports the project family — `DEC`, `INC`, `PAT`, `FLW` (`personnel-templates.md` § The project family) | a store turned on in doctrine but not in the schema the running gateway reads — the family absent |
+| The capture hook (`Stop`) and the session-open hook (`UserPromptSubmit`) are wired | the two hooks unwired — capture drafts nothing and nobody is shown what is pending, so the family stays empty and looks healthy |
+| No `proposed` record is older than the current run | a draft the user has neither accepted nor rejected across sessions — a backlog masquerading as memory |
+
+**Print `INV-KNOWLEDGE  proposed N · accepted N · superseded N · unclassified N`, always,
+including at every zero.** The counts are read from the store by type and status; `unclassified
+N` counts records whose `Subjects:` is `(unclassified)`, which is a reported finding and never an
+absence (`personnel-templates.md` § The project family). A bare "present" hides all four numbers,
+and a family that is present-but-empty behind two unwired hooks reads identical to one that is
+working.
+
+**A `proposed` record older than the current run is a finding, not an error.** The draft is doing
+its job — it exists so nothing was lost — but a draft nobody has accepted or rejected across a
+session boundary is evidence the open-list hook is not reaching the user. Report each such record
+by id and age; the fix is `ledger accept <id>` or a rejection, both the user's call.
 
 ## Reversibility — is this org actually disbandable?
 

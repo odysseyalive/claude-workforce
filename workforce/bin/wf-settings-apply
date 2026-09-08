@@ -79,6 +79,14 @@ SHIPPED_HOOKS = {
     # read at the head of a context (hooks.md § What is wired).
     "wf-speak-guard": ("Stop", None),
     "wf-loop-guard": ("PostToolUse", None),
+    # The project record family. `wf-ledger-capture` shares `Stop` with wf-speak-guard
+    # — one event, two registrations, both fired, because the event is not a slot.
+    # DEFAULT, not opt-in: a capture hook nobody wires records nothing, and the store
+    # it feeds was designed and left switched off for exactly that reason. Neither can
+    # block: capture writes a `proposed` record and exits 0, and the opener emits
+    # `additionalContext` once per session or stays silent.
+    "wf-ledger-capture": ("Stop", None),
+    "wf-ledger-open": ("UserPromptSubmit", None),
 }
 
 # WIREABLE, NEVER DEFAULT. hooks.md § What is wired marks `wf-loop-guard` "PROPOSED,

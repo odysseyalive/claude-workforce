@@ -3370,7 +3370,7 @@
     ]
   },
   "sa-hook-optin-not-default": {
-    "_why": "The opt-in guarantee, made mechanically checkable. wf-loop-guard is WIREABLE by name and is never in the default set (hooks.md \u00a7 What is wired: 'PROPOSED, and not wired by this command's default set'). The unknown-hook error prints both sets, so this near-miss name pins the membership: `want` carries the default set verbatim and `not` fires if wf-loop-guard is ever sorted into it. A regression that promotes it to the default set fails this case; a regression that removes it from SHIPPED_HOOKS altogether fails the three cases above. Exit 2 also keeps the negative half honest \u2014 a name that is not a shipped hook is refused rather than registered as dead wiring. Updated 2026-09-05: this row still named the four-hook default set from before `wf-plain-guard` shipped, so it was red at v1.16.0 HEAD \u2014 the release that added the hook updated the script and not its expectation. The membership list is the whole point of the case, so a stale copy of it is the one thing here that must never drift.",
+    "_why": "The opt-in guarantee, made mechanically checkable. wf-loop-guard is WIREABLE by name and is never in the default set (hooks.md \u00a7 What is wired: 'PROPOSED, and not wired by this command's default set'). The unknown-hook error prints both sets, so this near-miss name pins the membership: `want` carries the default set verbatim and `not` fires if wf-loop-guard is ever sorted into it. A regression that promotes it to the default set fails this case; a regression that removes it from SHIPPED_HOOKS altogether fails the three cases above. Exit 2 also keeps the negative half honest \u2014 a name that is not a shipped hook is refused rather than registered as dead wiring. Updated 2026-09-05: this row still named the four-hook default set from before `wf-plain-guard` shipped, so it was red at v1.16.0 HEAD \u2014 the release that added the hook updated the script and not its expectation. The membership list is the whole point of the case, so a stale copy of it is the one thing here that must never drift. Updated again 2026-09-08 when wf-ledger-capture and wf-ledger-open shipped as DEFAULT hooks: the project record family is switched on for every install, so both belong in this list and neither belongs in the opt-in one.",
     "args": [
       "--wire-hook",
       "wf-loopguard"
@@ -3382,7 +3382,7 @@
     "script": "wf-settings-apply",
     "want": [
       "not a shipped hook",
-      "Default set: wf-budget-guard, wf-plain-guard, wf-protect-directives, wf-speak-guard, wf-standing-request, wf-unique-persona",
+      "Default set: wf-budget-guard, wf-ledger-capture, wf-ledger-open, wf-plain-guard, wf-protect-directives, wf-speak-guard, wf-standing-request, wf-unique-persona",
       "Opt-in only, PROPOSED and never wired by the default set: wf-loop-guard"
     ]
   },
@@ -4381,6 +4381,336 @@
       "decision",
       "additionalContext",
       "could not verify"
+    ]
+  },
+  "ledger-consult-accepted": {
+    "_why": "THE POSITIVE HALF OF THE SLICE. `consult` is the mode `ledger.md` \u00a7 Modes calls the important one - index-scan, then read only what matches - and the claim being tested is that one store answers a scoped question without handing over the store. Two accepted records on different subjects; the billing one is on disk, in the index, and must not appear in an answer about `knowledge`. `via index` asserts the scan path was taken rather than a whole-directory read.",
+    "script": "wf-ledger",
+    "args": [
+      "consult",
+      "--subjects",
+      "knowledge"
+    ],
+    "exit": 0,
+    "want": [
+      "consult subjects: knowledge \u2014 via index",
+      "# DEC-one-store",
+      "One store, tagged records, filtered reads."
+    ],
+    "not": [
+      "PAT-billing-rounding",
+      "half-cent"
+    ]
+  },
+  "ledger-consult-proposed-leak": {
+    "_why": "THE LOAD-BEARING NEGATIVE, and the only rule in this build that cannot be relaxed: a `proposed` record is never served. The store holds one accepted and one proposed record on the SAME subject, so subject filtering cannot be what hides the draft - only the status filter can. `not` carries the draft's id AND a sentence that appears nowhere but its body, so a leak of either the row or the content fails the case. Removing the status filter from do_consult makes this the failing half; the accepted record still comes back, which is why the pair is needed.",
+    "script": "wf-ledger",
+    "args": [
+      "consult",
+      "--subjects",
+      "knowledge"
+    ],
+    "exit": 0,
+    "want": [
+      "# DEC-served",
+      "1 proposed record(s) match these subjects and were WITHHELD"
+    ],
+    "not": [
+      "DEC-not-agreed",
+      "NOBODY AGREED TO THIS SENTENCE"
+    ]
+  },
+  "ledger-consult-stale-index": {
+    "_why": "THE INDEX SELECTS; THE RECORD DECIDES. Identical to ledger-consult-proposed-leak except that the index row for the draft reads `accepted` while the record itself reads `proposed` - the state any store reaches the moment `accept` runs without a rebuild. A gateway that trusted the index row would serve a decision nobody made, and every other check here would stay green, because the index is internally consistent. The withheld count is what proves the status was re-read from the file.",
+    "script": "wf-ledger",
+    "args": [
+      "consult",
+      "--subjects",
+      "knowledge"
+    ],
+    "exit": 0,
+    "want": [
+      "# DEC-served",
+      "1 proposed record(s) match these subjects and were WITHHELD"
+    ],
+    "not": [
+      "DEC-not-agreed",
+      "NOBODY AGREED TO THIS SENTENCE"
+    ]
+  },
+  "ledger-emptyroot": {
+    "_why": "An empty --root is a caller error, never a silent retarget to the CWD. Every shipped caller writes `--root \"${CLAUDE_PROJECT_DIR}\"`, that variable is unset outside a hook, and `abspath(\"\")` is a real directory - so an is-it-a-directory guard passes and the gateway would read, and eventually write, records in a tree nobody named. The mode word comes first here, which is the arrangement that pushed `--root` onto the sub-parsers as well.",
+    "script": "wf-ledger",
+    "args": [
+      "pending",
+      "--root",
+      ""
+    ],
+    "exit": 2,
+    "want": [
+      "wf-ledger: --root is empty.",
+      "${CLAUDE_PROJECT_DIR} is unset outside a hook; pass an explicit path."
+    ]
+  },
+  "ledger-check-drift": {
+    "_why": "The three findings `check` exists for, in one tree: a record on disk and absent from the index, a Status outside the three legal values, and a project record with no Subjects line at all. Exit 2 is the point - a maintainer check that reports findings on stdout and exits 0 is a check nothing can gate on. The org family is deliberately absent here; ledger-check-clean carries it.",
+    "script": "wf-ledger",
+    "args": [
+      "check"
+    ],
+    "exit": 2,
+    "want": [
+      "INDEX DRIFT: index states 2 record(s), the filesystem holds 3",
+      "NOT INDEXED: DEC-unindexed",
+      "ILLEGAL STATUS: DEC-bad-status",
+      "NO SUBJECTS LINE: DEC-no-subjects",
+      "4 finding(s)"
+    ]
+  },
+  "ledger-check-clean": {
+    "_why": "The passing half, and it carries a DEF record so the scope of the field rules is asserted rather than assumed: the org family lives in the same flat directory, is counted by the index, and is NOT required to carry a Subjects line or one of the three project statuses. A check that failed on `DEF-... Status: closed` would make the two families uninhabitable together, which is the whole design.",
+    "script": "wf-ledger",
+    "args": [
+      "check"
+    ],
+    "exit": 0,
+    "want": [
+      "wf-ledger check \u2014 2 record(s) on disk, 1 project record(s)",
+      "index count equals file count"
+    ],
+    "not": [
+      "finding(s)",
+      "ILLEGAL STATUS"
+    ]
+  },
+  "ledger-index-rebuild": {
+    "_why": "ENUMERATE FROM THE FILESYSTEM, NEVER FROM THE PRIOR INDEX (`ledger.md` \u00a7 Migrating them in - a real predecessor index under-reported its own contents by three records). The fixture's index names a record that does not exist and omits two that do, so an implementation that read its own output forward would keep the phantom and drop the real ones while reporting success. `after` asserts the written file, because the destroyed value never appears on stdout.",
+    "script": "wf-ledger",
+    "args": [
+      "index",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "wrote .claude/workforce/personnel/index.md \u2014 2 record(s)"
+    ],
+    "after": {
+      ".claude/workforce/personnel/index.md": {
+        "want": [
+          "**2 records.**",
+          "- `DEC-real` \u2014 DEC \u2014 accepted",
+          "- `DEF-org-family` \u2014 DEF"
+        ],
+        "not": [
+          "DEC-phantom"
+        ]
+      }
+    }
+  },
+  "ledger-pending-order": {
+    "_why": "Newest first, and never an accepted record. The `want` string spans BOTH lines of the listing, so it fails if the order inverts - two separate substrings would pass on either order and assert nothing about the sort. The dates come from each record's `Recorded:` line rather than mtime, which is what makes the case survive being copied into a temp tree.",
+    "script": "wf-ledger",
+    "args": [
+      "pending"
+    ],
+    "exit": 0,
+    "want": [
+      "2 pending record(s), newest first:",
+      "  DEC-newer                    2026-09-08 by capture  subjects: runtime\n  DEC-older                    2026-08-01 by capture  subjects: runtime"
+    ],
+    "not": [
+      "DEC-live"
+    ]
+  },
+  "ledger-accept-execute": {
+    "_why": "Acceptance is the user's act and it is the only thing that makes a record servable. `after` reads the file back rather than trusting the confirmation line - the failure this project keeps finding is a write that was believed and never made. `not` on the old status is what distinguishes an edited field from an appended one.",
+    "script": "wf-ledger",
+    "args": [
+      "accept",
+      "DEC-draft",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "accepted DEC-draft \u2014 it is now served by `consult`"
+    ],
+    "after": {
+      ".claude/workforce/personnel/DEC-draft.md": {
+        "want": [
+          "**Status:** accepted"
+        ],
+        "not": [
+          "**Status:** proposed"
+        ]
+      }
+    }
+  },
+  "ledger-accept-notproposed": {
+    "_why": "`accept` is a transition, not an assignment: a record that is already accepted is refused with exit 2 rather than silently rewritten. Without this the mode would be a status setter, and `supersede` would be undoable by typing `accept` - which would quietly resurrect a decision the project had replaced.",
+    "script": "wf-ledger",
+    "args": [
+      "accept",
+      "DEC-live",
+      "--execute"
+    ],
+    "exit": 2,
+    "want": [
+      "wf-ledger: DEC-live is accepted, not proposed"
+    ]
+  },
+  "ledger-new-unclassified": {
+    "_why": "An untagged record is written `(unclassified)` and REPORTED - never quietly shown to everyone. `Subjects:` is what makes one store not one clunky source, so the moment a record is written without one is the only moment anybody finds out it needs one: it is invisible to `consult` from then on. The record is still written, because losing it would be worse than filing it untagged.",
+    "script": "wf-ledger",
+    "args": [
+      "new",
+      "DEC",
+      "--slug",
+      "untagged-thing",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "wrote .claude/workforce/personnel/DEC-untagged-thing.md",
+      "UNCLASSIFIED: DEC-untagged-thing carries no Subjects and will NOT be served"
+    ],
+    "after": {
+      ".claude/workforce/personnel/DEC-untagged-thing.md": {
+        "want": [
+          "**Status:** proposed",
+          "**Subjects:** (unclassified)"
+        ]
+      }
+    }
+  },
+  "ledgercap-drafts": {
+    "_why": "THE POSITIVE HALF OF CAPTURE, on a REAL exchange from the corpus the trigger was measured against. It drafts exactly one record, `proposed`, with the user's own words verbatim - typo included, because `personnel-templates.md` forbids tidying an originating ask - and tags it from the path the turn touched rather than from meaning. `after` carries `not: **Status:** accepted`, which is the rule that cannot be relaxed: this hook has no code path that writes an accepted record.",
+    "script": "wf-ledger-capture",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"sess-capture\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"This is a substantive doctrine change to workforce itself: make \\\"house rules dominate\\\" a first-class, auto-enforced concept in the evaluator doctrine, encode the em-dash zero-tolerance as this project's own rule, and land the assertion that proves it in the same change. The register stays the sole demotion, and every other hard tell is fixed rather than raised as a question.\"}",
+    "exit": 0,
+    "want": [
+      "drafted DEC-house-rules-always-dominate-and-set (proposed)"
+    ],
+    "after": {
+      ".claude/workforce/personnel/DEC-house-rules-always-dominate-and-set.md": {
+        "want": [
+          "**Status:** proposed",
+          "**Subjects:** workforce/references",
+          "**Recorded:** ",
+          " by capture",
+          "> house rules always dominate and set the precidence."
+        ],
+        "not": [
+          "**Status:** accepted"
+        ]
+      }
+    }
+  },
+  "ledgercap-workorder-silent": {
+    "_why": "THE NEGATIVE HALF, clause 4. A real work order that touches files and settles nothing: 'Please refresh invest scout ... they are already done'. It carries a trigger phrase (`don't `) and is refused on its imperative opener, so this case fails the moment the work-order clause is deleted - which is the shape of the largest false-positive class in the held-out corpus. Silence must be total: no note, and no record, because a hook that comments on every turn is one somebody unwires.",
+    "script": "wf-ledger-capture",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"sess-order\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"On it. Skipping items 1/2/3 (done - triage is a no-op, no writes). Launching the W33 scout refresh via the department lead, which has the permissions the analyst agent lacked, and building the rest of the briefing in parallel so the whole thing lands in one pass.\"}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "drafted",
+      "already recorded",
+      "Traceback"
+    ]
+  },
+  "ledgercap-question-silent": {
+    "_why": "THE NEGATIVE HALF, clause 3. A real question being answered - 'is the awareness-ledger and the journal also installed by default?' - whose reply opens 'Short answers first'. It carries the trigger phrase `by default` and must still be silent: an answer to a question is a read, and recording one would manufacture a decision out of a lookup. This is the false positive the measurement removed, so it is the one with a case.",
+    "script": "wf-ledger-capture",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"sess-ask\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"Short answers first: the journal is installed by default. The awareness-ledger is not. The journal gets created by any audit that changes something. It is written by the tool and read only by the tool, so nothing in a handbook has to name it, and nothing reads it at spawn time.\"}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "drafted",
+      "Traceback"
+    ]
+  },
+  "ledgercap-no-second-draft": {
+    "_why": "CLASS B: anything that writes is a no-op the second time. The tree already holds the record this turn produces, which is the state after a re-fired `Stop` or a resumed turn, and the hook must recognise it rather than write a second draft of one exchange. The contract says at most one record per turn; without `--if-absent` this is where that promise breaks, silently, one duplicate per re-run.",
+    "script": "wf-ledger-capture",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"sess-capture\", \"transcript_path\": \"transcript.jsonl\", \"last_assistant_message\": \"This is a substantive doctrine change to workforce itself: make \\\"house rules dominate\\\" a first-class, auto-enforced concept in the evaluator doctrine, encode the em-dash zero-tolerance as this project's own rule, and land the assertion that proves it in the same change. The register stays the sole demotion, and every other hard tell is fixed rather than raised as a question.\"}",
+    "exit": 0,
+    "want": [
+      "already recorded: DEC-house-rules-always-dominate-and-set (no second draft)"
+    ],
+    "not": [
+      "drafted"
+    ],
+    "after": {
+      ".claude/workforce/personnel/DEC-house-rules-always-dominate-and-set.md": {
+        "want": [
+          "> the first draft"
+        ]
+      }
+    }
+  },
+  "ledgercap-badstdin": {
+    "_why": "A malformed payload passes through, exit 0, nothing written. Same contract as every other hook here: a capture bug must never cost the user a turn, and exit 2 on `Stop` is indistinguishable from a crash. The note names what it could not do rather than staying silent, because a hook that is failing and a hook that has nothing to say must not read the same.",
+    "script": "wf-ledger-capture",
+    "stdin_raw": "not a json payload at all",
+    "exit": 0,
+    "want": [
+      "stdin is not a JSON payload; nothing captured"
+    ],
+    "not": [
+      "drafted",
+      "Traceback"
+    ]
+  },
+  "ledgeropen-announces": {
+    "_why": "The first turn of a session lists what is waiting, and lists ONLY what is waiting: the accepted record in the same store must not appear, because the point of the announcement is the set of things that need a decision. `after` asserts the session was recorded, which is what makes the second and third cases meaningful.",
+    "script": "wf-ledger-open",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"sess-fixture-1\", \"prompt\": \"carry on\"}",
+    "exit": 0,
+    "want": [
+      "additionalContext",
+      "DEC-pending-one",
+      "1 project record(s) are waiting for you to accept or reject",
+      "wf-ledger accept <id> --execute"
+    ],
+    "not": [
+      "DEC-already-accepted"
+    ],
+    "after": {
+      ".claude/workforce/.ledger-open.json": {
+        "want": [
+          "sess-fixture-1"
+        ]
+      }
+    }
+  },
+  "ledgeropen-silent-empty": {
+    "_why": "NOTHING PENDING, NOTHING SAID. The store holds an accepted record and no drafts, and the hook emits no stdout at all - a hook that announces its own emptiness every session teaches the reader to skip it, and then it is not there when it matters. The session is still marked, which `after` asserts: the mark is what makes the once-per-session rule hold for a session that had nothing to say on its first turn.",
+    "script": "wf-ledger-open",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"sess-fixture-1\", \"prompt\": \"carry on\"}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "additionalContext",
+      "hookSpecificOutput",
+      "waiting for you"
+    ],
+    "after": {
+      ".claude/workforce/.ledger-open.json": {
+        "want": [
+          "sess-fixture-1"
+        ]
+      }
+    }
+  },
+  "ledgeropen-once": {
+    "_why": "THE NEGATIVE FOR ONCE-PER-SESSION. A draft IS pending and the session id is already in the state file, so anything printed here is a repeat - the shape that turns a useful list into per-turn noise and gets the hook unwired. Deleting the seen-check makes this the failing half while ledgeropen-announces still passes, which is why both exist.",
+    "script": "wf-ledger-open",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"sess-already-open\", \"prompt\": \"carry on\"}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "additionalContext",
+      "hookSpecificOutput",
+      "DEC-pending-one"
     ]
   }
 }

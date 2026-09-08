@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 78 assertion(s) in bin/check name this file; 155 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 79 assertion(s) in bin/check name this file; 155 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1070,7 +1070,13 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    only, because a subagent runs its own system prompt. A handbook missing it is an org whose reports
    read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
    completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
-   one exists) carries verification step (4), the read-back against the REQUEST. **Role-specific
+   one exists) carries verification step (4), the read-back against the REQUEST. **A producing
+   handbook whose `## Sources` does not name the project ledger gains it here** —
+   `Skill(personnel-ledger)`, `consult` mode scoped to that craft's subjects (`org-design.md` § The
+   project ledger is a type-2 source on every producing craft) — so a handbook refreshed to the
+   installed contract is wired to the store that contract turned on. This is the same Sources heal
+   Step 5e owns, applied on the `workforce-version:` stamp so an org authored before the ledger
+   family existed reaches it in this run rather than at the next full sweep. **Role-specific
    judgment is NEVER rewritten here** — a refresh that touches `## Procedure` prose has exceeded this
    step and is a defect in the run.
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump

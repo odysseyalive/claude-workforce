@@ -220,6 +220,7 @@ _od = read("workforce/references/org-design.md")
 _hb = read("workforce/references/procedures/handbook.md")
 vfy = read("workforce/references/procedures/verify.md")
 inv = read("workforce/references/invariants.md")
+_led = read("workforce/references/procedures/ledger.md")
 pfp = read("workforce/references/procedure-for-procedures.md")
 da = read("workforce/agents/doctrine-auditor/AGENT.md")
 _cov_src = read("bin/coverage")
@@ -11421,6 +11422,214 @@ check("remainder: the insertion anchor is tested against the sacred spans first"
       "INSIDE an `origin: user | immutable: true` span — the user's own words. The "
       "detector already fired (`.directives.sha`, 1 failure in 435); what was missing is "
       "the producer-side precondition, so the write is not attempted")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project-knowledge record family (DEC / INC / PAT / FLW) — doctrine half.
+# A detector ships with its fix: every rule the doctrine author wrote lands with
+# its assertion here, in the same change. Appended, not interleaved, so a peer's
+# concurrent edits to this file do not collide.
+# ─────────────────────────────────────────────────────────────────────────────
+# `_pt` is rebound to an AST module lower in this file, so re-read fresh here.
+_ptk = read("workforce/references/personnel-templates.md")
+check(
+    "knowledge: the schema type list names the project family",
+    "`DEC`, `INC`, `PAT`, `FLW` (project family)" in _ptk,
+    "personnel-templates.md § Schema must enumerate the four project types beside the "
+    "org family, or the store is turned on in one file and unknown to the schema the "
+    "gateway reads — the specified-here/absent-there shape this project keeps recording",
+)
+# Read the templates, do not merely count them: each project type owns a `## <T>`
+# section carrying the same five bold field lines. A consumer told to file one has
+# nothing to write from otherwise (the ORG-with-nine-consumers-and-no-template shape).
+_pf_types = ["DEC", "INC", "PAT", "FLW"]
+_pf_fields = ["**Status:**", "**Subjects:**", "**Anchors:**", "**Recorded:**", "**Supersedes:**"]
+_pf_missing = []
+for _t in _pf_types:
+    _i = _ptk.find(f"## {_t}\n")
+    if _i < 0:
+        _pf_missing.append(f"{_t}: no `## {_t}` template section")
+        continue
+    _seg = _ptk[_i:_i + 900]
+    for _f in _pf_fields:
+        if _f not in _seg:
+            _pf_missing.append(f"{_t}: template missing {_f}")
+check(
+    "knowledge: every project type has a template with the five field lines",
+    not _pf_missing,
+    f"{_pf_missing} — each of DEC/INC/PAT/FLW needs a `## <T>` section carrying "
+    "Status/Subjects/Anchors/Recorded/Supersedes, the shape stated once and referenced everywhere",
+)
+check(
+    "knowledge: Status is exactly proposed|accepted|superseded",
+    "carries a `Status:` of exactly `proposed`\\|`accepted`\\|`superseded`" in _ptk,
+    "personnel-templates.md § Invariants must fix the three legal lifecycle states as a "
+    "mechanical invariant; without it a record can carry any Status and the consult filter "
+    "has nothing to trust",
+)
+check(
+    "knowledge: a proposed record is never served by a consult",
+    "a `proposed` record is never returned by a `consult` (`mechanical`)" in _ptk,
+    "the middle state is the whole design — a draft carries no authority until the user "
+    "accepts it, so § Invariants must forbid a consult from returning one; this is what "
+    "lets capture draft automatically without manufacturing an agreed history",
+)
+check(
+    "knowledge: every project-family record carries a Subjects line",
+    "every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value"
+    in _ptk,
+    "the Subjects tag is what makes one store not one clunky source; § Invariants must "
+    "require it, with `(unclassified)` a reported finding and never a silent absence",
+)
+check(
+    "knowledge: consult takes --subjects and returns accepted records only",
+    "**`consult` takes `--subjects <tag>[,…]` and returns `accepted` records only.**" in _led,
+    "ledger.md § Modes must state the slice (--subjects) and the accepted-only guarantee, "
+    "or the gateway that serves every craft from one store has no stated filter",
+)
+check(
+    "knowledge: drafting is automatic, acceptance is user-confirmed (the correction)",
+    "**Corrected 2026-09-08.**" in _led and "Drafting is automatic; acceptance is not." in _led,
+    "ledger.md § Two families amended the 'user-confirmed, never automatic' row; the change "
+    "must be recorded as a dated correction that keeps the predecessor's rationale for "
+    "ACCEPTANCE visible, not a silent rewrite",
+)
+check(
+    "knowledge: capture drafts the four project types proposed, accepted only by the user",
+    _led.count("drafted `proposed` automatically; accepted only by the user") >= 4,
+    "ledger.md § Capture must carry a row for each of DEC/INC/PAT/FLW stating drafting is "
+    "automatic and acceptance is the user's — the capture path the family needs to exist",
+)
+check(
+    "knowledge: the ledger is a type-2 source wired to every producing craft",
+    "The project ledger is a type-2 source on every producing craft" in _od
+    and "`Skill(personnel-ledger)`" in _od
+    and "`consult` mode\n      scoped to <this craft's subjects>" in _od,
+    "org-design.md must wire the ledger as a type-2 source on every producing craft, named "
+    "by its gateway skill (never a raw path), consult scoped to that craft's subjects",
+)
+check(
+    "knowledge: audit Step 5d heals an existing org's Sources with the ledger",
+    "whose `## Sources` does not name the project ledger gains it here" in aud,
+    "audit.md § Step 5d must add the ledger source entry to every producing agent that lacks "
+    "it, on the workforce-version: stamp — three paths or it does not propagate; a "
+    "template-only fix never reaches an org that already exists",
+)
+check(
+    "knowledge: verify reports the family absent, the hooks unwired, and stale proposed drafts",
+    "## The project ledger — family, hooks, and stale drafts" in vfy
+    and "the two hooks unwired" in vfy
+    and "A `proposed` record older than the current run is a finding" in vfy,
+    "verify.md must report the family absent, the capture/open hooks unwired, and any "
+    "`proposed` record older than the run — the between-audit detector the family owes",
+)
+check(
+    "knowledge: verify prints the INV-KNOWLEDGE counts, never a bare present",
+    "`INV-KNOWLEDGE  proposed N · accepted N · superseded N · unclassified N`" in vfy,
+    "invariants.md row 36 (INV-KNOWLEDGE) is owed by verify.md; the pairing check binds the "
+    "token's presence but not its shape. This asserts the counted line itself — proposed · "
+    "accepted · superseded · unclassified — so a bare 'present' cannot satisfy it",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project-knowledge record family — MECHANISM half (the three scripts).
+# The doctrine block above binds the prose; this binds the code that makes it
+# true, and every claim here has a fixture pair under fixtures/scripts/ that was
+# observed failing with the rule removed. Appended, not interleaved.
+# ─────────────────────────────────────────────────────────────────────────────
+_wlg = read("workforce/bin/wf-ledger")
+_wlc = read("workforce/bin/wf-ledger-capture")
+_wlo = read("workforce/bin/wf-ledger-open")
+check(
+    "ledger: the gateway serves accepted records only",
+    'if status != "accepted":' in _wlg
+    and "ledger-consult-proposed-leak" in _fix_json
+    and "DEC-not-agreed" in (_fix_json.get("ledger-consult-proposed-leak", {}).get("not") or []),
+    "the one rule in this family that cannot be relaxed. Without the status filter in "
+    "do_consult a draft nobody agreed to is handed to an agent as settled doctrine, and "
+    "every other check here stays green. The fixture holds an accepted and a proposed "
+    "record on the SAME subject, so subject filtering cannot be what hides it",
+)
+check(
+    "ledger: the index selects, the record decides",
+    "# THE INDEX SELECTS; THE RECORD DECIDES." in _wlg
+    and "ledger-consult-stale-index" in _fix_json,
+    "an index row is a CLAIM about the store and it goes stale the moment `accept` runs "
+    "without a rebuild. Reading status off the index would let one stale line serve a "
+    "draft — the leak reappearing through the bookkeeping rather than the filter",
+)
+check(
+    "ledger: index rebuilds from the filesystem, never from its own prior index",
+    "recs = [r for r in (header_of(root, i) for i in record_ids(root)) if r]" in _wlg
+    and "DEC-phantom" in str((_fix_json.get("ledger-index-rebuild", {}).get("after") or {})),
+    "ledger.md § Migrating them in: a real predecessor index under-reported its own "
+    "contents by three records, and a rebuild that trusts the old index drops them "
+    "silently while reporting success",
+)
+check(
+    "ledger: an empty --root is refused, never retargeted to the CWD",
+    'if not (args.root or "").strip():' in _wlg
+    and _fix_json.get("ledger-emptyroot", {}).get("exit") == 2,
+    "every shipped caller writes `--root \"${CLAUDE_PROJECT_DIR}\"`, that variable is "
+    "unset outside a hook, and abspath('') is a real directory — so the guard is the "
+    "only thing between an unset variable and records written into a tree nobody named",
+)
+check(
+    "ledger capture: it drafts, and has no code path that writes an accepted record",
+    '"--if-absent", "--execute"]' in _wlc
+    and '"--status"' not in _wlc
+    and "**Status:** accepted" in str((_fix_json.get("ledgercap-drafts", {}).get("after") or {})),
+    "a fuzzy signal may draft and may not decide (discovery.md § Reliability tiers). The "
+    "hook never passes --status, so `proposed` is not a default it could drift off; "
+    "--if-absent is what makes a re-fired turn a no-op instead of a duplicate",
+)
+check(
+    "ledger capture: the trigger's precision is measured, with its corpus and sample size",
+    "PRECISION 89%" in _wlc and "PRECISION 83%" in _wlc
+    and "349 turns from 66 sessions" in _wlc and "363 turns from 78 sessions" in _wlc,
+    "a REPORT verdict cites a measured precision figure and where it was measured, or "
+    "the pass is unfinished (operating-principles item 11). Both halves are required: "
+    "the tuned figure alone is fitted to the corpus that produced it",
+)
+check(
+    "ledger open: once per session, and silent when nothing is pending",
+    "    if session_id in sessions:" in _wlo
+    and "    if not rows:" in _wlo
+    and "ledgeropen-once" in _fix_json and "ledgeropen-silent-empty" in _fix_json,
+    "a session-opening hook that repeats every turn is noise somebody unwires, and one "
+    "that announces its own emptiness teaches the reader to skip it. Both fixtures "
+    "assert stdout is empty, which is the only observable form of either rule",
+)
+check(
+    "ledger hooks: both ship wired by default, neither is opt-in",
+    "hook workforce/bin/wf-ledger-capture" in read("manifest.txt")
+    and "hook workforce/bin/wf-ledger-open" in read("manifest.txt")
+    and '"wf-ledger-capture": ("Stop", None)' in _wsa
+    and '"wf-ledger-open": ("UserPromptSubmit", None)' in _wsa
+    and not (re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1).count("wf-ledger")),
+    "a capture hook nobody wires records nothing, and the store it feeds was designed "
+    "and left switched off for exactly that reason. DEFAULT membership is what makes "
+    "the family arrive with the install rather than with a command somebody types",
+)
+check(
+    "ledger: the gateway's record bodies match the shipped templates",
+    (lambda tpl, code: all(
+        tuple(re.findall(r"^## (.+)$", blk, re.M)) == tuple(
+            re.findall(r'"' + t + r'": \(([^)]*)\)', code)[0].replace('"', "").split(", ")
+        )
+        for t, blk in (
+            (t, re.search(
+                r"^## " + t + r"\n\n```markdown\n(.*?)^```", tpl, re.M | re.S).group(1))
+            for t in ("DEC", "INC", "PAT", "FLW")
+        )
+    ))(read("workforce/references/personnel-templates.md"), _wlg),
+    "the two halves of this family are authored in parallel — doctrine writes the "
+    "template a human reads, the gateway writes the file an agent reads — so their "
+    "bodies drift silently and nothing else notices. MEASURED 2026-09-08: they shipped "
+    "apart on the first build (DEC had no `What It Rules Out` in the script, and no "
+    "`Evidence` in the template) and every other assertion here stayed green. This is "
+    "the class fix: the headings in BODIES must equal the `## ` headings in the "
+    "matching template, in order",
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

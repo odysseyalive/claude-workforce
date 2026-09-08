@@ -1,6 +1,6 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 20 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 
@@ -363,6 +363,24 @@ must be able to invoke X — so its `## Procedure` grants that invocation and it
 `Skill`. Sources says WHERE the truth is + HOW to reach it; the Procedure EXERCISES that reach. This
 is NOT two-canonical-texts drift — Sources = identity+channel, Procedure = exercised step; they
 reference the same skill for different purposes.
+
+### The project ledger is a type-2 source on every producing craft
+
+**Every producing craft is wired to the project ledger as a type-2 source**, `consult` mode
+scoped to that craft's subjects. This is the store of what the project has decided, hit, patterned,
+and flowed (`procedures/ledger.md` § Two families, one ledger) — the input that stops an agent
+hallucinating against a decision reached in a conversation it never saw. It is a read-write state
+store, so it is named by its gateway skill exactly as type 2 requires — never by a raw path:
+
+    - `Skill(personnel-ledger)` — read-write store, your channel is READ ONLY, `consult` mode
+      scoped to <this craft's subjects>. What this project has decided about <craft>.
+
+The channel is `consult`, and `consult` returns `accepted` records only, sliced by `--subjects` to
+the craft's own tags (`procedures/ledger.md` § Modes) — which is what makes one store serve every
+craft without any craft reading the whole of it. The `Subjects:` tags are the craft's own concern,
+so the scoping is derived, not invented, and a `proposed` draft never reaches the agent.
+Write-coordination stays owned by `data-skills.md` as for any type-2 store; the agent's channel here
+is READ ONLY, because only the ledger's own owner and capture write it.
 
 ### Seam-completeness — authority over structure
 

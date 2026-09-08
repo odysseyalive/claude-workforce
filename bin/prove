@@ -1683,6 +1683,36 @@ CASES = [
     ("interface: Step 5-IFACE calls the backfill mode, not --apply",
      AUD, "del", "wf-remainder --interface-only <SKILL.md>"),
 
+    # ── the project record family, MECHANISM half (2026-09-08) ───────────────
+    # Eight rules, eight breaks. Each also has a fixture pair under
+    # fixtures/scripts/ that was observed failing with the same rule removed —
+    # these prove the ASSERTION binds, the fixtures prove the BEHAVIOUR does.
+    # Delete the status filter and a draft nobody agreed to is served as doctrine.
+    ("ledger: the gateway serves accepted records only",
+     "workforce/bin/wf-ledger", "del", 'if status != "accepted":'),
+    # Delete the re-read and one stale index row serves the draft instead.
+    ("ledger: the index selects, the record decides",
+     "workforce/bin/wf-ledger", "del", "# THE INDEX SELECTS; THE RECORD DECIDES."),
+    # Delete the filesystem enumeration and the rebuild inherits its own drift.
+    ("ledger: index rebuilds from the filesystem, never from its own prior index",
+     "workforce/bin/wf-ledger", "del",
+     "recs = [r for r in (header_of(root, i) for i in record_ids(root)) if r]"),
+    # Delete the guard and an unset ${CLAUDE_PROJECT_DIR} writes records into the CWD.
+    ("ledger: an empty --root is refused, never retargeted to the CWD",
+     "workforce/bin/wf-ledger", "del", 'if not (args.root or "").strip():'),
+    # Delete --if-absent and a re-fired turn writes a second draft of one exchange.
+    ("ledger capture: it drafts, and has no code path that writes an accepted record",
+     "workforce/bin/wf-ledger-capture", "del", '"--if-absent", "--execute"]'),
+    # Delete the measured figure and the capture rule is an assertion again.
+    ("ledger capture: the trigger's precision is measured, with its corpus and sample size",
+     "workforce/bin/wf-ledger-capture", "del", "PRECISION 89%"),
+    # Delete the seen-check and the list is re-injected on every turn of a session.
+    ("ledger open: once per session, and silent when nothing is pending",
+     "workforce/bin/wf-ledger-open", "del", "    if session_id in sessions:"),
+    # Delete the registration and the family ships installed, wired to nothing.
+    ("ledger hooks: both ship wired by default, neither is opt-in",
+     "workforce/bin/wf-settings-apply", "del",
+     '"wf-ledger-open": ("UserPromptSubmit", None),'),
 ]
 
 

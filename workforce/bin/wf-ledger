@@ -1,0 +1,603 @@
+#!/usr/bin/env python3
+"""wf-ledger — the one door into the project record family of the personnel store.
+
+WHY THIS EXISTS. The store was designed and never switched on. The project family —
+`INC` (something went wrong), `DEC` (a decision was reached), `PAT` (a recurring way
+this project does a thing), `FLW` (how a thing moves end to end) — has been declared
+in `procedures/ledger.md` since that file was written, and nothing wrote one, nothing
+read one, and the schema in `personnel-templates.md` did not list the four types. The
+origin is a real project where decisions reached in conversation lived nowhere: agents
+hallucinated against the gap, and the repair was hand-built after the fact.
+
+ONE STORE, TAGGED RECORDS, FILTERED READS — the user's own resolution, quoted in
+`plan/project-knowledge-2026-09-08.md`. The split different agents need is real, and it
+happens AT THE DOOR rather than on disk: one flat directory, every record carrying a
+`Subjects:` tag line, and `consult --subjects` handing back only the slice that was
+asked for. Separate stores would have to be chosen between at write time, by the thing
+least able to choose — the capture hook, mid-turn.
+
+THE LOAD-BEARING RULE, and it is one line: **a `proposed` record is never served.**
+Only `accepted` records leave this gateway. That is what lets drafting be automatic
+without manufacturing a history nobody agreed to — the draft exists so nothing is lost
+while the user is busy, and it carries no authority until the user says so. Everything
+else here is bookkeeping around that sentence.
+
+WHAT IT DOES.
+
+    new <TYPE> --slug <s> --subjects a,b     draft or record one, `proposed` by default
+    pending                                  every `proposed` record, newest first
+    accept <id>                              proposed -> accepted (the user's act)
+    supersede <id> --by <id>                 accepted -> superseded, and link the heir
+    consult --subjects a,b                   ACCEPTED only, index-scan then read matches
+    index                                    rebuild the index FROM THE FILESYSTEM
+    check                                    index count == file count; fields are legal
+
+DISPLAY IS THE DEFAULT, `--execute` WRITES. Same contract as every other writing script
+in this distribution: a run that would change the store prints exactly what it would
+write and changes nothing until it is told to.
+
+`index` NEVER READS ITS OWN PRIOR INDEX. `ledger.md` § Migrating them in states why:
+predecessor indexes drift — a real one under-reported its own contents by three
+records — and a rebuild that trusts the old index drops them silently while reporting
+success. This one enumerates the directory every time.
+
+`consult` IS THE IMPORTANT MODE. It reads the index, selects on tags and status, and
+then opens ONLY the records that matched. A ledger that must be read whole to be useful
+stops being consulted at exactly the point it becomes valuable. Where the index is
+absent it falls back to a HEADER scan — the five field lines of each record, never the
+bodies — and says so, because silently reading everything would be the failure this
+mode exists to prevent. The index SELECTS; the record DECIDES: `Status` is re-read
+from every candidate file, because an index row is a claim that goes stale the moment
+`accept` runs without a rebuild, and a stale claim must never be what serves a draft.
+
+WHAT IT DOES NOT DO.
+
+  * It does not touch the ORG family (`EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG`). Those
+    live in the same directory and are counted by `index` and `check`, and they are
+    written by the procedures that own them. `new` refuses any type outside the four.
+  * It does not judge a record's content, prune, or rewrite a body. Records are
+    institutional memory; the only field this tool ever changes after writing is
+    `Status:`, and `Supersedes:` on the heir.
+  * It does not decide what is worth recording. That is the capture hook's guess and
+    the user's confirmation, in that order.
+  * It never serves `(unclassified)` records to a subject query. An untagged record is
+    REPORTED — a count, never its contents — because quietly showing it to everyone is
+    the "one big clunky source" the tagging exists to refuse.
+
+EXIT CODES: 0 did the thing (including "nothing matched", which is an answer);
+2 caller error, or a `check` finding. Never any other code — a caller distinguishing
+"you asked wrong" from "the store is wrong" reads the message, not the number.
+"""
+
+import argparse
+import datetime
+import json
+import os
+import re
+import sys
+
+TYPES = ("INC", "DEC", "PAT", "FLW")
+STATUSES = ("proposed", "accepted", "superseded")
+UNCLASSIFIED = "(unclassified)"
+STORE = os.path.join(".claude", "workforce", "personnel")
+INDEX = "index.md"
+
+# The five field lines every project record carries, in order. Bold field lines under
+# an `# ID` heading, exactly like `DEF` and `AMD` — no YAML, because the store is read
+# by humans and by grep at least as often as by this script.
+FIELDS = ("Status", "Subjects", "Anchors", "Recorded", "Supersedes")
+
+# Body headings per type. The contract table in plan/project-knowledge-2026-09-08.md
+# names what each type holds; these are those asks as headings.
+BODIES = {
+    "DEC": ("What Was Decided", "Why", "What It Rules Out", "Evidence"),
+    "INC": ("What Happened", "Cause", "What Changed", "Evidence"),
+    "PAT": ("The Pattern", "When It Applies", "When It Does Not", "Evidence"),
+    "FLW": ("The Steps", "The Seams", "Who Owns Each", "Evidence"),
+}
+
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_ID_RE = re.compile(r"^(INC|DEC|PAT|FLW|EMP|PERF|DEF|AMD|RFI|ORG)-([A-Za-z0-9._-]+)$")
+# Field lines are LINE-ANCHORED. `**Status:**` inside a fenced example in a body is
+# documentation about the format, not the record's own field, and a substring test
+# would read it as one.
+_FIELD_RE = {f: re.compile(r"^\*\*%s:\*\*[ \t]*(.*)$" % f, re.M) for f in FIELDS}
+_INDEX_ROW_RE = re.compile(
+    r"^- `(?P<id>[A-Za-z]+-[A-Za-z0-9._-]+)` — (?P<type>[A-Z]+)"
+    r"(?: — (?P<status>[a-z]+) — subjects: (?P<subjects>.*?))?"
+    r"(?: — anchors: (?P<anchors>.*?))?$", re.M)
+
+
+def _die(msg):
+    print("wf-ledger: " + msg, file=sys.stderr)
+    return 2
+
+
+def store_dir(root):
+    return os.path.join(root, STORE)
+
+
+def record_path(root, rec_id):
+    return os.path.join(store_dir(root), rec_id + ".md")
+
+
+def record_ids(root):
+    """Every record on disk, enumerated FROM THE FILESYSTEM. Never from the index."""
+    d = store_dir(root)
+    out = []
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return out
+    for name in sorted(names):
+        if not name.endswith(".md"):
+            continue
+        stem = name[:-3]
+        if stem == INDEX[:-3]:
+            continue
+        if _ID_RE.match(stem):
+            out.append(stem)
+    return out
+
+
+def read_text(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def header_of(root, rec_id, lines=24):
+    """The field lines only — never the body. This is what makes a fallback scan of
+    the whole directory cheap enough to be honest about."""
+    path = record_path(root, rec_id)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            head = "".join(next(fh, "") for _ in range(lines))
+    except OSError:
+        return None
+    return parse_fields(head, rec_id)
+
+
+def parse_fields(text, rec_id):
+    rec = {"id": rec_id, "type": rec_id.split("-", 1)[0]}
+    for f in FIELDS:
+        m = _FIELD_RE[f].search(text or "")
+        rec[f.lower()] = (m.group(1).strip() if m else "")
+    rec["subject_tags"] = split_tags(rec.get("subjects", ""))
+    return rec
+
+
+def split_tags(value):
+    tags = [t.strip().lower() for t in (value or "").split(",")]
+    return [t for t in tags if t and t != UNCLASSIFIED]
+
+
+def is_project(rec_id):
+    return rec_id.split("-", 1)[0] in TYPES
+
+
+# ── the index ────────────────────────────────────────────────────────────────
+
+def index_path(root):
+    return os.path.join(store_dir(root), INDEX)
+
+
+def render_index(root, records):
+    today = datetime.date.today().isoformat()
+    out = ["# Personnel index", "",
+           "Regenerated from the filesystem by `wf-ledger index`, %s." % today,
+           "Never hand-edited.", "",
+           "**%d records.**" % len(records), ""]
+    for rec in records:
+        if is_project(rec["id"]):
+            subjects = rec["subjects"] or UNCLASSIFIED
+            row = "- `%s` — %s — %s — subjects: %s" % (
+                rec["id"], rec["type"], rec["status"] or "(no status)", subjects)
+            if rec.get("anchors") and rec["anchors"] != "(none)":
+                row += " — anchors: %s" % rec["anchors"]
+        else:
+            row = "- `%s` — %s" % (rec["id"], rec["type"])
+        out.append(row)
+    return "\n".join(out) + "\n"
+
+
+def read_index(root):
+    """(rows, error). Rows carry whatever the index states — which is a CLAIM about
+    the store, checked by `check` and never trusted by `index`."""
+    text = read_text(index_path(root))
+    if text is None:
+        return None, "no index at %s" % index_path(root)
+    rows = []
+    for m in _INDEX_ROW_RE.finditer(text):
+        rows.append({
+            "id": m.group("id"),
+            "type": m.group("type"),
+            "status": (m.group("status") or "").strip(),
+            "subjects": (m.group("subjects") or "").strip(),
+            "subject_tags": split_tags(m.group("subjects") or ""),
+        })
+    return rows, None
+
+
+# ── modes ────────────────────────────────────────────────────────────────────
+
+def do_new(root, args):
+    rec_type = args.type.upper()
+    if rec_type not in TYPES:
+        return _die("unknown type %r — this gateway writes the project family only: %s. "
+                    "The org family (EMP, PERF, DEF, AMD, RFI, ORG) is written by the "
+                    "procedures that own it." % (args.type, ", ".join(TYPES)))
+    slug = (args.slug or "").strip().lower()
+    if not slug:
+        return _die("--slug is required and was empty")
+    if not _SLUG_RE.match(slug):
+        return _die("--slug %r is not a legal slug (lowercase letters, digits and "
+                    "hyphens, starting with a letter or digit)" % args.slug)
+    status = args.status or "proposed"
+    if status not in STATUSES:
+        return _die("--status %r is not one of %s" % (status, ", ".join(STATUSES)))
+
+    rec_id = "%s-%s" % (rec_type, slug)
+    path = record_path(root, rec_id)
+    if os.path.exists(path):
+        if args.if_absent:
+            # CLASS B: anything that writes is a no-op the second time. The capture
+            # hook re-fires on a re-run turn and must not write a second draft of the
+            # same exchange; a human typing `new` gets the refusal below instead,
+            # because for them a collision is a different decision wearing a taken name.
+            print("already recorded: %s (unchanged)" % rec_id)
+            return 0
+        return _die("%s already exists. Pick another slug, or pass --if-absent to make "
+                    "this a no-op." % rec_id)
+
+    tags = split_tags(args.subjects or "")
+    subjects = ", ".join(tags) if tags else UNCLASSIFIED
+    anchors = (args.anchors or "").strip() or "(none)"
+    recorded_by = (args.recorded_by or "human:user").strip()
+    recorded = "%s by %s" % (datetime.date.today().isoformat(), recorded_by)
+
+    heads = BODIES[rec_type]
+    body = []
+    quote = (args.quote or "").strip()
+    body.append("## %s" % heads[0])
+    body.append("> %s" % (quote.replace("\n", "\n> ") if quote else "(not stated)"))
+    for h in heads[1:-1]:
+        body.append("")
+        body.append("## %s" % h)
+        body.append((args.why or "").strip() if h in ("Why", "Cause") else "(not stated)")
+    evidence = (args.evidence or "").strip()
+    body.append("")
+    body.append("## Evidence")
+    body.append("> %s" % (evidence.replace("\n", "\n> ") if evidence else "(not stated)"))
+
+    text = "\n".join([
+        "# %s" % rec_id, "",
+        "**Status:** %s" % status,
+        "**Subjects:** %s" % subjects,
+        "**Anchors:** %s" % anchors,
+        "**Recorded:** %s" % recorded,
+        "**Supersedes:** %s" % ((args.supersedes or "").strip() or "(none)"),
+        "",
+    ] + body) + "\n"
+
+    if not args.execute:
+        print("would write %s" % os.path.relpath(path, root))
+        print(text, end="")
+        print("write with: --execute")
+    else:
+        os.makedirs(store_dir(root), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        print("wrote %s — %s, %s" % (os.path.relpath(path, root), rec_id, status))
+    if subjects == UNCLASSIFIED:
+        # REPORTED, never quietly shown to everyone. An untagged record is invisible
+        # to `consult` by design, so the moment it is written is the only moment
+        # anybody finds out it needs a tag.
+        print("UNCLASSIFIED: %s carries no Subjects and will NOT be served by "
+              "`consult`. Tag it." % rec_id)
+    return 0
+
+
+def _sort_key(rec):
+    """Newest first. The `Recorded:` DATE is the key, never mtime: a fixture copy and
+    a `git checkout` both rewrite mtimes, and a list that reorders itself when the
+    tree is copied cannot be tested."""
+    m = re.match(r"(\d{4}-\d{2}-\d{2})", rec.get("recorded", "") or "")
+    return (m.group(1) if m else "0000-00-00", rec["id"])
+
+
+def do_pending(root, args):
+    recs = []
+    for rec_id in record_ids(root):
+        if not is_project(rec_id):
+            continue
+        rec = header_of(root, rec_id)
+        if rec and rec.get("status") == "proposed":
+            recs.append(rec)
+    recs.sort(key=_sort_key, reverse=True)
+    if args.json:
+        print(json.dumps([{k: r[k] for k in ("id", "type", "status", "subjects",
+                                             "anchors", "recorded")} for r in recs]))
+        return 0
+    if not recs:
+        print("no pending records — nothing is waiting on you")
+        return 0
+    print("%d pending record(s), newest first:" % len(recs))
+    for rec in recs:
+        print("  %-28s %s  subjects: %s" % (
+            rec["id"], rec["recorded"] or "(no date)", rec["subjects"] or UNCLASSIFIED))
+    print("accept one with: wf-ledger accept <id> --execute")
+    return 0
+
+
+def _set_status(root, rec_id, want_from, new_status, execute, extra=None):
+    path = record_path(root, rec_id)
+    text = read_text(path)
+    if text is None:
+        return None, "no such record: %s" % rec_id
+    rec = parse_fields(text, rec_id)
+    if want_from and rec["status"] not in want_from:
+        return None, "%s is %s, not %s" % (rec_id, rec["status"] or "(no status)",
+                                           " or ".join(want_from))
+    out = _FIELD_RE["Status"].sub("**Status:** %s" % new_status, text, count=1)
+    for field, value in (extra or {}).items():
+        out = _FIELD_RE[field].sub("**%s:** %s" % (field, value), out, count=1)
+    if execute:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(out)
+    return out, None
+
+
+def do_accept(root, args):
+    _, err = _set_status(root, args.id, ("proposed",), "accepted", args.execute)
+    if err:
+        return _die(err)
+    if args.execute:
+        print("accepted %s — it is now served by `consult`" % args.id)
+    else:
+        print("would accept %s (proposed -> accepted)" % args.id)
+        print("write with: --execute")
+    return 0
+
+
+def do_supersede(root, args):
+    if not args.by:
+        return _die("supersede requires --by <id>, the record that replaces this one")
+    if not os.path.exists(record_path(root, args.by)):
+        return _die("no such record: %s (given to --by)" % args.by)
+    _, err = _set_status(root, args.id, ("accepted", "proposed"), "superseded",
+                         args.execute)
+    if err:
+        return _die(err)
+    if args.execute:
+        text = read_text(record_path(root, args.by))
+        heir = _FIELD_RE["Supersedes"].sub("**Supersedes:** %s" % args.id, text, count=1)
+        with open(record_path(root, args.by), "w", encoding="utf-8") as fh:
+            fh.write(heir)
+        print("superseded %s — %s carries Supersedes: %s" % (args.id, args.by, args.id))
+    else:
+        print("would supersede %s, and record Supersedes: %s on %s"
+              % (args.id, args.id, args.by))
+        print("write with: --execute")
+    return 0
+
+
+def do_consult(root, args):
+    want = split_tags(args.subjects or "")
+    if not want:
+        return _die("consult requires --subjects a,b — an unfiltered read of the whole "
+                    "store is the thing this mode exists to refuse")
+    rows, err = read_index(root)
+    source = "index"
+    if err:
+        # NOT a failure. A store whose index has not been built yet must still answer,
+        # and saying which path was taken is what keeps a silent whole-store read from
+        # looking like an index scan.
+        source = "header scan (no index; rebuild with `wf-ledger index --execute`)"
+        rows = [r for r in (header_of(root, i) for i in record_ids(root)) if r]
+    candidates, unclassified = [], 0
+    for row in rows:
+        if not is_project(row["id"]):
+            continue
+        if not row["subject_tags"]:
+            unclassified += 1
+            continue
+        if set(row["subject_tags"]) & set(want):
+            candidates.append(row["id"])
+    print("consult subjects: %s — via %s" % (", ".join(want), source))
+
+    # THE INDEX SELECTS; THE RECORD DECIDES. Status is re-read from the file for every
+    # candidate, never taken from the index row — an index is a CLAIM about the store
+    # and it goes stale the moment `accept` runs without a rebuild. Taking the claim
+    # would make a stale line the thing that serves a record nobody agreed to, which is
+    # the one failure this gateway exists to make impossible. The extra reads are
+    # bounded by the subject slice, so the whole store is still never read.
+    matched, withheld, retired, unreadable = [], 0, 0, []
+    for rec_id in candidates:
+        text = read_text(record_path(root, rec_id))
+        if text is None:
+            unreadable.append(rec_id)
+            continue
+        status = parse_fields(text, rec_id)["status"]
+        if status != "accepted":
+            # THE LOAD-BEARING LINE. A proposed record is evidence the user has not
+            # agreed to yet; it leaves this gateway as a COUNT and never as content,
+            # so nothing downstream can quote a decision nobody made. A superseded one
+            # is counted apart from it: "waiting on you" and "replaced" are different
+            # states, and one message for both would report work where there is none.
+            if status == "proposed":
+                withheld += 1
+            else:
+                retired += 1
+            continue
+        matched.append((rec_id, text))
+    if not matched:
+        print("no accepted records match. That is an answer, not an error.")
+    for rec_id, text in matched:
+        print("")
+        print(text.rstrip())
+    for rec_id in unreadable:
+        print("  %s — UNREADABLE" % rec_id)
+    if withheld:
+        print("")
+        print("%d proposed record(s) match these subjects and were WITHHELD — a draft "
+              "carries no authority until the user accepts it. Review with "
+              "`wf-ledger pending`." % withheld)
+    if retired:
+        print("%d superseded record(s) match and were not served." % retired)
+    if unclassified:
+        print("%d record(s) carry no Subjects and are served to nobody. Tag them."
+              % unclassified)
+    return 0
+
+
+def do_index(root, args):
+    recs = [r for r in (header_of(root, i) for i in record_ids(root)) if r]
+    recs.sort(key=lambda r: r["id"])
+    text = render_index(root, recs)
+    path = index_path(root)
+    if args.execute:
+        os.makedirs(store_dir(root), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        print("wrote %s — %d record(s), enumerated from the filesystem"
+              % (os.path.relpath(path, root), len(recs)))
+    else:
+        print("would write %s — %d record(s), enumerated from the filesystem"
+              % (os.path.relpath(path, root), len(recs)))
+        print(text, end="")
+        print("write with: --execute")
+    return 0
+
+
+def do_check(root, args):
+    findings = []
+    on_disk = record_ids(root)
+    rows, err = read_index(root)
+    if err:
+        findings.append("INDEX ABSENT: %s — rebuild with `wf-ledger index --execute`"
+                        % err)
+    else:
+        indexed = {r["id"] for r in rows}
+        missing = sorted(set(on_disk) - indexed)
+        extra = sorted(indexed - set(on_disk))
+        if len(indexed) != len(on_disk):
+            findings.append("INDEX DRIFT: index states %d record(s), the filesystem "
+                            "holds %d" % (len(indexed), len(on_disk)))
+        for rec_id in missing:
+            findings.append("NOT INDEXED: %s is on disk and absent from the index"
+                            % rec_id)
+        for rec_id in extra:
+            findings.append("INDEXED AND ABSENT: %s is in the index and not on disk"
+                            % rec_id)
+    for rec_id in on_disk:
+        if not is_project(rec_id):
+            continue          # the org family carries its own fields, checked elsewhere
+        rec = header_of(root, rec_id)
+        if rec is None:
+            findings.append("UNREADABLE: %s" % rec_id)
+            continue
+        if rec["status"] not in STATUSES:
+            findings.append("ILLEGAL STATUS: %s carries %r, not one of %s"
+                            % (rec_id, rec["status"], ", ".join(STATUSES)))
+        if not rec["subjects"]:
+            findings.append("NO SUBJECTS LINE: %s — every project record carries one, "
+                            "even if it reads %s" % (rec_id, UNCLASSIFIED))
+    print("wf-ledger check — %d record(s) on disk, %d project record(s)"
+          % (len(on_disk), sum(1 for i in on_disk if is_project(i))))
+    for f in findings:
+        print("  " + f)
+    if findings:
+        print("%d finding(s)" % len(findings))
+        return 2
+    print("index count equals file count; every project record has a legal Status and "
+          "a Subjects line")
+    return 0
+
+
+def build_parser():
+    ap = argparse.ArgumentParser(
+        prog="wf-ledger", description="the gateway to the project record family")
+    ap.add_argument("--root", default=".", help="project root (holds .claude/)")
+
+    # `--root` IS ACCEPTED ON BOTH SIDES OF THE MODE WORD. Every shipped caller writes
+    # `--root "${CLAUDE_PROJECT_DIR}"`, and where that lands relative to the mode is
+    # the caller's business, not this parser's. `SUPPRESS` is what makes the second
+    # copy safe: without it the sub-parser's own default would overwrite a root the
+    # parent already parsed, and the tool would silently retarget to the CWD — the
+    # exact failure the empty-root guard exists to refuse, reintroduced by the
+    # convenience that was meant to prevent it.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--root", default=argparse.SUPPRESS)
+    sub = ap.add_subparsers(dest="mode")
+
+    p = sub.add_parser("new", parents=[common])
+    p.add_argument("type")
+    p.add_argument("--slug", default="")
+    p.add_argument("--subjects", default="")
+    p.add_argument("--anchors", default="")
+    p.add_argument("--status", default="proposed")
+    p.add_argument("--recorded-by", dest="recorded_by", default="human:user")
+    p.add_argument("--quote", default="", help="the words that settled it, verbatim")
+    p.add_argument("--why", default="")
+    p.add_argument("--evidence", default="")
+    p.add_argument("--supersedes", default="")
+    p.add_argument("--if-absent", dest="if_absent", action="store_true",
+                   help="an existing id is a no-op success rather than a refusal")
+    p.add_argument("--execute", action="store_true")
+
+    p = sub.add_parser("pending", parents=[common])
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("accept", parents=[common])
+    p.add_argument("id")
+    p.add_argument("--execute", action="store_true")
+
+    p = sub.add_parser("supersede", parents=[common])
+    p.add_argument("id")
+    p.add_argument("--by", default="")
+    p.add_argument("--execute", action="store_true")
+
+    p = sub.add_parser("consult", parents=[common])
+    p.add_argument("--subjects", default="")
+
+    p = sub.add_parser("index", parents=[common])
+    p.add_argument("--execute", action="store_true")
+
+    sub.add_parser("check", parents=[common])
+    return ap
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+
+    # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
+    # `${CLAUDE_PROJECT_DIR}` is unset outside a hook, so every shipped
+    # `--root "${CLAUDE_PROJECT_DIR}"` block expands to `--root ""`, and
+    # `os.path.abspath("")` is the CWD — a real directory, so an is-it-a-directory
+    # guard passes and the tool writes records into a tree nobody named.
+    if not (args.root or "").strip():
+        return _die("--root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; "
+                    "pass an explicit path.")
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(root):
+        return _die("not a directory: %s" % root)
+    if not args.mode:
+        build_parser().print_help()
+        return 2
+
+    if args.mode != "new" and not os.path.isdir(store_dir(root)):
+        return _die("no personnel store at %s — nothing has been recorded for this "
+                    "project yet." % os.path.join(STORE))
+
+    return {
+        "new": do_new, "pending": do_pending, "accept": do_accept,
+        "supersede": do_supersede, "consult": do_consult, "index": do_index,
+        "check": do_check,
+    }[args.mode](root, args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
