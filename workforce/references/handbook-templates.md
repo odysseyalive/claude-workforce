@@ -1,6 +1,6 @@
 # Handbook Templates — CEO, Lead, IC
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 40 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 41 assertion(s) in bin/check name this file; 7 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — the literal artifacts. Conform to procedure-for-procedures.md. -->
 
 Three templates. Fill every `<angle bracket>`; leave no placeholder in a written handbook.
@@ -235,7 +235,16 @@ table: one row per exit criterion, naming the line, file, or output that satisfi
 stated, never omitted, where one is not.
 Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
 and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
-there is nothing; never drop the heading. Narrative outside those three parts is a second work order
+there is nothing; never drop the heading.
+
+**Say the state, not the journey.** Every finding you report carries its outcome in the same breath —
+`fixed`, `blocked by <the named thing>`, or `for <your manager> to decide because <reason>` — attached
+to the finding, never a paragraph later. **Never hand work up the chain that you could have done**: a
+step you cannot run is a defect in the step, and if something genuinely refuses you, name it in one
+line and finish everything else. **Never retroactively downgrade a finding to a non-finding**; choosing
+not to act is a decision, stated when you make it, and a later downgrade is only ever an explicit
+correction. Accuracy is not the standard — the standard is that whoever reads this finishes it knowing
+the state (`operating-principles`, and `references/plain-output.md` § Say the state, not the journey). Narrative outside those three parts is a second work order
 nobody dispatched. Budget about three lines of evidence per exit criterion plus three per subordinate
 report you integrated.
 If a finding genuinely will not fit, return `ESCALATE:` rather than grow the file.
@@ -504,7 +513,16 @@ evidence table: one row per exit criterion, naming the line, file, or output tha
 fill in: return `QUESTION: no originating ask in the work order` instead of guessing.
 Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
 and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
-there is nothing; never drop the heading. Narrative outside those three parts is a second work order
+there is nothing; never drop the heading.
+
+**Say the state, not the journey.** Every finding you report carries its outcome in the same breath —
+`fixed`, `blocked by <the named thing>`, or `for <your manager> to decide because <reason>` — attached
+to the finding, never a paragraph later. **Never hand work up the chain that you could have done**: a
+step you cannot run is a defect in the step, and if something genuinely refuses you, name it in one
+line and finish everything else. **Never retroactively downgrade a finding to a non-finding**; choosing
+not to act is a decision, stated when you make it, and a later downgrade is only ever an explicit
+correction. Accuracy is not the standard — the standard is that whoever reads this finishes it knowing
+the state (`operating-principles`, and `references/plain-output.md` § Say the state, not the journey). Narrative outside those three parts is a second work order
 nobody dispatched. Budget about three lines of evidence per exit criterion.
 If a finding genuinely will not fit, return `ESCALATE:` rather than grow the file.
 Return ONLY: `<VERDICT> | <path to OUTPUT.md> | <≤3 line summary>`.

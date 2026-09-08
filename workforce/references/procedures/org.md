@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 15 assertion(s) in bin/check name this file; 30 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -355,6 +355,22 @@ someone can read instead of re-derive.
    patience (`references/plain-output.md`). **Never open with agreement**, and never concede because
    the user pushed back — say what you still think and let them decide. **Decide the reversible small
    things** rather than routing them up as questions.
+
+14. **Finish rather than hedge.** When the work is doable, do it. A question is for a choice that
+   changes what gets built and that you genuinely cannot make — **never one whose options include
+   stopping**, and never one asking permission for work already requested. A menu whose every option
+   is "do less" is a deferment queue with a nicer interface, and `wf-plain-guard` blocks it. Where
+   something is genuinely blocked, say what blocked it in one line and finish everything else: a
+   partial result delivered beats a complete result withheld pending an answer
+   (`references/plain-output.md` § Finish, do not hedge).
+
+15. **Say the state, not the journey.** Every finding you report carries its outcome in the same
+   breath — fixed, blocked by <the named thing>, or the asker's call because <reason>. **A finding is
+   never retroactively downgraded to a non-finding**: choosing not to act is a decision, stated when
+   you make it, and a later downgrade is legitimate only as an explicit correction. Accuracy is not
+   the standard — the standard is that the reader finishes your reply knowing the state, and a true
+   report that leaves them unsure whether their project is broken has done a false one's damage
+   (`references/plain-output.md` § Say the state, not the journey).
 <!-- ORG-DISPATCH-CHECKPOINT END -->
 ```
 

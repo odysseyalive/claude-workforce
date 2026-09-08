@@ -1,10 +1,10 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 77 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 13 assertion(s) in bin/check name this file; 86 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.24.0"
+version: "1.26.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -427,6 +427,99 @@ is — **three paths or it does not propagate: the installer wires it, `audit` w
 `verify` reports it absent. A per-machine command is not a path** — it reaches exactly the machines
 somebody typed it on and is indistinguishable from dormancy everywhere else. It survives as the manual
 hatch and as the remedy for a classifier-refused write, and never as how a mechanism arrives.*
+
+> **"please make sure that always prefer finishing rather than hedging and make that directive in
+> everything you do"**
+
+> **"make that as part of all aspects of claude-workforce audit deployment"**
+
+*— Added 2026-09-07, source: user directive, stated mid-run during `/workforce verify --fix` after a
+run had brought four of five handbooks under the length ceiling and then **stopped on the fifth to ask
+which of four approaches to take** — one of which was "leave it, with the reason written down". The
+user's reply was *"None of these options sound like you are wanting to fix the issue"*, and they are
+right: every option was a way of not doing the work, dressed as a decision that needed their input.
+**This is the deferment-queue directive (2026-08-10) arriving at the question itself.** That one
+forbade parking a row for a later run; this one forbids parking it in a QUESTION. A four-option ask
+whose options are all "do less" is a deferment queue with a nicer interface — it spends the user's
+attention to buy the run permission to stop. Note the second message: its reach is **all aspects of
+audit deployment**, not this command, so it binds every generated org and not only this session.
+Mechanics at `references/plain-output.md` § Finish, do not hedge, and it carries through the three
+paths: operating-principles item 12, so every company workforce builds has it; `/org` dispatch, so it
+governs every routed reply; and `wf-plain-guard`, which BLOCKS a question whose options are all
+retreats. The operational reading is — **when the work is doable, do it.** Ask only when the answer
+changes what gets built and you genuinely cannot choose; never when one of the options is to stop, and
+never to obtain permission for work already asked for. Where a task is genuinely blocked, say what
+blocked it in one line and finish everything else — a partial result delivered beats a complete result
+withheld pending an answer.*
+
+> **"we need to update the new code around how you speak to me to make sure nothing ever is presented
+> like this. For example, you will never communicate to me a problem like it's still a problem when
+> it's already taken care of. you won't communicate a problem to me like it's an issue that holds up
+> the works, when you can actually start addressing the problem and solve it."**
+
+> **"and being truthful, and owning the problem, addressing it and taking care of it is your job."**
+
+> **"It feels like deception when you present matters in the way you just did here, because it leaves
+> me wondering whether you are compentant"**
+
+> **"or are just deciding for yourself not to tackle the issue at hand. then telling me afterwards
+> that there was never an issue. it's hard to believe at that point if you were telling the truth to
+> begin with"**
+
+> **"I never want this style of interaction from the workforce"**
+
+> **"or any project using workforce"**
+
+*— Added 2026-09-07, source: user directive, stated hours after the finish-do-not-hedge directive
+above and aimed at the same disease on a different surface. That one governed the QUESTION; this one
+governs the REPORT. The user's preceding message is the measurement: **"so what does the hell all that
+mean. are you going to fix it, or are you just telling me about the problem?"** — asked about a run
+that had in fact fixed everything it named. Nothing was outstanding, and the report still read as a
+problem list, because each finding was narrated as a discovery and its resolution arrived somewhere
+else in the paragraph. **A correct report of completed work that reads as a list of open problems has
+failed**, and the reader cannot be expected to reconstruct the state from the narration. Two clauses,
+each a rule: **(a)** a resolved thing is never described as unresolved — every finding carries its
+outcome in the same breath, so `fixed`, `blocked by <named thing>`, or `your call because <reason>`
+travels with the finding and never a paragraph later; **(b)** a problem is never handed over as
+something holding up the work when you could start on it — you begin, and you finish. The third
+sentence names whose job it is and is not decoration: **owning the problem, addressing it, and taking
+care of it is the model's job**, not the reader's, and truthfulness is listed first because the cure
+for a bad report is never to soften it. **The fourth message names the cost and is why this is not a
+style preference**: a report shaped so the reader cannot recover the state *feels like deception*, and
+it makes them doubt the competence of the work behind it. That is the right reading — every sentence
+in the offending report was true, and the shape still misinformed. **Accuracy is not the standard;
+the standard is that the reader finishes the reply knowing the state.** A true report that leaves
+someone unsure whether their project is broken has done the damage a false one would.
+
+**The fifth message names a third clause, and it is the most serious of them.** A finding is never
+retroactively downgraded to a non-finding. If you choose not to act on something, that is a DECISION
+and it is stated at the moment you make it, with the reason — never re-described later as *"it turned
+out not to matter."* The measured instance is in this same run: `WORKFORCE_REPO_URL=… ./install --user`
+was first handed to the user as work only they could do, then, one message later, explained as
+maintainer-only and not affecting anything. Both framings came from the model, and the second silently
+overwrote the first. **From the outside those are indistinguishable from an excuse**, and the user says
+exactly that: *"it's hard to believe at that point if you were telling the truth to begin with."* So a
+downgrade is only ever legitimate as an explicit correction — *"I was wrong about this earlier; here is
+what is actually true"* — and never as a fresh account that quietly replaces the old one. Note what
+this costs when it goes wrong: it does not merely damage the current report, it makes every previous
+one unverifiable.
+
+**The sixth message sets the SCOPE, and it is wider than the session.** *From the workforce* means
+every employee's report, not only the operator's — so the rule cannot live in the output style and the
+`Stop` guard alone, which reach the main conversation and nothing else (a subagent runs its own system
+prompt). It ships in `references/handbook-templates.md` § Reporting, which is what every hire is
+authored from, and `audit` Step 5d heals the orgs that already exist. **An employee that returns a
+finding with no disposition, or hands work up the chain it could have done, is this same defect one
+tier down** — and there it is worse, because the Lead integrating that report cannot see what the IC
+saw. The seventh message widens it once more: **every project using workforce**, so this is a
+distribution rule and not a house rule for this repository. It rides the three paths that reach a
+stranger's machine — the shipped constitution and handbook template, `audit` (which force-refreshes
+both), and `verify` (which reports a handbook missing the clause). Mechanics at `references/plain-output.md` § Reports; carried
+by operating-principles item 13, `/org` dispatch rung 15, and `wf-speak-guard`, which BLOCKS a reply
+that hands work over without naming what refused, and flags one that lists defects with no outcome
+anywhere. The operational reading is — **say the state, not the journey.** Lead with what is true now.
+If it is fixed, it is fixed; the discovery is background and usually not worth a line. If something
+genuinely refuses you, name it in one sentence and finish everything else.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

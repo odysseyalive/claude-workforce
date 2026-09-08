@@ -4106,13 +4106,56 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
 # MARKER READER ANYWHERE UNDER workforce/bin/ OR IN bin/check RAISES BOTH FLOORS IN
 # THE SAME CHANGE, and `bin/prove` is what confirms it — bin/check cannot see this
 # failure by construction, because a floor that has stopped binding still passes.
-# Second occurrence, noted rather than mechanised (SKILL.md § anti-bloat counterweight);
-# a THIRD promotes it to an explicit reader inventory compared by equality, not by >=.
+# THIRD OCCURRENCE, 2026-09-07 — so the promotion this comment promised is now taken.
+# `wf-stamp` gained a sacred-marker reader (the `.directives.sha` producer) and the
+# floors kept their old values, exactly as predicted. `bin/prove` reported both guards
+# VACUOUS while `bin/check` stayed green, which is the failure mode by construction.
+# A `>=` floor cannot see a reader ADDED without its floor, and it stops binding the
+# moment the population grows past it. So the floors are gone and the inventory below
+# is compared by EQUALITY, per file: add or remove a reader anywhere and this fails
+# until its row is updated, which is the whole point.
+_READER_INVENTORY = {
+    "bin/check": 3,
+    "bin/baseline": 1,
+    "workforce/bin/wf-census": 1,
+    "workforce/bin/wf-claude-md": 1,
+    "workforce/bin/wf-conform": 2,
+    "workforce/bin/wf-protect-directives": 1,
+    "workforce/bin/wf-remainder": 1,
+    "workforce/bin/wf-seed": 1,
+    "workforce/bin/wf-stamp": 1,
+}
+# TWO TOTALS FROM ONE INVENTORY, because the two guards below scan different sets.
+# The grammar guard reads `bin/baseline` as well; the indentation guard does not, and
+# it counts only LINE-ANCHORED patterns. Deriving both from one dict keeps the single
+# source Core Principle 9a asks for while letting each guard assert its own exact
+# number — and it is the discrepancy that hid here: 11 anchored against 12 readers.
+_reader_actual = {}
+for _path in ["bin/check", "bin/baseline"] + sorted(glob.glob("workforce/bin/wf-*")):
+    _n = len(list(_marker_patterns(_path)))
+    if _n:
+        _reader_actual[_path] = _n
+_READERS_ALL = sum(_READER_INVENTORY.values())
+_READERS_ANCHORED = _READERS_ALL - _READER_INVENTORY["bin/baseline"]
+_reader_drift = sorted(
+    f"{k}: inventory {_READER_INVENTORY.get(k, 0)}, found {_reader_actual.get(k, 0)}"
+    for k in set(_READER_INVENTORY) | set(_reader_actual)
+    if _READER_INVENTORY.get(k, 0) != _reader_actual.get(k, 0))
+check(
+    "grammar: the sacred-marker reader inventory matches the readers on disk",
+    not _reader_drift,
+    f"{_reader_drift} — a reader was added or removed without updating the inventory. "
+    "This replaced two `>=` floors on 2026-09-07 after the third time a new reader "
+    "left them non-binding: a floor passes both when a reader vanishes below it and "
+    "when one is added above it, so it stops measuring and nothing says so. Update "
+    "the row in the same change that touches the reader",
+)
 check(
     "grammar: counters and guards reject an indented marker; the mask does not",
-    not _indent_bad and _indent_seen >= 10,
+    not _indent_bad and _indent_seen == _READERS_ANCHORED,
     (f"{_indent_bad}. " if _indent_bad else
-     f"only {_indent_seen} line-anchored readers examined, expected 10 — a reader "
+     f"{_indent_seen} line-anchored readers examined, inventory says "
+     f"{_READERS_ANCHORED} — a reader "
      "vanished or its file stopped parsing, and this check reports clean on an empty "
      "set. That is the direction it fails silently in. ")
     + "An indented marker sits in a code block and is an example. A "
@@ -4124,10 +4167,11 @@ check(
 
 check(
     "grammar: every sacred-marker reader accepts the same blocks",
-    not _grammar_bad and _grammar_readers >= 11,
+    not _grammar_bad and _grammar_readers == _READERS_ALL,
     (f"{_grammar_readers} readers tested; divergent: {_grammar_bad}. "
      if _grammar_bad else
-     f"only {_grammar_readers} marker readers found (expected 11) — the extractor "
+     f"{_grammar_readers} marker readers found, inventory says "
+     f"{_READERS_ALL} — the extractor "
      "stopped seeing "
      "them, so this check would pass on any grammar. ")
     + "A reader that cannot see a sacred block will not checksum it, will not guard "
@@ -9718,10 +9762,18 @@ check(
 # user's" bin/check` returned zero hits. **CLAUDE.md no longer exists on disk**, so
 # that span is the only copy outside git history — which makes the fence load-bearing
 # rather than cosmetic.
+# THE SPAN MAY LIVE IN THE HANDBOOK OR IN ITS GROUNDING LIBRARY, and this check
+# follows it rather than pinning it to one path. Relocated 2026-09-07 to bring the
+# handbook under the measured 172-line floor — `delegation-budget.md` § How the split
+# is performed calls relocation the ONLY legal way to shorten a handbook, so a check
+# that fails on a correct relocation would forbid the one remedy the rule allows.
+# What must NOT change is the bytes, and that is exactly what is still compared.
 _da = ".claude/agents/doctrine-author.md"
+_da_g = ".claude/workforce/grounding/doctrine-author.md"
+_da_src = _da_g if os.path.exists(_da_g) and "start of the user's verbatim" in read(_da_g) else _da
 _fenced = _orig = None
-if os.path.exists(_da):
-    _hb = read(_da).splitlines()
+if os.path.exists(_da_src):
+    _hb = read(_da_src).splitlines()
     try:
         _i = next(n for n, l in enumerate(_hb) if l.startswith("**— start of the user's verbatim"))
         _j = next(n for n, l in enumerate(_hb) if l.startswith("**— end of the user's verbatim"))
@@ -9749,10 +9801,19 @@ if os.path.exists(_da):
 check(
     "doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
     _fenced is not None and _orig is not None and _fenced == _orig,
-    f"fenced {len(_fenced or [])} non-blank lines against {len(_orig or [])} in "
+    f"fenced {len(_fenced or [])} non-blank lines in {_da_src} against {len(_orig or [])} in "
     "HEAD:CLAUDE.md § Non-negotiables. The fence exists so this comparison can be made; "
     "an unenforced fence drifts, and it already had. These are the user's own words and "
     "the file they came from has been deleted",
+)
+
+check(
+    "doctrine-author reaches its Non-negotiables wherever they live",
+    "start of the user's verbatim" in read(_da)
+    or ("GROUNDING" in read(_da) and "Non-negotiables" in read(_da)),
+    "relocation is legal; losing the pointer is not. If the span moved to the grounding "
+    "library the handbook must still name it and bind the reader to it, or the user's own "
+    "words reach nobody and the shortening was a deletion with extra steps",
 )
 
 check(
@@ -9773,7 +9834,9 @@ check(
 )
 check(
     "the source-first rule reaches the employee that owns it",
-    "Always edit source, then `bin/sync --personal`" in read(".claude/agents/runtime-lead.md"),
+    "Always edit source, then `bin/sync --personal`" in (
+        read(".claude/agents/runtime-lead.md")
+        + read(".claude/workforce/grounding/runtime-lead.md")),
     "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
     "destroyed rather than merged. The rule now arrives with the spawn that needs it; "
     "a handbook does not decay as context grows, which is the argument for the move",
@@ -10381,6 +10444,224 @@ check(
     "INV-STAMP" in _st_aud and "mismatch" in _st_aud and "blocks the sweep" in _st_aud,
     "an invariant that cannot print its own evidence is not enforced - audit.md must emit "
     "the INV-STAMP line and say that a nonzero mismatch blocks the sweep",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# .directives.sha had FOUR readers naming a producer and no producer (v1.25.0)
+# checksums.md § Where it runs names the sidecar path precisely so that "a generator
+# with no named destination is not a generator" would not happen to it;
+# wf-settings-apply cites it as the archetype of an artifact with a reader and no
+# writer; wf-stamp's own docstring cites it as the shape it closed for contract-stamp;
+# and wf-protect-directives line 24 recorded the gap as SHUT. The artifact existed
+# because an audit had hand-composed it — the hand-composed record wf-apply
+# --record-canary refuses on principle. Found 2026-09-07 by /workforce verify on this
+# repository: two rows stale after the 1.24.0 install rewrote their files.
+# ─────────────────────────────────────────────────────────────────────────────
+_ds_stamp = read("workforce/bin/wf-stamp")
+_ds_chk = read("workforce/references/procedures/checksums.md")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Say the state, not the journey (v1.26.0) — the same disease as finish-do-not-hedge,
+# on the REPORT instead of the question. The user read a report of work that was fully
+# done and asked "are you going to fix it, or are you just telling me about the
+# problem?", then "It feels like deception ... it leaves me wondering whether you are
+# compentant". Every sentence in it was true. Scoped by the user to "any project using
+# workforce", so it must reach an EMPLOYEE's report too — and the output style and the
+# Stop guard reach the main conversation only, because a subagent runs its own system
+# prompt. That is why the handbook template and wf-conform carry it.
+# ─────────────────────────────────────────────────────────────────────────────
+_ss_skill = read("workforce/SKILL.md")
+_ss_plain = read("workforce/references/plain-output.md")
+_ss_tmpl = read("workforce/references/templates.md")
+_ss_hbt = read("workforce/references/handbook-templates.md")
+_ss_guard = read("workforce/bin/wf-speak-guard")
+_ss_conform = read("workforce/bin/wf-conform")
+_ss_aud = read("workforce/references/procedures/audit.md")
+
+check(
+    "say-the-state: the user's words are retained verbatim in the directive block",
+    "are you just telling me about the problem" in _ss_skill
+    and "wondering whether you are compentant" in _ss_skill
+    and "or any project using workforce" in _ss_skill,
+    "directive one is that the user's verbiage is absolutely retained, and this directive arrived "
+    "over seven messages. All seven belong inside SKILL.md's immutable block, quoted — including "
+    "the typo, which is theirs and is not ours to correct",
+)
+
+check(
+    "say-the-state: plain-output.md owns the mechanics, all three clauses",
+    "## Say the state, not the journey" in _ss_plain
+    and "retroactively downgraded to a non-finding" in _ss_plain
+    and "Accuracy is not the standard" in _ss_plain,
+    "three clauses, not one: a resolved thing is never reported as unresolved, work is never handed "
+    "over that you could do, and a finding is never downgraded after the fact. A file carrying only "
+    "the first would leave the two the user was angriest about unwritten",
+)
+
+check(
+    "say-the-state: every generated org carries it in its constitution",
+    "13. **Say the state, not the journey.**" in _ss_tmpl,
+    "the user scoped this to any project using workforce. operating-principles is preloaded into "
+    "every employee, so a row there reaches every org this product builds",
+)
+
+check(
+    "say-the-state: the handbook template carries it, so an EMPLOYEE's report is governed",
+    _ss_hbt.count("**Say the state, not the journey.** Every finding you report") == 2,
+    "the output style and wf-speak-guard reach the main conversation ONLY — a subagent runs its own "
+    "system prompt. Both Reporting templates (directing tier and IC) must carry the clause or every "
+    "employee report is ungoverned, one tier below anyone who can see it",
+)
+
+check(
+    "say-the-state: wf-conform reports a handbook missing the clause",
+    "Say the state, not the journey" in _ss_conform
+    and "Reporting carries no say-the-state clause" in _ss_conform,
+    "a clause that ships in the template and is never checked reaches only the orgs hired after it. "
+    "wf-conform is the between-audit detector and audit Step 5d is its fix",
+)
+
+check(
+    "say-the-state: audit heals the orgs that already exist",
+    "carries the say-the-state" in _ss_aud and "Step 5d" in _ss_aud,
+    "a fresh-install path reaches new machines and leaves every org already in the world where it "
+    "was (SKILL.md § Directives, 2026-09-07). Step 5d is the heal, and it must name this clause",
+)
+
+check(
+    "say-the-state: the guard blocks a hand-back and flags findings with no outcome",
+    "def handback_hit" in _ss_guard and "def findings_without_disposition" in _ss_guard
+    and "_BLOCKED_BY = (" in _ss_guard,
+    "A DETECTOR SHIPS WITH ITS FIX, and prose read at the head of a context is not a detector. "
+    "wf-speak-guard must carry both checks and the _BLOCKED_BY list that lets a legitimate "
+    "hand-back through — without it the guard would block every honest 'this needs your approval'",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Finish, do not hedge — the directive that arrived at the QUESTION (v1.25.0)
+# 2026-09-07: a run brought four of five handbooks under the ceiling, could not reach
+# the fifth by the moves it had been making, and asked the user to pick between four
+# approaches — the first being "leave it, with the reason written down". The user
+# answered "None of these options sound like you are wanting to fix the issue." The
+# deferment-queue directive already forbade parking a row for a later run; this forbids
+# parking it in an ask. Three paths, per enforcement.md: the constitution carries it to
+# every generated org, plain-output.md states it, and wf-plain-guard blocks the shape.
+# ─────────────────────────────────────────────────────────────────────────────
+_fh_skill = read("workforce/SKILL.md")
+_fh_plain = read("workforce/references/plain-output.md")
+_fh_tmpl = read("workforce/references/templates.md")
+_fh_guard = read("workforce/bin/wf-plain-guard")
+
+check(
+    "finish-not-hedge: the user's words are retained verbatim in the directive block",
+    "always prefer finishing rather than hedging" in _fh_skill
+    and "all aspects of claude-workforce audit deployment" in _fh_skill,
+    "directive one is that the user's verbiage is absolutely retained. Both messages must sit "
+    "inside SKILL.md's `origin: user | immutable: true` block, quoted, not paraphrased into a rule",
+)
+
+check(
+    "finish-not-hedge: plain-output.md owns the mechanics",
+    "## Finish, do not hedge" in _fh_plain
+    and "Never offer stopping as an option" in _fh_plain,
+    "a directive whose mechanics live nowhere is a rule with no reader. plain-output.md is where "
+    "the question rules already live and must carry this one too",
+)
+
+check(
+    "finish-not-hedge: every generated org carries it in its constitution",
+    "Finish rather than hedge" in _fh_tmpl,
+    "the user scoped this to ALL aspects of audit deployment, not to this session. The "
+    "operating-principles default body is what reaches every company workforce builds; without a "
+    "row there the rule reaches exactly one project",
+)
+
+check(
+    "finish-not-hedge: /org dispatch carries it to every routed reply",
+    "Finish rather than hedge" in read("workforce/references/procedures/org.md"),
+    "the dispatch CHECKPOINT is loaded on every routed ask, so a rule absent from it governs only "
+    "the sessions that happen to read SKILL.md. The user scoped this to all of audit deployment",
+)
+
+check(
+    "finish-not-hedge: the guard blocks a menu whose every option is a retreat",
+    "def retreat_only" in _fh_guard and "_RETREAT = (" in _fh_guard
+    and "len(opts) < 2" in _fh_guard,
+    "A DETECTOR SHIPS WITH ITS FIX, and prose read at the head of a context is not a detector. "
+    "wf-plain-guard must carry retreat_only and its phrase list, and it must fire only when EVERY "
+    "option is a retreat — a genuine either/or may offer one",
+)
+
+# The length ceiling is MEASURED in delegation-budget.md and RESTATED in wf-conform,
+# which is the only legal shape for it (a script cannot read markdown at check time) —
+# so the two must be asserted equal. Measured 2026-09-07: doctrine had said 172 since
+# 2026-08-25 and the script still advised against 150, so every org built in between
+# was measured against a number its own doctrine had retired.
+_lc_bud = read("workforce/references/delegation-budget.md")
+_lc_cnf = read("workforce/bin/wf-conform")
+_lc_m = re.search(r"^DEFAULT_LENGTH_CEILING = (\d+)$", _lc_cnf, re.M)
+check(
+    "length ceiling: wf-conform's constant equals the measured floor doctrine states",
+    bool(_lc_m) and _lc_m.group(1) == "172" and "the number and 150 is retired" in _lc_bud,
+    f"delegation-budget.md measured the floor at 172 and retired 150; wf-conform says "
+    f"{_lc_m.group(1) if _lc_m else '(no constant)'}. A restated constant that nothing "
+    "compares is the fifty-file hunt Core Principle 9a exists to prevent",
+)
+
+check(
+    "directives sidecar: wf-stamp implements the producer, not only the contract half",
+    "--directives" in _ds_stamp and "def stamp_directives" in _ds_stamp
+    and "DIRECTIVES_REL" in _ds_stamp,
+    "wf-protect-directives reads .directives.sha on every edit and wf-conform re-hashes "
+    "it at every verify. wf-stamp must carry --directives and stamp_directives, or the "
+    "sidecar's only writer is a person typing rows by hand",
+)
+
+_ds_aud = read("workforce/references/procedures/audit.md")
+_ds_ver = read("workforce/references/procedures/verify.md")
+
+check(
+    "directives sidecar: audit CALLS the producer, so it reaches a tree nobody types on",
+    "--directives --execute            # cover new sacred blocks" in _ds_aud
+    and "--directives --execute --restamp" in _ds_aud and "Step 5-STAMP" in _ds_aud,
+    "three paths or it does not propagate (SKILL.md § Directives, 2026-09-07). The producer shipped "
+    "with verify naming it and nothing calling it, which reaches exactly the machines somebody typed "
+    "the command on. audit Step 5-STAMP must run it alongside the contract-stamp pair",
+)
+
+check(
+    "directives sidecar: verify names the producer, not a command with no script",
+    "--directives" in _ds_ver and "INV-DIRECTIVES" in _ds_ver
+    and "/workforce checksums --execute`." not in _ds_ver,
+    "verify's sidecar row pointed at `/workforce checksums --execute`, which is executor-followed "
+    "prose with no script behind it. A remedy with no producer is the shape this file exists to "
+    "catch, shipping inside the file that catches it",
+)
+
+check(
+    "directives sidecar: checksums.md names the invocation, not just the path",
+    "--directives --execute" in _ds_chk and "INV-DIRECTIVES" in _ds_chk,
+    "checksums.md is executor-followed, so a remedy it names without an invocation is a "
+    "remedy with no producer — the shape verify.md § Hook wiring records shipping once. "
+    "It must print the command and the INV-DIRECTIVES receipt",
+)
+
+check(
+    "directives sidecar: the mismatch rule is the contract half's, not a silent repair",
+    "--restamp" in _ds_stamp and "REFUSES every differing row" in _ds_stamp,
+    "checksums.md § On mismatch — an authorized amendment and an edit nobody approved "
+    "are indistinguishable from the hash, so a differing row is refused under --execute "
+    "and rewritten only under --restamp. A generator that repairs on --execute erases "
+    "the only evidence a sacred block changed",
+)
+
+check(
+    "directives sidecar: scope is declared, so a vendored tree is never stamped",
+    "def load_ignore" in _ds_stamp and ".censusignore" in _ds_stamp
+    and "SACRED_ROOTS = (" in _ds_stamp,
+    "wf-census answers 'what counts as project content' once, through .censusignore. A "
+    "producer with its own directory guess freezes somebody else's text as this "
+    "project's directive — the failure wf-census § load_ignore was written against",
 )
 
 check(

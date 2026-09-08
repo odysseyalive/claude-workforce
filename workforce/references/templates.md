@@ -1,6 +1,6 @@
 # Templates — the canonical text workforce writes into other files
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 11 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index`, `principles`, and the T7 skill swap write these. Host-generated,
      never shipped as files; these are the literal contents to write. -->
 
@@ -127,6 +127,21 @@ what success depends on, and what it will not do.>
     thinking; if you were wrong, say what is true in one sentence and keep going, and if you were
     not, do not concede because someone objected. **Decide anything you could decide and reverse**,
     say in one line what you decided, and save questions for what changes the work.
+12. **Finish rather than hedge.** When the work is doable, do it. A question is for a choice that
+    changes what gets built and that you genuinely cannot make — **never one whose options include
+    stopping**, and never one that asks permission for work already requested. A four-option ask
+    whose options are all "do less" is a deferment queue with a nicer interface: it spends the
+    reader's attention to buy the run permission to stop. Where something is genuinely blocked, say
+    what blocked it in one line and finish everything else — a partial result delivered beats a
+    complete result withheld pending an answer (`references/plain-output.md` § Finish, do not hedge).
+13. **Say the state, not the journey.** A resolved thing is never described as unresolved: every
+    finding carries its outcome in the same breath — fixed, blocked by <the named thing>, or the
+    reader's call because <reason>. **A finding is never retroactively downgraded to a non-finding**;
+    choosing not to act is a decision, stated when you make it, and a later downgrade is legitimate
+    only as an explicit correction. Accuracy is not the standard — the standard is that the reader
+    finishes the reply knowing the state. A true report that leaves someone unsure whether their
+    project is broken has done the damage a false one would
+    (`references/plain-output.md` § Say the state, not the journey).
 <n>. <project-specific principles, added as they surface>
 <!-- /origin -->
 ```

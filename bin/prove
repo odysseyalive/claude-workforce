@@ -127,6 +127,17 @@ OPR  = ".claude/skills/operating-principles/SKILL.md"
 WSR  = "workforce/bin/wf-standing-request"
 RTL  = ".claude/agents/runtime-lead.md"
 DAU  = ".claude/agents/doctrine-author.md"
+# THE GROUNDING LIBRARIES, and two cases key on them rather than on the handbook.
+# 2026-09-07 the handbooks were brought under the measured 172-line floor by
+# RELOCATION (`delegation-budget.md` § How the split is performed) — the only legal
+# way to shorten one — so the user's verbatim Non-negotiables and the source-first
+# rule now live here, byte-for-byte. `bin/check`'s assertions were updated to follow
+# the text the same day; these two payloads were not, and `bin/prove` reported both
+# SETUP-FAIL: the literal was absent from the file the case reads. **A case that
+# cannot set up proves nothing and is indistinguishable from a case that passes**,
+# which is why the run reports it as its own state rather than as a pass.
+DAUG = ".claude/workforce/grounding/doctrine-author.md"
+RTLG = ".claude/workforce/grounding/runtime-lead.md"
 CEN2 = "workforce/bin/wf-census"
 EVL  = "workforce/references/evaluators.md"
 EVLS = "workforce/references/evals.md"
@@ -152,11 +163,73 @@ RVW  = "workforce/references/procedures/review.md"
 ORGD = "workforce/references/org-design.md"
 HND  = "workforce/references/handoff.md"
 HOFF = "workforce/bin/wf-handoff"
+STMP = "workforce/bin/wf-stamp"
+CHKS = "workforce/references/procedures/checksums.md"
+PLN  = "workforce/references/plain-output.md"
+PGRD = "workforce/bin/wf-plain-guard"
+TMPL = "workforce/references/templates.md"
+DBUD = "workforce/references/delegation-budget.md"
+CNFM = "workforce/bin/wf-conform"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── say the state, not the journey (2026-09-07) ──────────────────────────
+    # Seven carriers, seven breaks. The user scoped this to "any project using
+    # workforce", so the handbook template and wf-conform are load-bearing in a way
+    # the output style is not: a subagent runs its own system prompt and neither the
+    # style nor the Stop guard reaches it.
+    ("say-the-state: the user's words are retained verbatim in the directive block",
+     SKL, "del", "are you just telling me about the problem"),
+    ("say-the-state: plain-output.md owns the mechanics, all three clauses",
+     PLN, "del", "retroactively downgraded to a non-finding"),
+    ("say-the-state: every generated org carries it in its constitution",
+     TMPL, "del", "13. **Say the state, not the journey.**"),
+    ("say-the-state: the handbook template carries it, so an EMPLOYEE's report is governed",
+     "workforce/references/handbook-templates.md", "del",
+     "**Say the state, not the journey.** Every finding you report carries its outcome"),  # 1 of 2
+    ("say-the-state: wf-conform reports a handbook missing the clause",
+     CNFM, "del", "Reporting carries no say-the-state clause"),
+    ("say-the-state: audit heals the orgs that already exist",
+     AUD, "del", "carries the say-the-state"),
+    ("say-the-state: the guard blocks a hand-back and flags findings with no outcome",
+     "workforce/bin/wf-speak-guard", "del", "def handback_hit"),
+    # ── finish, do not hedge (2026-09-07) ────────────────────────────────────
+    # The user's own words, the mechanics, the constitution row that reaches every
+    # generated org, and the guard that blocks the shape. Four paths, four breaks.
+    ("finish-not-hedge: the user's words are retained verbatim in the directive block",
+     SKL, "del", "always prefer finishing rather than hedging"),
+    ("finish-not-hedge: plain-output.md owns the mechanics",
+     PLN, "del", "Never offer stopping as an option"),
+    ("finish-not-hedge: every generated org carries it in its constitution",
+     TMPL, "del", "Finish rather than hedge"),
+    ("finish-not-hedge: /org dispatch carries it to every routed reply",
+     "workforce/references/procedures/org.md", "del", "Finish rather than hedge"),
+    ("finish-not-hedge: the guard blocks a menu whose every option is a retreat",
+     PGRD, "del", "def retreat_only"),
+    # ── the measured length ceiling (2026-09-07) ─────────────────────────────
+    # Breaking either SIDE of the comparison must fire it: the constant in the script
+    # and the sentence in doctrine that retires the old number.
+    ("length ceiling: wf-conform's constant equals the measured floor doctrine states",
+     CNFM, "del", "DEFAULT_LENGTH_CEILING = 172"),
+    # ── the .directives.sha producer (2026-09-07) ────────────────────────────
+    # Four shipped files named a producer for this sidecar and none existed. Each
+    # break below removes a DIFFERENT way the producer can go missing again, because
+    # the failure mode is not "the code is wrong" — it is "the remedy is named and
+    # nothing performs it", which is invisible to every test that runs the code.
+    ("directives sidecar: wf-stamp implements the producer, not only the contract half",
+     STMP, "del", "def stamp_directives"),
+    ("directives sidecar: audit CALLS the producer, so it reaches a tree nobody types on",
+     AUD, "del", "--directives --execute            # cover new sacred blocks"),
+    ("directives sidecar: verify names the producer, not a command with no script",
+     "workforce/references/procedures/verify.md", "del", "INV-DIRECTIVES` prints blocks-in-scope"),
+    ("directives sidecar: checksums.md names the invocation, not just the path",
+     CHKS, "del", "--directives --execute"),
+    ("directives sidecar: the mismatch rule is the contract half's, not a silent repair",
+     STMP, "del", "REFUSES every differing row"),
+    ("directives sidecar: scope is declared, so a vendored tree is never stamped",
+     STMP, "del", "SACRED_ROOTS = ("),
     # ── version anchor / mirror (2026-08-28) ─────────────────────────────────
     # WORKFORCE-VERSION in version.md is the sole authored anchor; SKILL.md's
     # frontmatter `version:` mirrors it. Deleting the `WORKFORCE-VERSION:` key breaks
@@ -847,7 +920,7 @@ CASES = [
     ("operating-principles stays sparse — it is preloaded into every employee",
      OPR, "append", "\n" + "bloat " * 4000),   # must clear 16 KB from a ~5 KB file
     ("doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
-     DAU, "del", "**Constants are stated once.**"),
+     DAUG, "del", "**Constants are stated once.**"),
     ("the standing cold-reader request reaches an ALWAYS-ON carrier",
      WSR, "del", "this line is the asking"),
     # NOT PROVABLE BY MUTATION, and that is a property of the assertion rather than a
@@ -895,7 +968,7 @@ CASES = [
     ("claude-md: the unstaffed region names no artifact that does not exist",
      WCM, "del", "Until then there is no org"),
     ("the source-first rule reaches the employee that owns it",
-     RTL, "del", "Always edit source, then `bin/sync --personal`"),
+     RTLG, "del", "Always edit source, then `bin/sync --personal`"),
     ("the development record exists and is not injected",
      DEV, "del", "## Open, as of"),
     ("close: the report carries no 'what I did not do' section",

@@ -1,6 +1,6 @@
 # checksums — integrity stamps for immutable blocks
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce checksums [target]`
 
 Generates and verifies the sidecar covering `<!-- origin: user | immutable: true -->` blocks and the
@@ -129,6 +129,39 @@ Report the target, the section, and both hashes. Resolution is a human or `amend
 `${CLAUDE_PROJECT_DIR}/.claude/workforce/.directives.sha`** — named here because an inherited hook
 once read a sidecar that no procedure wrote, and reported `NO-COVERAGE` forever. A generator with no
 named destination is not a generator.
+
+**Both halves have a script. The `contract-stamp` half got one 2026-09-05; the sidecar half got
+one 2026-09-07.**
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives            # report
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute  # write MISSING rows
+```
+
+It collects every `<!-- origin: user | immutable: true -->` block under `.claude/agents`,
+`.claude/skills`, `.claude/workforce/directives` and `.claude/workforce/personnel` — a **superset** of
+the paths `wf-protect-directives` guards, so the hook can never fire on a block the sidecar has no row
+for — minus whatever `.censusignore` declares out, read through the same declaration `wf-census` and
+`wf-conform` read. It writes the canonical row, re-parses its own output before counting the write, and
+prints `INV-DIRECTIVES` with every count including the zeroes.
+
+**`--execute` writes a MISSING row only, and `--restamp` is the separate gesture**, exactly as the
+contract half works and for the reason § On mismatch gives: a block with no row has no prior claim to
+erase, while a row whose digest differs is either an authorized amendment or an edit nobody approved,
+and the hash cannot tell them apart. An `ORPHAN ROW` — one naming a block that is no longer there — is
+dropped on write, because nothing can ever re-hash it and it reports coverage of nothing.
+
+*This gap outlived four separate notices of itself. § Where it runs above named the sidecar path
+precisely so that "a generator with no named destination is not a generator" would not happen to it;
+`wf-settings-apply` cites `.directives.sha` as the archetype of an artifact with a reader and no
+writer; `wf-stamp`'s own docstring cites it as the shape it was written to close for `contract-stamp`;
+and `wf-protect-directives` line 24 recorded the gap as **shut** — "FALSE NOW ... The artifact exists."
+The artifact existed because an audit run had hand-composed it, which is precisely the hand-composed
+record `wf-apply --record-canary` refuses to accept for the measurement file. Four files naming a
+producer, and the producer was a person typing. Found 2026-09-07 by `/workforce verify` on this
+repository: two rows stale after the 1.24.0 install rewrote their files, and no shipped command able to
+rewrite either.*
 
 **The `contract-stamp` half has a script, and until 2026-09-05 it had none.**
 

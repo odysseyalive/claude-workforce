@@ -17,7 +17,7 @@ That is the same decay the 2026-08-05 CLAUDE.md directive names. A hook does not
 receives `last_assistant_message` — the finished text — so it reads what the user is
 about to read rather than a description of it.
 
-WHAT IT CHECKS. Three things, all mechanical, all about the SHAPE of the reply:
+WHAT IT CHECKS. Five things, all mechanical, all about the SHAPE of the reply:
 
   1. A sycophantic or retracting OPENER. Whole-phrase, anchored to the first sentence.
      This is the one hard block. "You're absolutely right" carries no information; it
@@ -30,6 +30,25 @@ WHAT IT CHECKS. Three things, all mechanical, all about the SHAPE of the reply:
      would fire on every reply in a repository whose subject IS handbooks and tiers, and
      a guard that fires on everything is a guard that gets turned off.
   3. A BURIED ASK — a long reply whose only question sits in the last quarter.
+  4. A HAND-BACK — "one thing left for you", "you'll need to run", "over to you" — with
+     no named reason the model could not do it itself. BLOCKS. Added 2026-09-07 on the
+     user's directive: *"you won't communicate a problem to me like it's an issue that
+     holds up the works, when you can actually start addressing the problem and solve
+     it."* Measured the same day: a run finished eight of eight items, found and fixed
+     eleven more, then closed by handing the user a command to type — which turned out
+     to be a step no executor on this host could run, i.e. a defect in the procedure
+     rather than a chore for a human. A hand-back is legitimate ONLY when something
+     named refuses (a classifier, a missing credential, a rule that says ask), and the
+     check passes as soon as the reply says which. It never asks whether the reason is
+     good; it asks whether one is given.
+  5. FINDINGS WITH NO DISPOSITION. A reply that names defects and never says what
+     happened to any of them reads as a problem list when it is a done list. Same
+     directive: *"you will never communicate to me a problem like it's still a problem
+     when it's already taken care of."* Every finding carries its outcome in the same
+     breath — fixed, blocked by <named thing>, or your call because <reason>. NUDGE
+     rather than block, because the pairing of a specific finding to its specific
+     disposition is a judgment, and only the total absence of any disposition is
+     mechanical.
 
 WHAT IT DOES NOT CHECK. Register, length, and whether the prose is overbuilt. Those are
 the coffee test (`plain-output.md` § The test), a human judgment. A checker scoring
@@ -96,6 +115,36 @@ OPENERS = (
 
 # How much of the reply counts as "the opener". One sentence, generously measured.
 _OPENER_WINDOW = 120
+
+# CLAUSE 2 — handing work back. Phrase-matched, and the bar is deliberately narrow:
+# an explicit transfer of an action to the reader. "Say the word and I'll commit" is
+# NOT here, because it offers to do the work rather than assigning it.
+_HANDBACK = (
+    "left for you", "left to you", "one thing left", "needs your hand",
+    "over to you", "you'll need to", "you will need to", "you need to run",
+    "for you to run", "for you to do", "requires you to", "up to you to",
+    "waiting on you", "i'll leave that to you", "that's yours to",
+)
+# A named reason the model could not act. Presence of ANY of these clears clause 2 —
+# the check asks whether a reason is given, never whether it is a good one. Judging
+# the reason would be a taste call, and a guard that makes taste calls gets disabled.
+_BLOCKED_BY = (
+    "refused", "refuses", "denied", "denies", "blocked by", "not permitted",
+    "no permission", "classifier", "credential", "you haven't asked",
+    "have not asked", "only you can", "your call", "needs your approval",
+    "requires approval", "cannot reach", "no access", "unavailable",
+)
+# CLAUSE 1 — a defect named with no outcome attached anywhere in the reply.
+_FINDING = (
+    "defect", "bug", "broken", "is missing", "was missing", "no caller",
+    "nothing calls", "stale", "wrong", "failed", "failing", "gap",
+    "does not exist", "doesn't exist", "unproven", "vacuous",
+)
+_DISPOSITION = (
+    "fixed", "fixes", "corrected", "closed", "landed", "added", "removed",
+    "repaired", "resolved", "done", "already", "now ", "no longer",
+    "blocked by", "your call", "refused", "denied",
+)
 
 _SYSTEM_BLOCK = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 _FENCE = re.compile(r"```.*?```", re.S)
@@ -213,6 +262,34 @@ def buried_ask(message):
     return min(marks) >= int(len(lines) * 0.75)
 
 
+def handback_hit(message):
+    """(phrase, True) when work is assigned to the reader with no reason given.
+
+    Fenced blocks are stripped first: a command shown inside a fence is often the
+    thing the model just RAN, and matching prose inside code would fire on evidence.
+    """
+    prose = _FENCE.sub("", message).lower()
+    hit = next((ph for ph in _HANDBACK if ph in prose), None)
+    if not hit:
+        return None
+    if any(r in prose for r in _BLOCKED_BY):
+        return None
+    return hit
+
+
+def findings_without_disposition(message):
+    """True when a reply names defects and states no outcome for anything.
+
+    Deliberately coarse. It cannot pair a finding to its own disposition — that is a
+    judgment — so it fires only on the total absence, which is the shape the user
+    named: a reply that reads as a list of problems when the work is already done.
+    """
+    prose = _FENCE.sub("", message).lower()
+    if not any(f in prose for f in _FINDING):
+        return False
+    return not any(d in prose for d in _DISPOSITION)
+
+
 def main():
     payload = _read_payload()
     if payload is None:
@@ -243,6 +320,19 @@ def main():
         }))
         return 0
 
+    handback = handback_hit(message)
+    if handback:
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                "Your reply hands work to the user (\"%s\") without naming anything that "
+                "stopped you. Do it. If something genuinely refuses you — a permission "
+                "classifier, a missing credential, a rule that says ask — say which, in "
+                "one line, and finish everything else. A step no agent here can run is a "
+                "defect in the step, not a chore for the reader." % handback),
+        }))
+        return 0
+
     root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     ref = os.environ.get("WF_SPEAK_GUARD_REF") or _ref_path(root)
     terms = []
@@ -256,8 +346,15 @@ def main():
     owned = user_words(payload.get("transcript_path"))
     unowned = unowned_terms(message, terms, owned)
     buried = buried_ask(message)
+    undisposed = findings_without_disposition(message)
 
     notes = []
+    if undisposed:
+        notes.append(
+            "This reply names problems and never says what happened to any of them. "
+            "Every finding carries its outcome in the same breath — fixed, blocked by "
+            "<the named thing>, or the reader's call because <reason>. A finding "
+            "reported without one reads as still open when it is already closed.")
     if unowned:
         notes.append(
             "The user has not used %s in this session, and this reply did. Say it in "

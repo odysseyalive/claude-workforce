@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 75 assertion(s) in bin/check name this file; 154 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 77 assertion(s) in bin/check name this file; 154 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -1061,7 +1061,14 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    refresh-due by definition, and the stamp is added by this step.
 2. **Apply the contract deltas as amendments, touching contract sections only.** The current template
    (`references/handbook-templates.md`) is the source: `## Reporting` opens OUTPUT.md with the
-   `REQUEST (verbatim):` echo and the criterion → evidence table; a delegating handbook carries the
+   `REQUEST (verbatim):` echo and the criterion → evidence table, and **carries the say-the-state
+   clause** — every finding reports its outcome in the same breath, no work is handed up the chain
+   that the employee could have done, and no finding is retroactively downgraded to a non-finding
+   (`SKILL.md` § Directives, 2026-09-07; `references/plain-output.md` § Say the state, not the
+   journey). *That clause is scoped by the user to **every project using workforce**, and an employee
+   is where it is hardest to see: the output style and `wf-speak-guard` reach the main conversation
+   only, because a subagent runs its own system prompt. A handbook missing it is an org whose reports
+   read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
    completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
    one exists) carries verification step (4), the read-back against the REQUEST. **Role-specific
    judgment is NEVER rewritten here** — a refresh that touches `## Procedure` prose has exceeded this
@@ -1083,7 +1090,21 @@ amend, and any one of them alone leaves the org in this state.
 ```bash
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute            # stamp the unstamped
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute --restamp  # clear what THIS run moved
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute            # cover new sacred blocks
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute --restamp  # and what THIS run moved
 ```
+
+**The `--directives` pair is the same step for the OTHER sidecar, and it is here for the same reason.**
+`.directives.sha` is what `wf-protect-directives` compares every edit against; a block with no row is
+reported `UNPROTECTED` on every edit forever, and a row whose digest this run moved makes the hook cry
+drift about a change the run authorized. Both are silent until somebody edits a sacred block and reads
+a hook message they have no way to act on.
+
+*Added 2026-09-07, the same day the producer was built. `wf-stamp --directives` shipped with `verify`
+naming it and NOTHING calling it — the producer/consumer defect this project records more than any
+other, reproduced inside the patch that closed the previous instance of it. Caught by the user asking
+how a fix reaches another machine: a mechanism only a human types reaches exactly the machines somebody
+typed it on (`SKILL.md` § Directives, 2026-09-07, three paths or it does not propagate).*
 
 **`contract-stamp` is not `workforce-version:`, and step 3 above only ever set the second one.** The
 contract stamp is a sha over the normalized `## Procedure` + `## Verification` sections. It is what

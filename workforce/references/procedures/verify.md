@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 64 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 34 assertion(s) in bin/check name this file; 65 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -157,9 +157,25 @@ employee output is the overclaim Core Principle 6 exists for.
 shipped file pointed at a remedy with no producer — this project's signature defect, in the file whose
 job is reporting whether hooks work. The producer now exists.*
 
-**Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`,
-`PRESENT` with a block count or `ABSENT`. Absent is not an error — it is the day-one state — but a hook
-reporting `UNPROTECTED` on every edit forever is, and the fix is `/workforce checksums --execute`.
+**Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`.
+Run the producer in REPORT mode and print its receipt, rather than testing the file for existence:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives
+```
+
+`INV-DIRECTIVES` prints blocks-in-scope, covered, unprotected, drift, orphan, malformed and unreadable,
+**including the zeroes**. Absent is not an error — it is the day-one state — but `unprotected > 0` is: the
+hook reports `UNPROTECTED` on those blocks at every edit, forever. `drift > 0` means a sacred block
+changed after it was stamped, which is FLAGGED and never repaired here (`checksums.md` § On mismatch).
+
+**The remedy is `wf-stamp --directives --execute`, and `audit` Step 5-STAMP already runs it** — so an
+`unprotected` count above zero on a tree audited since 2026-09-07 means that write was refused or
+reversed, not that nobody got around to it. Say which. *Corrected 2026-09-07: this row named
+`/workforce checksums --execute`, which is executor-followed prose with no script behind it — the
+sidecar had four documents naming a producer and none existed, and the file on a real host had been
+composed by hand. Naming a remedy with no producer is the defect this section exists to catch.*
 
 **And report whether the git pre-commit pin guard is wired.** It is a git hook, not a settings hook, so
 its wiring lives in git config rather than the settings file — this row reads `core.hooksPath` and the
@@ -301,9 +317,14 @@ non-empty and names at least one literal invocation; the length ceiling; the imm
 digests; `tools:` is a real allowlist rather than the display string; and the staged draft still
 matches the registered bytes.
 
-Two advisory rows post-date most deployed handbooks and block nothing: `## Reporting` echoes the
-`REQUEST (verbatim)` block (dispatch CHECKPOINT clauses 6c/6d), and the ORG-RECORD carries a
-`workforce-version:` stamp. **The stamp is what makes staleness a finding instead of an unknown**:
+Three advisory rows post-date most deployed handbooks and block nothing: `## Reporting` echoes the
+`REQUEST (verbatim)` block (dispatch CHECKPOINT clauses 6c/6d), `## Reporting` carries the
+**say-the-state clause** (every finding reports its outcome in the same breath; no work handed up the
+chain the employee could have done; no finding retroactively downgraded), and the ORG-RECORD carries a
+`workforce-version:` stamp. **The say-the-state row is the only reader an employee's report shape
+has** — the output style and `wf-speak-guard` govern the main conversation, and a subagent runs its own
+system prompt, so without this row an org can report every finding as an open problem forever and
+nothing says so. `audit` Step 5d is its fix. **The stamp is what makes staleness a finding instead of an unknown**:
 where it is present and older than the installed `WORKFORCE-VERSION` (`references/version.md`), report
 the handbook as authored under superseded doctrine — the state two contract releases sat in,
 template-only across every deployed org, with nothing anywhere able to say so.

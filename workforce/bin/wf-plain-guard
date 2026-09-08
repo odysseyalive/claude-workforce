@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Block an `AskUserQuestion` written in this distribution's own vocabulary.
+"""Block an `AskUserQuestion` written in this distribution's own vocabulary, or one
+whose options are all ways of not doing the work.
 
 WHY THIS EXISTS. Everything in this distribution is written for an agent reading
 cold, and it is dense on purpose. That register kept reaching the user. The rule
@@ -28,6 +29,27 @@ from it, so adding a word is a one-line edit to the reference and never a two-fi
 hunt (SKILL.md Principle 9a). A term list copied into this file would drift from the
 reference the moment either changed.
 
+THE SECOND CHECK — a retreat menu. Added 2026-09-07 under the finish-do-not-hedge
+directive (`SKILL.md` § Directives). MEASURED that day: a run brought four of five
+handbooks under the length ceiling, could not reach the fifth by the moves it had
+been making, and asked the user to pick between four approaches — the first of which
+was "leave it, with the reason written down". The user answered "None of these
+options sound like you are wanting to fix the issue." Every option was a way of not
+doing the work, offered as a decision, so the user's attention became the price of
+the run's exit. A question whose options include stopping is a deferment queue with a
+nicer interface, and the deferment-queue directive already forbids that shape.
+
+WHAT COUNTS AS A RETREAT, and the bar is deliberately narrow: an option that proposes
+leaving the finding in place rather than resolving it. Detected by phrase, not by
+sentiment, because sentiment cannot be checked and a scorer that guessed would fire
+on honest questions and be turned off. The phrases live in `references/plain-output.md`
+§ Finish, do not hedge for the same reason the term list does — one edit, one file.
+
+IT FIRES ONLY WHEN EVERY OPTION IS A RETREAT, never when one is. A genuine either/or
+may legitimately include "keep the current behaviour" as one arm; what this refuses
+is a menu with no arm that does the work. That asymmetry is the whole discrimination,
+and getting it backwards would block the questions worth asking.
+
 EXIT CODES: 0 pass or could-not-verify (a guard bug never wedges a session); 2 block.
 """
 
@@ -41,6 +63,18 @@ _REF = os.path.join("references", "plain-output.md")
 # The paragraph that owns the list. Everything backticked inside it is a banned term.
 _LIST_RE = re.compile(
     r"\*\*Banned from question text and from every option label\*\*(.*?)(?:\n\n)", re.S)
+
+# An option that proposes leaving the finding in place. Phrase-matched, whole-word
+# where the phrase is one word. Kept short on purpose: a long list starts matching
+# honest options, and the check only fires when EVERY option matches, so a miss costs
+# one un-blocked question while a false hit costs a question that needed asking.
+_RETREAT = (
+    "leave it", "leave them", "leave as is", "leave as-is", "leave that",
+    "flag it", "flag them", "note it and move on", "just note",
+    "defer it", "defer them", "come back to it", "revisit later", "later run",
+    "do nothing", "no change", "skip it", "skip them", "accept it as is",
+    "raise it and stop", "report it and stop", "hand it back",
+)
 
 
 def _note(msg):
@@ -86,6 +120,34 @@ def parse_terms(text):
     return sorted(set(terms), key=len, reverse=True)
 
 
+def _options(payload):
+    """Per question: (question text, [option label + description, ...])."""
+    out = []
+    for q in (payload.get("tool_input") or {}).get("questions") or []:
+        if not isinstance(q, dict):
+            continue
+        opts = []
+        for opt in q.get("options") or []:
+            if isinstance(opt, dict):
+                opts.append((str(opt.get("label") or "") + " " +
+                             str(opt.get("description") or "")).strip())
+        if opts:
+            out.append((str(q.get("question") or ""), opts))
+    return out
+
+
+def retreat_only(opts):
+    """True when EVERY option proposes leaving the finding in place.
+
+    Never true for a single retreat among real options — a genuine either/or may
+    legitimately offer "keep what you have" as one arm. What this names is a menu
+    with no arm that does the work.
+    """
+    if len(opts) < 2:
+        return False
+    return all(any(ph in o.lower() for ph in _RETREAT) for o in opts)
+
+
 def _strings(payload):
     """Every string a human reads in this call, as (where, text) pairs."""
     out = []
@@ -125,6 +187,24 @@ def main():
     strings = _strings(payload)
     if not strings:
         return 0
+
+    # The retreat check runs FIRST and on its own terms: it needs no reference file,
+    # so a missing or unparseable plain-output.md cannot silently disable it.
+    for qtext, opts in _options(payload):
+        if retreat_only(opts):
+            _note("\n".join([
+                "BLOCKED — every option here is a way of not doing the work.",
+                "  question: " + (qtext if len(qtext) <= 160 else qtext[:157] + "..."),
+                "  options:  " + " | ".join(o[:60] for o in opts),
+                "",
+                "When the work is doable, do it (SKILL.md § Directives, 2026-09-07). Ask only "
+                "when the answer changes what gets built and you cannot choose — never when one "
+                "option is to stop, and never to get permission for work already requested. If "
+                "something is genuinely blocked, say what blocked it in one line and finish "
+                "everything else.",
+            ]))
+            return 2
+
 
     root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     ref = os.environ.get("WF_PLAIN_GUARD_REF") or _ref_path(root)

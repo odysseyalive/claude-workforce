@@ -208,7 +208,17 @@ ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
 def normalize(text):
     """Trailing whitespace and final newline. Same rule both readers apply."""
     return "\n".join(line.rstrip() for line in text.strip().splitlines())
-DEFAULT_LENGTH_CEILING = 150
+# MEASURED, NOT CHOSEN, and read from the one file that authors it —
+# `delegation-budget.md` § How the split is performed. 150 was a chosen budget with
+# nothing behind it, and a live audit measured it INVALID: `engineering-site` was
+# relocated block by block to a grounding library, verified verbatim, re-probed PASS,
+# and reached 172 — 154 lines of irreducible binding prose plus the ~18 `ORG-*` lines
+# the embed step itself appends, neither of which any author can cut. A measured floor
+# outranks an unmeasured budget (Core Principle 4). Recorded 2026-08-25; this script
+# still said 150 on 2026-09-07, so every org built since had been advised against a
+# retired number. `bin/check` asserts the two agree, because a constant restated in a
+# second file is the drift Core Principle 9a exists for.
+DEFAULT_LENGTH_CEILING = 172
 
 
 class Result:
@@ -635,6 +645,30 @@ def check_handbook(path, body, res, ceiling):
             "open with the work order's REQUEST block quoted unchanged plus a "
             "criterion → evidence table (handbook-templates.md § Reporting), or "
             "spec fidelity cannot be read back at return time.",
+        )
+
+    # SAY THE STATE, NOT THE JOURNEY (2026-09-07, SKILL.md § Directives). The user
+    # scoped this to "any project using workforce", and an employee is where it is
+    # hardest to see: the `Plain Speak` output style and `wf-speak-guard` govern the
+    # MAIN conversation only, because a subagent runs its own system prompt. So this
+    # row is the only reader an employee's report shape has. Without it an org can
+    # return every finding as an open problem forever — with the work already done —
+    # and nothing anywhere says so.
+    #
+    # MATCHED ON THE PHRASE, not on a paraphrase, for the same reason the ORG-RECORD
+    # marker is: a clause can be mentioned by accident, and a heading cannot. ADVISORY,
+    # like its two neighbours, because every handbook authored before this contract is
+    # in this state and a blocking row would drown a `verify` on a healthy org.
+    if seg is not None and "Say the state, not the journey" not in seg:
+        res.advise(
+            f"{n}: Reporting carries no say-the-state clause",
+            "add the say-the-state clause to ## Reporting (handbook-templates.md "
+            "§ Reporting): every finding reports its outcome in the same breath — "
+            "fixed, blocked by <the named thing>, or for the manager to decide "
+            "because <reason>; never hand work up the chain you could have done; "
+            "never retroactively downgrade a finding to a non-finding. Accuracy is "
+            "not the standard — the standard is that the reader finishes the report "
+            "knowing the state. `audit` Step 5d is the fix.",
         )
 
     # THE AUTHORING-VERSION STAMP (2026-09-01). Without `workforce-version:` in the
