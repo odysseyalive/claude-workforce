@@ -283,11 +283,8 @@ _cov_src = read("bin/coverage")
 _hire = read("workforce/references/procedures/hire.md")
 _tpl_cfg = read("workforce/references/org-config.template.md")
 _plat = read("workforce/references/platform.md")
-abl = read("workforce/references/ablation.md")
-_abl2 = read("workforce/references/procedures/ablate.md")
 rev = read("workforce/references/procedures/review.md")
 dbg = read("workforce/references/procedure-for-procedures.md")
-_bud = read("workforce/references/procedures/budget.md")
 _amd = read("workforce/references/procedures/amend.md")
 _ocfg = read("workforce/references/org-config.template.md")
 dfr = read("workforce/references/deferred.md")
@@ -1381,7 +1378,6 @@ _uninvoked = [p_ for p_ in _execs if os.path.basename(p_) not in _procedure_text
 _aud_pg = read("workforce/references/procedures/audit.md")
 _vfy_pg = read("workforce/references/procedures/verify.md")
 _hk_pg = read("workforce/references/procedures/hooks.md")
-_wpc_pg = read("workforce/bin/wf-pin-check")
 check(
     "pin guard: audit installs it, in the Step 6 execution order",
     "the git pin-guard install (Step 6-G)" in _aud_pg,
@@ -1403,8 +1399,6 @@ check(
 # next build, so the edit is unreviewable AND lost) and merged a `directory:
 # "/.next"` npm block into the user's dependabot.yml, which is NOT lost. Asserting
 # the SET rather than one member means the next hole fails this line too.
-_wpc_skip_m = re.search(r"^SKIP_DIRS = \{(.*?)\}", _wpc_pg, re.M)
-_wpc_skip = set(re.findall(r'"([^"]+)"', _wpc_skip_m.group(1))) if _wpc_skip_m else set()
 _wpc_skip_owed = {".git", "node_modules", "vendor", "dist", "build", ".next", "__pycache__"}
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4016,7 +4010,6 @@ check(
 # self-exclusion gate that is not stated, a detector that quietly grows a new
 # mechanism, a ROUTE disposition that records a spec instead of fixing it, or a
 # clean deliverable that goes unreported and reads as unchecked.
-_dgn = read("workforce/references/procedures/diagnose.md")
 # ─────────────────────────────────────────────────────────────────────────────
 # The mechanism layer — skills own mechanism, employees own judgment.
 #
@@ -5707,13 +5700,10 @@ check(
 # The script is a pure function of the template's table: it names NO model ID of its
 # own (constants: stated once — SKILL.md Principle 9a forbids a second copy of the
 # pool living in code) and derives the per-lane recommendation from the Notes column.
-_wfmb = read("workforce/bin/wf-model-budget")
 # The module docstring names the stale/current IDs to explain the historical drift —
 # that is documentation, not a second source of truth. Scope the constant check to
 # the code BELOW the module docstring, where a hardcoded ID would actually drive
 # emission. `_parts[1]` is the module docstring; `[0]` is the shebang, `[2:]` the code.
-_wfmb_parts = _wfmb.split('"""')
-_wfmb_code = (_wfmb_parts[0] + "".join(_wfmb_parts[2:])) if len(_wfmb_parts) >= 3 else _wfmb
 
 # ─────────────────────────────────────────────────────────────────────────────
 # THE OTHER HALF OF THE SAME HOLE: the EFFORT budget (2026-08-26)
@@ -5725,7 +5715,6 @@ _wfmb_code = (_wfmb_parts[0] + "".join(_wfmb_parts[2:])) if len(_wfmb_parts) >= 
 # session rebuilding "the budget questions" reached for a project's instantiated
 # org-config.md and reproduced the stale lane structure it found there. The fix is
 # the mirror script; these are the assertions that keep both readers pointed at it.
-_wfeb = read("workforce/bin/wf-effort-budget")
 check(
     "audit-setup: the effort budget option set is produced by wf-effort-budget, not by hand",
     "wf-effort-budget" in _asu and "PRODUCED BY `wf-effort-budget`" in _asu,
@@ -5750,12 +5739,8 @@ check(
 # than typed here, so this assertion cannot itself become a second copy of the
 # ladder; each is matched as a QUOTED literal, because `low` is a substring of
 # `allow`/`follow` and a bare scan would fail on an innocent word.
-_wfeb_parts = _wfeb.split('"""')
-_wfeb_code = (_wfeb_parts[0] + "".join(_wfeb_parts[2:])) if len(_wfeb_parts) >= 3 else _wfeb
 _m_rungs = re.search(r"The rungs are\s+([^(\n]*)", _ocfg)
 _rung_tokens = re.findall(r"`([a-z]+)`", _m_rungs.group(1)) if _m_rungs else []
-_rung_leaks = sorted({r for r in _rung_tokens
-                      if re.search(r"""['"]%s['"]""" % re.escape(r), _wfeb_code)})
 
 # ONE HOME FOR THE QUESTION COPY. The option set was produced mechanically while the
 # HEADER and BODY above it were still retyped from procedure prose — half a
@@ -5778,14 +5763,6 @@ check(
 # assertion must not become the second copy it exists to forbid.
 _word_headers = [l[2:].strip() for l in _wording_body.splitlines()
                  if l.startswith("> **") and l.rstrip().endswith("**")]
-_word_dupes = sorted({h for h in _word_headers if h in _wfmb or h in _wfeb})
-check(
-    "budget wording: neither emitter carries its own copy of the question copy",
-    bool(_word_headers) and not _word_dupes,
-    f"question copy found inside an emitter: {_word_dupes} ({len(_word_headers)} header(s) "
-    "compared). A fallback string in the script is a second source of truth that drifts "
-    "from the template the moment either is edited (SKILL.md Principle 9a)",
-)
 # ONE HOME, ENFORCED ACROSS THE PROSE TOO. The emitters no longer carry the copy
 # (above), but audit-setup.md § Step 0.4a–0.4d restated all four blocks verbatim
 # under a "Use this wording" line until 2026-08-26 — the pool's own precedent
@@ -8439,7 +8416,6 @@ check("INV-SPAWN prints an attempt count, not a bare verdict",
 # STATED ONCE. wf-claude-md IMPORTS the text for projects that still carry a region;
 # a second copy would be two canonical askings that drift, and the drift would be
 # invisible until a run degraded to UNAVAILABLE for no visible reason.
-_srq = read("workforce/bin/wf-standing-request")
 
 # THE BUDGET PICKER HAS A FLOOR. Three prose restatements of "render the emitter's LANE
 # blocks verbatim" (2026-08-20, 2026-08-26, and the fixture that froze them) did not
@@ -8447,11 +8423,8 @@ _srq = read("workforce/bin/wf-standing-request")
 # `## Model statics` on 2026-09-02. wf-budget-guard is the PreToolUse hook that blocks
 # that render; these assertions keep it shipped, wired by default, documented where
 # the rule it enforces lives, and free of any model ID or rung of its own.
-_wbg = read("workforce/bin/wf-budget-guard")
 _wsa = read("workforce/bin/wf-settings-apply")
 _hks = read("workforce/references/procedures/hooks.md")
-_wbg_parts = _wbg.split('"""')
-_wbg_code = (_wbg_parts[0] + "".join(_wbg_parts[2:])) if len(_wbg_parts) >= 3 else _wbg
 
 # THE REGISTER WRITTEN FOR AGENTS STOPS AT THE USER. The rule existed twice and both
 # copies were scoped too narrow: audit-setup.md governed the six setup questions,
@@ -8460,10 +8433,8 @@ _wbg_code = (_wbg_parts[0] + "".join(_wbg_parts[2:])) if len(_wbg_parts) >= 3 el
 # whether a model should "stay in the statics pool as a selectable option" and the user
 # answered "I don't even understand what your asking". These assertions keep the rule
 # single-homed, carried by all three readers, and floored by a hook.
-_plo = read("workforce/references/plain-output.md")
 _tpl_t = read("workforce/references/templates.md")
 _org_p = read("workforce/references/procedures/org.md")
-_wpg = read("workforce/bin/wf-plain-guard")
 check("plain output: audit-setup points at the rule instead of restating a narrower copy",
       "references/plain-output.md" in _asu
       and "archive` (as a verb)" not in _asu,
@@ -8477,13 +8448,6 @@ check("plain guard: named in the enforcement table at its true strength",
       "cover: the guard checks a word list, while register and length stay the coffee "
       "test, a human judgment. Describing it as enforcing clarity would be Core "
       "Principle 6's exact failure")
-_wpg_parts = _wpg.split('"""')
-_wpg_code = (_wpg_parts[0] + "".join(_wpg_parts[2:])) if len(_wpg_parts) >= 3 else _wpg
-_plo_terms = re.findall(r"`([a-z][a-z -]*)`",
-                        (re.search(r"\*\*Banned from question text and from every option label\*\*(.*?)\n\n",
-                                   _plo, re.S) or type("m", (), {"group": lambda s, n: ""})()).group(1))
-_plo_leaks = sorted({t for t in _plo_terms
-                     if re.search(r"""['"]%s['"]""" % re.escape(t), _wpg_code)})
 
 # ── the speak guard, the output style, and the two clauses they carry (2026-09-07) ──
 # The 2026-09-05 batch above shipped ONE enforced check — a word list on a question —
@@ -8492,14 +8456,10 @@ _plo_leaks = sorted({t for t in _plo_terms
 # when a long run was writing its longest report. These assertions guard the two
 # carriers that do NOT decay, and the two clauses (openers, decide-the-small-things)
 # that had no carrier at all. MEASURED: the reply the user quoted opens "You're right".
-_wsg = read("workforce/bin/wf-speak-guard")
 # THE CODE, not the file. Every claim below is about what the script DOES, and this
 # script explains itself at length — so `"stop_hook_active" in _wsg` was satisfied by
 # the docstring that describes the loop guard, and stayed green with the guard deleted.
 # Caught by bin/prove reporting the case VACUOUS, which is exactly what it is for.
-_wsg_parts = _wsg.split('"""')
-_wsg_code = (_wsg_parts[0] + "".join(_wsg_parts[2:])) if len(_wsg_parts) >= 3 else _wsg
-_sty = read("workforce/output-styles/plain-speak.md")
 _ttl = read("workforce/references/evaluator-additions/text-tells.md")
 check("text-eval: the conversational-register row no longer exempts what the user reads",
       "`DEVELOPMENT.md`, and run deliverables)" not in _ttl
@@ -10335,7 +10295,6 @@ check(
 # pair the doctrine with its enforcement so the rule cannot ship unwired.
 # ─────────────────────────────────────────────────────────────────────────────
 _jr_ver = read("workforce/references/verification.md")
-_jr_evl = read("workforce/references/evals.md")
 _jr_tpl = read("workforce/references/handbook-templates.md")
 
 check(
@@ -10384,7 +10343,6 @@ check(
 # report.md says what a run concluded; only telemetry says how it got there.
 # ─────────────────────────────────────────────────────────────────────────────
 _ai_aud = read("workforce/references/procedures/audit.md")
-_ai_dgn = read("workforce/references/procedures/diagnose.md")
 
 check(
     "audit telemetry: the spawn act writes the row, always on",
@@ -10457,7 +10415,6 @@ check(
 # emitter with its consumer: either alone is a write-only log or a missing input.
 # ─────────────────────────────────────────────────────────────────────────────
 _ol_org = read("workforce/references/procedures/org.md")
-_ol_dia = read("workforce/references/procedures/diagnose.md")
 _ol_tpl = read("workforce/references/templates.md")
 
 check(
@@ -10567,10 +10524,8 @@ _ds_chk = read("workforce/references/procedures/checksums.md")
 # prompt. That is why the handbook template and wf-conform carry it.
 # ─────────────────────────────────────────────────────────────────────────────
 _ss_skill = read("workforce/SKILL.md")
-_ss_plain = read("workforce/references/plain-output.md")
 _ss_tmpl = read("workforce/references/templates.md")
 _ss_hbt = read("workforce/references/handbook-templates.md")
-_ss_guard = read("workforce/bin/wf-speak-guard")
 _ss_conform = read("workforce/bin/wf-conform")
 _ss_aud = read("workforce/references/procedures/audit.md")
 
@@ -10621,9 +10576,7 @@ check(
 # every generated org, plain-output.md states it, and wf-plain-guard blocks the shape.
 # ─────────────────────────────────────────────────────────────────────────────
 _fh_skill = read("workforce/SKILL.md")
-_fh_plain = read("workforce/references/plain-output.md")
 _fh_tmpl = read("workforce/references/templates.md")
-_fh_guard = read("workforce/bin/wf-plain-guard")
 
 check(
     "finish-not-hedge: the user's words are retained verbatim in the directive block",
@@ -10886,8 +10839,6 @@ check(
 # 23); `references/handoff.md` decides what to do about it. Six normative claims here
 # would each regress silently, and each is the difference between a working design and
 # the flag this project refuses.
-_hnd = read("workforce/references/handoff.md")
-_hoff = read("workforce/bin/wf-handoff")
 _tpl2 = read("workforce/references/handbook-templates.md")
 _plat2 = read("workforce/references/platform.md")
 
@@ -10947,7 +10898,6 @@ check("edges: audit Step 5g heals existing orgs, and prints INV-EDGES + INV-HAND
 # printed the same green line either way. Presence and runnability are different
 # properties, and the assertions below are written against the second one.
 # ─────────────────────────────────────────────────────────────────────────────
-_h6 = read("workforce/bin/wf-handoff")
 _c6 = read("workforce/bin/wf-checkrun")
 _n6 = read("workforce/bin/wf-conform")
 _r6 = read("workforce/bin/wf-remainder")
@@ -11030,8 +10980,6 @@ check("org: a returned HANDOFF has a consumer, and it spawns rather than re-disp
 # and a clause rewrite turned one missing phrase into a traceback that took the WHOLE run
 # down — 1,200 other assertions unreported because one string moved. An ordering check
 # must degrade to a failed row, never to a crashed suite.
-_ord_a = _h6.find("READ THE WHOLE OF THIS BULLET")
-_ord_b = _h6.find("run that line exactly as printed")
 check("conform: a node that reports to itself is named as that, not as a missing edge",
       "reports-to itself" in _n6 and "terminates at itself" in _n6,
       "`reports-to: <self>` makes the node its own manager, so an escalation from it "
@@ -11230,8 +11178,6 @@ check(
 # observed failing with the rule removed. Appended, not interleaved.
 # ─────────────────────────────────────────────────────────────────────────────
 _wlg = read("workforce/bin/wf-ledger")
-_wlc = read("workforce/bin/wf-ledger-capture")
-_wlo = read("workforce/bin/wf-ledger-open")
 check(
     "ledger: the gateway serves accepted records only",
     'if status != "accepted":' in _wlg
