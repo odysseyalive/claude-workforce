@@ -8,7 +8,8 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.31.0 | 2026-09-09 | audit, update, changes, scripts, installer | no | (pending — message lands on the next regeneration) |
+| 1.32.0 | 2026-09-09 | update, scripts | no | An update that finished still read as broken, and eight hooks died quietly |
+| 1.31.0 | 2026-09-09 | audit, update, changes, scripts, installer | no | A version number nothing could explain |
 | 1.30.3 | 2026-09-09 | chart, audit, verify, installer | **yes** | The prune could not reach the hosts it was written for |
 | 1.30.2 | 2026-09-09 | handbook, chart, principles, audit, verify, hooks, scripts, installer, platform | **yes** | Bump to 1.30.2 — the strip shipped on an unchanged version |
 | 1.30.1 | 2026-09-08 | scripts | no | A guard that fires on 7% of good replies teaches you to ignore it |
