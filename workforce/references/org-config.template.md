@@ -270,7 +270,7 @@ so every value here is a deliberate override of whatever the user is running.
 
 - **IC `claude-sonnet-5` · `medium`.** ICs are the wide fan-out wave, so both levers point at cost: a
   model at ~60% lower price than the Lead's, and `medium` effort because `high` across the wave is
-  expensive and rarely changes mechanical output (`references/delegation-budget.md`). Sonnet 5 holds
+  expensive and rarely changes mechanical output (`references/procedure-for-procedures.md`). Sonnet 5 holds
   near-Opus quality on the research/review/ops work an analytical IC does. For the *most mechanical* ICs
   (pure classification, routing, lookups), pin `claude-haiku-4-5` per employee (§ Employee overrides) —
   it is cheaper still, though it takes no effort setting.
@@ -444,7 +444,7 @@ the same (`procedures/model-map.md` § The receipt).
 
 ## Caps
 
-Defaults live in `references/delegation-budget.md`. Override here only with a reason, and only
+Defaults live in `references/procedure-for-procedures.md`. Override here only with a reason, and only
 downward — raising a cap past the measured platform limits does not raise the limits.
 
 | Setting | Value |

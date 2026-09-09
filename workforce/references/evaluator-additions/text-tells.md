@@ -122,7 +122,7 @@ That scope is what keeps the test sharp, not a softening of it.
 *Amended 2026-09-07. This exemption used to end "and run deliverables", which excused **the report
 handed to the user** — the one surface where a formal register has no defence, because the reader is
 a person rather than an agent reading cold. The exemption's own logic never covered it: the corpus it
-names is read by agents, and it is exempt for that reason. `plain-output.md` § The test cites this
+names is read by agents, and it is exempt for that reason. this catalog's conversational-register row cites this
 row as the rule for live output, so the exemption was also cancelling an inheritance that had already
 been written. Files under `workforce/references/**` stay exempt and this row does not reach them;
 what an agent AUTHORS into a file and what it SAYS to a person are different corpora with different

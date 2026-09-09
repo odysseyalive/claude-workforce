@@ -43,7 +43,7 @@ and the **minimum viable org** — rather than letting it override them:
   weaker skill when a better one is installed. Second, the **model and effort tier the role's demands
   warrant** — set to the industry standard for the work, not to a tier default.
 - **It operates WITHIN the configured budget.** Model and effort are budget choices
-  (`procedures/budget.md`; the budget-not-payroll and budget-receipts directives). Where the
+  (`procedures/model-map.md`; the budget-not-payroll and budget-receipts directives). Where the
   most-capable choice would **exceed** the configured budget, the recruiter does not silently downgrade
   and does not silently blow the budget. It **surfaces a budget receipt** and prints the resolved values
   back: `this role warrants opus/high; budget caps it at <cap> — resolved value <what the hire gets>`.

@@ -711,22 +711,6 @@ never let a run decline one it staged (`references/invariants.md` row 20, `INV-S
    dominant failure mode there. Employee handbooks run in a fresh isolated context with no history
    and nobody watching: there, "do not assume anything" earns its keep. Leads get charters, ICs get
    procedures, and audit-side reference files get principles rather than decision trees.
-8b. **Everything a human reads is written the way you would say it.** Answer first, one idea per
-   sentence, no explanation nobody asked for, and no word from this distribution's own vocabulary — a
-   reader never has to know what a lane, a pool, an invariant, or an emitter is to read your reply. A
-   question the reader must decode before they can answer it is a broken question: state the real
-   choice and what changes on each answer. Full rule and the checked word list:
-   `references/plain-output.md`; the floor is `wf-plain-guard` for a question and `wf-speak-guard`
-   for a report. **Never open with agreement, and never concede because the user pushed back** — say
-   what you still think and let them decide. **Decide anything reversible** instead of asking.
-   And note WHERE this rule is carried: the `Plain Speak` output style and the `Stop` guard are the
-   only two carriers that do not decay as a context fills. Every other one, this line included, is
-   read at the head of a context — which is why the rule was written three times and still reached
-   the user in the register it forbids.
-   **This principle governs every `/workforce` invocation, `dev` included**, and that is why it lives
-   here rather than only in the three carriers. Principle 8 above calibrates scaffolding to an AGENT
-   reading cold; this one is its counterpart for the one reader who is not an agent. They do not
-   conflict — a handbook stays dense, and what you say back to the user does not.
 9. **Build for the next model, not this one.** The harness and the models change every few months and
    this project is expected to move with them. Three consequences, all mandatory:
    (a) **Constants are stated once.** Tier limits, caps, and model IDs live in exactly one file and
@@ -747,6 +731,6 @@ design), `references/scopes.md` (personal vs project install, and what each can 
 `references/org-design.md` (deriving a company from a project — the primary path),
 `references/org-doctrine.md` (the three-document hierarchy),
 `references/procedure-for-procedures.md` (how every handbook is authored),
-`references/delegation-budget.md` (depth, fan-out, spawn caps),
+`references/procedure-for-procedures.md` (depth, fan-out, spawn caps),
 `references/staging.md` (lint, probe, canary),
 `references/evaluators.md` (code and text quality review — what makes tier-4 verification real).

@@ -185,25 +185,15 @@ from that list for a full commit and no run ever executed it; this gate does not
 
 ## How every question is worded — plain language, no exceptions
 
-**The rule and the banned-word list live in `references/plain-output.md`.** Read it before wording any
-question here. It is not restated in this file: it applies to every question and every report a human
-reads, and a copy scoped to "the six questions" is exactly the narrowing that let the rest of the run
-talk however it liked.
-
 A reader at question 2 of 6 has installed a skill and typed one command. They have not read
 `conversion-taxonomy.md`. They do not know what a sweep is. Say what happens to **their project**, in
 words they already own.
 
-*Scope widened 2026-09-05. This section owned the rule and applied it to the six setup questions only.
-Everything else the run said to the user — findings, summaries, and any question asked outside setup —
-was ungoverned, and the user reported it: "your responses back to me and the choices you give back to
-me are too cryptic." The list moved to `plain-output.md` intact and grew six terms; nothing was
-relaxed.*
-
-*The doc's list and the check's list were different lengths until 2026-08-03 — the check omitted
-`IC`, `Lead`, `tier`, `probe`, `handbook`, `employee`, and `conversion`, while question 3's own option
-labels used three of them. "This is a list, and it is checked" was false in both directions. They are
-one list now, in `plain-output.md`.*
+*The banned-word list and the wider rule lived in `references/plain-output.md`, which the
+simplification release deleted along with the two guards that enforced it. What survives is the table
+below and the paragraph above it: concrete, local to the six questions this file owns, and checkable
+by reading them. The rule that governed every reply is gone by the user's own instruction — this is
+the part that was never about a word list.*
 
 | Instead of | Write |
 |---|---|
@@ -1112,7 +1102,7 @@ guarantee the second directive asks for, and a guarantee nobody prints is a guar
 
 **A conflict does not fail the run.** It cannot: the behavior it rests on is DOCUMENTED and unmeasured,
 and `platform.md` § DOCUMENTED bars an unverified fact from becoming a blocking check — the substitution
-`delegation-budget.md` already had to retract once. The org is reported as built, with the capability
+`procedure-for-procedures.md` already had to retract once. The org is reported as built, with the capability
 that will prompt or fail named. **If these facts are ever measured, the conflict row may become
 blocking, and the promotion belongs in the same edit that moves the row.**
 

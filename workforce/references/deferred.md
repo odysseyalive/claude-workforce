@@ -193,7 +193,7 @@ matters is how many chances to discharge it went by.
 | `audit` Step 0.7 | `catalog-unappendable` — the append was skipped because `<catalog>` is immutable end to end | `audit`, once the user opens a legal insertion point in `<catalog>` (a position outside every immutable span) — **the precondition, not just the command.** A missing machine-owned region is not this row: the append creates one |
 | `hire` | a transaction that failed with ✗ | `hire <role>` |
 | `amend` | `latency: pending-human-key` — suspended awaiting a human | `amend <target> --execute` |
-| `review` | a `NEUTRAL` line owed an eval case (`ablation.md`) | `evals <employee>` |
+| `review` | a `NEUTRAL` line owed an eval case (the ablation classifier, removed) | `evals <employee>` |
 | `audit` Step 6b | a row **no other command owns** — work the run left undone | `discharge --execute` |
 
 **Adding a source means adding a row to this table in the same change.** A `queue` instruction with no

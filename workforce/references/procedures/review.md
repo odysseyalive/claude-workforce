@@ -18,7 +18,7 @@ cannot make (`verify.md` § Detection vs treatment). Both print the same provena
 `## Verification`. A change since the last review means the eval baseline is stale and every score
 below is being compared against a different handbook.
 
-**2. Evals.** Run the set (`references/evals.md`), each case in its own fresh context.
+**2. Evals.** Run the set (the eval set), each case in its own fresh context.
 
 - A **drop** from the previous run is a regression → open a `PERF`, attributed to the **document**. A
   handbook that scored lower is a handbook that changed for the worse.
@@ -78,7 +78,7 @@ disclosure risk, and it does not wait for the next amendment cycle.
 **7. Calibration age.** Compare the `ORG-RECORD`'s `calibrated-for` against the frontmatter `model:`
 (`references/org-chart-format.md`). Equal → the wording has been measured against the model executing
 it. Different, or `calibrated-for` absent → it has not, and the handbook is a candidate for
-`ablate --classify` (`references/ablation.md` § Two clocks).
+`ablate --classify` (the ablation classifier, removed in the simplification release).
 
 This is a **finding, never a `PERF`**. Nothing has gone wrong: a model release moves every handbook
 into this state at once, and treating that as a regression would attribute a platform event to a
@@ -92,7 +92,7 @@ being skipped — an unstamped handbook is unmeasured, which is the state being 
 
 **8. Bloat.** Length against the ceiling. Over → the split is **performed this run**, not proposed:
 move the heavy material into its grounding library and leave a lean core that references it on demand
-(`delegation-budget.md` § The handbook length ceiling). **Never resolved by accepting a longer
+(`procedure-for-procedures.md` § The handbook length ceiling). **Never resolved by accepting a longer
 handbook, and never by trimming, condensing, or compressing the prose** — that risks dropping the
 user's verbiage, and directive one is retention. `review` opens the DISCHARGE; it never hands the
 length back as a question or an optional refinement.

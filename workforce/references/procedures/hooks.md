@@ -34,12 +34,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | Hook | Event | Matcher | Guards |
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
-| `wf-unique-persona` | `PostToolUse` | `Edit\|Write` | two registrations declaring one `name:`, across the union of `.claude/agents/**` and `AGENT.md` under `.claude/skills/**`, project and personal |
-| `wf-standing-request` | `UserPromptSubmit` | *(none)* | **asks, rather than guards.** Re-injects the standing cold-reader request every turn — the Off-the-Street Release Gate (`SKILL.md`) rule 3b depends on it, and without it spawning goes UNAVAILABLE and every handbook registers unprobed |
-| `wf-plain-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** Any question whose text, header, or option labels use a term from the banned list in `references/plain-output.md` — words a reader would have to look up. Exit 2 names the terms and the string they were found in. It checks words, never register: the coffee test is a human judgment and stays advisory. |
 | `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` | **blocks, once wired.** A model or effort budget picker whose options are not one of the `LANE` blocks `wf-model-budget` / `wf-effort-budget` emit for this project: the pool rebuilt from prose or from the project's stale `## Model statics`, the current pin re-labelled `(Recommended)`, a five-rung ladder. Exit 2 hands the model the emitter's block and the command that produces it. § The budget guard below |
-| `wf-speak-guard` | `Stop` | *(none)* | **blocks an opener; notes the rest.** The finished reply, read once per turn. A reply opening with an agreement phrase — "You're absolutely right", "Good catch", "I apologize" — is returned to the model with one instruction. A banned term the USER has never typed this session, or a long reply whose only question sits in its last quarter, comes back as `additionalContext`: the user reads the reply, the model carries the note into the next one. § The speak guard below |
-| `wf-loop-guard` | `PostToolUse` | *(none)* | **advisory; PROPOSED, and not wired by this command's default set.** Behavioural repetition — the same tool called with byte-identical arguments 3+ times with no distinct edit between them. Nudges; halts only when `WF_LOOP_GUARD_STOP_AT > 0`. § The loop guard below |
 
 **`wf-standing-request` is the one hook that adds context instead of checking something**, and it is
 there because the 2026-08-05 evacuation directive deletes `CLAUDE.md`. That request used to live in the
@@ -48,14 +43,6 @@ rather than whenever some component loads. It is also strictly better off here �
 once at the head of a conversation, so the request was faintest exactly when a long audit was doing its
 spawning. It exits `0` unconditionally: a hook that fails a turn because it could not phrase a request
 would break the session it exists to help.
-
-**`wf-speak-guard` is the only hook on `Stop`, and it is the only one that reads what the USER will
-read.** Everything else in the table watches a tool call. This one receives `last_assistant_message`
-— the finished reply text — because the rule it enforces is about the reply, not about anything the
-reply did. It is also the only carrier of the plain-output rule that does not decay with context
-(`references/plain-output.md` § Where the rule is carried): the other five are read at the head of a
-context and then compete with everything newer, which is why the rule was written three times and
-still reached the user in the register it forbids.
 
 **The two edit hooks are `PostToolUse`, not `PreToolUse`, and this is deliberate.** A `PostToolUse`
 exit 2 cannot undo an edit that already happened, so each is **detection, not prevention** —
@@ -206,13 +193,17 @@ names, and nothing else. An absent sidecar means workforce owns nothing here: re
 removing a registration is reversible; deleting the file the user installed is not, and `restore` has
 nothing to restore from if the sweep took it.
 
-**The removal has a producer, and the output style is part of it:**
+**The removal has a producer, and it still reverses what older releases wrote:**
 
 ```bash
 wf-settings-apply --root <tree> [--scope user] --unwire-defaults --execute
 ```
 
-It reverses **exactly** what `--wire-defaults` wrote. A registration goes only when its event, matcher
+It reverses **exactly** what `--wire-defaults` wrote — including registrations and an output style
+written by a release BEFORE the simplification. Nothing selects a style any more, and this is
+deliberately still able to un-select one: six settings files on the author's own workstation carried
+`outputStyle: "Plain Speak"` when it was removed, and a reversal deleted alongside the setter would
+have stranded every one of them (`wf-settings-apply` § no output style is selected any more). A registration goes only when its event, matcher
 AND command all match a recorded row, so a hook the user wired themselves with the same command and a
 different matcher survives, and an entry holding other hooks beside ours keeps them. The style is
 restored to `output_style_previous` — and when that is `None`, meaning the key was absent before, the
@@ -221,7 +212,7 @@ set it is reported and left alone. A second run is a reported NOOP, never a seco
 
 **Fixtures:** `saunwire-userhook`, `saunwire-absentstyle`, `saunwire-userchanged`, `saunwire-norecord`.
 **The first one is the case worth having**, and the clean tree is not it: that fixture carries the
-user's own `Stop` hook and a `wf-plain-guard` on a matcher the record does not name, so a reversal that
+user's own `Stop` hook and a since-removed guard on a matcher the record does not name, so a reversal that
 removed by event alone fails it. `saunwire-absentstyle` fails if a default is ever written back.
 Verified by hand first, which is one observation — this repository's own harness holds that a fixture
 which works once is not a regression test.
@@ -267,277 +258,3 @@ a picker rendered from no trustworthy pool is the thing being prevented.
 `budgetguard-badstdin`, `budgetguard-effort-handbuilt`, `budgetguard-effort-verbatim`,
 `sa-hook-budget-guard`.
 
-## The speak guard
-
-**What it reads.** `last_assistant_message` — the reply text, finished, exactly as the user is about
-to see it. `Stop` hands it over directly, so nothing parses a transcript to reconstruct it.
-
-**Three checks, one of which blocks.**
-
-| Check | What fires | Verdict |
-|---|---|---|
-| Opener | The reply's first sentence is an agreement or apology phrase — the list is in the script, because it is a property of position rather than of vocabulary (`references/plain-output.md` § Openers) | `decision: block` |
-| Unowned term | A banned term from `plain-output.md` that **the user has not typed in this session** | `additionalContext` |
-| Buried ask | 12+ lines of prose whose only `?` sits in the last quarter | `additionalContext` |
-
-**Why the vocabulary check is scoped to the user's own words, and not to a flat list.** The list
-`wf-plain-guard` applies to a QUESTION cannot be applied to a REPORT unchanged: in a repository whose
-subject is handbooks and tiers, a flat list fires on nearly every reply, and a guard that fires on
-everything is a guard somebody turns off. Scoping it to the transcript makes it execute the rule the
-reference actually states — *say it in words the reader already owns* — and it is near-zero
-false-positive by construction: the user said the word, so the word is theirs. An unreadable
-transcript **disables** the check rather than firing it, because every term looks unfamiliar when
-there is nothing to compare against.
-
-**Why an opener blocks and nothing else does.** Blocking costs the user a round trip. An opening
-agreement is worth it: it is the observable surface of caving under pushback, it is the first thing
-the reader sees, and the fix is deleting one sentence. A buried question is not worth it — the reply
-is already correct, only badly ordered, and the note reaches the next turn. `plain-output.md`
-§ Openers carries the rule; this carries the mechanism.
-
-**Loop safety.** `stop_hook_active` true means this guard blocked already this turn, and it passes
-through unconditionally. Combined with the host's eight-continuation cap, a guard and a model that
-disagree end the turn rather than spinning. And a verdict travels as JSON on stdout, never as exit 2:
-on `Stop`, a non-zero exit is indistinguishable from a crash.
-
-**What it does not check.** Register, length, and whether the prose is overbuilt. Those are the coffee
-test (`plain-output.md` § The test), which is a human judgment. This is the mechanical half only.
-
-**Fixtures:** `speakguard-opener`, `speakguard-clean`, `speakguard-unowned`,
-`speakguard-owned-term`, `speakguard-buried-ask`, `speakguard-active`, `speakguard-badstdin`.
-
-## The output style
-
-**Not a hook, wired by the same command.** `/workforce hooks --execute` also selects the shipped
-`Plain Speak` output style, by writing `outputStyle` into the resolved project settings file
-(`workforce/bin/wf-settings-apply --output-style --execute`). The style FILE is placed by the
-installer — `manifest.txt`, flag `style` — into `<config-root>/output-styles/` or
-`.claude/output-styles/`, which are the only two places a host looks for one.
-
-**Why it belongs to this command.** An output style is added to the system prompt, so it is the one
-carrier of the plain-output rule that is present at full strength on every turn regardless of how
-full the context is. That is the same property `hooks` exists to deliver, reached by a different
-mechanism, and splitting it into its own command would give the user two gestures for one guarantee.
-
-**What it does not reach.** The main conversation only. A subagent runs its own system prompt, so no
-employee is governed by this; a fork is the exception, because it inherits the parent's. Employee
-reports are covered by the handbook clause and by `wf-speak-guard`. **Describing the style as fixing
-employee output is an overclaim and `verify` reports it as one.**
-
-**When it takes effect.** The next session, or after `/clear` — the system prompt is read once at
-session start. The report says so, because a user who selects a style and sees no change in the
-current turn will reasonably conclude it did not work.
-
-## The loop guard
-
-**Status: PROPOSED, 2026-08-19. It ships with its fixtures and this row; it is not wired.** Wiring is
-the ordinary `/workforce hooks --execute` gesture and stays a separate, deliberate act — the rule that
-nothing ships dormant is satisfied by shipping the wiring path and the wired/orphaned report, not by
-registering a hook on a user's behalf because it happened to land.
-
-`wf-loop-guard` detects **behavioural repetition**: the same tool called with byte-identical arguments,
-three or more times, with no distinct edit or write between them. That is the observable shape of an
-agent that has stopped making progress and is re-reading its way around a wall. Registered at
-`settings.json` scope it fires in the main loop **and inside subagents** — an IC grinding inside a
-spawned agent is precisely the case nobody in the main loop can see.
-
-### What it is not, and cannot become
-
-- **It does not measure context or token usage.** The `PostToolUse` payload carries `session_id`,
-  `transcript_path`, `cwd`, `hook_event_name`, `tool_name`, `tool_input`, `tool_response`, and
-  `tool_use_id`. There is no context percentage and no token count in it. A guard advertised as firing
-  "at 80% context" would be asserting a number the runtime does not hand it, and `references/platform.md`
-  is unambiguous that platform behaviour is measured, never asserted. Repetition is what a hook can
-  actually observe, so repetition is what this measures.
-- **It cannot block a call.** `PostToolUse` runs after the tool ran, so `enforcement.md`'s
-  prevents/detects table governs here exactly as it does for the two sibling hooks. There is no exit-2
-  path and none is attempted.
-- **It cannot spawn anything, or hand off to a fresh context.** A hook is a subprocess reading JSON on
-  stdin. It has no `Agent` tool — a strictly lower ceiling than an IC, which at least *has* one and is
-  denied it (`references/evaluators.md` § The evaluators, whose tier table gives even the evaluator IC a `no`). Everything below about re-evaluation by a
-  different persona is therefore an **orchestration-layer** obligation, not something this file does.
-
-### The ladder
-
-| Rung | Fires when | Emits | Default |
-|---|---|---|---|
-| 1 — nudge | repeats `>= WF_LOOP_GUARD_NUDGE_AT` | `hookSpecificOutput.additionalContext` | **on**, threshold 3 |
-| 2 — stop | `WF_LOOP_GUARD_STOP_AT > 0` and repeats `>= ` it | `{"continue": false, "stopReason": …}` | **off** (`0`) |
-
-The nudge is advisory and **never halts a working agent by default**. The halting rung is opt-in twice
-over — the hook must be wired, and `WF_LOOP_GUARD_STOP_AT` must be set above zero — because a guard that
-stops an agent doing real work is worse than the loop it guards.
-
-A **distinct edit or write breaks the streak**: the tree changed, so a re-read of it is new information
-rather than a repeat. This is the entire discrimination between thrashing and legitimately repeated
-distinct work, and `fixtures/scripts/loopguard-nudge` and `loopguard-streak-broken` differ by exactly
-that one record so a regression in it fails one of them.
-
-### The nudge is the WEAKEST form of re-evaluation, and it says so
-
-Rung 1 is same-persona self-reflection **in the agent's own context** — a cheap first tap, and nothing
-more. A stuck agent reflecting inside the context that got it stuck is the worst-placed vantage there
-is: it has already committed to a path and will reliably rationalise it. So the nudge does not ask for
-a verdict, it demands articulation — state the goal in one line, name why the previous attempts did not
-achieve it, then pick a different approach **or return `ESCALATE:`**. The exit is part of the text on
-purpose.
-
-**Rounded re-evaluation comes from a different persona, and that is existing doctrine here, not a new
-invention.** `references/personas.md` § Panels already states it: a panel is *"perspective-diverse by
-construction — members are chosen to fail differently, not to agree"*, agreement between two draws from
-the same stance means nothing, and disagreement resolves to the conservative alternative rather than to
-a vote. `references/evaluators.md` supplies the ready-made lenses — `code-evaluator`, `text-eval`,
-`security-evaluator`, `image-eval` — each with a catalog, which is what makes a second opinion a
-checklist rather than another opinion.
-
-### Where the handoff actually happens
-
-When rung 2 fires, or when a nudged agent takes the `ESCALATE:` exit, the reassessment is performed by
-**whoever can spawn** — a department Lead or the main session; per `evaluators.md` no IC and certainly
-no hook can. The receiving persona inherits **the goal, and what was tried and failed as constraints**.
-It does **not** inherit the thrash transcript: the negative results are the valuable part, and the
-rotted context is the thing being escaped. The `stopReason` says this in as many words, so a reader of
-the halt is not left to infer that resuming the same agent is the remedy.
-
-**Diversity, not redundancy — and not everywhere.** Distinct lenses beat N identical reviewers, and a
-panel costs N spawns for diminishing returns. Reserve it for genuine escalation and decision points; a
-nudge is not one. Most nudges should end with the agent changing approach and nothing being spawned at
-all.
-
-### Configuration
-
-Env first, then an optional `.claude/workforce/loop-guard.json` in the project, then the default.
-
-| key | env | default |
-|---|---|---|
-| `nudge_at` | `WF_LOOP_GUARD_NUDGE_AT` | `3` |
-| `stop_at` | `WF_LOOP_GUARD_STOP_AT` | `0` — disabled |
-| `window` | `WF_LOOP_GUARD_WINDOW` | `12` |
-| `stale_secs` | `WF_LOOP_GUARD_STALE_SECS` | `43200` |
-| `state_dir` | *(file only)* | `CLAUDE_CODE_TMPDIR`, else the system temp dir |
-
-**`.claude/workforce/loop-guard.json` has a producer, and this step is it.** When this command wires
-`wf-loop-guard` — `wf-settings-apply --wire-hook wf-loop-guard --execute`, the same gesture as any other
-hook — it also stamps `loop-guard.json` with the resolved defaults if and only if the file is absent,
-and never touches one the user has edited:
-
-```json
-{"nudge_at": 3, "stop_at": 0, "window": 12, "stale_secs": 43200}
-```
-
-Display mode prints that block and writes nothing, exactly as step 6a requires of every write here. An
-artifact with a reader and no writer is the shape `.directives.sha` and `platform-local.md` each shipped
-in; writing the defaults at wiring time is what keeps this one from repeating it, and it is also why
-unwiring leaves the file alone — a config the user has since tuned is theirs, and removing a
-registration is reversible while deleting their settings is not.
-
-State is one JSON file per session under the state dir, replaced atomically, and treated as fresh
-whenever it is unreadable, unparseable, from another session, or older than `stale_secs`. **The project
-file exists because without it the ladder is untestable**: `bin/script-conformance` gives a case a stdin
-payload and a fixture tree and sets no per-case environment, so an env-only threshold could never carry
-a re-runnable test — and a script released on tests nobody can re-run is released on an anecdote. Env
-still wins wherever both are set.
-
-**Fail-open here means SILENT, which is a deliberate divergence from its siblings.**
-`wf-protect-directives` and `wf-unique-persona` hold *never fail-silent*, because they guard the user's
-sacred text on a handful of paths and a false clean is the failure. This hook guards nothing, is
-advisory, and fires on **every** tool call — so an error message per call would itself be the runaway
-loop it exists to detect. `fixtures/scripts/loopguard-badstdin` asserts the silence so it cannot later
-read as drift.
-
----
-
-## The git pre-commit pin guard
-
-**This command is also the lifecycle home of the commit-time pin-and-dependabot guard**, and it lives
-here for the same reason the settings hooks do: a mechanism that ships unwired enforces nothing and
-looks like it does. The guard is a **git** hook, not a Claude settings hook — it fires on every
-`git commit` by anyone, so it is wired through git config rather than through the settings file, but the
-make/report/unwire discipline is identical. **It must not ship dormant**: it ships WITH the wiring path
-below, WITH a `verify` row that reports whether it is wired (`procedures/verify.md` § Hook wiring), and
-WITH the unwire path that restores the prior git config exactly.
-
-The detector itself is `wf-pin-check`; on violation it auto-fixes and allows the commit rather than
-blocking it (a detector ships with its fix, `SKILL.md` § Directives). What this command owns is not the
-detection but the **git-config registration** that makes `git` invoke it.
-
-### What is wired, and where
-
-The registration points the target repository's `core.hooksPath` at a workforce-owned hooks directory:
-
-```
-core.hooksPath -> .claude/workforce/git-hooks
-```
-
-`--install-hook` places a **self-contained copy of `wf-pin-check` itself** at
-`.claude/workforce/git-hooks/pre-commit` — one Python file, no separate shell wrapper (`SKILL.md`
-Core Principle 9 and `manifest.txt` § Hooks: one Python file is one behavior on both platforms). When
-`git` runs it, it recognises it was invoked as the `pre-commit` hook (by its own argv name), auto-fixes
-against the repo root, and then chains to any prior hook recorded at install time, returning that prior
-hook's exit code. The copy is frozen at install, so a later `update`/re-audit re-runs `--install-hook`
-to refresh it (idempotent — a byte-identical copy is a NOOP). **The guard never blocks a commit on its
-own contribution**: its pin-and-dependabot pass always exits `0`, so only a *prior* chained hook can
-fail a commit; if the detector errors, it warns and exits `0`, because a guard that blocks on its own
-bug is worse than the drift it guards.
-
-### Wire
-
-Run the detector's own install path — it performs the git-config write, records ownership, and re-reads
-to confirm. Display by default; `--execute` writes:
-
-```bash
-wf-pin-check --install-hook --root <repo> --execute
-```
-
-It reads the current `core.hooksPath` (which may be unset), sets it to `.claude/workforce/git-hooks`,
-and records the prior value in `.claude/workforce/.settings-owned.json` under a `git_config` section so
-the unwire path restores EXACTLY the prior value — unset if it was unset, and nothing else:
-
-```json
-"git_config": {"core.hooksPath": {"set_to": "...", "prior": "<path|null>"}}
-```
-
-**Never report a write the re-read did not confirm** — the same rule the settings-hook procedure holds
-at step 6. Display mode (no `--execute`) and the confirmed write print, verbatim:
-
-```
-GIT HOOK  would register core.hooksPath -> .claude/workforce/git-hooks  (prior: <path|unset>)
-GIT HOOK  core.hooksPath -> .claude/workforce/git-hooks  (prior: <path|unset>)  registered
-```
-
-**When the target is not a git repository, wire nothing and say so** — a report, never an error, and
-exit `0`:
-
-```
-GIT HOOK  not a git repository: <root> — nothing to wire
-```
-
-### Report
-
-The guard emits its own report, and it is that report which the `INV-PINS` invariant treats as the
-promise a run must print (`references/invariants.md` row 21). A bare scan writes nothing and prints the
-`PIN GUARD` display header and the `INV-PINS` summary line; at commit time the pre-commit path prints
-what it auto-fixed. The `INV-PINS` line names the guard and carries the counts the invariant checks for
-coherence, verbatim:
-
-```
-INV-PINS  unpinned <N> · pinnable <M> · unpinnable <K> · dependabot MISSING|PARTIAL|PRESENT
-PIN GUARD (pre-commit)  auto-fixed <n>, staged <files>; <k> unpinnable left — commit allowed
-```
-
-An `unpinnable` count is a **measured limit, not a failure**: a wildcard with no lockfile floor cannot
-be pinned to an invented version, so `unpinnable > 0` is reported and the commit still proceeds. What
-`INV-PINS` refuses is silence or incoherent arithmetic, never a repository that carries a legitimately
-unpinnable spec.
-
-### Unwire
-
-```bash
-wf-pin-check --uninstall-hook --root <repo> --execute
-```
-
-It restores the recorded prior `core.hooksPath` (or unsets it if it was unset), drops the `git_config`
-section from the sidecar, and touches nothing else. An absent ownership record means workforce owns no
-git config here: restore nothing, and say so. `disband` replays the same restoration as part of its
-wider sweep. **As with the settings hooks, the wrapper file itself is not deleted by unwiring** —
-dropping a registration is reversible; deleting the installed file is not.

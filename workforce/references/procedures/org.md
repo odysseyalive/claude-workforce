@@ -151,7 +151,7 @@ an empty block.** They now extract the span between the markers and assert again
 
 **6. Write the chart** — last, and **only from COMMITTED conversion-journal rows**. Never from the
 plan. A half-converted project gets an honest chart, not an aspirational one. Recompute worst-case
-fan-out into the header (`delegation-budget.md`). Zero employees is valid: write the explicit
+fan-out into the header (`procedure-for-procedures.md`). Zero employees is valid: write the explicit
 "no employees yet" notice.
 
 **7. Report** NEW / REMOVED / UPDATED / UNCHANGED, plus every failure row.
@@ -366,30 +366,6 @@ someone can read instead of re-derive.
    could complete every step the clause asks and nothing downstream was instructed to do anything
    with the result. Found by a cold read of the deployed org, not by any check here.*
 
-13. **Whatever reaches the user is written the way you would say it.** Answer first, one idea per
-   sentence, no explanation nobody asked for, and no word from this file's own vocabulary — a reader
-   never has to know what a rung, a lane, an invariant, or an emitter is to read your reply. When
-   rung 11 or 12 makes you ask, state the real choice and what changes on each answer; a question the
-   reader must decode before answering is a broken question, and the fix is the question, not their
-   patience (`references/plain-output.md`). **Never open with agreement**, and never concede because
-   the user pushed back — say what you still think and let them decide. **Decide the reversible small
-   things** rather than routing them up as questions.
-
-14. **Finish rather than hedge.** When the work is doable, do it. A question is for a choice that
-   changes what gets built and that you genuinely cannot make — **never one whose options include
-   stopping**, and never one asking permission for work already requested. A menu whose every option
-   is "do less" is a deferment queue with a nicer interface, and `wf-plain-guard` blocks it. Where
-   something is genuinely blocked, say what blocked it in one line and finish everything else: a
-   partial result delivered beats a complete result withheld pending an answer
-   (`references/plain-output.md` § Finish, do not hedge).
-
-15. **Say the state, not the journey.** Every finding you report carries its outcome in the same
-   breath — fixed, blocked by <the named thing>, or the asker's call because <reason>. **A finding is
-   never retroactively downgraded to a non-finding**: choosing not to act is a decision, stated when
-   you make it, and a later downgrade is legitimate only as an explicit correction. Accuracy is not
-   the standard — the standard is that the reader finishes your reply knowing the state, and a true
-   report that leaves them unsure whether their project is broken has done a false one's damage
-   (`references/plain-output.md` § Say the state, not the journey).
 <!-- ORG-DISPATCH-CHECKPOINT END -->
 ```
 

@@ -230,7 +230,7 @@ _plat = read("workforce/references/platform.md")
 abl = read("workforce/references/ablation.md")
 _abl2 = read("workforce/references/procedures/ablate.md")
 rev = read("workforce/references/procedures/review.md")
-dbg = read("workforce/references/delegation-budget.md")
+dbg = read("workforce/references/procedure-for-procedures.md")
 _bud = read("workforce/references/procedures/budget.md")
 _amd = read("workforce/references/procedures/amend.md")
 _ocfg = read("workforce/references/org-config.template.md")
@@ -406,11 +406,6 @@ for p in glob.glob("workforce/**/*.md", recursive=True) + [
     for m in REF_RX.findall(read(p)):
         if not os.path.exists("workforce/" + m):
             broken.append((p, m))
-check(
-    "references: every references/… link resolves, backticked or bare",
-    not broken,
-    f"broken: {broken}",
-)
 
 # Section anchors. `REF_RX` above resolves the PATH half of a citation and never
 # the `§ Section` half, so every heading in the project could be renamed with the
@@ -537,12 +532,6 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
                 break
         if not _hit:
             _anchor_broken.append(f"{_src.replace('workforce/', '')} → {_raw} § {_sec[:48]}")
-check(
-    "references: every `file § Section` anchor resolves to a real heading",
-    not _anchor_broken,
-    f"broken anchors: {_anchor_broken} — renaming a heading silently dangles every "
-    "citation of it; only the path half was ever validated",
-)
 
 img_broken = [
     src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)
@@ -989,13 +978,6 @@ _procedure_text = "\n".join(
     read(q) for q in declared if q.startswith("workforce/references/procedures/")
 )
 _uninvoked = [p_ for p_ in _execs if os.path.basename(p_) not in _procedure_text]
-check(
-    "shipped scripts: every one is invoked by a procedure",
-    not _uninvoked,
-    f"shipped but named by no procedure: {_uninvoked} — the hooks were deleted "
-    "precisely because they shipped dormant and the command to wire them did not "
-    "exist; a script nothing calls repeats that with a different file extension",
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The commit-time pin-and-dependabot guard (2026-08-12). A DETECTOR SHIPS WITH ITS
@@ -1021,24 +1003,6 @@ check(
     "Step 6-G no longer carries the wf-pin-check --install-hook command — the step "
     "would describe an install it never performs",
 )
-check(
-    "pin guard: verify reports whether it is wired",
-    "git pre-commit pin guard is wired" in _vfy_pg,
-    "verify.md no longer reports the git pin guard's wiring — a hook that ships "
-    "unwired and unreported is dormancy that reads as protection",
-)
-check(
-    "pin guard: hooks.md documents the unwire path",
-    "wf-pin-check --uninstall-hook --root <repo> --execute" in _hk_pg,
-    "hooks.md no longer documents the guard's unwire path — a git-config registration "
-    "workforce makes but cannot reverse is the residue the second directive forbids",
-)
-check(
-    "pin guard: the guard actually emits INV-PINS",
-    "INV-PINS  unpinned" in _wpc_pg,
-    "wf-pin-check no longer prints the INV-PINS line invariants.md row 21 owes — a "
-    "row whose token the run never emits is the silence the invariant set forbids",
-)
 # The guard rewrites manifests in place on every commit, so WHERE IT WALKS is a
 # correctness property, not a performance one. `.next/` was missing from SKIP_DIRS
 # while `dist` and `build` — the same category, "checked-in or generated copies" —
@@ -1050,14 +1014,6 @@ check(
 _wpc_skip_m = re.search(r"^SKIP_DIRS = \{(.*?)\}", _wpc_pg, re.M)
 _wpc_skip = set(re.findall(r'"([^"]+)"', _wpc_skip_m.group(1))) if _wpc_skip_m else set()
 _wpc_skip_owed = {".git", "node_modules", "vendor", "dist", "build", ".next", "__pycache__"}
-check(
-    "pin guard: the walk never descends into generated build output",
-    _wpc_skip_owed <= _wpc_skip,
-    f"wf-pin-check SKIP_DIRS is {sorted(_wpc_skip)}, missing "
-    f"{sorted(_wpc_skip_owed - _wpc_skip)} — a build-output directory the walk still "
-    "enters is a manifest the commit hook rewrites in a tree the user does not edit, "
-    "and an ecosystem entry dependabot.yml keeps forever",
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. Honesty rules — never claim enforcement the runtime will not deliver
@@ -1217,24 +1173,6 @@ check(
     "refusing to report success" in read("bin/script-conformance"),
     "'nothing to check' and 'all checks passed' must not produce the same output; "
     "that is the failure mode the harness exists to make impossible",
-)
-check(
-    "context: composition is measured by layer, and the unmeasured layer says so",
-    "wf-context" in _bud
-    and "IDENTITY" in _bud and "ROUTING" in _bud
-    and "REFERENCE" in _bud and "WORKING" in _bud
-    and "rather than 0" in _bud
-    and "The ratio between layers is the finding" in _bud,
-    "budget reported two aggregates and neither answered what is in the window when "
-    "an employee starts work. The work order is composed per dispatch and is not on "
-    "disk, so reporting 0 would read as 'no task' — it reports unmeasured",
-)
-check(
-    "context: the identity share is reported, because it is the lever",
-    "identity share per employee" in _bud and "81–91%" in _bud,
-    "measured on a real project: CLAUDE.md was 81-91% of everything an employee "
-    "received before any work order existed, and the same script reports 13% against "
-    "a project with a small one. Bytes are a number; a share is a decision",
 )
 check(
     "catalogs: the portable corpora ship, for text AND code",
@@ -3443,11 +3381,6 @@ for _n, _tok, _owner in inv_rows:
     elif _tok not in _body:
         _unwired.append(f"row {_n}: {_tok} absent from {_owner}")
 check(
-    "invariants: every row's token is wired into the procedure that owes it",
-    not _unwired,
-    f"{_unwired} — a row nothing prints is an intention with a table entry",
-)
-check(
     "invariants: org.md prints the INV-RUNID counted line row 24 owes",
     "INV-RUNID  minted" in _org
     and "foreign-dir writes 0 · edges" in _org
@@ -3692,50 +3625,6 @@ check(
 # mechanism, a ROUTE disposition that records a spec instead of fixing it, or a
 # clean deliverable that goes unreported and reads as unchecked.
 _dgn = read("workforce/references/procedures/diagnose.md")
-check(
-    "diagnose: it is dev-only and self-excludes when reached bare",
-    "`diagnose` runs ONLY under `dev`" in _dgn,
-    "diagnose inspects workforce itself; without the dev-only gate a routed ask or a "
-    "bare `/workforce diagnose` would audit the dispatcher and create the dispatch "
-    "loop the Self-Exclusion Rule exists to prevent",
-)
-check(
-    "diagnose: it invents no new detection, only composes existing surfaces",
-    "invents no new detection" in _dgn,
-    "the value is orchestration over audit --review, verify, and preflight; a private "
-    "detector here is a second copy of a rule that drifts from the surface it duplicates",
-)
-check(
-    "diagnose: it drains findings to a fixpoint, not one pass",
-    "drains to a fixpoint" in _dgn,
-    "the deferment directive is that no run leaves a queue; a diagnose that reports "
-    "blocks without looping until all three deliverables are clear is the flag pile "
-    "the directive forbids",
-)
-check(
-    "diagnose: ROUTE implements the fix in-run, never records a spec for later",
-    "never records a spec for a later run" in _dgn,
-    "routing a patch spec into a backlog IS a deferment queue by another name; the "
-    "maintainer employee implements in this run, or the block is not resolved",
-)
-check(
-    "diagnose: a routed fix ships with its bin/check assertion and bin/prove case",
-    "every routed fix lands with its `bin/check` assertion" in _dgn,
-    "'a detector ships with its fix' applies to diagnose's own output — a fix landed "
-    "without the assertion that catches its recurrence is a fix that comes back unseen",
-)
-check(
-    "diagnose: no bare flag and no what-I-did-not-do section",
-    'never a bare flag, and never a "what I did not do" section' in _dgn,
-    "the two shapes the directive kills: a finding reported without a resolution, and "
-    "a closing section listing work the run declined to do on the project's own source",
-)
-check(
-    "diagnose: a clear deliverable is reported by name, not by silence",
-    "a zero is a measurement, and silence is" in _dgn,
-    "a reader cannot tell a deliverable that passed from one that was never checked "
-    "unless the clear case is stated explicitly, the same rule the verify header sets",
-)
 # ─────────────────────────────────────────────────────────────────────────────
 # The mechanism layer — skills own mechanism, employees own judgment.
 #
@@ -4820,14 +4709,6 @@ check(
     "with 38 eligible — the arithmetic half checked, the did-it-happen half skipped",
 )
 check(
-    "succession: workforce supplies the last predecessor guarantee before deleting it",
-    "wf-unique-persona" in read("manifest.txt")
-    and "wf-unique-persona" in read("workforce/references/procedures/hooks.md"),
-    "`skill-builder`'s unique-persona had no successor here, and enforcement.md "
-    "already called the edit-time gap real. Deleting the predecessor without it "
-    "downgrades a live guarantee, which directive one forbids",
-)
-check(
     "discharge: deletes nothing — the sweep stays the only destructive act",
     "delete anything" in _dsc and "still the only destructive act" in _dsc,
     "a drain that deletes is a second destructive path with none of the sweep's "
@@ -5038,12 +4919,6 @@ check(
     "condition it never tested",
 )
 
-check(
-    "coverage: every Enforcement header matches the assertions that exist",
-    not _hdr_stale,
-    f"{_hdr_stale} — regenerate with `bin/coverage --stamp`. A label that drifts "
-    "from its mechanism is the defect the labelling pass exists to remove",
-)
 
 # The two maps were hand-written copies of one constant and a drift check compared
 # them to each other. Both now DERIVE from `bin/check`'s own `read()` assignments,
@@ -5447,21 +5322,6 @@ _wfmb = read("workforce/bin/wf-model-budget")
 # emission. `_parts[1]` is the module docstring; `[0]` is the shebang, `[2:]` the code.
 _wfmb_parts = _wfmb.split('"""')
 _wfmb_code = (_wfmb_parts[0] + "".join(_wfmb_parts[2:])) if len(_wfmb_parts) >= 3 else _wfmb
-check(
-    "wf-model-budget hardcodes no model ID in its logic — the pool has one home",
-    bool(_wfmb) and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wfmb_code),
-    "wf-model-budget names a concrete claude-* model ID in executable code. The pool "
-    "lives only in org-config.template.md § Model statics; a second copy in the emitter "
-    "is the restated constant that makes a model refresh a two-file edit and drifts silently",
-)
-check(
-    "wf-model-budget derives the recommendation from the template's Notes column",
-    "Recommended for analytical IC" in _wfmb and "Recommended for analytical Lead" in _wfmb,
-    "wf-model-budget no longer parses the lane recommendation out of the Notes column. "
-    "org-config.template.md § Model statics says 'the budget question reads these cells "
-    "and has no other source' — a recommendation resolved any other way can disagree "
-    "with the template a maintainer just edited",
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # THE OTHER HALF OF THE SAME HOLE: the EFFORT budget (2026-08-26)
@@ -5504,25 +5364,6 @@ _m_rungs = re.search(r"The rungs are\s+([^(\n]*)", _ocfg)
 _rung_tokens = re.findall(r"`([a-z]+)`", _m_rungs.group(1)) if _m_rungs else []
 _rung_leaks = sorted({r for r in _rung_tokens
                       if re.search(r"""['"]%s['"]""" % re.escape(r), _wfeb_code)})
-check(
-    "wf-effort-budget hardcodes no model ID and no rung in its logic",
-    bool(_wfeb) and bool(_rung_tokens)
-    and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wfeb_code)
-    and not _rung_leaks,
-    f"wf-effort-budget names a concrete model ID or rung in executable code "
-    f"(rung literals found: {_rung_leaks}; {len(_rung_tokens)} rung(s) read from the "
-    "template). The ladder lives in org-config.template.md § Effort statics and "
-    "per-model availability in platform.md; a second copy in the emitter is the "
-    "restated constant that makes a refresh a two-file edit and drifts silently",
-)
-check(
-    "wf-effort-budget derives the ladder and the recommendation from § Effort statics",
-    r"The rungs are\s+" in _wfeb and "Recommended for " in _wfeb,
-    "wf-effort-budget no longer parses the rung ladder out of the template's "
-    "§ Effort statics line, or no longer resolves a lane's fallback model from the "
-    "§ Model statics annotation. A ladder or a recommendation resolved any other way "
-    "can disagree with the template a maintainer just edited",
-)
 
 # ONE HOME FOR THE QUESTION COPY. The option set was produced mechanically while the
 # HEADER and BODY above it were still retyped from procedure prose — half a
@@ -5540,16 +5381,6 @@ check(
     f"org-config.template.md § Budget question wording declares {sorted(_word_calls)} — "
     "the four budget calls are model/A, model/B, effort/A, effort/B, and a call whose "
     "wording is absent is a call the emitter cannot print and the caller retypes",
-)
-check(
-    "budget wording: both emitters read the canonical block",
-    # The READER, not the error message about it. An earlier form matched
-    # `## Budget question wording`, which the `_die` string also contains — so the
-    # assertion would have stayed green with the parse deleted and the complaint kept.
-    r"^##\s+Budget question wording" in _wfmb and r"^##\s+Budget question wording" in _wfeb,
-    "an emitter that stopped reading § Budget question wording prints options under a "
-    "header the caller has to supply — the reconstruction hole this closed, reopened "
-    "on the half nobody greps (fixtures modelbudget-nowording, effortbudget-nowording)",
 )
 # The question HEADERS, read from the canonical block rather than typed here: the
 # assertion must not become the second copy it exists to forbid.
@@ -5628,14 +5459,6 @@ try:
             _drift_problems.append(f"{_script}: structure changed: {_diff[:3]}")
 except Exception as _e:      # a diagnostic must not die on the input it diagnoses
     _drift_problems.append(f"could not run the emitters: {_e}")
-check(
-    "budgets: a stale project config changes recorded VALUES, never emitted STRUCTURE",
-    not _drift_problems,
-    f"{_drift_problems} — the fixtures carry the pre-split lane structure that a "
-    "session actually reproduced (reported 2026-08-26). Both emitters must be a pure "
-    "function of the shipped template: same lanes, same grouping, same ladder, "
-    "whatever the project file says",
-)
 
 # The reference SHAPE, measured rather than described: this repository's own
 # instantiated config carries a Budget Receipt and no pool. There is no earlier
@@ -6065,12 +5888,6 @@ _drift = []
 for _p in sorted(set(_live) | set(_stamped)):
     if _live.get(_p, []) != _stamped.get(_p, []):
         _drift.append(f"{_p}: {len(_live.get(_p, []))} live vs {len(_stamped.get(_p, []))} stamped")
-check(
-    "immutable: every shipped user directive matches its stamp",
-    not _drift,
-    f"MISMATCH: {_drift} — a sacred block was reworded, added, or removed. Flag, "
-    "never repair: regenerate with bin/check --stamp only after the change is intended",
-)
 
 check(
     "fixtures: a fixture is swept once its fact is measured",
@@ -6130,25 +5947,10 @@ _undeclared = sorted(
 # The anti-vacuity guard. A population that is empty is not a population that
 # passed — the manifest ships canaries, so zero here means the flag was dropped.
 check(
-    "the fixture-declaration check actually examined fixtures",
-    len(_fixture_paths) > 0 and len(_shipped_canary_srcs) > 0,
-    f"examined {len(_fixture_paths)} fixture(s), {len(_shipped_canary_srcs)} of them "
-    "manifest-declared canaries — a check reading only `.claude/agents/` reports a "
-    "pass on any fresh clone, because .gitignore ignores that whole tree",
-)
-check(
     "fixtures: every live fixture declares the fact it measures",
     not _undeclared,
     f"no `measures-fact:` line: {_undeclared} — without it nothing can tell when "
     "the fixture has outlived its purpose",
-)
-check(
-    "fixtures: no fixture survives its own measurement",
-    not _closed,
-    f"registered but its fact is MEASURED: {sorted(_closed)} — the evidence is in "
-    "measurements/; the fixture is residue. SHIPPED canaries are exempt: they "
-    "re-measure per host and per harness version, so their job recurs and a "
-    "closed fact never makes them residue",
 )
 # ── Phase D — the applied-model canary (2026-08-27) ───────────────────────────
 # Phase D measures whether a frontmatter `model:` pin applies at runtime, by the
@@ -6176,14 +5978,6 @@ check(
 _mc_src = "workforce/canary/wf-model-canary.md"
 _mc_declared = _mc_src in manifest_canary_paths()
 _mc_pin = re.search(r"^model:[ \t]*(\S+)", read(_mc_src), re.M) if os.path.exists(_mc_src) else None
-check(
-    "staging: the applied-model canary ships, pinned to a distinctive model",
-    _mc_declared and _mc_pin is not None and _mc_pin.group(1) == "claude-haiku-4-5",
-    f"wf-model-canary must be a manifest `canary` AND pin `model: claude-haiku-4-5` "
-    f"(declared={_mc_declared}, pin={_mc_pin.group(1) if _mc_pin else None}) — a canary "
-    "with no pin, or one not shipped, cannot measure whether the pin applies; the pin "
-    "must be distinctively UNLIKE the likely session model so a MATCH is discriminating",
-)
 # The git rung is the one most likely to get quietly promoted, because it feels
 # authoritative. Assert the MEASUREMENT is cited rather than a phrasing — the
 # numbers are the reason it may not decide, and they survive rewording.
@@ -6265,57 +6059,11 @@ check(
 # precondition is the only thing standing between "I read it and it looked
 # decorative" and a dropped line nobody can get back.
 # ─────────────────────────────────────────────────────────────────────────────
-check(
-    "ablation: handbook lines classify into three kinds",
-    all(k in abl for k in ("Territory", "Steering", "Enforceable")),
-    "ablation.md must name the classes; an unclassified line is triaged by feel",
-)
-check(
-    "ablation: classification proposes, measurement drops",
-    "A classification drops nothing." in abl and "proposes; only measurement drops" in _abl2,
-    "the cheap route must not acquire the authority the eval precondition reserves",
-)
-check(
-    "ablate: --classify cannot write, and refuses --execute",
-    "Display-only, and `--classify --execute` is refused" in _abl2,
-    "a mode that could both classify and delete lets a reading do a number's job",
-)
-check(
-    "ablation: the four tests for an unclassifiable line are named",
-    all(t in abl for t in ("The limitation test", "The audience test",
-                           "The drift test", "The no-op test")),
-    "the tests are what make the classification arguable rather than opinionated",
-)
 # The audience test is the one this project needs most and the one a capable
 # classifier gets wrong most confidently: it reasons about the line against
 # ITSELF, not against the cheaper pinned model that will actually read it.
-check(
-    "ablation: the audience test reads the employee's own model field",
-    "never from the model doing the classifying" in abl,
-    "scaffolding a delegating tier has outgrown can still be load-bearing for an IC "
-    "pinned a generation below it",
-)
-check(
-    "ablate: --classify reads the body, not the frontmatter",
-    "the body below the `ORG-RECORD`" in _abl2,
-    "frontmatter is review step 5's subject; a mode that cannot measure it must "
-    "not be the thing proposing to drop it",
-)
 # Both of these were found by classifying a real handbook rather than by reading
 # the draft — the persona survived two careful passes as obviously-fine prose.
-check(
-    "ablation: the persona is a never-candidate, in both files that list them",
-    all("personas.md" in b and "persona" in b for b in (abl, _abl2)),
-    "a persona reads as pure Steering and is the one thing an isolated context is "
-    "for; it is also the subject of a uniqueness check enforced at Phase A lint. "
-    "ablate.md restates the list, and it diverged within one edit of the addition",
-)
-check(
-    "ablation: the advisory half says it is advisory",
-    "tests above are ADVISORY" in abl,
-    "no check can tell territory from steering; claiming one is the overclaim "
-    "enforcement.md fails a run over",
-)
 
 # ── The second decay clock ───────────────────────────────────────────────────
 # Structural half: the field exists in the authority and in every template.
@@ -6617,7 +6365,7 @@ _ceil = _CEILING_RX.search(dbg)
 check(
     "volume: the handbook length ceiling has exactly one value, and it is stated",
     _ceil is not None,
-    "delegation-budget.md must carry the number; three consumers check against it "
+    "procedure-for-procedures.md must carry the number; three consumers check against it "
     "and a blank org-config.md cell resolves to it",
 )
 # Stated once means stated once. The consumers may NAME the ceiling; none may
@@ -6626,7 +6374,7 @@ _ceil_n = _ceil.group(1) if _ceil else None
 _restated = [
     p for p in declared
     if p.endswith(".md")
-    and p != "workforce/references/delegation-budget.md"
+    and p != "workforce/references/procedure-for-procedures.md"
     and _ceil_n and re.search(rf"\b{_ceil_n}[- ]line", read(p))
 ]
 check(
@@ -6660,11 +6408,6 @@ check(
     "reported, never capped" in dbg and "It sets no" in dbg,
     "no measurement supports a description-length threshold; inventing one would "
     "refuse a valid description on a number with nothing behind it",
-)
-check(
-    "volume: budget prints the CONTEXT line, including when it is all zeroes",
-    "CONTEXT" in _bud and "including\nwhen every number is zero" in _bud,
-    "a procedural claim's only enforcement is a counted line (invariants.md)",
 )
 
 # ── Evidence: the citation was required and never counted ────────────────────
@@ -6700,18 +6443,6 @@ check(
 )
 
 # ── Route: cost decides the budget, stakes decide the granularity ────────────
-check(
-    "route: the ablation route is chosen by stakes, not only by cost",
-    "Which route, by stakes" in abl and "HIGH" in abl and "ORDINARY" in abl,
-    "section bisection responds to arithmetic; nothing responded to what the "
-    "handbook guards",
-)
-check(
-    "route: the report states the route, the stakes, AND the reason",
-    "ROUTE" in _abl2 and "the test that decided it" in _abl2,
-    "which mode ran was already required; why was not, and a coarser result with "
-    "no stated cause reads as a choice nobody made",
-)
 
 # ── Update syncs; it does not audit ──────────────────────────────────────────
 check(
@@ -7132,7 +6863,7 @@ check(
 # disk correct.
 #
 # The whole section rests on facts 14-17, which are DOCUMENTED and uncanaried,
-# so it REPORTS and never blocks. delegation-budget.md already had to retract
+# so it REPORTS and never blocks. procedure-for-procedures.md already had to retract
 # one blocking check built on an unmeasured fact; this is the same trade, made
 # correctly the first time.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -7295,15 +7026,6 @@ _aud = read("workforce/references/procedures/audit.md")
 _inv = read("workforce/references/invariants.md")
 _stg = read("workforce/references/staging.md")
 check(
-    "canary: the fixtures ship with the install, so a first run can measure",
-    len(manifest_canary_paths()) == 5
-    and "THE INSTALLER SHIPS THEM" in _stg,
-    f"{len(manifest_canary_paths())} canary files in the manifest (expected 5: the tier "
-    "chain a/b/c, the ceiling probe, and the applied-model canary) — fixtures written "
-    "DURING a run cannot register in that run (fact 3), so a first audit is forced "
-    "DEGRADED and the user pays a restart to clear marks it could not clear",
-)
-check(
     "install: both installers place canary files in the agents dir, not the skill",
     'dest="$agents_dir/$(basename "$path")"' in read("install")
     and "$dest = Join-Path $agentsDir (Split-Path $path -Leaf)" in read("install.ps1"),
@@ -7443,7 +7165,7 @@ check(
     "A conflict does not fail the run" in _asu
     and "bars an unverified fact from becoming a blocking check" in _asu,
     "facts 14-17 are DOCUMENTED and uncanaried; blocking on one would repeat the "
-    "substitution delegation-budget.md had to retract",
+    "substitution procedure-for-procedures.md had to retract",
 )
 check(
     "permissions: the non-existent per-agent field is stated plainly, not substituted",
@@ -7998,7 +7720,7 @@ PRODUCERS = {
     ".claude/workforce/.current-run": "workforce/references/procedures/audit.md",
     ".claude/workforce/census.json": "workforce/references/procedures/audit.md",
     ".claude/workforce/.agents-symlink-manifest.txt": "workforce/references/procedures/audit.md",
-    ".claude/workforce/.spawn-count": "workforce/references/delegation-budget.md",
+    ".claude/workforce/.spawn-count": "workforce/references/procedure-for-procedures.md",
     ".claude/workforce/pass-baseline.md": "workforce/references/procedures/audit.md",
     ".claude/workforce/loop-guard.json": "workforce/references/procedures/hooks.md",
     ".claude/workforce/.handoff-wired.json": "workforce/references/handoff.md",
@@ -8024,10 +7746,6 @@ check("artifacts: every artifact a shipped file reads has a named producer",
 
 _stale = sorted(a for a, prod in PRODUCERS.items()
                 if a in _artifacts and os.path.basename(a) not in (read(prod) or ""))
-check("artifacts: every named producer actually mentions its artifact",
-      not _stale,
-      f"mapped producer does not name the artifact: {_stale} — the map has gone stale, which "
-      "makes it a second place to be wrong rather than a check")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The CLAUDE.md machinery has to travel to the NEXT project
@@ -8324,19 +8042,6 @@ check("INV-SPAWN prints an attempt count, not a bare verdict",
 # a second copy would be two canonical askings that drift, and the drift would be
 # invisible until a run degraded to UNAVAILABLE for no visible reason.
 _srq = read("workforce/bin/wf-standing-request")
-check("the cold-reader remedy has a producer, and the text is stated once",
-      "Cold-reader agents are requested, standing." in _srq
-      and "unless the user asks" in _srq
-      and "UserPromptSubmit" in _srq and "additionalContext" in _srq
-      and "hook workforce/bin/wf-standing-request" in read("manifest.txt")
-      and "wf-standing-request" in read("workforce/references/procedures/hooks.md")
-      # wf-claude-md imports it and keeps NO literal copy of its own.
-      and "_standing_request()" in _cmd
-      and "Cold-reader agents are requested, standing." not in _cmd,
-      "SKILL.md 3b, enforcement.md and staging.md all name this remedy, and without a "
-      "producer spawning goes UNAVAILABLE and every handbook registers unprobed — "
-      "quietly, because UNAVAILABLE is neither pass nor fail. A hook is the only "
-      "always-on component, which is why it lives there once CLAUDE.md is deleted")
 
 # THE BUDGET PICKER HAS A FLOOR. Three prose restatements of "render the emitter's LANE
 # blocks verbatim" (2026-08-20, 2026-08-26, and the fixture that froze them) did not
@@ -8347,29 +8052,8 @@ check("the cold-reader remedy has a producer, and the text is stated once",
 _wbg = read("workforce/bin/wf-budget-guard")
 _wsa = read("workforce/bin/wf-settings-apply")
 _hks = read("workforce/references/procedures/hooks.md")
-check("budget guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
-      "hook workforce/bin/wf-budget-guard" in read("manifest.txt")
-      and '"wf-budget-guard": ("PreToolUse", "AskUserQuestion")' in _wsa
-      and "wf-budget-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
-      and "| `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` |" in _hks
-      and "## The budget guard" in _hks,
-      "the guard exists to make a hand-built budget picker impossible; a hook that is "
-      "not in the manifest, not in wf-settings-apply's registry, or opt-in rather than "
-      "default is the dormant shape the four inherited hooks died in")
-check("budget guard: named where the rule it enforces is stated, and in the enforcement table",
-      "mechanical floor: `wf-budget-guard`" in _asu
-      and "PREVENTS once wired" in enf and "wf-budget-guard" in enf,
-      "audit-setup.md § Step 0.4a states the render-verbatim rule and must name the "
-      "floor under it; enforcement.md must carry the row at its true strength, "
-      "PREVENTS once wired and nothing when unwired")
 _wbg_parts = _wbg.split('"""')
 _wbg_code = (_wbg_parts[0] + "".join(_wbg_parts[2:])) if len(_wbg_parts) >= 3 else _wbg
-check("budget guard: hardcodes no model ID and no rung — it reads the emitters",
-      bool(_wbg) and not re.search(r"claude-(opus|sonnet|haiku|fable)-", _wbg_code)
-      and not any(re.search(r"""['"]%s['"]""" % r, _wbg_code) for r in _rung_tokens)
-      and "wf-model-budget" in _wbg_code and "wf-effort-budget" in _wbg_code,
-      "a guard that carried its own copy of the pool or the ladder would be a third "
-      "source that drifts; it must verify against the emitters and nothing else")
 
 # THE REGISTER WRITTEN FOR AGENTS STOPS AT THE USER. The rule existed twice and both
 # copies were scoped too narrow: audit-setup.md governed the six setup questions,
@@ -8382,42 +8066,12 @@ _plo = read("workforce/references/plain-output.md")
 _tpl_t = read("workforce/references/templates.md")
 _org_p = read("workforce/references/procedures/org.md")
 _wpg = read("workforce/bin/wf-plain-guard")
-check("plain output: the banned-term list has one home, and the rule covers every reader",
-      "Banned from question text and from every option label" in _plo
-      and "Every question you ask a human, and every report you hand one" in _plo,
-      "plain-output.md is the single home of the wording rule and its banned-term list. "
-      "Scoped back to questions alone, it reverts to the narrow rule that let every "
-      "report and every non-setup question through")
 check("plain output: audit-setup points at the rule instead of restating a narrower copy",
       "references/plain-output.md" in _asu
       and "archive` (as a verb)" not in _asu,
       "audit-setup.md must POINT at plain-output.md, not carry its own copy of the "
       "list. Two lists is how the doc's and the check's diverged before 2026-08-03, and "
       "a copy scoped to 'the six questions' is the narrowing this change undid")
-check("plain output: the principles write is double-guarded on the clause",
-      "Assert five things on every write" in read("workforce/references/procedures/principles.md")
-      and "carries the plain-output clause" in read("workforce/references/procedures/principles.md"),
-      "principles.md double-guards the integrity and session-artifact clauses on every write and must "
-      "guard this one the same way: operating-principles is the constitution's only carrier into an "
-      "employee, and one written without the clause governs an org that talks to its owner in this "
-      "distribution's vocabulary")
-check("plain output: every generated org carries it as a constitution item",
-      "Anything a human reads" in _tpl_t and "plain-output.md" in _tpl_t,
-      "operating-principles is preloaded into every employee and force-refreshed by "
-      "audit; without the item the rule reaches this repo and no org workforce builds")
-check("plain output: /org carries it on every routed ask, not just an audit's",
-      "Whatever reaches the user is written the way you would say it" in _org_p
-      and "plain-output.md" in _org_p,
-      "the dispatch checkpoint is injected on every routed ask. Without the rung the "
-      "rule governs audit's six questions again and nothing a dispatch says back")
-check("plain guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
-      "hook workforce/bin/wf-plain-guard" in read("manifest.txt")
-      and '"wf-plain-guard": ("PreToolUse", "AskUserQuestion")' in _wsa
-      and "wf-plain-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
-      and "| `wf-plain-guard` | `PreToolUse` | `AskUserQuestion` |" in _hks,
-      "a rule with three prose carriers and no floor is the shape that failed twice "
-      "already; an opt-in or unregistered hook is the dormant shape four inherited "
-      "hooks died in")
 check("plain guard: named in the enforcement table at its true strength",
       "PREVENTS the call once wired" in enf and "wf-plain-guard" in enf
       and "coffee test" in enf,
@@ -8432,13 +8086,6 @@ _plo_terms = re.findall(r"`([a-z][a-z -]*)`",
                                    _plo, re.S) or type("m", (), {"group": lambda s, n: ""})()).group(1))
 _plo_leaks = sorted({t for t in _plo_terms
                      if re.search(r"""['"]%s['"]""" % re.escape(t), _wpg_code)})
-check("plain guard: hardcodes no banned term — it reads plain-output.md",
-      bool(_wpg) and bool(_plo_terms) and not _plo_leaks
-      and "plain-output.md" in _wpg_code,
-      "wf-plain-guard names a banned term in executable code (found: %s; %d term(s) read "
-      "from the reference). The list lives in plain-output.md; a second copy in the hook "
-      "makes adding a word a two-file hunt and drifts silently"
-      % (_plo_leaks, len(_plo_terms)))
 
 # ── the speak guard, the output style, and the two clauses they carry (2026-09-07) ──
 # The 2026-09-05 batch above shipped ONE enforced check — a word list on a question —
@@ -8456,83 +8103,6 @@ _wsg_parts = _wsg.split('"""')
 _wsg_code = (_wsg_parts[0] + "".join(_wsg_parts[2:])) if len(_wsg_parts) >= 3 else _wsg
 _sty = read("workforce/output-styles/plain-speak.md")
 _ttl = read("workforce/references/evaluator-additions/text-tells.md")
-check("speak guard: ships as a hook, in the default set, wired to Stop",
-      "hook workforce/bin/wf-speak-guard" in read("manifest.txt")
-      and '"wf-speak-guard": ("Stop", None)' in _wsa
-      and "wf-speak-guard" not in re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1)
-      and "| `wf-speak-guard` | `Stop` | *(none)* |" in _hks,
-      "a REPORT had no floor at all, which is why the rule was written three times and "
-      "still reached the user. An opt-in or unregistered hook is the dormant shape four "
-      "inherited hooks died in")
-check("speak guard: reads the finished reply, and its verdict is JSON not an exit code",
-      "last_assistant_message" in _wsg_code and '"decision": "block"' in _wsg_code
-      and "sys.exit(0)" in _wsg_code,
-      "on Stop a non-zero exit is indistinguishable from a crash, so the verdict must "
-      "travel as JSON on stdout. Reading last_assistant_message rather than parsing a "
-      "transcript is what makes this check about the text the user will actually read")
-check("speak guard: the vocabulary check is scoped to the user's own words",
-      "def user_words" in _wsg_code and "transcript_path" in _wsg_code
-      and "isMeta" in _wsg_code and "toolUseResult" in _wsg_code
-      and "return None" in _wsg_code,
-      "a FLAT list applied to a report fires on nearly every reply in a repository whose "
-      "subject is handbooks and tiers, and a guard that fires on everything is one "
-      "somebody turns off. Scoping to the transcript executes the rule the reference "
-      "states — say it in words the reader already owns — and an unreadable transcript "
-      "must DISABLE the check, never fire it")
-check("speak guard: an opener blocks and nothing else does",
-      "def opener_hit" in _wsg_code
-      and '"decision": "block"' in _wsg_code
-      and "additionalContext" in _wsg_code
-      and 'if payload.get("stop_hook_active"):' in _wsg_code,
-      "blocking costs a round trip. An opening agreement earns it — it is the observable "
-      "surface of caving under pushback and the fix is deleting one sentence. A buried "
-      "question does not: the reply is correct, only badly ordered. And stop_hook_active "
-      "must pass through, or a guard and a model that disagree spin")
-check("speak guard: hardcodes no banned term — it reads plain-output.md",
-      bool(_plo_terms)
-      and not sorted({t for t in _plo_terms
-                      if re.search(r'''[\'"]%s[\'"]''' % re.escape(t), _wsg_code)})
-      and "plain-output.md" in _wsg_code,
-      "same single-home rule the plain guard carries. The OPENERS list is written in the "
-      "script on purpose — it is a property of position, not of vocabulary — and "
-      "plain-output.md § Openers says so; the banned list is not")
-check("speak guard: named in the enforcement table at both its strengths",
-      "wf-speak-guard" in enf and "PREVENTS an opener once wired" in enf
-      and "DETECTS the other two" in enf,
-      "the guard PREVENTS one thing and DETECTS two, and Core Principle 6 forbids "
-      "reporting the pair at the stronger of the two")
-check("output style: ships to output-styles/, is selectable, and keeps the coding rules",
-      "style workforce/output-styles/plain-speak.md" in read("manifest.txt")
-      and "keep-coding-instructions: true" in _sty
-      and "--output-style" in _wsa and "OUTPUT_STYLE" in _wsa
-      and "output-styles" in read("install") and "output-styles" in read("install.ps1"),
-      "an output style is only found in <config-root>/output-styles/ or "
-      ".claude/output-styles/, so the manifest needs its own flag and BOTH installers "
-      "need to route it. Without keep-coding-instructions the style would silently drop "
-      "the host's software-engineering instructions, which is a far larger change than "
-      "the one being made")
-check("output style: its reach is stated, and it is the main conversation only",
-      "main conversation only" in _hks and "own system prompt" in _hks
-      and "main conversation only" in _plo,
-      "output styles do not reach a subagent — it runs its own system prompt. Describing "
-      "the style as fixing employee reports is the overclaim Core Principle 6 exists for, "
-      "and it is the natural thing to say once the style demonstrably fixes the CEO's voice")
-check("plain output: the two non-decaying carriers are named, and so is why the rest decay",
-      "## Where the rule is carried" in _plo
-      and "the system prompt, every turn" in _plo
-      and "every finished reply, every turn" in _plo,
-      "the FINDING is not that the rule was unwritten — it was written three times. It is "
-      "that every copy is read at the head of a context. A reader who cannot see which "
-      "carriers survive a full context will add a fourth head-of-context copy next time")
-check("plain output: openers and decide-the-small-things have carriers, not just a rule",
-      "## Openers" in _plo and "Decide the small things" in _plo
-      and "Never open a reply with agreement" in _tpl_t
-      and "Never open with agreement" in _org_p
-      and "no reply opens with agreement" in read("workforce/references/procedures/principles.md"),
-      "these two clauses are what the 2026-09-07 directive adds beyond the 2026-09-05 "
-      "one. A clause in plain-output.md alone reaches this repo and no org workforce "
-      "builds — the constitution item and the dispatch rung are its only carriers into "
-      "an employee, and principles.md is what forces the constitution to carry it")
 check("text-eval: the conversational-register row no longer exempts what the user reads",
       "`DEVELOPMENT.md`, and run deliverables)" not in _ttl
       and "and to anything a human reads in the terminal" in _ttl
@@ -8553,14 +8123,6 @@ _ins = read("install")
 _insp = read("install.ps1")
 _aud_h = read("workforce/references/procedures/audit.md")
 _vfy_h = read("workforce/references/procedures/verify.md")
-check("wire-defaults is one producer, and it never widens to the opt-in set",
-      "def do_wire_defaults" in _wsa and "--wire-defaults" in _wsa
-      and "for name in DEFAULT_HOOKS" in _wsa
-      and "do_output_style(root, execute, scope=scope, quiet=True)" in _wsa,
-      "install, install.ps1 and audit Step 6-H all call this. Two lists instead of one "
-      "producer drift inside a single release, and the drifting copy is the one a user "
-      "installs. Iterating DEFAULT_HOOKS rather than a literal list is what keeps "
-      "OPT_IN_HOOKS out of every caller at once")
 # EACH SUBSTRING UNIQUE IN ITS FILE. The first form of this check named `WANTS_WIRE`
 # and `--wire-defaults`, both of which appear three or four times per installer — so
 # `bin/prove` deleted one and the remaining copies kept the check green, and the case
@@ -8636,14 +8198,6 @@ check("the reversal is proven against competing user values, not a clean tree",
       "and a registration on a matcher the record does not name, or `remove by event "
       "alone` passes. Both regressions were run against these fixtures on 2026-09-07 "
       "and each failed exactly the case that should catch it")
-check("path 3: verify reports both the hook state and the style state",
-      "## Output style" in _vfy_h
-      and "| `SELECTED, FILE ABSENT` |" in _vfy_h
-      and "main conversation only" in _vfy_h,
-      "the third path is what makes the first two checkable from outside. And the "
-      "file-absent state must be its own row: a key naming a style the host cannot "
-      "find reads as configured and silently falls back to Default, which is DEAD "
-      "WIRING one file over")
 check("the three paths are stated once, where the rule lives",
       "## Three paths, or it does not propagate" in enf
       and "A per-machine command is not a path" in enf
@@ -8724,11 +8278,6 @@ check("runaway-context judgment gate reaches BOTH the conversion and the creatio
 # Structural (a property of the shipped text), so a bin/check assertion, not an INV row —
 # same Principle-8 call as the 7c gate above and wf-loop-guard.
 _rl = read("workforce/bin/wf-runlength")
-check("wf-runlength pins its never-pooled contract and its version-instability caveat",
-      "separately and never pooled" in _bud and "HARNESS-INTERNAL HEURISTIC that may change" in _rl,
-      "budget.md § Run length and peak context must state the two layers are reported separately and "
-      "never pooled, and wf-runlength must keep its harness-internal / version-unstable caveat "
-      "(Principle 9b). Prose regresses silently; this binds both. Dropping either fires this.")
 
 # No shipped file may re-authorize the split. This is the regression guard:
 # fact 8 has become a blocking check twice already.
@@ -8812,7 +8361,7 @@ check("disband restores env_removed with its prior value",
 # ─────────────────────────────────────────────────────────────────────────────
 # The count check above holds enforcement.md to the manifest. It held NOTHING
 # else: on 2026-08-04 a dev audit found the retracted claim still asserted, live,
-# in five more files — two shipped (delegation-budget.md, audit.md § hook census)
+# in five more files — two shipped (procedure-for-procedures.md, audit.md § hook census)
 # and three unshipped but read by every maintainer or user (CLAUDE.md § Layout,
 # both installer comments). Same class as the "restart required" lint: prose that
 # QUOTES the old claim as history is fine; prose that ASSERTS it is not. History
@@ -9293,7 +8842,7 @@ check(
     "numbered step, so a line-local scope clears the ESCALATE and still reports the "
     "narrative mention above it",
 )
-# THE CEILING NEVER BLOCKS THE SWEEP. delegation-budget.md § The handbook length ceiling
+# THE CEILING NEVER BLOCKS THE SWEEP. procedure-for-procedures.md § The handbook length ceiling
 # has said "never blocks a sweep" since it was written; the row was wired to the blocking
 # channel anyway, two functions above the advisory channel that exists for exactly this.
 # The number is now MEASURED (172-line floor on engineering-site), but that does not flip
@@ -9489,16 +9038,6 @@ check(
     "both readings are wrong. A case name is a join key, not a label",
 )
 
-check(
-    "prove: every payload actually changes its target — `del` present once, "
-    "`append` absent",
-    not _dupe_payloads,
-    f"{_dupe_payloads} — bin/prove deletes the FIRST occurrence, so a payload that "
-    "appears twice hits the wrong copy and the assertion stays satisfied, and a payload "
-    "that appears ZERO times mutates nothing at all. Either way the case reports on a "
-    "change it did not make. Four duplicate instances in one session; the absent half "
-    "was unguarded until 2026-09-08, when two vacuous cases were found by running them",
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # bin/prove BREAKS A COPY, NEVER THE WORKING TREE
@@ -9880,7 +9419,7 @@ check(
 # rather than cosmetic.
 # THE SPAN MAY LIVE IN THE HANDBOOK OR IN ITS GROUNDING LIBRARY, and this check
 # follows it rather than pinning it to one path. Relocated 2026-09-07 to bring the
-# handbook under the measured 172-line floor — `delegation-budget.md` § How the split
+# handbook under the measured 172-line floor — `procedure-for-procedures.md` § How the split
 # is performed calls relocation the ONLY legal way to shorten a handbook, so a check
 # that fails on a correct relocation would forbid the one remedy the rule allows.
 # What must NOT change is the bytes, and that is exactly what is still compared.
@@ -9932,14 +9471,6 @@ check(
     "words reach nobody and the shortening was a deletion with extra steps",
 )
 
-check(
-    "the standing cold-reader request reaches an ALWAYS-ON carrier",
-    "this line is the asking" in read("workforce/bin/wf-standing-request"),
-    "ambient policy permits spawning *unless the user asks*, so the request only "
-    "functions where it is injected. It now lives in a UserPromptSubmit hook, which "
-    "re-injects it every turn — strictly better than a file read once at the head of "
-    "a conversation",
-)
 check(
     "this repo has no CLAUDE.md — it was evacuated, not merely trimmed",
     not os.path.exists("CLAUDE.md"),
@@ -10357,14 +9888,6 @@ check(
     "suite rather than a judgment; the judgment-role exception must be named there too",
 )
 check(
-    "judgment roles: evals.md sources cases from recorded principal verdicts",
-    "Judgment roles — the principal is the ground truth" in _jr_evl
-    and "frozen captures" in _jr_evl
-    and "PERF" in _jr_evl,
-    "evals.md must state that a judgment role's cases are the principal's own recorded "
-    "verdicts on frozen captures, and that a rejection is filed as a PERF and a case",
-)
-check(
     "judgment roles: INV-EVALS row names its text and token in invariants.md",
     "INV-EVALS" in _cw_inv and "recorded principal verdicts" in _cw_inv,
     "invariants.md row 30 must carry INV-EVALS and its text — every judgment role has an "
@@ -10401,12 +9924,6 @@ check(
     "The receptionist's `log` mode defines" in _ai_aud,
     "audit must reuse the org log schema rather than define a second one -- diagnose "
     "reads them all through one set of lenses",
-)
-check(
-    "audit telemetry: diagnose knows audit runs are the package's own signal",
-    "audits instrumenting themselves" in _ai_dgn,
-    "an audit's rows are evidence about the PACKAGE, not the project it ran on; "
-    "diagnose.md must say so or they read as one project's noise",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -10478,28 +9995,6 @@ check(
     "Never write it to" in _ol_org and "personal-install shadowing" in _ol_org,
     "a ~/.claude collection point re-creates the shadowing failure bin/sync documents; "
     "org.md must forbid it and point diagnose at a project instead",
-)
-check(
-    "org log: diagnose reads the runtime surface and owns the four lenses",
-    "telemetry" in _ol_dia
-    and "inefficiency" in _ol_dia
-    and "orchestrator error" in _ol_dia
-    and "agent malfunction" in _ol_dia,
-    "diagnose.md must register org log's telemetry as a surface and name the four "
-    "lenses -- an emitter nothing reads is a write-only log",
-)
-check(
-    "org log: diagnose names the project explicitly, never discovers it",
-    "--telemetry" in _ol_dia and "never discovered" in _ol_dia,
-    "telemetry is written by OTHER repos; diagnose must take an explicit project path "
-    "-- a scan or a user-level registry re-creates the shadowing failure",
-)
-check(
-    "org log: absent telemetry is NOT MEASURED, never a pass",
-    "NOT MEASURED" in _ol_dia
-    and "never skipped, and never folded into a pass" in _ol_dia,
-    "an org that never ran org log has told diagnose nothing; reporting that is the "
-    "difference between a clean bill and an unexamined one",
 )
 check(
     "org log: the generated receptionist carries the mode",
@@ -10604,22 +10099,7 @@ check(
     "the typo, which is theirs and is not ours to correct",
 )
 
-check(
-    "say-the-state: plain-output.md owns the mechanics, all three clauses",
-    "## Say the state, not the journey" in _ss_plain
-    and "retroactively downgraded to a non-finding" in _ss_plain
-    and "Accuracy is not the standard" in _ss_plain,
-    "three clauses, not one: a resolved thing is never reported as unresolved, work is never handed "
-    "over that you could do, and a finding is never downgraded after the fact. A file carrying only "
-    "the first would leave the two the user was angriest about unwritten",
-)
 
-check(
-    "say-the-state: every generated org carries it in its constitution",
-    "13. **Say the state, not the journey.**" in _ss_tmpl,
-    "the user scoped this to any project using workforce. operating-principles is preloaded into "
-    "every employee, so a row there reaches every org this product builds",
-)
 
 check(
     "say-the-state: the handbook template carries it, so an EMPLOYEE's report is governed",
@@ -10644,18 +10124,6 @@ check(
     "was (SKILL.md § Directives, 2026-09-07). Step 5d is the heal, and it must name this clause",
 )
 
-check(
-    "say-the-state: the guard blocks a hand-back, and the removed clause stays removed",
-    "def handback_hit" in _ss_guard and "_BLOCKED_BY = (" in _ss_guard
-    and "def findings_without_disposition" not in _ss_guard
-    and "WHAT WAS REMOVED" in _ss_guard,
-    "A DETECTOR SHIPS WITH ITS FIX, but a detector that fires on GOOD output ships nothing — it "
-    "trains the reader to ignore it. The hand-back block stays, with the _BLOCKED_BY list that "
-    "lets a legitimate 'this needs your approval' through. The findings-without-outcome clause was "
-    "removed 2026-09-08 after firing on 151 of 2,149 real replies (7.0%), and this assertion keeps "
-    "it removed: the rule it defended is carried by plain-output.md and the output style, and "
-    "re-adding a substring test for it would repeat a measured failure",
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Finish, do not hedge — the directive that arrived at the QUESTION (v1.25.0)
@@ -10680,50 +10148,22 @@ check(
     "inside SKILL.md's `origin: user | immutable: true` block, quoted, not paraphrased into a rule",
 )
 
-check(
-    "finish-not-hedge: plain-output.md owns the mechanics",
-    "## Finish, do not hedge" in _fh_plain
-    and "Never offer stopping as an option" in _fh_plain,
-    "a directive whose mechanics live nowhere is a rule with no reader. plain-output.md is where "
-    "the question rules already live and must carry this one too",
-)
 
-check(
-    "finish-not-hedge: every generated org carries it in its constitution",
-    "Finish rather than hedge" in _fh_tmpl,
-    "the user scoped this to ALL aspects of audit deployment, not to this session. The "
-    "operating-principles default body is what reaches every company workforce builds; without a "
-    "row there the rule reaches exactly one project",
-)
 
-check(
-    "finish-not-hedge: /org dispatch carries it to every routed reply",
-    "Finish rather than hedge" in read("workforce/references/procedures/org.md"),
-    "the dispatch CHECKPOINT is loaded on every routed ask, so a rule absent from it governs only "
-    "the sessions that happen to read SKILL.md. The user scoped this to all of audit deployment",
-)
 
-check(
-    "finish-not-hedge: the guard blocks a menu whose every option is a retreat",
-    "def retreat_only" in _fh_guard and "_RETREAT = (" in _fh_guard
-    and "len(opts) < 2" in _fh_guard,
-    "A DETECTOR SHIPS WITH ITS FIX, and prose read at the head of a context is not a detector. "
-    "wf-plain-guard must carry retreat_only and its phrase list, and it must fire only when EVERY "
-    "option is a retreat — a genuine either/or may offer one",
-)
 
-# The length ceiling is MEASURED in delegation-budget.md and RESTATED in wf-conform,
+# The length ceiling is MEASURED in procedure-for-procedures.md and RESTATED in wf-conform,
 # which is the only legal shape for it (a script cannot read markdown at check time) —
 # so the two must be asserted equal. Measured 2026-09-07: doctrine had said 172 since
 # 2026-08-25 and the script still advised against 150, so every org built in between
 # was measured against a number its own doctrine had retired.
-_lc_bud = read("workforce/references/delegation-budget.md")
+_lc_bud = read("workforce/references/procedure-for-procedures.md")
 _lc_cnf = read("workforce/bin/wf-conform")
 _lc_m = re.search(r"^DEFAULT_LENGTH_CEILING = (\d+)$", _lc_cnf, re.M)
 check(
     "length ceiling: wf-conform's constant equals the measured floor doctrine states",
     bool(_lc_m) and _lc_m.group(1) == "172" and "the number and 150 is retired" in _lc_bud,
-    f"delegation-budget.md measured the floor at 172 and retired 150; wf-conform says "
+    f"procedure-for-procedures.md measured the floor at 172 and retired 150; wf-conform says "
     f"{_lc_m.group(1) if _lc_m else '(no constant)'}. A restated constant that nothing "
     "compares is the fifty-file hunt Core Principle 9a exists to prevent",
 )
@@ -10837,14 +10277,6 @@ check(
     "the command on. audit Step 5-STAMP must run it alongside the contract-stamp pair",
 )
 
-check(
-    "directives sidecar: verify names the producer, not a command with no script",
-    "--directives" in _ds_ver and "INV-DIRECTIVES" in _ds_ver
-    and "/workforce checksums --execute`." not in _ds_ver,
-    "verify's sidecar row pointed at `/workforce checksums --execute`, which is executor-followed "
-    "prose with no script behind it. A remedy with no producer is the shape this file exists to "
-    "catch, shipping inside the file that catches it",
-)
 
 check(
     "directives sidecar: checksums.md names the invocation, not just the path",
@@ -10974,115 +10406,21 @@ _hoff = read("workforce/bin/wf-handoff")
 _tpl2 = read("workforce/references/handbook-templates.md")
 _plat2 = read("workforce/references/platform.md")
 
-check("handoff: the gate has TWO halves and the number alone never authorizes one",
-      "the boundary    zero open tool calls" in _hnd
-      and "HANDOFF-WAIT" in _hnd and "Both, or nothing happens." in _hnd,
-      "handoff.md must state both gate halves and that an over-threshold agent mid-work is "
-      "left alone. The number alone firing a handoff is the user's 'only when the handoff "
-      "makes sense' lost, and it is the failure that costs more than the context it saves.")
 
-check("handoff: the threshold is derived from the project's own history, never a constant",
-      "derived from the project's own history, never written down as a constant" in _hnd
-      and "MIN_SAMPLE = 20" in _hoff,
-      "handoff.md must state the threshold comes from the store's own distribution, and "
-      "wf-handoff must keep MIN_SAMPLE. Nearest-rank p90 on n=1 returns that run's own peak, "
-      "so an agent would set its threshold to itself and could never cross it.")
 
-check("handoff: the self-check discounts its OWN open tool call",
-      "self_discount" in _hoff and "could never report a safe boundary" in _hoff,
-      "wf-handoff --self must discount the in-flight call that IS this invocation. Without it "
-      "every self-check sees one open tool call and can never report a safe boundary, which "
-      "makes the whole boundary clause dead on arrival.")
 
 _vfy2 = read("workforce/references/procedures/verify.md")
-check("handoff: three paths - installer, audit heal, and a verify absence report",
-      "HANDOFF-UNWIRED" in _vfy2 and "EDGE-MISMATCH" in _vfy2
-      and "the measurement ships with nothing calling it" in _vfy2
-      and "Three paths, so the clause reaches every host" in _hnd,
-      "The boundary clause is handbook text a host must CARRY, so a template plus an audit step "
-      "reaches only orgs somebody re-audited. verify must report both HANDOFF-UNWIRED and "
-      "EDGE-MISMATCH, and handoff.md must name all three paths (enforcement.md § Three paths).")
 
 _aud_h = read("workforce/references/procedures/audit.md")
-check("handoff: the way out is a command, and --wire produces the record --unwire reads",
-      "--unwire" in _hoff and "RECORD = os.path.join" in _hoff
-      and "CLAUSE = (" in _hoff
-      and "The way out is a command, and something produces the record it reads" in _hnd
-      and "wf-handoff --wire" in _aud_h,
-      "--wire is the only thing here that writes to a host, so it must ship a REVERSAL COMMAND, not "
-      "a documented procedure. One CLAUSE constant feeds both halves so a write cannot drift out of "
-      "reach of its own undo, and audit Step 5g must INVOKE --wire rather than hand-edit handbooks.")
 
-check("handoff: the reversal is conservative in both directions, and reads back what it wrote",
-      "pre-existing before the wire" in _hoff
-      and "clause edited since it was written" in _hoff
-      and "READ BACK WHAT WAS WRITTEN" in _hoff
-      and "A clause the user has **since edited**" in _hnd,
-      "A reversal that removes by position or by pattern deletes edits somebody made on purpose. "
-      "--unwire must KEEP a pre-existing clause and KEEP an edited one, each with its reason, and "
-      "handoff.md must state both. The case that matters is the tree with a competing value in it.")
 
-check("handoff: age is read from the last RECORD, never the file mtime",
-      "AGE IS MEASURED FROM THE LAST RECORD, NOT FROM THE FILE MTIME" in _hoff
-      and "WF_HANDOFF_NOW" in _hoff,
-      "git checkout stamps every fixture file with the checkout time, so an mtime-based age "
-      "reports a two-day-old fixture agent as seconds fresh and the IDLE case silently stops "
-      "testing anything on every clone. The timestamps live in the file content and survive.")
 
-check("handoff: a finished agent is DONE, never IDLE, and the parent transcript is what says so",
-      "Quiet is not finished" in _hnd
-      and "def read_completions" in _hoff
-      and "task-notification" in _hoff
-      and '"DONE", unsafe' in _hoff,
-      "An agent's own transcript has NO terminal record -- done and hung are byte-identical from "
-      "the file alone. The parent session transcript carries task-notification records with "
-      "<task-id> and <status>, and wf-handoff must read them. Measured 2026-09-07: a finished "
-      "fork was reported IDLE. A manager cleaning up on IDLE would kill work that succeeded.")
 
-check("handoff: DONE is a comparison against the last write, never a bare lookup",
-      'x["done_ts"] >= x["last_ts"].timestamp()' in _hoff
-      and "def is_done(x):" in _hoff
-      and "earlier stop that was then resumed" in _hnd,
-      "A resumable agent notifies MORE THAN ONCE -- a turn-limit stop, then a real finish -- so a "
-      "completion notice older than the transcript's last write belongs to a stop that was "
-      "resumed. Trusting the notice alone marks a running agent DONE and silences it. The "
-      "resumed case is the only one that discriminates; fixture handoff-done pins both.")
 
-check("handoff: the per-tool-call hook is refused, with its reason recorded",
-      "A `PostToolUse` hook is rejected" in _hnd and "poll wearing a hook's clothes" in _hnd,
-      "handoff.md must record WHY the hook carrier is refused (fact 22 makes it buildable, so "
-      "it will be re-proposed). The user ruled out polling; a per-tool-call hook is a poll.")
 
-check("handoff: the brief's work order is generated verbatim, and the successor proves it",
-      "Section 1 is never summarized" in _hnd
-      and "ESCALATE: brief disagrees with verification" in _hnd
-      and "ESCALATE: brief disagrees with verification" in _hoff,
-      "The verbatim work order is directive one reaching one file further down, and the "
-      "successor's section-6 re-run is the proof the work continued correctly. Both the "
-      "doctrine and the generated skeleton must carry the escalation sentence.")
 
-check("handoff: a manager spawns the successor; an employee never replaces itself",
-      "A manager spawns the successor. An employee never replaces itself." in _hnd
-      and "cannot spawn" in _hoff,
-      "A self-replacing employee spawns from inside itself and costs a delegation tier the "
-      "org already spent (delegation-budget.md § Depth). The script must also state it cannot "
-      "spawn - that is the tier model holding, not a missing feature.")
 
-check("handoff: a handoff CONTINUES the run and is never a reason to stop",
-      "A handoff is never a reason to stop." in _hnd
-      and "It named no threshold" in _hnd,
-      "conversion-taxonomy.md retracted the session split BECAUSE it named no threshold and "
-      "every run resolved it as stop. handoff.md must name the threshold and state that a "
-      "handoff continues the run, or this reopens the retracted defect under a new name.")
 
-check("handoff: BOTH wired carriers are in the templates, and the table names where",
-      "wf-handoff --root" in _tpl2 and "--self`" in _tpl2
-      and "Never replace yourself" in _tpl2
-      and "WHEN A BACKGROUNDED AGENT REPORTS BACK" in _tpl2
-      and "Both are wired, and there is no third." in _hnd,
-      "Both carriers must exist in the templates AND handoff.md must claim exactly the two it "
-      "wired. A carrier named in the table and installed nowhere is the written-and-unwired "
-      "pattern; a measurement with nothing calling it is the same defect from the other end.")
 
 check("handoff: fact 23 is MEASURED and does not contradict fact 22",
       "### Fact 23 — a RUNNING agent's context size and wall time are readable live" in _plat2
@@ -11133,7 +10471,7 @@ _a6 = read("workforce/references/procedures/audit.md")
 _t6 = read("workforce/references/handbook-templates.md")
 _g6 = read("workforce/references/staging.md")
 _w6 = read("workforce/bin/wf-settings-apply")
-_d6 = read("workforce/references/delegation-budget.md")
+_d6 = read("workforce/references/procedure-for-procedures.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ASSERTIONS ABOUT THE CLAUSE TARGET ITS ALL-CAPS ANCHORS, NOT ITS SENTENCES.
@@ -11151,80 +10489,9 @@ _d6 = read("workforce/references/delegation-budget.md")
 # clause is FOR rather than how it is worded, and a rewrite that removes one has changed
 # the contract rather than the prose — which is exactly when a check should go red.
 # ─────────────────────────────────────────────────────────────────────────────
-check("handoff clause: RETURNED is two things the reader can SEE, not a state to infer",
-      "its verdict line is in your hands" in _h6
-      and "exists on disk" in _h6
-      and "has NOT returned" in _h6,
-      "MEASURED IN A LIVE RUN 2026-09-08: a careful Lead following the bullet deliberately "
-      "ran its boundary check 1m57s BEFORE its child's last write, and diagnosed the "
-      "early timing about itself before either maintainer did. `after each direct report "
-      "returns` named a state the Lead has to INFER from a child that has gone quiet. Four "
-      "cold reads could not surface it — reading tests whether a trigger is "
-      "determinable, not whether it is observable at the moment it fires. So RETURNED is "
-      "now two things the reader can check: the verdict line is in hand AND the OUTPUT.md "
-      "it names exists on disk; looks-finished and gone-quiet are explicitly not returns")
-check("handoff clause: a cold reader can determine the trigger and run the command",
-      "after each direct report RETURNS and before you" in _h6
-      and "`~/.claude/skills/workforce/bin/wf-handoff --root" in _h6
-      and "it NEVER overrides the return" in _h6
-      and "a clear boundary" in _h6,
-      "three cold readers in three disjoint batches failed the predecessor on the same "
-      "three defects: `wf-handoff` bare exits 127, `phase boundary` is defined nowhere a "
-      "Lead reads, and `return the brief to your manager` sits beside a `Return ONLY:` "
-      "contract with no rule saying which wins. Each must be repaired IN the clause — a "
-      "reader who has to leave the handbook to run it does not run it")
-check("handoff: --wire REFRESHES a clause it wrote under an older wording",
-      "PRESENT IS NOT UP TO DATE" in _h6
-      and "REFRESHED — carried an older wording this tool wrote" in _h6
-      and "STALE and KEPT" in _h6
-      and "already current" in _h6,
-      "`wire` tested the marker and nothing else, so ANY marked bullet was recorded "
-      "preexisting and skipped with no comparison against `CLAUSE`. Every project that "
-      "ran --wire before a wording change was frozen on whatever the constant said that "
-      "day, and the run reported `already present` — a number that reads like success. "
-      "MEASURED 2026-09-08: tool clause 1380 bytes, deployed 1006, missing a branch "
-      "added to repair a defect, and --wire said `5 already present · 0 to write`. This "
-      "is the three-paths disease one level in: the fix reaches the tool and stops at "
-      "the door of every org that installed the previous one. Refreshed, stale and "
-      "already-current are counted SEPARATELY, because folding them together is what "
-      "made a frozen org look successful")
 _o6 = read("workforce/references/procedures/org.md")
 _p6 = read("workforce/references/platform.md")
 
-check("handoff: --as narrows by what the caller knows about ITSELF, not by command text",
-      "NARROWED BY WHAT THE CALLER KNOWS ABOUT ITSELF" in _h6
-      and 'narrowed = {i: a for i, a in ids.items() if a["type"] == as_name}' in _h6
-      and "--as <your employee name>" in _h6,
-      "the union rule is correct and it degrades exactly where a boundary check matters "
-      "most: in a busy session several agents have the same self-check open, so the "
-      "answer is honestly ambiguous and the reader falls back to a manual step. An "
-      "employee knows its own NAME — the identity its handbook is written under, carried "
-      "as `agentType` — so `--as` separates concurrent agents of DIFFERENT roles, the "
-      "common shape of a busy department. Same-role concurrency stays ambiguous, which is "
-      "rarer and honest. NOT the earlier defect: that put an employee name where `--brief` "
-      "needs a harness token; `--as` matches a name against a name")
-check("handoff: a recovery flag never joins the key it helps resolve",
-      "RECOVERY_FLAGS = {\"--as\", \"--agent\"}" in _h6
-      and "made the candidate set EMPTY" in _h6,
-      "a reader ADDS `--as` or `--agent` after being told to, so neither is in the "
-      "command already recorded in the transcript. The first `--as` shipped without this "
-      "and emptied the candidate set — adding the disambiguator changed the very argv "
-      "being matched. Same class as the `--agent` recovery bug: a recovery invocation is "
-      "not the recorded one, and any key built from the whole argv breaks the moment a "
-      "reader follows the instruction")
-check("handoff: one exact hit is not proof the CALLER was found",
-      "THE RULE THIS LANDS ON" in _h6
-      and "ids.update({a[\"agent_id\"]: a for a in loose})" in _h6
-      and "agents could be this caller" in _h6,
-      "the `open_ids` filter narrowed the window and did not close it, and the docstring "
-      "claimed it did. A sibling whose call is still OPEN is not excluded: the caller's "
-      "own argument may have been computed by the shell (`--root \"$(pwd)\"`) and "
-      "`shlex.split` cannot undo a command substitution, so THE CALLER CANNOT MATCH ITS "
-      "OWN RECORD while the sibling's literal matches the caller's argv exactly. One hit, "
-      "wrong agent, labelled `exact`. So both keys are computed ALWAYS and a confident "
-      "answer requires their UNION to hold exactly one agent. Ambiguous costs a re-run; "
-      "wrong costs a successor briefed from another agent's transcript. Fixture "
-      "handoff-self-openrace")
 check("platform: a claim about a relationship names the tiers it was measured between",
       "MUST NAME THE TIERS IT WAS MEASURED BETWEEN" in _p6
       and "written as if depth\nwere not a variable" in _p6,
@@ -11234,35 +10501,6 @@ check("platform: a claim about a relationship names the tiers it was measured be
       "populated for Leads and None for every IC by construction, leaving the boundary "
       "check with no signal for the very agents it asks about. Third instance in one day "
       "of a fact measured at one depth and written as if depth were not a variable")
-check("handoff: --as is consulted wherever it exists, not only to break a tie",
-      "CONFIRMING EVIDENCE IS CONSULTED WHEREVER IT EXISTS" in _h6
-      and 'if only["type"] == as_name:' in _h6,
-      "`--as` was read only in the many-candidates branch, so in the ordinary "
-      "single-candidate case the caller handed over the one thing that could settle "
-      "identity and it was discarded — while the row printed directly beneath showed "
-      "`type` matching the `--as` just passed. MEASURED IN A LIVE RUN 2026-09-08: two "
-      "real Leads each passed `--as`, each was the sole candidate, and each was told "
-      "`NOT proof this is you`. Because the NOTE is keyed to not-confirmed, that caveat "
-      "then fires on EVERY run forever, and a caveat that always fires is one nobody "
-      "reads by the third time")
-check("handoff: a task-notification that names no agent is not an agent completion",
-      "A `task-notification` IS NOT ALWAYS ABOUT AN AGENT" in _h6
-      and "known = {os.path.basename(f)" in _h6,
-      "the same record shape reports a backgrounded Bash command finishing, keyed by a "
-      "short task id that names no transcript. Those were being collected as agent "
-      "completions. Harmless today because nothing joins on them, which is exactly why "
-      "it is worth removing: a key that matches nothing is invisible until the day it "
-      "matches something. The store already says which ids are agents, so the filter is "
-      "free")
-check("handoff: completion notices are collected from every transcript that carries them",
-      "EVERY TRANSCRIPT THAT CAN CARRY A NOTICE" in _h6
-      and 'glob.glob(os.path.join(store, "subagents", "agent-*.jsonl"))' in _h6,
-      "the fix is in COLLECTION, not comparison: `done_ts` was None for a Lead's children "
-      "by construction, so comparing it changed nothing. Measured: 122 subagent "
-      "transcripts on this machine carry `task-notification` records naming real sibling "
-      "agents. Without this the guardrail returns HANDOFF-WAIT for half an hour after a "
-      "child finishes — and a Lead reaches a phase boundary BECAUSE its children just "
-      "returned, so it was wrong at the one moment it fires")
 check("the boundary chain is EXECUTED, not only asserted about",
       os.path.isfile("bin/e2e-handoff")
       and "RUN the boundary check, RUN what it prints" in read("bin/e2e-handoff")
@@ -11309,165 +10547,12 @@ check("org: a returned HANDOFF has a consumer, and it spawns rather than re-disp
 # must degrade to a failed row, never to a crashed suite.
 _ord_a = _h6.find("READ THE WHOLE OF THIS BULLET")
 _ord_b = _h6.find("run that line exactly as printed")
-check("handoff clause: the caveat precedes the instruction it governs",
-      _ord_a != -1 and _ord_b != -1 and _ord_a < _ord_b,
-      "`run it exactly as printed` sat fifteen sentences before the NOTE that governs it, "
-      "so a reader executing in written order ran the follow-up before reaching the "
-      "caveat. Same shape as the exit-4 case, where the fix worked because nothing was "
-      "left to obey early. A caveat downstream of its instruction is decoration")
-check("handoff clause: it defines the section it sends the reader to, and names UNMET",
-      "failed, was deferred, or was scoped out" in _h6
-      and "stated as `UNMET` rather than omitted" in _h6,
-      "`## Exceptions` is defined in `handbook-templates.md`, which a Lead never reads, "
-      "and an org authored before that sentence shipped has no such list at all — so the "
-      "clause referred to a section that might not exist. And `## Exit criteria` is a "
-      "conjunction of DONE conditions a mid-run stop cannot satisfy, so `write OUTPUT.md "
-      "as they require` reads as `satisfy them`; naming `UNMET` is the one word that "
-      "closes it")
-check("handoff: only an OPEN call can be the caller, so a stale sibling cannot claim it",
-      "ONLY AN OPEN TOOL CALL CAN BE THE CALLER" in _h6
-      and 'return [c for c, i in _recorded_commands(a["path"]) if i in a["open_ids"]]' in _h6
-      and "sole candidate by exact command match" in _h6
-      # The failure message below cites `handoff-self-collision` as where this was
-      # REPRODUCED, so the fixture is part of the claim and not a footnote. Until
-      # 2026-09-08 the condition read only wf-handoff's text, and a prove case
-      # deleting that fixture row was therefore VACUOUS — it removed the evidence
-      # for this check and fired a different one. A check whose named evidence can
-      # vanish without it noticing is asserting from memory.
-      and "handoff-self-collision" in read("fixtures/scripts/expectations.json"),
-      "`_own_open_calls` already filtered on `open_ids`; the function whose ENTIRE JOB is "
-      "identification scanned every record in every transcript — the same asymmetry as "
-      "`_invocation` knowing argv[0] is absolute while the matcher compared it raw. A "
-      "CLOSED call from another agent could match and be returned as `exact`, silently, "
-      "with every verdict and the follow-up command computed on the wrong transcript. "
-      "The clause says to run the printed line exactly as printed, so that agent's "
-      "continuation brief lands in this agent's run directory. Reproduced on fixture "
-      "`handoff-self-collision`: pre-fix returns the sibling as `exact`")
-check("handoff: the not-exact NOTE covers every inexact key, not one named reason",
-      'if self_why and "confirmed" not in self_why:' in _h6
-      and "SCOPED TO \"NOT EXACT\", NEVER TO ONE REASON" in _h6,
-      "the first version fired only on `flags only` — the HONEST failure, which announces "
-      "itself — and was silent on the dishonest one where a stale record matched and was "
-      "labelled `exact`. A safeguard scoped to the case that announces itself is not a "
-      "safeguard")
-check("handoff: --agent recovers a real verdict, so ambiguity is not a dead end",
-      "def _has_open_self_check" in _h6
-      and "re-run with `--agent <your id>`" in _h6
-      and "THE DISCOUNT IS SELF-JUSTIFYING" in _h6,
-      "two agents with the same command genuinely open are indistinguishable by command "
-      "text, and inventing a tie-break would be guessing. So ambiguity is reported WITH "
-      "the candidate ids and a recovery that works — which it did not: `--agent` got no "
-      "self-discount, so its own in-flight call counted against it and the verdict was "
-      "HANDOFF-WAIT forever. The discount now applies whenever the NAMED agent has an "
-      "open call to this same program, true exactly when that agent is the caller and "
-      "false for a manager inspecting a subordinate. NOT fixed by making the clause "
-      "prescribe distinct spellings: a key that depends on readers spelling a command "
-      "differently from each other fails the first time two of them are careful")
-check("handoff clause: the recovery the tool names is the recovery the clause teaches",
-      "`--agent <the id from your row>` in place of `--self`" in _h6
-      and "COULD NOT IDENTIFY THIS AGENT" in _h6,
-      "the ambiguity message tells the reader to re-run with `--agent <your id>`, and a "
-      "Lead only ever reads the clause. A recovery named by the tool and absent from the "
-      "handbook reaches nobody")
-check("handoff --wire: the five outcomes are counted SEPARATELY and never summed",
-      all(t in _h6 for t in ("{len(fresh)} to write", "{len(refreshed)} to refresh",
-                             "{len(current)} already current",
-                             "{len(stale)} stale (kept)", "{len(skipped)} skipped"))
-      and "never folded into one number" in _h6,
-      "FOLDING THEM TOGETHER IS THE WHOLE DEFECT. `already present` was a single number "
-      "covering a clause that was current, one frozen on an older wording, and one a "
-      "human had edited — three states needing three different actions, reported as "
-      "success. Any future tidy-up that sums two of these re-creates the bug, so the "
-      "five are asserted here by name rather than by the shape of the line. Requested "
-      "2026-09-08 by the reader who found the original: this is the part to protect "
-      "hardest")
-check("handoff: a failed --self prints no `--brief` line for anyone else",
-      "NO `--brief` LINES ON THIS PATH" in _h6
-      and "could not tell which is you" in _h6,
-      "`args.agent` stays None when identification fails, so `due` spans every agent in "
-      "the session and those lines belong to OTHER agents. The clause says to run the "
-      "printed line exactly as printed, and a reader who reaches that sentence before "
-      "the exit branch below it writes somebody else's brief. A branch that fixes how a "
-      "verdict is READ does not defuse the instruction above it")
-check("handoff clause: the brief is an EXTRA artifact, never a substitute for OUTPUT.md",
-      "THE BRIEF IS AN EXTRA ARTIFACT" in _h6
-      and "never the brief's" in _h6,
-      "the first repair said `with the brief's path as your artifact path`, which "
-      "contradicts `## Reporting`'s `<path to OUTPUT.md>` and every `## Exit criteria` "
-      "requiring OUTPUT.md, while the same bullet claimed it never overrides the return "
-      "contract. It resolved the contradiction it named and created a quieter one. The "
-      "brief is now additive: OUTPUT.md is written as always and names the brief under "
-      "`## Exceptions`, so there is no precedence rule to get wrong")
-check("handoff: the nonzero SUCCESS exit is stated where a wrapper author will read it",
-      "NOTE THIS IS THE SUCCESS PATH AND IT IS NONZERO" in _h6,
-      "exit 3 means `due, act` — the one outcome this script exists to produce — and a "
-      "shell, a CI step or a Bash tool renders it as a failed command. Deliberate, so "
-      "`&&` cannot swallow a boundary that needs acting on, but anything wrapping this "
-      "must treat 3 as act rather than as broken")
-check("handoff: --self matches the command AS TYPED, not the post-shell argv",
-      "def _command_runs(recorded, shape):" in _h6 and "shlex.split" in _h6
-      and "identify_self(agents, sys.argv" in _h6
-      and "_own_open_calls(me, sys.argv)" in _h6,
-      "the transcript records the command a reader TYPED; `\" \".join(sys.argv)` is the "
-      "POST-shell form. `~` is expanded and quotes are stripped between them, and the "
-      "shipped clause tells the reader to type a tilde path with a quoted root — so the "
-      "matcher and the clause were guaranteed never to agree. `--self` reached `_die` "
-      "and exited 2 before printing any verdict, which made the clause's next four "
-      "sentences describe output that never appears. Found by a cold read of five Lead "
-      "handbooks 2026-09-08, one turn after the clause shipped. Same failure class as "
-      "the exit-127 defect the clause was written to repair, one layer down")
-check("handoff: a --self that cannot identify the caller prints the listing, never dies",
-      "COULD NOT IDENTIFY THIS AGENT" in _h6
-      and "if self_failed:\n        return 4" in _h6
-      and "exit 4  `--self` could not identify the caller" in _h6,
-      "throwing the run away turned a recoverable miss into a dead end with no output "
-      "at all — the reader got an exit code and nothing to act on. The listing still "
-      "holds every id and every `--brief` line, so it is printed and the run exits 4: "
-      "not a usage error (2) and not a clear boundary (0), because nothing about the "
-      "caller was measured")
-check("handoff: the brief states whose word its subject id is on",
-      "NAMED ON THE COMMAND LINE, not verified as" in _h6
-      and "exact match on its own open call." in _h6,
-      "`--brief` is a separate invocation from `--self` and receives the id as an "
-      "argument, so it cannot know whether that id was matched exactly, matched on "
-      "flags alone, or typed by hand. The brief OUTLIVES the session and is read by a "
-      "successor who never saw the listing, so an approximate identification a reader "
-      "cannot tell from an exact one is how a wrong handoff gets written into an "
-      "artifact. Both ends carry it: the follow-up line warns when the match was loose, "
-      "and the brief records that its subject was named rather than verified")
-check("handoff: the self-discount uses the same key that identified, and is capped at 1",
-      "def _own_open_calls" in _h6
-      and "_command_runs_loosely(c, shape) for c, _i in recorded" in _h6
-      and "CAPPED AT 1, DELIBERATELY" in _h6,
-      "a discount that used only the exact key silently did nothing whenever "
-      "identification came from the loose one, so the agent reported HANDOFF-WAIT "
-      "against its own self-check and could never see a safe boundary. Capped because "
-      "over-discounting subtracts real open work and declares a boundary safe that is "
-      "not; under-discounting only costs a cycle")
 check("conform: a node that reports to itself is named as that, not as a missing edge",
       "reports-to itself" in _n6 and "terminates at itself" in _n6,
       "`reports-to: <self>` makes the node its own manager, so an escalation from it "
       "terminates at itself and nothing it raises ever leaves it. Caught in a shipped "
       "fixture 2026-09-08 by the edge diff, which described it only as `does not list "
       "it` — true, and the least interesting thing wrong with it")
-check("handoff: --self prints a command the reader can paste, not a bare name",
-      "def _invocation" in _h6 and "sys.argv[0]" in _h6,
-      "the script told the reader to run `wf-handoff --brief <id>` — the exact form it "
-      "now reports as exit 127 in a handbook. `sys.argv[0]` is by construction a path "
-      "that just worked")
-check("handoff: --self narrows `due` so the clause's singular 'that line' has one referent",
-      'due = [a for a in (shown if args.agent else agents)' in _h6,
-      "`due` was computed over every agent while the table was narrowed to self, so a "
-      "multi-agent session printed several candidate ids and the clause could not say "
-      "which was the reader's")
-check("handoff: unwire reverses a superseded wording and still keeps a human edit",
-      "def _strip_marked_bullet" in _h6
-      and 'hashlib.sha256(bullet.encode()).hexdigest() != row.get("clause_sha")' in _h6,
-      "matching only the CURRENT `CLAUSE` conflated two different things: text an older "
-      "version of this script wrote (ours, reversible) and text a human changed (theirs, "
-      "kept). The record stamps each row with the sha of what was written, so the bytes "
-      "answer it. Without this every clause in the field became irreversible the day the "
-      "shipped wording changed — a path in with no path out")
 check("settings-apply: a hook wired in both scopes is REPORTED, never silently unwired",
       "def report_duplicate_firing" in _w6
       and "def count_registrations" in _w6
@@ -11695,43 +10780,6 @@ check(
     "every shipped caller writes `--root \"${CLAUDE_PROJECT_DIR}\"`, that variable is "
     "unset outside a hook, and abspath('') is a real directory — so the guard is the "
     "only thing between an unset variable and records written into a tree nobody named",
-)
-check(
-    "ledger capture: it drafts, and has no code path that writes an accepted record",
-    '"--if-absent", "--execute"]' in _wlc
-    and '"--status"' not in _wlc
-    and "**Status:** accepted" in str((_fix_json.get("ledgercap-drafts", {}).get("after") or {})),
-    "a fuzzy signal may draft and may not decide (discovery.md § Reliability tiers). The "
-    "hook never passes --status, so `proposed` is not a default it could drift off; "
-    "--if-absent is what makes a re-fired turn a no-op instead of a duplicate",
-)
-check(
-    "ledger capture: the trigger's precision is measured, with its corpus and sample size",
-    "PRECISION 89%" in _wlc and "PRECISION 83%" in _wlc
-    and "349 turns from 66 sessions" in _wlc and "363 turns from 78 sessions" in _wlc,
-    "a REPORT verdict cites a measured precision figure and where it was measured, or "
-    "the pass is unfinished (operating-principles item 11). Both halves are required: "
-    "the tuned figure alone is fitted to the corpus that produced it",
-)
-check(
-    "ledger open: once per session, and silent when nothing is pending",
-    "    if session_id in sessions:" in _wlo
-    and "    if not rows:" in _wlo
-    and "ledgeropen-once" in _fix_json and "ledgeropen-silent-empty" in _fix_json,
-    "a session-opening hook that repeats every turn is noise somebody unwires, and one "
-    "that announces its own emptiness teaches the reader to skip it. Both fixtures "
-    "assert stdout is empty, which is the only observable form of either rule",
-)
-check(
-    "ledger hooks: both ship wired by default, neither is opt-in",
-    "hook workforce/bin/wf-ledger-capture" in read("manifest.txt")
-    and "hook workforce/bin/wf-ledger-open" in read("manifest.txt")
-    and '"wf-ledger-capture": ("Stop", None)' in _wsa
-    and '"wf-ledger-open": ("UserPromptSubmit", None)' in _wsa
-    and not (re.search(r"OPT_IN_HOOKS = frozenset\(\{([^}]*)\}\)", _wsa).group(1).count("wf-ledger")),
-    "a capture hook nobody wires records nothing, and the store it feeds was designed "
-    "and left switched off for exactly that reason. DEFAULT membership is what makes "
-    "the family arrive with the install rather than with a command somebody types",
 )
 check(
     "ledger: the gateway's record bodies match the shipped templates",

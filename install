@@ -371,6 +371,124 @@ FETCH_FAILED=""
 VERIFY_FAILED=""
 SETTINGS_FAILED=""
 
+# Remove what the manifest no longer lists.
+#
+# `update.md` line 57 has promised "a clean full replacement, not a merge" since
+# the file was written. Against this installer that sentence was FALSE: the fetch
+# loop wrote the current manifest set over whatever was already there and removed
+# nothing, so a file dropped from the manifest stayed on disk forever. MEASURED
+# 2026-09-09: zero removal operations in this file outside failed-fetch cleanup at
+# line 507, and zero comparison against the tree already installed. `bin/sync`
+# rmtree's and rebuilds, so the DEV path has always been clean and the INSTALL path
+# never was — the gap survived because every release from 1.8.0 to 1.30.1 mostly
+# ADDED files, so it had nothing to expose. The strip-down release is the first that
+# removes many, which turns a dormant gap into the largest residue event the project
+# would ever have produced, shipped by the release meant to cut residue.
+#
+# SCOPE IS THE ENTIRE SAFETY ARGUMENT, and it is three different rules:
+#
+#   1. Inside the skill directory the manifest is authoritative. Anything not listed
+#      is an orphan and goes.
+#   2. Outside it — `agents/`, `output-styles/` — other tools' files sit beside ours
+#      in shared directories. NOTHING there is removed unless a previous run of this
+#      installer wrote it, recorded by exact path in `.installed-external`. A blunt
+#      basename match would delete a user's own agent that happened to share a name.
+#   3. `.claude/workforce/` project state is NEVER walked. `update.md` step 5 promises
+#      it is byte-identical across an update. That promise cost nothing while no prune
+#      existed; it is load-bearing now, so it is asserted below rather than inferred
+#      from the paths merely being different.
+#
+# A partial install never prunes. If any fetch failed, the manifest set on disk is
+# incomplete, and deleting "everything not in the set" would delete working files
+# whose replacements did not arrive.
+prune_scope() {
+    _skill_dir="$1"
+    _agents_dir="$2"
+    _styles_dir="$3"
+
+    # Rule 3, asserted. Refusing is the correct outcome — an un-pruned install is
+    # untidy, and a prune pointed at the wrong root destroys a user's project state.
+    case "$_skill_dir" in
+        */skills/workforce) : ;;
+        *)
+            echo "  Prune SKIPPED: '$_skill_dir' is not a skill directory under skills/workforce."
+            return 0 ;;
+    esac
+    case "$_skill_dir" in
+        */.claude/workforce|*/.claude/workforce/*)
+            echo "  Prune REFUSED: '$_skill_dir' is project state, not a skill directory."
+            return 0 ;;
+    esac
+
+    if [ -n "${FETCH_FAILED:-}" ]; then
+        echo "  Prune SKIPPED: a fetch failed this run, so the shipped set on disk is incomplete."
+        return 0
+    fi
+
+    _expect="$(mktemp)"
+    _ext_now="$(mktemp)"
+    : > "$_expect"
+    : > "$_ext_now"
+
+    while IFS= read -r pline || [ -n "$pline" ]; do
+        case "$pline" in ''|\#*) continue ;; esac
+        pflag=""
+        ppath="$pline"
+        case "$pline" in
+            "keep "*)   ppath="${pline#keep }" ;;
+            "hook "*)   ppath="${pline#hook }" ;;
+            "exec "*)   ppath="${pline#exec }" ;;
+            "canary "*) pflag="canary"; ppath="${pline#canary }" ;;
+            "style "*)  pflag="style";  ppath="${pline#style }" ;;
+        esac
+        if [ "$pflag" = "canary" ]; then
+            echo "$_agents_dir/$(basename "$ppath")" >> "$_ext_now"
+        elif [ "$pflag" = "style" ]; then
+            echo "$_styles_dir/$(basename "$ppath")" >> "$_ext_now"
+        else
+            echo "${ppath#workforce/}" >> "$_expect"
+        fi
+    done < "$MANIFEST_TMP"
+
+    _record="$_skill_dir/.installed-external"
+    _pruned=0
+
+    # Rule 1 — the skill directory, where the manifest is the whole truth.
+    find "$_skill_dir" -type f -print > "$_expect.found" 2>/dev/null || : > "$_expect.found"
+    while IFS= read -r pf || [ -n "$pf" ]; do
+        [ -n "$pf" ] || continue
+        _rel="${pf#"$_skill_dir"/}"
+        [ "$_rel" = ".installed-external" ] && continue
+        if ! grep -Fxq "$_rel" "$_expect"; then
+            rm -f "$pf" && _pruned=$((_pruned + 1))
+            echo "  Pruned $_rel"
+        fi
+    done < "$_expect.found"
+
+    # Rule 2 — outside it, only files a previous run of this installer wrote.
+    if [ -f "$_record" ]; then
+        while IFS= read -r pf || [ -n "$pf" ]; do
+            [ -n "$pf" ] || continue
+            if [ -f "$pf" ] && ! grep -Fxq "$pf" "$_ext_now"; then
+                rm -f "$pf" && _pruned=$((_pruned + 1))
+                echo "  Pruned $pf"
+            fi
+        done < "$_record"
+    fi
+    cp "$_ext_now" "$_record" 2>/dev/null || :
+
+    # Directories the prune emptied. -delete on -empty never removes a non-empty
+    # parent, and $_skill_dir itself always holds .installed-external.
+    find "$_skill_dir" -mindepth 1 -type d -empty -delete 2>/dev/null || :
+
+    rm -f "$_expect" "$_expect.found" "$_ext_now"
+    if [ "$_pruned" -gt 0 ]; then
+        echo "  Pruned $_pruned file(s) the manifest no longer lists."
+    else
+        echo "  Prune: nothing orphaned."
+    fi
+}
+
 # Post-install completeness pass. The manifest is the authoritative shipped-file
 # list, so "did the install include everything the project needs" is answerable
 # by re-reading it against disk -- and it was never asked. This both REPORTS what
@@ -512,6 +630,8 @@ install_to_scope() {
             chmod +x "$dest"
         fi
     done < "$MANIFEST_TMP"
+
+    prune_scope "$skill_dir" "$agents_dir" "$styles_dir"
 
     verify_scope "$skill_dir"
 

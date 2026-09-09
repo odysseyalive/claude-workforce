@@ -82,7 +82,7 @@ concurrency cap, **report the overage and convene the redesign panel — do not 
 
 That cap is `platform.md` fact 8, which is DOCUMENTED and unmeasured, and an unverified fact may not
 become a blocking check. An earlier form of this line read "the answer is a structural change, not one
-more employee", which refuses on the unmeasured cap — the exact substitution `delegation-budget.md`
+more employee", which refuses on the unmeasured cap — the exact substitution `procedure-for-procedures.md`
 was rewritten to remove. The demotion landed there and was never swept into this file.
 
 The run prints **`INV-REGISTER`** — registrations verified before any retirement

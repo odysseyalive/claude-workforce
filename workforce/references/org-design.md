@@ -140,7 +140,7 @@ not different departments; they are one job with two folders.
 
 **Two to four departments is the normal answer.** One department means the whole project is one job —
 which is fine, and means the CEO tier is unnecessary overhead. Five or more hits the concurrency wall
-(`delegation-budget.md`).
+(`procedure-for-procedures.md`).
 
 ---
 

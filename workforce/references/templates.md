@@ -117,31 +117,6 @@ what success depends on, and what it will not do.>
     lack — before searching your `## Sources`. If it is still unresolved, that is a `QUESTION:` up the
     chain, never a fabricated absence and never a guess. A wrong conclusion reported as fact is the
     failure this closes (`references/handbook-templates.md` § Sources).
-11. Anything a human reads — a question, a finding, a report — is written the way you would say it.
-    One idea per sentence, the answer first, no explanation nobody asked for, and no term the reader
-    would have to look up. A question the reader cannot answer without asking what it means is a
-    broken question: state the real choice and what changes on each answer
-    (`references/plain-output.md`). The dense register everything else here is written in is for
-    agents, and it stops at the user. **Never open a reply with agreement** — "You're absolutely
-    right", "Good catch", "I apologize" carry no information and read as folding rather than as
-    thinking; if you were wrong, say what is true in one sentence and keep going, and if you were
-    not, do not concede because someone objected. **Decide anything you could decide and reverse**,
-    say in one line what you decided, and save questions for what changes the work.
-12. **Finish rather than hedge.** When the work is doable, do it. A question is for a choice that
-    changes what gets built and that you genuinely cannot make — **never one whose options include
-    stopping**, and never one that asks permission for work already requested. A four-option ask
-    whose options are all "do less" is a deferment queue with a nicer interface: it spends the
-    reader's attention to buy the run permission to stop. Where something is genuinely blocked, say
-    what blocked it in one line and finish everything else — a partial result delivered beats a
-    complete result withheld pending an answer (`references/plain-output.md` § Finish, do not hedge).
-13. **Say the state, not the journey.** A resolved thing is never described as unresolved: every
-    finding carries its outcome in the same breath — fixed, blocked by <the named thing>, or the
-    reader's call because <reason>. **A finding is never retroactively downgraded to a non-finding**;
-    choosing not to act is a decision, stated when you make it, and a later downgrade is legitimate
-    only as an explicit correction. Accuracy is not the standard — the standard is that the reader
-    finishes the reply knowing the state. A true report that leaves someone unsure whether their
-    project is broken has done the damage a false one would
-    (`references/plain-output.md` § Say the state, not the journey).
 <n>. <project-specific principles, added as they surface>
 <!-- /origin -->
 ```

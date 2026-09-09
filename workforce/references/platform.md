@@ -47,7 +47,7 @@ is.
 - **Fact 23b** read *"Run live, one hit, unambiguous"* — taken with ONE agent in the session, and
   then carried a self-identification design that only ever runs in multi-agent ones. Two silent
   misidentifications followed. Corrected in place 2026-09-08.
-- **The handbook length ceiling** (`delegation-budget.md` § The handbook length ceiling, which owns
+- **The handbook length ceiling** (`procedure-for-procedures.md` § The handbook length ceiling, which owns
   the number and is the only file that states it) was measured by relocating ONE IC handbook and was
   applied to Leads, which have no `## Procedure` to relocate at all. No Lead could reach it and every
   audit spent real effort trying. Corrected 2026-09-08.
@@ -389,8 +389,8 @@ the tail reaches 317k. **Main sessions run very large** — the median already p
 (227k), and the largest sat at the auto-compaction ceiling (~994k peak, 1024 tool-calls).
 
 **Consequence.** Long-context / context-rot risk is concentrated in the main loop but is present in a
-real minority of subagents too. Any delegation-budget or handoff design must treat the main loop as the
-primary lever and must **not** assume employees are uniformly cheap. See `delegation-budget.md`.
+real minority of subagents too. Any delegation-budget design must treat the main loop as the
+primary lever and must **not** assume employees are uniformly cheap. See `procedure-for-procedures.md`.
 
 ### Fact 23 — a RUNNING agent's context size and wall time are readable live, from disk ✅ MEASURED
 
@@ -420,7 +420,7 @@ The staleness window is **1,800 s**, measured: the largest gap ever seen between
 still-working run was 1,282.7 s (n=11,200 gaps, p99 = 82.6 s). Past it the verdict is IDLE, never
 DEAD — nothing observes a process, only a file that stopped growing.
 
-Consumed by `wf-handoff`; the design that acts on it is `references/handoff.md`. Same standing caveat
+No shipped script consumes this; it is a measured platform fact kept for the next design that needs it. Same standing caveat
 as fact 21: transcript JSONL is internal and version-unstable.
 
 ### Fact 23b — `CLAUDE_CODE_SESSION_ID` names the store exactly, and an agent can identify itself ✅ MEASURED
@@ -428,7 +428,6 @@ as fact 21: transcript JSONL is internal and version-unstable.
 Evidence: same file.
 
 `CLAUDE_CODE_SESSION_ID` is the session directory name, so **the path-encoding heuristic
-`wf-runlength` documents is not needed where this variable is set.** `CLAUDE_CODE_CHILD_SESSION=1`
 says the code is running inside a subagent; `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=3` reports the depth
 ceiling from the harness itself, agreeing with § header `TIER-LIMIT`.
 
@@ -454,8 +453,6 @@ returns a single confident hit is claiming something the platform does not offer
 
 What is sound: compute every key, take the UNION of the candidates, and answer confidently only
 when it holds exactly one agent. Anything else is ambiguity, reported with the candidate ids and a
-recovery that names an agent explicitly. `wf-handoff` does this; fixtures
-`handoff-self-collision` and `handoff-self-openrace` hold both failures. **Do not build a blocking
 check on single-hit self-identification.**
 
 **Negative finding, so it is not re-hunted:** none of these names the agent's *model*. Fact 12's
@@ -479,7 +476,7 @@ DOCUMENTED and non-blocking** until that runs.
 | 5 | Agents resolve only from `.claude/agents/` and `~/.claude/agents/`; identity comes solely from the `name:` field, and **subfolders do not namespace** | Two handbooks named `reviewer` in different subfolders collide **silently** — one simply wins by filesystem read order. Guarded by a blocking Phase A lint check and by `verify`, not by a hook (`enforcement.md` § Nothing ships dormant) | unverified |
 | 6 | Every non-fork subagent receives a fresh isolated context **plus the full CLAUDE.md plus git status**, with no per-agent opt-out | CLAUDE.md cost is multiplied by fan-out; audit runs a CLAUDE.md size budget check | partly corroborated — isolation is evident; the injection cost is not measured |
 | 7 | Only the **top-level** subagent's summary returns to main | Drives the mandatory `## Reporting` convention: every employee writes `OUTPUT.md` and returns verdict + path + ≤3 lines | unverified |
-| 8 | Caps: 200 subagents/session (**cannot be disabled**), 20 concurrent | Drives department-width caps and the `/org` budget preflight. **REPEAT OFFENDER — this fact has become a blocking check twice and must never become one again**: once on the org-design path (`delegation-budget.md` § The session cap is not enforceable by us, caught 2026-08-03) and once on the conversion path (`conversion-taxonomy.md`, caught 2026-08-04, after it postponed 37 of 37 conversions on a cap with 90% headroom). It may **report**; it may not refuse. Note also that a *sequential* batch draws only on the session total and never on the concurrent cap — conflating the two is how both regressions read as prudent | unverified |
+| 8 | Caps: 200 subagents/session (**cannot be disabled**), 20 concurrent | Drives department-width caps and the `/org` budget preflight. **REPEAT OFFENDER — this fact has become a blocking check twice and must never become one again**: once on the org-design path (`procedure-for-procedures.md` § The session cap is not enforceable by us, caught 2026-08-03) and once on the conversion path (`conversion-taxonomy.md`, caught 2026-08-04, after it postponed 37 of 37 conversions on a cap with 90% headroom). It may **report**; it may not refuse. Note also that a *sequential* batch draws only on the session total and never on the concurrent cap — conflating the two is how both regressions read as prudent | unverified |
 | 9 | `Agent(agent_type)` allowlists are **ignored** inside subagent definitions | The chain of command is prose + `permissions.deny` — detection, never prevention | unverified, and **load-bearing for the honesty clause**: if it were ever measured false, the Chain-of-Command Gate could be strengthened |
 | 10 | The agent `skills:` field preloads a skill's **full content** at startup; skills with `disable-model-invocation: true` cannot be preloaded | The only deterministic way to get the General Operating Principles into every isolated context | unverified — **and fact 18 documents that this field is dropped entirely for a named teammate.** The one deterministic doctrine channel has a spawn form in which it does not exist |
 | 11 | `memory:` is auto-memory and is inert when `autoMemoryEnabled` is off | **Nothing blocks on this.** Handbooks omit `memory:` because records live in data skills, not because of this fact (`procedure-for-procedures.md` rule 9) — so the design holds whichever way it measures | unverified |
@@ -512,7 +509,7 @@ outcome of a real call. This applies to every `tools:` claim in this file.
 
 The numbers in the header block are the **single source of truth**. No other file restates them.
 
-`SKILL.md`, `delegation-budget.md`, `org-chart-format.md`, and every procedure say *"the measured
+`SKILL.md`, `procedure-for-procedures.md`, `org-chart-format.md`, and every procedure say *"the measured
 tier limit"* and read it from here — never *"exactly three tiers"* as a literal. The reason is
 forward mobility: if a future harness raises the depth limit, the org's shape should change by
 **re-measuring and updating one line**, not by hunting the phrase "three tiers" through fifty files

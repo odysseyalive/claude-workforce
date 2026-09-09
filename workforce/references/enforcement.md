@@ -17,8 +17,6 @@ The single most important table in this project:
 | Total spawns stay under the session cap | — | **CANNOT. Advisory only.** |
 | Two employees cannot share a name | Phase A lint + `verify` | **DETECTS** at author time and at review; the platform itself is silent |
 | A question a human reads uses no term from the banned list — the words this distribution writes for agents stop at the user | `wf-plain-guard` (`PreToolUse` on `AskUserQuestion`) | **PREVENTS the call once wired** — a `PreToolUse` exit 2 blocks the call. **Nothing when unwired.** Covers the mechanical half only: a fixed word list. Register and length are the coffee test, which is a human judgment and is ADVISORY, never checked. Measured need 2026-09-05: the rule existed in two places and both were scoped too narrow to reach a live question |
-| A reply a human reads does not open with agreement, does not use a word the user has never used, and does not bury its ask at the bottom | `wf-speak-guard` (`Stop`) | **PREVENTS an opener once wired** — `decision: block` returns the reply to the model and the user never sees the draft. **DETECTS the other two**: `additionalContext` reaches the next turn, the user reads the reply as written. **Nothing when unwired.** Register, length, and overbuilt prose stay the coffee test and are ADVISORY, never checked. This is the only carrier of the rule that does not decay with context — every other one is read at the head of a context (`references/plain-output.md` § Where the rule is carried) |
-| The plain-output rule is present at full strength on every turn, however full the context | the `Plain Speak` output style, selected by `outputStyle` | **STRUCTURAL for the main conversation once selected** — an output style is added to the system prompt, so it does not compete with newer context the way CLAUDE.md, a constitution item, or a dispatch rung does. **Reaches NO employee**: a subagent runs its own system prompt (a fork inherits the parent's). Claiming otherwise is an overclaim |
 | A budget picker offers the emitter's option set, never one rebuilt from prose or a stale project config | `wf-budget-guard` (`PreToolUse` on `AskUserQuestion`) | **PREVENTS once wired** — a `PreToolUse` exit 2 blocks the call (DOCUMENTED in the hooks reference, not yet canaried on this host). **Nothing when unwired**; `verify` § Hook wiring reports which. Measured need 2026-09-02: three prose restatements had not held |
 
 **Anything in a "cannot" row must never be described as enforced, guaranteed, prevented, or
@@ -178,6 +176,11 @@ ban was doctrine that felt like a conclusion**, which is the tell `CLAUDE.md` na
 |---|---|---|
 | anything **wired** — a procedure invokes it, or a command registers it *and* `verify` reports whether it is registered | **yes** | its absence is loud, so a fresh install cannot silently lose it |
 | anything **dormant** — no invoker, no registration path, or a registration nothing reports on | **never** | this is the whole of the finding, and it has now cost this project three times |
+
+**This distribution ships exactly one hook — `wf-protect-directives`.** The simplification release
+removed the other eight: four were speech guards the user deleted outright, one shipped unwired and
+therefore never fired for anyone, and three lost the producers they read and would have passed
+everything through while still firing on every turn.
 
 **A hook ships only under three conditions, and the shipped one meets two and a half.** It needs a
 command that wires it — `/workforce hooks`, present. A `verify` row reporting wired / orphaned / dead

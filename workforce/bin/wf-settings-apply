@@ -26,9 +26,10 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
     --wire-hook <name>  register a shipped workforce hook at its event, idempotently.
                         A PROPOSED hook (`OPT_IN_HOOKS`) is wireable only by NAME and is
                         never in the default set. Wiring one that owns a config file also
-                        stamps that file with the defaults the hook itself declares, IF
-                        AND ONLY IF it is absent — `wf-loop-guard` ->
-                        `.claude/workforce/loop-guard.json` (hooks.md § The loop guard).
+                        stamps that file with the defaults the hook itself declares,
+                        IF AND ONLY IF it is absent. No shipped hook owns a config
+                        file since the simplification release; the path is kept for
+                        the next one that does.
     --automode          write autoMode.environment/allow into ~/.claude/settings.json
                         so the classifier stops refusing routine workforce maintenance.
                         User scope is deliberate: the classifier reads autoMode ONLY
@@ -59,7 +60,6 @@ import os
 import sys
 
 OWNED_REL = os.path.join(".claude", "workforce", ".settings-owned.json")
-LOOP_GUARD_REL = os.path.join(".claude", "workforce", "loop-guard.json")
 
 # The two project-scope settings files, precedence order (references/scopes.md).
 PROJECT_SETTINGS = ("settings.local.json", "settings.json")
@@ -68,40 +68,22 @@ PROJECT_SETTINGS = ("settings.local.json", "settings.json")
 # § What is wired. A matcher of None omits the key, which is correct for
 # UserPromptSubmit (it has no tool to match against).
 SHIPPED_HOOKS = {
-    "wf-standing-request": ("UserPromptSubmit", None),
     "wf-protect-directives": ("PostToolUse", "Edit|Write"),
-    "wf-unique-persona": ("PostToolUse", "Edit|Write"),
-    "wf-budget-guard": ("PreToolUse", "AskUserQuestion"),
-    "wf-plain-guard": ("PreToolUse", "AskUserQuestion"),
-    # `Stop` has no tool to match against, same as UserPromptSubmit. It fires once per
-    # turn and receives the finished reply, which is why the report half of the
-    # plain-output rule is enforceable at all: everything else that carries the rule is
-    # read at the head of a context (hooks.md § What is wired).
-    "wf-speak-guard": ("Stop", None),
-    "wf-loop-guard": ("PostToolUse", None),
-    # The project record family. `wf-ledger-capture` shares `Stop` with wf-speak-guard
-    # — one event, two registrations, both fired, because the event is not a slot.
-    # DEFAULT, not opt-in: a capture hook nobody wires records nothing, and the store
-    # it feeds was designed and left switched off for exactly that reason. Neither can
-    # block: capture writes a `proposed` record and exits 0, and the opener emits
-    # `additionalContext` once per session or stays silent.
-    "wf-ledger-capture": ("Stop", None),
-    "wf-ledger-open": ("UserPromptSubmit", None),
-    # Dates every observation the session has made, before the next reply is written.
-    # DEFAULT, and on `UserPromptSubmit` rather than `Stop` on purpose: the defect it
-    # answers is a stale reading asserted in the present tense, and by `Stop` the
-    # sentence is already written. It cannot block and never judges a claim.
-    "wf-turn-brief": ("UserPromptSubmit", None),
 }
 
-# WIREABLE, NEVER DEFAULT. hooks.md § What is wired marks `wf-loop-guard` "PROPOSED,
-# and not wired by this command's default set" — so membership in SHIPPED_HOOKS means
+# WIREABLE, NEVER DEFAULT. A hook named here is registered only when a human types
+# `--wire-hook <name>` — so membership in SHIPPED_HOOKS means
 # "`--wire-hook <name>` will register it", and nothing more. DEFAULT_HOOKS is the set
 # any "wire the shipped hooks" gesture iterates; a name here is excluded from it and
 # reaches a settings file only when a human types it. Two sets rather than one flag
 # because the unknown-hook error prints BOTH, which is what makes the distinction
 # observable — and therefore fixture-checkable — instead of a comment nobody executes.
-OPT_IN_HOOKS = frozenset({"wf-loop-guard"})
+# Empty since the simplification release. It held `wf-loop-guard`, which shipped
+# unwired and therefore never fired for anyone — an unwired detector, which
+# `enforcement.md` forbids shipping. The set stays because the two-set shape is what
+# makes the unknown-hook error print both, and a future opt-in hook needs somewhere
+# to go; an empty frozenset is the honest expression of "none right now".
+OPT_IN_HOOKS = frozenset()
 DEFAULT_HOOKS = tuple(n for n in sorted(SHIPPED_HOOKS) if n not in OPT_IN_HOOKS)
 
 # The autoMode entries recommended into ~/.claude/settings.json. Prose, not patterns —
@@ -385,11 +367,11 @@ def hook_defaults(name):
     """The defaults a stamping hook DECLARES, imported from the hook itself.
 
     IMPORTED, never restated — the same reason `wf-claude-md` imports the standing
-    request from `wf-standing-request` rather than keeping a second copy. Two
+    request from its own producer rather than keeping a second copy. Two
     canonical copies of `nudge_at: 3` drift, and the drifting one is the one written
     into the user's project. Returns None when the sibling cannot be read, and the
     caller then REFUSES to stamp: a schema this script invented would be worse than
-    no file, because `wf-loop-guard` would silently ignore keys it does not know.
+    no file, because the hook would silently ignore keys it does not know.
     """
     import importlib.util
     from importlib.machinery import SourceFileLoader
@@ -412,7 +394,7 @@ def hook_defaults(name):
 # hooks.md § The loop guard — "`.claude/workforce/loop-guard.json` has a producer, and
 # this step is it." An artifact with a reader and no writer is the shape `.directives.sha`
 # and `platform-local.md` each shipped in; this is that gap closed for the loop guard.
-STAMPED_FILES = {"wf-loop-guard": LOOP_GUARD_REL}
+STAMPED_FILES = {}
 
 
 def stamp_body(defaults):
@@ -569,7 +551,7 @@ def report_duplicate_firing(root):
 
 
 def do_wire_defaults(root, scope, execute):
-    """Wire every DEFAULT hook and select the output style, in one call.
+    """Wire every DEFAULT hook, in one call.
 
     WHY THIS EXISTS. Wiring was one `--wire-hook` invocation per hook, typed by a human
     per machine and per project. On a single workstation that is a chore; across
@@ -586,12 +568,11 @@ def do_wire_defaults(root, scope, execute):
     `.settings-owned.json` record."""
     spath = settings_for_scope(root, scope)
     print(f"WIRE   {spath}          <- resolved, not assumed")
-    print(f"  {len(DEFAULT_HOOKS)} default hook(s) + the output style"
+    print(f"  {len(DEFAULT_HOOKS)} default hook(s)"
           f"{'' if execute else '  (nothing written — add --execute)'}")
     rc = 0
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
-    rc = max(rc, do_output_style(root, execute, scope=scope, quiet=True))
     report_duplicate_firing(root)
     if not execute:
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
@@ -884,89 +865,24 @@ def do_automode(execute):
     return 0
 
 
-# The shipped output style, and the settings key that selects it. `outputStyle` is a
-# plain string field, not a hook entry, so it gets its own writer rather than a fifth
-# branch inside do_wire_hook — and the STYLE FILE itself is placed by the installer
-# (`manifest.txt`, flag `style`), never by this script: writing a style into a scope
-# the installer did not target would leave a settings file naming a style that is not
-# on disk, which the host reports as no style at all.
-OUTPUT_STYLE = "Plain Speak"
-
-
-def do_output_style(root, execute, scope="project", quiet=False):
-    """Select the shipped plain-speak output style in the project settings file.
-
-    WHY A SETTING AND NOT A REFERENCE. An output style is added to the SYSTEM PROMPT
-    (Claude Code docs, Output styles § How output styles work), so it is present at
-    full strength on every turn regardless of how full the context is, and the host
-    re-reminds the model of a non-Default style during the conversation. Every other
-    carrier of this rule — a constitution item, a dispatch rung, CLAUDE.md — is read
-    once at the head of a context and then competes with everything newer.
-
-    WHAT IT DOES NOT REACH. Output styles apply to the MAIN CONVERSATION ONLY: a
-    subagent runs its own system prompt. Employee reports are covered by the handbook
-    clause and by `wf-speak-guard`, never by this. Saying otherwise would be the
-    overclaim this project fails a run over."""
-    spath = settings_for_scope(root, scope)
-    if not quiet:
-        print(f"STYLE  {spath}          <- resolved, not assumed")
-
-    # Both scopes, precedence order, exactly as references/scopes.md defines for the
-    # skill itself: a `--user` install puts the style under the config root, a project
-    # install puts it in the tree. Checking only one would print a "missing" note about
-    # a style that is installed, which teaches the reader to ignore the note.
-    config_root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
-    candidates = (os.path.join(config_root, "output-styles", "plain-speak.md"),
-                  os.path.join(root, ".claude", "output-styles", "plain-speak.md"))
-    style_file = next((c for c in candidates if os.path.exists(c)), candidates[1])
-    if not os.path.exists(style_file):
-        print(f"  note: neither {candidates[0]} nor {candidates[1]} exists. "
-              f"Selecting the style still writes the "
-              f"key, but the host silently falls back to Default until the installer "
-              f"places the file. Re-run the installer for this scope.")
-    else:
-        print(f"  style file: {style_file}")
-
-    data, err = load(spath)
-    if err:
-        print(f"wf-settings-apply: {err}", file=sys.stderr)
-        return 1
-    if not isinstance(data, dict):
-        data = {}
-
-    current = data.get("outputStyle")
-    if current == OUTPUT_STYLE:
-        print(f"  . outputStyle already {OUTPUT_STYLE!r} — NOOP")
-        return 0
-    if current:
-        print(f"  note: outputStyle is currently {current!r}. It will be replaced; the "
-              f"previous value is recorded so `disband` can restore it.")
-
-    print(f"  {'+' if execute else '~'} outputStyle = {OUTPUT_STYLE!r}  "
-          f"{'written' if execute else 'would write'}")
-    if not execute:
-        if not quiet:
-            print("  apply with: --execute   (run it yourself via `!` if the classifier "
-                  "refused the agent's write)")
-        return 0
-
-    owned_path, owned = load_owned(root, scope)
-    owned["output_style_previous"] = current
-    owned["output_style_set"] = OUTPUT_STYLE
-    dump(owned_path, owned)
-
-    data["outputStyle"] = OUTPUT_STYLE
-    dump(spath, data)
-
-    back, err = load(spath)
-    if err or not isinstance(back, dict) or back.get("outputStyle") != OUTPUT_STYLE:
-        print(f"wf-settings-apply: re-read of {spath} does not show the style; the "
-              f"write did not land.", file=sys.stderr)
-        return 1
-    print(f"  verified on disk: outputStyle = {back['outputStyle']!r}")
-    print("  takes effect on the next session or after /clear — the system prompt is "
-          "read once at session start.")
-    return 0
+# NO OUTPUT STYLE IS SELECTED ANY MORE.
+#
+# `OUTPUT_STYLE` and `do_output_style` lived here and wrote `outputStyle: "Plain Speak"`
+# into a settings file. The user removed the style and everything around it in the
+# simplification release, so selecting it is gone — but the REVERSAL is not, and the
+# distinction is the whole point of this comment.
+#
+# `--unwire-defaults` still reads `output_style_set` and `output_style_previous` from
+# `.settings-owned.json` and restores whatever was there before. That path is how a
+# machine which ALREADY has the style selected gets it cleared, and six settings files
+# on the author's own workstation were in exactly that state when this was written.
+# Deleting the reverser along with the setter would have left every one of them styled
+# with no tool able to unstyle them — a removal that reaches new installs and strands
+# existing ones, which is the failure the user's 2026-09-07 propagation directive names.
+#
+# So: nothing selects a style, and the code that un-selects one stays until no install
+# in the world still carries the record. `audit` Step 5h clears a selected style whose
+# file is absent, which covers the installs this script never runs against.
 
 
 def main(argv=None):
@@ -977,10 +893,8 @@ def main(argv=None):
     ap.add_argument("--wire-hook", metavar="NAME", help="a shipped workforce hook name")
     ap.add_argument("--automode", action="store_true",
                     help="write autoMode entries into ~/.claude/settings.json (user scope)")
-    ap.add_argument("--output-style", action="store_true",
-                    help="select the shipped plain-speak output style for this project")
     ap.add_argument("--wire-defaults", action="store_true",
-                    help="wire every default hook AND select the output style, in one call")
+                    help="wire every default hook, in one call")
     ap.add_argument("--unwire-defaults", action="store_true",
                     help="reverse exactly what --wire-defaults wrote, per the record")
     ap.add_argument("--scope", choices=("project", "user"), default="project",
@@ -988,16 +902,16 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
-             bool(args.output_style), bool(args.wire_defaults),
+             bool(args.wire_defaults),
              bool(args.unwire_defaults)]
     if sum(modes) != 1:
         print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
-              "--automode, --output-style, --wire-defaults, --unwire-defaults.",
+              "--automode, --wire-defaults, --unwire-defaults.",
               file=sys.stderr)
         return 2
     if args.scope == "user" and (args.grants or args.wire_hook):
         print("wf-settings-apply: --scope user applies to --wire-defaults and "
-              "--output-style only.", file=sys.stderr)
+              "--wire-defaults only.", file=sys.stderr)
         return 2
 
     # --automode writes only the user file and needs no --root, and neither does any
@@ -1020,8 +934,6 @@ def main(argv=None):
         return do_grants(root, args.grants, args.execute)
     if args.wire_hook:
         return do_wire_hook(root, args.wire_hook, args.execute)
-    if args.output_style:
-        return do_output_style(root, args.execute, scope=args.scope)
     if args.wire_defaults:
         return do_wire_defaults(root, args.scope, args.execute)
     if args.unwire_defaults:

@@ -127,72 +127,6 @@ wire the default set after the files land, and `audit` Step 6-H wires it again �
 a tree that has been audited since 2026-09-07 means the write was refused or reversed, not that nobody
 got around to it. Report which: name the settings file the registration is missing from.
 
-## Output style
-
-**One row, and it is the only carrier of the plain-output rule that a check can see.** The rule that
-everything a human reads is written the way you would say it has six carriers, and five of them are
-prose read at the head of a context (`references/plain-output.md` § Where the rule is carried). The
-`Plain Speak` output style is added to the system prompt, so it is the one that does not decay — and it
-is a settings key, so its state is readable.
-
-| State | Meaning |
-|---|---|
-| `SELECTED` | `outputStyle` is `Plain Speak` in the resolved settings file **and** `plain-speak.md` is on disk in an `output-styles/` directory the host reads |
-| `NOT SELECTED` | no `outputStyle` key, or another style — the rule reaches this session only through the five carriers that decay |
-| `SELECTED, FILE ABSENT` | the key names a style the host cannot find. **Worse than not selected**, because it reads as configured and the host silently falls back to Default — the same shape as `DEAD WIRING` above |
-| `OVERRIDDEN` | a different style is selected. **Report, never change it**: a style the user picked is a preference, and `audit` Step 6-H reports the same rather than overwriting |
-
-**The fix for `NOT SELECTED` and for `SELECTED, FILE ABSENT` is one command**, and it is the same one
-both installers and Step 6-H run: `wf-settings-apply --root <tree> --wire-defaults --execute`. Naming a
-settings fragment for the user to paste is forbidden here for the same reason it is forbidden in
-`audit.md` § Step 6 — the producer exists.
-
-**Say what it does not cover.** An output style reaches the main conversation only; a subagent runs its
-own system prompt. This row says nothing about how an employee reports, and describing it as governing
-employee output is the overclaim Core Principle 6 exists for.
-
-*Corrected 2026-08-05. This line named `/workforce hooks --execute` for both, and that command
-**could not do the second one**: `hooks.md` § Unwiring scopes `--remove --execute` to the entries
-`.settings-owned.json` already names, which by construction can never name a foreign registration. A
-shipped file pointed at a remedy with no producer — this project's signature defect, in the file whose
-job is reporting whether hooks work. The producer now exists.*
-
-**Also report the sidecar** `wf-protect-directives` depends on: `.claude/workforce/.directives.sha`.
-Run the producer in REPORT mode and print its receipt, rather than testing the file for existence:
-
-```bash
-WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
-"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives
-```
-
-`INV-DIRECTIVES` prints blocks-in-scope, covered, unprotected, drift, orphan, malformed and unreadable,
-**including the zeroes**. Absent is not an error — it is the day-one state — but `unprotected > 0` is: the
-hook reports `UNPROTECTED` on those blocks at every edit, forever. `drift > 0` means a sacred block
-changed after it was stamped, which is FLAGGED and never repaired here (`checksums.md` § On mismatch).
-
-**The remedy is `wf-stamp --directives --execute`, and `audit` Step 5-STAMP already runs it** — so an
-`unprotected` count above zero on a tree audited since 2026-09-07 means that write was refused or
-reversed, not that nobody got around to it. Say which. *Corrected 2026-09-07: this row named
-`/workforce checksums --execute`, which is executor-followed prose with no script behind it — the
-sidecar had four documents naming a producer and none existed, and the file on a real host had been
-composed by hand. Naming a remedy with no producer is the defect this section exists to catch.*
-
-**And report whether the git pre-commit pin guard is wired.** It is a git hook, not a settings hook, so
-its wiring lives in git config rather than the settings file — this row reads `core.hooksPath` and the
-ownership sidecar `.claude/workforce/.settings-owned.json` § `git_config`, exactly as the guard's
-lifecycle home describes (`procedures/hooks.md` § The git pre-commit pin guard). Report the count in each
-state, including the zeroes:
-
-| State | Meaning |
-|---|---|
-| `WIRED` | `core.hooksPath` resolves to `.claude/workforce/git-hooks` and the sidecar records the prior value |
-| `UNWIRED` | no `core.hooksPath` names the workforce hooks dir — the guard is installed but not registered, the git-hook analogue of `ORPHANED` |
-| `NOT A GIT REPO` | the target has no `.git`, so there is nothing for a commit-time guard to bind to — reported, never an error |
-
-`UNWIRED` on a git repository → `/workforce hooks --execute`, whose Step 6-G equivalent runs
-`wf-pin-check --install-hook`. A guard that ships but is never wired is the dormancy this whole section
-exists to make visible; the count says whether it happened.
-
 ## Platform freshness
 
 Compare `platform.md` § Header (`MEASURED-ON`) against the running `claude --version`, and report which
@@ -599,7 +533,7 @@ it caught five restatements in this project's own files during its first day.
 The check above polices **workforce's** constants. A handbook copying **the project's** values — a
 port, a dependency version, a list of directories, a count of anything — is uncovered by it, and drifts
 the same way for the same reason. The rule this census measures is the drift test in
-`references/ablation.md`: a pointer cannot drift, a copy is a second canonical text.
+the ablation reference, now removed: a pointer cannot drift, a copy is a second canonical text.
 
 Reported at the two tiers `discovery.md` defines, never merged into one list:
 

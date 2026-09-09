@@ -156,7 +156,7 @@ literal contract:
 > `QUESTION: <the question>` to whoever dispatched you. A question you cannot answer against this
 > handbook is a defect in this handbook, not a failure of yours.
 
-**7. Length ceiling.** The employee-handbook body ceiling is defined once in `delegation-budget.md`
+**7. Length ceiling.** The employee-handbook body ceiling is defined once in `procedure-for-procedures.md`
 § The handbook length ceiling (`org-config.md` § Caps overrides it per project) — never restate the
 number here. Exceeding it is a *structural* finding the run **performs, not proposes**: relocate the
 heavy material into its grounding library and leave a lean core that references it on demand. Never
@@ -229,3 +229,114 @@ handbook may not be delegated to.
 8. Escalation sentinel present verbatim.
 9. Under 200 lines. No restated constants. No `memory:`.
 10. Name unique across every agent location — collisions are silent (`platform.md` fact 5).
+
+---
+
+*Relocated here 2026-09-09 from `references/procedure-for-procedures.md`, which the simplification release
+deleted. The number is a MEASUREMENT, not a preference, and it had ten readers — deleting the file
+that states it would have left every one of them checking against nothing while still reporting a
+pass. It lands in this file because this is where a handbook is authored, which is the moment the
+ceiling applies. Nothing below is reworded: a measured floor re-derived from memory is no longer
+measured.*
+
+a narrow org of enormous handbooks is expensive in a way no fan-out number reveals.
+
+### The handbook length ceiling
+
+**172 lines**, and this is the only place the number is written. `verify` § Handbook conformance
+and `review` step 8 both check against it, and `org-config.md` § Caps overrides it per project.
+The number is two components a single budget must not conflate: a **154-line authored body** — the
+binding prose an author controls (numbered Procedure and Verification steps, Guardrail rules) plus
+whatever survives relocation — and an **18-line allowance** for the `ORG-RECORD` and `ORG-CHAIN`
+block the mandatory `embed` step appends and no author can relocate or condense. 154 + 18 = 172.
+
+**A blank cell in `org-config.md` means this default, not "no ceiling."** It was blank in the shipped
+template while three consumers already checked "under the length ceiling" — a rule with three readers
+and no value, which is this project's signature defect arriving in its own budget file. Found
+2026-08-01.
+
+**This is now a MEASURED floor, not a chosen budget.** The predecessor was 150 lines and labelled
+a chosen budget — ~2.5× a filled IC template, with nothing measured to produce it — and a live
+audit measured it invalid. The worst-case single-job handbook, `engineering-site` (242 lines), was
+relocated block by block to a grounding library: retention verified verbatim, every do-not-touch
+block intact, `wf-conform` exit 0, and a cold-read re-probe PASS. It reached **172 lines, not
+≤150**. An independent cold context confirmed 172 is the floor — what remains is irreducible
+binding imperative prose PLUS the ~18 auto-generated `ORG-*` lines the `embed` step itself appends,
+neither of which any author can cut. A measured floor outranks an unmeasured budget (Principle 4,
+Measure don't assume; `platform.md` § DOCUMENTED bars only the unmeasured from blocking), so 172 is
+the number and 150 is retired. Recorded 2026-08-25 from the live `engineering-site` audit
+(measurements stamped, Principle 9b).
+
+**172 IS AN IC NUMBER AND IS NOT APPLIED TO A LEAD.** It was measured once, on one IC handbook,
+by relocating it block by block until it would not shrink further. A Lead is a different document:
+it has no `## Procedure` to relocate at all, and it carries two sections an IC does not — a full
+`## Chain of Command` and a `## Probe` covering the whole department. The exercise that produced
+172 was never run on one, so applying the number to a Lead is exactly the unmeasured budget this
+section retired 150 for being.
+
+Measured 2026-09-08 across a live 22-handbook org carrying the current contract: the smallest IC is
+141 lines and four sit under 172, so the number is reachable and stays binding there. The smallest
+LEAD is 233 and not one of the five is under 172. Seven independent relocation passes were
+dispatched against the over-ceiling set and none reached the number; eight of those handbooks could
+not reach it even if every line of `## Scope`, `## Procedure` and `## Escalation` were relocated,
+and all the Leads are in that set.
+
+**So `wf-conform` OBSERVES a Lead's length and orders nothing.** It states the count, names 172 as
+an IC measurement, and stops. This is not an exemption from the doctrine above — it is the doctrine
+applied honestly: an advisory that orders a relocation which provably cannot reach its target is
+worse than silence, because the split "is PERFORMED this run" and the run then spends real effort
+on an unreachable goal and reports the same row again next audit. **What is owed is a measurement,
+not a guess**: repeat the `engineering-site` exercise on a Lead — relocate block by block, verify
+retention verbatim, re-probe cold — and write the floor it reaches here. Until someone runs it,
+there is no Lead ceiling, and inventing one would be Principle 4 broken in the file that states it.
+
+**A mandated section is allowance, not authored body.** The 154/18 split holds, but the 18 was
+never only `ORG-*`: it is *everything the contract requires and no author can relocate*. `## Sources`
+became mandatory in v1.7.0 and the say-the-state clause in v1.26.0, and both landed inside the
+authored-body half where they do not belong — measured as +9 lines on an IC and +13 on a Lead, all
+of it text the contract requires. When a new section is made mandatory, it grows the allowance. A
+ceiling that counts required text against an author's budget is measuring the contract and blaming
+the writer.
+
+**Over the ceiling still never blocks a sweep — but not-blocking is not not-acting.** Under the
+no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement the run can perform,
+so **the run performs it: DISCHARGED this run, never proposed back, never raised as a question,
+never parked as an optional refinement.** A finding that says "over the ceiling — want me to split
+it?" is the deferment queue the directive forbids, wearing the word *structural*. The measurement
+changes the number, not this disposition: exceeding 172 means the handbook carries more than one
+job's irreducible prose, so the cure is still to move a job, never to say it in fewer words.
+
+**How the split is performed — relocation, never condensation.** The handbook is not shortened by
+cutting; it is restructured into the two-path shape (`handbook-templates.md` § Employees INVOKE
+skills): a lean core that INVOKES a skill or reads its grounding-library file **on demand**, with the
+heavy material — worked examples, mapping tables, reference data — relocated out of the body into that
+grounding library or a data skill. Relocation is proven per block, because directive one makes
+retention the floor: every line leaving the body arrives somewhere the handbook still reaches, and
+re-running `wf-conform` confirms the core is under ceiling. **Two resolutions are forbidden outright:**
+accepting a longer handbook — the length is never the answer — and trimming, condensing, or compressing
+the prose, because that risks dropping the user's verbiage and a condensed safety example is a lost one
+(directive one is retention). The 154-line authored body and the 18-line `ORG-*` allowance are
+what the measured floor protects: binding imperative prose and the auto-generated block are never
+condensed to fit, because there is nothing left to relocate once a handbook is down to one job.
+
+### Description bytes — reported, never capped
+
+Every registered employee's `description:` sits in the model's context on **every turn of every
+session**, whether or not that employee is ever dispatched to. It is the only part of a handbook paid
+by projects that never use it, which makes it the most expensive line per byte in the whole system.
+
+`budget` reports the org's total description bytes and the per-employee breakdown. **It sets no
+threshold**, because none has been measured and inventing one would refuse a valid description on a
+number with nothing behind it. The report is the mechanism; the judgment is the reader's.
+
+The two questions that make the number actionable, both from the same accounting:
+
+- **Does a trigger appear twice?** Synonyms restating one branch are duplication paid on every turn.
+- **Does the description restate what the body already says?** Identity belongs in `## Role`, which is
+  paid only when the employee actually runs.
+
+### Total instruction volume
+
+Sum of handbook bytes, per department, reported by `budget`. It is the denominator `ablate --org`'s
+`LOAD-BEARING` share is a fraction of — and unlike that share, it costs nothing to compute, so it is
+available every run rather than only after a full measured ablation.

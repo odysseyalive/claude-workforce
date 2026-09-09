@@ -55,7 +55,7 @@ that was pinned when its evals last ran, or when it was last ablated. **It is no
 setting them equal by assignment is what makes the second decay clock unreadable. They are written by
 different acts — `model:` by the budget, `calibrated-for` only by a run that measured something. A
 mismatch is not a fault; it is the signal that the text is due for `ablate --classify`
-(`references/ablation.md` § Two clocks), and `review` counts it every run.
+(the ablation classifier, removed in the simplification release), and `review` counts it every run.
 
 > **Stamp generators must read back what they wrote.** claude-enforcer's
 > `INC-2026-07-29-sidecar-format-mismatch` records a checksum generator that emitted rows its own
@@ -256,7 +256,7 @@ chart, and reports **NEW / REMOVED / UPDATED / UNCHANGED**.
 
 - Written **last**, and **only from COMMITTED conversion-journal rows** — never from the plan. A
   half-converted project gets an honest chart, not an aspirational one.
-- Recomputes worst-case fan-out (`delegation-budget.md`) into the header.
+- Recomputes worst-case fan-out (`procedure-for-procedures.md`) into the header.
 - **Re-derives every edge from `reports-to` and rewrites `direct-reports` to match**, printing
   `INV-EDGES` (`references/invariants.md` row 34) with every count and reporting each
   `EDGE-MISMATCH` it healed. This runs on every `index`, so an org repaired once cannot silently

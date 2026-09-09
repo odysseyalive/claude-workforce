@@ -417,7 +417,7 @@ Full method: `references/org-design.md`.
 
 A three-agent panel — domain reader, `headcount-skeptic`
 (`workforce/agents/headcount-skeptic/AGENT.md`, read in full and passed as its body), premortem analyst
-— proposes departments from **all** the Step 1 evidence. Capped per `delegation-budget.md`.
+— proposes departments from **all** the Step 1 evidence. Capped per `procedure-for-procedures.md`.
 
 A department is warranted by a **distinct output, a distinct notion of done, and a distinct way of
 being wrong** — not by a distinct directory. Two to four is the normal answer.
@@ -979,7 +979,7 @@ holds every draft at once and runs out, exactly as predicted, from a constraint 
 impose.
 
 **The main context holds the roster, the returned verdicts, and the journal — never the drafts.** Run in
-waves under the concurrency cap (`delegation-budget.md`), sequentially across waves; a sequential batch
+waves under the concurrency cap (`procedure-for-procedures.md`), sequentially across waves; a sequential batch
 draws only on the session total (`platform.md` fact 8).
 
 **IF the authoring capacity of THIS context is ever the stated reason to stop, convert, or defer → STOP
@@ -1090,8 +1090,7 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    `REQUEST (verbatim):` echo and the criterion → evidence table, and **carries the say-the-state
    clause** — every finding reports its outcome in the same breath, no work is handed up the chain
    that the employee could have done, and no finding is retroactively downgraded to a non-finding
-   (`SKILL.md` § Directives, 2026-09-07; `references/plain-output.md` § Say the state, not the
-   journey). *That clause is scoped by the user to **every project using workforce**, and an employee
+   (`SKILL.md` § Directives, 2026-09-07). *That clause is scoped by the user to **every project using workforce**, and an employee
    is where it is hardest to see: the output style and `wf-speak-guard` reach the main conversation
    only, because a subagent runs its own system prompt. A handbook missing it is an org whose reports
    read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
@@ -1302,7 +1301,7 @@ the zero and moves on.
 
 **For each, answer one question: has this gate ever been checked against the principal?** The set
 lives at `.claude/workforce/evals/<employee>.md` and its cases are recorded principal verdicts on
-frozen captures (`references/evals.md` § Judgment roles). Three states, and only one of them is a
+frozen captures (§ Judgment roles). Three states, and only one of them is a
 finding:
 
 | State | Reading | Action |
@@ -1314,7 +1313,7 @@ finding:
 **The heal seeds the set from what is already on disk.** Every past pass of that gate left its report
 and its captures under `.claude/workforce/work/<run-id>/<employee>/`; pair each with what the principal
 said about that surface and write the cases. Where the principal's words are in a conversation rather
-than a record, **file the `PERF` first** (`references/evals.md`: the rejection is recorded against the
+than a record, **file the `PERF` first** (the eval set: the rejection is recorded against the
 gate that passed it) — a case sourced from an unrecorded memory is a case nobody can audit. Never
 invent a verdict the principal did not give, and never seed a case from the gate's own reasoning: the
 whole point is a second source.
@@ -1449,6 +1448,71 @@ exists: the reduction has been specified since the beginning, no run ever perfor
 counted it** — so a run reducing zero looked exactly like a run reducing everything.
 
 **Under `--review`: print the cut per skill and the manifest token counts, apply nothing.**
+
+## Step 5h — Heal an org built under the pre-simplification shape
+
+**Fires on every `audit` against a project whose ORG-RECORD `workforce-version:` predates the
+simplification release.** Absent is not exempt — it is the pre-stamp state and is heal-due by
+definition, exactly as Step 5d rules it.
+
+The simplification removed roughly forty shipped files: the speech guards and their reference, four
+always-on hooks, the pin guard, handoff, the two budget producers, eight rarely-run commands, the two
+personnel hooks, and the five canary fixtures. **A project that installed before that release does not
+look broken.** Its handbooks parse, its org chart resolves, its checks pass. What it holds is a
+settings file registering hooks whose scripts are gone, an output style pointing at a deleted file, and
+agent registrations for fixtures that no longer ship. Nothing already in this procedure would ever
+report it, which is the exact condition the user's 2026-09-07 directive names: *"a machine that
+installed BEFORE the mechanism existed must be healed by the next use of workforce, even if it needs
+ran through an audit again."*
+
+**The installer's prune is not this step and does not cover it.** `install` now removes what the
+manifest no longer lists (`install` § prune_scope), but its rule 2 is deliberately narrow: outside the
+skill directory it removes only what a previous run of that same installer recorded writing. A
+registration inside a settings file is not a file it wrote, and a project that is updated by any other
+path — a copied tree, a checkout, a sync — never runs it at all. **Three paths or it does not
+propagate** (`references/enforcement.md`): the installer prunes, THIS step heals, and `verify` reports
+what neither reached.
+
+1. **Unwire the registrations whose scripts no longer ship.** Read every hook command in the project's
+   settings, resolve each to a path, and where the target does not exist on disk, remove that
+   registration through `wf-settings-apply` and record it in `.settings-owned.json` as the sidecar
+   requires. **Resolve, never match by name** — a dead registration is identified by its target being
+   absent, which is a fact about the disk, not by a list of names this file would have to keep in step
+   with every future release.
+2. **Dedupe registrations that differ only by config-directory spelling.** MEASURED 2026-09-09 on this
+   repository: `.claude/settings.local.json` held **15 registrations for 9 scripts**, six of them
+   written twice — once against `~/.claude/skills/workforce/bin/` and once against
+   `~/.claude-brooke/skills/workforce/bin/`. The harness dedupes on the literal command string, so two
+   spellings of one script are two hooks and **both execute**; `wf-standing-request` was observably
+   injecting its block twice into every prompt. `_norm_command` (`wf-settings-apply`) already
+   normalizes these spellings on the CHECK path, which is why no duplicate was ever WRITTEN — and
+   nothing ever pruned a superseded spelling already on disk, so detection sat beside the defect it
+   detected. Collapse each normalized-equal group to the spelling whose target exists; where both
+   exist, keep the one under the config directory this run is installed to.
+3. **Clear an output style whose file is gone.** A selected `outputStyle` naming a file that no longer
+   exists is inert, not neutral — it reads as configured behaviour to anyone inspecting the settings,
+   and it is what a user who asked for a style to be removed will check first.
+4. **Unregister shipped fixtures that no longer ship.** The five canaries are registered in
+   `.claude/agents/`, so their names and descriptions enter the agent menu of **every session in the
+   project** whether or not a measurement is running. Remove a registration whose definition is no
+   longer in the manifest. Preserve any agent the census attributes to the user
+   (`references/org-chart-format.md`) — an unregistration here is scoped to fixtures this distribution
+   shipped and recorded, never to an adopted agent that merely resembles one.
+5. **Amend handbooks citing a removed reference.** A `## Sources` entry or a procedure line naming
+   `plain-output.md`, `handoff.md`, `delegation-budget.md`, or a deleted procedure is a dangling
+   citation, and Step 5d's rule governs the edit: contract sections only, role-specific judgment is
+   never rewritten. Where the cited rule survived into another file, repoint. Where it did not, remove
+   the citation rather than leaving a reader chasing a path that resolves to nothing.
+6. **Stamp.** Set `workforce-version:` to the installed version so the heal does not re-run, and report
+   every removal by name in the Execution Summary. **Silent healing is the failure mode this step
+   exists to fix** — a user who asked for something removed and is told nothing has no way to
+   distinguish a heal that ran from one that did not.
+
+**This step deletes and rewires without asking**, on the same authority as every other write in
+`audit`: the user's 2026-08-05 directive, and the verified backup the Atomic-or-Absent gate makes a
+precondition of the run. What it may never touch is `.claude/workforce/**` project state, which
+`update.md` step 5 promises is byte-identical across an update and which no heal has any reason to
+enter.
 
 ### Step 6-S — Stage the removal set (the step the sweep was reading and nobody was writing)
 
@@ -2023,7 +2087,7 @@ report containing one is corrected before it is printed.
 
 **An over-ceiling handbook is DISCHARGED, never DECIDED — the worked case of the line above.** It is
 not even a preference the one consolidated prompt may carry, because it has no legal either/or: the
-split is performed this run (`delegation-budget.md` § The handbook length ceiling). *Leave it as-is*
+split is performed this run (`procedure-for-procedures.md` § The handbook length ceiling). *Leave it as-is*
 accepts a longer handbook, which `review` step 8 forbids; *trim / condense / compress* drops the user's
 verbiage, which directive one forbids — so the only resolution is the split, and a resolution with one
 legal outcome is not a question. **IF a run is about to raise a picker, print an optional-refinement

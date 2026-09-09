@@ -351,7 +351,7 @@ peak context is the maximum over a run's assistant turns of `input + cache_read 
 the tool-call count is the number of `tool_use` items; a run whose peak crosses the window, or whose
 tool-calls run into the hundreds, is evidence rather than a worry (`platform.md` Fact 21). The script
 that reads an arbitrary project's transcript store this way is **`wf-runlength`** — the Fact 21 census
-generalised beyond this repo (`procedures/budget.md` § Run length and peak context). Run it where
+generalised beyond this repo (`procedures/model-map.md` § Run length and peak context). Run it where
 transcript history exists; where none does, the static tells stand on their own. State the
 check in the survey report, and never state a count nothing produced (`audit.md` Step 1; `SKILL.md`
 Core Principle 5).
@@ -461,7 +461,7 @@ terminal error. Either way the caller is left holding a hole where a result was 
 **The rule: a no-result return is a FIRST-CLASS outcome with a defined return — `UNAVAILABLE: <why>` —
 and the caller never synthesizes the missing result.** This is `staging.md` § UNAVAILABLE ("register
 DEGRADED and stated; never abort, never infer a PASS") applied to an orchestrator's own dispatch channel,
-and it is the "reads as success" hazard (`delegation-budget.md`; `principles.md`) in its most dangerous
+and it is the "reads as success" hazard (`procedure-for-procedures.md`; `principles.md`) in its most dangerous
 form — not a node silently doing the work itself, but a node **inventing** the work it could not get done.
 
 **Measured 2026-08-26, apps-odyssey-alive.** A `/copy-truth` skill dispatched its `interface-claim-auditor`
