@@ -4,7 +4,7 @@
 <!-- Enforcement: LOW — the authoritative product version anchor. `version` and `update` read it. -->
 
 ```
-WORKFORCE-VERSION: 1.30.3
+WORKFORCE-VERSION: 1.31.0
 ```
 
 The **source of truth** for the installed release, and the only place the number is *authored*. One

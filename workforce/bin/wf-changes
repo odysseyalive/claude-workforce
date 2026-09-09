@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""wf-changes — what changed between two releases, without loading the whole record.
+
+    wf-changes                       from this org's chart stamp to the installed version
+    wf-changes --from 1.28.0         from that version to the installed one
+    wf-changes --from 1.28.0 --to 1.30.3
+    wf-changes --rows                index rows only, no bodies — the cheap read
+    wf-changes --heal-only           only releases an existing org must be healed for
+    wf-changes --index               the whole index, unfiltered
+    wf-changes --root <dir>          project root (default: cwd)
+
+WHY THIS IS A SCRIPT AND NOT AN AGENT. The second directive: an agent is the
+instrument of last resort, and data in hand that answers the question is itself a
+terminal answer. "What changed between 1.28.0 and 1.30.3" is answered exactly by
+reading files — every call returns the same bytes, which is what makes it dependable
+in a way a summarizing agent is not. An employee can call this too and gets the same
+answer; what it adds is what to DO about it, which is the half a script cannot supply.
+
+WHY IT IS RANGED AND NOT WHOLESALE. The record is 160 KB across 34 files. Reading it
+all to answer a two-release question is the cost that made a flat changelog
+unshippable in the first place (`bin/gen-changes` § docstring). So the index — 4.7 KB,
+one row per release — decides WHICH bodies matter, and only those are read.
+
+WHAT `Org: yes` MEANS, because it is the field that changes what a caller does. The
+release changed something an existing org holds a COPY of: a handbook contract, the
+chart format, the /org dispatch checkpoint, the operating principles. Installing the
+skill does not update those copies — `/workforce audit` does. `Org: no` means the
+change lives only in the skill directory and the install was the whole update.
+
+EXIT CODES. 0 = printed a range. 1 = an error a caller should surface. 2 = the range
+is empty, which is a legitimate answer meaning "you are current" and is NOT a failure.
+"""
+import argparse
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SKILL = os.path.dirname(HERE)
+CHANGES = os.path.join(SKILL, "changes")
+
+
+def vkey(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v)) or (0,)
+
+
+def installed_version():
+    p = os.path.join(SKILL, "references", "version.md")
+    try:
+        m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)\s*$", open(p).read(), re.M)
+        return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+def chart_stamp(root):
+    """The release that last indexed this project's org, from the chart header.
+
+    ABSENT IS NOT CURRENT. A chart written before the stamp existed carries none, and
+    reading that as "up to date" is the failure the field was added to prevent
+    (`org-chart-format.md` § `workforce-version:` on the header). Returns None, and
+    the caller reports it as unknown rather than assuming equality.
+    """
+    p = os.path.join(root, ".claude", "workforce", "org-chart.md")
+    try:
+        head = open(p).read(4000)
+    except OSError:
+        return None
+    m = re.search(r"workforce-version:\s*([0-9][0-9.]*)", head)
+    return m.group(1) if m else None
+
+
+def read_index():
+    """Parse index.md into rows. The index is the only file always read."""
+    p = os.path.join(CHANGES, "index.md")
+    try:
+        text = open(p).read()
+    except OSError:
+        return None
+    rows = []
+    for line in text.splitlines():
+        if not line.startswith("| ") or line.startswith("| Version") or set(line) <= set("|- "):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) < 5 or not re.match(r"^\d+\.\d+", cells[0]):
+            continue
+        rows.append({"version": cells[0], "date": cells[1], "surface": cells[2],
+                     "heal": "yes" in cells[3], "subject": cells[4]})
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--from", dest="frm")
+    ap.add_argument("--to", dest="to")
+    ap.add_argument("--rows", action="store_true")
+    ap.add_argument("--heal-only", action="store_true")
+    ap.add_argument("--index", action="store_true")
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    a = ap.parse_args()
+
+    rows = read_index()
+    if rows is None:
+        print(f"wf-changes: no change index at {CHANGES}/index.md.", file=sys.stderr)
+        print("This install predates the change record. Re-run the installer.", file=sys.stderr)
+        return 1
+
+    if a.index:
+        print(open(os.path.join(CHANGES, "index.md")).read(), end="")
+        return 0
+
+    inst = installed_version()
+    to = a.to or inst
+    frm = a.frm
+    origin = "--from"
+    if not frm:
+        frm = chart_stamp(a.root)
+        origin = "the org chart's stamp"
+        if not frm:
+            print("No --from given, and this project's org chart carries no "
+                  "`workforce-version:` stamp.")
+            print("That is the pre-stamp state, not a current org: the chart predates "
+                  "the field.")
+            print(f"Installed version is {inst or 'unknown'}. Run `/workforce audit` "
+                  "to heal and stamp it,")
+            print("or pass --from <version> if you know which release built it.")
+            return 2
+
+    sel = [r for r in rows
+           if vkey(frm) < vkey(r["version"]) <= vkey(to or "0")]
+    if a.heal_only:
+        sel = [r for r in sel if r["heal"]]
+
+    heal = [r for r in sel if r["heal"]]
+    print(f"From {frm} ({origin}) to {to}: {len(sel)} release(s), "
+          f"{len(heal)} needing an org heal.")
+    if not sel:
+        print("Nothing between those versions — this org is current with the "
+              "installed release.")
+        return 2
+    print()
+    print("| Version | Date | Surface | Org | Change |")
+    print("|---|---|---|---|---|")
+    for r in reversed(sel):
+        print(f"| {r['version']} | {r['date']} | {r['surface']} | "
+              f"{'**yes**' if r['heal'] else 'no'} | {r['subject']} |")
+
+    if heal:
+        print()
+        print(f"Org heal required for: {', '.join(r['version'] for r in reversed(heal))}")
+        print("Installing the skill does not update an org's own copies of these. "
+              "`/workforce audit` does.")
+
+    if a.rows:
+        return 0
+
+    print()
+    for r in reversed(sel):
+        p = os.path.join(CHANGES, f"{r['version']}.md")
+        if not os.path.exists(p):
+            print(f"(no body file for {r['version']} — index row without a file)")
+            continue
+        print("=" * 72)
+        print(open(p).read(), end="")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

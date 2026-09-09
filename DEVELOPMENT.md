@@ -115,6 +115,46 @@ this very patch run the old doctrine and look like a failure.
 
 ## Open, as of 2026-09-09
 
+**Landed 2026-09-09 — a version number that nothing could explain (v1.31.0).** Asked for
+by the user during `/workforce update`: *"does every version number come with some kind of
+file that says okay this is the change that happened during this version number?"* It did
+not. `update` printed `1.28.0 -> 1.30.3` and stopped; `audit` — which minutes earlier had
+gained the ability to read an org's chart stamp and see it was behind — had nothing to
+consult about what *behind* meant. Two commands could see a number move and neither could
+say what moved with it.
+
+The user also named the constraint before it was hit: *"we don't want a huge file loaded in
+the context as the project grows... some kind of skill-based query of changes, where there
+is an index and only the MD files for that particular version are what is pulled."* That is
+the right shape and the numbers say so. MEASURED: `DEVELOPMENT.md` is 213,761 B, which is
+2.7x the `SKILL.md` that v1.31.0 stripped for being too large to sit at the head of a turn.
+A flat shipped changelog would hand every project a quarter-megabyte to answer a question
+that usually spans two releases.
+
+So: `workforce/changes/index.md` (4.7 KB, one row per release, always readable) plus one
+body per version, pulled only when a range asks for it. `wf-changes` does the pulling and
+is a script rather than an agent, per the second directive — the data IS the answer.
+
+**Everything in it is derived, nothing is authored.** Bodies are the commit messages
+between one version bump and the next, which already average ~2.4 KB of why-this-changed
+prose. `Surface` — which components a release touched — comes from the PATHS its commits
+changed, so it cannot drift from the change the way a hand-written summary does. `Org:
+yes/no` says whether an existing org holds a COPY of something the release changed (a
+handbook contract, the chart format, the /org dispatch checkpoint, the operating
+principles); `yes` means installing the skill was not the whole update and `audit` has real
+work. That field is what `audit` Step 5d now reads, so it applies the deltas of the
+releases that need them instead of running every heal pass on the strength of a version
+number.
+
+**Two collisions worth recording.** The commit hook refuses a bump whose `changes/<new>.md`
+is absent, and the generator derives releases from committed history — so at the moment the
+record is needed, the commit that would create it does not exist. Deadlock, resolved by a
+PENDING entry classified from the uncommitted diff, which is exactly the change about to
+ship. And the archive is verbatim history, so the authored-prose rules invert on it: an old
+message legitimately names a command a later release removed, and the only way to satisfy
+`constants: stated once` would be to EDIT the messages. Excluded by prefix in one place,
+with the argument written next to it, rather than by growing five exemption sets.
+
 **Landed 2026-09-09 — the strip shipped on an unchanged version, and the prune could not
 reach an old host (v1.30.2, v1.30.3).** Two findings from running `/workforce update` on
 the maintainer's own machine the morning after the strip-down release.

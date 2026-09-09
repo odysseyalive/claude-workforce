@@ -434,6 +434,87 @@ check(
     % (", ".join(_absent_rule) or "ok"),
 )
 
+# ── The change record: index, bodies, query, and two readers ────────────────
+#
+# A host that installs or updates gets the new bytes and, until 2026-09-09, no account
+# of what moved. `update` printed "1.28.0 -> 1.30.3" and stopped; `audit` could see an
+# org's chart stamp was behind and had nothing to consult about what behind MEANT. The
+# record answers both, and it is indexed rather than flat because MEASURED the same
+# day: DEVELOPMENT.md is 213,761 B, 2.7x the SKILL.md that v1.31.0 stripped for size.
+#
+# Four ways this can be shipped broken, all silent, so all four are asserted.
+
+_chg_dir = os.path.join(ROOT, "workforce", "changes")
+_chg_index = read("workforce/changes/index.md")
+
+# (1) The index exists and has a row per release. An empty index is a query that
+#     returns "you are current" for every range — the wrong answer, confidently.
+_chg_rows = [l for l in _chg_index.splitlines()
+             if l.startswith("| ") and re.match(r"^\| \d+\.\d+", l)]
+check(
+    "the change index exists and carries rows",
+    len(_chg_rows) >= 10,
+    f"{len(_chg_rows)} row(s) in workforce/changes/index.md — regenerate with "
+    "`bin/gen-changes --execute`. An index with no rows makes `wf-changes` answer "
+    "'nothing changed between those versions' for every range it is asked",
+)
+
+# (2) Every index row has a body file, and every body has a row. A row without a file
+#     is a promise the query cannot keep; a file without a row is unreachable, because
+#     the index is the only thing the query enumerates.
+_chg_idx_vers = {l.strip("|").split("|")[0].strip() for l in _chg_rows}
+_chg_files = {n[:-3] for n in (os.listdir(_chg_dir) if os.path.isdir(_chg_dir) else [])
+              if n.endswith(".md") and n != "index.md"}
+_chg_rowless = sorted(_chg_files - _chg_idx_vers)
+_chg_bodiless = sorted(_chg_idx_vers - _chg_files)
+check(
+    "every change-index row has a body file, and every body file has a row",
+    not _chg_rowless and not _chg_bodiless,
+    f"rows with no body: {', '.join(_chg_bodiless) or 'none'}; bodies with no row: "
+    f"{', '.join(_chg_rowless) or 'none'} — the index is the only thing `wf-changes` "
+    "enumerates, so an unlisted body is unreachable and a bodiless row is a promise "
+    "the query cannot keep",
+)
+
+# (3) Every change file is in the manifest. The installers fetch by explicit URL —
+#     raw.githubusercontent cannot list a directory — so a file with no row 404s on
+#     every real install while every local check passes, because local checks read the
+#     working tree. This is the same shape as the untracked-manifest-path assertion.
+_chg_declared = {p for p in declared if p.startswith("workforce/changes/")}
+_chg_ondisk = {f"workforce/changes/{n}"
+               for n in (os.listdir(_chg_dir) if os.path.isdir(_chg_dir) else [])
+               if n.endswith(".md")}
+_chg_unshipped = sorted(_chg_ondisk - _chg_declared)
+check(
+    "every change-record file is declared in the manifest",
+    not _chg_unshipped,
+    f"{', '.join(_chg_unshipped) or 'ok'} — present in the tree, absent from the "
+    "manifest, so no host ever receives it. `bin/gen-changes --execute` rewrites the "
+    "manifest block from the same list that writes the files, which is why the two "
+    "cannot disagree unless somebody hand-edited one",
+)
+
+# (4) THE PRODUCER-AND-READER RULE, applied to this record. A shipped query nothing
+#     calls is dormant, and a record nothing queries is a documentation folder. Both
+#     readers are named here because each was the point of building it.
+_chg_readers = [
+    ("the query is shipped", "workforce/bin/wf-changes" in declared,
+     "`exec workforce/bin/wf-changes` missing from the manifest — the record ships "
+     "and nothing on a host can read it"),
+    ("`update` reports the range", "wf-changes" in
+     read("workforce/references/procedures/update.md"),
+     "update.md does not call it, so an update still reports two bare version numbers"),
+    ("`audit` asks what the gap contains", "wf-changes" in
+     read("workforce/references/procedures/audit.md"),
+     "audit.md does not call it, so Step 5d knows an org is behind and not by what"),
+]
+_chg_dead = [_why for _name, _ok, _why in _chg_readers if not _ok]
+check(
+    "the change record has a shipped query and both of its readers",
+    not _chg_dead,
+    "; ".join(_chg_dead) or "ok",
+)
+
 _keep_flagged = [l.strip() for l in read("manifest.txt").splitlines() if l.strip().startswith("keep ")]
 check(
     "manifest: no `keep` flag without its handling",
@@ -508,6 +589,28 @@ CONST_RX = re.compile(
 # its frontmatter is a DECLARED exception. The exemption is scoped to the frontmatter
 # ONLY: the canary's BODY prose is still scanned, so it cannot smuggle a restated
 # constant into its instructions the way any other reference would be caught.
+# ── The change record is HISTORY, not authored guidance ─────────────────────
+#
+# `workforce/changes/*.md` is the verbatim commit-message archive, projected out of
+# git by `bin/gen-changes` and shipped so a host can answer "what changed between my
+# version and this one" without the network. Every prose rule below governs text
+# somebody WRITES: state a constant once, do not restate a paragraph, do not name a
+# command that no longer exists, do not send a host to a path that does not ship.
+#
+# Applied to an archive those rules invert. An old commit message legitimately names
+# a command that a later release removed — that is what the message is FOR, it
+# records the world as it was. A restated paragraph across two commits is two
+# authors saying the same thing on two days, not a duplicate to collapse. And the
+# only way to satisfy the rules would be to EDIT the messages, which is rewriting
+# history to pass a style check, and directive one is that the record is retained.
+#
+# So the archive is excluded from the authored-prose family, by prefix, once, here —
+# never by adding rows to each rule's exemption set, which is how an exclusion
+# quietly grows to cover files it was never argued for. Everything else still
+# applies to it: it must be in the manifest, tracked in git, and its index and
+# bodies must agree (§ The change record).
+ARCHIVE = {p for p in declared if p.startswith("workforce/changes/")}
+
 _canary_set = set(manifest_canary_paths())
 def _const_scan_text(_p):
     _t = read(_p)
@@ -519,6 +622,7 @@ def _const_scan_text(_p):
 offenders = [
     p for p in declared
     if p.endswith(".md") and p not in CONST_EXEMPT and p not in VENDORED
+    and p not in ARCHIVE
     and CONST_RX.search(_const_scan_text(p))
 ]
 check(
@@ -895,7 +999,7 @@ DUP_EXEMPT = {
     "workforce/references/org-config.template.md",
 }
 for p in declared:
-    if not p.endswith(".md") or p in DUP_EXEMPT or p in VENDORED:
+    if not p.endswith(".md") or p in DUP_EXEMPT or p in VENDORED or p in ARCHIVE:
         continue
     n = os.path.basename(p)
     lines = [l.rstrip() for l in read(p).splitlines()]
@@ -954,7 +1058,7 @@ KNOWN_COMMANDS = set(
 ) | {"dev", "audit"}
 referenced = {}
 for p_ in declared + ["README.md", "COMMANDS.md", "CLAUDE.md", "install", "install.ps1", "manifest.txt"]:
-    if not os.path.exists(p_):
+    if not os.path.exists(p_) or p_ in ARCHIVE:
         continue
     for m in re.findall(r"/workforce\s+(?:dev\s+)?([a-z][a-z-]*)", read(p_)):
         referenced.setdefault(m, set()).add(p_)
@@ -1033,7 +1137,7 @@ _HOST_SENDS = re.compile(r"(?:^|[^`\w])(?:Read|read|Search|search|Open|open|cons
                          r"[^.\n]{0,40}`?bin/(?:check|baseline|coverage|conformance)`?", re.M)
 _sends = {}
 for p_ in declared:
-    if not p_.endswith(".md") or p_ in VENDORED:
+    if not p_.endswith(".md") or p_ in VENDORED or p_ in ARCHIVE:
         continue
     for m in _HOST_SENDS.finditer(read(p_)):
         # A QUOTED instruction is a retraction reporting what the text used to say.
@@ -6512,6 +6616,7 @@ _restated = [
     p for p in declared
     if p.endswith(".md")
     and p != "workforce/references/procedure-for-procedures.md"
+    and p not in ARCHIVE
     and _ceil_n and re.search(rf"\b{_ceil_n}[- ]line", read(p))
 ]
 check(

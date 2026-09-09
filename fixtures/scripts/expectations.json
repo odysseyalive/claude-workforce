@@ -285,6 +285,85 @@
       "1 unterminated"
     ]
   },
+  "changes-current": {
+    "args": [
+      "--from",
+      "1.31.0",
+      "--rows"
+    ],
+    "exit": 2,
+    "script": "wf-changes",
+    "want": [
+      "Nothing between those versions",
+      "current with the installed release"
+    ]
+  },
+  "changes-healonly": {
+    "args": [
+      "--from",
+      "1.28.0",
+      "--to",
+      "1.30.3",
+      "--heal-only",
+      "--rows"
+    ],
+    "exit": 0,
+    "reject": [
+      "1.30.1",
+      "1.29.0"
+    ],
+    "script": "wf-changes",
+    "want": [
+      "2 release(s)",
+      "1.30.2",
+      "1.30.3"
+    ]
+  },
+  "changes-nostamp": {
+    "args": [],
+    "exit": 2,
+    "reject": [
+      "release(s),"
+    ],
+    "script": "wf-changes",
+    "want": [
+      "carries no",
+      "pre-stamp state",
+      "workforce audit"
+    ]
+  },
+  "changes-range": {
+    "args": [
+      "--from",
+      "1.28.0",
+      "--to",
+      "1.30.3",
+      "--rows"
+    ],
+    "exit": 0,
+    "reject": [
+      "1.28.0 |"
+    ],
+    "script": "wf-changes",
+    "want": [
+      "5 release(s)",
+      "2 needing an org heal",
+      "1.30.3",
+      "Org heal required for"
+    ]
+  },
+  "changes-stamp": {
+    "args": [
+      "--rows"
+    ],
+    "exit": 0,
+    "script": "wf-changes",
+    "want": [
+      "the org chart's stamp",
+      "1.29.0",
+      "needing an org heal"
+    ]
+  },
   "checkrun-ambiguous": {
     "_why": "`ambiguous-markup` is the only ALWAYS-blocking row and had no fixture, while being produced by the masker rewritten in four separate rounds. An UNCLOSED FENCE is the canonical trigger; an unclosed HTML wrapper deliberately is not -- with lookahead it is ignored rather than quarantining the file, which is right once nothing executes: masking less risks a reporting miss, never a run.",
     "exit": 1,

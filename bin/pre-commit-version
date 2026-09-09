@@ -112,6 +112,23 @@ def main():
         if mir != new:
             die("SKILL.md frontmatter version ({}) does not match WORKFORCE-VERSION ({}); "
                 "bump both together.".format(mir, new))
+
+    # THE CHANGE RECORD MOVES WITH THE VERSION. `workforce/changes/<new>.md` is what a
+    # host reads to learn what this release did — `update` prints the range, `audit`
+    # asks which of the releases in it need an org heal. A bump with no body ships a
+    # version that both commands can see and neither can explain, and the failure is
+    # silent on the maintainer's machine because the index still parses.
+    #
+    # It is not hand-written: `bin/gen-changes --execute` projects the whole tree out
+    # of git history and rewrites the manifest block from the same list. So this check
+    # is really "did you run the generator", and its remedy is one command.
+    body = "workforce/changes/{}.md".format(new)
+    if body not in changed:
+        die("WORKFORCE-VERSION advanced to {} but {} is not in this commit.\n"
+            "  run `bin/gen-changes --execute` and stage workforce/changes/ plus "
+            "manifest.txt.\n"
+            "  without it, `update` reports a version it cannot explain and `audit` "
+            "sees an org is behind without knowing by what.".format(new, body))
     return 0
 
 

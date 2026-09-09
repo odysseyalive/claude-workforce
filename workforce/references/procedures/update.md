@@ -127,6 +127,32 @@ locations have been looked at.
    installer itself now echoes `Installed workforce <version> at <path> (<scope>)` per scope it
    touched, so the "after" version is the number it printed on its way out; the "before" is the
    `WORKFORCE-VERSION` the step-1 census read at that path.
+7. **Say what those two numbers MEAN**, by running the shipped query against them:
+
+   ```
+   wf-changes --from <before> --to <after> --rows
+   ```
+
+   **Two numbers are not a report.** `1.28.0 -> 1.30.3` tells a reader that something moved and
+   nothing about what, so the only honest next move available to them was to run `verify` and find
+   out — a second command to answer a question this one already had the data for. The query prints
+   one row per release in the range with its date, the components it touched, and whether an
+   existing org must be healed for it. It reads a 4.7 KB index, not the whole 160 KB record.
+
+   `--rows` is deliberate: the per-release bodies exist for a reader who wants them, and printing
+   five of them unasked is the wholesale read this record was structured to avoid. Name the command
+   that shows one — `wf-changes --from <before>` without `--rows` — rather than pasting the text.
+
+   **If any row says the org must be healed, say so in the closing line and name `audit`.** That is
+   the one case where updating the skill was NOT the whole update: an org holds its own copies of
+   handbook contracts, the chart format, the `/org` dispatch checkpoint and the operating
+   principles, and the install does not touch any of them. Reporting a clean update over a stale
+   org is the shape the say-the-state directive forbids — true in every particular, and it leaves
+   the reader believing something that is not so.
+
+   **An absent index is reported, never worked around.** An install predating the change record has
+   no `changes/index.md`; say that the range could not be shown and why, rather than printing two
+   bare numbers as though that were the intended output.
 
 ### What the installer does besides fetching
 
@@ -174,7 +200,8 @@ anything.** A command that is cheap to run gets run.
 
 So close by naming the next step rather than performing it:
 
-> Updated `<old>` → `<new>` at `<path>`. Run `/workforce verify` to check the org against this release.
+> Updated `<old>` → `<new>` at `<path>`. `<N>` release(s) in between, `<M>` of them needing an org
+> heal (`wf-changes --from <old>`). Run `/workforce verify` to check the org against this release.
 
 **Do not run `verify` for them, and do not run a "quick subset" of it.** A subset is a second copy of
 the rules, which is the drift `verify.md` § Detection vs treatment exists to prevent.

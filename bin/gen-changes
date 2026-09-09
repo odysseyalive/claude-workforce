@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""Regenerate `workforce/changes/` from git history. MAINTAINER-ONLY; not shipped.
+
+    bin/gen-changes            report what would change, write nothing
+    bin/gen-changes --execute  write index.md and one <version>.md per release
+
+WHAT THIS IS FOR, and it is a context problem rather than a documentation one.
+
+A host that installs or updates workforce gets the new bytes and NO account of what
+moved. `update` prints "1.28.0 -> 1.30.3" and stops there, and `audit` — which since
+2026-09-09 can read an org's `workforce-version:` stamp and see that it is behind —
+has nothing to consult about WHAT being behind means. So both commands know a number
+changed and neither knows where to look.
+
+The obvious fix is a changelog, and the obvious fix is wrong at this size. MEASURED
+2026-09-09: `DEVELOPMENT.md` is 213,761 B across 2,465 lines, which is 2.7x the
+`SKILL.md` that v1.31.0 stripped for being too large to sit at the head of every turn.
+Shipping one flat file would hand every project a quarter-megabyte to load in order to
+answer a question that usually spans two releases.
+
+So it is an INDEX plus one file per version. The index is small enough to read always;
+a version body is pulled only when the range asks for it. `wf-changes` (shipped) does
+the pulling, and it is a script rather than an agent for the reason the second
+directive gives: data in hand that answers the question is a terminal answer.
+
+DERIVED, NEVER AUTHORED. Both the bodies and the classifications come from git:
+
+  body      the commit messages between one version bump and the next. They already
+            average ~2.4 KB of why-this-changed prose, which is the thing a later
+            reader needs and the thing nobody would write twice.
+  surface   which components a release touched, from the PATHS its commits changed.
+            This is what tells `audit` where to look, and a path list cannot drift
+            from the change the way a hand-written summary does.
+  heal      whether an existing org carries a COPY of something the release changed —
+            a handbook contract, the chart format, the /org dispatch checkpoint, the
+            operating principles. If it does, updating the skill is not enough and
+            `audit` has real work; if it does not, the change is self-contained in
+            the skill tree and an org that never re-audits is still correct.
+
+Regenerating from history rather than appending means the record cannot rot: it is a
+projection of the commits, and a maintainer who forgets to write an entry has not
+created a gap, because there is no entry to write.
+"""
+import os
+import re
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, "workforce", "changes")
+ANCHOR = "workforce/references/version.md"
+# Per-release ceiling. See the truncation note in main().
+BODY_CAP = 60_000
+
+# A release "reaches into an existing org" when it changes something the org holds a
+# COPY of. Those copies are what `audit`'s heal passes rewrite; everything else lives
+# only in the skill directory and is replaced wholesale by the install.
+HEAL_PATHS = (
+    "workforce/references/handbook-templates.md",
+    "workforce/references/templates.md",
+    "workforce/references/org-chart-format.md",
+    "workforce/references/personnel-templates.md",
+    "workforce/references/procedures/org.md",
+    "workforce/references/procedures/principles.md",
+    "workforce/references/org-config.template.md",
+)
+
+# Surface labels, in the order they are reported. First match wins per path.
+SURFACES = (
+    ("handbook",  ("references/handbook-templates.md", "procedures/handbook.md",
+                   "references/personnel-templates.md")),
+    ("chart",     ("references/org-chart-format.md", "procedures/org.md")),
+    ("principles",("references/templates.md", "procedures/principles.md")),
+    ("audit",     ("procedures/audit.md", "references/audit-setup.md")),
+    ("verify",    ("procedures/verify.md",)),
+    ("update",    ("procedures/update.md",)),
+    ("changes",   ("workforce/changes/",)),
+    ("hooks",     ("procedures/hooks.md", "references/enforcement.md")),
+    ("scripts",   ("workforce/bin/",)),
+    ("installer", ("install", "install.ps1", "manifest.txt")),
+    ("platform",  ("references/platform.md",)),
+    ("docs",      ("workforce/references/",)),
+)
+
+
+def git(*args):
+    r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+def parse_version(text):
+    m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)\s*$", text, re.M)
+    return m.group(1) if m else None
+
+
+def vkey(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def releases():
+    """(version, bump_commit) oldest-first, one per distinct version.
+
+    A version can be touched by more than one commit to the anchor — a reformat, a
+    correction. The FIRST commit that introduced the number is the boundary, because
+    everything after it belongs to that release.
+    """
+    seen, out = {}, []
+    for c in git("log", "--reverse", "--format=%H", "--", ANCHOR).split():
+        v = parse_version(git("show", f"{c}:{ANCHOR}"))
+        if v and v not in seen:
+            seen[v] = c
+            out.append((v, c))
+    return out
+
+
+def surfaces_for(paths):
+    hits = []
+    for label, needles in SURFACES:
+        if any(any(n in p for n in needles) for p in paths):
+            if label not in hits:
+                hits.append(label)
+    # `docs` is the catch-all; drop it when anything specific already fired.
+    if len(hits) > 1 and "docs" in hits:
+        hits.remove("docs")
+    return hits or ["none"]
+
+
+def working_version():
+    try:
+        return parse_version(open(os.path.join(ROOT, ANCHOR)).read())
+    except OSError:
+        return None
+
+
+def main():
+    execute = "--execute" in sys.argv
+    rels = releases()
+    if not rels:
+        print("no releases found — is this a git checkout?")
+        return 1
+
+    # THE PENDING RELEASE, and it exists because of an ordering the commit hook makes
+    # unavoidable. `bin/pre-commit-version` refuses a bump whose `changes/<new>.md` is
+    # not in the same commit, and this generator derives releases from the history of
+    # the version anchor — so at the moment the record is needed, the commit that
+    # would create it does not exist yet. Without this the two rules deadlock and a
+    # maintainer can never land a release.
+    #
+    # So a working-tree version with no committed bump is emitted as PENDING: its
+    # classification comes from the uncommitted diff, which is exactly the change
+    # about to ship and is therefore the right input. Its body carries a note instead
+    # of a commit message, because the message is not written yet. Nothing rots —
+    # this file regenerates whole every run, so the next release rewrites the pending
+    # entry from the real commit.
+    pending = None
+    _wv = working_version()
+    if _wv and _wv not in {v for v, _ in rels}:
+        _dirty = set(git("diff", "--name-only").split()) | set(
+            git("diff", "--cached", "--name-only").split())
+        pending = (_wv, _dirty)
+
+    rows, bodies = [], {}
+    for i, (ver, bump) in enumerate(rels):
+        prev = rels[i - 1][1] if i else None
+        # THE FIRST RELEASE IS NOT "EVERY COMMIT EVER". Without a predecessor the
+        # range walks back to the repo root, which measured 679,219 B — 87% of the
+        # whole record, for the one release nobody is upgrading FROM. Pre-versioning
+        # history is real history and it belongs in git, not in a file shipped to
+        # every host. So the first release carries its own bump commit and says where
+        # the rest is, rather than carrying it.
+        rng = f"{prev}..{bump}" if prev else f"{bump}~1..{bump}"
+        commits = git("log", "--format=%H", rng).split() or [bump]
+        paths = set()
+        for c in commits:
+            paths.update(git("show", "--name-only", "--format=", c).split())
+        date = git("log", "-1", "--format=%ad", "--date=short", bump).strip()
+        surf = surfaces_for(paths)
+        heal = any(any(h in p for p in paths) for h in HEAL_PATHS)
+        subj = git("log", "-1", "--format=%s", bump).strip()
+        subj = re.sub(r"\s*\(v[\d.]+\)\s*$", "", subj)
+
+        rows.append((ver, date, surf, heal, subj, len(commits), len(paths)))
+
+        parts = [f"# {ver}", "",
+                 f"*Released {date}. {len(commits)} commit(s), {len(paths)} file(s) "
+                 f"changed. Surface: {', '.join(surf)}. "
+                 f"Reaches an existing org: {'YES' if heal else 'no'}.*", ""]
+        if heal:
+            parts += ["**An org built before this release carries a stale copy of "
+                      "something this release changed.** Updating the skill is not "
+                      "enough — run `/workforce audit` so the heal passes rewrite it.",
+                      ""]
+        if not prev:
+            parts += ["*This is the first numbered release. Everything before it "
+                      "predates version numbering and is in git history, not here — "
+                      "no host upgrades FROM it, so shipping it would cost every "
+                      "project 679 KB to answer a question nobody asks.*", ""]
+        parts += ["---", ""]
+        for c in commits:
+            parts.append(git("log", "-1", "--format=%B", c).strip())
+            parts.append("")
+            parts.append("---")
+            parts.append("")
+        body = "\n".join(parts).rstrip() + "\n"
+        # A CEILING, ENFORCED HERE RATHER THAN HOPED FOR. This whole tree exists
+        # because a 213 KB flat changelog was too big to ship; a record that grows
+        # without a bound re-creates that in slow motion. Truncation is LOUD — the
+        # reader is told what was cut and where the rest is, because a silently
+        # shortened change record is worse than none: it reads complete.
+        if len(body) > BODY_CAP:
+            keep = body[:BODY_CAP]
+            body = (keep.rsplit("\n", 1)[0] +
+                    f"\n\n---\n\n*TRUNCATED at {BODY_CAP:,} B. This release's full "
+                    f"message set is {len(bodies) and ''}"
+                    f"in git: `git log {rng}`. Everything above is verbatim; nothing "
+                    f"was summarized.*\n")
+        bodies[ver] = body
+
+    if pending:
+        ver, paths = pending
+        date = git("log", "-1", "--format=%ad", "--date=short").strip()
+        surf = surfaces_for(paths)
+        heal = any(any(h in p for p in paths) for h in HEAL_PATHS)
+        subj = "(pending — message lands on the next regeneration)"
+        rows.append((ver, date, surf, heal, subj, 0, len(paths)))
+        parts = [f"# {ver}", "",
+                 f"*PENDING as of {date}. {len(paths)} file(s) changed. "
+                 f"Surface: {', '.join(surf)}. "
+                 f"Reaches an existing org: {'YES' if heal else 'no'}.*", ""]
+        if heal:
+            parts += ["**An org built before this release carries a stale copy of "
+                      "something this release changed.** Updating the skill is not "
+                      "enough — run `/workforce audit` so the heal passes rewrite it.",
+                      ""]
+        parts += ["*This release is being committed as this file is written, so its "
+                  "commit message does not exist yet. The classification above comes "
+                  "from the diff itself and is final; the prose arrives when "
+                  "`bin/gen-changes --execute` next runs. Files changed:*", ""]
+        parts += [f"- `{p}`" for p in sorted(paths)]
+        bodies[ver] = "\n".join(parts).rstrip() + "\n"
+
+    idx = ["# Change index", "",
+           "**One row per release, newest first.** Read this to decide WHICH versions "
+           "matter; read `<version>.md` only for the ones that do. Both are queried by "
+           "`wf-changes`, which is a script — no agent is spawned to answer "
+           "\"what changed\".", "",
+           "`Org` says whether an existing org carries a copy of something the release "
+           "changed. **`yes` means `/workforce audit` has real work to do**; `no` means "
+           "the change is self-contained in the skill directory and installing it was "
+           "the whole update.", "",
+           "*Generated by `bin/gen-changes` from git history — never hand-edited. It is "
+           "a projection of the commits, so it cannot drift from them and there is no "
+           "entry for a maintainer to forget.*", "",
+           "| Version | Date | Surface | Org | Change |",
+           "|---|---|---|---|---|"]
+    for ver, date, surf, heal, subj, nc, np in reversed(rows):
+        idx.append(f"| {ver} | {date} | {', '.join(surf)} | "
+                   f"{'**yes**' if heal else 'no'} | {subj} |")
+    idx_text = "\n".join(idx) + "\n"
+
+    total = len(idx_text) + sum(len(b) for b in bodies.values())
+    print(f"{len(rows)} release(s)")
+    print(f"index.md      {len(idx_text):>8,} B")
+    print(f"{len(bodies)} bodies     {sum(len(b) for b in bodies.values()):>8,} B "
+          f"(largest {max(len(b) for b in bodies.values()):,} B)")
+    print(f"total         {total:>8,} B")
+    print(f"heal-required releases: "
+          f"{', '.join(v for v, _, _, h, _, _, _ in rows if h) or 'none'}")
+
+    if not execute:
+        print("\n(report only — pass --execute to write)")
+        return 0
+
+    os.makedirs(OUT, exist_ok=True)
+    for name in os.listdir(OUT):
+        if name.endswith(".md"):
+            os.remove(os.path.join(OUT, name))
+    with open(os.path.join(OUT, "index.md"), "w") as f:
+        f.write(idx_text)
+    for ver, body in bodies.items():
+        with open(os.path.join(OUT, f"{ver}.md"), "w") as f:
+            f.write(body)
+    # Read back what was written. A generator that does not re-read its own output is
+    # the failure org-chart-format.md opens on.
+    written = sorted(n for n in os.listdir(OUT) if n.endswith(".md"))
+    assert len(written) == len(bodies) + 1, f"wrote {len(written)}, expected {len(bodies)+1}"
+    print(f"\nwrote {len(written)} file(s) to workforce/changes/")
+
+    # THE MANIFEST BLOCK IS WRITTEN HERE TOO, and that is the point. The installers
+    # fetch by explicit URL — raw.githubusercontent cannot list a directory — so every
+    # change file needs its own manifest row, and the set grows by one every release.
+    # A maintainer who bumps a version and forgets the row ships a body no host can
+    # fetch, and `wf-changes` would report an index row with no file. Regenerating the
+    # block from the same list that wrote the files makes the two unable to disagree.
+    mpath = os.path.join(ROOT, "manifest.txt")
+    mtext = open(mpath).read()
+    start = "# ── Change record (generated by bin/gen-changes — do not hand-edit) ──\n"
+    end = "# ── end change record ──\n"
+    block = start + "workforce/changes/index.md\n" + "".join(
+        f"workforce/changes/{v}.md\n" for v in sorted(bodies, key=vkey)) + end
+    if start in mtext and end in mtext:
+        pre = mtext.split(start)[0]
+        post = mtext.split(end, 1)[1]
+        mtext = pre + block + post
+    else:
+        mtext = mtext.rstrip("\n") + "\n\n" + block
+    open(mpath, "w").write(mtext)
+    print(f"manifest: {len(bodies) + 1} change-record row(s) written")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

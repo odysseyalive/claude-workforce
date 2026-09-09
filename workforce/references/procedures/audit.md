@@ -1095,6 +1095,32 @@ all" in one file read instead of one read per employee, and on an org of nine th
 between a decision made and a decision skipped. **Absent is treated as older**, never as equal — a
 chart written before the field existed is exactly the pre-stamp state this step exists for.
 
+**Then ask what the gap CONTAINS**, which is the half a version number cannot answer:
+
+```
+wf-changes --from <chart stamp> --heal-only
+```
+
+**Knowing an org is four releases behind does not say which four, and this step's work is entirely
+determined by which.** Without the query the only safe reading of "behind" is "run every heal pass",
+which spends the whole of Step 5d on releases that changed nothing an org holds. The record marks a
+release `Org: yes` when it changed something an org keeps its own copy of — a handbook contract, the
+chart format, the `/org` dispatch checkpoint, the operating principles — and `no` when the change
+lived only in the skill directory. **`--heal-only` returns exactly the releases whose deltas this
+step must apply**, with the components each one touched.
+
+Read the body for each — `wf-changes --from <chart stamp>` without `--rows` — and take the deltas
+from the release that shipped them, rather than diffing the current template against a handbook and
+inferring what must have changed. The record is generated from the commits, so it says what moved
+and why; an inferred delta says only what differs now.
+
+**No index, or a version with no body file → say so and fall back to the full per-handbook scan.**
+An install predating the change record cannot answer the query, and the scan below is correct
+without it — slower, never wrong. What is forbidden is treating an unanswerable query as an empty
+answer: zero releases returned because the record is missing is not the same finding as zero
+releases returned because the org is current, and reporting the first as the second marks a stale
+org healed.
+
 Per **governed** handbook (adopted agents stay exempt until their first amendment, as everywhere):
 
 1. **Read the ORG-RECORD `workforce-version:` stamp.** Older than the installed `WORKFORCE-VERSION`
