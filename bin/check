@@ -549,6 +549,63 @@ check(
     "; ".join(_chg_dead) or "ok",
 )
 
+# EVERY PROVE CASE MUST STILL BE RUNNABLE, and nothing watched that. A case names a
+# shipped file and a literal inside it; a release that deletes the file or the literal
+# leaves a case that can never fire. `bin/prove` reports those as STALE-CASE and
+# SETUP-FAIL — but prove takes ~40 minutes and refuses to start while check is red, so
+# in practice nobody saw them. MEASURED 2026-09-09: the 1.30.2 strip left 84 rows
+# naming deleted scripts and 23 naming literals that no longer exist, 107 dead cases in
+# a suite of 478, and prove could not even start — it raised FileNotFoundError out of a
+# worker on the first one. This check is seconds, runs on every commit, and is what
+# makes the removal stick rather than recur on the next strip.
+def _prove_case_rows():
+    """Every (name, path, mode, payload) case literal in bin/prove, statically."""
+    import ast as _ast
+    _src = read("bin/prove")
+    if not _src:
+        return []
+    try:
+        _tree = _ast.parse(_src)
+    except SyntaxError:
+        return []
+    _consts = {
+        n.targets[0].id: n.value.value for n in _tree.body
+        if isinstance(n, _ast.Assign) and len(n.targets) == 1
+        and isinstance(n.targets[0], _ast.Name)
+        and isinstance(n.value, _ast.Constant) and isinstance(n.value.value, str)
+    }
+
+    def _lit(node):
+        if isinstance(node, _ast.Constant):
+            return node.value
+        if isinstance(node, _ast.Name):
+            return _consts.get(node.id)
+        return None
+
+    rows = []
+    for n in _ast.walk(_tree):
+        if isinstance(n, _ast.Tuple) and len(n.elts) == 4:
+            name, path, mode, payload = (_lit(e) for e in n.elts)
+            if isinstance(path, str) and path.startswith("workforce/"):
+                rows.append((name, path, mode, payload, n.lineno))
+    return rows
+
+
+_dead_cases = []
+for _name, _path, _mode, _payload, _ln in _prove_case_rows():
+    if not os.path.exists(_path):
+        _dead_cases.append(f"L{_ln} names {_path}, which does not ship")
+    elif _mode == "del" and isinstance(_payload, str) and _payload not in read(_path):
+        _dead_cases.append(f"L{_ln} deletes a literal absent from {_path}")
+check(
+    "every bin/prove case names a file that ships and a literal that is in it",
+    not _dead_cases,
+    f"{len(_dead_cases)} dead case(s): " + "; ".join(_dead_cases[:4])
+    + (" …" if len(_dead_cases) > 4 else "")
+    + ". A case that cannot fire proves nothing and hides in a 40-minute suite that "
+    "refuses to start while check is red — remove it with the rule it proved",
+)
+
 # update.md step 7 must CENSUS before it names `audit`. Shipped 1.31.0 with no
 # census, it closed a run against a zero-employee repo with "the update is not
 # complete — run audit", on the workforce repository itself, which the
