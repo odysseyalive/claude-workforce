@@ -549,6 +549,26 @@ check(
     "; ".join(_chg_dead) or "ok",
 )
 
+# COVERAGE IS DERIVED, NOT REMEMBERED. `bin/prove` computes a case for every assertion
+# whose condition is `'<literal>' in read("workforce/…")`, so an assertion of that shape
+# is proven on the next run with nothing to add by hand. Measured 2026-09-09 before it
+# existed: 836 assertions, 386 distinct case names, 457 with no case at all — and the
+# gap grew by one every time anyone wrote an assertion and did not also write a case.
+# Removing the generator would silently un-prove 277 assertions, which is why it is
+# checked here rather than trusted.
+_prove_src = read("bin/prove")
+check(
+    "prove derives a case for every literal-in-a-shipped-file assertion",
+    "def derived_cases" in _prove_src
+    and "DERIVED = derived_cases" in _prove_src
+    and "CASES = CASES + DERIVED" in _prove_src
+    and "assertions with a case:" in _prove_src,
+    "without the generator, coverage is whatever somebody remembered to type beside the "
+    "assertion — measured at 386 of 836 the day it was built. The summary line is part "
+    "of it: a suite that reports only the cases it has cannot show the gap it is not "
+    "covering",
+)
+
 # EVERY PROVE CASE MUST STILL BE RUNNABLE, and nothing watched that. A case names a
 # shipped file and a literal inside it; a release that deletes the file or the literal
 # leaves a case that can never fire. `bin/prove` reports those as STALE-CASE and

@@ -1642,11 +1642,104 @@ def run_shard(shard):
 
 
 before = tree_digest(ROOT)
+def derived_cases(existing):
+    """Generate a case for every assertion whose condition is a literal-in-a-shipped-file.
+
+    WHY THIS IS DERIVED AND NOT TYPED. Hand-written cases have to be added beside every
+    new assertion, by a person who remembers to, and nothing failed when they did not.
+    MEASURED 2026-09-09: `bin/check` carried 836 assertions against 386 distinct case
+    names — **457 assertions had no case at all**, so more than half the suite was
+    unproven and the number was not visible anywhere. Worse, the gap grows on its own:
+    every assertion added since the last time somebody swept it is unproven by default.
+
+    277 of those 457 are the same mechanical shape — `check(name, '<literal>' in VAR)`
+    where VAR is `read("workforce/...")`. A case for that shape is fully determined by
+    the assertion, so it is COMPUTED from `bin/check`'s syntax tree rather than copied.
+    Coverage then follows the assertions automatically: write a new one of this shape
+    and it is proven on the next run, with nothing to remember.
+
+    THE LONGEST LITERAL IS CHOSEN, deliberately. A short one may appear many times or be
+    a fragment of ordinary prose, and prove deletes only the FIRST occurrence — so a
+    short literal can be removed from a place the assertion never reads and report a
+    vacuous non-firing. The longest is the most specific thing the assertion names.
+
+    WHAT THIS DOES NOT REACH, said plainly rather than left to be inferred: the other 180
+    are structural — a file exists, a count matches, a parse succeeds, two files agree.
+    Deleting text cannot express those, and they stay hand-written or unproven. This
+    generator never claims them.
+    """
+    import ast as _ast
+    try:
+        _t = _ast.parse(pathlib.Path(ROOT, "bin/check").read_text())
+    except (OSError, SyntaxError):
+        return []
+
+    binds = {}
+    for n in _ast.walk(_t):
+        if (isinstance(n, _ast.Assign) and len(n.targets) == 1
+                and isinstance(n.targets[0], _ast.Name)
+                and isinstance(n.value, _ast.Call)
+                and isinstance(n.value.func, _ast.Name) and n.value.func.id == "read"
+                and n.value.args and isinstance(n.value.args[0], _ast.Constant)):
+            binds[n.targets[0].id] = n.value.args[0].value
+
+    out, seen = [], set(existing)
+    for n in _ast.walk(_t):
+        if not (isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                and n.func.id == "check" and len(n.args) >= 2):
+            continue
+        if not (isinstance(n.args[0], _ast.Constant) and isinstance(n.args[0].value, str)):
+            continue
+        name = n.args[0].value
+        if name in seen:
+            continue
+        best = None
+        for c in _ast.walk(n.args[1]):
+            # BOTH POLARITIES, and the second is not an afterthought. `'x' in FILE` is
+            # broken by DELETING x; `'x' not in FILE` — an assertion that something is
+            # absent — is broken by APPENDING it. An absence rule with no case is the
+            # easier one to get wrong, because it passes on an empty file and on a file
+            # that was never read: exactly the vacuous green the guard checks exist for.
+            if not (isinstance(c, _ast.Compare) and len(c.ops) == 1
+                    and isinstance(c.ops[0], (_ast.In, _ast.NotIn))
+                    and isinstance(c.left, _ast.Constant) and isinstance(c.left.value, str)
+                    and isinstance(c.comparators[0], _ast.Name)
+                    and c.comparators[0].id in binds):
+                continue
+            path = binds[c.comparators[0].id]
+            if not path.startswith("workforce/"):
+                continue
+            f = pathlib.Path(ROOT, path)
+            if not f.is_file():
+                continue
+            lit = c.left.value
+            if not lit:
+                continue
+            negated = isinstance(c.ops[0], _ast.NotIn)
+            body = f.read_text()
+            # A `del` case needs the literal PRESENT to remove; an `append` case needs it
+            # ABSENT, or the append changes nothing and the run reports a vacuous pass.
+            if (lit in body) is negated:
+                continue
+            mode = "append" if negated else "del"
+            if best is None or len(lit) > len(best[2]):
+                best = (path, mode, lit)
+        if best:
+            seen.add(name)
+            out.append((name, best[0], best[1], best[2]))
+    return out
+
+
+DERIVED = derived_cases({c[0] for c in CASES})
+CASES = CASES + DERIVED
+
 baseline = failing_checks(ROOT)
 if baseline:
     print(f"REFUSING: bin/check is not green to begin with: {sorted(baseline)}")
     sys.exit(1)
-print(f"baseline: 0 failures · {len(CASES)} cases across {WORKERS} workers\n")
+print(f"baseline: 0 failures · {len(CASES)} cases "
+      f"({len(CASES) - len(DERIVED)} written, {len(DERIVED)} derived) "
+      f"across {WORKERS} workers\n")
 
 results = []
 interrupted = ""
@@ -1692,6 +1785,29 @@ for name, status, detail in results:
     print(f"{status:<10} {name}\n           {detail}")
 print("-" * 78)
 print(f"{len(results) - bad} of {len(results)} proven by breaking")
+
+# THE ASSERTIONS WITH NO CASE ARE PRINTED, ALWAYS. Until 2026-09-09 this suite reported
+# only on the cases it HAD, so a run could say "431 of 478 proven" while 457 of 836
+# assertions had no case at all — a number that appeared nowhere and grew with every
+# assertion anyone added. A coverage figure that counts only what it already covers is
+# the vacuous green this tool exists to find, aimed at itself.
+_covered = {c[0] for c in CASES}
+_all_assertions = set()
+try:
+    import ast as _a
+    _ct = _a.parse(pathlib.Path(ROOT, "bin/check").read_text())
+    for _n in _a.walk(_ct):
+        if (isinstance(_n, _a.Call) and isinstance(_n.func, _a.Name) and _n.func.id == "check"
+                and _n.args and isinstance(_n.args[0], _a.Constant)
+                and isinstance(_n.args[0].value, str)):
+            _all_assertions.add(_n.args[0].value)
+except (OSError, SyntaxError):
+    pass
+if _all_assertions:
+    _nocase = len(_all_assertions - _covered)
+    print(f"assertions with a case:  {len(_all_assertions) - _nocase} of "
+          f"{len(_all_assertions)} · {_nocase} structural, provable only by hand")
+
 print(f"working tree untouched: {'yes' if untouched else 'NO — run `git status`'}")
 print(f"baseline still clean:   {'yes' if not after else 'NO — ' + str(sorted(after))}")
 
