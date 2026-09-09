@@ -10645,12 +10645,16 @@ check(
 )
 
 check(
-    "say-the-state: the guard blocks a hand-back and flags findings with no outcome",
-    "def handback_hit" in _ss_guard and "def findings_without_disposition" in _ss_guard
-    and "_BLOCKED_BY = (" in _ss_guard,
-    "A DETECTOR SHIPS WITH ITS FIX, and prose read at the head of a context is not a detector. "
-    "wf-speak-guard must carry both checks and the _BLOCKED_BY list that lets a legitimate "
-    "hand-back through — without it the guard would block every honest 'this needs your approval'",
+    "say-the-state: the guard blocks a hand-back, and the removed clause stays removed",
+    "def handback_hit" in _ss_guard and "_BLOCKED_BY = (" in _ss_guard
+    and "def findings_without_disposition" not in _ss_guard
+    and "WHAT WAS REMOVED" in _ss_guard,
+    "A DETECTOR SHIPS WITH ITS FIX, but a detector that fires on GOOD output ships nothing — it "
+    "trains the reader to ignore it. The hand-back block stays, with the _BLOCKED_BY list that "
+    "lets a legitimate 'this needs your approval' through. The findings-without-outcome clause was "
+    "removed 2026-09-08 after firing on 151 of 2,149 real replies (7.0%), and this assertion keeps "
+    "it removed: the rule it defended is carried by plain-output.md and the output style, and "
+    "re-adding a substring test for it would repeat a measured failure",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

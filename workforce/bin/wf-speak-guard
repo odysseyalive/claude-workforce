@@ -17,7 +17,7 @@ That is the same decay the 2026-08-05 CLAUDE.md directive names. A hook does not
 receives `last_assistant_message` — the finished text — so it reads what the user is
 about to read rather than a description of it.
 
-WHAT IT CHECKS. Five things, all mechanical, all about the SHAPE of the reply:
+WHAT IT CHECKS. Four things, all mechanical, all about the SHAPE of the reply:
 
   1. A sycophantic or retracting OPENER. Whole-phrase, anchored to the first sentence.
      This is the one hard block. "You're absolutely right" carries no information; it
@@ -41,14 +41,6 @@ WHAT IT CHECKS. Five things, all mechanical, all about the SHAPE of the reply:
      named refuses (a classifier, a missing credential, a rule that says ask), and the
      check passes as soon as the reply says which. It never asks whether the reason is
      good; it asks whether one is given.
-  5. FINDINGS WITH NO DISPOSITION. A reply that names defects and never says what
-     happened to any of them reads as a problem list when it is a done list. Same
-     directive: *"you will never communicate to me a problem like it's still a problem
-     when it's already taken care of."* Every finding carries its outcome in the same
-     breath — fixed, blocked by <named thing>, or your call because <reason>. NUDGE
-     rather than block, because the pairing of a specific finding to its specific
-     disposition is a judgment, and only the total absence of any disposition is
-     mechanical.
 
   6. A MESSAGE THAT REPEATS ONE ALREADY SENT THIS TURN. Reports the overlap as a
      NUMBER and rules on nothing. MEASURED 2026-09-08: a session sent three consecutive
@@ -63,6 +55,20 @@ WHAT IT CHECKS. Five things, all mechanical, all about the SHAPE of the reply:
      rewritten. It NEVER blocks. A blocked recap is a ruling on whether a restatement
      was worth sending, which is a judgment; a stated overlap is a fact the model can
      act on or explain.
+
+WHAT WAS REMOVED, and why the removal is the fix rather than a retreat. A fifth clause
+flagged a reply that named defects and stated no outcome for any of them. It was written
+2026-09-07 against a real complaint and it was too coarse to keep: `_FINDING` matched
+ordinary words like "wrong", "failed" and "gap", `_DISPOSITION` cleared on "now ",
+"already" and "added", and the pairing it actually wanted — THIS finding to THIS outcome
+— is a judgment no substring test reaches. MEASURED 2026-09-08 over 2,149 real assistant
+replies from this machine: it fired on 151 of them, 7.0%, and the samples are dispatch
+announcements and status notes with nothing unresolved in them. It fired twice in one
+hour on clean replies in the session that removed it. A guard firing on 7% of good output
+does not teach a model to write better; it teaches a user to stop reading the guard. The
+rule it was defending is unchanged and lives in `references/plain-output.md` § Say the
+state, not the journey, and in the output style, which is read at full strength on every
+turn.
 
 WHAT IT DOES NOT CHECK. Register, length, and whether the prose is overbuilt. Those are
 the coffee test (`plain-output.md` § The test), a human judgment. A checker scoring
@@ -158,17 +164,6 @@ _BLOCKED_BY = (
     "no permission", "classifier", "credential", "you haven't asked",
     "have not asked", "only you can", "your call", "needs your approval",
     "requires approval", "cannot reach", "no access", "unavailable",
-)
-# CLAUSE 1 — a defect named with no outcome attached anywhere in the reply.
-_FINDING = (
-    "defect", "bug", "broken", "is missing", "was missing", "no caller",
-    "nothing calls", "stale", "wrong", "failed", "failing", "gap",
-    "does not exist", "doesn't exist", "unproven", "vacuous",
-)
-_DISPOSITION = (
-    "fixed", "fixes", "corrected", "closed", "landed", "added", "removed",
-    "repaired", "resolved", "done", "already", "now ", "no longer",
-    "blocked by", "your call", "refused", "denied",
 )
 
 # CLAUSE 6 — how much of this message is a message already sent this turn. Generic
@@ -315,19 +310,6 @@ def handback_hit(message):
     return hit
 
 
-def findings_without_disposition(message):
-    """True when a reply names defects and states no outcome for anything.
-
-    Deliberately coarse. It cannot pair a finding to its own disposition — that is a
-    judgment — so it fires only on the total absence, which is the shape the user
-    named: a reply that reads as a list of problems when the work is already done.
-    """
-    prose = _FENCE.sub("", message).lower()
-    if not any(f in prose for f in _FINDING):
-        return False
-    return not any(d in prose for d in _DISPOSITION)
-
-
 def prior_assistant_turn(transcript_path):
     """Assistant messages already sent since the user's last message, oldest first.
 
@@ -453,7 +435,6 @@ def main():
     owned = user_words(payload.get("transcript_path"))
     unowned = unowned_terms(message, terms, owned)
     buried = buried_ask(message)
-    undisposed = findings_without_disposition(message)
 
     overlap = repeat_overlap(
         message, prior_assistant_turn(payload.get("transcript_path"))[:-1])
@@ -466,12 +447,6 @@ def main():
             "two — the reader cannot tell it is a repeat until they have finished "
             "reading it. If it genuinely adds something, lead with the part that is new."
             % int(overlap * 100))
-    if undisposed:
-        notes.append(
-            "This reply names problems and never says what happened to any of them. "
-            "Every finding carries its outcome in the same breath — fixed, blocked by "
-            "<the named thing>, or the reader's call because <reason>. A finding "
-            "reported without one reads as still open when it is already closed.")
     if unowned:
         notes.append(
             "The user has not used %s in this session, and this reply did. Say it in "
