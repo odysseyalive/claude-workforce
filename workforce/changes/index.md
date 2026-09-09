@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.32.1 | 2026-09-09 | changes, installer | no | No .claude/ here is the settled state, not a step somebody skipped |
 | 1.32.0 | 2026-09-09 | update, scripts | no | An update that finished still read as broken, and eight hooks died quietly |
 | 1.31.0 | 2026-09-09 | audit, update, changes, scripts, installer | no | A version number nothing could explain |
 | 1.30.3 | 2026-09-09 | chart, audit, verify, installer | **yes** | The prune could not reach the hosts it was written for |
