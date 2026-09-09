@@ -16,6 +16,7 @@ and are recorded here so they cannot recur unnoticed.
 
 import json
 import os
+import ast
 import re
 import subprocess
 import sys
@@ -9413,24 +9414,68 @@ except Exception as _e:  # a diagnostic must not die on the input it diagnoses
 # and never compared.
 # ─────────────────────────────────────────────────────────────────────────────
 _chk_src = read("bin/check")
-_check_names = set(re.findall(r'\ncheck\(\s*\n?\s*"((?:[^"\\]|\\.)*)"', _chk_src))
+# NAMES COME FROM THE SYNTAX TREE, NOT A REGEX — on both sides. This block scraped both
+# files with `re.findall` and the scrape on each side missed real entries: a `check(`
+# call indented inside an `if` (which is how a skipped pair is written) is invisible to
+# a pattern anchored on `\ncheck(`, and a case tuple laid out any way but name-alone-on-
+# its-own-line is invisible to the case pattern. MEASURED 2026-09-09: this assertion was
+# GREEN while eight prove cases named assertions that no longer exist, and prove reported
+# every one of them VACUOUS — the rule was right, present, and blind. A guard that reads
+# Python with a regex is a filter narrower than its question, which is the exact shape
+# the comment above says this guard exists to catch.
+_check_names = set()
+try:
+    _cast_t = ast.parse(_chk_src)
+    for _cn in ast.walk(_cast_t):
+        if (isinstance(_cn, ast.Call) and isinstance(_cn.func, ast.Name)
+                and _cn.func.id in ("check", "skip") and _cn.args
+                and isinstance(_cn.args[0], ast.Constant)
+                and isinstance(_cn.args[0].value, str)):
+            _check_names.add(_cn.args[0].value)
+except SyntaxError:
+    _check_names = set(re.findall(r'\ncheck\(\s*\n?\s*"((?:[^"\\]|\\.)*)"', _chk_src))
 # A CHECK NAME MAY BE AN f-STRING, and the literal scan cannot see one. `install: {_inst}
 # verifies every manifest file landed` names two real checks whose cases match at RUNTIME,
 # so a guard that only reads literals reports them as orphans — a false positive from a
 # filter narrower than its question, which is the very shape this guard exists to catch.
 # f-string names become patterns with `{...}` as a wildcard.
-_check_pats = [re.compile("^" + "".join(
-    ".*" if part.startswith("{") else re.escape(part)
-    for part in re.split(r"(\{[^}]*\})", _f)) + "$")
-    for _f in re.findall(r'\n\s*f"((?:[^"\\]|\\.)*)"\s*,\n', _chk_src) if "{" in _f]
+# THE f-STRING NAMES COME FROM THE FIRST ARGUMENT OF `check(`, NEVER FROM A SCRAPE OF
+# EVERY f-STRING IN THE FILE. The scrape harvested DETAIL arguments too — they are
+# f-strings followed by a comma and a newline, same as a name — and one of them was
+# `f'{[p_ for p_ in _ADDITIONS if ...]}'`, a bare interpolation. Turned into a pattern
+# that is `^.*$`, which matches EVERY case name, so this guard reported zero orphans no
+# matter what was in bin/prove. MEASURED 2026-09-09: green while 10 cases named
+# assertions that had been deleted, and prove reported all 10 VACUOUS. A wildcard built
+# from an unfiltered scrape does not widen a check, it cancels it.
+_check_pats = []
+try:
+    for _cn in ast.walk(ast.parse(_chk_src)):
+        if not (isinstance(_cn, ast.Call) and isinstance(_cn.func, ast.Name)
+                and _cn.func.id == "check" and _cn.args
+                and isinstance(_cn.args[0], ast.JoinedStr)):
+            continue
+        _parts, _lit = [], 0
+        for _v in _cn.args[0].values:
+            if isinstance(_v, ast.Constant) and isinstance(_v.value, str):
+                _parts.append(re.escape(_v.value))
+                _lit += len(_v.value)
+            else:
+                _parts.append(".*")
+        # A pattern with no literal text of its own is `^.*$` — it would swallow every
+        # name. An f-string name that carries no fixed words cannot be a join key, so
+        # it is dropped rather than compiled into a blanket match.
+        if _lit >= 8:
+            _check_pats.append(re.compile("^" + "".join(_parts) + "$"))
+except SyntaxError:
+    pass
 _orphan_cases = []
 try:
-    for _n in re.findall(r'\n    \(\s*"((?:[^"\\]|\\.)*)"\s*,\n', _prove_src):
-        if _n in _check_names:
+    for _n, _p_, _m_, _pl_, _ln_ in _prove_case_rows():
+        if not isinstance(_n, str) or _n in _check_names:
             continue
         if any(_p.match(_n) for _p in _check_pats):
             continue
-        _orphan_cases.append(_n)
+        _orphan_cases.append(f"L{_ln_} {_n}")
 except Exception as _e:
     _orphan_cases.append(f"could not parse bin/prove case names: {_e}")
 check(

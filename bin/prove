@@ -241,8 +241,13 @@ CASES = [
      CNFM, "del", "reports-to itself"),
     ("checkrun: a command wired into `## Guardrails` is resolved, not just counted present",
      CKR, "del", "def check_guardrails"),
+    # DELETE WHAT THE ASSERTION TESTS, NOT A LONGER STRING CONTAINING IT. The check
+    # reads `"BARE_WF_RX" in _c6`; removing only the definition line left every other
+    # mention in the file, so the substring survived and this case reported VACUOUS
+    # while the mutation landed. `delall` on the tested substring is the mutation the
+    # assertion actually describes.
     ("checkrun: a command wired into `## Guardrails` is resolved, not just counted present",
-     CKR, "del", "BARE_WF_RX = re.compile"),
+     CKR, "delall", "BARE_WF_RX"),
     ("checkrun: only the row with a certain fix blocks; naming a command is not running it",
      CKR, "del", "may name a command in order to FORBID it"),
     ("a hook command is matched after expansion, never as a raw string",
@@ -369,8 +374,6 @@ CASES = [
     ("wf-checkrun states WHY the executing path is absent",
      CKR, "del", "does not execute anything"),
     # ── the canary fixture lifecycle (2026-08-04) ────────────────────────────
-    ("fixtures: no fixture survives its own measurement",
-     CHK, "del", '    if _name in _shipped_canaries:\n        continue                      # its job recurs; see the two populations above\n'),
     # ── Phase D — the applied-model canary (2026-08-27) ──────────────────────
     ("staging: Phase D — the applied-model canary — is specified",
      STG, "del", "## Phase D — applied-model canary"),
@@ -600,12 +603,6 @@ CASES = [
     ("org-config: the session advisor's recommendation is the one pool row that names it",
      CFG, "del", "the session advisor's pick too"),
     # ── the budget guard (2026-09-02): a hand-built picker is blocked, not restated ──
-    ("budget guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
-     HKS, "del", "| `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` |"),
-    ("budget guard: named where the rule it enforces is stated, and in the enforcement table",
-     ASU, "del", "mechanical floor: `wf-budget-guard`"),
-    ("budget guard: named where the rule it enforces is stated, and in the enforcement table",
-     ENF, "del", "PREVENTS once wired"),
     # ── plain output (2026-09-05): the register written for agents stops at the user ──
     ("plain guard: named in the enforcement table at its true strength",
      ENF, "del", "PREVENTS the call once wired"),
@@ -615,10 +612,6 @@ CASES = [
     ("text-eval: the conversational-register row no longer exempts what the user reads",
      TTL, "del", "and to anything a human reads in the terminal"),
     # ── three paths, or it does not propagate (2026-09-07) ──────────────────────────
-    ("wire-defaults is one producer, and it never widens to the opt-in set",
-     WSA, "del", "def do_wire_defaults"),
-    ("wire-defaults is one producer, and it never widens to the opt-in set",
-     WSA, "del", "for name in DEFAULT_HOOKS"),
     ("path 1: both installers wire what they just installed",
      INS, "del", 'WANTS_WIRE="yes"'),
     ("path 1: both installers wire what they just installed",
@@ -725,8 +718,6 @@ CASES = [
     # INV-RUNID (row 24). Strip the sole `INV-RUNID` token from org.md → the pairing loop cannot resolve
     # the row's token into its owner and the wiring check fails. "INV-RUNID" is unique in org.md (grep -c
     # == 1) — the prose refers to "the run-id line", so no earlier occurrence absorbs the del.
-    ("invariants: every row's token is wired into the procedure that owes it",
-     ORGP, "del", "INV-RUNID"),
     # The explicit counted-line assertion: delete the line's foreign-dir/edges span and its shape breaks
     # while the token survives, so pairing still passes and only this check fires. Unique in org.md.
     ("invariants: org.md prints the INV-RUNID counted line row 24 owes",
@@ -880,8 +871,6 @@ CASES = [
      HIR, "del", "Do not read an unmarked skill as a failed"),
     ("batch: a batch that did not run may never print UPHELD",
      CT, "del", "never evidence it was cheap"),
-    ("canary: the fixtures ship with the install, so a first run can measure",
-     STG2, "del", "THE INSTALLER SHIPS THEM"),
     ("install: both installers place canary files in the agents dir, not the skill",
      INS, "del", 'dest="$agents_dir/$(basename "$path")"'),
     ("hooks: no file asserts the distribution ships zero hooks or zero executables",
@@ -1481,12 +1470,8 @@ CASES = [
     # clone resets — the case would pass while asserting nothing.
     # Delete the verify row and the clause reaches only orgs somebody re-audited — the
     # exact "wired nowhere" failure the three-paths rule names.
-    ("handoff: three paths - installer, audit heal, and a verify absence report",
-     VFY, "del", "the measurement ships with nothing calling it"),
     # Delete the reversal record path and --wire writes with nothing able to read it
     # back — a path in with no path out, which is the defect the rule is named for.
-    ("handoff: the way out is a command, and --wire produces the record --unwire reads",
-     AUD, "del", "wf-handoff --wire"),
     # Delete the user-edited guard and --unwire silently deletes an edit somebody made
     # on purpose. This is the half a clean-tree test never reaches.
     # Delete the read-back and the reversal reports a delta it never verified — a
@@ -1682,6 +1667,21 @@ def derived_cases(existing):
             continue
         name = n.args[0].value
         if name in seen:
+            continue
+        # AN `A or B` ASSERTION CANNOT BE FALSIFIED BY ONE MUTATION, so no case is
+        # emitted for one. Deleting A leaves B true and the check still passes — a case
+        # that is VACUOUS by construction, which is worse than no case: it reports the
+        # assertion as untested-and-weak when the truth is that this tool cannot express
+        # its mutation. MEASURED 2026-09-09: three of the last fifteen vacuous verdicts
+        # were exactly this, and reading them cost more than the coverage was worth.
+        # They join the structural remainder the summary line already counts.
+        _has_or = any(
+            isinstance(_b, _ast.BoolOp) and isinstance(_b.op, _ast.Or)
+            and sum(1 for _v in _ast.walk(_b)
+                    if isinstance(_v, _ast.Compare) and len(_v.ops) == 1
+                    and isinstance(_v.ops[0], (_ast.In, _ast.NotIn))) > 1
+            for _b in _ast.walk(n.args[1]))
+        if _has_or:
             continue
         best = None
         for c in _ast.walk(n.args[1]):
