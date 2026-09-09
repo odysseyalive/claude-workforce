@@ -167,6 +167,75 @@ finding to its specific disposition — that is judgment, and a checker that gue
 reports and be turned off — so the pairing is carried by the three tests above and by the output
 style.
 
+## Overcompensating
+
+**Measured 2026-09-08.** A session stopped a worker agent while a 70-minute test suite it
+had launched kept running. Nothing was lost — the suite carried on, and a durable marker on
+disk still held the result. The session said so itself: *"Didn't need to."* Cost zero.
+
+It then reported **three problems**: its own mistake, a "harness inconsistency", and a
+workforce gap it called "real and fixable". It filed harness feedback. The "inconsistency"
+was a parent process dying without killing its child, which it explained correctly two
+messages later as *"by design of how processes work"*.
+
+The user's verdict: *"So you did what you were suppose to and everything worked out, but now
+we've had this unnecessary dialogue?"* And afterwards: *"the issue was the fact that there
+was no problem at all. it appears the session was overcompensating and telling me something
+that wasn't true."*
+
+Three rules. **Read what carries each one — they are not all the same strength, and two of
+them are carried by nothing mechanical at all.**
+
+- **Unexpected is not broken.** Before calling anything a defect, ask one OPEN question —
+  "what is this behaviour actually?" — and answer it with a command, not from memory. Never a
+  yes/no question: a model agrees with whatever a yes/no question assumes, which is measured
+  (Chain-of-Verification, arXiv 2309.11495) and is why the rule names the shape of the
+  question. In the case above the correct answer arrived two messages later from the same
+  session, so it was available before the claim was made and nobody ran it.
+  *Carried by `output-styles/plain-speak.md` only. Advisory. Nothing proves it fires.*
+- **A recovered mistake is not a finding.** If the cost was zero, the report is one line.
+  *Carried by the output style only. Advisory.*
+- **Say it once per turn.** Three consecutive messages restated one list, then two more
+  restated one paragraph. Each was well-formed alone, which is why every check that existed
+  passed all five — the defect lives BETWEEN messages, not in any one of them.
+  *Carried mechanically. `wf-speak-guard` clause 6 reports the share of a message that
+  repeats one already sent this turn, as a number, and NEVER blocks: deciding whether a
+  restatement was worth sending is a judgment, and a checker making judgments is the failure
+  mode this file exists to avoid.*
+
+**Length is not one of the rules, and an earlier draft of this section made it one.** That
+draft had a check blocking a reply over 120 words to a short closed question. The user's
+correction was *"I don't care how long the reply is back, I just want it to be accurate and
+understandable, period"* and then *"no exceptions"*. A long reply that is accurate and clear
+is a good reply. The measured defect in that 300-word answer was never its size — it was that
+one of the three problems it reported was not real.
+
+Why this matters more than register: a reader who cannot tell a real finding from a
+manufactured one stops trusting all of them. **Reporting diligence is not diligence.**
+
+## Referents
+
+**A pronoun with two live antecedents reads as contradicting yourself.** Same session, same
+night: a reply used "it" for the worker agent and for the test suite the agent had started,
+twice inside one sentence. The user read it as *"you are talking in circles. it sounds like
+you didn't stop it, then it sounds like you did stop it. which is it?"*
+
+The answer was one sentence and true from the first message: **"I killed the worker, not the
+test run."** It took four exchanges to surface.
+
+Name each thing every time, even where it reads as repetitive.
+
+**Nothing checks this, and that is a decision.** A check was built on 2026-09-08 — a
+paragraph naming two or more things and leaning on "it" three or more times — and it
+false-fired on a clean reply within twenty minutes, in the session that shipped it. Every
+mechanical approximation of pronoun ambiguity is a curated noun list that grows forever and
+fires on good prose. The same holds for the one-claim-per-sentence discipline that GSAR
+(arXiv 2604.23366) names as the defeater of any grounding partition: *"compound claims that
+mix observation and inference in a single sentence defeat the partition."*
+
+Both rules live in the output style, which is read at full strength on every turn, and they
+stay there. **An honestly empty slot beats a checker that has to be apologised for.**
+
 ## Where the rule is carried
 
 **Six carriers, and only two of them survive a full context.** This matters because the failure

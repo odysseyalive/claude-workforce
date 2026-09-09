@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""Date every observation this session made, BEFORE the next reply is written.
+
+WHY THIS EXISTS. MEASURED 2026-09-08, in a session the user could not get a straight
+answer out of. It ran `ps` once at 22:47, saw a pid, and wrote "verify keeps running —
+still alive right now as pid 2635715, three Playwright workers going." It then repeated
+that in the present tense for four hours. Checked from another session, no verify
+process existed: pid 2635715 was a sleep loop the session had started itself, whose
+`pgrep -f "bash scripts/verify.sh"` pattern matched its own command line and so could
+never exit, and the Chrome processes belonged to an unrelated tool. The user's verdict
+was "it's been telling you the suite is running for hours while nothing runs."
+
+The same session, the same night, told the user "There are two Spark accounts, and the
+card went on the wrong one." There was one. The reading came from a browser session
+captured half an hour before the user added the card, and re-reading THE SAME CACHE was
+treated as corroboration: "That's no longer explainable as a stale session — I
+recaptured it and it's identical."
+
+Both failures have one shape. An observation was made at T and asserted at T+hours with
+its age stripped off, in the present tense, in the same flat voice as a fact measured a
+second ago. Neither is a wording problem, and no amount of reading the finished reply
+finds them — "the suite is running" is a well-formed sentence, and it was false.
+
+WHY A PRODUCER AND NOT A CHECKER. The predecessor approach put seven pattern checks on
+`Stop`, matching word lists against the finished text. Two false-fired on good replies
+within minutes of shipping and were hand-tuned; the user's response was "there are
+infinite possible feedbacks... something needs completely redesigned." He is right, and
+the literature agrees: grounding frameworks tag a claim's provenance at the moment it is
+MADE — tool-observed, signal-observed, or model-inferred — and never try to recover the
+distinction from finished prose (GSAR, arXiv 2604.23366; agent-provenance survey, arXiv
+2606.04990). GSAR names the exact defeater this hook is built around: "compound claims
+that mix observation and inference in a single sentence defeat the partition."
+
+So this hook publishes the ages and lets the model do the partition while it still can.
+It runs on `UserPromptSubmit` — before a word is written, not after — and it emits
+`additionalContext`. It cannot block, and it never judges a claim. It dates one.
+
+WHAT IT PRINTS. Every command this session ran that is now old enough to have decayed,
+with its clock time and its age, most recent first. A command run more than once is one
+row carrying `REPEAT xN`, because re-running the same probe is not a second opinion —
+that is the Spark failure, stated as a row.
+
+Actions are skipped. A `git checkout`, a `chmod`, a heredoc piping a patch into python
+changed something; it did not observe anything, and nobody will later assert it as a
+fact about the world. Dating it only buries the rows that can bear on that question. A
+line that both mutates and reads (`kill 2635715; ps -p 2635715`) counts as a reading,
+because the reading is the half that gets repeated later.
+
+Two decay rates, because facts do not age alike. A LIVENESS probe (`ps`, `pgrep`,
+`curl`, `docker ps`, a port check) describes a world that changes by the second and is
+listed after _LIVENESS_STALE. Everything else is a READ and is listed after _READ_STALE.
+A session that has measured nothing recently prints nothing, which is the common case.
+
+WHAT IT DOES NOT DO. It does not know whether a claim is true, whether the right command
+was run, or whether the model read its output correctly. The measured `pgrep` pattern
+that matched itself is invisible to this hook — it can only quote the pattern back and
+let a reader notice. It is main-loop only: `UserPromptSubmit` does not fire for
+subagents, which is correct here because every measured failure was main-loop, and is
+the reason this must never be described as fixing employee reports.
+
+EXIT CODES: 0 always. The verdict travels as JSON on stdout. A hook that wedges a
+session over its own bookkeeping is worse than the defect it watches for.
+"""
+
+import json
+import os
+import re
+import sys
+import time
+
+# How long before a measurement stops being the present tense. Two rates, because a
+# process list and a source file do not decay alike. Minutes.
+_LIVENESS_STALE = 5
+_READ_STALE = 30
+
+# The most rows worth printing. Past this the brief becomes the wall it exists to
+# prevent, and the oldest rows are the least likely to be re-asserted anyway.
+_MAX_ROWS = 10
+
+# Commands describing a world that changes without anyone touching it. Matched against
+# the first words of a shell command, so `ps` hits and `psql` does not.
+_LIVENESS_CMD = re.compile(
+    r"\b(?:ps|pgrep|pidof|top|htop|lsof|ss|netstat|jobs|systemctl|journalctl"
+    r"|docker\s+ps|docker\s+stats|podman\s+ps|kubectl\s+get|curl|wget|nc|ping"
+    r"|tail\s+-f|watch|uptime|free|df|who|last)\b")
+
+# Tools whose calls are observations worth dating. A write is not an observation.
+_OBSERVING = frozenset((
+    "Bash", "BashOutput", "Read", "Grep", "Glob", "WebFetch", "WebSearch",
+    "NotebookRead", "TaskOutput",
+))
+_OBSERVING_PREFIX = ("mcp__",)
+
+# A shell command that CHANGES something is an action, not a reading, and dating it
+# tells the reader nothing they can use. Dropping these is not cosmetic: the brief is
+# read by someone deciding what is still true, and every row that cannot bear on that
+# question makes the rows that can harder to find. Matched anywhere in the command,
+# because a mutation buried in a compound line still makes the line a mutation.
+_MUTATING = re.compile(
+    r"(?:^|[;&|]\s*|\$\(|`)\s*(?:git\s+(?:checkout|commit|add|push|reset|merge|rebase|rm|mv|stash|apply|restore)"
+    r"|chmod|chown|mkdir|rmdir|rm\b|mv\b|cp\b|ln\b|touch|truncate|dd\b"
+    r"|sed\s+-i|npm\s+i|pnpm\s+(?:i|add|install)|pip\s+install|apt|pacman|brew"
+    r"|kill\b|pkill|systemctl\s+(?:start|stop|restart|enable|disable)"
+    r"|docker\s+(?:run|rm|stop|start|build)|make\b|tee\b)")
+# A heredoc that pipes a script into an interpreter is a write in disguise.
+_HEREDOC_WRITE = re.compile(r"<<\s*'?[A-Z_]{3,}'?")
+
+
+def _note(msg):
+    sys.stderr.write("wf-turn-brief: " + msg + "\n")
+
+
+def _read_payload():
+    try:
+        return json.loads(sys.stdin.read() or "{}")
+    except (ValueError, OSError):
+        return None
+
+
+def _stamp(row):
+    """Epoch seconds for a transcript row, or None."""
+    ts = row.get("timestamp")
+    if not ts:
+        return None
+    try:
+        cleaned = ts.replace("Z", "+0000")
+        # 2026-09-08T22:47:03.123Z -> drop sub-second, keep offset if present
+        m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.\d+)?([+-]\d\d:?\d\d)?", cleaned)
+        if not m:
+            return None
+        base = time.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")
+        secs = time.mktime(base)
+        off = m.group(2)
+        if off:
+            off = off.replace(":", "")
+            delta = int(off[1:3]) * 3600 + int(off[3:5]) * 60
+            if off[0] == "-":
+                delta = -delta
+            secs = secs - delta - time.timezone
+        return secs
+    except (ValueError, OverflowError):
+        return None
+
+
+def _label(name, inp):
+    """One short line naming what was observed. Never the whole input."""
+    if not isinstance(inp, dict):
+        return name
+    for key in ("command", "url", "pattern", "file_path", "query", "path"):
+        val = inp.get(key)
+        if isinstance(val, str) and val.strip():
+            one = " ".join(val.split())
+            return one if len(one) <= 88 else one[:85] + "..."
+    return name
+
+
+def _is_liveness(name, label):
+    if name in ("BashOutput", "TaskOutput"):
+        return True
+    return bool(_LIVENESS_CMD.search(label))
+
+
+def _is_action(name, label):
+    """True when the call changed something rather than reading it.
+
+    A liveness probe wins the tie: `kill 2635715; ps -p 2635715` both mutates and reads,
+    and the reading is the part someone will later assert. Judging it an action would
+    hide exactly the row that matters."""
+    if name != "Bash":
+        return False
+    if _LIVENESS_CMD.search(label):
+        return False
+    return bool(_MUTATING.search(label) or _HEREDOC_WRITE.search(label))
+
+
+def observations(transcript_path):
+    """[(label, name, last_epoch, count, liveness)] for this session, newest first.
+
+    Keyed by the label, so the same command run five times is ONE row carrying its
+    latest time and a count. That collapsing is the point: it is what turns "I checked
+    again and got the same answer" into a visible repeat rather than fresh evidence."""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return []
+    seen = {}
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if row.get("type") != "assistant":
+                    continue
+                content = (row.get("message") or {}).get("content")
+                if not isinstance(content, list):
+                    continue
+                when = _stamp(row)
+                if when is None:
+                    continue
+                for blk in content:
+                    if not isinstance(blk, dict) or blk.get("type") != "tool_use":
+                        continue
+                    name = blk.get("name") or ""
+                    if name not in _OBSERVING and not name.startswith(_OBSERVING_PREFIX):
+                        continue
+                    label = _label(name, blk.get("input"))
+                    if _is_action(name, label):
+                        continue
+                    prev = seen.get(label)
+                    if prev:
+                        seen[label] = (label, name, max(prev[2], when), prev[3] + 1, prev[4])
+                    else:
+                        seen[label] = (label, name, when, 1, _is_liveness(name, label))
+    except OSError:
+        return []
+    return sorted(seen.values(), key=lambda r: r[2], reverse=True)
+
+
+def _age(mins):
+    if mins >= 60:
+        return "%dh %02dm ago" % (mins // 60, mins % 60)
+    return "%dm ago" % mins
+
+
+def stale_rows(obs, now):
+    """The rows old enough that asserting them in the present tense is a guess."""
+    out = []
+    for label, name, when, count, liveness in obs:
+        mins = int((now - when) // 60)
+        if mins < 0:
+            continue
+        if mins < (_LIVENESS_STALE if liveness else _READ_STALE):
+            continue
+        out.append((label, when, mins, count, liveness))
+    return out[:_MAX_ROWS]
+
+
+def render(rows):
+    if not rows:
+        return ""
+    lines = [
+        "MEASURED — what this session actually looked at, and how long ago. "
+        "None of the following is the present tense any more."
+    ]
+    for label, when, mins, count, liveness in rows:
+        clock = time.strftime("%H:%M", time.localtime(when))
+        tags = []
+        if liveness:
+            tags.append("LIVE-STATE, decays in minutes")
+        if count > 1:
+            tags.append("REPEAT x%d — same probe, so not a second opinion" % count)
+        suffix = ("  [" + "; ".join(tags) + "]") if tags else ""
+        lines.append("  %s  %s (%s)%s" % (clock, label, _age(mins), suffix))
+    lines.append(
+        "Before stating any of these as true RIGHT NOW: run it again, or say when you "
+        "looked. Keep what you observed and what you concluded from it in separate "
+        "sentences — a sentence carrying both cannot be checked by anyone, including you."
+    )
+    return "\n".join(lines)
+
+
+def main():
+    payload = _read_payload()
+    if payload is None:
+        _note("stdin is not a JSON payload; nothing to date")
+        return 0
+    rows = stale_rows(observations(payload.get("transcript_path")), time.time())
+    text = render(rows)
+    if not text:
+        return 0
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": payload.get("hook_event_name") or "UserPromptSubmit",
+            "additionalContext": text,
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # never wedge a session over this hook's bookkeeping
+        _note("passing through — %s: %s" % (type(exc).__name__, exc))
+        sys.exit(0)

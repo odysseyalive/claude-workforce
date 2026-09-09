@@ -50,9 +50,34 @@ WHAT IT CHECKS. Five things, all mechanical, all about the SHAPE of the reply:
      disposition is a judgment, and only the total absence of any disposition is
      mechanical.
 
+  6. A MESSAGE THAT REPEATS ONE ALREADY SENT THIS TURN. Reports the overlap as a
+     NUMBER and rules on nothing. MEASURED 2026-09-08: a session sent three consecutive
+     messages restating one list, then two more restating one paragraph, and every check
+     that existed passed all five because each was well-formed ON ITS OWN. The defect
+     only exists BETWEEN messages. The user could not tell the third message was the
+     first one again until he had finished reading it.
+
+     This is arithmetic over a generic English stoplist, not a vocabulary check: its
+     whole configuration is one float, and covering a new phrasing requires nothing,
+     because two accounts of one list share their nouns however the sentences are
+     rewritten. It NEVER blocks. A blocked recap is a ruling on whether a restatement
+     was worth sending, which is a judgment; a stated overlap is a fact the model can
+     act on or explain.
+
 WHAT IT DOES NOT CHECK. Register, length, and whether the prose is overbuilt. Those are
 the coffee test (`plain-output.md` § The test), a human judgment. A checker scoring
 prose quality would fire on everything, which is failure mode 2 above.
+
+WHAT WAS DELIBERATELY NOT BUILT, and it belongs in this list because the absence is a
+decision rather than an oversight. Pronoun ambiguity — "it" meaning both the worker
+agent and the test suite in one sentence, the failure the user called "talking in
+circles" — is NOT checked here. Nor is the one-claim-per-sentence discipline that GSAR
+names as the defeater of any grounding partition. Neither is computable from a
+transcript, and every mechanical approximation of either is a curated word list that
+grows forever and fires on good prose; a first attempt at the pronoun check false-fired
+on a clean reply within twenty minutes of shipping. Both rules live in
+`output-styles/plain-speak.md`, which is read at full strength on every turn, and they
+stay there. An honestly empty slot beats a checker that has to be apologised for.
 
 BLOCK VS NUDGE. An opener blocks: `decision: block` returns the reply to the model with
 one instruction, and the user never sees the draft. Everything else returns
@@ -145,6 +170,19 @@ _DISPOSITION = (
     "repaired", "resolved", "done", "already", "now ", "no longer",
     "blocked by", "your call", "refused", "denied",
 )
+
+# CLAUSE 6 — how much of this message is a message already sent this turn. Generic
+# English only: this is the machinery for measuring overlap, NOT a list of things to
+# look for, so it never grows in response to a new failure.
+_REPEAT_MIN_WORDS = 12     # below this there is not enough content to compare
+_REPEAT_REPORT = 0.55      # Jaccard, so both messages must be near the same size AND
+                           # the same content. Calibrated against the two measured
+                           # duplicates (0.60) and a real corpus of 400 replies.
+_STOPWORDS = frozenset((
+    "the a an and or but so it its is was were are be been being to of in on at for "
+    "with from that this these those i you he she they we my your not no yes as by if "
+    "then than there here what which who when how all any can could would should will "
+    "just now still only more most one two three do does did done have has had").split())
 
 _SYSTEM_BLOCK = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 _FENCE = re.compile(r"```.*?```", re.S)
@@ -290,6 +328,75 @@ def findings_without_disposition(message):
     return not any(d in prose for d in _DISPOSITION)
 
 
+def prior_assistant_turn(transcript_path):
+    """Assistant messages already sent since the user's last message, oldest first.
+
+    The final row is DROPPED by the caller: at `Stop` the transcript already holds the
+    reply being judged, so keeping it would compare a message to itself and score 100%.
+    Measured 2026-09-08, by an earlier form of this check blocking the first reply it
+    ever ran on."""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return []
+    out = []
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                kind = d.get("type")
+                if kind == "user" and not d.get("isMeta") and not d.get("toolUseResult"):
+                    out = []
+                    continue
+                if kind != "assistant":
+                    continue
+                c = (d.get("message") or {}).get("content")
+                txt = ""
+                if isinstance(c, str):
+                    txt = c
+                elif isinstance(c, list):
+                    txt = "\n".join(str(b.get("text") or "") for b in c
+                                    if isinstance(b, dict) and b.get("type") == "text")
+                if txt.strip():
+                    out.append(txt)
+    except OSError:
+        return []
+    return out
+
+
+def _content(text):
+    return {w for w in re.findall(r"[a-z][a-z'-]+", text.lower())
+            if w not in _STOPWORDS and len(w) > 2}
+
+
+def repeat_overlap(message, prior):
+    """Share of this message's content words already sent this turn, or 0.0.
+
+    Reports a number. It does not decide whether restating was warranted — sometimes it
+    is — and that is why this returns a measurement and the caller never blocks on it."""
+    here = _content(_FENCE.sub("", message))
+    if len(here) < _REPEAT_MIN_WORDS:
+        return 0.0
+    best = 0.0
+    for earlier in prior:
+        there = _content(_FENCE.sub("", earlier))
+        if len(there) < _REPEAT_MIN_WORDS:
+            continue
+        # JACCARD, not overlap-over-the-smaller. Dividing by the smaller set scores a
+        # short closing summary of a long earlier message at ~100%, because a subset is
+        # wholly contained in its superset — and summarising at the end of a turn is a
+        # legitimate act, not a repeat. Measured over 400 real replies, the min()
+        # denominator fired 24 times and the samples were progress notes, not
+        # restatement. Jaccard divides by the union, so it only reaches the threshold
+        # when the two messages are near the same SIZE as well as the same content,
+        # which is what "you said this already" actually looks like.
+        union = len(here | there)
+        if union:
+            best = max(best, len(here & there) / float(union))
+    return best if best >= _REPEAT_REPORT else 0.0
+
+
 def main():
     payload = _read_payload()
     if payload is None:
@@ -348,7 +455,17 @@ def main():
     buried = buried_ask(message)
     undisposed = findings_without_disposition(message)
 
+    overlap = repeat_overlap(
+        message, prior_assistant_turn(payload.get("transcript_path"))[:-1])
+
     notes = []
+    if overlap:
+        notes.append(
+            "This message shares %d%% of its content words with one you already sent "
+            "this turn. If it is the same account again, send one message instead of "
+            "two — the reader cannot tell it is a repeat until they have finished "
+            "reading it. If it genuinely adds something, lead with the part that is new."
+            % int(overlap * 100))
     if undisposed:
         notes.append(
             "This reply names problems and never says what happened to any of them. "
