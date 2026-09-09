@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 36 assertion(s) in bin/check name this file; 67 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 37 assertion(s) in bin/check name this file; 70 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 
@@ -538,6 +538,38 @@ a dataset nobody ever asked the question about.
 
 The section list is not restated here. It lives in `references/data-skills.md` and is read from there,
 for the reason § Constants gives below.
+
+## Core companion freshness
+
+**The between-audit detector for the Step 4 force-refresh.** `audit` refreshes the Core companion
+skills to shipped source every run (`procedures/audit.md` § Step 4, `wf-companion`); this reports the
+gap in the long stretch between audits, when a `/workforce update` has moved the shipped source under an
+org nobody has re-audited since.
+
+```bash
+"$WF/bin/wf-companion" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+```
+
+Read-only here — `verify` never writes, so it never passes `--execute`. Reproduce the `INV-CORE` line
+and the per-skill rows exactly as the script prints them.
+
+| Row | Means |
+|---|---|
+| `current` | the machine-owned region matches shipped source |
+| `DRIFTED` | it does not — **name the remedy**: `/workforce audit`, or `wf-companion --execute` |
+| `UNMANAGED` | the skill has no machine-owned region, so no refresh is possible without overwriting the project's own copy. **Report it; never call it a failure** |
+| `NO-REGION` | one marker without its pair — report and skip, never auto-repair |
+| `ABSENT` | Step 0.3 materializes companions and `INV-COMPANIONS` counts them; this row defers to that gate rather than giving absence two owners |
+
+**A `DRIFTED` row is a finding with a remedy, not a defect in the project.** The org did nothing wrong;
+the shipped source moved. Say which skill, how far behind it is in the unit the script prints (rungs,
+items, record types), and the one command that closes it.
+
+*This section exists because the refresh it reports on had no reporter. Until 2026-09-08 the Core-skill
+force-refresh was prose in `audit.md` with no producer, no counted line and no check, and `verify` said
+nothing about it — so an org drifted silently between audits and no diagnostic could see it. Three paths
+or it does not propagate (`SKILL.md` § Directives): the installer and `audit` write it, and this reports
+it absent.*
 
 ## Constants
 

@@ -50,7 +50,33 @@ IGNORE = shutil.ignore_patterns(*IGNORED_DIRS)
 
 # One worker per core. bin/check is CPU-bound Python, and the work each worker does
 # is a subprocess, so threads are enough — the GIL is released across the wait.
+#
+# `WF_PROVE_WORKERS` overrides it. Each worker holds a full copy of the tree plus a
+# `bin/check` subprocess, so the run's peak footprint scales with the worker count,
+# and core count is the wrong input for that on a host whose cores are already busy.
+#
+# MEASURED 2026-09-08, and the first reading of it was WRONG — recorded here because
+# the wrong reading is the instructive half. A 4-worker run on a 4-core host carrying
+# two other agent sessions (load average 13.5) was killed partway through 556 cases
+# after 35 minutes, and the kill was attributed to memory pressure. It was not: `free`
+# reported 13 GiB of 30 GiB available, and the 2-worker retry died after FOUR cases,
+# which no footprint argument explains. The killer was the AGENT HARNESS's background
+# -task supervisor, which reaps a long-running background command on its own signal,
+# not the kernel's. Fewer workers does not help with that; running the suite outside
+# the supervisor's reach does (`setsid`), or running it in shards.
+#
+# The knob is kept anyway, because the footprint argument is still true for a genuinely
+# small host — but it is NOT the remedy for a harness kill, and reaching for it there
+# costs another 35 minutes to learn nothing.
 WORKERS = max(1, os.cpu_count() or 2)
+try:
+    _w = int(os.environ.get("WF_PROVE_WORKERS", "") or 0)
+    if _w > 0:
+        WORKERS = _w
+except ValueError:
+    # A garbage value falls back to the core count rather than refusing the run: a
+    # typo in an env var must not be the thing that stops a suite from being run.
+    pass
 
 STOP = threading.Event()
 
@@ -333,6 +359,43 @@ CASES = [
      STMP, "del", "REFUSES every differing row"),
     ("directives sidecar: scope is declared, so a vendored tree is never stamped",
      STMP, "del", "SACRED_ROOTS = ("),
+    # ── the symlink census (2026-09-08) ──────────────────────────────────────
+    # Rule 3 prescribed a before/after census the same day it landed, and nothing
+    # performed one. Each break removes a different half, because the halves fail
+    # differently: without the "before" the census measures nothing, without the
+    # resolved target a retargeted link reads clean, and without the exit code the
+    # finding prints under an otherwise-green report and is scrolled past.
+    ("symlink census: wf-stamp takes it before the first write and re-reads it after",
+     STMP, "del", "links_before = symlink_census(agents)"),
+    ("symlink census: a retargeted link is caught, not only a lost one",
+     STMP, "del", "retargeted.append((name, target, after[name]))"),
+    ("symlink census: a lost link fails the run rather than printing beside a clean report",
+     STMP, "del", "if symlink_drift:"),
+    ("symlink census: SKILL.md rule 3 names the producer, not an unperformed prescription",
+     SKL, "del", "The mechanical floor is BUILT"),
+    # ── the Core-skill refresh producer (2026-09-08) ─────────────────────────
+    # The rule existed as prose for weeks and did not run. Each break removes one of
+    # the three things that make it run rather than read: the producer, the caller,
+    # and the between-audit reporter. The two script breaks cover the ways a producer
+    # can be present and still be wrong — overwriting what it must not, and locating
+    # the canonical span with a bare find() that matches the prose above the block.
+    ("core refresh: wf-companion exists and refreshes a REGION, never a whole skill",
+     "workforce/bin/wf-companion", "del", "(audit-setup.md \u00a7 Step 0.3, state 3)"),
+    ("core refresh: the canonical span is found line-anchored, not by bare find()",
+     "workforce/bin/wf-companion", "del",
+     'm = re.search(r"^" + re.escape(start_tag), text, re.M)'),
+    ("core refresh: audit calls the producer instead of describing the refresh",
+     AUD, "del", "--execute  # refresh"),
+    ("core refresh: verify reports the drift between audits",
+     VFY, "del", "## Core companion freshness"),
+    ("core refresh: INV-CORE is a counted row, not a stray print",
+     INV, "del", "`INV-CORE`"),
+    # The tier count restated in a shape the literal alternatives missed. This is the
+    # ACTUAL sentence conversion-taxonomy.md carried for weeks while the check passed
+    # it, so the case proves the widened CONST_RX on the real defect rather than on a
+    # specimen written to match the regex.
+    ("constants: stated once, outside the declared exceptions",
+     CT, "append", "\n`platform.md` fact 1 — there are exactly three and none to spare.\n"),
     # ── version anchor / mirror (2026-08-28) ─────────────────────────────────
     # WORKFORCE-VERSION in version.md is the sole authored anchor; SKILL.md's
     # frontmatter `version:` mirrors it. Deleting the `WORKFORCE-VERSION:` key breaks

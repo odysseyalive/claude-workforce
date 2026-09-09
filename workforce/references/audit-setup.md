@@ -1159,8 +1159,8 @@ evidence, so the report states the retry's actual result and names the next sess
 first real test. A gate that asserted either way would be asserting platform behaviour, which this
 project does not do.
 
-**This gate is never a question.** The question budget above is a ceiling of four and this is not a
-fifth — the remedy writes into a region `/workforce` already owns and rewrites every audit, so there
+**This gate is never a question.** The question budget above is a ceiling (§ The question budget) and
+this gate is not another one — the remedy writes into a region `/workforce` already owns and rewrites every audit, so there
 is no user prose at stake to ask about.
 
 **Under `--review`: attempt the spawn, write nothing.** A throwaway spawn touches no file in the

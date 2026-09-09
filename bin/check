@@ -347,7 +347,21 @@ CONST_RX = re.compile(
     # explicitly ("and to model IDs, which live in org-config.md, never in
     # prose"). The rule was written; the check never covered it, leaving the one
     # class of constant most likely to churn unguarded.
-    r"|\bclaude-(?:opus|sonnet|haiku|fable)-[\w.\[\]-]*\d",
+    r"|\bclaude-(?:opus|sonnet|haiku|fable)-[\w.\[\]-]*\d"
+    # The tier count restated in a shape the literal alternatives above miss.
+    # MEASURED 2026-09-08: conversion-taxonomy.md carried "there are exactly
+    # three and none to spare" for weeks. platform.md § Derived constants forbids
+    # exactly that sentence, and the check passed it, because "three tiers" and
+    # "three-tier" are the only wordings the literals covered — the class is
+    # defined by MEANING and was being matched by SPELLING (templates.md:171
+    # records the same defect against itself). These three alternatives scope the
+    # count to tiers by proximity in either direction, plus the "none to spare"
+    # idiom that names the limit without naming the noun. Bare "exactly three" is
+    # deliberately NOT matched: deferred.md, audit.md and invariants.md each count
+    # three non-tier things, and a check that fires on those gets turned off.
+    r"|\b(?:exactly|only|just)\s+(?:three|3)\b[^.]{0,60}\btiers?\b"
+    r"|\btiers?\b[^.]{0,60}\b(?:exactly|only|just)\s+(?:three|3)\b"
+    r"|\b(?:exactly|only|just)\s+(?:three|3)\b[^.]{0,30}\bnone to spare\b",
     re.I,
 )
 # A manifest canary's frontmatter `model:` pin is a REQUIRED RESOLVED VALUE — the same
@@ -1363,7 +1377,17 @@ check(
     "audit: the Core skills are force-refreshed to shipped source each run, operating-principles named",
     "Force-refresh the Core skills to current shipped source, every run" in _aud_hr
     and "the current shipped `operating-principles` skill over" in _aud_hr
-    and "CORE SKILLS     operating-principles  refreshed to shipped" in _aud_hr,
+    # NAMES THE PRODUCER AND ITS COUNTED LINE, not a hand-typed sample of the output.
+    # Until 2026-09-08 the third clause pinned the literal string
+    # "CORE SKILLS     operating-principles  refreshed to shipped" — a SPECIMEN of a
+    # report block, which was satisfied by somebody having typed an example into the
+    # procedure and said nothing about whether anything produced one. It passed for
+    # weeks while the refresh had no script, no INV row and no run: measured on this
+    # repository, `/org` sat at 11 rungs against the shipped 15 across three audits.
+    # A check that pins the example rather than the mechanism proves the example.
+    and '"$WF/bin/wf-companion"' in _aud_hr
+    and "--execute  # refresh" in _aud_hr
+    and "INV-CORE" in _aud_hr,
     "a re-audit must REPAIR an existing project, not only fix new ones: every employee preloads the "
     "INSTALLED operating-principles skill (handbook-templates.md § skills:), so a principle the shipped "
     "principles.md gained after install (e.g. § 4 resolve-before-escalate) never reaches existing "
@@ -10709,8 +10733,96 @@ check(
     "sidecar's only writer is a person typing rows by hand",
 )
 
+# ── the symlink census (2026-09-08) ──────────────────────────────────────────
+# Atomic-or-Absent rule 3 ended "record both before the first write and re-read them
+# after, and a drop is the whole detector", and nothing recorded anything: wf-census
+# REPORTED the counts and no caller compared them across a write. A rule whose remedy
+# is described and unperformed is the detector-with-no-fix shape the user's directive
+# names, and it had shipped that way since the rule landed the same day.
+check(
+    "symlink census: wf-stamp takes it before the first write and re-reads it after",
+    "def symlink_census" in _ds_stamp
+    and "links_before = symlink_census(agents)" in _ds_stamp
+    and "report_symlink_drift(links_before, symlink_census(agents))" in _ds_stamp,
+    "a census taken only after a write measures nothing; both halves must be in wf-stamp",
+)
+
+check(
+    "symlink census: a retargeted link is caught, not only a lost one",
+    "def symlink_census" in _ds_stamp and "os.path.realpath" in _ds_stamp
+    and "retargeted.append((name, target, after[name]))" in _ds_stamp,
+    "a COUNT of symlinks reports a link that still exists but now points at a different "
+    "AGENT.md as clean. The census must carry resolved targets, not a number",
+)
+
+check(
+    "symlink census: a lost link fails the run rather than printing beside a clean report",
+    "if symlink_drift:" in _ds_stamp,
+    "every handbook can stamp OK while the registration is broken; INV-SYMLINK is a "
+    "separate question and must set the exit code itself",
+)
+
+check(
+    "symlink census: SKILL.md rule 3 names the producer, not an unperformed prescription",
+    "INV-SYMLINK" in read("workforce/SKILL.md")
+    and "The mechanical floor is BUILT" in read("workforce/SKILL.md"),
+    "a rule that describes a detector nobody runs sends every project round the same "
+    "loop; rule 3 must name wf-stamp and the line it prints",
+)
+
 _ds_aud = read("workforce/references/procedures/audit.md")
 _ds_ver = read("workforce/references/procedures/verify.md")
+
+# ── the Core-skill refresh producer (2026-09-08) ─────────────────────────────
+# audit.md Step 4 carried the rule "force-refresh the Core skills to current shipped
+# source, every run" with NO script, NO counted line and NO check that anything ran.
+# The evaluator half of the same idea (§ Forcible propagation) had all three. MEASURED
+# on this repository across three audits: `.claude/skills/org` sat at 11 dispatch rungs
+# against the shipped 15, and `personnel-ledger` at 4 record types against 10.
+_ds_comp = read("workforce/bin/wf-companion")
+
+check(
+    "core refresh: wf-companion exists and refreshes a REGION, never a whole skill",
+    "def evaluate" in _ds_comp and "UNMANAGED" in _ds_comp
+    # The UNMANAGED report string itself, which is the load-bearing text: it is what
+    # tells a reader the skill was SEEN and deliberately not written, rather than
+    # missed. Pinned on the citation because that is the clause a future edit would
+    # drop first while leaving the word UNMANAGED in place.
+    and "(audit-setup.md \u00a7 Step 0.3, state 3)" in _ds_comp,
+    "audit-setup.md Step 0.3 state 3: the shipped version is the newcomer and the "
+    "customization is the requirement. A refresh that overwrites an unmanaged Core "
+    "skill deletes the project's own doctrine and reports success",
+)
+
+check(
+    "core refresh: the canonical span is found line-anchored, not by bare find()",
+    'm = re.search(r"^" + re.escape(start_tag), text, re.M)' in _ds_comp,
+    "procedures/org.md DOCUMENTS its own markers in prose above the real block, on one "
+    "backticked line. A bare find() matches that line for both markers and returns a "
+    "span with zero rungs, which then overwrites a project's dispatcher with nothing",
+)
+
+check(
+    "core refresh: audit calls the producer instead of describing the refresh",
+    '"$WF/bin/wf-companion"' in _ds_aud and "INV-CORE" in _ds_aud
+    and "--execute  # refresh" in _ds_aud,
+    "the rule shipped as a paragraph that reads exactly like a step that runs, and did "
+    "not run for three audits of its own repository. A detector ships with its fix",
+)
+
+check(
+    "core refresh: verify reports the drift between audits",
+    "## Core companion freshness" in _ds_ver and "wf-companion" in _ds_ver
+    and "INV-CORE" in _ds_ver,
+    "three paths or it does not propagate: audit writes it, verify reports it absent. "
+    "Without this an org drifts silently in the stretch between audits",
+)
+
+check(
+    "core refresh: INV-CORE is a counted row, not a stray print",
+    "`INV-CORE`" in read("workforce/references/invariants.md"),
+    "a line no invariants row owes is an intention with a print statement",
+)
 
 check(
     "directives sidecar: audit CALLS the producer, so it reaches a tree nobody types on",
@@ -11211,7 +11323,14 @@ check("handoff clause: it defines the section it sends the reader to, and names 
 check("handoff: only an OPEN call can be the caller, so a stale sibling cannot claim it",
       "ONLY AN OPEN TOOL CALL CAN BE THE CALLER" in _h6
       and 'return [c for c, i in _recorded_commands(a["path"]) if i in a["open_ids"]]' in _h6
-      and "sole candidate by exact command match" in _h6,
+      and "sole candidate by exact command match" in _h6
+      # The failure message below cites `handoff-self-collision` as where this was
+      # REPRODUCED, so the fixture is part of the claim and not a footnote. Until
+      # 2026-09-08 the condition read only wf-handoff's text, and a prove case
+      # deleting that fixture row was therefore VACUOUS — it removed the evidence
+      # for this check and fired a different one. A check whose named evidence can
+      # vanish without it noticing is asserting from memory.
+      and "handoff-self-collision" in read("fixtures/scripts/expectations.json"),
       "`_own_open_calls` already filtered on `open_ids`; the function whose ENTIRE JOB is "
       "identification scanned every record in every transcript — the same asymmetry as "
       "`_invocation` knowing argv[0] is absolute while the matcher compared it raw. A "

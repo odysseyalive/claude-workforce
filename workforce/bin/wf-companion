@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""wf-companion — the producer for the Core-skill force-refresh, which had a rule and none.
+
+    wf-companion --root <dir>              report every Core skill's refresh state, write nothing
+    wf-companion --root <dir> --execute    refresh the machine-owned regions that can be refreshed
+
+THE DEFECT THIS CLOSES. `procedures/audit.md` Step 4 says, in prose: "Force-refresh
+the Core skills to current shipped source, every run — never skipped, never offered,
+never a question", and names the report block it owes. Nothing performed it. The
+evaluator half of the same idea — § Forcible propagation, the house-rules refresh —
+has a producer, a counted line (`INV-HOUSERULES`, invariants row 22) and a check; the
+Core half had a paragraph. That asymmetry is the bug, and it is invisible from inside
+the text because the paragraph reads exactly like a step that runs.
+
+MEASURED 2026-09-08 on this repository, which has been audited three times:
+`.claude/skills/org` carried 11 dispatch rungs against the shipped 15 — rungs 12-15
+(verify escalations, plain output, finish-not-hedge, say-the-state) never reached the
+dispatcher of the project that authored them. `personnel-ledger` listed 4 record types
+against the shipped 10. A rule that has not fired across three audits of its own
+repository is not a rule, it is a description.
+
+WHAT IT WILL AND WILL NOT OVERWRITE. `audit-setup.md` § Step 0.3 defines three states,
+and the third is the common one: a Core skill is routinely CUSTOMIZED, and "the shipped
+version is the newcomer; the customization is the requirement." So this script refreshes
+a MACHINE-OWNED REGION and nothing else. Where a skill has such a region, the region is
+replaced byte-for-byte from shipped source and everything around it is untouched. Where
+a skill has no region, the skill is reported UNMANAGED with the drift signal that would
+matter, and it is counted in `unrefreshed` naming that precondition — which is the
+outcome Step 4's own prose already sanctions. It is NEVER silently overwritten.
+
+Measured on the same repository: `operating-principles` carries 18 numbered items
+against 13 shipped. That is not staleness, it is five project-specific principles this
+project added, and a force-refresh that "won" would delete them. The three-state rule is
+why this script reports rather than writes there.
+
+EXIT CODE. 0 when every Core skill is either current or names its precondition; 1 when a
+refresh was owed, attempted and failed. An UNMANAGED skill is not a failure — it is a
+reported state with a named reason, and `INV-CORE` prints it either way.
+"""
+import argparse
+import os
+import re
+import sys
+
+# The Core set, per `references/audit-setup.md` § Step 0.3 — Companion skills. The
+# evaluators are deliberately NOT here: their refresh is § Forcible propagation and it
+# already has a producer and `INV-HOUSERULES`. Two mechanisms for one idea is how the
+# rules drift apart, so this one stops where that one starts.
+#
+# `region` is the marker PAIR that delimits the machine-owned span, and `source` is the
+# shipped file carrying the canonical span between the SAME markers. Reading the
+# canonical from between its own markers is what makes this a copy rather than a
+# re-composition — `procedures/org.md` § step 5: "COPY THE BLOCK. DO NOT WRITE ONE."
+CORE = [
+    {
+        "name": "org",
+        "region": ("<!-- ORG-DISPATCH-CHECKPOINT START", "<!-- ORG-DISPATCH-CHECKPOINT END -->"),
+        "source": ("references", "procedures", "org.md"),
+        # A rung is a numbered top-level item inside the span. Counted only to make the
+        # report legible ("11 rungs vs 15"); the REFRESH decision is byte equality, never
+        # the count, because two spans can agree on rung count and differ in every rail.
+        "unit": "rung",
+    },
+    {
+        "name": "operating-principles",
+        "region": None,
+        "source": ("references", "templates.md"),
+        "unit": "item",
+    },
+    {
+        "name": "personnel-ledger",
+        "region": None,
+        "source": ("references", "personnel-templates.md"),
+        "unit": "record type",
+    },
+]
+
+
+def wf_source_root():
+    """The shipped tree this script runs from — `<install>/`, parent of `bin/`."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def installed_version():
+    """WORKFORCE-VERSION from the anchor, or None. Never the SKILL.md mirror.
+
+    Same rule as `wf-conform.installed_version`: `references/version.md` is where the
+    number is AUTHORED (SKILL.md Core Principle 9a), and a literal written here would be
+    a restated constant in a script whose whole job is detecting drift.
+    """
+    path = os.path.join(wf_source_root(), "references", "version.md")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            m = re.search(r"^WORKFORCE-VERSION:\s*(\d+(?:\.\d+)*)\s*$", fh.read(), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def span(text, markers):
+    """(start_index, end_index) of the machine-owned span INCLUDING both markers.
+
+    None when either marker is missing. A lone marker is NOT treated as a span: that is
+    `procedures/org.md` step 5's "one marker without its pair -> REPORT and SKIP", and
+    guessing where the missing half belongs is how a partial hand-edit gets overwritten.
+    """
+    if not markers:
+        return None
+    start_tag, end_tag = markers
+    # ANCHORED TO THE START OF A LINE, and that is not fussiness. `procedures/org.md`
+    # DOCUMENTS its own markers in prose one paragraph above the real block —
+    # "`<!-- ORG-DISPATCH-CHECKPOINT START -->` / `<!-- ORG-DISPATCH-CHECKPOINT END -->`"
+    # on a single backticked line. A bare `str.find` matches that line for both markers
+    # and returns a span of a few characters containing zero rungs, which the caller then
+    # reports as "0 shipped" and would happily write over a project's dispatcher.
+    # MEASURED 2026-09-08: that is exactly what the first run of this script did.
+    m = re.search(r"^" + re.escape(start_tag), text, re.M)
+    if not m:
+        return None
+    i = m.start()
+    m2 = re.search(r"^" + re.escape(end_tag), text[i:], re.M)
+    if not m2:
+        return None
+    return (i, i + m2.end())
+
+
+def count_units(text):
+    """Numbered top-level items in a block — the legibility figure, never the verdict."""
+    return len(re.findall(r"^\s{0,3}(\d+)\.\s", text, re.M))
+
+
+def evaluate(root, wf, entry):
+    """One row: (state, detail, installed_path, new_body_or_None)."""
+    name = entry["name"]
+    inst_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
+    inst = read(inst_path)
+    if inst is None:
+        # ABSENT is not this script's job to fix. Step 0.3 materializes companions and
+        # `INV-COMPANIONS` counts them; a second mechanism creating them here would give
+        # absence two owners that can disagree.
+        return ("ABSENT", "no SKILL.md — Step 0.3 materializes it, not this step",
+                inst_path, None)
+
+    src_path = os.path.join(wf, *entry["source"])
+    src = read(src_path)
+    if src is None:
+        return ("UNREADABLE", f"shipped source {os.path.join(*entry['source'])} unreadable",
+                inst_path, None)
+
+    if entry["region"] is None:
+        # No marker convention defined for this skill yet, so there is no span to replace
+        # and no way to tell generated prose from the project's own. Report the drift
+        # signal and refuse — Step 4's sanctioned `unrefreshed` outcome.
+        return ("UNMANAGED",
+                "no machine-owned region defined; refresh would have to overwrite the "
+                "whole file, and a customized Core skill is never overwritten "
+                "(audit-setup.md § Step 0.3, state 3)",
+                inst_path, None)
+
+    inst_span = span(inst, entry["region"])
+    src_span = span(src, entry["region"])
+    if src_span is None:
+        return ("UNREADABLE",
+                f"shipped {os.path.join(*entry['source'])} carries no canonical span "
+                f"between {entry['region'][0]!r} and its END marker",
+                inst_path, None)
+    if inst_span is None:
+        return ("NO-REGION",
+                "installed copy carries no marker pair (or only one of the two) — "
+                "REPORT and SKIP, never auto-repair (procedures/org.md step 5)",
+                inst_path, None)
+
+    canonical = src[src_span[0]:src_span[1]]
+    current = inst[inst_span[0]:inst_span[1]]
+    if current == canonical:
+        return ("CURRENT", f"region matches shipped ({count_units(current)} "
+                           f"{entry['unit']}s)", inst_path, None)
+
+    detail = (f"region differs from shipped "
+              f"({count_units(current)} {entry['unit']}s installed vs "
+              f"{count_units(canonical)} shipped)")
+    new_body = inst[:inst_span[0]] + canonical + inst[inst_span[1]:]
+    return ("DRIFTED", detail, inst_path, new_body)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--execute", action="store_true")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    wf = wf_source_root()
+    if not os.path.isdir(os.path.join(root, ".claude")):
+        # NEVER 0 ON AN UNREADABLE TARGET — a validator exiting clean on a tree it could
+        # not open reports health it did not measure.
+        print(f"wf-companion: no .claude under {root}", file=sys.stderr)
+        return 2
+
+    ver = installed_version()
+    print(f"wf-companion — {root}")
+    print(f"  shipped source: {wf}  ·  WORKFORCE-VERSION "
+          f"{ver if ver else '<unreadable — no staleness claim made>'}\n")
+
+    refreshed = unrefreshed = current = 0
+    failed = False
+    print("CORE SKILLS")
+    for entry in CORE:
+        state, detail, path, new_body = evaluate(root, wf, entry)
+        name = entry["name"]
+
+        if state == "CURRENT":
+            current += 1
+            print(f"  = {name:22s} current   {detail}")
+            continue
+
+        if state == "DRIFTED":
+            if not args.execute:
+                unrefreshed += 1
+                print(f"  ~ {name:22s} DRIFTED   {detail} — would refresh")
+                continue
+            try:
+                # WRITE THROUGH A SYMLINK, NEVER OVER IT. A Core skill may be symlinked
+                # into a shared doctrine tree, and `open(path, "w")` truncates the TARGET
+                # rather than replacing the link (SKILL.md Atomic-or-Absent rule 3).
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(new_body)
+                # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
+                # its own output has not finished (`checksums.md` rule 2).
+                back_state, _, _, _ = evaluate(root, wf, entry)
+                if back_state != "CURRENT":
+                    failed = True
+                    unrefreshed += 1
+                    print(f"  ! {name:22s} FAILED    wrote the region and read back "
+                          f"{back_state} — not counted as refreshed", file=sys.stderr)
+                    continue
+                refreshed += 1
+                print(f"  + {name:22s} refreshed {detail}")
+            except OSError as exc:
+                failed = True
+                unrefreshed += 1
+                print(f"  ! {name:22s} FAILED    {exc.strerror}", file=sys.stderr)
+            continue
+
+        # ABSENT / UNMANAGED / NO-REGION / UNREADABLE all land here, and each one PRINTS
+        # ITS PRECONDITION. `INV-CORE` is NOT UPHELD only when an unrefreshed row cites
+        # nothing — the uncited-refusal shape `INV-SWEPT` and `INV-HOUSERULES` both use,
+        # so a run cannot skip the refresh silently and still close clean.
+        unrefreshed += 1
+        print(f"  ~ {name:22s} {state:9s} {detail}")
+
+    total = len(CORE)
+    print(f"\nINV-CORE  {total} core skill(s) · current {current} · refreshed {refreshed} "
+          f"· unrefreshed {unrefreshed} · each unrefreshed names its precondition")
+    if not args.execute and unrefreshed:
+        print("Re-run with --execute to refresh the machine-owned regions. A row reading "
+              "UNMANAGED or NO-REGION is not refreshed by --execute either: it names the "
+              "precondition instead, because a customized Core skill is never overwritten.")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

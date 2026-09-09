@@ -373,6 +373,59 @@ def stamp_directives(root, execute, restamp):
     return 0
 
 
+def symlink_census(agents):
+    """{basename: resolved target} for every symlinked handbook in `.claude/agents`.
+
+    THE DETECTOR SKILL.md RULE 3 PRESCRIBES AND NOTHING PERFORMED. That rule ends
+    "`wf-census` already reports `symlinks` and `aliases`; record both before the
+    first write and re-read them after, and a drop is the whole detector" — and
+    `wf-census` only ever REPORTED the counts. No caller compared them across a
+    write, which is the difference between a measurement and a guard.
+
+    WHAT IS AND IS NOT THE HAZARD, measured 2026-09-08 rather than assumed. Python's
+    `open(path, "w")` FOLLOWS a symlink: it truncates and writes the TARGET, so the
+    link survives and the `AGENT.md` that owns the registration receives the edit.
+    That is what rule 3 asks a bulk writer to do, and it is what this script already
+    did before this census existed. The destroyer is the rename-in-place family —
+    `sed -i`, `perl -i`, `find -exec`, every tool that writes a temp file and renames
+    it over the target — which replaces the link with a regular file EVEN WHEN THE
+    PATTERN MATCHED NOTHING. So this census does not defend against this script; it
+    defends against the next hand-run sweep across the same directory, and against a
+    future edit here that reaches for a rename-in-place helper. A guard that only
+    watches its own author is not a guard.
+
+    Returns a dict rather than a count so a RETARGETED link — still a symlink, now
+    pointing somewhere else — is caught too. A count alone reports that case clean.
+    """
+    out = {}
+    for p in sorted(glob.glob(os.path.join(agents, "*.md"))):
+        if os.path.islink(p):
+            try:
+                out[os.path.basename(p)] = os.path.realpath(p)
+            except OSError:
+                out[os.path.basename(p)] = "<unresolvable>"
+    return out
+
+
+def report_symlink_drift(before, after):
+    """Print INV-SYMLINK and return the rows that regressed. Empty is the good case."""
+    lost, retargeted = [], []
+    for name, target in before.items():
+        if name not in after:
+            lost.append((name, target))
+        elif after[name] != target:
+            retargeted.append((name, target, after[name]))
+    print(f"\nINV-SYMLINK  {len(before)} symlinked handbook(s) before · {len(after)} after · "
+          f"lost {len(lost)} · retargeted {len(retargeted)}")
+    for name, target in lost:
+        print(f"  ! LINK LOST    {name}  was a symlink to {target}; it is a regular file now. "
+              f"The registration has stopped tracking the file that owns it, and the "
+              f"content there is frozen at whatever this run wrote.", file=sys.stderr)
+    for name, was, now in retargeted:
+        print(f"  ! RETARGETED   {name}  pointed at {was}, now points at {now}", file=sys.stderr)
+    return lost + retargeted
+
+
 def staged_path(root, name):
     return os.path.join(root, ".claude", "workforce", "staging", name, "HANDBOOK.md")
 
@@ -410,6 +463,10 @@ def main():
     counts = {k: 0 for k in
               ("OK", "MISMATCH", "UNSTAMPED", "NO-SECTIONS", "NO-RECORD", "STAMPED", "UNREADABLE")}
     refused = []
+    # BEFORE THE FIRST WRITE, not before the first write that happens to be reached.
+    # Taken unconditionally — a review run writes nothing, and its INV-SYMLINK line is
+    # still the record of what the directory looked like going in.
+    links_before = symlink_census(agents)
 
     for path in sorted(glob.glob(os.path.join(agents, "*.md"))):
         name = os.path.basename(path)[:-3]
@@ -506,7 +563,14 @@ def main():
         print("A MISMATCH is not written by --execute. Resolve it with `review <employee>`, "
               "or, where an authorized amendment is what moved the contract, "
               "`wf-stamp --execute --restamp`.")
+    symlink_drift = report_symlink_drift(links_before, symlink_census(agents))
+
     if refused:
+        return 1
+    # A LOST LINK OUTRANKS A CLEAN STAMP REPORT. Every handbook above can stamp OK and
+    # the registration still be broken, so this cannot be folded into `counts` — it is
+    # a different question with its own answer, and it fails the run on its own.
+    if symlink_drift:
         return 1
     return 0
 

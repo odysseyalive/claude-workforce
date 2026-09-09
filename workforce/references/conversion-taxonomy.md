@@ -431,7 +431,7 @@ generator being removed.
 **Not RETAIN with nicer words.** RETAIN means "nothing here to convert." ORCHESTRATOR means
 "converting this would *remove* capability." An orchestrator sits **above** the org chart — the
 employees it dispatches to are nodes; it is the thing dispatching. Collapsing it into a handbook
-costs a delegation tier (`platform.md` fact 1 — there are exactly three and none to spare) and buries
+costs a delegation tier (`platform.md` fact 1 — the measured limit, with none to spare) and buries
 the orchestration inside an isolated context that returns only a summary (fact 7).
 
 It appears in the chart as an `ORCHESTRATOR` row — visible, never a silent absence — and never

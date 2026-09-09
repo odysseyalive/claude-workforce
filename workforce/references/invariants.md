@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-six, and the list is closed: adding a procedural invariant means adding a row here and a
+Thirty-eight, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -133,6 +133,8 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 34 | every chain-of-command edge was re-derived from the child's `reports-to`, and every `direct-reports` mirror that disagreed was healed, or names the rule that declined | `INV-EDGES` | references/org-chart-format.md |
 | 35 | every Lead handbook carries the handoff boundary clause, or names the rule that declined | `INV-HANDOFF` | references/handoff.md |
 | 36 | the project ledger's records are counted by type and status, and no `proposed` record predates the run | `INV-KNOWLEDGE` | references/procedures/verify.md |
+| 37 | the symlinked handbooks in `.claude/agents` were enumerated before the first bulk write and re-read after, and none was lost or retargeted | `INV-SYMLINK` | workforce/SKILL.md |
+| 38 | every Core companion skill was force-refreshed to shipped source, or each unrefreshed one names the precondition that stopped it | `INV-CORE` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

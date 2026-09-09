@@ -1,6 +1,6 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 79 assertion(s) in bin/check name this file; 155 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 80 assertion(s) in bin/check name this file; 157 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -55,7 +55,7 @@ degraded everything downstream without ever attempting one. Its outcome is `INV-
 **Step 0.8 writes early and reports last, and the split is deliberate.** The grants have to be in place
 before anything dispatches or runs a mechanical check, so the write belongs in Step 0; the findings are
 the final section of the closing report, per the user directive at `audit-setup.md` § Permissions. It is
-never a question — the budget above is a ceiling of four.
+never a question — the question budget is a ceiling (`audit-setup.md` § The question budget).
 
 **Step 0.7 was absent from this list while Steps 3 and 3a consumed its output.** A run following this
 file literally never executed it, so the succession branch had no input and the disposition arithmetic
@@ -848,12 +848,23 @@ run reports the gap. So each run re-installs the current shipped `operating-prin
 the installed one — and every other Core skill (`org`, `personnel-ledger`, per
 `references/audit-setup.md` § Step 0.3 — Companion skills) whose body is shipped doctrine rather
 than project state — in the same forcible manner as § Forcible propagation, preserving any
-machine-owned user region exactly as the house-rules refresh does. Report it per skill, including
-the zeroes, in the same block as the reconciliation:
+machine-owned user region exactly as the house-rules refresh does.
+
+**`wf-companion` IS THE PRODUCER. Run it; do not perform this by hand.**
+
+```bash
+"$WF/bin/wf-companion" --root "${CLAUDE_PROJECT_DIR:-$PWD}"            # report
+"$WF/bin/wf-companion" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute  # refresh
+```
+
+It prints the `CORE SKILLS` block per skill including the zeroes, and closes with **`INV-CORE`**
+(`references/invariants.md` row 38):
 
 ```
-CORE SKILLS     operating-principles  refreshed to shipped (§ 4 now present)
-                org  refreshed · personnel-ledger  refreshed · 0 unrefreshed
+CORE SKILLS
+  + org                    refreshed region differs from shipped (11 rungs installed vs 15 shipped)
+  ~ operating-principles   UNMANAGED no machine-owned region defined; …
+INV-CORE  3 core skill(s) · current 0 · refreshed 1 · unrefreshed 2 · each unrefreshed names its precondition
 ```
 
 A Core skill that cannot receive the refresh — a copy carrying user edits outside any
@@ -861,6 +872,21 @@ machine-owned region — is counted in `unrefreshed` and **names that preconditi
 uncited-refusal shape as `INV-HOUSERULES`: a run cannot skip the refresh silently and still close
 clean. A settled principle that quietly stops propagating to existing projects is exactly the
 "reads as success while doing nothing" failure, one install removed.
+
+*Until 2026-09-08 this section was the whole mechanism: a paragraph instructing a run to force-refresh,
+with no script, no counted line, and no check. The evaluator half of the same idea — § Forcible
+propagation — had all three, and the asymmetry was invisible from inside the text because the paragraph
+reads exactly like a step that runs. **MEASURED on this repository, audited three times:
+`.claude/skills/org` carried 11 dispatch rungs against the shipped 15** — rungs 12-15 never reached the
+dispatcher of the project that authored them, and `personnel-ledger` listed 4 record types against 10.
+A detector ships with its fix (`SKILL.md` § Directives); so does a refresh.*
+
+**What `--execute` will NOT do, and why that is the design.** It replaces a **machine-owned region** and
+nothing else. A Core skill with no such region is reported `UNMANAGED` and left alone, because
+`audit-setup.md` § Step 0.3 state 3 holds that *"the shipped version is the newcomer; the customization
+is the requirement."* Measured on the same repository: `operating-principles` carries 18 numbered items
+against 13 shipped — five project-specific principles a "successful" force-refresh would have deleted.
+`UNMANAGED` is a reported state with a named reason, never a silent pass and never a failure.
 
 ## Step 4b — Tier canary (the last step before anything is registered)
 
@@ -1102,16 +1128,21 @@ amend, and any one of them alone leaves the org in this state.
 
 **PRECONDITION — count the symlinks first, and never bulk-edit `.claude/agents/*.md` in place.**
 This step touches every registered handbook at once, and a registration may be a symlink into a
-skill directory rather than a regular file. Run the census before the first write and again after:
+skill directory rather than a regular file. **`wf-stamp` now performs the census itself** — it
+enumerates the symlinked handbooks before its first write, re-reads them after, prints
 
-```bash
-"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" | grep -E 'symlinks|aliases'   # before
-# ... the wf-stamp calls below ...
-"$WF/bin/wf-census" --root "${CLAUDE_PROJECT_DIR:-$PWD}" | grep -E 'symlinks|aliases'   # after
+```
+INV-SYMLINK  <n> symlinked handbook(s) before · <n> after · lost <n> · retargeted <n>
 ```
 
-**If either count dropped, a write destroyed a link — STOP and restore from the pre-run backup.**
-The counts are already computed, so this costs two greps and catches the whole class.
+and **exits non-zero on a loss or a retarget**, so the run stops without anyone comparing anything.
+Read the line; if it reports a loss, restore from the pre-run backup.
+
+*Until 2026-09-08 this block prescribed two `wf-census` greps and a human reading the delta, which is
+how the `odyssey-alive` incident below was caught — by somebody looking. A remedy that depends on a
+person noticing is a detector with no fix (`SKILL.md` § Directives), and the counts alone could not
+see a link that still existed but had been retargeted. The greps remain valid for a hand-run sweep
+this step does not own.*
 
 **Do NOT reach for `sed -i` here, or for any other rewrite-and-rename tool.** GNU `sed -i` writes a
 temp file and renames it over the target, so it replaces a symlink with a regular file *even when
