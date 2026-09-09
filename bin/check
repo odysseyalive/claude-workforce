@@ -76,11 +76,15 @@ def skip(name, why):
     """A check whose INPUT is absent — recorded as neither passed nor failed.
 
     Some assertions here read a project's own org state (`.claude/agents/*`,
-    `.claude/workforce/*`). THIS REPOSITORY CARRIES NONE, BY DECISION — the user deleted
-    `.claude/` and works through `/workforce dev`, because the distribution does not need
-    an org of its own to be developed (SKILL.md § Directives, 2026-09-09). So absence here
-    is the settled state, not a step somebody has yet to take, and nothing below suggests
-    creating one.
+    `.claude/workforce/*`). **Every project workforce is used on carries that after its
+    first audit.** This repository is the one that does not, because it is the
+    DEVELOPMENT KIT: it builds the distribution rather than being staffed by it, and the
+    user deleted `.claude/` deliberately and works through `/workforce dev`
+    (SKILL.md § Directives, 2026-09-09).
+
+    So a skip here says something narrow: the rule is real, it is measured on every
+    staffed project, and this one checkout cannot measure it. It never says the rule is
+    optional, and nothing below suggests staffing this repo to satisfy a check.
 
     SKIP IS NOT A PASS, AND THAT DISTINCTION IS THE WHOLE POINT. `read()` returns ""
     for an absent file, so `"x" not in ""` is True: an unstaffed repo would report
@@ -5866,10 +5870,10 @@ _proj_cfg = org_state(".claude/workforce/org-config.md")
 if _proj_cfg is None or "## Budget Receipt" not in _proj_cfg:
     skip(
         "org-config: a project's config declares no competing statics pool",
-        "no `.claude/workforce/org-config.md` here, by decision — this repo carries no "
-        "org and does not need one. NOT evaluated, and specifically not passed on an "
-        "empty string. The rule it asserts is about an instantiated project config and "
-        "is measured wherever a project has one",
+        "no `.claude/workforce/org-config.md` here — this is the development kit, the "
+        "one project with no org of its own; every audited project has this file. NOT "
+        "evaluated, and specifically not passed on an empty string. The rule is measured "
+        "wherever workforce has actually been audited in",
     )
 else:
     check(
@@ -9912,10 +9916,11 @@ if os.path.exists(_da_src):
 # property of an instantiated org, which is why absence is a skip rather than a failure.
 if not os.path.exists(_da):
     _da_why = (
-        f"no {_da} here, by decision — this repo carries no org, so the employee that "
-        "would hold the user's Non-negotiables is not staffed. NOT evaluated, and "
-        "specifically not passed against an empty file. The words themselves are not at "
-        "risk: they live in git history and in any project that staffs the employee"
+        f"no {_da} here — this is the development kit, the one project with no org of "
+        "its own, so the employee that would hold the user's Non-negotiables is not "
+        "staffed. NOT evaluated, and specifically not passed against an empty file. The "
+        "words themselves are not at risk: they live in git history and in every project "
+        "that staffs the employee"
     )
     skip("doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
          _da_why)
@@ -9953,9 +9958,10 @@ _rl = ".claude/agents/runtime-lead.md"
 if not os.path.exists(_rl):
     skip(
         "the source-first rule reaches the employee that owns it",
-        f"no {_rl} here, by decision — this repo carries no org, so there is no employee "
-        "to carry the rule. NOT evaluated. The rule itself still ships, in SKILL.md "
-        "§ Dev Path Discipline, which is checked separately",
+        f"no {_rl} here — this is the development kit, the one project with no org of "
+        "its own, so there is no employee to carry the rule. NOT evaluated. The rule "
+        "itself still ships, in SKILL.md § Dev Path Discipline, which is checked "
+        "separately",
     )
 else:
     check(

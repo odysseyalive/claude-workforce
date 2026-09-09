@@ -1584,8 +1584,28 @@ def run_shard(shard):
             # row instead of the run. Measured 2026-09-09: the 1.30.2 strip deleted
             # eight hook scripts and left their cases here, and prove could not run at
             # all. Reported per case so the stale ones are named and removed.
+            # TWO REASONS A TARGET IS MISSING, AND THEY WANT OPPOSITE ACTIONS.
+            #
+            # A `.claude/` path is a project's OWN org — the `operating-principles`
+            # skill, an employee's handbook, a grounding file. **Every workforce project
+            # carries those after its first audit.** This repository is the one that does
+            # not, because it is the development kit: it builds the thing rather than
+            # being staffed by it. So the case is correct, the coverage is real
+            # everywhere the distribution is used, and it simply cannot run HERE.
+            # Telling a reader to remove it would delete live coverage for every project
+            # that does have an org — which is why this is N/A and never STALE-CASE.
+            #
+            # Any other missing path is a shipped file that no longer ships, and that
+            # case IS residue: remove it with the rule it proved.
             if not target.is_file():
-                out.append((name, "STALE-CASE", f"{relpath} does not ship — remove this case"))
+                if relpath.startswith(".claude/"):
+                    out.append((name, "N/A", f"{relpath} is project org state, which this "
+                                             "repo does not carry — the development kit is "
+                                             "the one project with no org. Runs wherever "
+                                             "workforce has been audited in. Do NOT remove."))
+                else:
+                    out.append((name, "STALE-CASE",
+                                f"{relpath} does not ship — remove this case"))
                 continue
             original = target.read_bytes()          # restore is byte-exact, not text-round-tripped
             try:
@@ -1768,13 +1788,22 @@ if interrupted:
 
 print(f"{'STATUS':<10} CHECK")
 print("-" * 78)
-bad = 0
+# N/A IS NOT A FAILURE AND IT IS NOT A PASS — it is a case this CHECKOUT cannot run.
+# Counting it as unproven would leave this suite permanently short of green on the one
+# repository it lives in, and the standing red would train a reader to ignore the
+# number. Counting it as proven would be a lie about coverage. It leaves the ratio and
+# is reported on its own line, with the reason.
+bad = na = 0
 for name, status, detail in results:
-    if status != "PROVEN":
+    if status == "N/A":
+        na += 1
+    elif status != "PROVEN":
         bad += 1
     print(f"{status:<10} {name}\n           {detail}")
 print("-" * 78)
-print(f"{len(results) - bad} of {len(results)} proven by breaking")
+_runnable = len(results) - na
+print(f"{_runnable - bad} of {_runnable} proven by breaking"
+      + (f" · {na} n/a here (project org state — see above)" if na else ""))
 
 # THE ASSERTIONS WITH NO CASE ARE PRINTED, ALWAYS. Until 2026-09-09 this suite reported
 # only on the cases it HAD, so a run could say "431 of 478 proven" while 457 of 836
