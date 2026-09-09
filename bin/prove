@@ -237,12 +237,8 @@ CASES = [
     ("org: a returned HANDOFF has a consumer, and it spawns rather than re-dispatches",
      "workforce/references/procedures/org.md", "del",
      "A returned `HANDOFF` means SPAWN A SUCCESSOR"),
-    ("handoff: only an OPEN call can be the caller, so a stale sibling cannot claim it",
-     "fixtures/scripts/expectations.json", "del", "handoff-self-collision"),
     ("conform: a node that reports to itself is named as that, not as a missing edge",
      CNFM, "del", "reports-to itself"),
-    ("handoff: only an OPEN call can be the caller, so a stale sibling cannot claim it",
-     "fixtures/scripts/expectations.json", "del", "handoff-self-collision"),
     ("checkrun: a command wired into `## Guardrails` is resolved, not just counted present",
      CKR, "del", "def check_guardrails"),
     ("checkrun: a command wired into `## Guardrails` is resolved, not just counted present",
@@ -373,8 +369,6 @@ CASES = [
     ("wf-checkrun states WHY the executing path is absent",
      CKR, "del", "does not execute anything"),
     # ── the canary fixture lifecycle (2026-08-04) ────────────────────────────
-    ("the fixture-declaration check actually examined fixtures",
-     MAN, "del", 'canary workforce/canary/wf-canary-a.md\ncanary workforce/canary/wf-canary-b.md\ncanary workforce/canary/wf-canary-c.md\ncanary workforce/canary/wf-ceiling-probe.md\ncanary workforce/canary/wf-model-canary.md\n'),
     ("fixtures: no fixture survives its own measurement",
      CHK, "del", '    if _name in _shipped_canaries:\n        continue                      # its job recurs; see the two populations above\n'),
     # ── Phase D — the applied-model canary (2026-08-27) ──────────────────────
@@ -386,8 +380,6 @@ CASES = [
     # Deleting its manifest line breaks registration; deleting the pin ID from the
     # fixture frontmatter (the only occurrence — the body cites it, never repeats it)
     # leaves `model:` valueless. Each fires the same check for a different reason.
-    ("staging: the applied-model canary ships, pinned to a distinctive model",
-     MAN, "del", "canary workforce/canary/wf-model-canary.md\n"),
     # ── the handbook verification gap (2026-08-04) ───────────────────────────
     ("wf-checkrun is shipped in the manifest",
      MAN, "del", "exec workforce/bin/wf-checkrun\n"),
@@ -609,25 +601,17 @@ CASES = [
      CFG, "del", "the session advisor's pick too"),
     # ── the budget guard (2026-09-02): a hand-built picker is blocked, not restated ──
     ("budget guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
-     MAN, "del", "hook workforce/bin/wf-budget-guard\n"),
-    ("budget guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
      HKS, "del", "| `wf-budget-guard` | `PreToolUse` | `AskUserQuestion` |"),
     ("budget guard: named where the rule it enforces is stated, and in the enforcement table",
      ASU, "del", "mechanical floor: `wf-budget-guard`"),
     ("budget guard: named where the rule it enforces is stated, and in the enforcement table",
      ENF, "del", "PREVENTS once wired"),
     # ── plain output (2026-09-05): the register written for agents stops at the user ──
-    ("plain guard: ships as a hook, in the default set, wired to PreToolUse/AskUserQuestion",
-     MAN, "del", "hook workforce/bin/wf-plain-guard\n"),
     ("plain guard: named in the enforcement table at its true strength",
      ENF, "del", "PREVENTS the call once wired"),
     ("plain output: audit-setup points at the rule instead of restating a narrower copy",
      ASU, "del", "references/plain-output.md"),
     # ── the speak guard and the output style (2026-09-07): the report, not the question ──
-    ("speak guard: ships as a hook, in the default set, wired to Stop",
-     MAN, "del", "hook workforce/bin/wf-speak-guard\n"),
-    ("output style: ships to output-styles/, is selectable, and keeps the coding rules",
-     MAN, "del", "style workforce/output-styles/plain-speak.md"),
     ("text-eval: the conversational-register row no longer exempts what the user reads",
      TTL, "del", "and to anything a human reads in the terminal"),
     # ── three paths, or it does not propagate (2026-09-07) ──────────────────────────
@@ -896,8 +880,6 @@ CASES = [
      HIR, "del", "Do not read an unmarked skill as a failed"),
     ("batch: a batch that did not run may never print UPHELD",
      CT, "del", "never evidence it was cheap"),
-    ("succession: workforce supplies the last predecessor guarantee before deleting it",
-     MAN, "del", "hook workforce/bin/wf-unique-persona"),
     ("canary: the fixtures ship with the install, so a first run can measure",
      STG2, "del", "THE INSTALLER SHIPS THEM"),
     ("install: both installers place canary files in the agents dir, not the skill",
@@ -1623,11 +1605,19 @@ def run_shard(shard):
             original = target.read_bytes()          # restore is byte-exact, not text-round-tripped
             try:
                 text = original.decode()
-                if mode == "del":
+                if mode in ("del", "delall"):
                     if payload not in text:
                         out.append((name, "SETUP-FAIL", f"literal absent from {relpath}"))
                         continue
-                    target.write_text(text.replace(payload, "", 1))
+                    # `del` removes the FIRST occurrence, which is what a hand-written
+                    # case wants: it names one site deliberately. `delall` removes EVERY
+                    # occurrence, which is what a DERIVED case needs — its assertion is
+                    # `'lit' in <whole file>`, so leaving a second copy anywhere in the
+                    # file leaves the assertion true and the case reports VACUOUS having
+                    # broken nothing. MEASURED 2026-09-09: 39 of 54 vacuous verdicts were
+                    # exactly this, including an assertion written the same afternoon.
+                    target.write_text(text.replace(payload, "", 1) if mode == "del"
+                                      else text.replace(payload, ""))
                 else:
                     target.write_text(text + payload)
 
@@ -1721,7 +1711,7 @@ def derived_cases(existing):
             # ABSENT, or the append changes nothing and the run reports a vacuous pass.
             if (lit in body) is negated:
                 continue
-            mode = "append" if negated else "del"
+            mode = "append" if negated else "delall"
             if best is None or len(lit) > len(best[2]):
                 best = (path, mode, lit)
         if best:

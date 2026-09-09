@@ -602,11 +602,27 @@ def _prove_case_rows():
             return _consts.get(node.id)
         return None
 
+    # EVERY PATH A CASE NAMES, not just the shipped tree. Scoped to `workforce/` this
+    # missed 12 dead rows on its first real run — cases naming `manifest.txt`,
+    # `fixtures/scripts/expectations.json`, and `.claude/…` org state this repo does not
+    # carry. A residue check that only looks where residue is tidiest is the same
+    # too-narrow guard the symlink refusal had to be widened out of.
+    #
+    # `.claude/` is EXCLUDED and that is not an oversight: it is gitignored project state
+    # whose absence is a decision here, so a case naming it is dead on this checkout and
+    # alive on a staffed one. Those are reported by prove as STALE-CASE, where a human
+    # reads them, rather than failing a commit for a file that is correctly missing.
+    _skip = (".claude/",)
     rows = []
     for n in _ast.walk(_tree):
         if isinstance(n, _ast.Tuple) and len(n.elts) == 4:
             name, path, mode, payload = (_lit(e) for e in n.elts)
-            if isinstance(path, str) and path.startswith("workforce/"):
+            # KEYED ON THE MODE, not on the path's shape. Requiring a "/" excluded
+            # `manifest.txt` — a bare filename — which is exactly where six of the dead
+            # rows lived. The mode is what makes a 4-tuple a prove case, and it cannot be
+            # confused with a name or a payload.
+            if (isinstance(path, str) and mode in ("del", "delall", "append")
+                    and not path.startswith(_skip)):
                 rows.append((name, path, mode, payload, n.lineno))
     return rows
 
@@ -615,7 +631,7 @@ _dead_cases = []
 for _name, _path, _mode, _payload, _ln in _prove_case_rows():
     if not os.path.exists(_path):
         _dead_cases.append(f"L{_ln} names {_path}, which does not ship")
-    elif _mode == "del" and isinstance(_payload, str) and _payload not in read(_path):
+    elif _mode in ("del", "delall") and isinstance(_payload, str) and _payload not in read(_path):
         _dead_cases.append(f"L{_ln} deletes a literal absent from {_path}")
 check(
     "every bin/prove case names a file that ships and a literal that is in it",
