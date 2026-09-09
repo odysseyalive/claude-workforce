@@ -154,10 +154,24 @@ plan. A half-converted project gets an honest chart, not an aspirational one. Re
 fan-out into the header (`procedure-for-procedures.md`). Zero employees is valid: write the explicit
 "no employees yet" notice.
 
-**7. Report** NEW / REMOVED / UPDATED / UNCHANGED, plus every failure row.
+**Stamp the header with the running release.** Read `WORKFORCE-VERSION` from the installed
+`references/version.md` and write it into the `Generated:` line as `| workforce-version: <value>`
+(`org-chart-format.md` § `workforce-version:` on the header). **Read the number, never type it** — a
+hand-written version is a restated constant, which is the drift Core Principle 9(a) fails a run over.
+This is the one line `audit` opens to learn whether the org predates the release it is running, so a
+chart written without it costs every later run nine handbook reads to recover a number this step had
+in hand.
 
-**8. Verify.** Re-read the chart: header present, honesty line verbatim, every roster row has a file
-on disk, fan-out arithmetic matches the roster. Failures are reported, not silently retried.
+**7. Report** NEW / REMOVED / UPDATED / UNCHANGED, plus every failure row. **Name the version
+transition** when the prior chart's stamp differs from the one just written — `indexed by 1.28.0,
+now 1.30.2` — and say `no prior stamp` where the prior chart had none. An unremarked bump reads as
+an ordinary re-index.
+
+**8. Verify.** Re-read the chart: header present, honesty line verbatim, **the `workforce-version:`
+value equals the installed `WORKFORCE-VERSION`**, every roster row has a file on disk, fan-out
+arithmetic matches the roster. Failures are reported, not silently retried. The stamp is re-read
+rather than assumed written, because a generator that does not read back what it wrote is the
+failure `org-chart-format.md` opens on.
 
 ---
 

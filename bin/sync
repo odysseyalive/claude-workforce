@@ -87,6 +87,13 @@ def manifest_entries():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
+        # `retired ` names a path this project USED to install outside the skill
+        # directory and no longer ships. It is deliberately NOT on disk, so it is
+        # skipped before the on-disk checks below — which would otherwise report six
+        # permanent phantom absences and refuse to sync. Only the installer's
+        # prune_scope reads these rows, to seed `.installed-external`.
+        if s.startswith("retired "):
+            continue
         executable = False
         for flag in ("exec ", "hook "):
             if s.startswith(flag):

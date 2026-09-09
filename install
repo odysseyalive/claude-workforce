@@ -427,8 +427,10 @@ prune_scope() {
 
     _expect="$(mktemp)"
     _ext_now="$(mktemp)"
+    _seed="$(mktemp)"
     : > "$_expect"
     : > "$_ext_now"
+    : > "$_seed"
 
     while IFS= read -r pline || [ -n "$pline" ]; do
         case "$pline" in ''|\#*) continue ;; esac
@@ -440,11 +442,24 @@ prune_scope() {
             "exec "*)   ppath="${pline#exec }" ;;
             "canary "*) pflag="canary"; ppath="${pline#canary }" ;;
             "style "*)  pflag="style";  ppath="${pline#style }" ;;
+            # A retired path is NOT expected on disk and is NOT written to
+            # $_ext_now — that file is "what we ship now", and shipping is exactly
+            # what a retired path stopped doing. It goes to the seed list instead.
+            "retired "*) pflag="retired"; ppath="${pline#retired }" ;;
         esac
         if [ "$pflag" = "canary" ]; then
             echo "$_agents_dir/$(basename "$ppath")" >> "$_ext_now"
         elif [ "$pflag" = "style" ]; then
             echo "$_styles_dir/$(basename "$ppath")" >> "$_ext_now"
+        elif [ "$pflag" = "retired" ]; then
+            # Destination from the source directory, the same mapping the live flags
+            # use. An unrecognized prefix is NOT guessed at: seeding a wrong path
+            # would point a delete at a directory nobody declared.
+            case "$ppath" in
+                workforce/canary/*)        echo "$_agents_dir/$(basename "$ppath")" >> "$_seed" ;;
+                workforce/output-styles/*) echo "$_styles_dir/$(basename "$ppath")" >> "$_seed" ;;
+                *) echo "  Prune: retired path '$ppath' has no known destination; skipped." ;;
+            esac
         else
             echo "${ppath#workforce/}" >> "$_expect"
         fi
@@ -465,6 +480,27 @@ prune_scope() {
         fi
     done < "$_expect.found"
 
+    # THE BOOTSTRAP. Rule 2 reads `.installed-external`, and that record was added
+    # WITH this prune (2026-09-09). On every host installed before then it does not
+    # exist, so rule 2 reads nothing and the external files of older releases survive
+    # forever — which is the precise case the prune was written for. Seeding the
+    # record from the manifest's `retired` list closes that, and it does not weaken
+    # rule 2: these are paths this project shipped, named explicitly in the manifest,
+    # never inferred from a basename or a directory scan.
+    #
+    # ONLY when the record is absent. A record that exists is the authority on what
+    # THIS host was written, and overwriting it with a static list would claim
+    # authorship of files this installer may never have placed here.
+    if [ ! -f "$_record" ] && [ -s "$_seed" ]; then
+        _seeded=0
+        while IFS= read -r sf || [ -n "$sf" ]; do
+            [ -n "$sf" ] || continue
+            [ -f "$sf" ] && _seeded=$((_seeded + 1))
+        done < "$_seed"
+        cp "$_seed" "$_record" 2>/dev/null || :
+        echo "  Prune: no install record here; seeded from the manifest's retired list ($_seeded of $(grep -c . "$_seed") present on disk)."
+    fi
+
     # Rule 2 — outside it, only files a previous run of this installer wrote.
     if [ -f "$_record" ]; then
         while IFS= read -r pf || [ -n "$pf" ]; do
@@ -481,7 +517,7 @@ prune_scope() {
     # parent, and $_skill_dir itself always holds .installed-external.
     find "$_skill_dir" -mindepth 1 -type d -empty -delete 2>/dev/null || :
 
-    rm -f "$_expect" "$_expect.found" "$_ext_now"
+    rm -f "$_expect" "$_expect.found" "$_ext_now" "$_seed"
     if [ "$_pruned" -gt 0 ]; then
         echo "  Pruned $_pruned file(s) the manifest no longer lists."
     else
@@ -504,6 +540,8 @@ verify_scope() {
     while IFS= read -r vline || [ -n "$vline" ]; do
         case "$vline" in
             ''|\#*) continue ;;
+            # Not shipped, so not part of completeness. See the fetch loop above.
+            "retired "*) continue ;;
         esac
 
         vflag=""
@@ -573,6 +611,10 @@ install_to_scope() {
     while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in
             ''|\#*) continue ;;
+            # `retired` names a path this project USED to install outside the skill
+            # directory. It is not a shipped file and is never fetched; its only
+            # reader is prune_scope, which seeds `.installed-external` from it.
+            "retired "*) continue ;;
         esac
 
         flag=""

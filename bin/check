@@ -136,6 +136,14 @@ def manifest_paths():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
+        # `retired ` is NOT a shipped file — it names a path this project used to
+        # install outside the skill tree, kept so the installer's prune can seed
+        # `.installed-external` on a host whose record predates that record. It is
+        # excluded here rather than stripped: every downstream reader of this list
+        # treats a path as something that must exist on disk and must be fetched,
+        # and a retired path is neither.
+        if s.startswith("retired "):
+            continue
         for flag in ("exec ", "hook ", "canary ", "style "):
             if s.startswith(flag):
                 s = s[len(flag):].strip()
@@ -173,6 +181,15 @@ def manifest_style_paths():
 def manifest_canary_paths():
     """Paths carrying `canary` — agent definitions installed to `.claude/agents/`."""
     return _flagged("canary")
+
+
+def manifest_retired_paths():
+    """Paths carrying `retired` — externally-installed files this project SHIPPED in
+    an earlier release and no longer ships. Never fetched, never expected on disk.
+    Their one reader is the installer's `prune_scope`, which seeds
+    `.installed-external` from them so a host installed before that record existed
+    still gets its orphans removed."""
+    return _flagged("retired")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -296,6 +313,126 @@ try:
     )
 except Exception as _e:  # no git, no assertion — never a false pass
     warn("manifest: tracked-ness not asserted", f"git unavailable ({_e})")
+
+# ── `retired`: the list that lets the prune reach an old host ────────────────
+#
+# `prune_scope` rule 2 deletes nothing outside the skill directory unless
+# `.installed-external` records writing it. That record was added WITH the prune on
+# 2026-09-09, so on every host installed before then it is absent, rule 2 reads
+# nothing, and the external files of older releases survive forever — the exact case
+# the prune exists for. The `retired` rows seed it. Three ways the list can be wrong,
+# and all three are silent, so all three are asserted.
+
+_retired = manifest_retired_paths()
+
+# (1) A destination the installer can resolve. It maps by SOURCE PREFIX, and refuses
+#     to guess on anything else — a seeded wrong path aims a delete at a directory
+#     nobody declared.
+_ret_bad_dest = [r for r in _retired
+                 if not (r.startswith("workforce/canary/")
+                         or r.startswith("workforce/output-styles/"))]
+check(
+    "manifest: every `retired` path has a destination the installer can resolve",
+    not _ret_bad_dest,
+    "%s — `retired` maps by source prefix (`workforce/canary/` -> the agents "
+    "directory, `workforce/output-styles/` -> output-styles). A path outside both is "
+    "skipped by prune_scope with a notice, so the row looks present and removes "
+    "nothing" % (", ".join(_ret_bad_dest) or "ok"),
+)
+
+# (2) Retired and shipped are exclusive. A path in both would be fetched and then
+#     seeded as an orphan record — the installer writing a file it has recorded as
+#     something to delete on the next run.
+_ret_also_shipped = sorted(set(_retired) & set(declared))
+check(
+    "manifest: no path is both `retired` and shipped",
+    not _ret_also_shipped,
+    "%s — retired means NOT shipped. A path in both is fetched by the install loop "
+    "and seeded into `.installed-external` as removable by the same run"
+    % (", ".join(_ret_also_shipped) or "ok"),
+)
+
+# (3) THE ONE THAT KEEPS THE LIST HONEST. A `canary` or `style` row removed from the
+#     manifest without a `retired` row left behind is invisible: the file stops
+#     shipping, no host is told, and it sits in the agent menu or the style list of
+#     every machine that ever installed it. Derived from git history rather than
+#     from memory, because "which external files did we used to ship" is a question
+#     the repository can answer exactly and a maintainer cannot.
+try:
+    _ext_ever = set()
+    _hist = subprocess.run(["git", "log", "--format=%H", "--", "manifest.txt"],
+                           cwd=ROOT, capture_output=True, text=True, timeout=60)
+    if _hist.returncode != 0:
+        raise RuntimeError(_hist.stderr.strip()[:120] or "git log failed")
+    for _c in _hist.stdout.split():
+        _blob = subprocess.run(["git", "show", f"{_c}:manifest.txt"], cwd=ROOT,
+                               capture_output=True, text=True, timeout=30)
+        if _blob.returncode != 0:
+            continue
+        for _l in _blob.stdout.splitlines():
+            _l = _l.strip()
+            for _f in ("canary ", "style "):
+                if _l.startswith(_f):
+                    _ext_ever.add(_l[len(_f):].strip())
+    _ext_now = set(manifest_canary_paths()) | set(manifest_style_paths())
+    _unaccounted = sorted(_ext_ever - _ext_now - set(_retired))
+    check(
+        "manifest: every external path this project ever shipped is still accounted for",
+        not _unaccounted,
+        "%s — shipped once as `canary`/`style`, no longer shipped, and carrying no "
+        "`retired` row. `prune_scope` therefore cannot remove them from a host that "
+        "installed them, and they stay in that machine's agent menu or output-style "
+        "list forever. Add a `retired` row for each, in the commit that drops the "
+        "original" % (", ".join(_unaccounted) or "ok"),
+    )
+except Exception as _e:  # no git, no assertion — never a false pass
+    warn("manifest: retired-list completeness not asserted", f"git unavailable ({_e})")
+
+# ── The org chart's `workforce-version:` stamp — producer, reader, reporter ──
+#
+# Every handbook already carried an authoring-version stamp; the CHART did not, and
+# the chart is the file a run opens first. So "is this org older than the release I
+# am running" cost one read per employee, which is why no procedure asked it. The
+# field is only worth anything if all three legs exist, and a field with a spec and
+# no writer is the "rule with no producer is a description" shape this project fails
+# a run over — so each leg is asserted separately and named in the failure.
+_stamp_legs = [
+    ("spec",      "workforce/references/org-chart-format.md",
+     "the header layout must show the field, or `org index` has nothing to copy"),
+    ("producer",  "workforce/references/procedures/org.md",
+     "`org index` step 6 must WRITE it, read from references/version.md, never typed"),
+    ("reader",    "workforce/references/procedures/audit.md",
+     "`audit` Step 5d must branch on it, or the stamp changes no decision"),
+    ("reporter",  "workforce/references/procedures/verify.md",
+     "`verify` must report ORG-STALE, or an org built before the field looks current"),
+]
+_stamp_missing = [f"{_role} ({_path}): {_why}"
+                  for _role, _path, _why in _stamp_legs
+                  if "workforce-version:" not in read(_path)]
+check(
+    "the org chart's workforce-version stamp has a spec, a producer, a reader and a reporter",
+    not _stamp_missing,
+    "; ".join(_stamp_missing) or "ok",
+)
+
+# ABSENT IS NOT EQUAL, in all three readers. A chart written before the field existed
+# carries no stamp, and every one of these steps had to be told so explicitly —
+# reading a blank as "current" is the same failure a blank release record is.
+_absent_rule = [
+    _p for _p in ("workforce/references/org-chart-format.md",
+                  "workforce/references/procedures/audit.md",
+                  "workforce/references/procedures/verify.md")
+    if "workforce-version:" in read(_p)
+    and "bsent" not in read(_p).split("workforce-version:")[0][-4000:] + "".join(
+        _seg[:4000] for _seg in read(_p).split("workforce-version:")[1:])
+]
+check(
+    "every reader of the chart stamp states that ABSENT is not a pass",
+    not _absent_rule,
+    "%s — a chart predating the field carries no stamp. A reader that does not say so "
+    "treats the one org most in need of healing as the one org that is current"
+    % (", ".join(_absent_rule) or "ok"),
+)
 
 _keep_flagged = [l.strip() for l in read("manifest.txt").splitlines() if l.strip().startswith("keep ")]
 check(

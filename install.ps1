@@ -327,6 +327,10 @@ function Install-ClaudeWorkforce {
 
             $flag = ''
             $path = $line
+            # `retired` names a path this project USED to install outside the skill
+            # directory and no longer ships. Not fetched; the bash installer's prune
+            # is its only reader. Skipped here so it is never treated as shipped.
+            if ($line.StartsWith('retired ')) { continue }
             if ($line.StartsWith('keep ')) { $flag = 'keep'; $path = $line.Substring(5).Trim() }
             elseif ($line.StartsWith('hook ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
             # `exec` is `hook`'s mechanical twin — chmod +x on unix, a no-op here.
@@ -393,6 +397,8 @@ function Install-ClaudeWorkforce {
             if (-not $line -or $line.StartsWith('#')) { continue }
             $vPath = $line
             $vFlag = ''
+            # Not shipped, so not part of completeness. See the fetch loop above.
+            if ($line.StartsWith('retired ')) { continue }
             foreach ($pre in @('keep ', 'hook ', 'exec ', 'canary ', 'style ')) {
                 if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim(); $vFlag = $pre.Trim() }
             }

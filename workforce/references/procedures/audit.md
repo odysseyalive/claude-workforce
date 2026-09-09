@@ -1080,6 +1080,21 @@ across every org this skill manages — and no finding anywhere said so, because
 authoring-version stamp. Step 5c's clause governs here unchanged: healed **in this same run**, never
 deferred, never handed back as an optional keep-or-resolve.
 
+**Open on the chart's stamp, once, before touching a handbook.** `.claude/workforce/org-chart.md`'s
+header carries `workforce-version:` (`org-chart-format.md` § `workforce-version:` on the header) — the
+release that last indexed this org. Compare it to the installed `WORKFORCE-VERSION`:
+
+| Chart stamp | What it means | This step |
+|---|---|---|
+| equal | the whole org was indexed by this release | the per-handbook scan below still runs — an individual handbook can lag a chart — but nothing org-wide is due |
+| older, or absent | the org predates this release | every governed handbook is refresh-due; run the deltas shipped in between |
+| newer | this copy of the skill is older than the org it is reading | **STOP.** Report both numbers and refuse the refresh. Rewriting contracts from a spec older than the one that authored them is a downgrade wearing a heal's clothes |
+
+**This is a cheap gate, not a replacement for the per-handbook read.** It answers "is anything due at
+all" in one file read instead of one read per employee, and on an org of nine that is the difference
+between a decision made and a decision skipped. **Absent is treated as older**, never as equal — a
+chart written before the field existed is exactly the pre-stamp state this step exists for.
+
 Per **governed** handbook (adopted agents stay exempt until their first amendment, as everywhere):
 
 1. **Read the ORG-RECORD `workforce-version:` stamp.** Older than the installed `WORKFORCE-VERSION`

@@ -205,6 +205,19 @@ agreeing against the third is a finding, not a tiebreak.
 | Each domain-overseeing Lead has a domain-model critic IC, or a recorded repin | `LANE-DRIFT` — a Lead judging what it cannot see |
 | Every edge re-derived from the child's `reports-to`, and each parent's `direct-reports` agrees | `EDGE-MISMATCH` — a real edge the chart does not draw |
 | Every Lead handbook carries the handoff boundary clause | `HANDOFF-UNWIRED` — the measurement ships with nothing calling it |
+| Chart header `workforce-version:` present, and equal to the installed `WORKFORCE-VERSION` | `ORG-STALE` — the org was last indexed by an older release, so shipped contract changes have not reached it |
+
+**`ORG-STALE` reports the state; it never fixes it.** The remedy is `audit`, whose Step 5d opens on
+this same stamp and applies the deltas shipped in between. Three readings, and the third is the one
+worth naming: **absent is `ORG-STALE`, not a pass.** A chart written before the field existed carries
+no stamp, and a check that skipped it would report an org clean for the precise reason it cannot be
+verified. **Newer than the installed release is its own finding** — the skill has been downgraded
+under the org — and it is reported with both numbers rather than folded into staleness, because the
+remedy is the opposite one: update the skill, do not re-index the org.
+
+This is the reporting leg of the three that carry the stamp. The installer ships the field's spec,
+`org index` writes it, `audit` reads it to decide, and this row says when it is missing or behind —
+so an org that was built before the field existed is told about rather than left looking current.
 
 **`EDGE-MISMATCH` is the missing-edge direction, and that is why it is checked here rather than
 left to `index`.** An extra edge is visible to anyone reading the chart; an omitted one reads as a

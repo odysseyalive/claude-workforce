@@ -22,7 +22,12 @@
 #              `staging.md` Phase C or D can spawn it, and it is shipped so the first
 #              audit finds it already there rather than having to write it
 #
-# THIS LIST IS THE FLAG SET, and it is complete. Both installers branch on all five
+#   retired    NOT fetched, and not a shipped file. A path this project USED to
+#              install OUTSIDE the skill directory and no longer ships. It exists so
+#              the prune can reach a host whose `.installed-external` record predates
+#              the record itself — see § Retired external paths at the foot of this file
+#
+# THIS LIST IS THE FLAG SET, and it is complete. Both installers branch on all six
 # and every reader that strips a flag must strip all five. `canary` went undocumented
 # here from the day it was added until 2026-09-07 while five rows used it, and
 # release-verifier's own completeness check — which its handbook orders to read the
@@ -255,3 +260,39 @@ workforce/agents/provenance-analyst/AGENT.md
 workforce/agents/settings-scout/AGENT.md
 exec workforce/bin/wf-claude-md
 workforce/references/claude-md.md
+
+# ── Retired external paths ───────────────────────────────────────────────────
+#
+# WHAT THIS IS FOR, and it is one specific hole. `prune_scope` rule 2 refuses to
+# delete anything in `agents/` or `output-styles/` unless a previous run of the
+# installer recorded writing it, by exact path, in `.installed-external`. That rule
+# is right — a basename match would delete a user's own agent that happened to share
+# a name — but the record was ADDED with the prune, on 2026-09-09. Every install
+# made before that date has no record, so on those hosts rule 2 has nothing to read
+# and the prune's first run skips the external files entirely.
+#
+# MEASURED on this maintainer's own machine, 2026-09-09: `.installed-external` absent
+# at `~/.claude/skills/workforce/`, five `wf-canary-*.md` in `~/.claude/agents/` and
+# `plain-speak.md` in `~/.claude/output-styles/` — all six shipped by a release that
+# no longer ships them, all six invisible to the prune that exists to remove them.
+# Five of them appear in the agent menu of every session on the machine.
+#
+# So the record is SEEDED from this list when it is absent. That keeps rule 2's
+# safety property exactly: these are paths this project shipped, named explicitly,
+# never inferred from a basename or a directory scan. A user's own agent cannot
+# appear here, because the list is authored from this repository's own history.
+#
+# Destination is derived from the source directory, the same mapping the live flags
+# use: `workforce/canary/*` -> the agents directory, `workforce/output-styles/*` ->
+# the output-styles directory. A retired path outside those two prefixes is a
+# manifest error and `bin/check` fails on it rather than guessing.
+#
+# A row is added here when a `canary` or `style` row is removed, in the same commit.
+# Rows are never deleted: a host can be arbitrarily old, and a list that forgets an
+# entry re-opens exactly the hole it was written to close.
+retired workforce/canary/wf-canary-a.md
+retired workforce/canary/wf-canary-b.md
+retired workforce/canary/wf-canary-c.md
+retired workforce/canary/wf-ceiling-probe.md
+retired workforce/canary/wf-model-canary.md
+retired workforce/output-styles/plain-speak.md

@@ -113,7 +113,41 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-08
+## Open, as of 2026-09-09
+
+**Landed 2026-09-09 — the strip shipped on an unchanged version, and the prune could not
+reach an old host (v1.30.2, v1.30.3).** Two findings from running `/workforce update` on
+the maintainer's own machine the morning after the strip-down release.
+
+**The version.** `90fb341` removed 60 shipped files and modified 23, and its subject line
+says v1.31.0 while `references/version.md` and the `SKILL.md` mirror both still read
+1.30.1. Nothing on a host compares anything but that number — `version --check`, the
+installer's downgrade guard, and `update`'s before/after all read it — so a user on the
+pre-strip 1.30.1 would have been told they were current while running 60 files that no
+longer exist upstream. Bumped to 1.30.2, on the user's call rather than to 1.31.0.
+
+**The prune's bootstrap hole, and it is the sharper one.** `prune_scope` rule 2 correctly
+refuses to delete anything outside the skill directory unless `.installed-external`
+records writing it — but that record was added *with the prune*, in the same commit. So
+on every host installed before 2026-09-09 the record is absent, rule 2 reads nothing, and
+the external files of older releases survive forever. MEASURED here: five `wf-canary-*.md`
+in `~/.claude/agents/` and `plain-speak.md` in `~/.claude/output-styles/`, all six shipped
+by a release that no longer ships them, all six invisible to the prune written to remove
+them, five of them showing in the agent menu of every session on the machine. **The
+release meant to cut residue could not remove its own.** Closed by a `retired` manifest
+flag — the explicit list of external paths this project has ever shipped — which seeds
+the record when it is absent. Proved by breaking it: without the list all six survive the
+install; with it all six go and a hand-placed `my-own-agent.md` beside them does not.
+Three assertions guard the list, the third derived from `git log -- manifest.txt` so
+"which external files did we used to ship" is answered by the repository rather than by
+a maintainer's memory.
+
+**And the org chart now carries `workforce-version:`.** Every handbook already stamped the
+release that authored it; the chart, which is the file a run opens first, did not — so
+*is this org older than the release I am running* cost one read per employee, which is why
+no procedure asked it. `org index` writes it, `audit` Step 5d branches on it before
+touching a handbook, `verify` reports `ORG-STALE`. Absent is treated as older in all
+three, never as equal.
 
 **Landed 2026-09-08 — six defects a live audit found in the distribution, and the two the repair
 introduced (v1.27.0).** Trigger: a peer session ran `/workforce audit` against a deployed project
