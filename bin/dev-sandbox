@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Run a command against a THROWAWAY workforce install, then delete it.
+
+    bin/dev-sandbox                     # install, print the path, run nothing, remove
+    bin/dev-sandbox python3 bin/check   # install, run that, remove
+    bin/dev-sandbox --keep <cmd>        # leave it behind (prints where)
+
+WHY THIS EXISTS — user directive, 2026-09-09:
+
+    "I didn't ask for workforce to be installed inside the project directory. I
+    intentionaly deleted it and am just using workforce dev, because that's all
+    that should happen in this project repo"
+
+    "if you need to test something workforce dev should create a temporary
+    installation in the user ~/ and then delete the installation after testing."
+
+Before this, testing anything that needed a real install meant writing into the
+live personal copy at ~/.claude/skills/workforce — the one every other project on
+the machine resolves, and the one a peer session may be running against — or into
+the repo, which is what the first message forbids. Neither is a test environment;
+both are production.
+
+The sandbox is a CLAUDE_CONFIG_DIR under $HOME (scopes.md § Installing into a
+specific CLAUDE_CONFIG_DIR), which is what relocates the whole ~/.claude tree. It
+lives under $HOME rather than /tmp because that is what the directive says, and
+because a tmpfs /tmp does not reproduce the real filesystem the install lands on.
+
+REMOVAL IS UNCONDITIONAL. It runs in a finally block, so a failing command, a
+traceback, and a Ctrl-C all still clean up. `--keep` is the only way to leave one,
+and it prints the path so it can never be lost.
+"""
+import os
+import shutil
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
+
+argv = sys.argv[1:]
+keep = False
+if argv and argv[0] == "--keep":
+    keep, argv = True, argv[1:]
+
+if not os.path.isfile("manifest.txt"):
+    sys.exit("no manifest.txt — run from the repo root")
+
+home = os.path.expanduser("~")
+sandbox = os.path.join(home, f".claude-workforce-sandbox.{os.getpid()}")
+
+# REFUSE to reuse a path that already holds something. The remover below is
+# recursive, and it must never be aimed at a directory this process did not make.
+if os.path.exists(sandbox):
+    sys.exit(f"REFUSING — {sandbox} already exists. Nothing was created or removed.")
+
+rc = 0
+try:
+    os.makedirs(os.path.join(sandbox, "skills"))
+    env = dict(os.environ, CLAUDE_CONFIG_DIR=sandbox)
+    install = subprocess.run(
+        [sys.executable, "bin/sync", "--personal"],
+        env=env, capture_output=True, text=True)
+    if install.returncode != 0:
+        sys.stderr.write(install.stdout + install.stderr)
+        sys.exit(f"sandbox install failed (rc={install.returncode}) — {sandbox} removed")
+
+    dest = os.path.join(sandbox, "skills", "workforce")
+    n = sum(len(f) for _, _, f in os.walk(dest))
+    print(f"sandbox install: {n} files at {dest}")
+    print(f"CLAUDE_CONFIG_DIR={sandbox}")
+
+    if argv:
+        print(f"running: {' '.join(argv)}\n")
+        rc = subprocess.run(argv, env=env).returncode
+finally:
+    if keep:
+        print(f"\n--keep: sandbox LEFT at {sandbox} — remove it yourself")
+    elif os.path.isdir(sandbox):
+        shutil.rmtree(sandbox)
+        print(f"\nsandbox removed: {sandbox}")
+
+sys.exit(rc)

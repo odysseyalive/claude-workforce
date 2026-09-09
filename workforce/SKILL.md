@@ -4,7 +4,7 @@ name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.31.0"
+version: "1.32.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -521,6 +521,29 @@ anywhere. The operational reading is — **say the state, not the journey.** Lea
 If it is fixed, it is fixed; the discovery is background and usually not worth a line. If something
 genuinely refuses you, name it in one sentence and finish everything else.*
 
+> **"I didn't ask for workforce to be installed inside the project directory. I intentionaly
+> deleted it and am just using workforce dev, because that's all that should happen in this project
+> repo"**
+
+> **"if you need to test something workforce dev should create a temporary installation in the user
+> ~/ and then delete the installation after testing."**
+
+*— Added 2026-09-09, source: user directive, stated during `/workforce dev` after `bin/sync
+--personal` — asked for the personal copy and nothing else — silently rebuilt a 137-file install
+inside this repository, which the user had deliberately deleted. **Two clauses, and the first is a
+rule about CREATION, not about sync.** `update.md` § Resolution rules had stated it for the shipped
+command since the beginning — "update never creates an install that was not already there" — and
+every maintainer path was exempt from it, so the one rule that would have prevented this was written
+down, correct, and out of reach of the code that broke it. The second clause names what to do
+instead: a dev test that needs a real install builds a THROWAWAY one under `$HOME` and removes it
+when the test ends. Note what it rules out, which is what was happening before — testing against
+`~/.claude/skills/workforce`, the copy every other project on the machine resolves and a peer session
+may be running against. That is not a test environment; it is production with a different name.
+Mechanics at `bin/sync` § NEVER CREATE AN INSTALL THAT WAS NOT ALREADY THERE and `bin/dev-sandbox`,
+whose removal runs in a `finally` block so a failing command, a traceback, and a Ctrl-C all still
+clean up. The operational reading is — **never materialize an install nobody asked for, and test
+against a copy you are about to delete.***
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
@@ -647,6 +670,14 @@ inherited from claude-enforcer, where reverse-order edits repeatedly landed in t
 vanished. End-of-session check: `git status --short -- workforce/` empty when changes were expected is
 a FAIL.
 
+**No install is created in this repo, and no test runs against the live one.** `bin/sync` refreshes
+`.claude/skills/workforce` only if it is already there and never materializes it; `--personal`
+refreshes `~/.claude/skills/workforce` alone. When a test needs a real install, `bin/dev-sandbox
+[--keep] [cmd...]` builds a throwaway one under `$HOME` via `CLAUDE_CONFIG_DIR`, runs the command
+against it, and removes it in a `finally` block. Never point a test at the live personal copy — every
+other project on the machine resolves it, and a peer session may be running against it (§ Directives,
+2026-09-09).
+
 ## Display vs. Execute
 
 High-risk commands default to **display mode** and require `--execute`: `hire`, `promote`,
@@ -730,7 +761,7 @@ Cross-cutting specs: `references/platform.md` (MEASURED host facts — read befo
 design), `references/scopes.md` (personal vs project install, and what each can see),
 `references/org-design.md` (deriving a company from a project — the primary path),
 `references/org-doctrine.md` (the three-document hierarchy),
-`references/procedure-for-procedures.md` (how every handbook is authored),
-`references/procedure-for-procedures.md` (depth, fan-out, spawn caps),
+`references/procedure-for-procedures.md` (how every handbook is authored, and the
+MEASURED handbook length ceiling),
 `references/staging.md` (lint, probe, canary),
 `references/evaluators.md` (code and text quality review — what makes tier-4 verification real).

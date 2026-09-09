@@ -75,7 +75,25 @@ if personal and os.path.exists(PERSONAL_ROOT) and not os.path.isfile(
     sys.exit(f"REFUSING — {PERSONAL_ROOT} exists but has no SKILL.md, so it is not a "
              f"workforce install. Nothing was removed.")
 
-targets = [DEST_ROOT] + ([PERSONAL_ROOT] if personal else [])
+# NEVER CREATE AN INSTALL THAT WAS NOT ALREADY THERE. This script used to list
+# DEST_ROOT unconditionally, so `bin/sync --personal` — asked for the personal copy
+# and nothing else — also materialised a 137-file install inside the repo. Measured
+# 2026-09-09 on this repository, where the user had deliberately deleted the
+# in-project copy and works through `/workforce dev`: the sync silently put it back,
+# and the report said "synced 137 files" twice as though both were asked for.
+# `update.md` § Resolution rules already states the rule for the shipped command —
+# "update never creates an install that was not already there" — and the maintainer
+# script was the one path exempt from it.
+project_present = os.path.isdir(DEST_ROOT)
+targets = ([DEST_ROOT] if project_present else []) + (
+    [PERSONAL_ROOT] if personal else [])
+if not targets:
+    sys.exit(f"nothing to refresh — {DEST_ROOT} is not present and --personal was not "
+             f"given. This repo does not need an in-project install to develop against; "
+             f"pass --personal to refresh {PERSONAL_ROOT}.")
+if personal and not project_present:
+    print(f"note: {DEST_ROOT} is absent and is NOT being created — refreshing the "
+          f"personal install only.")
 
 
 def manifest_entries():

@@ -143,12 +143,28 @@ locations have been looked at.
    five of them unasked is the wholesale read this record was structured to avoid. Name the command
    that shows one — `wf-changes --from <before>` without `--rows` — rather than pasting the text.
 
-   **If any row says the org must be healed, say so in the closing line and name `audit`.** That is
-   the one case where updating the skill was NOT the whole update: an org holds its own copies of
-   handbook contracts, the chart format, the `/org` dispatch checkpoint and the operating
-   principles, and the install does not touch any of them. Reporting a clean update over a stale
-   org is the shape the say-the-state directive forbids — true in every particular, and it leaves
-   the reader believing something that is not so.
+   **If any row says the org must be healed, CENSUS THIS PROJECT FIRST, then say what follows from
+   it.** An org holds its own copies of handbook contracts, the chart format, the `/org` dispatch
+   checkpoint and the operating principles, and the install does not touch any of them — so a
+   heal-flagged row means updating the skill was not the whole update *for a project that has an
+   org*. Reporting a clean update over a stale org is the shape the say-the-state directive forbids.
+
+   **But naming `audit` where there is nothing to heal is the same defect pointing the other way.**
+   It tells the reader their update is unfinished when it is finished, and it sends them to a
+   command that would find no employees. So the closing line is resolved from `.claude/agents/`,
+   which step 1 already has the tree for:
+
+   | This project | Closing line |
+   |---|---|
+   | has registered employees | the update is not complete here — name `audit` and the releases that need it |
+   | has none | **the update IS complete here.** Name the heal only as something other projects with an org need |
+   | is the workforce distribution itself | the update is complete. **Never name `audit`** — the Self-Exclusion Rule forbids workforce auditing itself, and `dev audit` is user-typed only |
+
+   *Added 1.31.1: this step said "name `audit`" on any heal-flagged row with no census, so a run
+   against a repo with zero employees closed by telling the user their update was not finished and
+   to run `audit` — on the workforce repository, which the Self-Exclusion Rule forbids. The user's
+   reply was "did the update not work? and I shouldn't have to run audit on the actually workforce
+   installation itself". Both halves were right.*
 
    **An absent index is reported, never worked around.** An install predating the change record has
    no `changes/index.md`; say that the range could not be shown and why, rather than printing two

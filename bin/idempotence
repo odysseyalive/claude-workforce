@@ -62,9 +62,14 @@ WRITERS = {
         "argv": ["bin/coverage", "--stamp"],
         "watch": "workforce",
     },
+    # SEEDED, because `bin/sync` no longer CREATES a project install that was not
+    # there (SKILL.md § Directives, 2026-09-09) — and this case exists to prove the
+    # REFRESH is idempotent, not that the guard fires. Without the seed the run is a
+    # reported no-op comparing two empty trees: green, and measuring nothing.
     "sync": {
         "argv": ["bin/sync"],
         "watch": ".claude/skills/workforce",
+        "seed_dirs": [".claude/skills/workforce"],
     },
     # Both wf-claude-md write modes, against fixture trees inside the copy. The
     # region is substituted rather than appended, and that is exactly the property
@@ -121,32 +126,6 @@ WRITERS = {
                  "fixtures/scripts/apply-deadhook-execute", "--execute"],
         "watch": "fixtures/scripts/apply-deadhook-execute",
     },
-    # wf-pin-check --execute rewrites a manifest IN PLACE and writes dependabot.yml. The
-    # second pass finds nothing loose because the first pass pinned it — but the hazard
-    # is the rewrite itself: it is a targeted substring substitution, and one that
-    # matched its own output would pin `1.0.0` to `1.0.0` forever, or worse, a version
-    # containing a regex-significant character would corrupt the line on every commit.
-    # This writer runs on EVERY COMMIT in a guarded repo, so a non-idempotent version of
-    # it damages a file a little more each time anyone touches the project.
-    "pincheck-execute": {
-        "argv": ["workforce/bin/wf-pin-check", "--root",
-                 "fixtures/scripts/pincheck-execute", "--execute"],
-        "watch": "fixtures/scripts/pincheck-execute",
-    },
-    # The dependabot MERGE, which is the append-only path and therefore the exact shape
-    # `bin/coverage --stamp` got wrong: a merge whose "is this ecosystem already
-    # covered?" test stops matching its own output appends the same entry on every run,
-    # forever, silently. The second pass must find the file PRESENT and write nothing.
-    "pincheck-dependabot": {
-        "argv": ["workforce/bin/wf-pin-check", "--root",
-                 "fixtures/scripts/pincheck-dependabot-merge", "--execute"],
-        "watch": "fixtures/scripts/pincheck-dependabot-merge",
-    },
-    # The git wiring: see PIN_HOOK_SETUP above for why this one builds its own repo.
-    "pincheck-install-hook": {
-        "argv": ["-c", PIN_HOOK_SETUP],
-        "watch": ".idempotence-scratch",
-    },
 }
 
 
@@ -170,6 +149,12 @@ def run_writer(name, spec):
         # copying it makes this slow enough that nobody runs it — which is how the
         # original defect survived.
         shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "node_modules"))
+
+        # A writer that REFUSES to create what is not there needs the thing to exist
+        # before the case can measure its refresh. `seed_dirs` makes those directories
+        # in the copy, never in ROOT.
+        for d in spec.get("seed_dirs") or []:
+            os.makedirs(os.path.join(work, d), exist_ok=True)
 
         for pass_no in (1, 2):
             p = subprocess.run([sys.executable] + spec["argv"], cwd=work,

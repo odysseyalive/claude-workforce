@@ -573,11 +573,115 @@ def do_wire_defaults(root, scope, execute):
     rc = 0
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
+    rc = max(rc, prune_dead_hooks(root, scope, execute))
     report_duplicate_firing(root)
     if not execute:
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
               "refused the agent's write)")
     return rc
+
+
+def prune_dead_hooks(root, scope, execute):
+    """Remove workforce-owned hook registrations whose command is no longer on disk.
+
+    WHY THIS EXISTS — the missing half of "three paths, or it does not propagate"
+    (SKILL.md § Directives, 2026-09-07). That directive built three paths for WIRING a
+    new mechanism and none for UNWIRING a retired one, so a release that deletes a hook
+    script leaves its registration behind on every machine that already had it. The
+    installer prunes the FILES; nothing pruned the REGISTRATIONS.
+
+    MEASURED 2026-09-09 on this machine. The 1.30.2 strip took the shipped hook set
+    from nine to one. Updating to 1.31.0 removed the eight scripts as designed and left
+    all eight `hooks` entries in `~/.claude/settings.json` pointing at paths that no
+    longer exist — `wf-plain-guard`, `wf-speak-guard`, `wf-ledger-open`,
+    `wf-standing-request`, `wf-turn-brief`, `wf-ledger-capture`, `wf-unique-persona`,
+    `wf-budget-guard`. A dead registration is worse than an absent one: the host runs it
+    every turn, it fails every turn, and the failure is invisible.
+
+    IT IS NOT `--unwire-defaults`. That reverses everything workforce owns, on purpose,
+    as a teardown. This removes ONLY rows the record calls workforce-owned whose command
+    path does not resolve — a row the user wired themselves is never touched, and a row
+    whose script is present is never touched, so a release that merely renames nothing
+    removes nothing. Absence of the record means workforce owns nothing here and this
+    removes nothing, exactly as the unwire path treats it.
+
+    IT RIDES `--wire-defaults`, which is deliberate: that is the single producer the
+    installer, `audit`, and `verify` all call, so the prune reaches every path the wiring
+    reaches and cannot drift from it. A separate flag would be a fourth path somebody has
+    to type, which is the shape the directive forbids."""
+    spath = settings_for_scope(root, scope)
+    owned_path, owned = load_owned(root, scope)
+    recorded = owned.get("hooks_added") or []
+    if not recorded:
+        return 0
+
+    data, err = load(spath)
+    if err or not isinstance(data, dict):
+        return 0
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict):
+        return 0
+
+    def _dead(command):
+        """True only when the command resolves to a path that is not there.
+
+        EXPANSION FIRST, ALWAYS. `_norm_command` is the one place a registration's two
+        spellings are reduced to the form they share — a raw string test would read
+        `"$HOME/.claude/skills/workforce/bin/wf-protect-directives"` as a nonexistent
+        path and prune a live hook. Same helper the wire and unwire paths use, for the
+        same reason.
+
+        A command that is not a plain absolute path — a shell pipeline, an interpreter
+        call — is NEVER called dead: this cannot tell whether it runs, and guessing
+        would remove a working hook. Absence is proven, never inferred.
+        """
+        c = _norm_command(command, root)
+        if not isinstance(c, str) or not os.path.isabs(c) or " " in c:
+            return False
+        return not os.path.exists(c)
+
+    removed = []
+    for row in recorded:
+        if not isinstance(row, dict):
+            continue
+        event, matcher, command = row.get("event"), row.get("matcher"), row.get("command")
+        if not _dead(command):
+            continue
+        entries = hooks.get(event)
+        if not isinstance(entries, list):
+            continue
+        keep = []
+        for e in entries:
+            if (isinstance(e, dict) and e.get("matcher") == matcher
+                    and any(_same_command(h, command, root)
+                            for h in (e.get("hooks") or []))):
+                removed.append((event, command))
+                continue
+            keep.append(e)
+        if keep:
+            hooks[event] = keep
+        else:
+            hooks.pop(event, None)
+
+    if not removed:
+        return 0
+    print(f"  PRUNE  {len(removed)} dead registration(s) — the script no longer ships:")
+    for event, command in removed:
+        print(f"    - {event}  {os.path.basename(command.strip(chr(34)))}")
+    if not execute:
+        print("    (nothing written — add --execute)")
+        return 0
+
+    owned["hooks_added"] = [
+        r for r in recorded
+        if not (isinstance(r, dict) and (r.get("event"), r.get("command")) in
+                {(e, c) for e, c in removed})
+    ]
+    if not hooks:
+        data.pop("hooks", None)
+    dump(spath, data)
+    dump(owned_path, owned)
+    return 0
 
 
 def do_unwire_defaults(root, scope, execute):

@@ -55,6 +55,7 @@ if "--stamp" in sys.argv:
 
 FAILS = []
 WARNS = []
+SKIPS = []
 PASSES = 0
 
 
@@ -68,6 +69,37 @@ def check(name, ok, detail=""):
 
 def warn(name, detail=""):
     WARNS.append((name, detail))
+
+
+def skip(name, why):
+    """A check whose INPUT is absent — recorded as neither passed nor failed.
+
+    Some assertions here read a project's own org state (`.claude/agents/*`,
+    `.claude/workforce/*`). That state is created by `/workforce dev audit` and this
+    repository does not always carry it — the user works through `/workforce dev` and
+    deliberately keeps no in-project install (SKILL.md § Directives, 2026-09-09).
+
+    SKIP IS NOT A PASS, AND THAT DISTINCTION IS THE WHOLE POINT. `read()` returns ""
+    for an absent file, so `"x" not in ""` is True: an unstaffed repo would report
+    every one of these rules upheld having measured nothing. That vacuous green is
+    what `bin/prove` exists to find and what the guard checks were written against.
+    A skip says the opposite out loud — the property was NOT evaluated, and here is
+    the precondition that would evaluate it.
+
+    It does not fail the run, because a missing org is a legitimate state of this
+    repository rather than a defect in the distribution. `bin/prove` can therefore
+    run. Every skip prints its own line, with its precondition.
+    """
+    SKIPS.append((name, why))
+
+
+def org_state(path):
+    """Read a project-org file, or return None if this repo carries no org.
+
+    None is deliberately NOT "" — the empty string is what makes a `not in` test
+    pass vacuously, so callers are forced to handle absence explicitly.
+    """
+    return read(path) if os.path.exists(path) else None
 
 
 def read(p):
@@ -513,6 +545,25 @@ check(
     "the change record has a shipped query and both of its readers",
     not _chg_dead,
     "; ".join(_chg_dead) or "ok",
+)
+
+# update.md step 7 must CENSUS before it names `audit`. Shipped 1.31.0 with no
+# census, it closed a run against a zero-employee repo with "the update is not
+# complete — run audit", on the workforce repository itself, which the
+# Self-Exclusion Rule forbids. The closing line is main-loop prose and cannot be
+# checked; that step 7 states all three outcomes CAN be.
+_upd_census = [
+    (".claude/agents/ is consulted", ".claude/agents/" in upd),
+    ("the no-employee outcome is stated", "the update IS complete here" in upd),
+    ("self-exclusion is stated", "Never name `audit`" in upd),
+]
+_upd_missing = [_n for _n, _ok in _upd_census if not _ok]
+check(
+    "update.md step 7 censuses the project before naming `audit`",
+    not _upd_missing,
+    f"missing from update.md: {_upd_missing} — a heal-flagged release then reports "
+    "an unfinished update to a project that has no org to heal, and points the "
+    "workforce distribution at a command that excludes it",
 )
 
 _keep_flagged = [l.strip() for l in read("manifest.txt").splitlines() if l.strip().startswith("keep ")]
@@ -5711,23 +5762,29 @@ except Exception as _e:      # a diagnostic must not die on the input it diagnos
 # True: an unreadable config would report the rule upheld having measured nothing.
 # That is the same vacuous green the personal-install drift check grew its
 # `_compared > 0` guard for, and the same one bin/prove exists to find.
-_proj_cfg = read(".claude/workforce/org-config.md")
-check(
-    "the project-config pool check actually read a project config",
-    "## Budget Receipt" in _proj_cfg,
-    ".claude/workforce/org-config.md is absent or is not an instantiated config, so "
-    "the sole-source check below has nothing to look at and would pass on an empty "
-    "string. Run `/workforce audit` in this repo, or accept that the assertion under "
-    "it is unproven — never both",
-)
-check(
-    "org-config: a project's config declares no competing statics pool",
-    not re.search(r"(?m)^## Model statics", _proj_cfg),
-    "this repository's `.claude/workforce/org-config.md` carries a `## Model statics` "
-    "heading of its own. That is the legacy artifact the template says to report and "
-    "read PAST, and this repo's config is the shape every other project's is compared "
-    "against. Report it; do NOT delete it — the never-clobber rule owns that file",
-)
+# THE PAIR SKIPS TOGETHER OR RUNS TOGETHER. The guard exists so the assertion under
+# it can never pass on an empty string, so resolving the guard by skipping while
+# letting the assertion run would rebuild the exact vacuous green it was written to
+# prevent. Absence of an org is a legitimate state of this repo, not a defect.
+_proj_cfg = org_state(".claude/workforce/org-config.md")
+if _proj_cfg is None or "## Budget Receipt" not in _proj_cfg:
+    skip(
+        "org-config: a project's config declares no competing statics pool",
+        ".claude/workforce/org-config.md is absent or is not an instantiated config. "
+        "This repo works through `/workforce dev` and does not always carry an org, so "
+        "there is no project config to compare — NOT evaluated, and specifically not "
+        "passed on an empty string. Precondition: `/workforce dev audit` in this repo "
+        "(`audit` alone excludes workforce itself)",
+    )
+else:
+    check(
+        "org-config: a project's config declares no competing statics pool",
+        not re.search(r"(?m)^## Model statics", _proj_cfg),
+        "this repository's `.claude/workforce/org-config.md` carries a `## Model statics` "
+        "heading of its own. That is the legacy artifact the template says to report and "
+        "read PAST, and this repo's config is the shape every other project's is compared "
+        "against. Report it; do NOT delete it — the never-clobber rule owns that file",
+    )
 # LINE-ANCHORED, and that is load-bearing rather than incidental. The doctrine
 # requires the stale section to be REPORTED, so a correct config may well mention
 # `## Model statics` in prose or inside a fence while carrying no such section.
@@ -8419,6 +8476,17 @@ check("a hook command is matched after expansion, never as a raw string",
       "three-paths directive has audit re-wire every run — one duplicate per audit, "
       "forever. The unwire path is the worse half: it left the hook wired and reported "
       "it removed")
+check("a retired hook is UNWIRED by the same pass that wires the live ones",
+      "def prune_dead_hooks" in _wsa
+      and "prune_dead_hooks(root, scope, execute)" in _wsa
+      and "_same_command(h, command, root)" in _wsa,
+      "the three-paths directive built three paths for WIRING a new mechanism and none "
+      "for unwiring a retired one. Measured 2026-09-09: the 1.30.2 strip cut the shipped "
+      "hook set from nine to one, the update removed the eight scripts as designed, and "
+      "all eight registrations stayed in ~/.claude/settings.json pointing at paths that "
+      "no longer exist — run every turn, failing every turn, invisibly. The prune rides "
+      "--wire-defaults so it reaches the installer, audit and verify without a fourth "
+      "gesture anyone has to type")
 check("restoring a style that was absent DELETES the key",
       "outputStyle removed (it was absent before)" in _wsa
       and 'data.pop("outputStyle", None)' in _wsa,
@@ -9695,23 +9763,42 @@ if os.path.exists(_da_src):
         _orig = [l for l in _old[_a + 1:_b] if l.strip()]
     except StopIteration:
         _orig = None
-check(
-    "doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
-    _fenced is not None and _orig is not None and _fenced == _orig,
-    f"fenced {len(_fenced or [])} non-blank lines in {_da_src} against {len(_orig or [])} in "
-    "HEAD:CLAUDE.md § Non-negotiables. The fence exists so this comparison can be made; "
-    "an unenforced fence drifts, and it already had. These are the user's own words and "
-    "the file they came from has been deleted",
-)
+# BOTH SKIP WHEN THE EMPLOYEE IS NOT STAFFED HERE. `doctrine-author` is an employee of
+# this repository's own org, and this repo does not always carry one — it is worked
+# through `/workforce dev`, with no in-project install (SKILL.md § Directives,
+# 2026-09-09). With the handbook absent, `read()` returns "" and the pointer check
+# below would be testing a substring against an empty string; the byte-comparison
+# would compare two Nones. Neither measures the property, so neither reports a pass.
+# WHAT IS NOT SKIPPED: nothing about the DISTRIBUTION depends on these — they assert a
+# property of an instantiated org, which is why absence is a skip rather than a failure.
+if not os.path.exists(_da):
+    _da_why = (
+        f"{_da} is absent — this repo carries no org, so the employee that holds the "
+        "user's Non-negotiables is not staffed here. NOT evaluated, and specifically "
+        "not passed against an empty file. Precondition: `/workforce dev audit` in "
+        "this repo"
+    )
+    skip("doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
+         _da_why)
+    skip("doctrine-author reaches its Non-negotiables wherever they live", _da_why)
+else:
+    check(
+        "doctrine-author's fenced span is the user's Non-negotiables, byte-for-byte",
+        _fenced is not None and _orig is not None and _fenced == _orig,
+        f"fenced {len(_fenced or [])} non-blank lines in {_da_src} against {len(_orig or [])} in "
+        "HEAD:CLAUDE.md § Non-negotiables. The fence exists so this comparison can be made; "
+        "an unenforced fence drifts, and it already had. These are the user's own words and "
+        "the file they came from has been deleted",
+    )
 
-check(
-    "doctrine-author reaches its Non-negotiables wherever they live",
-    "start of the user's verbatim" in read(_da)
-    or ("GROUNDING" in read(_da) and "Non-negotiables" in read(_da)),
-    "relocation is legal; losing the pointer is not. If the span moved to the grounding "
-    "library the handbook must still name it and bind the reader to it, or the user's own "
-    "words reach nobody and the shortening was a deletion with extra steps",
-)
+    check(
+        "doctrine-author reaches its Non-negotiables wherever they live",
+        "start of the user's verbatim" in read(_da)
+        or ("GROUNDING" in read(_da) and "Non-negotiables" in read(_da)),
+        "relocation is legal; losing the pointer is not. If the span moved to the grounding "
+        "library the handbook must still name it and bind the reader to it, or the user's own "
+        "words reach nobody and the shortening was a deletion with extra steps",
+    )
 
 check(
     "this repo has no CLAUDE.md — it was evacuated, not merely trimmed",
@@ -9721,15 +9808,27 @@ check(
     "CLAUDE.md here means the one project guaranteed to exercise `wf-claude-md` is the "
     "one project not living by its result",
 )
-check(
-    "the source-first rule reaches the employee that owns it",
-    "Always edit source, then `bin/sync --personal`" in (
-        read(".claude/agents/runtime-lead.md")
-        + read(".claude/workforce/grounding/runtime-lead.md")),
-    "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
-    "destroyed rather than merged. The rule now arrives with the spawn that needs it; "
-    "a handbook does not decay as context grows, which is the argument for the move",
-)
+# Same shape: `runtime-lead` is an employee, not a shipped file. With no org here the
+# two reads concatenate to "" and the `in` test would be measuring nothing.
+_rl = ".claude/agents/runtime-lead.md"
+if not os.path.exists(_rl):
+    skip(
+        "the source-first rule reaches the employee that owns it",
+        f"{_rl} is absent — this repo carries no org, so there is no employee to carry "
+        "the rule. NOT evaluated. The rule itself still ships, in SKILL.md § Dev Path "
+        "Discipline, which is checked separately. Precondition: `/workforce dev audit` "
+        "in this repo",
+    )
+else:
+    check(
+        "the source-first rule reaches the employee that owns it",
+        "Always edit source, then `bin/sync --personal`" in (
+            read(_rl)
+            + read(".claude/workforce/grounding/runtime-lead.md")),
+        "bin/sync deletes the runtime tree and rebuilds it, so a runtime-first edit is "
+        "destroyed rather than merged. The rule now arrives with the spawn that needs it; "
+        "a handbook does not decay as context grows, which is the argument for the move",
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The recruiter upgrade (2026-08-27): a role brief is RESEARCHED before it is
@@ -11060,5 +11159,15 @@ if WARNS:
     for name, detail in WARNS:
         print(f"  · {name}" + (f" — {detail}" if detail else ""))
     print()
-print(f"{PASSES} passed, {len(FAILS)} failed, {len(WARNS)} warnings")
+# SKIPS PRINT BEFORE THE SUMMARY AND ARE COUNTED SEPARATELY. Folding them into
+# passed would restore the vacuous green; folding them into warnings would bury
+# them among the length advisories. A reader must be able to see, in one line,
+# how many properties this run did NOT measure.
+if SKIPS:
+    print(f"skipped ({len(SKIPS)}) — NOT evaluated, not passed:")
+    for name, why in SKIPS:
+        print(f"  – {name}\n      {why}\n")
+
+print(f"{PASSES} passed, {len(FAILS)} failed, {len(SKIPS)} skipped, "
+      f"{len(WARNS)} warnings")
 sys.exit(1 if FAILS else 0)
