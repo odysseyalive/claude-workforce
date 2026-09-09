@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.32.6 | 2026-09-09 | changes, installer | no | A case that cannot run HERE is not a case to delete |
 | 1.32.5 | 2026-09-09 | changes, installer | no | The guard against unproven cases had been cancelled by a wildcard |
 | 1.32.4 | 2026-09-09 | changes, installer | no | 39 of 54 vacuous verdicts were one bug: deleting the first copy of two |
 | 1.32.3 | 2026-09-09 | changes, installer | no | 457 assertions had no proof case, and the number appeared nowhere |
