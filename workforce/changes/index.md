@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.32.7 | 2026-09-09 | changes, hooks, installer | no | The hook table described three hooks on a one-hook install |
 | 1.32.6 | 2026-09-09 | changes, installer | no | A case that cannot run HERE is not a case to delete |
 | 1.32.5 | 2026-09-09 | changes, installer | no | The guard against unproven cases had been cancelled by a wildcard |
 | 1.32.4 | 2026-09-09 | changes, installer | no | 39 of 54 vacuous verdicts were one bug: deleting the first copy of two |
