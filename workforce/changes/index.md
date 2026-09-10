@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.49.0 | 2026-09-10 | docs | no | (pending — message lands on the next regeneration) |
 | 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | Roll the session into one release |
 | 1.47.1 | 2026-09-10 | changes, installer | no | The hook that forced a version number per commit is gone |
 | 1.47.0 | 2026-09-10 | changes, installer | no | The session boundary is a judgement, so it is a command |
