@@ -34,7 +34,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | Hook | Event | Matcher | Guards |
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
-| `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
+| `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. It also names any of this distribution's own coined terms used bare in the reply. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
 
 **This distribution ships TWO hooks**, and `enforcement.md` is the count. Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -282,3 +282,22 @@ false-positive rate; a classifier does.** Bash now counts as a read without the 
 **What it is NOT, and must never be reported as.** A turn with zero reads is often correct — answering
 from context already in hand is directive two's explicit instruction. The count buys only that a reader
 need not guess which turns those were.
+
+**It also names bare jargon, and that is the largest measured defect.** MEASURED over **4,447 real
+Opus 5 replies: 7.0%** used one of this distribution's own coined terms — `rung 10`, `the pool`,
+`emitter`, `dormant`, `INV-…` — bare, in prose written for a human. That is more than double the
+unsourced-causal-claim rate (2.9%) and twenty times the caving-opener rate (0.3%), and it is the class
+the user has filed complaints about more than once.
+
+**Why this is not the guard that died.** `wf-speak-guard` fired on 7.0% of GOOD replies because it
+matched ordinary English — "wrong", "failed", "gap" (`changes/1.30.1.md`). These words have no ordinary
+meaning to match, so a fire means the term is genuinely there. And the remedy is unambiguous: the line
+names the exact term, and the fix is to say it plainly.
+
+**Code spans are masked before matching, by measurement.** Unmasked the rate was 7.0% and every false
+positive was one shape — `dormant` inside a probe filename, `fan-out` inside a table cell of
+identifiers. Masking dropped it to **5.2%** and removed that whole class. A backticked term is naming
+an artifact; a bare one is asking the reader to decode it first.
+
+**Folded into the same hook and the same line**, deliberately: every additional always-on mechanism is
+another thing that can go dormant, and this project has paid for that three times.

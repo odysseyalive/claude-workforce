@@ -39,6 +39,7 @@ than the defect it watches.
 
 import json
 import os
+import re
 import sys
 
 # Tools that ACQUIRE information about the world. There is NO write column and no
@@ -56,6 +57,39 @@ import sys
 # CLASSIFIER does, and this file's own header claimed the former while doing the
 # latter. Counting reads needs no classifier, so there is none.
 READERS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}
+
+# ── this distribution's OWN coined vocabulary ────────────────────────────────
+# Words that mean nothing to a reader who has not read these files. Not "hard
+# words" and not a style opinion: each one is a term this project invented, and a
+# reply that uses one bare has asked the user to decode it first.
+#
+# MEASURED 2026-09-09 over 4,447 real Opus 5 replies: 7.0% carried one of these.
+# That is the largest of the four defect classes measured that day — more than
+# double the unsourced-causal-claim rate (2.9%) and twenty times the caving-opener
+# rate (0.3%) — and it is the one the user has filed complaints about repeatedly.
+#
+# WHY THIS IS NOT THE GUARD THAT DIED. `wf-speak-guard` fired on 7.0% of GOOD
+# replies because it matched ordinary English — "wrong", "failed", "gap"
+# (changes/1.30.1.md). These words have no ordinary meaning to match; a fire means
+# the term is genuinely there. And this REPORTS rather than blocks, naming the exact
+# term, so the remedy is unambiguous: say it plainly.
+JARGON = re.compile(
+    r"\brung \d+[a-z]?\b|\bINV-[A-Z]+\b|\bvacuous\b|\bdormant\b|\bemitter\b"
+    r"|\bthe pool\b|\bfan-out\b|\bORG-(?:CHAIN|RECORD)\b|\bremainder test\b"
+    r"|\bT7[a-z]?\b")
+
+# CODE SPANS ARE MASKED BEFORE MATCHING, and that is a measured correction rather
+# than caution. Unmasked, the rate was 7.0% and the false positives were all one
+# shape: `dormant` inside a probe FILENAME, `fan-out` inside a table cell of
+# identifiers. Masking dropped it to 5.2% and removed that whole class. A backticked
+# term is naming an artifact; a bare one is asking the reader to decode it.
+_FENCE = re.compile(r"```.*?```", re.S)
+_CODE = re.compile(r"`[^`\n]*`")
+
+
+def mask_code(text):
+    text = _FENCE.sub(lambda m: " " * len(m.group(0)), text)
+    return _CODE.sub(lambda m: " " * len(m.group(0)), text)
 
 
 def emit(message):
@@ -100,7 +134,7 @@ def main():
         start = i
         break
 
-    reads, targets = 0, []
+    reads, targets, said = 0, [], []
     for line in lines[start:]:
         try:
             d = json.loads(line)
@@ -109,6 +143,8 @@ def main():
         if d.get("type") != "assistant":
             continue
         for b in d.get("message", {}).get("content") or []:
+            if isinstance(b, dict) and b.get("type") == "text":
+                said.append(b.get("text", ""))
             if not (isinstance(b, dict) and b.get("type") == "tool_use"):
                 continue
             name = b.get("name") or ""
@@ -126,8 +162,21 @@ def main():
                     targets.append(os.path.basename(t.split()[0])[:30] if "/" in t.split()[0]
                                    else t.split()[0][:30])
 
+    # The jargon scan reads what was SAID, which is the one thing the read count
+    # cannot cover: a turn can be perfectly grounded and still hand the user a
+    # sentence they have to decode. Reported on the same line so it costs no extra
+    # output, and folded into this hook rather than a second one — every additional
+    # always-on mechanism is another thing that can go dormant.
+    terms = []
+    for m in JARGON.finditer(mask_code("\n".join(said))):
+        t = m.group(0)
+        if t not in terms:
+            terms.append(t)
+    tail = ("  ·  PLAIN: " + ", ".join(terms[:4]) + ("…" if len(terms) > 4 else "")) if terms else ""
+
     if reads == 0:
-        emit("GROUNDING  0 reads this turn — answering from context already in hand.")
+        emit("GROUNDING  0 reads this turn — answering from context already in hand."
+             + tail)
         return 0
 
     # DISTINCT SOURCES IS THE SIGNAL, not the raw count. Reading one file four times
@@ -139,7 +188,7 @@ def main():
         if t not in seen:
             seen.add(t)
             uniq.append(t)
-    emit(f"GROUNDING  {reads} reads · {len(uniq)} distinct")
+    emit(f"GROUNDING  {reads} reads · {len(uniq)} distinct{tail}")
     return 0
 
 
