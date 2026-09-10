@@ -74,6 +74,12 @@ def _root(argv):
 # FRAGMENT: prose writes `wf-canary-*` and `wf-mcp-…`, and matching the stem alone
 # invents a name nobody claimed. `wf-<digits>` is a run id, not a name.
 NAME = re.compile(r"\bwf-[a-z][a-z0-9]*(?:-[a-z0-9]+)*\b(?![-\w])")
+
+# A citation of OUR references/ tree. The leading boundary is load-bearing: without it
+# `text-eval/references/ai-patterns.md` — a path inside a PROJECT's own evaluator skill,
+# quoted in an example table — reads as a workforce reference and is reported missing.
+# Two such false positives appeared on the first sweep and neither was a defect.
+REFCITE = re.compile(r"(?:^|[\s`(\[])references/([A-Za-z0-9_./-]+\.md)")
 NOT_A_NAME = re.compile(r"^wf-\d")
 
 # TWO TIERS, BECAUSE A GUARD THAT CRIES WOLF GETS IGNORED. That is not a guess: a
@@ -138,8 +144,28 @@ def registry():
                         if n.endswith(".md"))
     agents = names_in(os.path.join(WF, "agents"), want_dirs=True)
 
-    m = re.search(r"Commands: (.+?)\"", slurp(os.path.join(WF, "SKILL.md")))
-    commands = sorted(c.strip() for c in m.group(1).split(",")) if m else []
+    # ADVERTISED COMMANDS, DERIVED FROM THE PROSE A READER ACTUALLY FOLLOWS — not from
+    # one hand-authored line. This read a single `Commands: a, b, c` frontmatter string,
+    # which is a HAND-KEPT LIST: exactly the artifact this script's own header warns
+    # about ("a stored list of what is live is the same artifact that called `vendor` a
+    # live command"). MEASURED 2026-09-10: SKILL.md's § Display vs. Execute tables named
+    # SEVEN commands with no procedure file — promote, transfer, ablate, reconcile,
+    # vendor, budget, diagnose — and every one was invisible here, `vendor` included.
+    # The frontmatter line stays as one source; the body is now read too.
+    skill_src = slurp(os.path.join(WF, "SKILL.md"))
+    commands = set()
+    m = re.search(r"Commands: (.+?)\"", skill_src)
+    if m:
+        commands |= {c.strip() for c in m.group(1).split(",")}
+    # `/workforce <name>` and the display-vs-execute lists, which are where a reader is
+    # told what exists. A name is a command only if it is a bare lowercase word: `org
+    # index` and `audit --review` are sub-forms of a command already counted.
+    for chunk in re.findall(r"`/workforce ([a-z][a-z-]*)", skill_src):
+        commands.add(chunk)
+    for para in re.findall(r"(?:require `--execute`|run immediately):(.*?)\.\n", skill_src, re.S):
+        for name in re.findall(r"`([a-z][a-z-]*)`", para):
+            commands.add(name)
+    commands = sorted(c for c in commands if c and c not in ("workforce", "org", "dev"))
 
     # The hook set comes from the one producer that wires it, never from prose. Three
     # shipped files once stated three different counts; this reads the emitter.
@@ -211,6 +237,34 @@ def disagreements(reg):
     for c in reg["commands"]:
         if c not in reg["procedures"]:
             out.append(("command", c, "advertised in SKILL.md, no references/procedures/%s.md" % c))
+
+    # A CITED REFERENCE THAT DOES NOT EXIST IS THE SAME DEFECT AS A NAMED SCRIPT THAT DOES
+    # NOT EXIST, and this script could not see it. MEASURED 2026-09-10: six were live —
+    # `plain-output.md` cited eight times including four in SKILL.md, plus `evals.md`,
+    # `handoff.md`, `procedures/diagnose.md`, `procedures/charter.md` and one more. Every
+    # one sent a reader to a file deleted in a strip, and nothing failed.
+    #
+    # THE IMPERATIVE SPLIT APPLIES HERE TOO, for the reason it applies to scripts: prose
+    # correctly RECORDING that a reference went with its mechanism is the record doing its
+    # job, and failing on it teaches a reader to skim the report.
+    for doc in shipped_docs():
+        rel = os.path.relpath(doc, WF)
+        fenced = False
+        for lineno, line in enumerate(slurp(doc).splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            for m in REFCITE.finditer(line):
+                target = m.group(1)
+                # Only OUR references/ tree. `.claude/skills/<x>/references/y.md` is a
+                # path inside a project's own skill and is never ours to resolve — two
+                # such citations read as defects on the first sweep and were not.
+                if os.path.isfile(os.path.join(WF, "references", target)):
+                    continue
+                imperative = fenced or RUNNABLE.search(line[:m.start()])
+                kind = "BROKEN" if imperative else "stale"
+                out.append((kind, "references/" + target,
+                            "cited at %s:%d and not in references/" % (rel, lineno)))
 
     for h in reg["hooks"]:
         if h in (reg.get("agent_hooks") or []):

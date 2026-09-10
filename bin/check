@@ -896,6 +896,43 @@ if "--root" not in _lv:
     _lv_problems.append("--root is gone; a registry that can only describe its own "
                         "directory answers the question for the one tree that least "
                         "needs asking")
+# AND IT IS RUN, NOT MERELY DESCRIBED. Until 2026-09-10 this section asserted that
+# `wf-live`'s SOURCE still contained the words `BROKEN` and `stale` and never executed it —
+# so the one tier that is a failure was a net nobody had attached, and three whole classes
+# of defect sat unreported until a human drew a map by hand and found them: seven commands
+# advertised with no procedure, a greenfield step telling a reader to run a `charter`
+# command that never shipped, and six cited reference files that had been deleted in a
+# strip. A detector shipped without its gate is a flag, and SKILL.md § Directives says a
+# flag is not a fix.
+#
+# ONLY `BROKEN` FAILS. `stale` is a name or a citation in prose that correctly RECORDS a
+# removal, which is the record doing its job; failing on it makes the report permanently
+# red and teaches its reader to skim. That split is wf-live's, not this file's — it is
+# read from the output rather than re-decided here.
+_live_broken = []
+try:
+    _lv_out = subprocess.run(
+        [sys.executable, "workforce/bin/wf-live", "--root", "workforce"],
+        capture_output=True, text=True, timeout=120).stdout
+    _cur = None
+    for _ln in _lv_out.splitlines():
+        _m = re.match(r"\s+BROKEN\s+(\S+)", _ln)
+        if _m:
+            _cur = _m.group(1)
+            continue
+        if _cur and _ln.strip():
+            _live_broken.append(f"{_cur}: {_ln.strip()}")
+            _cur = None
+except Exception as _exc:                                # noqa: BLE001
+    _live_broken.append(f"wf-live would not run ({_exc}) — the registry cannot report on a "
+                        f"tree it cannot read, and an unrun detector is indistinguishable "
+                        f"from a clean one")
+check(
+    "wf-live runs here, and nothing live tells a reader to run what is not there",
+    not _live_broken,
+    "; ".join(_live_broken[:4]),
+)
+
 check(
     "wf-live derives the live set and never stores one",
     not _lv_problems,
