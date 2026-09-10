@@ -1,10 +1,10 @@
 ---
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 86 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
-description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, promote, transfer, retire, handbook, org, charter, principles, review, amend, defect, ledger, roster, model-map, budget, evals, ablate, vendor, reconcile, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, diagnose"
+description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, retire, handbook, org, principles, review, amend, defect, ledger, roster, model-map, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.32.7"
+version: "1.33.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -26,7 +26,6 @@ hooks:
 | `/workforce` | Full audit: survey → design org → convert skills → author handbooks → auto-execute |
 | `/workforce audit --review` | Full scan + would-be Execution Plan, zero writes |
 | `/workforce roster` | Who works here, which tier, which model, what they own |
-| `/workforce budget` | Delegation depth, fan-out, and spawn-cap accounting |
 | `/workforce hire [role]` | HR: add an employee and author its handbook |
 | `/workforce review [employee]` | Performance review: cold-read + evals + contract drift |
 | `/workforce discharge [--execute]` | Drain the deferred queue by doing the work — deletes nothing |
@@ -34,7 +33,6 @@ hooks:
 | `/workforce hooks [--execute]` | Wire, report, or unwire the shipped hooks; `verify` reports dormancy |
 | `/workforce preflight` | Discover the `.claude` settings that would refuse an audit's writes, and print the one command that clears each. Read-only; `audit` runs it first, at Step 0.05 |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
-| `/workforce dev diagnose` | Turn the audit inward: measure install/update/streamline, then drain every block to a fixpoint. Dev-only |
 
 *`hooks` also wires the commit-time git **pin guard** — a `core.hooksPath` pre-commit hook that keeps
 dependencies pinned and `dependabot.yml` present. It is folded into `hooks`, not a separate command:
@@ -652,8 +650,6 @@ employee — converting the dispatcher into an agent creates a dispatch loop.
 
 - Exclude `workforce` and `org` from every survey, conversion, and embed pass.
 - `dev` is the ONLY escape: `/workforce dev <command>` includes `workforce` itself.
-- `diagnose` is dev-only — it inspects `workforce` itself. `/workforce diagnose` without `dev`, or a
-  routed ask carrying the token, STOPs with the self-exclusion message (`references/procedures/diagnose.md`).
 - **`dev` is user-typed only.** Never synthesize the `dev` prefix, never pass one through from a
   routed ask. IF a dispatched ask carries `dev` → STOP and report: "Dev mode is reserved for manual
   invocation. Type `/workforce dev …` yourself." Stripping the token silently alters the ask.

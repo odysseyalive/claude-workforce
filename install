@@ -99,7 +99,7 @@ PROJECT_SKILL_DIR="$(pwd)/.claude/skills/workforce"
 # The remaining trade-off is REMOTE sessions that only ever see a cloned repo
 # (and collaborators who clone it). Those cannot read ~/.claude/. To use
 # workforce on a repo that way, vendor the skill into it:
-#     /workforce vendor            (from inside that project)
+#     WORKFORCE_REPO_URL="file:///path/to/checkout" ./install --user   (no network)
 # or install with --project in the first place.
 #
 # BUT SCOPE IS NOT GUESSED WHEN A COPY ALREADY EXISTS. Defaulting to personal on
@@ -917,8 +917,9 @@ case " $TARGETS " in *" user "*)
     echo "Cowork sees this install too, as long as it is in code mode."
     echo
     echo "For a repo worked on REMOTELY (a session that only clones the repo) or"
-    echo "shared with collaborators, run /workforce vendor from inside that repo"
-    echo "to copy the skill into it."
+    echo "shared with collaborators, run this same installer there. On a machine"
+    echo "with no network, point it at a local checkout:"
+    echo "    WORKFORCE_REPO_URL=\"file:///path/to/claude-workforce\" ./install --user"
     echo
     ;;
 esac
@@ -926,5 +927,4 @@ echo "Then, from inside a project:"
 echo "    /workforce audit          Survey the project and build its org"
 echo "    /org <describe a task>    Hand work to the right employee"
 echo "    /workforce roster         Who works here, on which model"
-echo "    /workforce budget         Delegation depth and spawn-cap accounting"
 echo

@@ -77,7 +77,7 @@ function Install-ClaudeWorkforce {
     # Cowork runs on this machine, so in CODE MODE it reads this same ~/.claude/
     # setup — a personal install is fully visible there. The remaining trade-off is
     # REMOTE sessions that only see a cloned repo, and collaborators who clone it:
-    # run /workforce vendor from inside such a repo to copy the skill into it.
+    # run this same installer there; with no network set WORKFORCE_REPO_URL to a checkout.
     #
     # BUT SCOPE IS NOT GUESSED WHEN A COPY ALREADY EXISTS. Defaulting to personal
     # on every run installs a SECOND copy beside a project install the user already
@@ -680,7 +680,8 @@ function Install-ClaudeWorkforce {
         Write-Host 'Cowork sees this install too, as long as it is in code mode.'
         Write-Host ''
         Write-Host 'For a repo worked on REMOTELY (a session that only clones the repo) or'
-        Write-Host 'shared with collaborators, run /workforce vendor from inside that repo'
+        Write-Host 'shared with collaborators, run this same installer there. With no'
+        Write-Host 'network: $env:WORKFORCE_REPO_URL="file:///path/to/checkout"; ./install.ps1'
         Write-Host 'to copy the skill into it.'
         Write-Host ''
     }
@@ -688,7 +689,6 @@ function Install-ClaudeWorkforce {
     Write-Host '    /workforce audit          Survey the project and build its org'
     Write-Host '    /org <describe a task>    Hand work to the right employee'
     Write-Host '    /workforce roster         Who works here, on which model'
-    Write-Host '    /workforce budget         Delegation depth and spawn-cap accounting'
     Write-Host ''
 }
 

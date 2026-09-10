@@ -38,7 +38,6 @@ Hands work to the employee who owns it — the lowest node that can do the job.
 | `/org <task>` | — | Dispatch work to the right employee |
 | `/workforce roster` | read-only | Who works here, on which model, owning what |
 | `/workforce org status [employee]` | read-only | Why routing resolves the way it does |
-| `/workforce budget` | read-only | Depth, fan-out, spawn accounting, projected cost |
 | `/workforce verify` | read-only | Is what this project reports about itself true? |
 
 ```
@@ -57,10 +56,7 @@ same.
 |---|---|---|
 | `/workforce hire [role]` | high | Add an employee; HR owns hire-vs-extend |
 | `/workforce handbook [employee]` | high | Author or refresh one handbook |
-| `/workforce promote <employee>` | high | IC → Lead. A structural change, not a title |
-| `/workforce transfer <employee> <dept>` | high | Move between departments, or rename |
 | `/workforce retire <employee>` | **destructive** | Remove an employee and every reference to it |
-| `/workforce reconcile` | high | Cross-employee conflicts that break completion |
 
 ```
 /workforce hire --execute
@@ -101,25 +97,7 @@ inventing a latency it did not achieve.
 
 | Command | Risk | Does |
 |---|---|---|
-| `/workforce evals [employee]` | low | Create or run an employee's measurement set |
-| `/workforce ablate <employee>` | high | Delete lines, add back only what earns its place |
 | `/workforce model-map` | low | The model and effort budgets, standalone — analytical, creative, code, advisor |
-
-```
-/workforce ablate <employee> --execute
-```
-
-Boris Cherny's method as a command: skeletonize the handbook, add lines back one at a time, keep only
-what the evals prove is load-bearing. **Refuses to run without an eval set** — deleting lines and
-observing that nothing obviously broke is not evidence.
-
-```
-/workforce ablate --org
-```
-
-The six-month reset at company scale. Display-only, always. Its headline number is what share of the
-org's total instruction volume is actually load-bearing; well under half means you are carrying
-scaffolding written for a model that no longer needs it.
 
 ---
 
@@ -148,21 +126,11 @@ org produced.
 |---|---|---|
 | `/workforce org index` | low | Rebuild the chart from disk |
 | `/workforce org embed` | high | Push chain-of-command facts into handbooks |
-| `/workforce charter` | low | The Strategic Objective |
 | `/workforce principles` | low | The General Operating Principles |
 | `/workforce checksums` | low | Integrity stamps for immutable blocks |
-| `/workforce vendor` | high | Copy the **active** skill into this project (no network) |
 | `/workforce update [--user\|--project\|--all]` | low | Pull the latest release into a chosen scope |
 | `/workforce version [--check]` | read-only | Every copy by path, which is active, whether facts are current |
 | `/workforce dev <command>` | — | Run a command with `workforce` itself included |
-| `/workforce dev diagnose [--execute]` | high | Turn the audit inward on install/update/streamline, then drain every block to a fixpoint |
-
-```
-/workforce vendor --execute
-```
-
-For a repo used by a session that only ever has the clone — remote execution, or a collaborator.
-A personal install is invisible to those.
 
 ### Choosing which copy to update
 
@@ -170,19 +138,25 @@ A personal install is invisible to those.
 /workforce update --all
 ```
 
-Skills resolve personal > project, so a personal install **shadows** a vendored one. With both present
-the active copy is always the personal one — so without an explicit scope there is no way to update a
-vendored copy, and it would quietly fall behind release after release.
-
 `--user` and `--project` target one copy; `--all` updates every copy on the machine and reports each
 path and version **separately**, never as one aggregate that could hide a failure.
 
-**`update` never creates an install that was not already there.** Use `install` for a new one, or
-`vendor` to copy the active skill into a repo. Conflating them would let a mistyped flag silently add a
-second copy and change which one wins.
+**`vendor` is gone (2026-09-09), and the scope it wrote to is not.** Vendor copied the *active* skill
+into a repo as a snapshot — a second, lower-precedence copy that never wins on your own machine and
+exists only to be kept in sync with the one that does. Installing at project scope is a different
+thing: it fetches the current release and `update --project` advances it, so there is no snapshot to
+drift.
 
-Every run starts by looking at both locations — `~/.claude/skills/workforce` and this project's
-`.claude/skills/workforce` — and reports what it found before writing anything. It then runs the same
+A clone, a cloud session, or a collaborator installs the same way you did, with the published
+one-liner. On a machine with no network, point the installer at a local checkout:
+
+```
+WORKFORCE_REPO_URL="file:///path/to/claude-workforce" ./install --user
+```
+
+**`update` never creates an install that was not already there.** Use `install` for a new one.
+
+Every run reports the path it is replacing before writing anything. It then runs the same
 install command the README publishes for that scope and platform, so updating and installing are the
 same operation and cannot drift apart. It syncs and stops; run `/workforce verify` afterward to check
 your org against the new release.

@@ -571,6 +571,37 @@ check(
     "covering",
 )
 
+# THE HOOK COUNT IS DERIVED FROM SHIPPED_HOOKS, NEVER FROM PROSE. MEASURED 2026-09-09:
+# three statements of one countable fact — enforcement.md said "six hooks in its default
+# set and one opt-in" (naming five scripts that no longer ship), enforcement.md 200 lines
+# later said "exactly one hook", and hooks.md tabled three. All wrong, in the two files
+# whose job is refusing claims the runtime will not back. Stating the number was the fix
+# applied in September after it went stale for three weeks; stating it in three places is
+# how it went wrong again. So nothing states it — this derives it, and every shipped hook
+# must appear in the authority table and be declared in the manifest.
+_shipped_hooks = set(re.findall(r'^\s*"(wf-[\w-]+)":\s*\(',
+                                read("workforce/bin/wf-settings-apply"), re.M))
+_manifest_hooks = {os.path.basename(l.split()[1])
+                   for l in read("manifest.txt").splitlines()
+                   if l.startswith("hook ") and len(l.split()) > 1}
+_hooks_md = read("workforce/references/procedures/hooks.md")
+_hook_problems = []
+if _shipped_hooks != _manifest_hooks:
+    _hook_problems.append(
+        f"SHIPPED_HOOKS {sorted(_shipped_hooks)} != manifest {sorted(_manifest_hooks)}")
+for _h in sorted(_shipped_hooks):
+    if f"`{_h}`" not in _hooks_md:
+        _hook_problems.append(f"{_h} is wired but absent from hooks.md § What is wired")
+    if not os.path.exists(f"workforce/bin/{_h}"):
+        _hook_problems.append(f"{_h} is wired but does not ship")
+check(
+    "hooks: the wired set, the manifest, and the authority table agree",
+    not _hook_problems,
+    "; ".join(_hook_problems) + ". The count is DERIVED here so no file has to state it; "
+    "a hook that ships undescribed is the dormancy enforcement.md refuses, arriving from "
+    "the other side — wired, and documented nowhere",
+)
+
 # EVERY PROVE CASE MUST STILL BE RUNNABLE, and nothing watched that. A case names a
 # shipped file and a literal inside it; a release that deletes the file or the literal
 # leaves a case that can never fire. `bin/prove` reports those as STALE-CASE and
@@ -1216,6 +1247,33 @@ phantom = {c: sorted(v) for c, v in referenced.items() if c not in KNOWN_COMMAND
 # command, because employee names are per-project and unknowable here. That is the
 # correct trade: a phantom command in shipped docs is a defect, an employee example is
 # a convenience. Docs write `<employee>`; do NOT relax this check to allow a literal one.
+# AND THE ADVERTISED SURFACE MUST HAVE AN IMPLEMENTATION. The check below derives
+# KNOWN_COMMANDS *from the description line itself*, so it compares the advertised list
+# against references to it and passes whenever the two agree — including when every one
+# of them is a command nobody can run. MEASURED 2026-09-09: the description advertised
+# 33 commands and NINE had no procedure file — ablate, budget, charter, diagnose, evals,
+# promote, reconcile, transfer, vendor — all removed by the simplification release,
+# which stripped the procedures and left the advertisement. SKILL.md § Grounding says
+# "Read the procedure file for the invoked command before acting", so each of those
+# routes a reader to a path that does not exist.
+#
+# This is the two-halves-of-one-fact defect the phantom check below was itself written
+# for, one level up: that one guards references against the surface, and nothing
+# guarded the surface against the tree.
+_cmd_no_proc = sorted(
+    c for c in KNOWN_COMMANDS
+    if c not in {"dev", "audit", "org"}
+    and not os.path.exists(f"workforce/references/procedures/{c}.md")
+)
+check(
+    "commands: every ADVERTISED command has a procedure file",
+    not _cmd_no_proc,
+    f"advertised with no procedure: {_cmd_no_proc} — SKILL.md § Grounding sends a "
+    "reader to `references/procedures/<command>.md` for each. Either the procedure "
+    "ships or the command comes off the description, the Quick Commands table, and "
+    "the Display vs. Execute lists together",
+)
+
 check(
     "commands: every referenced /workforce command exists in the command surface",
     not phantom,
@@ -1323,15 +1381,13 @@ check(
     "the tool-grant A/B is clean evidence; the depth effect is one discrepancy read "
     "coherently, and conflating the two is how a measurement becomes a belief",
 )
-check(
-    "hooks: the stated count matches what the manifest actually ships",
-    ("ships exactly one hook" in enf) == (len(manifest_hook_paths()) == 1)
-    and "ships zero hooks" not in enf,
-    f"manifest ships {len(manifest_hook_paths())} hook(s); enforcement.md said the "
-    "count 'stays zero' for a full commit after one landed. A stated fact about the "
-    "distribution that the distribution contradicts, in the file whose job is "
-    "refusing claims the runtime will not back",
-)
+# SUPERSEDED 2026-09-09 by "hooks: the wired set, the manifest, and the authority table
+# agree", above. This asserted a PROSE SENTENCE — `"ships exactly one hook" in enf` — which
+# made the literal a restated constant that any rewording breaks, and which said nothing
+# about whether the hooks named in prose exist or are declared. It also could not survive
+# its own subject: the phrase now appears only inside a correction quoting what the file
+# used to say. The replacement derives the set from SHIPPED_HOOKS and compares it against
+# the manifest and the authority table, so no file states the number at all.
 check(
     "shipped hooks: each has a wiring command and a report of whether it is wired",
     not _hooks or (
@@ -8574,12 +8630,21 @@ check("the three paths are stated once, where the rule lives",
       "enforcement.md is the file a reader checks before claiming a mechanism is on. "
       "Without the rule stated here, the next mechanism ships with one path and nobody "
       "has anything to check it against")
-check("enforcement.md's hook count points at the table instead of restating it",
-      "ships exactly two hooks" not in enf
-      and "which is the authority on the set" in enf,
-      "the count read 'exactly two' against six on disk from 2026-08-19 to 2026-09-07. "
-      "A constant restated outside the file that owns it is Principle 9a's exact case, "
-      "and the fix is a pointer, never a fresher number")
+# ASSERTED ON THE PROPERTY, NOT ON A PHRASE. This read `"which is the authority on the
+# set" in enf` — a literal that any rewording breaks, which is the restated-constant
+# defect it exists to police, committed by the check itself. Reworded 2026-09-09 while
+# reconciling three contradictory hook counts, and it failed on the rewrite rather than
+# on the rule. It now tests that enforcement.md POINTS at the authority and states no
+# bare count of its own; the numbers-agree half is the derived assertion above.
+_enf_counts = [m.group(0) for m in re.finditer(
+    r"ships (?:exactly )?(?:one|two|three|four|five|six|seven|eight|nine|zero|\d+) hooks?", enf)
+    if "Corrected" not in enf[max(0, m.start() - 400):m.start()]]
+check("enforcement.md points at the hook authority instead of restating a count",
+      "authority on the set" in enf and not _enf_counts,
+      f"bare hook counts outside a dated correction: {_enf_counts}. A constant restated "
+      "outside the file that owns it is Principle 9a's exact case, and the fix is a "
+      "pointer, never a fresher number — measured 2026-09-09, when THREE statements of "
+      "this one count disagreed across two files")
 
 check("Step 0.9 applies the remedy rather than naming it",
       "--ensure-region --execute" in _asu and "re-attempt the spawn exactly once" in _asu,

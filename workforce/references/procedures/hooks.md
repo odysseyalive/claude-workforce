@@ -34,8 +34,9 @@ detection at the next command, and the user's first directive is the thing it pr
 | Hook | Event | Matcher | Guards |
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
+| `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
 
-**This distribution now ships exactly ONE hook**, and `enforcement.md` is the count. Two more were
+**This distribution ships TWO hooks**, and `enforcement.md` is the count. Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
 mis-rendered budget picker, and `wf-standing-request`, which added the cold-reader request to every
 turn. Neither script is in `workforce/bin/` and neither is in `manifest.txt`.
@@ -246,3 +247,38 @@ that runs on every call to say nothing.
 The rule it enforced still stands — `audit-setup.md` § Step 0.4a and `model-map.md` say to render the
 emitted block verbatim — and it is now carried by prose alone. **That is a real reduction in
 enforcement**, named here rather than left for a reader to infer from an empty table.
+
+
+---
+
+## The turn ledger
+
+`wf-turn-ledger` prints what a turn actually looked at, before the reply lands.
+
+**Why it is a count and not a check.** MEASURED 2026-09-09 across one working session: ten times the
+operator settled on a wrong reading and defended it. **Nine of the ten escapes came from outside** — six
+from the user, three from a spawned panel. The tenth came from re-reading a tool's raw output. **Zero
+came from noticing.** That measurement retires the whole family of self-checks, because each needs the
+operator to DECIDE to run it and that decision is made by the faculty that is impaired. The literature
+agrees: metacognition in frontier models is real but "limited in resolution" and "context-dependent"
+(arXiv 2509.21545, ICLR 2026), and reasoning is latent-state trajectory formation rather than surface
+chain-of-thought (arXiv 2604.15726), so reading one's own reasoning inspects the wrong object.
+
+So this hook notices nothing. It tallies, and prints the tally where the reader who demonstrably does
+escape tunnels can see it.
+
+**Distinct sources, not raw reads.** `3 reads · 1 distinct` is the shape of the failure it was built
+for: one document read three times, counted as corroboration. ProvenanceGuard measures source accuracy
+falling to **0.229** with semantically close sources (arXiv 2606.18037) — two files in one repository
+are semantically close, so looking twice at the same kind of thing is not looking twice.
+
+**There is no write column and no command classification, and that is the fix rather than an omission.**
+The first version split Bash by substring; `grep -rn foo . 2>/dev/null` scored as a WRITE because `>`
+was on the list, as did `python3 bin/check 2>&1 | grep passed`. It under-counted exactly the reads it
+exists to surface. That is the substring failure that retired `wf-speak-guard` at a measured 7.0%
+(`changes/1.30.1.md`), one layer down — judging commands rather than prose. **A count has no
+false-positive rate; a classifier does.** Bash now counts as a read without the command being read.
+
+**What it is NOT, and must never be reported as.** A turn with zero reads is often correct — answering
+from context already in hand is directive two's explicit instruction. The count buys only that a reader
+need not guess which turns those were.

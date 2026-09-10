@@ -36,6 +36,19 @@ FIX = os.path.join(ROOT, "fixtures", "scripts")
 BIN = os.path.join(ROOT, "workforce", "bin")
 
 
+def _sub_version(arg):
+    """Replace `${VERSION}` with the release version.md declares, or leave it alone."""
+    if "${VERSION}" not in str(arg):
+        return arg
+    import re as _re
+    try:
+        _t = open("workforce/references/version.md", encoding="utf-8").read()
+    except OSError:
+        return arg
+    _m = _re.search(r"^WORKFORCE-VERSION:\s*(\S+)", _t, _re.M)
+    return arg.replace("${VERSION}", _m.group(1)) if _m else arg
+
+
 def run_case(name, spec):
     src = os.path.join(FIX, name)
     script = os.path.join(BIN, spec["script"])
@@ -98,7 +111,15 @@ def _run_in(tree, script, spec):
         p = subprocess.run([sys.executable, script], input=payload, text=True,
                            capture_output=True, env=env, cwd=tree)
     else:
-        p = subprocess.run([sys.executable, script, "--root", tree] + spec.get("args", []),
+        # `${VERSION}` RESOLVES TO THE INSTALLED RELEASE, so a case about "the current
+        # version" is not a literal that goes stale on the next bump. MEASURED
+        # 2026-09-09: `changes-current` pinned `--from 1.31.0` and asserted "nothing
+        # between those versions" — true only while 1.31.0 WAS current. Seven bumps in
+        # one afternoon broke it, and the fix-the-number repair would break again on the
+        # eighth. Constants are stated once (SKILL.md Principle 9a); this is that rule
+        # reaching the fixture args.
+        _args = [_sub_version(a) for a in spec.get("args", [])]
+        p = subprocess.run([sys.executable, script, "--root", tree] + _args,
                            text=True, capture_output=True, env=env)
 
     shutil.rmtree(_home, ignore_errors=True)

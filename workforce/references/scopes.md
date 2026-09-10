@@ -137,8 +137,13 @@ Running on the right machine is **not sufficient on its own**.
 | Desktop application on this machine, **not in code mode** | **No** — same machine, but it does not reach the local setup |
 | Repo-only — anything whose whole world is a clone: remote execution, a collaborator's checkout | **No** — only that repo's `.claude/` exists |
 
-`/workforce vendor` copies the active skill into the current project's `.claude/skills/` for the last
-row. Product names and modes change; the filesystem question does not.
+For the last row, run the published installer inside that repo — the same one-liner used here, or
+`WORKFORCE_REPO_URL="file:///path/to/checkout" ./install --user` on a machine with no network.
+*The `vendor` command served this row until 2026-09-09. It copied the ACTIVE skill in as a snapshot: a
+second copy, lower precedence than a personal install so it never won on the author's own machine, whose
+only job was staying in sync with the copy that did. Installing at project scope fetches the current
+release and `update --project` advances it, so there is no snapshot to drift.* Product names and modes
+change; the filesystem question does not.
 
 ---
 

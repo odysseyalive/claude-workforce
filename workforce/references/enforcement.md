@@ -131,15 +131,20 @@ of both. All three write through **one producer**, so the wired set cannot drift
 
 ## Nothing ships dormant — the rule the hook findings actually support
 
-**claude-workforce ships six hooks in its default set and one opt-in, and the count is a current fact
-rather than a prohibition** — `wf-protect-directives` and `wf-unique-persona` (`PostToolUse` on
-`Edit|Write`), `wf-standing-request` (`UserPromptSubmit`), `wf-budget-guard` and `wf-plain-guard`
-(`PreToolUse` on `AskUserQuestion`), `wf-speak-guard` (`Stop`), plus `wf-loop-guard`, which is
-PROPOSED and wired only when a human names it (`manifest.txt` § Hooks; `procedures/hooks.md` § What is
-wired, which is the authority on the set). Getting from "ships zero executables" to a stated count took
-two corrections on the same day. *The number was stale from 2026-08-19 to 2026-09-07 — it read "exactly
-two" against four more on disk. A count restated outside the file that owns it is Principle 9a's exact
-case, and the fix is that this sentence now points at the table rather than trying to be one.*
+**The default hook set is whatever `manifest.txt` § Hooks declares, and `procedures/hooks.md`
+§ What is wired is the authority on the set** — each row there names its event, its matcher, and what it
+guards. There is no opt-in tier; `wf-settings-apply`'s
+`SHIPPED_HOOKS` is the single producer all three propagation paths call.
+
+*Corrected 2026-09-09, and the correction is the finding. This paragraph read "six hooks in its default
+set and one opt-in" and named seven scripts, FIVE of which no longer exist — the simplification release
+removed them and this file kept counting them. Two hundred lines below, the same file said "ships
+exactly one hook". `procedures/hooks.md` tabled three. **Three statements of one countable fact, in two
+files, all wrong, in the document whose job is refusing claims the runtime will not back.** Found by a
+panel reading this repo against its own manifest. The number was previously stale from 2026-08-19 to
+2026-09-07; the lesson taken then was to state it, and the lesson now is that stating it in three places
+is how it went wrong again — so `bin/check` asserts this line against `SHIPPED_HOOKS` rather than
+trusting anyone to update it.*
 
 *The second landed 2026-08-04, and it closes a gap this file had already named against itself.* Under
 declared succession `procedures/hooks.md` holds that **workforce owes a predecessor's capability**, and
@@ -177,8 +182,10 @@ ban was doctrine that felt like a conclusion**, which is the tell `CLAUDE.md` na
 | anything **wired** — a procedure invokes it, or a command registers it *and* `verify` reports whether it is registered | **yes** | its absence is loud, so a fresh install cannot silently lose it |
 | anything **dormant** — no invoker, no registration path, or a registration nothing reports on | **never** | this is the whole of the finding, and it has now cost this project three times |
 
-**This distribution ships exactly one hook — `wf-protect-directives`.** The simplification release
-removed the other eight: four were speech guards the user deleted outright, one shipped unwired and
+**The shipped hook set is `manifest.txt` § Hooks, and `procedures/hooks.md` § What is wired describes
+each one.** This paragraph deliberately states no count — see the correction above; a number here is a
+restated constant, and it has now been wrong three times. The simplification release removed eight of
+the nine that existed before it: four were speech guards the user deleted outright, one shipped unwired and
 therefore never fired for anyone, and three lost the producers they read and would have passed
 everything through while still firing on every turn.
 

@@ -286,9 +286,10 @@
     ]
   },
   "changes-current": {
+    "_why": "`--from` the INSTALLED version has nothing after it. Written with `${VERSION}` rather than a literal: the case is about the current release, not about 1.31.0, and a pinned number made this fail on every version bump (fixed 2026-09-09 after seven bumps in one afternoon).",
     "args": [
       "--from",
-      "1.31.0",
+      "${VERSION}",
       "--rows"
     ],
     "exit": 2,
@@ -2833,6 +2834,52 @@
       "wrote .claude/workforce/.directives.sha",
       "read back and re-parsed",
       "1 row(s)"
+    ]
+  },
+  "ledger-badstdin-is-silent": {
+    "_why": "A hook that wedges a session over its own bookkeeping is worse than the defect it watches. Unparseable input exits 0 and says nothing.",
+    "exit": 0,
+    "script": "wf-turn-ledger",
+    "stdin_raw": "not json",
+    "want": []
+  },
+  "ledger-counts-bash-as-read": {
+    "_why": "MEASURED regression. The first version classified Bash by substring and scored `grep -rn foo . 2>/dev/null` and `python3 bin/check 2>&1 | grep passed` as WRITES, because `>` was on the write list \u2014 under-counting exactly the reads this hook exists to surface. There is no classifier now; Bash counts as a read without the command being inspected.",
+    "exit": 0,
+    "script": "wf-turn-ledger",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\"}",
+    "want": [
+      "3 reads",
+      "3 distinct"
+    ]
+  },
+  "ledger-one-source-read-thrice": {
+    "_why": "The failure this hook was built for: one document read three times is ONE piece of evidence, not three. Distinct count is the signal; the raw count is not.",
+    "exit": 0,
+    "script": "wf-turn-ledger",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\"}",
+    "want": [
+      "3 reads",
+      "1 distinct"
+    ]
+  },
+  "ledger-scopes-to-current-turn": {
+    "_why": "Reads belonging to an EARLIER turn must not be credited to this one. A ledger that spans the session grows monotonically and stops meaning anything \u2014 the dormancy shape enforcement.md refuses.",
+    "exit": 0,
+    "script": "wf-turn-ledger",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\"}",
+    "want": [
+      "1 reads",
+      "1 distinct"
+    ]
+  },
+  "ledger-zero-reads": {
+    "_why": "A turn that asserts and looked at nothing. NOT an error and never described as one \u2014 answering from context in hand is directive two's explicit instruction. The count is reported so a reader need not guess which turns those were.",
+    "exit": 0,
+    "script": "wf-turn-ledger",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\"}",
+    "want": [
+      "0 reads"
     ]
   }
 }

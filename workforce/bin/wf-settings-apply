@@ -69,6 +69,11 @@ PROJECT_SETTINGS = ("settings.local.json", "settings.json")
 # UserPromptSubmit (it has no tool to match against).
 SHIPPED_HOOKS = {
     "wf-protect-directives": ("PostToolUse", "Edit|Write"),
+    # A COUNT, NOT A CHECK — see wf-turn-ledger's header. It reports what the turn
+    # read; it never reads the reply and never judges one, so it has no
+    # false-positive rate to tune and cannot repeat the 7.0% failure that retired
+    # the speech guards (changes/1.30.1.md).
+    "wf-turn-ledger": ("Stop", None),
 }
 
 # WIREABLE, NEVER DEFAULT. A hook named here is registered only when a human types

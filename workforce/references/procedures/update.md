@@ -32,7 +32,7 @@ failed.
 |---|---|---|
 | (none) | whichever copy is active, by path | nothing installed → report and stop |
 | `--user` | `~/.claude/skills/workforce` | not installed personally → offer the install command, do not silently create it |
-| `--project` | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce` | not vendored here → point at `/workforce vendor`, do not silently create it |
+| `--project` | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce` | no project install here → point at `install --project`, do not silently create it |
 | `--all` | every copy found | none found → report and stop |
 
 **`update` never creates an install that was not already there.** Creating one is `install` or

@@ -86,7 +86,7 @@ do). Every legitimate row names a precondition the run genuinely could not satis
 
 | Legitimate | Example |
 |---|---|
-| a fix **in another repository** | *"`wf-conform` false positive — `.censusignore` unread. Discharged by:* `/workforce dev diagnose, run in /home/you/lab/claude-workforce`*"* |
+| a fix **in another repository** | *"`wf-conform` false positive — `.censusignore` unread. Discharged by:* `/workforce dev verify, run in /home/you/lab/claude-workforce`*"* |
 | a **measured host limit** the run hit and recorded, with its attempt count | *"canary UNAVAILABLE after two attempts"* |
 
 **BLOCKING — a row about THIS project's own work may not survive to a next run.** The queue a run

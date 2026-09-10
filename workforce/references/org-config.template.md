@@ -37,8 +37,8 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 |---|---|---|---|---|
 | 1 | `claude-fable-5-1` | 1M | 128K | the most capable model, priced above the Opus tier ($10/$50); sees what it judges. **Recommended for creative-visual** (graphics & frontend design); the session advisor's pick too (§ Session advisor) |
 | 2 | `claude-opus-5` | 1M | 128K | the Opus-tier workhorse ($5/$25); commits and drives. **Recommended for analytical Lead** (agents that coordinate) and **Recommended for code** |
-| 3 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
-| 4 | `claude-sonnet-5` | 1M | 128K | near-Opus quality at ~60% lower cost ($2/$10 vs $5/$25). **Recommended for analytical IC** (agents that do the work) |
+| 3 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical IC** (agents that do the work) |
+| 4 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
 
 **One row may be recommended for several lanes.** Row 2 carries two `Recommended for` annotations, and
 both budget emitters read every annotation a row carries; a lane is never recommended twice, but a model
@@ -57,8 +57,8 @@ in § Model statics: `wf-model-budget` derives the picker from this section and 
 cannot see, so the budget and this table can never drift.
 
 **Ordered by cost, most expensive first, and presented in that order every time** (`claude-fable-5-1`
-is the `$10/$50` tier and sits first; `claude-opus-5` and `claude-opus-4-6` share the `$5/$25` tier and
-are ordered newest-first within it; `claude-sonnet-5` is `$2/$10` and sits last). The blank "Other" field
+is the `$10/$50` tier and sits first; `claude-opus-5`, `claude-opus-4-8` and `claude-opus-4-6` all share
+the `$5/$25` tier and are ordered newest-first within it). The blank "Other" field
 accepts any model ID typed by hand — this is how a project reaches a model not in the four, e.g.
 `claude-haiku-4-5` for high-volume mechanical ICs ($1/$5, 200K/64K, **and note it does not accept an
 effort setting**), or `claude-opus-4-8`, the analytical-Lead pick this pool carried until 2026-09-05. On the advisor
@@ -89,8 +89,11 @@ reference that day (the `claude-api` skill, cached 2026-06-24) is the arithmetic
 depends on: `claude-opus-5` at $5/$25 with the full five-rung ladder, and `claude-sonnet-5` at $2/$10 —
 the latter correcting a stale `$3/$15` this file had carried, which understated the IC lane's saving as
 ~40% when it is ~60%. The analytical lane still splits its recommendation by tier: `claude-opus-5` for
-the **Lead**, whose mistakes are inherited by every IC beneath it, and `claude-sonnet-5` for the **IC**,
-the wide fan-out wave. A directive is not a measurement of THIS project's work either — treat the picks
+the **Lead**, whose mistakes are inherited by every IC beneath it, and — **since 2026-09-09** —
+`claude-opus-4-8` for the **IC**, the wide fan-out wave. **The arithmetic above is the record of what
+was verified that day and is deliberately left standing; the `$2/$10` IC and the ~60% saving it
+describes are gone.** `claude-opus-4-8` is `$5/$25`, so the two tiers are now price-neutral and effort
+is the only lever between them (§ Tier defaults). A directive is not a measurement of THIS project's work either — treat the picks
 as the user's defaults, not a certificate. Edit the Notes column when that changes; the budget question
 reads these cells and has no other source.*
 
@@ -255,7 +258,7 @@ model as well as effort** — a change from the era when one model supplied both
 | Tier | Model | Effort |
 |---|---|---|
 | Lead (2) | `claude-opus-5` | high |
-| IC (3) | `claude-sonnet-5` | medium |
+| IC (3) | `claude-opus-4-8` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
 Claude Code session, not a budget setting. (The recommendation for that seat is Opus — `claude-opus-5`,
@@ -268,10 +271,14 @@ both the model and the effort. `effort` is not a platform default this file is r
 field a subagent *inherits the session* (`references/platform.md` fact 12b, **DOCUMENTED, not measured**),
 so every value here is a deliberate override of whatever the user is running.
 
-- **IC `claude-sonnet-5` · `medium`.** ICs are the wide fan-out wave, so both levers point at cost: a
-  model at ~60% lower price than the Lead's, and `medium` effort because `high` across the wave is
-  expensive and rarely changes mechanical output (`references/procedure-for-procedures.md`). Sonnet 5 holds
-  near-Opus quality on the research/review/ops work an analytical IC does. For the *most mechanical* ICs
+- **IC `claude-opus-4-8` · `medium`.** ICs are the wide fan-out wave, and **only one lever points at
+  cost now**: `medium` effort, because `high` across the wave is expensive and rarely changes mechanical
+  output (`references/procedure-for-procedures.md`). The model no longer does — `claude-opus-4-8` is the
+  same `$5/$25` tier as the Lead's `claude-opus-5`, so the IC wave costs what the Lead costs per token.
+  *Changed 2026-09-09 by user directive deprecating Sonnet. The predecessor was `claude-sonnet-5` at
+  `$2/$10`, and its entire rationale was that gap — read any older text about "~60% lower cost" as
+  describing a pool this one no longer has. Effort is now the only budget lever between the tiers, which
+  makes the `medium` setting load-bearing rather than a refinement.* For the *most mechanical* ICs
   (pure classification, routing, lookups), pin `claude-haiku-4-5` per employee (§ Employee overrides) —
   it is cheaper still, though it takes no effort setting.
 - **Lead `claude-opus-5` · `high`.** Leads are 2–4 in the whole org and spawn once per work order, so
@@ -334,7 +341,7 @@ analytical, not creative.** An employee whose work is research, review, analysis
 gathering sources, a promoter formatting for channels, an evaluator scoring against a mechanical rubric —
 resolves to the analytical lane (Lead or IC by tier) even when it sits in a content or visual department.
 The old floor assigned whole DEPARTMENTS and swept these support roles onto the authorship model;
-per-role assignment routes them to the analytical IC (`claude-sonnet-5`) where their work actually lives.
+per-role assignment routes them to the analytical IC (`claude-opus-4-8`) where their work actually lives.
 This is not a loophole in the floor — the floor never covered them, because their work is not generative.
 
 **Ambiguity errs toward creative, and is reported, never silent.** When a handbook's role genuinely sits
