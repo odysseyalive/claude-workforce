@@ -627,6 +627,47 @@ check(
     "; ".join(_wd_problems),
 )
 
+# wf-task-tag NAMES AND NEVER BLOCKS, which is the one property that cannot regress
+# quietly. `decision: "block"` on `UserPromptSubmit` ERASES the user's prompt from
+# context — so a tagger that ever learned to block would destroy an ask on a regex
+# match, a worse failure than every tunnel it prevents.
+_tt = read("workforce/bin/wf-task-tag")
+# SCOPE IT TO THE CODE, not the prose. The module docstring says the words
+# `decision: "block"` in order to explain why this hook never uses them, so a
+# whole-file substring test fails on the file DOCUMENTING the property it checks —
+# the same shape as the producer-has-a-reader check that once passed on its own
+# comment. `_parts[1]` is the docstring; `[0]` is the shebang, `[2:]` the code.
+_tt_parts = _tt.split('"""')
+_tt_code = '"""'.join(_tt_parts[2:]) if len(_tt_parts) > 2 else _tt
+_tt_problems = []
+if '"block"' in _tt_code or "suppressOriginalPrompt" in _tt_code:
+    _tt_problems.append("it can block a prompt; UserPromptSubmit's block ERASES the "
+                        "user's ask, and no sense classification justifies that")
+if "for name, pat, sense, why in KINDS" not in _tt:
+    _tt_problems.append("the all-matches loop is gone; first-match-wins names one sense "
+                        "and silently drops the other on an ask that is two kinds at once")
+if "additionalContext" not in _tt:
+    _tt_problems.append("the injection channel is gone; a tag nothing reads is a tag "
+                        "that changes no turn")
+if "hearing" not in _tt or "touch" not in _tt or "taste" not in _tt:
+    _tt_problems.append("a sense went missing from the KINDS table")
+check(
+    "wf-task-tag names the sense and never blocks the ask",
+    not _tt_problems,
+    "; ".join(_tt_problems),
+)
+
+# THE TAG BEATS THE REPLY SCAN, and wf-widen must actually read it. A tagger that
+# injects context while the Stop half re-guesses from prose is two mechanisms that
+# agree by luck.
+check(
+    "wf-widen scores against the tag the ask carried, not only the reply",
+    "def task_tag(" in _wd and "TAG:" in _wd,
+    "wf-widen no longer reads wf-task-tag's tag. The reply scan infers the turn's job "
+    "from the turn's own prose, which is the surface a tunnel is built out of; the tag "
+    "was set before any of the answer existed and is the stronger of the two",
+)
+
 # THE REGISTRY IS DERIVED, NEVER AUTHORED, and that is its whole claim. A stored list of
 # what is live is the same artifact that called `vendor` a live command and `wf-handoff`
 # a shipped script — written down, believed, wrong. Reading the tree cannot go stale

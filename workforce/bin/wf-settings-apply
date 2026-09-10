@@ -96,6 +96,12 @@ SHIPPED_HOOKS = {
     # from the thin surface in front of it.
     "wf-widen": ("Stop", None),
     "wf-widen@subagent": ("SubagentStop", None),
+    # THE FRONT HALF. `UserPromptSubmit` fires before the prompt is processed, which is
+    # the only point in a turn where "which sense does this need" arrives in time to
+    # change what the turn does instead of grading it afterwards. It names and never
+    # blocks: `decision: "block"` on this event ERASES the user's prompt, and nothing
+    # about a regex classification justifies destroying an ask.
+    "wf-task-tag": ("UserPromptSubmit", None),
 }
 
 # WIREABLE, NEVER DEFAULT. A hook named here is registered only when a human types

@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""wf-task-tag — classify the ask BEFORE the work, and name the sense that closes it.
+
+WHY THIS EXISTS, and it is the half `wf-widen` could not do.
+
+`wf-widen` reads the finished reply and infers a claim from prose. That is reactive and
+it is a guess about what the turn was doing, made from the turn's own words — which is
+the same surface the tunnel is built out of. It catches a reply that asserts something
+is missing. It cannot catch a reply that reasons its way to a wrong answer without ever
+asserting anything of that shape.
+
+THE MEASURED MISS, this session. Asked to decide the fate of four scripts that live
+procedures still called for, the operator read `audit-setup.md` and `invariants.md`,
+saw live requirements, and concluded the scripts had to be restored. Wrong: the removal
+was deliberate, on the user's explicit marks, and the record that says so had not been
+read. No absence claim was made and no universal claim was made, so `wf-widen` was
+silent and correct to be silent. **The TASK, though, was "decide the fate of a removed
+mechanism," and that task cannot be closed without HEARING — the record's own
+testimony.** A tag on the ask would have said so before a word of the answer was
+written. A scan of the answer could not.
+
+SO THE TAG IS SET AT THE FRONT. `UserPromptSubmit` fires before the prompt is
+processed and can inject context, which is the only point in a turn where "which sense
+does this need" arrives in time to change what the turn does rather than grade it after.
+
+IT IS DETERMINISTIC, NOT A MODEL CALL. Every classification below is a regex over the
+ask. That is the input-side discipline the rest of this distribution's newer mechanisms
+follow, and it costs no tokens and no latency: a classifier that spends a model call on
+every prompt to say "this one needs the web" has to be right very often to be worth it,
+and nothing here has measured that it would be.
+
+IT NAMES, IT NEVER BLOCKS. `decision: "block"` on this event erases the user's prompt.
+Nothing about a sense classification justifies destroying an ask, and a tagger that can
+swallow a prompt on a regex is a worse failure than every tunnel it prevents.
+
+THE TAG IS ALSO WRITTEN TO DISK, so `wf-widen` at `Stop` scores against the tag the ask
+carried rather than re-guessing from the reply. One classification, set once, read by
+both ends of the turn.
+
+EXIT CODES: 0 always. An unclassifiable ask is the common case and produces silence.
+"""
+
+import json
+import os
+import re
+import sys
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# TASK KINDS. Each row is (name, pattern, sense, why that sense and not another).
+#
+# These are the kinds whose WRONG ANSWER this project has actually produced and paid
+# for. It is not a taxonomy of asks; it is a list of the ways work here has gone wrong,
+# and it stays that length until another way is measured.
+KINDS = [
+    ("history", re.compile(
+        r"\b(why (?:was|were|did|is it)|when (?:was|were|did)|who (?:removed|changed|added)"
+        r"|what happened to|deliberate|on purpose|intentional"
+        r"|(?:should|do) (?:we|i|you) (?:restore|bring back|re-?add|revert))\b", re.I),
+     "hearing",
+     "the record is testimony and it is the only thing that knows INTENT. A tree shows "
+     "what is there; only the record says whether its absence was a decision"),
+
+    ("world", re.compile(
+        r"\b(deprecat\w*|latest|current(?:ly)? (?:supported|recommended)|still (?:supported|a thing)"
+        r"|best practice|state of the art|new(?:est)? version|does .{0,20}still exist"
+        r"|has .{0,20}changed|up to date)\b", re.I),
+     "hearing",
+     "this repository cannot know the world. Reading local documents to answer it is "
+     "how `vendor` was called a live command from docs that had gone stale"),
+
+    ("behaviour", re.compile(
+        r"\b(does (?:it|this|that) (?:still |even |actually |really )*(?:work|run|fire|pass)"
+        r"|why (?:does|is) .{0,30}(?:fail|break|error)"
+        r"|is (?:it|this) working|what does .{0,30}(?:do|return|emit|print)"
+        r"|test|verify|prove|reproduce)\b", re.I),
+     "touch",
+     "prose says what a script does; running it says what it did. Four scripts here were "
+     "described in working detail by live procedures and existed nowhere"),
+
+    ("existence", re.compile(
+        r"\b(is there (?:a|an|any)|are there|do we have|does .{0,25} exist|what(?:'s| is) in"
+        r"|how many|list (?:the|all|every)|which (?:ones|files|scripts|commands)"
+        r"|any (?:other|more)|anywhere else)\b", re.I),
+     "taste",
+     "a claim about a SET is closed by enumerating the set. Point reads sample it, and a "
+     "sample cannot show what is absent"),
+]
+
+SENSE_HOW = {
+    "hearing": "read the record that decided it (`git log`, `workforce/changes/`), or ask "
+               "a source outside this turn's own reasoning",
+    "touch": "run it and read what came back, rather than reading a description of it",
+    "taste": "enumerate the set — Glob, find, ls, grep -l — before saying what is in it "
+             "or missing from it",
+    "sight": "read the file itself",
+}
+
+
+def classify(prompt):
+    """Every kind the ask matches, in the order the list declares them.
+
+    NOT first-match. An ask can be two kinds at once — "why was this removed and does it
+    still work" is history AND behaviour — and answering it needs both channels. Taking
+    only the first would name one and silently drop the other, which is the narrowing
+    this whole mechanism exists against.
+    """
+    hits = []
+    for name, pat, sense, why in KINDS:
+        if pat.search(prompt or ""):
+            hits.append({"kind": name, "sense": sense, "why": why})
+    return hits
+
+
+def tag_path(payload):
+    """Where the tag waits for `Stop`. Session-scoped, so two sessions never cross."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    return os.path.join(d, f"wf-task-tag.{sid}.json")
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+
+    hits = classify(payload.get("prompt") or "")
+    if not hits:
+        return 0
+
+    try:
+        with open(tag_path(payload), "w", encoding="utf-8") as fh:
+            json.dump({"hits": hits}, fh)
+    except OSError:
+        pass        # the injection below still lands; the Stop half degrades quietly
+
+    # STATED AS FACTS ABOUT THE ASK, NEVER AS AN INSTRUCTION. The hooks reference is
+    # explicit that text framed as an out-of-band command trips the prompt-injection
+    # defences and gets surfaced to the user instead of read — which would turn a tag
+    # into one more thing a human has to deal with.
+    lines = ["This ask is of a kind whose wrong answers are on record in this project."]
+    for h in hits:
+        lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
+                     f"In practice: {SENSE_HOW[h['sense']]}.")
+    lines.append("Senses are described at `references/senses.md`.")
+
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": "\n".join(lines),
+    }}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

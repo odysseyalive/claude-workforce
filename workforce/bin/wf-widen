@@ -96,6 +96,30 @@ TL = _ledger()
 OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
 
 
+def task_tag(payload):
+    """The tag `wf-task-tag` set on this turn's ask, or None.
+
+    THE TAG BEATS THE CLAIM SCAN, and that ordering is the point. A claim scan reads the
+    finished reply and infers what the turn was doing from the turn's own prose — the
+    same surface the tunnel is built out of. The tag was set from the ASK, before a word
+    of the answer existed, so it cannot have been bent by the answer.
+
+    MEASURED MISS that this closes: asked to decide the fate of four removed scripts,
+    the operator read the live requirements, never read the record that removed them,
+    and concluded they should come back. Wrong. No absence claim and no universal claim
+    were made, so the reply scan was silent and correct to be silent — while the ASK was
+    plainly a `history` question, whose sense is hearing.
+    """
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    try:
+        with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
+            hits = json.load(fh).get("hits") or []
+    except (OSError, ValueError):
+        return None
+    return hits or None
+
+
 def instruments(cwd):
     """What was available to widen with, read off the machine at the moment of the Stop.
 
@@ -170,12 +194,29 @@ CLAIM_SENSE = {
 # the moment of the stop the operator believes it is continuing. `Stop` is the first
 # instant at which the promise and the ending are both visible in the same frame, and
 # the harness — not the operator — is the thing that can see both.
+# THE VERB LIST WAS MEASURED TWICE, and the first list was wrong in a way that made the
+# hook useless without making it noisy — the worst failure mode, because it looks fine.
+# MEASURED after 8 live firings: the hook ran on every one, cost 143-507ms, and blocked
+# ZERO. Counting the verbs that actually appear in this operator's forward-looking tails
+# explains it: `report` is the most common by a factor of three (10 uses) and was not on
+# the list. The single promise most often made was the one promise not detected.
 PROMISE = re.compile(
     r"(?:^|[.\n]\s*)(?:now[, ]+)?(?:i'?ll|i am|i'?m|let me)\s+"
     r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?"
-    r"(?:start|continue|keep|carry|build|do|go|move|fix|wire|write|run|land|finish)\b"
+    r"(?:start|continue|keep|carry|build|do|go|move|fix|wire|write|run|land|finish"
+    r"|report|add|revise|bring|state|clear)\b"
     r"|(?:^|[.\n]\s*)(?:carrying on|continuing|starting|building|moving on|picking up)\b",
     re.I)
+# A CONDITIONAL PROMISE IS A WAIT, NOT A STOP, and this is what makes `report` safe to
+# add. "I'll report the verdict when the monitor fires" is correct behaviour: the work
+# is running and the turn has nothing to do until it lands. "Carrying on with that" has
+# no condition and nothing pending. MEASURED over 96 tails: the widened list matches 21,
+# handoffs take 3, and this takes 9 more — leaving 9 fires (9.4%), every one a genuine
+# mid-work stop, and sparing 9, every one a genuine wait. It is a second exemption
+# rather than a narrower verb list because the verb is not what distinguishes them.
+CONDITIONAL = re.compile(
+    r"\b(?:when|once|after|as soon as|if)\b[^.\n]{0,60}"
+    r"\b(?:finish|complete|land|fire|return|done|end|arrive|report)", re.I)
 # A GENUINE HANDOFF, where stopping is correct and this must stay silent. The user's
 # instruction is the spec: do not stop mid-work "unless you actually really do need
 # input, your soliciting input from me." A question mark, or an explicit offer of the
@@ -200,7 +241,7 @@ def unfinished(reply, payload):
     if payload.get("background_tasks"):
         return None
     tail = (reply or "")[-TAIL:]
-    if HANDOFF.search(tail):
+    if HANDOFF.search(tail) or CONDITIONAL.search(tail):
         return None
     m = PROMISE.search(tail)
     return m.group(0).strip(" .\n") if m else None
@@ -274,14 +315,19 @@ def widen_reason(total, threshold, why, rows, inst, counts):
     the prompt-injection defences and gets surfaced to the user instead of acted on,
     which would turn an automatic widen back into one more thing a human has to do.
     """
-    lines = [f"Turn score {total}/100 against a {threshold} threshold, "
-             f"scored only on the senses this claim needs.",
+    _tagged = any(t.startswith("TAG:") for t, _, _ in why)
+    lines = [f"Turn score {total}/100 against a {threshold} threshold, scored only on "
+             f"the senses this {'ask' if _tagged else 'claim'} needs.",
              "  " + " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows), ""]
     for trip, sense, reason in why:
-        article = "an" if trip[0] in "aeiou" else "a"
-        lines.append(f"The reply makes {article} {trip} claim. That is settled by "
-                     f"{sense.upper()}: "
-                     f"{reason}.")
+        if trip.startswith("TAG:"):
+            head = (f"The ASK was tagged `{trip[4:]}` before this turn began. "
+                    f"That kind is closed by {sense.upper()}: ")
+        else:
+            article = "an" if trip[0] in "aeiou" else "a"
+            head = (f"The reply makes {article} {trip} claim. That is settled by "
+                    f"{sense.upper()}: ")
+        lines.append(head + f"{reason}.")
     lines.append("")
     lines.append("On this machine, unused this turn:")
     if not counts[3]:
@@ -361,6 +407,13 @@ def main():
         sense, reason = CLAIM_SENSE[t]
         applicable.add(sense)
         why.append((t, sense, reason))
+
+    # THE TAG IS ADDITIVE, never a replacement. A turn can trip a claim trigger AND
+    # answer a tagged ask, and both senses are then required — taking one would drop
+    # the other silently, which is the narrowing every mechanism here is built against.
+    for h in (task_tag(payload) or []):
+        applicable.add(h["sense"])
+        why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
 
     # A TURN SCORED AGAINST NOTHING DOES NOT GET A PERFECT SCORE. Printing 100/100
     # for a turn that tripped no trigger is a number with nothing under it, and a

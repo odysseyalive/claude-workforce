@@ -53,6 +53,31 @@ requires a different aperture, not a second sample through the same one.
 **Widening means consulting something not yet consulted.** Restating the conclusion with
 more confidence is the tunnel continuing, and it registers as work.
 
+## Tagging the task, not just scanning the reply
+
+**A reply scan is reactive and it reads the turn's own prose** — the same surface a
+tunnel is built out of. `wf-task-tag` runs on `UserPromptSubmit`, classifies the ask
+before any of the answer exists, and names the sense that closes it. `wf-widen` then
+scores against that tag at `Stop` rather than re-guessing.
+
+| Task kind | The ask looks like | Closed by | Because |
+|---|---|---|---|
+| `history` | why was this removed · should we restore it · was it deliberate | **hearing** | a tree shows what is there; only the record says whether an absence was a decision |
+| `world` | is it deprecated · what is current · still supported | **hearing** | this repository cannot know the world |
+| `behaviour` | does it work · why does it fail · what does it return | **touch** | prose says what a script does; running it says what it did |
+| `existence` | is there any · how many · list every · anywhere else | **taste** | a claim about a set is closed by enumerating it |
+
+**The list is short because it is a list of measured failures, not a taxonomy.** Each row
+is a way work in this project has actually gone wrong. It grows when another way is
+measured and not before.
+
+**An ask can be two kinds at once** — "why was this removed and does it still work" is
+`history` and `behaviour` — and both channels are then required. Taking only the first
+match would drop the other silently.
+
+**The tag is additive to the claim triggers, never a replacement.** A turn can answer a
+tagged ask and make a claim; both senses are required.
+
 ## Where this is enforced
 
 `wf-widen` scores the turn at `Stop` and `SubagentStop`, and blocks rather than stopping

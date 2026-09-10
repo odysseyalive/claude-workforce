@@ -38,6 +38,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-turn-ledger` | `SubagentStop` | *(none)* | the same ledger on a spawned employee. A subagent has **zero residency** — fresh context, no history, one shot — so it is the node most exposed to authoring from the thin surface in front of it. `SubagentStop` carries `agent_type`, `agent_transcript_path` and `last_assistant_message` for that agent. § The turn ledger below |
 | `wf-widen` | `Stop` | *(none)* | **acts where the ledger reports.** Scores the turn on the senses its claim needs and returns `decision: "block"` when one went unopened — the reason names the instruments on this machine that were untouched. Also blocks a turn that announced it was continuing and then ended. § The widen below |
 | `wf-widen` | `SubagentStop` | *(none)* | the same widen on a spawned employee, for the reason the ledger has both rows: a subagent has zero residency and is the node most exposed to authoring from the thin surface in front of it. |
+| `wf-task-tag` | `UserPromptSubmit` | *(none)* | classifies the ASK before the turn runs and injects the sense that closes it — `history`/`world` need hearing, `behaviour` needs touch, `existence` needs taste. Names, never blocks: `decision: "block"` on this event erases the user's prompt. § The widen below |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -275,6 +276,8 @@ something that is not the operator.
 | a claim about what is NOT there, from a turn that read nothing | `taste` — only enumerating a set can close it | 0.5% of 1,495 turns |
 | a claim about a whole SET, with no enumerating read, quotes excluded | `taste` | 1.5% of 1,495 turns |
 | a turn that announced it was continuing and then ended, asking nothing | not a sense — the stop itself | 9.4% of 106 turns, 0.9% false |
+
+**The tag comes from the ask, the claim scan from the reply, and the tag is the stronger of the two** — it was set before any of the answer existed, so the answer cannot have bent it. The measured miss it closes: a turn asked to decide the fate of four removed scripts read the live requirements, never read the record that removed them, and concluded they should return. No absence or universal claim was made, so the reply scan was silent and right to be — while the ask was plainly a `history` question.
 
 **The denominator moves, and that is the design.** A turn is scored only on the senses its claim
 needs (`references/senses.md`). Marking a turn down for not spawning a reader when spawning one was
