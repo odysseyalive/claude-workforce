@@ -120,6 +120,7 @@ def widen_flag(payload):
 
 
 def raise_flag(payload, why, rows, counts, unopened, sampled=False, reply=""):
+    _tag = task_tag(payload)
     """Record what the auditing agent needs to judge RESULTS against the ASK.
 
     The three things it carries are the directive, made concrete: "it's the evidence
@@ -140,8 +141,9 @@ def raise_flag(payload, why, rows, counts, unopened, sampled=False, reply=""):
         with open(widen_flag(payload), "w", encoding="utf-8") as fh:
             json.dump({
                 "sampled": sampled,
-                "ask": {"prompt": (payload.get("prompt") or "")[:2000],
-                        "kinds": [h.get("kind") for h in (task_tag(payload) or [])]},
+                "ask": {"prompt": (_tag or {}).get("prompt") or "",
+                        "kinds": [h.get("kind") for h in ((_tag or {}).get("hits") or [])],
+                        "senses": (_tag or {}).get("senses") or sorted(unopened)},
                 "evidence": {"channels": {k: v for k, v in rows},
                              "reads": counts[0], "distinct": len(counts[1] or []),
                              "enumerating": counts[2], "outside": counts[3],
@@ -183,10 +185,9 @@ def task_tag(payload):
     sid = (payload.get("session_id") or "nosession")[:64]
     try:
         with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
-            hits = json.load(fh).get("hits") or []
+            return json.load(fh)
     except (OSError, ValueError):
         return None
-    return hits or None
 
 
 def instruments(cwd):
@@ -479,7 +480,7 @@ def main():
     # THE TAG IS ADDITIVE, never a replacement. A turn can trip a claim trigger AND
     # answer a tagged ask, and both senses are then required — taking one would drop
     # the other silently, which is the narrowing every mechanism here is built against.
-    for h in (task_tag(payload) or []):
+    for h in ((task_tag(payload) or {}).get("hits") or []):
         applicable.add(h["sense"])
         why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
 

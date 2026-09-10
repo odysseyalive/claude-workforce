@@ -78,6 +78,39 @@ match would drop the other silently.
 **The tag is additive to the claim triggers, never a replacement.** A turn can answer a
 tagged ask and make a claim; both senses are required.
 
+## The jury
+
+**Six jurors, yes or no, no numbers.** A jury of twelve returns a verdict, not a score,
+and nobody asks how confident juror seven was. The senses work the same way: each one
+answers a single question about the finished turn, and one verified `no` is a `no`.
+
+**Only the jurors an ask summons are seated.** The docket comes from `ask.senses`,
+derived from the user's own words before any answer existed — not from the session's
+read of its own work. In every case shipped that is one or two jurors, so a jury costs
+about what a single opinion did.
+
+| Juror | Its one question |
+|---|---|
+| **sight** | does the source say what the conclusion says it says? |
+| **hearing** | did an outside voice actually address this, and was it read? |
+| **touch** | was the behaviour claimed demonstrated by something that was RUN? |
+| **taste** | was the set the conclusion speaks about actually enumerated? |
+| **smell** | is something off in the conclusion itself — overclaimed, or resting on a word the evidence does not support? |
+| **intuition** | what did this turn assume without evidence, and does anything support it? |
+
+**A juror may abstain**, and that is not a `yes`. One that cannot verify either way says
+so rather than voting, because a vote nobody could check is the fabricated number in
+another costume.
+
+**Notes on a `yes` are the point.** A juror that votes to acquit and still noticed
+something adjacent should say it. A verdict tells you that you were wrong; a note tells
+you where to look, and the second is worth more — "you never read the record that
+removed it" is already the widening, before any widening process runs.
+
+**Why the sixth juror can finally sit.** `intuition` was shipped permanently unscored
+because judging one's own prior from inside is the impaired faculty. True, and it only
+ever ruled out SELF-judgement. A juror did not form the prior and can read it.
+
 ## Widening — the act, not the alarm
 
 **A score that reports is an alarm. The widening is what answers it**, and it is

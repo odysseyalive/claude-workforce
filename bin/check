@@ -634,6 +634,14 @@ if ("100 if n >= 2" in _wd_code or "/100" in _wd_code
                         "appeared exactly once in this repository with no measurement "
                         "anywhere behind them, and 100/100 read as 'this work was "
                         "complete' while meaning 'two shell commands ran'")
+if '"senses"' not in _wd_code or '(_tag or {}).get("prompt")' not in _wd_code:
+    _wd_problems.append("the flag no longer carries the ASK. `Stop` has NO `prompt` "
+                        "field — measured against the hooks reference — so reading it "
+                        "from the Stop payload yields an empty string every time, and "
+                        "the judge compares evidence to conclusion with no idea what "
+                        "was requested. That is the measure-results directive "
+                        "implemented with the request missing. It is carried forward "
+                        "from wf-task-tag, the one event that sees it")
 if "unopened, sampled=sampled" not in _wd_code:
     _wd_problems.append("the flag derives `unopened` again instead of being told it. "
                         "Derived, it listed every APPLICABLE sense as unopened — on a "
@@ -688,6 +696,11 @@ if "os.remove(tag_path(payload))" not in _tt:
 if "additionalContext" not in _tt:
     _tt_problems.append("the injection channel is gone; a tag nothing reads is a tag "
                         "that changes no turn")
+if '"senses"' not in _tt or '"prompt"' not in _tt:
+    _tt_problems.append("the tag no longer persists the prompt and the jury docket. "
+                        "UserPromptSubmit is the only event that receives the user's "
+                        "prompt; if it is not written down here nothing downstream can "
+                        "ever compare results against the ask")
 if "hearing" not in _tt or "touch" not in _tt or "taste" not in _tt:
     _tt_problems.append("a sense went missing from the KINDS table")
 check(
@@ -750,6 +763,13 @@ if "def _same_agent(" not in _sa_agent:
     _ag_problems.append("agent-hook identity is gone; agent hooks carry no `command`, so "
                         "_same_command answers False forever and every --wire-defaults "
                         "leaves another duplicate, each spawning its own subagent per Stop")
+if "YOU ARE A JURY, NOT A SCORER" not in _sa_agent or "abstains" not in _sa_agent:
+    _ag_problems.append("the jury prompt is gone. A single global verdict loses the "
+                        "per-sense structure that makes the reasons useful: a score "
+                        "says 'insufficient', a juror says which channel was never "
+                        "opened and what it would have shown, and that reason IS the "
+                        "widening. An abstain option is required so a juror that cannot "
+                        "verify either way does not vote")
 if "wf-widen-flag" not in _sa_agent:
     _ag_problems.append("the flag gate is gone from the agent prompt; without it the "
                         "hook analyses every Stop and spends a subagent per turn to "

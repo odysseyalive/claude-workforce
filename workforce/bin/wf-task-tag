@@ -159,7 +159,15 @@ def main():
 
     try:
         with open(tag_path(payload), "w", encoding="utf-8") as fh:
-            json.dump({"hits": hits}, fh)
+            json.dump({"hits": hits,
+                       # THE ASK ITSELF, carried forward because `Stop` never gets it.
+                       # The Stop payload has no `prompt` field, so the judge was
+                       # comparing evidence to conclusion with NO IDEA what was asked —
+                       # the measure-results directive implemented with the request
+                       # missing. This event is the only one that sees it.
+                       "prompt": (payload.get("prompt") or "")[:2000],
+                       # THE JURY DOCKET: which senses sit on this ask.
+                       "senses": sorted({h["sense"] for h in hits})}, fh)
     except OSError:
         pass        # the injection below still lands; the Stop half degrades quietly
 
