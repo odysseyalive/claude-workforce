@@ -634,6 +634,17 @@ if ("100 if n >= 2" in _wd_code or "/100" in _wd_code
                         "appeared exactly once in this repository with no measurement "
                         "anywhere behind them, and 100/100 read as 'this work was "
                         "complete' while meaning 'two shell commands ran'")
+if '"senses": sorted(applicable)' not in _wd_code:
+    _wd_problems.append("the jury docket falls back to the unopened set again. On a "
+                        "SAMPLED turn nothing is unopened by definition, so the fallback "
+                        "hands over an EMPTY docket — no juror seated — and the jury "
+                        "convicts anyway. Measured twice in a row, the second verdict "
+                        "citing the turn that diagnosed the first")
+if "if not applicable:" not in _wd_code or "no docket" not in _wd:
+    _wd_problems.append("a case with no docket is still handed to the jury. Nothing to "
+                        "try means no trial: an empty docket cannot be heard, and "
+                        "spawning a reader to hear one spends a subagent to return a "
+                        "verdict about no question")
 if '"senses"' not in _wd_code or '(_tag or {}).get("prompt")' not in _wd_code:
     _wd_problems.append("the flag no longer carries the ASK. `Stop` has NO `prompt` "
                         "field — measured against the hooks reference — so reading it "
@@ -642,7 +653,7 @@ if '"senses"' not in _wd_code or '(_tag or {}).get("prompt")' not in _wd_code:
                         "was requested. That is the measure-results directive "
                         "implemented with the request missing. It is carried forward "
                         "from wf-task-tag, the one event that sees it")
-if "unopened, sampled=sampled" not in _wd_code:
+if "unopened, applicable," not in _wd_code:
     _wd_problems.append("the flag derives `unopened` again instead of being told it. "
                         "Derived, it listed every APPLICABLE sense as unopened — on a "
                         "sampled turn that is every sense the ask needed, including ones "
@@ -763,6 +774,11 @@ if "def _same_agent(" not in _sa_agent:
     _ag_problems.append("agent-hook identity is gone; agent hooks carry no `command`, so "
                         "_same_command answers False forever and every --wire-defaults "
                         "leaves another duplicate, each spawning its own subagent per Stop")
+if "NO JUROR IS SEATED" not in _sa_agent:
+    _ag_problems.append("the jury no longer stops on an empty docket. The prompt tells a "
+                        "juror who cannot verify to abstain and said nothing about a jury "
+                        "with no jurors, so it inferred a docket from the other fields "
+                        "and returned a verdict on a question nobody asked")
 if "YOU ARE A JURY, NOT A SCORER" not in _sa_agent or "abstains" not in _sa_agent:
     _ag_problems.append("the jury prompt is gone. A single global verdict loses the "
                         "per-sense structure that makes the reasons useful: a score "
