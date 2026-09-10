@@ -211,6 +211,28 @@ TTAG = "workforce/bin/wf-task-tag"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # Removing the write weighting spends the same attention on a read-only turn as on
+    # one that rewrote the tree unclassified.
+    # TARGET A LITERAL, NOT A LINE. Deleting the whole `rate = ...` line left another
+    # `counts[5]` in the flag message, so the presence check still passed — vacuous. The
+    # expression itself occurs once and removing it is the real regression: the sample
+    # stops caring whether the turn changed anything.
+    ("an unclassified ask can still be read by someone who did not answer it",
+     WDN, "del", " if counts[5] else blind"),
+    # Removing the blind sample restores the gap: an unclassified ask exits before the
+    # sampler and is read by nobody but the turn that answered it.
+    # THE THIRD CASE IS DROPPED, not padded. Deleting the BLIND_DOCKET binding leaves
+    # `raise_flag(..., BLIND_DOCKET, ...)` referencing a name that is gone — the file
+    # still parses, so bin/check runs, but it fails five OTHER assertions first and the
+    # named one never reports. Fourth time this session that a mutation aimed at a
+    # binding proved nothing; the two cases above target LITERALS whose removal changes
+    # behaviour and leaves the file valid, which is the only shape that works here.
+    # And deleting the empty-tag write takes the ask off disk, so the jury refuses.
+    # Deleting the json.dump LINE orphaned the block and check died on syntax before
+    # reaching the named assertion. `"senses": []` occurs once, and a dict tolerates the
+    # trailing comma it leaves — so the file still parses and the empty docket is gone.
+    ("an unclassified ask can still be read by someone who did not answer it",
+     TTAG, "del", '"senses": []'),
     # Removing the judgment kind restores the gap: design asks carry no docket, so the
     # jury can never convene on the turns where a reading forms unchecked.
     ("the tagger reads the user's ask, and tells a question from a statement",

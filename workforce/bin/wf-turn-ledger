@@ -62,6 +62,16 @@ READERS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}
 # skill, an MCP server. Counted apart from reads for the reason in `turn_counts`.
 OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
 
+# A Bash command that CHANGES the tree, as against one that reads it. Narrow on
+# purpose: an in-place edit, a redirect or heredoc into a file, a move or remove, a
+# git write. `cat`, `grep` and `sed -n` are reads and must stay reads.
+WRITE_CMD = re.compile(
+    r"\bgit\s+(?:commit|apply|checkout|reset|rm|mv|add)\b"
+    r"|\b(?:sed|perl)\b[^|;\n]*\s-i\b"
+    r"|\b(?:tee|mv|rm|cp|mkdir|touch|chmod)\b"
+    r"|>\s*[\w./-]+"
+    r"|<<\s*.?[A-Z]{2,}")
+
 # READING THE RECORD IS HEARING, and this set is why the guard blocked a turn that had
 # done exactly what it asked. `wf-task-tag`'s own SENSE_HOW tells a reader that hearing
 # means *"read the record that decided it (`git log`, `workforce/changes/`), or ask a
@@ -300,7 +310,7 @@ def turn_counts(payload):
         start = i
         break
 
-    reads, targets, said, setreads, outside, direct = 0, [], [], 0, 0, 0
+    reads, targets, said, setreads, outside, direct, wrote = 0, [], [], 0, 0, 0, 0
     for line in lines[start:]:
         try:
             d = json.loads(line)
@@ -320,6 +330,12 @@ def turn_counts(payload):
             # wrong reading came from outside the turn, none from re-reading inside
             # it. A repository read and a spawned second opinion are not the same
             # evidence, however alike they look in a raw tool count.
+            # WHAT THE TURN CHANGED. A read-only turn rarely needs an outside reader;
+            # a turn that rewrote the tree and matched no classifier is the risky one.
+            # Counted here, never judged here — `wf-widen` decides what to do with it.
+            if name in ("Edit", "Write", "NotebookEdit") or (
+                    name == "Bash" and WRITE_CMD.search(str(inp.get("command", "")))):
+                wrote += 1
             if (name in OUTSIDE or name.startswith("mcp__")
                     or (name == "Bash" and OUTSIDE_CMD.search(str(inp.get("command", ""))))):
                 outside += 1
@@ -364,7 +380,7 @@ def turn_counts(payload):
         if t not in seen:
             seen.add(t)
             uniq.append(t)
-    return reads, uniq, setreads, outside, direct, reply
+    return reads, uniq, setreads, outside, direct, wrote, reply
 
 
 def main():
@@ -379,7 +395,7 @@ def main():
     counts = turn_counts(payload)
     if counts is None:
         return 0
-    reads, uniq, setreads, _outside, _direct, reply = counts
+    reads, uniq, setreads, _outside, _direct, _wrote, reply = counts
 
     terms = []
     for m in JARGON.finditer(mask_code(reply)):

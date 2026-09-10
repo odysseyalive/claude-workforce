@@ -251,8 +251,16 @@ def main():
         # fires on a turn carrying no claim is the 7.0% noise that retired
         # `wf-speak-guard`, arriving by a different route: not a bad detector, but a
         # correct detector reading last turn's input.
+        # WRITE AN EMPTY TAG, NEVER DELETE. Removing the file solved the stale-tag bug
+        # and created a worse one: `Stop` then has no record that this turn happened at
+        # all, and no `prompt` — so an untagged turn can never be audited, because the
+        # jury correctly refuses a case with no ask. A fresh, explicitly-empty tag fixes
+        # the staleness just as well (it IS this turn's) and keeps the ask on disk for
+        # the blind sample in `wf-widen` (§ THE BLIND SAMPLE).
         try:
-            os.remove(tag_path(payload))
+            with open(tag_path(payload), "w", encoding="utf-8") as fh:
+                json.dump({"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
+                           "senses": []}, fh)
         except OSError:
             pass
         return 0

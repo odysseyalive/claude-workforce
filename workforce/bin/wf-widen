@@ -547,9 +547,62 @@ def main():
     # for a turn that tripped no trigger is a number with nothing under it, and a
     # number with nothing under it is what this whole mechanism exists to stop
     # producing. It says so instead.
+    # ── THE BLIND SAMPLE ─────────────────────────────────────────────────────
+    # CLASSIFICATION CANNOT BE THE ONLY DOOR TO THE JURY, and this is the fix for the
+    # gap that let this session's tunnels form. The docket comes from five keyword
+    # patterns; a design ask phrased as a flat requirement — "the audit process should
+    # be smart enough to see that" — matches none of them and is a real proposal that
+    # produced real design work. No regex reads between lines, and widening one until it
+    # does is how a guard reaches the false-positive rate that gets it switched off.
+    #
+    # So a SHARE OF UNCLASSIFIED TURNS is read by someone who did not do the work,
+    # independent of what any pattern thought the ask was. That is the same argument the
+    # 1-in-5 audit of PASSING turns already makes — "auditing only the turns that fail
+    # their own dispatch is the self-scoring bias wearing a different hat" — extended to
+    # the turns no pattern classified, which until now exited above this point and could
+    # never be audited at all.
+    #
+    # THE DOCKET IS ASSIGNED, NEVER INFERRED. `e83990e` forbids inferring one, and for
+    # good reason: a jury handed an empty case convicted twice. `smell` and `intuition`
+    # are the two senses that require no particular channel — smell reads the reply
+    # itself, and intuition is "what did this turn assume without evidence", which
+    # `senses.md` says is deliberately unscored precisely because judging one's own prior
+    # from inside is the impaired faculty. From outside, it is readable. That is the
+    # standing docket for a turn nobody classified, and it is a constant here rather than
+    # anything derived from the turn.
+    BLIND_DOCKET = ["smell", "intuition"]
     if not applicable:
+        try:
+            blind = int(os.environ.get("WF_BLIND_SAMPLE") or 20)
+        except ValueError:
+            blind = 20
+        tag = task_tag(payload) or {}
+        ask = (tag.get("prompt") or "").strip()
+        # WEIGHTED BY WHAT THE TURN DID, not by how the ask was worded — the one idea
+        # worth keeping from the retired `diagnose` command, whose own critique was that
+        # four of its five surfaces were static and none observed a run. A turn that only
+        # read things rarely needs an outside reader. A turn that REWROTE THE TREE and
+        # matched no classifier is the risky case: it is design work by any reasonable
+        # reading, whatever pattern the prompt did or did not trip. Sampled four times as
+        # often, so the attention lands where a wrong reading has already been acted on.
+        rate = max(1, blind // 4) if counts[5] else blind
+        picked = (blind > 0 and ask and reply
+                  and hashlib.sha256((reply or "").encode("utf-8")).digest()[1] % rate == 0)
+        if not picked:
+            # THE MESSAGE IS UNCHANGED for the unsampled case, and two fixtures assert it.
+            # A turn carrying no claim that evidence settles is not scored — that is what
+            # it was before the blind sample existed and it is still true; the sample adds
+            # a second outcome above, it does not reword this one.
+            print(json.dumps({"systemMessage":
+                              "WIDEN  not scored — no claim this turn that evidence settles"}))
+            return 0
+        raise_flag(payload, [("BLIND", "intuition",
+                              "no pattern classified this ask, so nobody but this turn has "
+                              "read it" + (" — and it changed the tree" if counts[5] else ""))],
+                   [(k, None) for k in ("sight", "hearing", "touch", "taste")],
+                   counts, [], BLIND_DOCKET, sampled=True, reply=reply)
         print(json.dumps({"systemMessage":
-                          "WIDEN  not scored — no claim this turn that evidence settles"}))
+                          "WIDEN  unclassified ask · blind-sampled for an outside read"}))
         return 0
 
     unopened, rows = senses(counts, applicable)

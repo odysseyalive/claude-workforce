@@ -698,12 +698,25 @@ if '"block"' in _tt_code or "suppressOriginalPrompt" in _tt_code:
 if "for name, pat, sense, why in KINDS" not in _tt:
     _tt_problems.append("the all-matches loop is gone; first-match-wins names one sense "
                         "and silently drops the other on an ask that is two kinds at once")
-if "os.remove(tag_path(payload))" not in _tt:
-    _tt_problems.append("an untagged turn no longer clears the previous turn's tag; "
-                        "wf-widen then reads a stale tag at Stop as though it belonged "
-                        "to this turn, and blocks a message that carried no claim — a "
-                        "correct detector reading last turn's input, which is the 7.0% "
-                        "noise that retired wf-speak-guard arriving by another route")
+# THE STALENESS RULE SURVIVES; ITS IMPLEMENTATION CHANGED. This asserted that an untagged
+# turn DELETES the tag. Deleting does clear staleness, and it also erased the ask — so
+# `Stop` had no `prompt` for an untagged turn, the jury correctly refuses a case with no
+# ask, and an unclassified turn could never be audited by anyone. Writing a fresh,
+# explicitly-empty tag clears staleness just as well (it IS this turn's) and keeps the ask
+# on disk for the blind sample. What must never return is the ORIGINAL bug: a tag from the
+# previous turn read at Stop as though it belonged to this one — measured on "tunnel vision
+# is never fun", which inherited `behaviour` and was blocked for not running a shell
+# command about a remark.
+if '"hits": []' not in _tt or '"senses": []' not in _tt:
+    _tt_problems.append("an untagged turn no longer writes an explicitly-empty tag; either "
+                        "it leaves the PREVIOUS turn's tag to be read as this one's — the "
+                        "7.0% noise that retired wf-speak-guard, arriving as a correct "
+                        "detector reading last turn's input — or it deletes the ask and "
+                        "the blind sample can never fire")
+if "os.remove(tag_path(payload))" in _tt:
+    _tt_problems.append("the untagged path deletes the tag again, which takes the ask off "
+                        "disk; the jury then refuses the case and an unclassified turn is "
+                        "read by nobody but the turn that answered it")
 if "additionalContext" not in _tt:
     _tt_problems.append("the injection channel is gone; a tag nothing reads is a tag "
                         "that changes no turn")
@@ -1078,6 +1091,54 @@ if "def describe(" not in _wd or "shown = describe(" not in _wd:
     _disp.append("the sentence renderer is gone or is no longer what builds the Stop "
                  "line; a row of counts is the shape a grade occupied and reads as one "
                  "whatever the code does")
+# CLASSIFICATION IS NOT THE ONLY DOOR TO THE JURY. Five keyword patterns decide whether a
+# turn gets a docket, and a design ask phrased as a flat requirement matches none of them:
+# "the audit process should be smart enough to see that" is a real proposal that produced
+# real design work and carries no tag. No regex reads between lines, and widening one until
+# it does reaches the false-positive rate that gets a guard switched off — `should be`
+# unhedged was measured doing exactly that and rejected.
+#
+# So a share of UNCLASSIFIED turns is read by someone who did not do the work. Same
+# argument as the existing 1-in-5 audit of PASSING turns, extended to the turns no pattern
+# classified — which until 2026-09-10 exited before the sampler and could never be audited.
+_blind = []
+if "BLIND_DOCKET" not in _wd or "WF_BLIND_SAMPLE" not in _wd:
+    _blind.append("the blind sample is gone; an unclassified ask exits without ever being "
+                  "read by anyone but the turn that answered it, which is the gap the "
+                  "tunnels formed in")
+# THE DOCKET IS ASSIGNED, NEVER INFERRED — e83990e, where a jury handed an empty case
+# convicted twice in a row. smell and intuition are the two senses needing no particular
+# channel, and intuition is unscorable from inside by construction, which is exactly why
+# an outside reader can do it.
+# WEIGHTED BY WHAT THE TURN DID. The one idea worth keeping from the retired `diagnose`
+# command, whose own critique was that four of its five surfaces were static and none
+# observed a run. A read-only turn rarely needs an outside reader; a turn that rewrote the
+# tree and matched no classifier is design work by any reasonable reading, whatever the
+# prompt did or did not trip.
+if "counts[5] else blind" not in _wd:
+    _blind.append("the blind sample no longer weights by whether the turn WROTE — the "
+                  "risky case is a turn that changed the tree and was classified by "
+                  "nothing, and a flat rate spends the same attention on a turn that "
+                  "only read things")
+if "wrote" not in _wl or "WRITE_CMD" not in _wl:
+    _blind.append("the ledger no longer counts writes, so the blind sample has nothing "
+                  "to weight by")
+if '"smell", "intuition"' not in _wd.replace("'", '"'):
+    _blind.append("the standing docket is no longer smell + intuition — those are the two "
+                  "senses that require no particular channel, and anything derived from "
+                  "the turn would be the inferred docket e83990e forbids")
+# And the ask must survive an untagged turn, or the jury refuses the case.
+_tt2 = read("workforce/bin/wf-task-tag")
+if "os.remove(tag_path(payload))" in _tt2:
+    _blind.append("an untagged turn deletes its tag again; `Stop` then has no `prompt`, "
+                  "the jury correctly refuses a case with no ask, and the blind sample "
+                  "can never fire")
+check(
+    "an unclassified ask can still be read by someone who did not answer it",
+    not _blind,
+    "; ".join(_blind),
+)
+
 check(
     "wf-widen reports a decision in words, not a score",
     not _disp,
