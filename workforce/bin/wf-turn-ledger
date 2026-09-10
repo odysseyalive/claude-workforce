@@ -162,13 +162,25 @@ def main():
                     targets.append(os.path.basename(t.split()[0])[:30] if "/" in t.split()[0]
                                    else t.split()[0][:30])
 
-    # The jargon scan reads what was SAID, which is the one thing the read count
-    # cannot cover: a turn can be perfectly grounded and still hand the user a
-    # sentence they have to decode. Reported on the same line so it costs no extra
-    # output, and folded into this hook rather than a second one — every additional
-    # always-on mechanism is another thing that can go dormant.
+    # THE REPLY COMES FROM `last_assistant_message`, NOT FROM THE TRANSCRIPT.
+    # The transcript "is written asynchronously and may lag the in-memory
+    # conversation, so it may not yet include the current turn's most recent
+    # messages when a hook fires" — the hooks reference says outright that a hook
+    # needing the final assistant text of the current turn should read
+    # `last_assistant_message` on Stop and SubagentStop instead.
+    #
+    # This shipped reading the transcript, which means the jargon scan could be
+    # examining a turn that does not yet contain the reply it exists to check —
+    # silently, and looking identical to a clean turn. Found by reading the hooks
+    # documentation AFTER building against remembered behaviour. The transcript
+    # remains the source for the READ COUNT, where lag is harmless because tool
+    # calls are already recorded by the time the turn ends; it is wrong only for
+    # the last message, which is exactly the field provided for it.
+    reply = payload.get("last_assistant_message")
+    if not isinstance(reply, str) or not reply.strip():
+        reply = "\n".join(said)      # older hosts that do not send the field
     terms = []
-    for m in JARGON.finditer(mask_code("\n".join(said))):
+    for m in JARGON.finditer(mask_code(reply)):
         t = m.group(0)
         if t not in terms:
             terms.append(t)

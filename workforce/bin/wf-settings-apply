@@ -74,6 +74,20 @@ SHIPPED_HOOKS = {
     # false-positive rate to tune and cannot repeat the 7.0% failure that retired
     # the speech guards (changes/1.30.1.md).
     "wf-turn-ledger": ("Stop", None),
+    # THE SAME LEDGER ON SUBAGENTS. Registered a second time on `SubagentStop`,
+    # which fires when a spawned agent finishes and carries `agent_type`,
+    # `agent_transcript_path` and `last_assistant_message` for that agent.
+    #
+    # This distribution's whole argument is that a spawned employee has ZERO
+    # residency — fresh context, no history, one shot — so it is the node MOST
+    # exposed to authoring from the thin surface in front of it. Covering the main
+    # loop and not the spawns inverted that.
+    #
+    # *Added 2026-09-09 after reading the hooks reference. The gap was reported
+    # twice as a structural limit — "main-loop only, it will not cover spawned
+    # agents" — which was never true: `SubagentStart` and `SubagentStop` are both
+    # documented events. A limit asserted from memory and never checked.*
+    "wf-turn-ledger@subagent": ("SubagentStop", None),
 }
 
 # WIREABLE, NEVER DEFAULT. A hook named here is registered only when a human types
@@ -325,10 +339,25 @@ def do_grants(root, spec_arg, execute):
 
 # ------------------------------------------------------------------------- wire-hook
 
+def hook_script(name):
+    """The SCRIPT a hook key names, stripping any `@event` suffix.
+
+    One script may be registered on more than one event — `wf-turn-ledger` runs on
+    both `Stop` and `SubagentStop`, because a spawned employee has zero residency and
+    is the node most exposed to authoring from a thin surface. SHIPPED_HOOKS is keyed
+    by registration, not by file, so `wf-turn-ledger@subagent` is a second
+    registration of the SAME script. Without this split the key was used as a
+    filename and resolved to a script that does not exist — caught by running
+    `--wire-defaults` and reading its output rather than trusting the edit.
+    """
+    return name.split("@", 1)[0]
+
+
 def hook_command(name):
     """The absolute, shell-quoted command string for a shipped hook. Personal scope
     first, then project (scopes.md § Resolving the shipped scripts). Expand ~ here — a
     hook command is not run through a shell that will do it."""
+    name = hook_script(name)
     personal = os.path.join(config_root(), "skills", "workforce", "bin", name)
     project = os.path.join("${CLAUDE_PROJECT_DIR}", ".claude", "skills", "workforce",
                            "bin", name)

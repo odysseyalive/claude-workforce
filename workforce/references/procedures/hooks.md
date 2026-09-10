@@ -35,6 +35,7 @@ detection at the next command, and the user's first directive is the thing it pr
 |---|---|---|---|
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. It also names any of this distribution's own coined terms used bare in the reply. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
+| `wf-turn-ledger` | `SubagentStop` | *(none)* | the same ledger on a spawned employee. A subagent has **zero residency** — fresh context, no history, one shot — so it is the node most exposed to authoring from the thin surface in front of it. `SubagentStop` carries `agent_type`, `agent_transcript_path` and `last_assistant_message` for that agent. § The turn ledger below |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -301,3 +302,22 @@ an artifact; a bare one is asking the reader to decode it first.
 
 **Folded into the same hook and the same line**, deliberately: every additional always-on mechanism is
 another thing that can go dormant, and this project has paid for that three times.
+
+**It runs on spawned employees too, and the earlier claim that it could not was wrong.** This was
+twice reported as a structural limit — *"main-loop only, it will not cover spawned agents"* — asserted
+from memory and never checked. `SubagentStart` and `SubagentStop` are both documented events, and the
+latter carries the finishing agent's own transcript and final message. A limit named without reading
+the reference is a claim, not a limit.
+
+**The reply text comes from `last_assistant_message`, never from the transcript.** The hooks reference
+is explicit: the transcript *"is written asynchronously and may lag the in-memory conversation, so it
+may not yet include the current turn's most recent messages when a hook fires"*, and a hook needing the
+final assistant text *"should use `last_assistant_message` on Stop and SubagentStop instead of reading
+the transcript"*. This shipped reading the transcript, so the jargon scan could examine a turn that did
+not yet contain the reply it exists to check — silently, and identical to a clean turn. The read count
+still comes from the transcript, where lag is harmless: tool calls are recorded before the turn ends.
+
+**One script, two registrations.** `SHIPPED_HOOKS` is keyed by REGISTRATION rather than by file, so
+`wf-turn-ledger@subagent` is a second registration of the same script; `hook_script()` strips the
+`@event` suffix when resolving the path. Without that split the key was used as a filename and resolved
+to a script that does not exist.
