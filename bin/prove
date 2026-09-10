@@ -205,11 +205,21 @@ CNFM = "workforce/bin/wf-conform"
 CATL = "workforce/bin/wf-catalog"
 WDN  = "workforce/bin/wf-widen"
 TLDG = "workforce/bin/wf-turn-ledger"
+TTAG = "workforce/bin/wf-task-tag"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── the docket must come from the user's own words (2026-09-10) ──────────
+    # Measured over 1,909 real prompts: 469 turns carried a docket built from injected
+    # preamble the user never wrote. Deleting the guard restores that.
+    ("the tagger reads the user's ask, and tells a question from a statement",
+     TTAG, "del", "    if INJECTED.search(prompt or \"\"):\n        return []\n"),
+    # And the `world` gate: a user STATING something is deprecated is not asking whether
+    # it is. Deleting the two-line gate sends the turn to look up a supplied fact.
+    ("the tagger reads the user's ask, and tells a question from a statement",
+     TTAG, "del", '            if name == "world" and not ASKING.search(prompt or ""):\n                continue\n'),
     # Narrowing the record class is the regression: `changes/` and the git log stop
     # reading as testimony, and the guard goes back to blocking turns that consulted the
     # record. The whole alternative is deleted rather than a fragment of it — a fragment

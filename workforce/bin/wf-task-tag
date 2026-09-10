@@ -51,6 +51,48 @@ import sys
 # These are the kinds whose WRONG ANSWER this project has actually produced and paid
 # for. It is not a taxonomy of asks; it is a list of the ways work here has gone wrong,
 # and it stays that length until another way is measured.
+# TEXT THE USER DID NOT WRITE. `UserPromptSubmit` receives whatever is injected ahead of
+# the turn — a skill's preamble, a continuation summary, a cross-session message, a stop
+# hook's own feedback — and none of it is the ask.
+#
+# MEASURED 2026-09-10 over 1,909 real user prompts from this machine's transcripts:
+# 586 (30.7%) are injected preamble, and 469 of them — 24.6% OF THE WHOLE CORPUS — are
+# currently tagged. Tagged as: behaviour 344, existence 320, history 280, world 43. Every
+# one puts a docket on a turn whose prompt the user never wrote, and the jury then judges
+# the reply against a question nobody asked. A stop hook's own feedback tagging the next
+# turn is the loop closing on itself.
+#
+# ANCHORED AT THE START, deliberately. A user who QUOTES one of these mid-message is still
+# asking something, and their ask keeps its docket.
+# IS THE USER ASKING, OR TELLING? Only `world` is gated on this, and the asymmetry is
+# measured rather than tidy. An IMPERATIVE is exactly when `behaviour` matters most —
+# "run the baseline test now" needs touch — so gating every kind on a question mark would
+# suppress the sense at the moment it is most needed; 34.9% of `behaviour` fires carry no
+# question and they are correct. `world` is the opposite: it asks whether the OUTSIDE
+# WORLD is a certain way, and a user who states it is not asking, they are telling.
+#
+# MEASURED over 1,909 real prompts, after the INJECTED filter: `world` fires 13 times, 7
+# ask something and 6 do not. The 6 are two error dumps and four instructions — including
+# the one that produced this fix, *"those are deprecated and any vestiges should be
+# completely removed"*, which sent a turn to look up a fact the user had just supplied and
+# then blocked the reply for not looking it up. The 7 kept are genuine: "aren't those
+# deprecated?", "wouldn't vendor be deprecated?", "weren't we deprecating verify?".
+ASKING = re.compile(
+    r"\?"
+    r"|^\s*(?:is|are|was|were|does|do|did|can|could|should|would|has|have"
+    r"|what|which|why|when|who|where|how)\b"
+    r"|\b(?:check whether|find out|look up|verify (?:whether|if)|do you know"
+    r"|not sure|i think|might be|i wonder)\b", re.I)
+
+INJECTED = re.compile(
+    r"^\s*(?:Base directory for this skill"
+    r"|Caveat:"
+    r"|This session is being continued"
+    r"|Another Claude session sent a message"
+    r"|Stop hook feedback"
+    r"|\d+ background agents? (?:was|were) stopped"
+    r"|<[a-z-]+-message\b)", re.I)
+
 KINDS = [
     ("history", re.compile(
         r"\b(why (?:was|were|did|is it)|when (?:was|were|did)|who (?:removed|changed|added)"
@@ -60,10 +102,20 @@ KINDS = [
      "the record is testimony and it is the only thing that knows INTENT. A tree shows "
      "what is there; only the record says whether its absence was a decision"),
 
+    # `latest` ALONE WAS 46 OF THIS KIND'S 60 FIRES and almost all of them were wrong:
+    # "pull down the latest master", "audit the latest article", "prepare the latest
+    # release". It is an ordinary English word in an instruction, not a question about the
+    # world. MEASURED over 1,909 real prompts, narrowing it to a lookup context takes this
+    # kind from 60 fires to 13, drops 48, and loses no prompt that actually needed an
+    # outside source. One residual false positive remains in the 13 and is named rather
+    # than tuned away, the way 1.38.0 named what its trigger could not do.
     ("world", re.compile(
-        r"\b(deprecat\w*|latest|current(?:ly)? (?:supported|recommended)|still (?:supported|a thing)"
-        r"|best practice|state of the art|new(?:est)? version|does .{0,20}still exist"
-        r"|has .{0,20}changed|up to date)\b", re.I),
+        r"\b(deprecat\w*"
+        r"|(?:the )?(?:latest|newest|current) (?:version|release|stable|api|docs?|spec)"
+        r"|current(?:ly)? (?:supported|recommended)|still (?:supported|a thing|maintained)"
+        r"|best practice|state of the art|does .{0,20}still exist"
+        r"|has .{0,20}changed|up to date"
+        r"|what(?:'s| is) (?:the )?(?:latest|current|new))\b", re.I),
      "hearing",
      "this repository cannot know the world. Reading local documents to answer it is "
      "how `vendor` was called a live command from docs that had gone stale"),
@@ -104,9 +156,17 @@ def classify(prompt):
     only the first would name one and silently drop the other, which is the narrowing
     this whole mechanism exists against.
     """
+    # The ask is what the USER typed. Injected preamble is not it, and tagging it puts a
+    # docket on a turn whose prompt nobody wrote (see INJECTED, measured).
+    if INJECTED.search(prompt or ""):
+        return []
+
     hits = []
     for name, pat, sense, why in KINDS:
         if pat.search(prompt or ""):
+            # `world` only: a statement about the world is not a question about it.
+            if name == "world" and not ASKING.search(prompt or ""):
+                continue
             hits.append({"kind": name, "sense": sense, "why": why})
     return hits
 

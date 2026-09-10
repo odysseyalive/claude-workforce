@@ -1155,6 +1155,54 @@ if _tlmod is not None:
         if _tg("Bash", {"command": "python3 workforce/bin/wf-catalog --root ."}) != ["wf-catalog"]:
             _det.append("the interpreter or a bare `.` is being counted as a source")
 
+# THE ASK IS WHAT THE USER TYPED. `UserPromptSubmit` also receives injected preamble —
+# a skill's header, a continuation summary, a cross-session message, a stop hook's own
+# feedback — and tagging any of it puts a docket on a turn whose prompt nobody wrote,
+# after which the jury judges the reply against a question that was never asked.
+# MEASURED 2026-09-10 over 1,909 real prompts from this machine: 586 are injected and
+# 469 of them were tagged, 24.6% of the whole corpus.
+_tt_src = read("workforce/bin/wf-task-tag")
+_tag = []
+try:
+    sys.dont_write_bytecode = True
+    import importlib.util as _iu2, importlib.machinery as _im2
+    _sp2 = _iu2.spec_from_loader("_wf_tt", _im2.SourceFileLoader(
+        "_wf_tt", "workforce/bin/wf-task-tag"))
+    _ttm = _iu2.module_from_spec(_sp2)
+    _sp2.loader.exec_module(_ttm)
+except Exception as _exc:                                # noqa: BLE001
+    _ttm = None
+    _tag.append(f"wf-task-tag will not import ({_exc})")
+
+if _ttm is not None:
+    for _inj in ("Base directory for this skill: /home/x\n# Some Skill\ndeprecated things",
+                 "Stop hook feedback: is this still supported and what is the latest version?",
+                 "This session is being continued from a previous conversation"):
+        if _ttm.classify(_inj):
+            _tag.append("injected preamble is being tagged again — the docket must come "
+                        "from the user's own words, or the jury judges a question nobody "
+                        "asked")
+            break
+    # A STATEMENT ABOUT THE WORLD IS NOT A QUESTION ABOUT IT. This is `world` only:
+    # 34.9% of `behaviour` fires carry no question and are correct, because an imperative
+    # is exactly when touch matters most.
+    if _ttm.classify("those hooks are deprecated, remove every vestige of them"):
+        _tag.append("a user STATING that something is deprecated is tagged as a question "
+                    "about the world — it sends a turn to look up a fact the user just "
+                    "supplied, then blocks the reply for not looking it up")
+    if not any(h["kind"] == "world" for h in _ttm.classify("aren't those deprecated?")):
+        _tag.append("a genuine world question no longer tags; the `world` gate has gone "
+                    "from too loose to too tight")
+    if not any(h["kind"] == "behaviour" for h in _ttm.classify("run the baseline test now")):
+        _tag.append("an imperative no longer tags `behaviour` — the asymmetry is the "
+                    "point, and gating every kind on a question mark suppresses the "
+                    "sense at the moment it is most needed")
+check(
+    "the tagger reads the user's ask, and tells a question from a statement",
+    not _tag,
+    "; ".join(_tag),
+)
+
 check(
     "the ledger's detectors measure sources and set-reads, not shell verbs",
     not _det,

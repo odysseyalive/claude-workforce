@@ -15,7 +15,7 @@ is never "look again." It is "open a channel this turn has not opened."
 | Sense | What it is | What only it can settle |
 |---|---|---|
 | **sight** | reading the thing directly — the file, the line, the source | what a specific known thing says |
-| **hearing** | testimony: a spawned reader, a web source, a skill — a voice that is not this turn's own reasoning | anything true of the world outside this repo |
+| **hearing** | testimony: the record (`git log`, `changes/`), a spawned reader, a web source, a skill — a voice that is not this turn's own reasoning | anything true of the world outside this repo, and whether an absence here was a decision |
 | **touch** | running it: an exit code, a test result, output that came back from the world | what a thing DOES, as against what a document says it does |
 | **taste** | discriminating between near-identical candidates: enumerating, diffing, listing before choosing | anything about a SET — what is all of them, what is missing, what is only |
 
@@ -30,6 +30,15 @@ inside is the exact faculty the measurement found impaired. It is what the other
 are for.
 
 ## Guidelines
+
+**The RECORD is testimony, and this table omitted it.** Three other shipped surfaces name it —
+`wf-task-tag`'s own instruction (*"read the record that decided it (`git log`, `workforce/changes/`)"*),
+the juror prompt (*"an outside voice — the record, the web, a spawned reader"*), and the `history` row
+below (*"only the record says whether an absence was a decision"*). This row, the canonical definition,
+listed only a reader, the web and a skill. *Corrected 2026-09-10, after a turn read two change records
+before removing a mechanism and was told it had opened no hearing channel.* A turn that consults
+`git log` for a decision has heard testimony; a turn that reads a source file has used sight, and the
+difference is whether the thing read was WRITTEN to record a decision.
 
 **Not every situation needs all six.** A turn is scored only on the senses its claim
 needs. Asking for a channel the claim never required is how a guard earns its way into
