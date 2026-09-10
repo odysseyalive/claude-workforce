@@ -8841,8 +8841,18 @@ check("plain output: audit-setup points at the rule instead of restating a narro
 # marks — so the one table that forbids describing an unenforced rule as prevented was
 # required by check to describe two removed hooks as preventing things. The row is now a
 # CANNOT row, which is what enforcement.md's own gate demands of it.
+# THE ASSERTION AND ITS PROVE CASE MUST AIM AT THE SAME BYTES. The first version tested
+# for `**CANNOT. Detection only.**` anywhere in the file — a string that appears FOUR
+# times, once per cannot-row — so the case that deleted it removed some OTHER row's
+# marker and this check went on passing. `prove` called it VACUOUS on the first
+# complete run and it was right: a check that cannot fail is a property nobody has.
+# Scoped to the row itself, keyed on a phrase that appears exactly once.
+_bt_row = next((l for l in enf.splitlines()
+                if l.startswith("| A question a human reads uses no term")), "")
 check("plain guard: the banned-term row states CANNOT, because nothing enforces it",
-      "wf-plain-guard" in enf and "**CANNOT. Detection only.**" in enf
+      "wf-plain-guard" in _bt_row
+      and "**CANNOT. Detection only.**" in _bt_row
+      and "held this row and was removed on the user's explicit marks" in _bt_row
       and "PREVENTS the call once wired" not in enf,
       "enforcement.md's banned-term row must read CANNOT and name the removal: the "
       "guard that held it went in the simplification release, and a row claiming "
