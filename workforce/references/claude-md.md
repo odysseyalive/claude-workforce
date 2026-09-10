@@ -150,7 +150,13 @@ call to make with a number in front of them, which is the whole of what this can
 
 ## The standing cold-reader request — a remedy that had no producer
 
-**`wf-standing-request` is the durable carrier, and it survives this file's deletion.** The
+**THE DURABLE CARRIER WAS REMOVED, AND NOTHING REPLACED IT.** `wf-standing-request` was a
+`UserPromptSubmit` hook that re-injected the cold-reader request every turn; it went with the two
+personnel hooks in the simplification release, on the user's explicit marks (`changes/1.31.0.md`).
+**The consequence is that the evacuation's precondition below cannot be satisfied by wiring anything**,
+so for a project that needs the request the generated region remains the only live carrier and the
+deletion cannot complete. That is a real block on a directive, recorded here rather than discovered by
+the run that hits it; the argument for why a carrier is needed at all is unchanged and follows. The
 withdrawn-capability section of `enforcement.md` establishes that ambient policy suppressing subagent
 spawning is typically conditioned on *unless the user asks*, so the asking is the fix — and the asking
 only functions where it is **present at the moment a spawn is attempted**. A `UserPromptSubmit` hook
@@ -182,25 +188,24 @@ thirty-five conversions, and the sweep behind them.
 
 ### The region is still the carrier for one case, and that is a precondition on the evacuation
 
-**The generated region remains the live carrier for exactly one kind of project: one whose `CLAUDE.md`
-still exists and whose `wf-standing-request` is not yet registered in `settings.json`.** For that
-project the region is doing the asking and the hook is doing nothing, which is why `wf-claude-md` still
-imports the text instead of dropping it.
+**The generated region is now the live carrier for EVERY project that needs the request**, because the
+hook that would have replaced it does not ship. The region is doing the asking and there is no hook,
+which is why `wf-claude-md` still imports the text instead of dropping it.
 
-**So deleting `CLAUDE.md` while `wf-standing-request` is unregistered removes the live carrier and puts
-nothing in its place.** Spawning silently reverts to UNAVAILABLE, every handbook registers unprobed, and
-the file that would have explained why is gone. `hooks` is the mechanism that wires it and `verify`
-reports whether it is wired (`procedures/hooks.md`; `procedures/verify.md` § Hook wiring) — a hook that
-ships unwired enforces nothing and looks like it does.
+**So deleting `CLAUDE.md` removes the live carrier and puts nothing in its place.** Spawning silently
+reverts to UNAVAILABLE, every handbook registers unprobed, and the file that would have explained why is
+gone.
 
-**Order, therefore: wire the hook, confirm it is registered, then delete.** This is a **precondition on
-the evacuation, not an exemption from it.** Reading it as a reason to keep `CLAUDE.md` indefinitely
-reinstates the 89% that this whole file exists to measure.
+**Order, therefore: the region survives until a carrier exists that is not this file.** That is a
+**precondition on the evacuation, not an exemption from it**, and it is narrow: it holds the region for
+projects where subagent spawning is actually suppressed, and nowhere else. Reading it as a reason to
+keep `CLAUDE.md` indefinitely reinstates the 89% that this whole file exists to measure.
 
-**And the whole order completes WITHIN the run — it is not a reason to defer the evacuation to a later
-audit.** Wiring the hook is one command, `! wf-settings-apply --wire-hook wf-standing-request`, surfaced
-by the settings preflight (`audit-setup.md` § Step 0.05) and run by the human at setup because the
-self-modification classifier refuses the agent's own settings write. Once it is registered — the run
+**What a replacement has to be.** Not a `UserPromptSubmit` hook restated — the removal was on the
+user's marks and re-adding the same script reverses a decision rather than solving the problem. The
+constraint is that the request must be **present at the moment a spawn is attempted**, and
+`SubagentStart` fires exactly there and can inject context, which the removed hook could only
+approximate by re-injecting on every prompt. Until such a carrier ships and is proven, the run
 re-reads to confirm — the relocation and the deletion are ordinary file work this run then does. **The
 classifier refusing the agent one write is not the run declining the evacuation.** *Added 2026-08-08: a
 run closed by handing the user the `hooks` block to paste, `/workforce verify`, and "a later

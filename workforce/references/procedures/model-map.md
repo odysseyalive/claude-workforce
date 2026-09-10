@@ -58,19 +58,23 @@ only** — never from the project's `org-config.md`. A legacy `## Model statics`
 project config is reported as a stale artifact and read past, never clobbered
 (`org-config.template.md` § Model statics).
 
-**The model budget's option set comes from `wf-model-budget`, the same shipped script `audit` Step 0.4a
-renders** (`references/audit-setup.md` § Step 0.4a). Run `wf-model-budget --root <project> --config
-<org-config.md>` and render its four `LANE` blocks verbatim rather than reconstructing the pool, the
-`(recommended)` marker, or the cost order by hand — the two readers of the pool must not derive it two ways.
+**The model budget's option set is derived from `org-config.template.md` § Model statics, and from
+nowhere else** (`references/audit-setup.md` § Step 0.4a states the derivation in full: the template's
+cost order, the `(recommended)` mark taken in place from the Notes column, the recorded value
+pre-selected on a re-audit). Do not rebuild the pool from a project's own `org-config.md`, even where a
+legacy instantiation left a `## Model statics` section inside it.
 
-**The effort budget's option set comes from `wf-effort-budget`, the same shipped script `audit`
-Step 0.4c/0.4d renders** (`references/audit-setup.md` § Step 0.4c). Run `wf-effort-budget --root <project>
---config <org-config.md> --models <lane=model,...>` and render its `LANE` blocks verbatim:
-**the effort ladder is never rebuilt here either.**
-Which rungs a lane may offer depends on the model that lane resolved to
+**The effort budget's option set is derived the same way** (`references/audit-setup.md` § Step 0.4c):
+the ladder and per-lane recommended rung from § Effort statics, per-model rung availability from
+`references/platform.md`. Which rungs a lane may offer depends on the model that lane resolved to
 (`references/platform.md` facts 12b/12c), so a ladder retyped from memory is wrong for whichever lane
-the reader was not thinking about. Both emitters also print the call's header and body from
-`org-config.template.md` § Budget question wording, so render the WHOLE call as emitted.
+the reader was not thinking about. Both calls also take their header and body from
+`org-config.template.md` § Budget question wording, so the WHOLE call is rendered from the template.
+
+*Both option sets were emitted by shipped scripts — `wf-model-budget` and `wf-effort-budget` — until the
+simplification release removed them on the user's explicit marks (`changes/1.31.0.md`). The
+single-source rule survives them and is now carried by prose alone, which is exactly the state that
+produced the 2026-08-20 stale-pool drift `audit-setup.md` records.*
 
 ## Resolution
 

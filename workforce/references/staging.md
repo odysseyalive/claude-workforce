@@ -370,12 +370,23 @@ Phase C's tool-grant observation (fact 4b), because a future model could misrepo
 
 **The procedure.**
 
-1. Spawn `wf-model-canary` **by its registered `subagent_type`** — not through a generic agent with an
-   overriding `model` parameter. Registering it and spawning it by type is the only way the frontmatter
-   `model:` sits on the honored path this canary exists to measure. The fixture carries a distinctive
-   model pin in its own frontmatter (`workforce/canary/wf-model-canary.md`) — deliberately unlike the
-   model a session or a CEO is likely running — so a match is discriminating rather than accidental.
-   The pin ID lives in that one file and is not restated here.
+1. **The fixture no longer ships, so this phase reports `UNAVAILABLE` and stops.**
+   `wf-model-canary` was one of five canary fixtures removed on the user's explicit marks in the
+   simplification release (`changes/1.31.0.md`), and the reason is a constraint on any replacement:
+   a fixture measurable this way has to be REGISTERED as an agent, and a registered agent appears in
+   every session's agent menu, in every project, forever — a permanent cost paid by every user for a
+   measurement run a handful of times. The manifest carries it as `retired`, so `install` removes it
+   from hosts that still have one.
+
+   *The procedure below is kept whole rather than deleted, because it is the specification any
+   replacement has to satisfy and it was correct when it ran. What it needs is a fixture that is
+   spawnable by type without being menu-visible; until one exists this phase has no instrument.*
+   The steps as they stood: spawn `wf-model-canary` **by its registered `subagent_type`** — not
+   through a generic agent with an overriding `model` parameter, since registering it and spawning it
+   by type is the only way the frontmatter `model:` sits on the honored path this canary exists to
+   measure. The fixture carried a distinctive model pin in its own frontmatter, deliberately unlike
+   the model a session or a CEO is likely running, so a match was discriminating rather than
+   accidental.
 2. Parse the fixture's one line, `MODEL=<id>`.
 3. Compare that self-report against **both** the fixture's pin **and** the resolved session
    model. The comparison needs both because a match against the pin means nothing when the session

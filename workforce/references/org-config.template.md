@@ -46,15 +46,15 @@ may be recommended for as many lanes as its Notes cell names.
 
 **No recommendation currently sits outside the pool, and the path that allows one still works.** An
 out-of-pool recommendation is a `Recommended for <lane>` annotation on a PROSE line of this section,
-beside a backticked ID that is not a table row, which `wf-model-budget` offers as that lane's LEADING
+beside a backticked ID that is not a table row, which the budget call offers as that lane's LEADING
 first-class option, never relegated to the hand-typed "Other" field. To fit the four-option cap it drops
 the cheapest pool model from that lane's slate only, positionally from the cheap end and never by ID. It
 was last exercised before 2026-09-02, when the creative-visual pick was priced above every pool row; the
 frontier model now heads the table, so nothing needs the path today. The mechanism stays, and
 `creative-visual` remains the one lane sanctioned to use it, for the next frontier model that outprices
 the pool. Such an annotation lives HERE,
-in § Model statics: `wf-model-budget` derives the picker from this section and from nowhere the question
-cannot see, so the budget and this table can never drift.
+in § Model statics: the picker is derived from this section and from nowhere the question cannot see,
+so the budget and this table can never drift.
 
 **Ordered by cost, most expensive first, and presented in that order every time** (`claude-fable-5-1`
 is the `$10/$50` tier and sits first; `claude-opus-5`, `claude-opus-4-8` and `claude-opus-4-6` all share
@@ -167,12 +167,12 @@ are DOCUMENTED and unverified — the ladder they produce is offered, never enfo
 
 ## Budget question wording — the four calls, stated once
 
-**The header and body of all four budget calls live here.** `wf-model-budget` and `wf-effort-budget`
-parse the blocks below and print them above their option sets, so a caller renders the WHOLE call —
-header, body, objects, options — verbatim and assembles no part of it by hand.
+**The header and body of all four budget calls live here.** A caller reads the blocks below, prints
+them above its option set, and renders the WHOLE call — header, body, objects, options — verbatim,
+assembling no part of it by hand.
 
 Wording rebuilt from procedure prose drifts exactly the way an option pool rebuilt from prose drifts.
-The pool was mechanised first (§ Model statics, `wf-model-budget`) and the wording was not, so half of
+The pool was mechanised first (§ Model statics) and the wording was not, so half of
 each budget question was still hand-assembled; reported 2026-08-26, a session rebuilding the budget
 questions reached for a project's instantiated `org-config.md` and reproduced the stale lane structure
 it found there. A question the emitter cannot print is a question the next reader reconstructs.

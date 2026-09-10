@@ -415,9 +415,8 @@ took the lanes to five, which is itself over the cap — hence the two-call spli
 
 **Every one of these four calls reads its header and body from `org-config.template.md` § Budget
 question wording and from nowhere else** — exactly as each reads its lane list from § The four lanes
-and its pool from § Model statics. `wf-model-budget` and `wf-effort-budget` emit that header and body
-above their option sets, and the caller renders the whole call verbatim, assembling no part of it by
-hand. The sub-sections below name which wording block each call takes; none of them retypes it.
+and its pool from § Model statics. The caller reads that header and body from the template
+and renders them verbatim above its option set, assembling no part of the wording by hand. The sub-sections below name which wording block each call takes; none of them retypes it.
 Restating the copy in a sub-section is the same drift as restating the pool, and § Budget question
 wording is its one home.
 
@@ -462,27 +461,31 @@ section is reported as a stale legacy artifact and read past, never clobbered (`
 a co-located stale copy is exactly how a re-audited project once proposed a stale pool and dropped the
 lower-cost static the template had since added.
 
-**This option set is PRODUCED MECHANICALLY — it is not reconstructed here by hand.** Run
-`wf-model-budget --root <project> --config <org-config.md when one is present>` (a shipped script). It
-reads the pool from the template's § Model statics and nothing else, emits the `LANE` blocks in the
-template's cost order, marks each lane's recommended model `(recommended)` **in place** from the Notes
-column, resolves the per-lane pre-selected default (recorded value on a re-audit, else the recommendation),
-and prints a `STALE-ARTIFACT` line when the project config carries its own `## Model statics`. **Render its
-`LANE` blocks verbatim as the objects; do not derive the pool, the recommendation, or the order by
-hand.** The sole-source rule above stood as prose alone until 2026-08-20, when a re-audit read the project's
-stale section and rendered the pool the template had since dropped — a superseded static shown as an
-option, the lower-cost IC static absent, and the analytical recommendation left undifferentiated rather
-than split by tier. A prose rule bites only the inputs a reader happens to read correctly, which
-is why the drift was inconsistent across projects; the script is a pure function of the template and cannot
-read the project's pool at all. Regression fixture: `modelbudget-stale-reaudit`.
+**This option set is DERIVED FROM ONE SOURCE, and the source is the shipped template.** Read the pool
+from `org-config.template.md` § Model statics and from nowhere else; offer the lanes in the template's
+cost order; mark each lane's recommended model `(recommended)` **in place** from the Notes column; and
+pre-select the recorded value on a re-audit, else the recommendation. Where the project's own
+`org-config.md` carries a `## Model statics` section, report it as a stale legacy artifact and read
+past it — never clobber it, and never read the pool from it.
 
-**And the prose rule now has a mechanical floor: `wf-budget-guard`.** A `PreToolUse` hook on
-`AskUserQuestion`, in `/workforce hooks`' default set, that blocks any model or effort picker whose
-options are not one of the emitters' `LANE` blocks for this project (`procedures/hooks.md` § The budget
-guard). Measured 2026-09-02 on a v1.8.0 install: a re-audit of `apps-odyssey-alive` read the project's
-stale `## Model statics`, rendered the retired frontier pick as a static and the current pin as
-`(Recommended)`, and never ran the script, with this paragraph and two others in front of it. A rule restated a fourth
-time fails the same way; a hook does not.
+*Until the simplification release this was emitted by `wf-model-budget`, a shipped script that made the
+derivation a pure function of the template. It was removed on the user's explicit marks
+(`changes/1.31.0.md`), so the rule is prose again and the reader performs the derivation. The history
+is kept because it is the reason the rule is worded this tightly:* the sole-source rule stood as prose
+alone until 2026-08-20, when a re-audit read the project's stale section and rendered the pool the
+template had since dropped — a superseded static shown as an option, the lower-cost IC static absent,
+and the analytical recommendation left undifferentiated rather than split by tier. A prose rule bites
+only the inputs a reader happens to read correctly, which is why the drift was inconsistent across
+projects. Regression fixture: `modelbudget-stale-reaudit`.
+
+**There is no mechanical floor under this rule, and that is a stated gap rather than an omission.**
+`wf-budget-guard` was a `PreToolUse` hook on `AskUserQuestion` that blocked any picker whose options
+were not the emitter's, and it went with the emitters it read (`changes/1.31.0.md`). Measured
+2026-09-02 on a v1.8.0 install: a re-audit of `apps-odyssey-alive` read the project's stale
+`## Model statics`, rendered the retired frontier pick as a static and the current pin as
+`(Recommended)`, and never ran the script — with this paragraph and two others in front of it. That
+measurement is why the gap is named here instead of being left for a reader to discover: this rule has
+failed against attentive readers before, and nothing now catches it when it does.
 
 **That order is by cost, and a recommendation never changes it.** Append `(recommended)` to the label of
 whichever static the table recommends for THIS object's lane — the analytical objects take the analytical
@@ -561,13 +564,13 @@ five rungs (`references/platform.md` fact 12c), so the four nearest its `medium`
 offered — `xhigh`/`high`/`medium`/`low`, dropping the far `max` end. A model that supports no effort at
 all renders **no effort object** for its lane — not a blank one.
 
-**This option set is PRODUCED BY `wf-effort-budget` — it is never rebuilt here by hand.** Run
-`wf-effort-budget --root <project> --config <org-config.md when one is present> --models <lane=model,...>`
-(a shipped script). It reads the ladder and the per-lane recommended rung from the template's § Effort
-statics, per-model rung availability from `references/platform.md`, and the call's header and body from
-§ Budget question wording — then emits both calls whole. **Render its `LANE` blocks and its
-`QUESTION-HEADER`/`QUESTION-BODY` blocks verbatim; derive no ladder, no window, and no question text by
-hand.** The model half of this budget was mechanised on 2026-08-20 and the effort half was left on prose,
+**This option set is DERIVED HERE, from the template and the platform facts.** Read the ladder and the
+per-lane recommended rung from `org-config.template.md` § Effort statics, per-model rung availability
+from `references/platform.md`, and the call's header and body from § Budget question wording — then
+render both calls whole, deriving no ladder, no window and no question text from a project's own file.
+
+*Emitted by `wf-effort-budget` until the simplification release removed it on the user's explicit marks
+(`changes/1.31.0.md`).* The model half of this budget was mechanised on 2026-08-20 and the effort half was left on prose,
 so it went on being reconstructed from a project's own file: a session rebuilding the budget questions
 reproduced the stale lane structure it found in an instantiated `org-config.md` (reported 2026-08-26).
 A lane's ladder depends on the model that lane resolved to, which is precisely the part a reader

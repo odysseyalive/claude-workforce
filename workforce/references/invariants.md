@@ -117,7 +117,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
 | 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
-| 21 | the pin guard emitted its report, and its unpinned/pinnable/unpinnable counts and dependabot status are coherent | `INV-PINS` | references/procedures/hooks.md |
+| 21 | **RETIRED** — the commit-time pin guard was removed with `wf-pin-check` on the user's explicit marks; the number is held rather than reused so rows 22+ keep the positions five other files cite | `INV-PINS` | changes/1.31.0.md |
 | 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
 | 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
@@ -177,18 +177,15 @@ was no number at all, because none was owed. **`0 uncited refusals` is the figur
 the same reason it is in row 17** — a refusal naming no precondition is a run that stopped wearing a
 gate's clothes, and it is indistinguishable from a gate holding until something counts it.
 
-**Row 21 is measured, not asserted, and it is the guard's own report treated as an invariant.** The
-commit-time pin guard (`procedures/hooks.md` § The git pre-commit pin guard) prints
-`INV-PINS  unpinned <N> · pinnable <M> · unpinnable <K> · dependabot MISSING|PARTIAL|PRESENT` — the
-same line whether it fires from `wf-pin-check --pre-commit` on a developer's commit, from
-`--install-hook` under `audit`, or from a bare `--root` scan under `verify`. **What the row asserts is
-coherence, not cleanliness**: a repository may legitimately carry an `unpinnable` count (a wildcard with
-no lockfile floor is a measured limit, `SKILL.md` § Directives — precision is a property of the
-detector), so `unpinnable > 0` is never `NOT UPHELD`. The row is `NOT UPHELD` only when the guard could
-not emit the line at all, or when its arithmetic does not close — `pinnable` and `unpinnable` must sum to
-`unpinned`, and a `dependabot` token outside `MISSING|PARTIAL|PRESENT` is incoherent. A missing line is
-the same silence rows 1–20 forbid: a guard that reports nothing is indistinguishable from one that never
-ran, and this guard runs on every commit where a run cannot watch it.
+**Row 21 is retired, and the paragraph is kept because the rule it stated still governs every other
+measured row.** The commit-time pin guard printed `INV-PINS  unpinned <N> · pinnable <M> · unpinnable
+<K> · dependabot MISSING|PARTIAL|PRESENT`, and what the row asserted was **coherence, not
+cleanliness**: a repository may legitimately carry an `unpinnable` count (a wildcard with no lockfile
+floor is a measured limit, `SKILL.md` § Directives — precision is a property of the detector), so
+`unpinnable > 0` was never `NOT UPHELD`. It was `NOT UPHELD` only when the guard could not emit the
+line at all, or when its arithmetic did not close. That last clause is the part that outlives the row:
+a missing line is the same silence rows 1–20 forbid, because a guard that reports nothing is
+indistinguishable from one that never
 
 **Row 19 is the producer check for the only destructive command, and it exists because the removal set
 had a reader and no writer.** `sweep.md` § Procedure derives it from the journal; `conversion-taxonomy.md`

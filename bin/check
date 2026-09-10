@@ -1561,18 +1561,21 @@ _uninvoked = [p_ for p_ in _execs if os.path.basename(p_) not in _procedure_text
 _aud_pg = read("workforce/references/procedures/audit.md")
 _vfy_pg = read("workforce/references/procedures/verify.md")
 _hk_pg = read("workforce/references/procedures/hooks.md")
+# THE PIN GUARD IS GONE, AND THESE TWO ASSERTIONS USED TO REQUIRE ITS ABSENCE TO BE A
+# FAILURE. They asserted audit.md still carried `wf-pin-check --install-hook` — a command
+# whose script was deleted in the simplification release — so `bin/check` was enforcing
+# that every host keep being told to run something that is not there. Found 2026-09-09 by
+# `wf-live`. What replaces them is the inverse: the step must NOT name a dead command, and
+# must say what happened, so a reader finding the guard in an older org's records can see
+# where it went instead of concluding the audit skipped a step.
 check(
-    "pin guard: audit installs it, in the Step 6 execution order",
-    "the git pin-guard install (Step 6-G)" in _aud_pg,
-    "audit.md Step 6 order no longer names the git pin-guard install (Step 6-G) — a "
-    "guard installed WITH audit that the execution order never runs is dormant, the "
-    "exact failure enforcement.md § Hooks was written against",
-)
-check(
-    "pin guard: audit runs wf-pin-check --install-hook",
-    "wf-pin-check --install-hook --root <repo> --execute" in _aud_pg,
-    "Step 6-G no longer carries the wf-pin-check --install-hook command — the step "
-    "would describe an install it never performs",
+    "pin guard: Step 6-G is retired and says so, and names no dead command",
+    "### Step 6-G — RETIRED" in _aud_pg
+    and "--install-hook --root <repo> --execute" not in _aud_pg,
+    "audit.md Step 6-G must be marked RETIRED and must not carry the wf-pin-check "
+    "install command: the script was removed on the user's explicit marks "
+    "(changes/1.31.0.md), and a step that instructs a host to run an absent command is "
+    "the dangling reference that release reported healing and missed",
 )
 # The guard rewrites manifests in place on every commit, so WHERE IT WALKS is a
 # correctness property, not a performance one. `.next/` was missing from SKIP_DIRS
@@ -5866,19 +5869,22 @@ check(
 # reconstructing by hand — the exact split that let the rule hold in one reader and
 # fail in the other above.
 check(
-    "audit-setup: the model budget option set is produced by wf-model-budget, not by hand",
-    "wf-model-budget" in _asu and "PRODUCED MECHANICALLY" in _asu,
-    "audit-setup.md Step 0.4a no longer names wf-model-budget as the mechanical "
-    "producer of the picker's options. Without it the run reconstructs the pool from "
-    "prose — the path that read a re-audit's stale `## Model statics` and proposed the "
+    "audit-setup: the model budget option set has ONE source, and it is the template",
+    "DERIVED FROM ONE SOURCE, and the source is the shipped template" in _asu
+    and "Run\n`wf-model-budget" not in _asu,
+    "audit-setup.md Step 0.4a must state the single-source derivation and must not "
+    "instruct a run to execute wf-model-budget, which was removed on the user's marks "
+    "(changes/1.31.0.md). The rule outlives its emitter: reading the pool from a "
+    "project's own stale `## Model statics` is the path that proposed the "
     "pre-`claude-sonnet-5` four on 2026-08-20 (fixture modelbudget-stale-reaudit)",
 )
 check(
-    "model-map: the model budget option set is produced by wf-model-budget, not by hand",
-    "wf-model-budget" in _mm_pool and "must not derive it two ways" in _mm_pool,
-    "model-map.md re-renders the same budget objects and must name the same mechanical "
-    "producer as audit-setup. A pool derived two ways by two readers is the drift the "
-    "script exists to foreclose",
+    "model-map: the model budget points at audit-setup's derivation, never its own",
+    "derived from `org-config.template.md` § Model statics, and from\nnowhere else" in _mm_pool
+    and "Run `wf-model-budget" not in _mm_pool,
+    "model-map.md re-renders the same budget objects audit-setup Step 0.4a does and must "
+    "point at the same single source rather than restate a derivation or name a removed "
+    "script. A pool derived two ways by two readers is the drift the rule forecloses",
 )
 # The script is a pure function of the template's table: it names NO model ID of its
 # own (constants: stated once — SKILL.md Principle 9a forbids a second copy of the
@@ -5899,18 +5905,19 @@ check(
 # org-config.md and reproduced the stale lane structure it found there. The fix is
 # the mirror script; these are the assertions that keep both readers pointed at it.
 check(
-    "audit-setup: the effort budget option set is produced by wf-effort-budget, not by hand",
-    "wf-effort-budget" in _asu and "PRODUCED BY `wf-effort-budget`" in _asu,
-    "audit-setup.md Step 0.4c no longer names wf-effort-budget as the mechanical "
-    "producer of the effort option set. Without it the run rebuilds the ladder from "
-    "prose — and the per-model windowing (one model has no `xhigh`, one rejects "
+    "audit-setup: the effort budget option set is derived here, from template and platform",
+    "DERIVED HERE, from the template and the platform facts" in _asu
+    and "Run\n`wf-effort-budget" not in _asu,
+    "audit-setup.md Step 0.4c must state where the ladder is derived from and must not "
+    "instruct a run to execute wf-effort-budget, removed on the user's marks. The rule "
+    "matters more without the script, not less — the per-model windowing (one model has no `xhigh`, one rejects "
     "`effort` outright) is exactly the part a reader gets wrong for whichever lane "
     "it was not thinking about (fixture effortbudget-drift-regression)",
 )
 check(
-    "model-map: the effort budget option set is produced by wf-effort-budget, not by hand",
-    "wf-effort-budget" in _mm_pool
-    and "the effort ladder is never rebuilt here either" in _mm_pool,
+    "model-map: the effort budget points at audit-setup's derivation, never its own",
+    "The effort budget's option set is derived the same way" in _mm_pool
+    and "Run `wf-effort" not in _mm_pool,
     "model-map.md re-renders the same effort objects `audit` Step 0.4c does and must "
     "name the same mechanical producer. A ladder derived two ways by two readers is "
     "the drift the script exists to foreclose",
@@ -8624,13 +8631,18 @@ check("plain output: audit-setup points at the rule instead of restating a narro
       "audit-setup.md must POINT at plain-output.md, not carry its own copy of the "
       "list. Two lists is how the doc's and the check's diverged before 2026-08-03, and "
       "a copy scoped to 'the six questions' is the narrowing this change undid")
-check("plain guard: named in the enforcement table at its true strength",
-      "PREVENTS the call once wired" in enf and "wf-plain-guard" in enf
-      and "coffee test" in enf,
-      "enforcement.md must carry the row at its true strength and say what it does NOT "
-      "cover: the guard checks a word list, while register and length stay the coffee "
-      "test, a human judgment. Describing it as enforcing clarity would be Core "
-      "Principle 6's exact failure")
+# THIS ASSERTION USED TO REQUIRE AN OVERCLAIM. It demanded enforcement.md say
+# "PREVENTS the call once wired" of `wf-plain-guard` — a hook removed on the user's
+# marks — so the one table that forbids describing an unenforced rule as prevented was
+# required by check to describe two removed hooks as preventing things. The row is now a
+# CANNOT row, which is what enforcement.md's own gate demands of it.
+check("plain guard: the banned-term row states CANNOT, because nothing enforces it",
+      "wf-plain-guard" in enf and "**CANNOT. Detection only.**" in enf
+      and "PREVENTS the call once wired" not in enf,
+      "enforcement.md's banned-term row must read CANNOT and name the removal: the "
+      "guard that held it went in the simplification release, and a row claiming "
+      "PREVENTS for a hook that does not ship is exactly the overclaim this table "
+      "exists to forbid")
 
 # ── the speak guard, the output style, and the two clauses they carry (2026-09-07) ──
 # The 2026-09-05 batch above shipped ONE enforced check — a word list on a question —

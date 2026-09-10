@@ -604,8 +604,8 @@ CASES = [
      CFG, "del", "the session advisor's pick too"),
     # ── the budget guard (2026-09-02): a hand-built picker is blocked, not restated ──
     # ── plain output (2026-09-05): the register written for agents stops at the user ──
-    ("plain guard: named in the enforcement table at its true strength",
-     ENF, "del", "PREVENTS the call once wired"),
+    ("plain guard: the banned-term row states CANNOT, because nothing enforces it",
+     ENF, "del", "**CANNOT. Detection only.**"),
     ("plain output: audit-setup points at the rule instead of restating a narrower copy",
      ASU, "del", "references/plain-output.md"),
     # ── the speak guard and the output style (2026-09-07): the report, not the question ──
@@ -670,20 +670,20 @@ CASES = [
     # ── the sole-source rule ships with its mechanical fix: wf-model-budget derives
     #    the picker from the template so a re-audit cannot reconstruct a stale pool
     #    (2026-08-20, TicketTomato) ──
-    ("audit-setup: the model budget option set is produced by wf-model-budget, not by hand",
-     ASU, "del", "PRODUCED MECHANICALLY"),
-    ("model-map: the model budget option set is produced by wf-model-budget, not by hand",
-     MM, "del", "must not derive it two ways"),
+    ("audit-setup: the model budget option set has ONE source, and it is the template",
+     ASU, "del", "DERIVED FROM ONE SOURCE, and the source is the shipped template"),
+    ("model-map: the model budget points at audit-setup's derivation, never its own",
+     MM, "del", "derived from `org-config.template.md` § Model statics, and from"),
     ("audit-setup: the effort budget orders its rungs most expensive first",
      ASU, "del", "The rungs are offered most expensive first"),
     # ── the same hole's other half: the EFFORT budget had no emitter, so its ladder
     #    was still rebuilt from prose on every run — and a lane's ladder depends on
     #    the MODEL that lane resolved to, which is the part a reader gets wrong
     #    (2026-08-26) ──
-    ("audit-setup: the effort budget option set is produced by wf-effort-budget, not by hand",
-     ASU, "del", "PRODUCED BY `wf-effort-budget`"),
-    ("model-map: the effort budget option set is produced by wf-effort-budget, not by hand",
-     MM, "del", "the effort ladder is never rebuilt here either"),
+    ("audit-setup: the effort budget option set is derived here, from template and platform",
+     ASU, "del", "DERIVED HERE, from the template and the platform facts"),
+    ("model-map: the effort budget points at audit-setup's derivation, never its own",
+     MM, "del", "The effort budget's option set is derived the same way"),
     # Two payloads, one check, because the check forbids two different constants and
     # a single break would leave the other half unproven: a model ID reaches the code
     # from a copied pool, a rung reaches it from a retyped ladder.
@@ -1210,10 +1210,14 @@ CASES = [
     # Five prose/script claims that keep the git pin guard from shipping dormant.
     # Each payload is a unique literal in its file, so `del` alters exactly the
     # checked condition and nothing else.
-    ("pin guard: audit installs it, in the Step 6 execution order",
-     AUD, "del", "the git pin-guard install (Step 6-G)"),
-    ("pin guard: audit runs wf-pin-check --install-hook",
-     AUD, "del", "wf-pin-check --install-hook --root <repo> --execute"),
+    # TWO CASES COLLAPSED TO ONE PAIR, because the two assertions became one when the
+    # guard was retired. Both halves are proven: deleting the RETIRED header breaks the
+    # first, and appending the old command breaks the second — the half that matters, since
+    # it is what kept every host being told to run a script that is not there.
+    ("pin guard: Step 6-G is retired and says so, and names no dead command",
+     AUD, "del", "### Step 6-G — RETIRED"),
+    ("pin guard: Step 6-G is retired and says so, and names no dead command",
+     AUD, "append", "\nwf-pin-check --install-hook --root <repo> --execute\n"),
     # The sixth (2026-08-25): where the walk goes. Payload is the SKIP_DIRS member with
     # its quotes and separator, unique in the file (grep -c == 1) — the comment above the
     # set spells `.next` in backticks, so `del` removes the set entry and leaves the

@@ -1422,7 +1422,7 @@ the same.
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
-`wf-claude-md` → `checksums` → **the git pin-guard install (Step 6-G)** → `verify` → **discharge (Step 6b)** → the sweep.**
+`wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sat between `checksums` and `verify` and is RETIRED — its script was removed on the user's marks; the step number is held as a placeholder so nothing else shifts.)*
 
 **`org index` runs UNCONDITIONALLY here — every audit, every mode.** It generates the project-local
 `/org` receptionist at `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md` (`procedures/org.md` step 2,
@@ -1753,30 +1753,21 @@ the single `!` command at Step 0.05 exactly as § Step 6 requires, and never as 
 **Under `--review`: print what would be wired and what the output style would become, and write
 nothing.**
 
-### Step 6-G — Wire the git pre-commit pin guard (installed WITH audit, alongside the hooks)
+### Step 6-G — RETIRED (the git pre-commit pin guard went with its script)
 
-**The commit-time pin-and-dependabot guard is installed here, in this run, when the target is a git
-repository.** This sits alongside the settings-hook wiring of the same run — Step 6-H above — and follows the same
-make-before-break discipline: the guard is wired (make) before `verify` reports it and long before the
-sweep (break), so a `verify` row reporting it can only read the state this step just wrote. Its lifecycle
-home — wire, report, unwire — is `procedures/hooks.md` § The git pre-commit pin guard; this step is only
-where an `audit` performs the wiring.
+**Nothing runs here.** This step wired a commit-time pin-and-dependabot guard by registering
+`core.hooksPath`, and it did that by running `wf-pin-check --install-hook`. That script was removed on
+the user's explicit marks in the simplification release (`changes/1.31.0.md`), and `hooks.md` no longer
+carries the § The git pre-commit pin guard section this step and `invariants.md` row 21 both pointed at.
 
-Per target:
+**The step is kept as a numbered placeholder rather than deleted** so that Step 6-H and Step 6a keep the
+positions every other file cites, and so a reader who finds the guard described in an older org's
+records can see here what happened to it rather than concluding the audit skipped a step.
 
-```bash
-wf-pin-check --install-hook --root <repo> --execute
-```
-
-It registers `core.hooksPath -> .claude/workforce/git-hooks`, chaining any prior hook, and records the
-prior git-config value in `.claude/workforce/.settings-owned.json` § `git_config` so the wiring is
-reversible by `disband` and `/workforce hooks --remove` exactly (`procedures/hooks.md`). Re-read to
-confirm; never report a git-config write the re-read did not confirm.
-
-**When the target is not a git repository, skip and report** — `GIT HOOK  not a git repository: <root> —
-nothing to wire`, exit `0`, wire nothing. That is a reported skip, never a silent no-op and never an
-error: a project with no `.git` has nothing for a commit-time guard to bind to, and saying so is the
-measurement. **Under `--review`: print the registration this step would write, and touch no git config.**
+*Found 2026-09-09 by `wf-live`, which reads the tree and reports where a live procedure names something
+that is not there. The simplification release reported healing 171 dangling references across 31 files
+and missed four, of which this was one: an audit step that would have told every host to run a command
+that does not exist.*
 
 ## Step 6a — Canary re-attempt (the step that keeps DEGRADED from leaving the run)
 

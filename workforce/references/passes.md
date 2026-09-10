@@ -207,12 +207,13 @@ work back.
 
 **Where an `AUTO` pass has a precondition that is a settings write the self-modification classifier
 refuses, the sub-write goes to `wf-settings-apply` and the pass still auto-applies the rest.**
-`PASS-CLAUDE-MD-EVACUATED` is the case: it deletes `CLAUDE.md` on a proven-empty ledger, but the ledger
-cannot empty until `wf-standing-request` is wired (`claude-md.md` § standing cold-reader request), and
-wiring it is a settings write the classifier blocks. That one write is performed by the human via
-`! wf-settings-apply --wire-hook wf-standing-request`, surfaced at the settings preflight
-(`audit-setup.md` § Step 0.05) so it is run at setup — after which the relocation and the deletion are
-the pass's ordinary AUTO work. **The classifier refusing one sub-write never demotes the pass to
+`PASS-CLAUDE-MD-EVACUATED` WAS the case, and it is now BLOCKED rather than gated: it deletes
+`CLAUDE.md` on a proven-empty ledger, the ledger cannot empty until the cold-reader request has a
+carrier that is not `CLAUDE.md` itself, and the hook that was that carrier — `wf-standing-request` —
+was removed in the simplification release (`claude-md.md` § standing cold-reader request). No settings
+write satisfies the precondition now, because there is nothing to wire. The pass still auto-applies the
+relocation; the deletion is held for projects where subagent spawning is actually suppressed, and runs
+normally everywhere else. **The classifier refusing one sub-write never demotes the pass to
 `REPORT`; it relocates that sub-write to the one command a human runs.**
 
 | the run prints | meaning |

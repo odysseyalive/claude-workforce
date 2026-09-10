@@ -181,10 +181,12 @@ frontmatter `model:` pin actually applied. It is the non-audit surface for that 
 it the applied-model check can only run at audit time, so on an existing project a drifted pin goes
 unseen between audits. **Run `staging.md` § Phase D** and report its verdict.
 
-- Spawn `wf-model-canary` by its registered `subagent_type` — never through a generic agent with an
-  overriding `model` parameter, or the frontmatter pin never sits on the honored path this canary
-  exists to measure. Parse its one self-reported `MODEL=<id>` line, and compare it against **both**
-  the fixture's pin **and** the resolved session model.
+- **Reports `UNAVAILABLE`.** The `wf-model-canary` fixture was removed on the user's explicit marks in
+  the simplification release (`changes/1.31.0.md`) — a fixture measurable this way must be registered
+  as an agent, and a registered agent sits in every session's agent menu in every project. There is no
+  instrument for this measurement until a fixture exists that is spawnable by type without being
+  menu-visible. `staging.md` § Phase D keeps the full procedure as the specification a replacement has
+  to satisfy.
 - Report one of the four Phase D outcomes: **MATCH** (self-report == pin != session model — the pin
   applied), **MISMATCH** (self-report == session model, or any third value — the pin was
   overridden), **INDETERMINATE** (pin == session model, so a match proves nothing), or
