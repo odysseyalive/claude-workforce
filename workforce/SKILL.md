@@ -1,10 +1,10 @@
 ---
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 86 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: workforce
-description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, retire, handbook, org, principles, review, amend, defect, ledger, roster, model-map, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
+description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, retire, handbook, org, principles, review, amend, defect, ledger, roster, model-map, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, wrap"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.46.0"
+version: "1.47.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
