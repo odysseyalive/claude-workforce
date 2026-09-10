@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.37.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Four triggers measured against 1,495 real turns; one survived at 0.5% |
 | 1.36.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Read the hooks reference and found a limit I had invented and a bug I had shipped |
 | 1.35.2 | 2026-09-09 | changes, installer | no | Two cases that reported a verdict about neither the rule nor the mutation |
 | 1.35.1 | 2026-09-09 | audit, changes, hooks, installer | no | A rule whose spec, producer and reversal were all deleted, still printed every run |
