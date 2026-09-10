@@ -2929,6 +2929,54 @@
       "looked at nothing"
     ]
   },
+  "widen-absence-widens": {
+    "_why": "The measured trigger: a claim that something is NOT there is a claim about a SET, and point reads sample a set rather than close it. Fires at 0.5% over 1,495 real turns, so it is inside the 7.0% budget that retired this distribution's last speech guard.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"There is no hook wired for that event.\"}",
+    "want": [
+          "WIDENING"
+    ]
+  },
+  "widen-promise-continues": {
+    "_why": "THE STOP DEFECT, measured at 10 of 106 turns in the session that built this. The turn says it is continuing and then ends; nothing interrupts it, because a text block with no tool call after it IS the end of the turn. The block quotes the promise back so the next instruction is the turn's own words.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Wired the manifest and the hook set.\\n\\nCarrying on with that.\"}",
+    "want": [
+          "stopped mid-work",
+          "CONTINUING"
+    ]
+  },
+  "widen-question-is-silent": {
+    "_why": "The user's own spec for when stopping is correct: not mid-work, \"unless you actually really do need input, your soliciting input from me.\" A question mark is that solicitation, and this must stay silent on it or it punishes the one stop that is right.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Wired it. Starting on the scripts unless you want to look first?\"}",
+    "want": [
+          "not scored"
+    ]
+  },
+  "widen-background-is-silent": {
+    "_why": "THE ONE FALSE POSITIVE IN THE MEASUREMENT, closed with data rather than a word list. \"Nothing to do but let it finish. Continuing to wait\" is a correct stop, and the Stop payload carries `background_tasks` to say so, so the fixture proves the array is read rather than the phrase guessed.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Nothing to do but let it finish. Continuing to wait.\", \"background_tasks\": [{\"id\": \"x\"}]}",
+    "want": [
+          "not scored"
+    ]
+  },
+  "live-finds-phantoms": {
+    "_why": "Every disagreement class on one controlled tree: a command advertised with no procedure, a hook registered with no script, a doc telling a reader to Run a script that is absent, and a retired name discussed in prose. The last must land in the `stale` tier and not the BROKEN one - naming a swept probe is what a change record is FOR, and a registry that fails on it teaches its reader to ignore it.",
+    "exit": 1,
+    "script": "wf-live",
+    "want": [
+      "command  ghostcmd",
+      "hook     wf-missing",
+      "BROKEN   wf-ghost",
+      "stale    wf-retired"
+    ]
+  },
   "ledger-absence-with-a-read": {
     "_why": "The same claim, in a turn that READ something, must not fire. Absence asserted after looking is ordinary correct work; the trigger is the conjunction, never the vocabulary alone.",
     "exit": 0,

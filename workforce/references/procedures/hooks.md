@@ -36,6 +36,8 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. It also names any of this distribution's own coined terms used bare in the reply. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
 | `wf-turn-ledger` | `SubagentStop` | *(none)* | the same ledger on a spawned employee. A subagent has **zero residency** — fresh context, no history, one shot — so it is the node most exposed to authoring from the thin surface in front of it. `SubagentStop` carries `agent_type`, `agent_transcript_path` and `last_assistant_message` for that agent. § The turn ledger below |
+| `wf-widen` | `Stop` | *(none)* | **acts where the ledger reports.** Scores the turn on the senses its claim needs and returns `decision: "block"` when one went unopened — the reason names the instruments on this machine that were untouched. Also blocks a turn that announced it was continuing and then ended. § The widen below |
+| `wf-widen` | `SubagentStop` | *(none)* | the same widen on a spawned employee, for the reason the ledger has both rows: a subagent has zero residency and is the node most exposed to authoring from the thin surface in front of it. |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -251,6 +253,42 @@ enforcement**, named here rather than left for a reader to infer from an empty t
 
 
 ---
+
+
+## The widen
+
+`wf-widen` is the acting half of `wf-turn-ledger`, and the split is deliberate rather than tidy: a
+count has no false-positive rate, and folding judgment into the count would cost the property that
+makes the count safe to leave running.
+
+**Why a hook and not a habit.** MEASURED over one working session: ten tunnels — a reading settled
+early and defended. Nine of the ten escapes came from OUTSIDE the turn that formed the reading, six
+from the user and three from a spawned panel. Zero came from noticing. Every self-check in the family
+needs the operator to decide to run it, and that decision is made from inside, by the faculty that is
+impaired. `Stop` is the first instant at which the claim and the evidence are both visible to
+something that is not the operator.
+
+**Two triggers, each measured before it shipped.**
+
+| Trigger | Fires on | Rate |
+|---|---|---|
+| a claim about what is NOT there, from a turn that read nothing | `taste` — only enumerating a set can close it | 0.5% of 1,495 turns |
+| a claim about a whole SET, with no enumerating read, quotes excluded | `taste` | 1.5% of 1,495 turns |
+| a turn that announced it was continuing and then ended, asking nothing | not a sense — the stop itself | 9.4% of 106 turns, 0.9% false |
+
+**The denominator moves, and that is the design.** A turn is scored only on the senses its claim
+needs (`references/senses.md`). Marking a turn down for not spawning a reader when spawning one was
+pointless is how a guard earns its way into being ignored, and this distribution retired one at a
+measured 7.0% for exactly that.
+
+**The block reason is the deliverable.** "Insufficient" hands the tunnel back to itself. What blocks
+instead is a registry read off the machine at that moment: the agents by name, the skills by name,
+whether web search was ever run. It is written as statements of fact about the environment rather
+than as commands, because the hooks reference is explicit that out-of-band instruction text trips the
+prompt-injection defences and gets surfaced to the user — which would turn an automatic widen back
+into one more thing a human has to do.
+
+**`stop_hook_active` returns immediately.** A widen that can widen forever is a wedged session.
 
 ## The turn ledger
 

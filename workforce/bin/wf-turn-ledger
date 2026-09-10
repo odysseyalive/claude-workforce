@@ -58,6 +58,10 @@ import sys
 # latter. Counting reads needs no classifier, so there is none.
 READERS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}
 
+# Tools that reach BEYOND this repository's own files — the web, a spawned reader, a
+# skill, an MCP server. Counted apart from reads for the reason in `turn_counts`.
+OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
+
 # ── this distribution's OWN coined vocabulary ────────────────────────────────
 # Words that mean nothing to a reader who has not read these files. Not "hard
 # words" and not a style opinion: each one is a term this project invented, and a
@@ -186,23 +190,22 @@ def emit(message):
     print(json.dumps({"systemMessage": message}))
 
 
-def main():
-    raw = sys.stdin.read()
-    try:
-        payload = json.loads(raw) if raw.strip() else {}
-    except json.JSONDecodeError:
-        return 0
-    if payload.get("stop_hook_active"):
-        return 0
+def turn_counts(payload):
+    """Walk THIS turn and return (reads, distinct, setreads, outside, reply), or None.
 
+    Split out of `main` so `wf-widen` scores the same turn off the same walk. Two
+    copies of a transcript reader is two things to keep in step, and the copy that
+    drifts is the one that reports wrong — which is the whole defect class this
+    distribution keeps finding in itself. Nothing here judges; it counts.
+    """
     tpath = payload.get("transcript_path") or ""
     if not tpath or not os.path.isfile(tpath):
-        return 0
+        return None
 
     try:
         lines = open(tpath, encoding="utf-8", errors="replace").readlines()
     except OSError:
-        return 0
+        return None
 
     # THE CURRENT TURN ONLY — everything after the last genuine user message. A
     # ledger spanning the whole session would grow monotonically and stop meaning
@@ -223,7 +226,7 @@ def main():
         start = i
         break
 
-    reads, targets, said, setreads = 0, [], [], 0
+    reads, targets, said, setreads, outside, direct = 0, [], [], 0, 0, 0
     for line in lines[start:]:
         try:
             d = json.loads(line)
@@ -238,12 +241,25 @@ def main():
                 continue
             name = b.get("name") or ""
             inp = b.get("input") or {}
+            # OUTSIDE is counted separately from reads because the measurement that
+            # built these hooks separates them: nine of ten escapes from a settled
+            # wrong reading came from outside the turn, none from re-reading inside
+            # it. A repository read and a spawned second opinion are not the same
+            # evidence, however alike they look in a raw tool count.
+            if name in OUTSIDE or name.startswith("mcp__"):
+                outside += 1
             # Bash counts as a read WITHOUT inspecting the command. A command that
             # also mutates still looked at something, and the read is the half that
             # gets asserted later. Over-counting a read is a smaller error than the
             # classifier that produced it.
             if name in READERS or name == "Bash":
                 reads += 1
+                # TOUCH, counted apart from sight. Running a thing and reading a
+                # document about the thing are different channels: this session found
+                # four scripts that every procedure described in detail and that no
+                # `ls` would have found. Prose said they worked; nothing had run them.
+                if name == "Bash":
+                    direct += 1
                 # A SET read enumerates; a POINT read answers about a known thing.
                 # Only the former can support a claim about a set.
                 if name in SET_TOOLS or (
@@ -273,6 +289,28 @@ def main():
     reply = payload.get("last_assistant_message")
     if not isinstance(reply, str) or not reply.strip():
         reply = "\n".join(said)      # older hosts that do not send the field
+    seen, uniq = set(), []
+    for t in targets:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return reads, uniq, setreads, outside, direct, reply
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    if payload.get("stop_hook_active"):
+        return 0
+
+    counts = turn_counts(payload)
+    if counts is None:
+        return 0
+    reads, uniq, setreads, _outside, _direct, reply = counts
+
     terms = []
     for m in JARGON.finditer(mask_code(reply)):
         t = m.group(0)
@@ -296,12 +334,9 @@ def main():
     # DISTINCT SOURCES IS THE SIGNAL, not the raw count. Reading one file four times
     # is not four pieces of evidence; it is one, looked at again. That is the shape of
     # the failure this session logged: two documents in one repo read as corroboration
-    # when they were one instrument twice.
-    seen, uniq = set(), []
-    for t in targets:
-        if t not in seen:
-            seen.add(t)
-            uniq.append(t)
+    # when they were one instrument twice. Deduplicated in `turn_counts`, which is the
+    # single walk both this hook and `wf-widen` score from.
+    #
     # THE SECOND TRIGGER. A universal claim rests on a SET, and point reads cannot
     # support one however many there are. Quoted text is excluded so a turn DISCUSSING
     # such a claim is not confused with one making it.

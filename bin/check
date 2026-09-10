@@ -596,6 +596,64 @@ check(
     "; ".join(_tl_problems),
 )
 
+# wf-widen ACTS WHERE THE LEDGER REPORTS, and every property below is one a measurement
+# paid for. It is checked separately from the ledger on purpose: the ledger's claim is
+# that it has no false-positive rate because it never judges, and this one does judge,
+# so it carries the burden the ledger is exempt from.
+_wd = read("workforce/bin/wf-widen")
+_wd_problems = []
+if "stop_hook_active" not in _wd:
+    _wd_problems.append("the re-entrancy guard is gone; a widen that can widen forever "
+                        "is a wedged session, which is worse than the defect it watches")
+if "HANDOFF" not in _wd:
+    _wd_problems.append("the handoff exemption is gone; the user's spec is that a turn "
+                        "may stop mid-work when it is soliciting input, so a guard "
+                        "without it punishes the one stop that is correct")
+if "background_tasks" not in _wd:
+    _wd_problems.append("the background-task exemption is gone; that was the single "
+                        "false positive in 106 measured turns and the payload carries "
+                        "the array that settles it")
+if "dont_write_bytecode" not in _wd:
+    _wd_problems.append("bytecode suppression is gone; importing a sibling by path drops "
+                        "a __pycache__/ inside the SHIPPED directory on every host, "
+                        "every turn")
+if "applicable" not in _wd:
+    _wd_problems.append("the moving denominator is gone; scoring a turn on senses its "
+                        "claim never needed marks down correct work, which is how the "
+                        "7.0% guard earned its retirement")
+check(
+    "wf-widen blocks only where a measurement licensed it",
+    not _wd_problems,
+    "; ".join(_wd_problems),
+)
+
+# THE REGISTRY IS DERIVED, NEVER AUTHORED, and that is its whole claim. A stored list of
+# what is live is the same artifact that called `vendor` a live command and `wf-handoff`
+# a shipped script — written down, believed, wrong. Reading the tree cannot go stale
+# because nothing is kept.
+_lv = read("workforce/bin/wf-live")
+_lv_problems = []
+if "SHIPPED_HOOKS" not in _lv:
+    _lv_problems.append("the hook set is no longer read from wf-settings-apply; three "
+                        "shipped files once stated three different hook counts, and the "
+                        "fix was to read the emitter rather than any prose")
+if "changes" not in _lv:
+    _lv_problems.append("the changes/ exclusion is gone; a change record naming a swept "
+                        "mechanism is the record doing its job, and failing on it "
+                        "teaches its reader to ignore the report")
+if "BROKEN" not in _lv or "stale" not in _lv:
+    _lv_problems.append("the two tiers collapsed; without them a correct past-tense "
+                        "mention and an instruction to run something absent read alike")
+if "--root" not in _lv:
+    _lv_problems.append("--root is gone; a registry that can only describe its own "
+                        "directory answers the question for the one tree that least "
+                        "needs asking")
+check(
+    "wf-live derives the live set and never stores one",
+    not _lv_problems,
+    "; ".join(_lv_problems),
+)
+
 # EVERY PRODUCER HAS A READER — the anti-bloat invariant, and the one every
 # accumulation defect in this repo turns out to be an instance of.
 #

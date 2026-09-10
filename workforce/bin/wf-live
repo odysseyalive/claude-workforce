@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""wf-live — the liveness registry: what this distribution ships, read from the tree.
+
+WHY THIS EXISTS, and it is the one mechanism class this project had none of.
+
+MEASURED (Freeman & Kicklighter, arXiv 2603.10047): five hallucination-reduction
+strategies, 100 runs each, against a common baseline. The sort is the finding:
+
+    M4  Enhanced Data Registry     100/100     input data
+    M3  Agent Specialization        80/100     architecture
+    M5  Glossary Injection          77/100     input data
+    M1  Iterative Convergence       75/100     reasoning
+    M2  Decomposed Prompting        34/100     reasoning — NET NEGATIVE
+
+The two input-side methods took first and third; the two reasoning-side methods took
+last and worst. Every mechanism this distribution had built was reasoning-side (a guard
+watching what the model says) or architecture-side (add a reviewer). This is the first
+input-side one.
+
+M4 IS NOT A RETRIEVAL INDEX. It is an enrichment layer: bare records get readable
+metadata attached before the model reasons over them. The paper's own framing — without
+a physical meaning map the model hallucinates component relationships — names this
+repository's failure mode exactly.
+
+WHAT WENT WRONG WITHOUT IT. `vendor` was documented as a live command with no procedure.
+`INV-HANDOFF` was a live invariant whose producer had been deleted. `audit` told every
+run to execute `wf-handoff`, which does not exist. Three shipped files stated three
+different hook counts. In every case the map said live, the tree said gone, and a human
+caught it. Stale metadata does not make context engineering fail loudly; it delivers bad
+context faster.
+
+WHY IT IS DERIVED AND NEVER AUTHORED. A hand-kept list of what is live is the same
+artifact that was wrong four times above. This reads the tree — `workforce/bin/`,
+`references/procedures/`, `agents/`, `SKILL.md`, and `wf-settings-apply`'s own
+`SHIPPED_HOOKS` — and reports what it finds. It cannot go stale, because it is not
+stored.
+
+WHAT IT IS NOT. It reports what SHIPS, never what is correct, and never whether a live
+thing works. `bin/check` (maintainer) and `/workforce verify` (host) judge conformance.
+This answers the narrower question nothing answered before: *is this thing there?*
+"""
+
+import json
+import os
+import re
+import sys
+
+# `<...>/skills/workforce/bin/wf-live` on a host, `<repo>/workforce/bin/wf-live` here.
+# Either way the parent of bin/ is the shipped root, and nothing above it is assumed to
+# exist: `manifest.txt` lives in the repo and is NOT installed on a host.
+WF = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(WF)
+
+
+def _root(argv):
+    """`--root <dir>` points the registry at another install; default is this one.
+
+    Needed for two readers that are not this checkout: a fixture, which must run the
+    registry against a tree it controls rather than against whatever the working copy
+    happens to hold, and `audit`, which asks the question of the project it is
+    auditing. A registry that can only describe its own directory answers the question
+    for the one tree that least needs asking.
+    """
+    global WF, REPO
+    if "--root" in argv:
+        i = argv.index("--root")
+        if i + 1 < len(argv):
+            WF = os.path.abspath(argv[i + 1])
+            REPO = os.path.dirname(WF)
+            del argv[i:i + 2]
+    return argv
+
+# A phantom is a `wf-` name that no file backs. The trailing lookahead rejects a
+# FRAGMENT: prose writes `wf-canary-*` and `wf-mcp-…`, and matching the stem alone
+# invents a name nobody claimed. `wf-<digits>` is a run id, not a name.
+NAME = re.compile(r"\bwf-[a-z][a-z0-9]*(?:-[a-z0-9]+)*\b(?![-\w])")
+NOT_A_NAME = re.compile(r"^wf-\d")
+
+# TWO TIERS, BECAUSE A GUARD THAT CRIES WOLF GETS IGNORED. That is not a guess: a
+# speech guard firing on 7.0% of GOOD replies was retired for exactly this
+# (changes/1.30.1.md). Naming a dead mechanism is often CORRECT — `platform.md` is a
+# measurement log and `staging.md` says outright "they were swept" — so past-tense
+# prose about a retired probe is not a defect and must not be reported as one.
+#
+# BROKEN is the tier that fails: the name sits where a reader is told to RUN it.
+# `verify.md` says "Spawn `wf-model-canary` by its registered subagent_type" and there
+# is no `wf-model-canary`. That is an instruction to run nothing, and it fires on every
+# host that reaches the step.
+# THE VERB MUST BE CAPITALISED AND ADJACENT. Both halves were learned by getting it
+# wrong: a 40-character window with a case-insensitive verb read "in the confounded
+# run `wf-canary-c` reported" as an instruction to run a probe, because `run` is a NOUN
+# there. In markdown prose an imperative opens its clause and is capitalised — "Run
+# `wf-model-budget --root …`", "Spawn `wf-model-canary`" — while the noun sits
+# lowercase mid-sentence after an article or adjective. Requiring the capital and
+# allowing at most a backtick or two of gap separates them without a word list.
+RUNNABLE = re.compile(r"\b(?:Run|Spawn|Invoke|Execute|Call)s?\b[\s`*_]{0,4}$")
+
+
+def slurp(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def names_in(d, want_dirs=False):
+    if not os.path.isdir(d):
+        return []
+    out = []
+    for n in sorted(os.listdir(d)):
+        full = os.path.join(d, n)
+        if os.path.isdir(full) == want_dirs:
+            out.append(n)
+    return out
+
+
+def shipped_docs():
+    """Every markdown a reader is steered to, EXCLUDING `changes/`.
+
+    `changes/` is a historical record. It names retired mechanisms on purpose and
+    correctly, so scanning it would report the changelog doing its job as a defect.
+    Everything else — SKILL.md, references/, agents/ — is read as current instruction.
+    """
+    out = []
+    skill = os.path.join(WF, "SKILL.md")
+    if os.path.isfile(skill):
+        out.append(skill)
+    for sub in ("references", "agents"):
+        for dirpath, _, files in os.walk(os.path.join(WF, sub)):
+            out += [os.path.join(dirpath, f) for f in sorted(files) if f.endswith(".md")]
+    return out
+
+
+def registry():
+    scripts = [n for n in names_in(os.path.join(WF, "bin")) if n.startswith("wf-")]
+    procedures = sorted(n[:-3] for n in names_in(os.path.join(WF, "references/procedures"))
+                        if n.endswith(".md"))
+    agents = names_in(os.path.join(WF, "agents"), want_dirs=True)
+
+    m = re.search(r"Commands: (.+?)\"", slurp(os.path.join(WF, "SKILL.md")))
+    commands = sorted(c.strip() for c in m.group(1).split(",")) if m else []
+
+    # The hook set comes from the one producer that wires it, never from prose. Three
+    # shipped files once stated three different counts; this reads the emitter.
+    sa = slurp(os.path.join(WF, "bin/wf-settings-apply"))
+    block = re.search(r"SHIPPED_HOOKS = \{(.*?)\n\}", sa, re.S)
+    hooks = sorted(set(re.findall(r'"(wf-[a-z0-9-]+)(?:@[a-z]+)?"', block.group(1)))) if block else []
+
+    return {"scripts": scripts, "hooks": hooks, "procedures": procedures,
+            "agents": agents, "commands": commands}
+
+
+def disagreements(reg):
+    """Where one part of the tree contradicts another. This is the payload."""
+    out = []
+    live_script = set(reg["scripts"])
+    # An agent is addressed as `wf-<dir>`; that name is backed by agents/<dir>/, not bin/.
+    live_agent = {"wf-" + a for a in reg["agents"]}
+
+    for c in reg["commands"]:
+        if c not in reg["procedures"]:
+            out.append(("command", c, "advertised in SKILL.md, no references/procedures/%s.md" % c))
+
+    for h in reg["hooks"]:
+        if h not in live_script:
+            out.append(("hook", h, "registered by wf-settings-apply, not in bin/"))
+
+    broken, stale = {}, {}
+    for doc in shipped_docs():
+        rel = os.path.relpath(doc, WF)
+        fenced = False
+        for lineno, line in enumerate(slurp(doc).splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            for m in NAME.finditer(line):
+                tok = m.group(0)
+                if NOT_A_NAME.search(tok) or tok in live_script or tok in live_agent:
+                    continue
+                imperative = fenced or RUNNABLE.search(line[:m.start()])
+                (broken if imperative else stale).setdefault(tok, []).append(f"{rel}:{lineno}")
+
+    for tok in sorted(broken):
+        out.append(("BROKEN", tok, "a reader is told to run it, and it is not in bin/ or agents/ — "
+                                   + ", ".join(broken[tok][:3])))
+    for tok in sorted(stale):
+        if tok in broken:
+            continue
+        out.append(("stale", tok, "named in %d place(s), backed by nothing — %s"
+                    % (len(stale[tok]), ", ".join(stale[tok][:3]))))
+    return out
+
+
+def main():
+    argv = _root(list(sys.argv[1:]))
+    as_json = "--json" in argv
+    reg = registry()
+    bad = disagreements(reg)
+
+    if as_json:
+        print(json.dumps({"live": reg,
+                          "disagreements": [{"kind": k, "name": n, "why": w} for k, n, w in bad]},
+                         indent=2))
+        return 1 if bad else 0
+
+    print("LIVE  what this distribution ships, read from the tree\n")
+    for label, key in (("scripts", "scripts"), ("hooks", "hooks"), ("procedures", "procedures"),
+                       ("agents", "agents"), ("commands", "commands")):
+        v = reg[key]
+        head = ", ".join(v[:5]) + ("…" if len(v) > 5 else "")
+        print(f"  {label:12} {len(v):3}   {head}")
+
+    print()
+    if not bad:
+        print("  nothing the docs call live is missing from the tree.")
+        return 0
+    print(f"  {len(bad)} DISAGREEMENT(S) — the docs say live, the tree says otherwise:\n")
+    for kind, name, why in bad:
+        print(f"    {kind:8} {name}")
+        print(f"             {why}")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

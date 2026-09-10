@@ -1,0 +1,392 @@
+#!/usr/bin/env python3
+"""wf-widen — score the turn at Stop; when the score is thin, WIDEN instead of stopping.
+
+WHY THIS EXISTS, and it is the half `wf-turn-ledger` deliberately left undone.
+
+THE MEASUREMENT THAT BUILT BOTH. One working session, ten tunnels — a reading settled
+early and defended. NINE of the ten escapes came from OUTSIDE: six from the user, three
+from a spawned panel. The tenth came from re-reading a tool's raw output. **Zero came
+from noticing.**
+
+The ledger drew the right conclusion from that and then stopped one step short. It
+concluded that self-checking cannot work, because the faculty that would run the check
+is the impaired one — true, and the literature agrees (arXiv 2509.21545: metacognition
+is real but "limited in resolution" and "context-dependent"). So it prints a count and
+leaves the acting to the human. Its own header says so: the operator has to DECIDE to
+act, "and that decision is made from inside the tunnel."
+
+BUT THE MEASUREMENT SAYS SOMETHING ELSE TOO, and it is the thing that was missed. Three
+of the ten escapes came from a spawned panel. **A spawn is not self-checking** — fresh
+context, no history, none of the reasoning that built the tunnel. It is an outside
+reader, and outside readers are the ones that demonstrably work here. What kept it from
+firing was never that it does not work. It is that spawning required the operator to
+decide to spawn, from inside.
+
+SO THIS FIRES THE OUTSIDE AUTOMATICALLY. `Stop` is the only place it can: the turn is
+over, the claims are made, and the harness — not the operator — decides what happens
+next. `decision: "block"` with a reason does not end the turn; the reason becomes the
+next instruction and the work continues.
+
+WHAT IT SCORES, AND WHY NOT QUALITY. Every component is COUNTED, never judged. That is
+not fastidiousness, it is the measured difference between the two classes of mechanism:
+in a five-method comparison at 100 runs each (Freeman & Kicklighter, arXiv 2603.10047),
+the input-side methods scored 100/100 and 77/100 while the reasoning-side methods scored
+75/100 and **34/100 — net negative against the baseline.** A hook asking "how good was
+this turn?" is the 34. A hook asking "what did this turn look at, and what was sitting
+right there unused?" is the 100.
+
+WHAT KEEPS IT FROM CRYING WOLF. The score is computed on every turn and always shown —
+it is the user's dial and it has to be legible to be tuned. **The block is far
+narrower.** It fires only when the reply makes a claim that evidence could settle and
+the evidence is not there. Those two triggers were measured over 1,495 real turns of
+this operator's traffic before either shipped: zero reads plus a project-scoped absence
+claim fires on **0.5%**; a universal claim with no enumerating read, quotes excluded,
+fires on **1.5%**. A guard at 7.0% was retired from this distribution for teaching its
+reader to ignore it (changes/1.30.1.md), and that retirement is the budget this one is
+held to.
+
+THE REASON STRING IS THE WHOLE DELIVERABLE. "Insufficient, try harder" hands the tunnel
+back to itself and is worth nothing. What blocks instead is a REGISTRY: the instruments
+that were on this machine, for this project, during this turn, and went untouched — the
+agents by name, the skills by name, whether web search was ever run. Naming the unused
+instrument is the widening; the score is only what decides to print it.
+
+EXIT CODES: 0 always, and `stop_hook_active` returns immediately. A widen that can widen
+forever is a wedged session, and a hook that wedges a session is worse than the defect
+it watches.
+"""
+
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WF = os.path.dirname(HERE)
+
+
+def _ledger():
+    """Share the ledger's detectors rather than restate them.
+
+    They are measured regexes with a published false-positive rate; a second copy is a
+    second thing to keep in step, and the copy that drifts is the one that fires wrong.
+    Both files ship in this directory together, so the import cannot miss.
+    """
+    # NEVER WRITE BYTECODE. Importing a sibling by path makes CPython drop a
+    # `__pycache__/` beside it — inside the SHIPPED directory, on every host, every
+    # turn. Caught by `bin/check`'s undeclared-file assertion the first time this ran:
+    # two `.pyc` files the installers would never fetch and nothing would ever clean.
+    # A hook that litters the install it lives in is a hook that fails an integrity
+    # check it did not cause.
+    sys.dont_write_bytecode = True
+    path = os.path.join(HERE, "wf-turn-ledger")
+    spec = importlib.util.spec_from_loader(
+        "wf_turn_ledger", importlib.machinery.SourceFileLoader("wf_turn_ledger", path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+TL = _ledger()
+
+# Tools that reach OUTSIDE this repository's own files. The measurement says outside is
+# where the escapes come from, so these are scored apart from ordinary reads.
+OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
+
+
+def instruments(cwd):
+    """What was available to widen with, read off the machine at the moment of the Stop.
+
+    Never a stored list. A stored list of what you could have used is the same artifact
+    that told this project `vendor` was a live command and `wf-handoff` was a shipped
+    script — both wrong, both authored, both believed.
+    """
+    found = {"agents": [], "skills": []}
+    roots = [os.path.join(cwd, ".claude"),
+             os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")]
+    for root in roots:
+        for kind in ("agents", "skills"):
+            d = os.path.join(root, kind)
+            if not os.path.isdir(d):
+                continue
+            for n in sorted(os.listdir(d)):
+                name = n[:-3] if n.endswith(".md") else n
+                if not name.startswith(".") and name not in found[kind]:
+                    found[kind].append(name)
+    return found
+
+
+# WHICH SENSE SETTLES WHICH CLAIM. The denominator moves, and that is the design, not
+# a shortcut: **not every situation needs all six.** A turn scored out of a fixed six
+# is marked down for failing to spawn a reader when spawning one was pointless, and a
+# guard that marks down correct work is the guard that gets ignored — this
+# distribution retired one at a measured 7.0% for exactly that (changes/1.30.1.md).
+#
+# So the question is never "did this turn use every channel." It is "which channel
+# could have settled THIS claim, and did the turn open it." One applicable sense, one
+# unused, is a widen. Five inapplicable senses are silence.
+#
+# Each row is (claim trigger, the sense that settles it, why that one).
+CLAIM_SENSE = {
+    "absence": ("taste", "a claim that something is NOT there is a claim about a SET, "
+                         "and no number of point reads can settle it — only enumerating "
+                         "the set can"),
+    "universal": ("taste", "\"the only\", \"no other\", \"never\" are claims about a "
+                           "whole set, and point reads sample it rather than close it"),
+}
+# NOT SHIPPED UNTIL MEASURED. Two more mappings are obviously right and are deliberately
+# absent: a claim about what a SCRIPT DOES is settled by touch (running it), and a claim
+# about the WORLD OUTSIDE this repo — deprecated, current, latest — is settled by
+# hearing (the web), which is precisely the channel that was skipped when this operator
+# called `vendor` live from local docs and never checked. Both need a detector, and a
+# detector ships with a measured false-positive rate over real traffic or it does not
+# ship. The two above were measured at 0.5% and 1.5% over 1,495 turns before either was
+# wired. These get the same bar, not a shortcut on the strength of being obviously right.
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# THE SECOND TRIGGER: A TURN THAT SAYS IT IS CONTINUING, AND ENDS.
+#
+# This is NOT a sense failure and it is not filed as one. The senses answer "did the
+# turn look at enough, through the right channel." This answers something else
+# entirely: the turn said out loud that it was not finished, and then finished.
+#
+# WHAT IS ACTUALLY HAPPENING, measured rather than theorised. Over 106 turns of this
+# session: 12 (11.3%) ended with a tail promising more work; 10 (9.4%) promised more
+# work and asked the user nothing at all. Every stop_reason in the transcript is
+# `end_turn` — no token cap, no harness interrupt, no tool error. Nothing stopped the
+# turn. The turn stopped.
+#
+# THE MECHANISM, and it is structural rather than a lapse of will: there is no way to
+# say something to the user and keep working. A text block with no tool call after it
+# IS the end of the turn. So the sentence "Building it." does not describe what happens
+# next — it is the act of stopping, spelled as a promise not to. From inside it reads
+# as narrating progress, which is exactly why noticing does not catch it, and it lands
+# hardest right after a long complete-feeling report, because completeness feels
+# terminal.
+#
+# WHY A HOOK IS THE ONLY PLACE THIS CAN LIVE. The operator cannot catch it, because at
+# the moment of the stop the operator believes it is continuing. `Stop` is the first
+# instant at which the promise and the ending are both visible in the same frame, and
+# the harness — not the operator — is the thing that can see both.
+PROMISE = re.compile(
+    r"(?:^|[.\n]\s*)(?:now[, ]+)?(?:i'?ll|i am|i'?m|let me)\s+"
+    r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?"
+    r"(?:start|continue|keep|carry|build|do|go|move|fix|wire|write|run|land|finish)\b"
+    r"|(?:^|[.\n]\s*)(?:carrying on|continuing|starting|building|moving on|picking up)\b",
+    re.I)
+# A GENUINE HANDOFF, where stopping is correct and this must stay silent. The user's
+# instruction is the spec: do not stop mid-work "unless you actually really do need
+# input, your soliciting input from me." A question mark, or an explicit offer of the
+# choice, is that solicitation.
+HANDOFF = re.compile(
+    r"\?|\byour call\b|\bunless you\b|\bsay the word\b|\blet me know\b|\bwant me to\b"
+    r"|\bwhich (?:one|way)\b|\bdo you want\b|\bshould i\b", re.I)
+# THE TAIL ONLY. A promise made in the middle of a long reply and then kept two
+# paragraphs later is not this defect; the last words are where the stop happens.
+TAIL = 400
+
+
+def unfinished(reply, payload):
+    """True when the turn announced it was continuing and then ended anyway.
+
+    Returns the promise it made, so the block can quote the turn its own words back.
+    Silent when the turn asked the user something, and silent when a background task
+    is still running — that was the one false positive in the measurement above
+    ("nothing to do but let it finish"), and the payload carries the array that
+    settles it rather than a guess.
+    """
+    if payload.get("background_tasks"):
+        return None
+    tail = (reply or "")[-TAIL:]
+    if HANDOFF.search(tail):
+        return None
+    m = PROMISE.search(tail)
+    return m.group(0).strip(" .\n") if m else None
+
+
+SENSE_COUNT = {
+    "sight": lambda c: c[1] and len(c[1]),      # distinct sources read
+    "hearing": lambda c: c[3],                  # web, spawned readers, skills
+    "touch": lambda c: c[4],                    # things actually run
+    "taste": lambda c: c[2],                    # enumerating reads
+}
+
+
+def senses(counts, applicable):
+    """Score ONLY the senses this claim needs. Returns (percent, rows).
+
+    THE SIX SENSES, EACH A COUNTED CHANNEL. The user named this shape across the
+    session — three muses, then the three monkeys ("one sees, one smells, one hears"),
+    then six with intuition as the sixth. It is not decoration. Each sense is a
+    DIFFERENT WAY OF TAKING SOMETHING IN, and a turn strong in one and blank in the
+    rest has looked at its subject through exactly one aperture. That is the tunnel
+    described precisely: not too little evidence, but all of it the same kind.
+
+    The four that supply evidence:
+
+      SIGHT    reading the thing directly — the file, the line, the source.
+      HEARING  testimony: a spawned reader, a web source, a skill. Something a voice
+               that is not this turn's own reasoning said. Nine of ten recorded escapes
+               in this project arrived through this channel, which is why it is counted
+               apart from sight instead of folded into one read total.
+      TOUCH    running it. An exit code, a test result, output that came back from the
+               world rather than from a document describing the world. Prose says what
+               a script does; touch says what it did — and this session found four
+               scripts every procedure described in working detail that no `ls` had
+               ever been pointed at.
+      TASTE    discriminating between near-identical candidates: enumerating a set,
+               diffing two things, listing before choosing. The sense that separates
+               `wf-handoff` documented from `wf-handoff` present.
+
+    The two that warn, and neither adds a point:
+
+      SMELL      something is off in the reply itself, caught without re-reading the
+                 subject — the measured absence and universal-claim triggers. Smell is
+                 what selects the applicable senses; it never scores them.
+      INTUITION  the prior. The one channel with no input behind it: what the turn
+                 asserted because it seemed right. Deliberately unscored — scoring it
+                 means judging it, and judging one's own prior from inside is the exact
+                 faculty the measurement found impaired. It is what the other five are
+                 for.
+    """
+    rows = []
+    for name in ("sight", "hearing", "touch", "taste"):
+        if name not in applicable:
+            rows.append((name, None))
+            continue
+        n = SENSE_COUNT[name](counts) or 0
+        rows.append((name, 100 if n >= 2 else (50 if n == 1 else 0)))
+    scored = [v for _, v in rows if v is not None]
+    return (sum(scored) // len(scored) if scored else 100), rows
+
+
+def widen_reason(total, threshold, why, rows, inst, counts):
+    """The block payload: the sense this claim needed, and what was there to open it.
+
+    "Insufficient, try harder" hands the tunnel back to itself and is worth nothing.
+    What blocks instead is a REGISTRY — the instruments on this machine, for this
+    project, during this turn, that went untouched, named one by one.
+
+    Written as statements of fact about the environment rather than as commands. The
+    hooks reference is explicit that text framed as an out-of-band instruction trips
+    the prompt-injection defences and gets surfaced to the user instead of acted on,
+    which would turn an automatic widen back into one more thing a human has to do.
+    """
+    lines = [f"Turn score {total}/100 against a {threshold} threshold, "
+             f"scored only on the senses this claim needs.",
+             "  " + " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows), ""]
+    for trip, sense, reason in why:
+        article = "an" if trip[0] in "aeiou" else "a"
+        lines.append(f"The reply makes {article} {trip} claim. That is settled by "
+                     f"{sense.upper()}: "
+                     f"{reason}.")
+    lines.append("")
+    lines.append("On this machine, unused this turn:")
+    if not counts[3]:
+        lines.append("  · hearing — no web search, no web fetch, no spawned reader")
+    if not counts[2]:
+        lines.append("  · taste — nothing enumerated a set: no Glob, no find, no ls, "
+                     "no grep -l")
+    if inst["agents"]:
+        lines.append(f"  · {len(inst['agents'])} agent(s) available to read this "
+                     f"independently: " + ", ".join(inst["agents"][:8]))
+    if inst["skills"]:
+        lines.append(f"  · {len(inst['skills'])} skill(s) installed: "
+                     + ", ".join(inst["skills"][:8]))
+    lines += ["",
+              "Nine of ten recorded escapes from a settled wrong reading in this project "
+              "came from outside the turn that formed it; none came from re-examining it. "
+              "Opening a channel this turn has not opened is what changes the answer; "
+              "restating the conclusion is not."]
+    return "\n".join(lines)
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    # THE LOOP STOP. Set on the second and later firings for one turn; without this a
+    # widen that keeps scoring low blocks forever and the session is dead.
+    if payload.get("stop_hook_active"):
+        return 0
+
+    threshold = int(os.environ.get("WF_WIDEN_THRESHOLD") or 50)
+    cwd = payload.get("cwd") or os.getcwd()
+
+    counts = TL.turn_counts(payload)
+    if counts is None:
+        return 0
+    reply = counts[-1]
+
+    # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
+    # applicable to this turn, and a turn that trips neither is scored against nothing
+    # and reported silently. That is the 98% — a turn answering from context in hand is
+    # directive two's explicit instruction, not a defect, and must never be widened for
+    # having read little.
+    # THE UNFINISHED-WORK TRIGGER, CHECKED FIRST. It is independent of the senses —
+    # a turn can be perfectly grounded and still stop in the middle of its own
+    # sentence. Measured at 9.4% of turns, with one false positive in 106 (0.9%),
+    # against the 7.0% budget that retired this distribution's last speech guard.
+    promise = unfinished(reply, payload)
+    if promise:
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                f'The turn ended immediately after saying "{promise}", and asked '
+                f"nothing. Nothing interrupted it — the stop was the turn's own.\n\n"
+                "In this session 10 of 106 turns ended that way: work announced, then "
+                "the turn closed with the work not started. The cause is structural "
+                "rather than a change of mind — a text block with no tool call after it "
+                "IS the end of the turn, so writing the sentence is the act of "
+                "stopping, and from inside it reads as narrating progress.\n\n"
+                "The announced work has not been done yet. Stopping mid-task is correct "
+                "only when input is genuinely needed and is being asked for."),
+            "systemMessage": f"WIDEN  stopped mid-work after \u201c{promise}\u201d — CONTINUING",
+        }))
+        return 0
+
+    masked = TL.mask_code(reply or "")
+    trips = []
+    if TL.ABSENCE.search(masked):
+        trips.append("absence")
+    if TL.UNIVERSAL.search(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
+        trips.append("universal")
+
+    applicable, why = set(), []
+    for t in trips:
+        sense, reason = CLAIM_SENSE[t]
+        applicable.add(sense)
+        why.append((t, sense, reason))
+
+    # A TURN SCORED AGAINST NOTHING DOES NOT GET A PERFECT SCORE. Printing 100/100
+    # for a turn that tripped no trigger is a number with nothing under it, and a
+    # number with nothing under it is what this whole mechanism exists to stop
+    # producing. It says so instead.
+    if not applicable:
+        print(json.dumps({"systemMessage":
+                          "WIDEN  not scored — no claim this turn that evidence settles"}))
+        return 0
+
+    total, rows = senses(counts, applicable)
+    shown = " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows)
+    summary = f"WIDEN  {total}/100 · {shown}"
+
+    if total >= threshold:
+        print(json.dumps({"systemMessage": summary}))
+        return 0
+
+    print(json.dumps({
+        "decision": "block",
+        "reason": widen_reason(total, threshold, why, rows,
+                               instruments(cwd), counts),
+        "systemMessage": summary + " — WIDENING",
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

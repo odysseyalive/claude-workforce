@@ -64,6 +64,23 @@ backlog reported only by the command that created a row is invisible to a user w
 one — and the whole failure being fixed is a queued item nobody returns to. On the header it is seen
 from every surface, including `roster`, which does nothing else with it.
 
+
+## The liveness registry
+
+`wf-live --root <install>` reports what a distribution SHIPS, read off the tree: scripts in `bin/`,
+the hook set from `wf-settings-apply`'s own `SHIPPED_HOOKS`, procedures, agents, and the commands
+`SKILL.md` advertises. It then reports where those disagree — a command advertised with no procedure
+file, a hook registered with no script, a live reference telling a reader to run something that is
+not there.
+
+**Derived, never authored.** A hand-kept list of what is live is the same artifact that told this
+project `vendor` was a live command and `wf-handoff` was a shipped script. Both were wrong, both were
+written down, and both were believed. Nothing here is stored, so nothing here can go stale.
+
+**Two tiers, because a guard that cries wolf gets ignored.** `BROKEN` is a name sitting where a
+reader is told to run it. `stale` is a name mentioned anywhere else — often correctly, since a change
+record naming a swept mechanism is a change record doing its job. Only the first tier is a failure.
+
 ## Install and scope
 
 | Check | Failure it catches |
