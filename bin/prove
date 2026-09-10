@@ -637,8 +637,12 @@ CASES = [
      HKS, "del", "saunwire-userhook"),
     ("the three paths are stated once, where the rule lives",
      ENF, "del", "A per-machine command is not a path"),
+    # RETARGETED 2026-09-09: this deleted a phrase from enforcement.md that the check
+    # never reads, and reported VACUOUS while three unrelated checks failed. The
+    # assertion requires every hook in SHIPPED_HOOKS to appear in hooks.md's table, so
+    # removing that row is the mutation it is actually built to catch.
     ("hooks: the wired set, the manifest, and the authority table agree",
-     ENF, "del", "What is wired is the authority on the set"),
+     "workforce/references/procedures/hooks.md", "delall", "`wf-turn-ledger`"),
     ("org-config: the effort ladder is ordered most expensive first",
      CFG, "del", "`max`, `xhigh`, `high`, `medium`, `low`"),
     # ── per-employee lane classification reaches the Lead tier (2026-08-27):
@@ -1073,8 +1077,13 @@ CASES = [
     # literals are concatenated at PARSE time: the AST sees the whole payload, the
     # file text never carries it contiguously, and the count in the target is 1.
     # Do not join these into one literal; that is the vacuity the sibling check bans.
-    ("prove: every case name is exactly the name of the check it breaks",
-     CHK, "del", "A CASE NAME IS NOT A LABEL"),
+    # NO CASE FOR "prove: every case name is exactly the name of the check it breaks".
+    # Removed 2026-09-09 after it reported VACUOUS. Its failure mode is SILENT PASS, not
+    # failure: break the blanket-pattern guard and `_check_pats` swallows every orphan,
+    # so the check goes green having tested nothing. A deletion cannot make it red, and a
+    # case that cannot make its check fire proves nothing. It joins the 162 assertions the
+    # summary counts as structural — provable only by hand — which is the honest bucket
+    # rather than a case that reports a verdict about neither the rule nor the mutation.
     ("prove: each worker breaks a private copy of the tree",
      PRV, "del", "shutil.copy" "tree(ROOT, work"),
     ("prove: cases are applied to the copy, not to ROOT",
