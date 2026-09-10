@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""wf-widen — score the turn at Stop; when the score is thin, WIDEN instead of stopping.
+"""wf-widen — decide at Stop whether the channels an ask needed were opened.
+
+THERE IS NO SCORE. This header said "score the turn at Stop; when the score is thin,
+WIDEN instead of stopping" for a release after the score was deleted in 1.44.0 — a
+threshold implies a scale, the scale was invented, and `WF_WIDEN_THRESHOLD` went with
+it. The decision here is binary per sense: opened, or not. What replaced the score is a
+JURY of six that votes yes / no / abstain and must give a reason. *Found 2026-09-10 by
+the user, who read the Stop line, saw a row of counts and asked why the yes/no verdict
+was not showing up instead. The mechanism had been converted and its display had not.*
 
 WHY THIS EXISTS, and it is the half `wf-turn-ledger` deliberately left undone.
 
@@ -333,7 +341,11 @@ SENSE_COUNT = {
 
 
 def senses(counts, applicable):
-    """Score ONLY the senses this claim needs. Returns (percent, rows).
+    """Report ONLY the senses this claim needs. Returns (unopened, rows).
+
+    *The signature said `(percent, rows)` until 2026-09-10 and had never returned a
+    percent. A docstring describing a deleted return value is how a reader concludes the
+    conversion never happened.*
 
     THE SIX SENSES, EACH A COUNTED CHANNEL. The user named this shape across the
     session — three muses, then the three monkeys ("one sees, one smells, one hears"),
@@ -383,6 +395,46 @@ def senses(counts, applicable):
         if n == 0:
             unopened.append(name)
     return unopened, rows
+
+
+def describe(why, rows, unopened):
+    """One sentence: what kind of claim, which channels it needed, which opened.
+
+    THE COUNTS ARE NOT A GRADE AND THE OLD LINE READ LIKE ONE. It rendered
+    `sight n/a · hearing n/a · touch 20 · taste n/a`, and 20 does nothing here — the
+    decision is `unopened` empty or not, so `touch 20` and `touch 1` are the same
+    verdict. Reported 2026-09-10 by the user: "I thought we had moved over from a
+    scoring system to yes, no or abstain with a forced reason. So why isn't that showing
+    up here instead?" The mechanism HAD moved; the display had not, and a row of digits
+    in the shape a score used to occupy reads as a score however the code behaves.
+
+    WHAT THIS DOES NOT DO, deliberately: it never summarises what was DISCOVERED. This
+    function counts and matches regexes; it read nothing. The only component that knows
+    what a turn found is the jury, and its `reason` is the headline when one sits. A
+    mechanism asserting a judgment it did not make is the overclaim this project kills
+    everywhere else, and it would be worse here than a bad number.
+
+    `wf-turn-ledger` keeps the raw counts. Its job is counting; this one's is deciding,
+    and both printing numbers is how the two got confused for one score.
+    """
+    kinds = []
+    for trigger, _sense, _reason in why:
+        name = trigger[4:] if trigger.startswith("TAG:") else trigger
+        if name not in kinds:
+            kinds.append(name)
+    subject = " + ".join(kinds[:2]) if kinds else "claim"
+    needed = [k for k, v in rows if v is not None]
+    if not needed:
+        return f"{subject} claim · no channel required"
+    opened = [k for k in needed if k not in unopened]
+    parts = [f"{subject} claim", "needed " + "/".join(needed)]
+    if unopened:
+        parts.append("NOT opened: " + "/".join(unopened))
+        if opened:
+            parts.append("opened: " + "/".join(opened))
+    else:
+        parts.append("opened")
+    return " · ".join(parts)
 
 
 def widen_reason(unopened, why, rows, inst, counts):
@@ -501,7 +553,7 @@ def main():
         return 0
 
     unopened, rows = senses(counts, applicable)
-    shown = " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows)
+    shown = describe(why, rows, unopened)
 
     # THE SAMPLE. Auditing only the turns that fail their own dispatch is the
     # self-scoring bias wearing a different hat: a turn that looks fine is then judged

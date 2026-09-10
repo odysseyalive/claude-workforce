@@ -157,8 +157,31 @@ _ABSENCE_PHRASE = (r"the only|no other|the sole|only way|only place"
 _QUOTED = re.compile(r"[\"\u201c\u201d][^\"\u201c\u201d\n]{6,200}[\"\u201c\u201d]")
 
 # Tools and commands that ENUMERATE a set rather than answer about a known thing.
+# Commands that OPEN a target rather than being one. Without this, `timeout 900 ./bin/check`
+# contributes `timeout` and the real target is never counted.
+WRAPPERS = frozenset((
+    "timeout", "nohup", "sudo", "env", "xargs", "command", "exec", "time",
+    "cd", "then", "do", "done", "fi", "else", "until", "while", "for", "if",
+    "echo", "printf", "true", "false", "set", "local", "export",
+    "python3", "python", "node", "bash", "sh", "zsh", "perl", "ruby",
+))
+
 SET_TOOLS = {"Glob"}
-SET_CMD = re.compile(r"\b(find|ls|tree|grep -rl|grep -l|git ls-files|comm)\b")
+# A Bash command that ENUMERATES rather than point-reads. The flags matter: `grep -l`,
+# `-c`, `-n`, `-r` and `-o` all report across a whole file or tree, which is what closes a
+# claim about a set.
+#
+# *Widened 2026-09-10. The list held `find|ls|tree|grep -rl|grep -l|git ls-files|comm` and
+# BLOCKED A TURN THAT HAD ENUMERATED THE MANIFEST TWICE — with `grep -c` and `grep -nE`,
+# neither of which it recognised. A guard that refuses the very work it demands costs its
+# reader a round trip and teaches them the guard is noise, which is the 7.0% failure that
+# retired the speech guards arriving through a narrow allowlist instead of a broad regex.
+# The fix is to match on the FLAG, not on a hand list of spellings.*
+SET_CMD = re.compile(
+    r"\b(?:find|ls|tree|comm|git ls-files|git grep)\b"
+    r"|\bgrep\b[^|;\n]*?\s-[A-Za-z]*[lcnro]"
+    r"|\brg\b[^|;\n]*?\s-[A-Za-z]*[lc]"
+    r"|\bwc\s+-l\b")
 
 _PROJECT_NOUN = (r"file|files|script|scripts|command|commands|hook|hooks|procedure|procedures"
                  r"|path|paths|skill|skills|agent|agents|handbook|handbooks|org|repo|repository"
@@ -188,6 +211,36 @@ def mask_code(text):
 def emit(message):
     """systemMessage — the channel the USER sees. That is the whole point."""
     print(json.dumps({"systemMessage": message}))
+
+
+def read_targets(name, inp):
+    """What a tool call actually LOOKED AT, for the distinct count.
+
+    *Rewritten 2026-09-10, because the old expression took the first token of a Bash
+    command and so counted SHELL UTILITIES, not sources. Measured on one real turn:
+    `20 reads · 8 distinct` where the eight were `timeout, grep, sed, python3, git, until,
+    cat, nohup`. Forty greps across forty files scored 1; six utilities against one file
+    scored 6. The number was not merely uninformative, it was close to inverted — and it
+    was printed beside a label a reader reasonably read as "consulted 8 sources".*
+
+    For a real tool the field IS the target. For Bash the target is any path-like or
+    dotted argument in the command, with the wrapper verbs that open one dropped.
+    """
+    if name != "Bash":
+        t = str(inp.get("file_path") or inp.get("pattern") or inp.get("query") or "").strip()
+        return [os.path.basename(t)[:40]] if t else []
+    cmd = str(inp.get("command") or "")
+    out = []
+    for tok in re.findall(r"[\w./\-]+", cmd):
+        if tok in WRAPPERS or tok.startswith("-"):
+            continue
+        if tok in (".", "..", "./") or set(tok) <= set("."):
+            continue                       # `--root .` names no source
+        if "/" in tok or "." in tok:
+            base = os.path.basename(tok.rstrip("/"))
+            if base:
+                out.append(base[:40])
+    return out
 
 
 def turn_counts(payload):
@@ -265,12 +318,7 @@ def turn_counts(payload):
                 if name in SET_TOOLS or (
                         name == "Bash" and SET_CMD.search(str(inp.get("command", "")))):
                     setreads += 1
-                t = (inp.get("file_path") or inp.get("pattern") or inp.get("query")
-                     or inp.get("command") or "")
-                t = str(t).strip()
-                if t:
-                    targets.append(os.path.basename(t.split()[0])[:30] if "/" in t.split()[0]
-                                   else t.split()[0][:30])
+                targets += read_targets(name, inp)
 
     # THE REPLY COMES FROM `last_assistant_message`, NOT FROM THE TRANSCRIPT.
     # The transcript "is written asynchronously and may lag the in-memory

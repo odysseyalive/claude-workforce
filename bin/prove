@@ -203,11 +203,37 @@ TMPL = "workforce/references/templates.md"
 DBUD = "workforce/references/procedure-for-procedures.md"
 CNFM = "workforce/bin/wf-conform"
 CATL = "workforce/bin/wf-catalog"
+WDN  = "workforce/bin/wf-widen"
+TLDG = "workforce/bin/wf-turn-ledger"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── the display was not converted with the mechanism (2026-09-10) ─────────
+    # Reported by the user reading a Stop line: the score went in 1.44.0 and the row of
+    # counts stayed, so a converted mechanism was indistinguishable from an unconverted
+    # one. Each break is one of the four things that made it read as a grade.
+    ("wf-widen reports a decision in words, not a score",
+     WDN, "del", "def describe(why, rows, unopened):"),
+    ("wf-widen reports a decision in words, not a score",
+     WDN, "del", "Returns (unopened, rows)"),
+    # ONE PROVEN CASE, NOT TWO WITH A VACUOUS ONE. A case deleting
+    # `def read_targets(name, inp):` orphans its body, so bin/check fails on syntax and
+    # the NAMED check never runs — `did NOT fire — 2 other failures`. A case that cannot
+    # reach its assertion proves nothing about it and pads the count while looking green.
+    # The SET_CMD case below reaches the same check and fires, which is what makes it
+    # non-vacuous; `read_targets`'s presence is asserted there too.
+    # THE MUTATION MUST NARROW THE DETECTOR, NOT WIDEN IT. Two earlier targets failed for
+    # opposite reasons and both are worth keeping written down. Deleting
+    # `WRAPPERS = frozenset((` orphaned the body, so bin/check died on syntax and the NAMED
+    # check never ran. Deleting `[A-Za-z]*[lcnro]` left `\bgrep\b[^|;\n]*?\s-`, which
+    # matches ANY flagged grep — a BROADER regex, so `grep -c` still passed and the check
+    # correctly did not fire. Removing the whole grep alternative is the real regression:
+    # adjacent string literals concatenate, so the file still parses, and `grep -c` and
+    # `grep -n` stop reading as set-reads exactly as they did before this was widened.
+    ("the ledger's detectors measure sources and set-reads, not shell verbs",
+     TLDG, "del", r'    r"|\bgrep\b[^|;\n]*?\s-[A-Za-z]*[lcnro]"' + "\n"),
     # ── wf-catalog: removal is per file, proven by byte identity (2026-09-10) ──
     # Each break below is one of the ways the FIRST design failed. An independent code
     # evaluation broke it before it shipped: append a prose project rule under an

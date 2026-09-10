@@ -1015,6 +1015,92 @@ check(
     % (_ct_seq or "nothing", _sd_seq or "nothing", _want_seq),
 )
 
+# THE SCORE IS GONE AND THE DISPLAY MUST SAY SO. Reported 2026-09-10 by the user, who read
+# a Stop line, saw `sight n/a · hearing n/a · touch 20 · taste n/a` and asked why the
+# yes/no/abstain verdict was not showing up instead. The mechanism HAD been converted in
+# 1.44.0; the header still said "score the turn", `senses()` still documented a `percent`
+# it had never returned, and the row of digits sat exactly where a score used to. A
+# converted mechanism with an unconverted display is indistinguishable from an unconverted
+# mechanism, and it cost the reader their confidence in the conversion.
+_wd = read("workforce/bin/wf-widen")
+_wl = read("workforce/bin/wf-turn-ledger")
+# SCOPED TO WHAT IS LIVE, NEVER TO THE WHOLE FILE. Both corrections QUOTE the wording they
+# replaced, so a whole-file search for the old phrase matches the note explaining its
+# removal and fires forever — the deleting-the-first-of-two family, caught here on the
+# first run of this very check.
+_disp = []
+_wd_head = _wd.split("\n")[1] if "\n" in _wd else ""
+if "score the turn" in _wd_head:
+    _disp.append("wf-widen's header line still describes a score; it was deleted in "
+                 "1.44.0 and the threshold with it, and a reader who believes the header "
+                 "cannot tell that the jury replaced it")
+if "Returns (unopened, rows)" not in _wd:
+    _disp.append("senses() no longer documents its real return; it advertised "
+                 "`(percent, rows)` for a release after the percent stopped existing")
+if "def describe(" not in _wd or "shown = describe(" not in _wd:
+    _disp.append("the sentence renderer is gone or is no longer what builds the Stop "
+                 "line; a row of counts is the shape a grade occupied and reads as one "
+                 "whatever the code does")
+check(
+    "wf-widen reports a decision in words, not a score",
+    not _disp,
+    "; ".join(_disp),
+)
+
+# A DETECTOR THAT REFUSES THE WORK IT DEMANDS. `SET_CMD` decides whether a turn enumerated
+# a set. It held a hand list of spellings — `find|ls|tree|grep -rl|grep -l|git ls-files|
+# comm` — and BLOCKED A TURN that had enumerated the manifest twice with `grep -c` and
+# `grep -nE`. That is the 7.0% false-positive failure that retired the speech guards,
+# arriving through a narrow allowlist rather than a loose regex, and it costs the reader a
+# round trip while teaching them the guard is noise.
+# THE DETECTOR IS LOADED AND PROBED, NEVER SLICED OUT OF THE SOURCE. The first version
+# exec'd a substring located by two `.index()` calls and fell back to an empty namespace on
+# any error — so every probe was SKIPPED and the check passed. `prove` called it VACUOUS,
+# correctly: a check that quietly stops testing when its own parsing breaks is a check that
+# cannot fail. An import failure is now itself the finding.
+_det = []
+try:
+    import importlib.util as _ilu, importlib.machinery as _ilm
+    # NEVER LEAVE A __pycache__ BESIDE A SHIPPED SCRIPT — residue in a directory the
+    # installer owns, and `manifest: no shipped file is undeclared` catches it the moment
+    # it appears. wf-settings-apply, wf-apply and wf-claude-md each hit this first.
+    sys.dont_write_bytecode = True
+    _spec = _ilu.spec_from_loader("_wf_tl", _ilm.SourceFileLoader(
+        "_wf_tl", "workforce/bin/wf-turn-ledger"))
+    _tlmod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_tlmod)
+except Exception as _exc:                                # noqa: BLE001
+    _tlmod = None
+    _det.append(f"wf-turn-ledger will not import ({_exc}) — its detectors cannot be probed, "
+                f"and an unprobed detector is the shape this check exists to refuse")
+
+if _tlmod is not None:
+    for _probe in ('grep -c "^exec" manifest.txt', 'grep -nE "bin/" manifest.txt',
+                   "ls bin/", "find . -name SKILL.md", 'grep -rl "x" .'):
+        if not getattr(_tlmod, "SET_CMD", re.compile("(?!)")).search(_probe):
+            _det.append(f"SET_CMD no longer reads `{_probe}` as enumerating a set — a "
+                        f"guard that refuses the work it demands blocks correct turns and "
+                        f"teaches its reader it is noise")
+    # The measured failure: first-token extraction returned the shell verb, so one real
+    # turn reported `8 distinct` that were timeout, grep, sed, python3, git, until, cat,
+    # nohup. Forty greps over forty files scored 1; six utilities on one file scored 6.
+    _tg = getattr(_tlmod, "read_targets", None)
+    if not callable(_tg):
+        _det.append("read_targets is gone; the distinct count is back to the first token "
+                    "of a Bash command, which counts SHELL UTILITIES rather than sources")
+    else:
+        if _tg("Bash", {"command": "timeout 900 ./bin/check 2>&1 | tail -1"}) != ["check"]:
+            _det.append("a wrapped command no longer resolves to its target — "
+                        "`timeout 900 ./bin/check` must count `check`, never `timeout`")
+        if _tg("Bash", {"command": "python3 workforce/bin/wf-catalog --root ."}) != ["wf-catalog"]:
+            _det.append("the interpreter or a bare `.` is being counted as a source")
+
+check(
+    "the ledger's detectors measure sources and set-reads, not shell verbs",
+    not _det,
+    "; ".join(_det),
+)
+
 # EVERY PRODUCER HAS A READER — the anti-bloat invariant, and the one every
 # accumulation defect in this repo turns out to be an instance of.
 #
