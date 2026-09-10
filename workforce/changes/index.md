@@ -8,6 +8,18 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.46.0 | 2026-09-10 | scripts | no | The reason is the deliverable, on every verdict |
+| 1.45.1 | 2026-09-10 | scripts | no | Nothing to try means no trial |
+| 1.45.0 | 2026-09-10 | scripts | no | Six jurors, yes or no, and the judge can finally see the ask |
+| 1.44.1 | 2026-09-09 | scripts | no | The auditing agent caught a contradiction the author could not see |
+| 1.44.0 | 2026-09-09 | scripts | no | The judge is not the one who did the work |
+| 1.43.0 | 2026-09-09 | scripts | no | A score is not a tally of activity, and nobody grades their own paper |
+| 1.42.1 | 2026-09-09 | docs | no | A check that could not fail, found by the suite nobody had let finish |
+| 1.42.0 | 2026-09-09 | hooks, scripts, installer | no | The list was written by the head that was tunneling |
+| 1.41.0 | 2026-09-09 | hooks, scripts | no | The alarm had no response |
+| 1.40.0 | 2026-09-09 | hooks, scripts, installer | no | Tag the ask, not the answer |
+| 1.39.1 | 2026-09-09 | audit, verify, hooks | **yes** | Bump to 1.39.1 — the healing pass shipped on an unchanged version |
+| 1.39.0 | 2026-09-09 | audit, verify, changes, hooks, scripts, installer | no | The stop and the report were the same act |
 | 1.38.0 | 2026-09-09 | changes, hooks, scripts, installer | no | The class that needed a human: a true citation supporting a false claim |
 | 1.37.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Four triggers measured against 1,495 real turns; one survived at 0.5% |
 | 1.36.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Read the hooks reference and found a limit I had invented and a bug I had shipped |
