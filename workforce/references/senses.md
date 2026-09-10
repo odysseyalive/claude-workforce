@@ -102,6 +102,12 @@ about what a single opinion did.
 so rather than voting, because a vote nobody could check is the fabricated number in
 another costume.
 
+**Every verdict carries a reason — `yes`, `no` and `abstain` alike.** A bare `yes` says
+nothing. A juror that acquits must say what it checked and what it showed, because the
+reason is the deliverable and the verdict is not: the reason is the context that makes
+the next step obvious without anyone having to be told, and that is the whole value of
+an outside look at a tunnel you do not know you are in.
+
 **Notes on a `yes` are the point.** A juror that votes to acquit and still noticed
 something adjacent should say it. A verdict tells you that you were wrong; a note tells
 you where to look, and the second is worth more — "you never read the record that
