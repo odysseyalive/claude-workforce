@@ -120,6 +120,42 @@ JARGON = re.compile(
 # phrase, and it costs one regex rather than a judgment.
 _ABSENCE_PHRASE = (r"the only|no other|the sole|only way|only place"
                    r"|there is no|there are no|does(?:n't| not) need|was never|were never")
+
+# ── the unenumerated-universal trigger ───────────────────────────────────────
+# The SECOND trigger, and it covers the class the first one cannot: a claim with a
+# TRUE citation that is still wrong.
+#
+# MEASURED, this session. "Vendor is the only documented path for a remote repo" was
+# cited to scopes.md:140 and update.md:41 — both true statements, both ABOUT VENDOR.
+# The claim was about the SPACE OF ALTERNATIVES, and no read ever enumerated that
+# space; README.md's published one-liner was never opened. The citation's scope did
+# not cover the claim's scope, and a human had to catch it.
+#
+# The mechanical distinction is between two kinds of read:
+#     POINT read  answers "what does X say?"        Read(file), grep for a known term
+#     SET read    answers "what is the set of Y?"   Glob, find, ls, grep -rl, a census
+# A universal claim is a claim about a SET. Point reads cannot support one, however
+# many of them there are — that turn had four.
+#
+# RATES over 1,497 substantive Opus 5 turns:
+#     universal claim anywhere                        28.7%
+#     ...with no set-read in the turn                  2.1%
+#     ...and not inside quoted text                    1.5%   <- this one
+# The quote exclusion is not tidiness: without it the trigger fires on a turn
+# DISCUSSING the failure rather than committing it, which is common in exactly the
+# sessions where it would be read.
+#
+# WHAT IT CANNOT DO. ProvenanceGuard (arXiv 2606.18037) measures source-attribution
+# accuracy falling to 0.229 with semantically close sources — and two files in one
+# repository are close. So this flags that a set-claim rests on point reads; it does
+# NOT establish which source should have been consulted, and must never be reported
+# as if it did.
+_QUOTED = re.compile(r"[\"\u201c\u201d][^\"\u201c\u201d\n]{6,200}[\"\u201c\u201d]")
+
+# Tools and commands that ENUMERATE a set rather than answer about a known thing.
+SET_TOOLS = {"Glob"}
+SET_CMD = re.compile(r"\b(find|ls|tree|grep -rl|grep -l|git ls-files|comm)\b")
+
 _PROJECT_NOUN = (r"file|files|script|scripts|command|commands|hook|hooks|procedure|procedures"
                  r"|path|paths|skill|skills|agent|agents|handbook|handbooks|org|repo|repository"
                  r"|reference|references|manifest|assertion|assertions|check|checks|employee")
@@ -130,6 +166,11 @@ _PROJECT_NOUN = (r"file|files|script|scripts|command|commands|hook|hooks|procedu
 _NOUN_THEN_PHRASE = rf"\b(?:{_PROJECT_NOUN})\b[^.\n]{{0,70}}?\b({_ABSENCE_PHRASE})\b"
 _PHRASE_THEN_NOUN = rf"\b({_ABSENCE_PHRASE})\b[^.\n]{{0,70}}?\b(?:{_PROJECT_NOUN})\b"
 ABSENCE = re.compile(rf"{_PHRASE_THEN_NOUN}|{_NOUN_THEN_PHRASE}", re.I)
+_UNIV_PHRASE = (r"the only|no other|the sole|only way|only place|there is no"
+                r"|there are no|does(?:n't| not) need|was never|were never")
+UNIVERSAL = re.compile(
+    rf"\b({_UNIV_PHRASE})\b[^.\n]{{0,70}}?\b(?:{_PROJECT_NOUN})\b"
+    rf"|\b(?:{_PROJECT_NOUN})\b[^.\n]{{0,70}}?\b({_UNIV_PHRASE})\b", re.I)
 
 _FENCE = re.compile(r"```.*?```", re.S)
 _CODE = re.compile(r"`[^`\n]*`")
@@ -182,7 +223,7 @@ def main():
         start = i
         break
 
-    reads, targets, said = 0, [], []
+    reads, targets, said, setreads = 0, [], [], 0
     for line in lines[start:]:
         try:
             d = json.loads(line)
@@ -203,6 +244,11 @@ def main():
             # classifier that produced it.
             if name in READERS or name == "Bash":
                 reads += 1
+                # A SET read enumerates; a POINT read answers about a known thing.
+                # Only the former can support a claim about a set.
+                if name in SET_TOOLS or (
+                        name == "Bash" and SET_CMD.search(str(inp.get("command", "")))):
+                    setreads += 1
                 t = (inp.get("file_path") or inp.get("pattern") or inp.get("query")
                      or inp.get("command") or "")
                 t = str(t).strip()
@@ -256,6 +302,18 @@ def main():
         if t not in seen:
             seen.add(t)
             uniq.append(t)
+    # THE SECOND TRIGGER. A universal claim rests on a SET, and point reads cannot
+    # support one however many there are. Quoted text is excluded so a turn DISCUSSING
+    # such a claim is not confused with one making it.
+    if setreads == 0:
+        u = UNIVERSAL.search(_QUOTED.sub(
+            lambda m: " " * len(m.group(0)), mask_code(reply)))
+        if u:
+            emit(f"GROUNDING  {reads} reads · {len(uniq)} distinct · 0 enumerating — "
+                 f"asserts \"{u.group(0)[:44]}\", a claim about a SET, from point "
+                 f"reads only.{tail}")
+            return 0
+
     emit(f"GROUNDING  {reads} reads · {len(uniq)} distinct{tail}")
     return 0
 

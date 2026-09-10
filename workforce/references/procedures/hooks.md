@@ -353,3 +353,33 @@ is a regex. 0.5% is cheap enough to print and nowhere near good enough to gate a
 produced it came from outside — six from the user, three from a panel, zero from noticing. This makes
 one narrow class of ungrounded claim *visible at the moment it is made*; it does not make the claim
 right, and it must never be reported as if it did.
+
+## The unenumerated-universal trigger
+
+**The second trigger, and it covers the class the first one cannot: a claim with a TRUE citation that
+is still wrong.**
+
+The measured case is the one a human had to correct. *"Vendor is the only documented path for a remote
+repo"* was cited to `scopes.md:140` and `update.md:41` — both true, and both **about vendor**. The claim
+was about the **space of alternatives**, and no read ever enumerated that space; the published one-liner
+in `README.md` was never opened. The citation's scope did not cover the claim's scope.
+
+**The mechanical distinction is between two kinds of read:**
+
+| | answers | examples |
+|---|---|---|
+| **point** | *what does X say?* | `Read(file)`, a grep for a known term |
+| **set** | *what is the set of Y?* | `Glob`, `find`, `ls`, `grep -rl`, a census |
+
+A universal claim is a claim about a **set**. Point reads cannot support one however many there are —
+that turn had three, and the first trigger misses it entirely because the turn read plenty.
+
+**Rates over 1,497 substantive turns:** a universal claim anywhere is 28.7%; with no set-read in the
+turn, 2.1%; and excluding quoted text, **1.5%**. The quote exclusion is not tidiness — without it the
+trigger fires on a turn *discussing* such a claim rather than making one, which is common in exactly
+the sessions where it would be read.
+
+**What it cannot do.** ProvenanceGuard (arXiv 2606.18037) measures source-attribution accuracy falling
+to **0.229** with semantically close sources, and two files in one repository are close. So this flags
+that a set-claim rests on point reads. It does **not** establish which source should have been
+consulted, and must never be reported as if it did.
