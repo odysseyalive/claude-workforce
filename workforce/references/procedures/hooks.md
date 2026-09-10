@@ -36,7 +36,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. It also names any of this distribution's own coined terms used bare in the reply. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
 
-**This distribution ships TWO hooks**, and `enforcement.md` is the count. Two more were
+**The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
 mis-rendered budget picker, and `wf-standing-request`, which added the cold-reader request to every
 turn. Neither script is in `workforce/bin/` and neither is in `manifest.txt`.

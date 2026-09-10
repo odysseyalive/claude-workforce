@@ -39,7 +39,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-eight, and the list is closed: adding a procedural invariant means adding a row here and a
+Thirty-seven, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -131,7 +131,6 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 32 | every governed handbook's `contract-stamp` matches its current `## Procedure` + `## Verification`, restamped in the run that amended it, or names the rule that declined | `INV-STAMP` | references/procedures/audit.md |
 | 33 | every reduced skill declares `## Interface` with its Invoke / Returns / Fails rows, or is named as undeclarable | `INV-IFACE` | references/procedures/audit.md |
 | 34 | every chain-of-command edge was re-derived from the child's `reports-to`, and every `direct-reports` mirror that disagreed was healed, or names the rule that declined | `INV-EDGES` | references/org-chart-format.md |
-| 35 | every Lead handbook carries the handoff boundary clause, or names the rule that declined | `INV-HANDOFF` | references/handoff.md |
 | 36 | the project ledger's records are counted by type and status, and no `proposed` record predates the run | `INV-KNOWLEDGE` | references/procedures/verify.md |
 | 37 | the symlinked handbooks in `.claude/agents` were enumerated before the first bulk write and re-read after, and none was lost or retargeted | `INV-SYMLINK` | workforce/SKILL.md |
 | 38 | every Core companion skill was force-refreshed to shipped source, or each unrefreshed one names the precondition that stopped it | `INV-CORE` | references/procedures/audit.md |
@@ -287,7 +286,6 @@ Run Invariants
   INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
   INV-COMPANIONS  6 of 6 materialized · org (org index) · operating-principles · personnel-ledger · code-evaluator · text-eval · security-evaluator · 0 absent
   INV-EDGES       employees 9 · edges 8 · mismatched 1 · healed 1 · 0 declined
-  INV-HANDOFF     leads 3 · clause present 3 · installed 1 · 0 declined
   INV-KNOWLEDGE   proposed 2 · accepted 11 · superseded 1 · unclassified 0
   …every remaining row, always all of them…
 ```

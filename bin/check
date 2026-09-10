@@ -11014,12 +11014,18 @@ check("edges: the child's `reports-to` is the authority; `direct-reports` is a d
       "encodings with no reconciliation is how a staffed employee stays off the chart and "
       "/org routes around it - a chart that reads as a correct chart of a smaller org.")
 
-check("edges: audit Step 5g heals existing orgs, and prints INV-EDGES + INV-HANDOFF",
-      "## Step 5g" in _aud2 and "INV-EDGES" in _aud2 and "INV-HANDOFF" in _aud2
-      and "INV-EDGES" in _inv2 and "INV-HANDOFF" in _inv2,
+# INV-HANDOFF DROPPED FROM THIS ASSERTION 2026-09-09, with the step that produced it.
+# `wf-handoff` was deleted in the simplification release and `references/handoff.md` with
+# it, so Step 5g instructed every run to execute a command that does not exist and to
+# print a count nobody could take. This check REQUIRED that dead pairing to be present —
+# an assertion holding a removed mechanism in place, which is the shape of a guard
+# outliving its subject. The edge heal is live and still guarded.
+check("edges: audit Step 5g heals existing orgs, and prints INV-EDGES",
+      "## Step 5g" in _aud2 and "INV-EDGES" in _aud2 and "INV-EDGES" in _inv2
+      and "INV-HANDOFF" not in _inv2,
       "The fix must reach orgs that ALREADY EXIST, in-run, per Step 5c's heal clause - a "
-      "template-only change reaches new hires and leaves every live org broken. Both invariant "
-      "rows must exist for the run to be able to print what it healed.")
+      "template-only change reaches new hires and leaves every live org broken. INV-HANDOFF "
+      "must NOT return: its script, its spec and its reversal were all removed.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

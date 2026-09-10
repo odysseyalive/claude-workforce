@@ -1397,22 +1397,22 @@ handed back as an optional refinement.
    correct chart of a smaller org, and `/org` routes around an employee that exists and is staffed.
    Reported 2026-09-07 from a live org whose `test-engineer` reported to `platform-engineer` on disk
    while the tree drew `platform-engineer` with no reports.
-2. **Install the boundary clause in every delegating handbook** that lacks it, by running
-   `wf-handoff --wire --root "${CLAUDE_PROJECT_DIR}" --execute` — never by hand-editing, because the
-   clause and its reversal are one constant inside that script and a hand-written copy is a write with
-   no matching way back. It skips a handbook that already carries the clause, records what it wrote to
-   `.claude/workforce/.handoff-wired.json`, and is reversed by `wf-handoff --unwire --execute`. An
-   existing org gets the clause here; only a fresh hire gets it from the template, which is why this is
-   a heal step and not a template change alone (Core Principle 7c — a rule added to one path is added
-   to the other in the same change).
+2. *The handoff-clause install stood here and is REMOVED (2026-09-09). It ran
+   `wf-handoff --wire --execute`, and the simplification release deleted that script — so this step
+   instructed every run to execute a command that does not exist, recorded state in a
+   `.handoff-wired.json` nothing writes, and named a reversal nothing can perform. Its rule's spec
+   file, `references/handoff.md`, went with it. **A rule whose spec, producer and reversal are all gone
+   is not a weakened rule; it is a step that fails on every run** — found by the collision sweep, which
+   asked which invariants cite a spec that no longer ships.*
 
-The run prints **`INV-EDGES`** and **`INV-HANDOFF`** (`references/invariants.md` rows 34 and 35), all
-counts, always:
+The run prints **`INV-EDGES`** (`references/invariants.md` row 34), all counts, always:
 
 ```
 INV-EDGES    employees 9 · edges 8 · mismatched 1 · healed 1 · 0 declined
-INV-HANDOFF  leads 3 · clause present 3 · installed 1 · 0 declined
 ```
+
+*`INV-HANDOFF` was printed here beside it until 2026-09-09 and is removed with the step that produced
+it — a counted line whose producer had been deleted reports a measurement nobody took.*
 
 A declined heal names the shipped rule that refused it. `mismatched 0` on a coherent org is the
 expected steady state and is printed rather than skipped — an absent row and a zero row must not look
