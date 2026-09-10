@@ -3,7 +3,7 @@
 name: wf-provenance-analyst
 description: "Measures the evidence for who a directive-shaped block came from — marker, duplication, sidecar, voice, downstream authority, git — and reports the full vector rather than a verdict. Distinguishes an immaterial question from an unresolved one."
 disallowedTools: Agent
-tools: Read, Grep, Glob, Bash
+tools: Read, Bash
 effort: high
 ---
 

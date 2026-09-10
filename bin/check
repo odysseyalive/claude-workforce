@@ -852,6 +852,36 @@ check(
     not _ag_problems,
     "; ".join(_ag_problems),
 )
+# ── A grant may not name a tool this host has no registry entry for ──────────
+# MEASURED 2026-09-10 on 2.1.266 (measurements/2026-09-10-subagent-grant.md):
+# `Grep`, `Glob` and `WebFetch` are absent from the subagent namespace loaded and
+# deferred alike, and absent from the main session too — this host has no registry
+# entry for them at all. Fact 13b measured what an explicit `tools:` list does with
+# a name that resolves to nothing: it drops it SILENTLY. So three shipped panel
+# agents granted `Grep, Glob` and ran without them, indistinguishable at runtime
+# from agents that were never granted them, while their frontmatter said otherwise.
+# The distribution's own rule had said "never assume Grep/Glob" in four files and
+# nothing checked the artifacts that ship.
+_PHANTOM_TOOLS = ("Grep", "Glob", "WebFetch")
+_grant_problems = []
+for _ag in sorted(glob.glob("workforce/agents/*/AGENT.md")):
+    for _ln in read(_ag).splitlines():
+        if _ln.startswith("tools:"):
+            _granted = [t.strip() for t in _ln[len("tools:"):].split(",")]
+            for _t in _PHANTOM_TOOLS:
+                if _t in _granted:
+                    _grant_problems.append(f"{_ag} grants {_t}")
+            break
+if "Grep/Glob" in _sa_agent or "Read/Grep/Glob" in _sa_agent:
+    _grant_problems.append("workforce/bin/wf-settings-apply tells an agent-hook juror "
+                           "to verify with Grep/Glob")
+check(
+    "no shipped agent grant or agent-hook prompt names a tool this host does not have",
+    not _grant_problems,
+    "; ".join(_grant_problems) + " — measured absent from the registry (fact 4, "
+    "re-measured 2.1.266) and silently dropped from a grant (fact 13b), so the "
+    "agent runs with less reach than its own frontmatter claims and nothing says so",
+)
 check(
     "wf-widen writes the flag the widening agent reads",
     "def raise_flag(" in _wd and "wf-widen-flag" in _wd,
@@ -11549,6 +11579,48 @@ check(
     f"procedure-for-procedures.md measured the floor at 172 and retired 150; wf-conform says "
     f"{_lc_m.group(1) if _lc_m else '(no constant)'}. A restated constant that nothing "
     "compares is the fifty-file hunt Core Principle 9a exists to prevent",
+)
+
+# The BYTE companion is derived from the same measurement and restated the same way,
+# so it gets the same assertion. MEASURED 2026-09-10 on apps-odyssey-alive: all five
+# IC handbooks sat at 169-172 lines and ranged 30 KB to 96 KB, the largest passing the
+# line ceiling at 557 bytes per line with one line of 14,540 characters. The ceiling
+# is a context budget; lines only proxy it, and nothing checked that the proxy held.
+_bpl_m = re.search(r"^MEASURED_BYTES_PER_LINE = (\d+)$", _lc_cnf, re.M)
+check(
+    "length ceiling: the byte companion is derived from the same measured density",
+    bool(_bpl_m) and _bpl_m.group(1) == "113"
+    and "19,436 B" in _lc_bud and "113 bytes per line" in _lc_bud,
+    f"procedure-for-procedures.md derives the byte budget as 172 x 113 = 19,436 B from "
+    f"`engineering-site`'s measured density; wf-conform says "
+    f"{_bpl_m.group(1) if _bpl_m else '(no constant)'}. Same restated-constant hazard as "
+    "the line ceiling above, and without the byte row a 96 KB handbook reads as compliant",
+)
+check(
+    "length ceiling: the ceiling check measures bytes, not only lines",
+    "body_bytes" in _lc_cnf and "byte_budget" in _lc_cnf
+    and "body_lines <= ceiling and not _over_bytes" in _lc_cnf,
+    "the pass branch is `body_lines <= ceiling` alone, so a handbook carrying its weight "
+    "in a few enormous lines passes the budget it blows. Measured: 172 lines, 95,832 B",
+)
+
+# THE SACRED-BLOCK SCAN WALKED WORKFORCE'S OWN SCRATCH.
+# MEASURED 2026-09-10 on apps-odyssey-alive: 846 markdown files under
+# .claude/workforce/{work,staging}/ — 236 run directories, 298 MB, never reaped —
+# scanned by every verify, and they produced that org's ONLY hard failure: 8 unstamped
+# sacred blocks, 5 of them inside an August run report and a staged tree already
+# dispositioned for removal. Those are COPIES; the originals are guarded at source and
+# Step 6-S's T2 extraction is blocking so a staged tree's spans reach directives/
+# before it is ever staged. Stamping a copy guards nothing.
+# The exclusion must also PRINT: a passing row is never displayed, so a count carried
+# only in the row name is invisible in exactly the clean case it qualifies.
+check(
+    "sidecar scan: workforce's own run scratch is excluded, and the exclusion prints",
+    "_SCRATCH" in _lc_cnf and "scratch_skipped" in _lc_cnf
+    and "not scanned for sacred blocks" in _lc_cnf,
+    "the scan walks all of .claude/, so every run report and staged tree is read as "
+    "live doctrine — the check's only failures become its own leftovers, which is how "
+    "a check stops being read. Excluded silently is the other half of the defect",
 )
 
 check(

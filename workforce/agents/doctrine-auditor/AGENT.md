@@ -3,7 +3,7 @@
 name: wf-doctrine-auditor
 description: "Reads this project's own doctrine adversarially and finds rules that nothing makes true — written correctly, enforced nowhere. Reports the gap, never the rule's merit."
 disallowedTools: Agent
-tools: Read, Grep, Glob, Bash
+tools: Read, Bash
 effort: high
 ---
 

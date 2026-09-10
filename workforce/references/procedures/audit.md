@@ -1153,7 +1153,27 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    Step 5e owns, applied on the `workforce-version:` stamp so an org authored before the ledger
    family existed reaches it in this run rather than at the next full sweep. **Role-specific
    judgment is NEVER rewritten here** — a refresh that touches `## Procedure` prose has exceeded this
-   step and is a defect in the run.
+   step and is a defect in the run. *This bars REWRITING, not RELOCATING, and the two are separate acts
+   with separate authority.* A handbook over the length ceiling is split — heavy material moved verbatim
+   into the grounding library, the core left reading it on demand — and Step 7 forbids handing that back
+   in any form. The split preserves every word by construction, which is why it is not a rewrite and why
+   directive one permits it where trimming is forbidden. **Do not read this clause as a refusal to
+   relocate**; a run that leaves a 95,832 B handbook in place citing it has inverted the rule.
+2b. **Heal the FRONTMATTER, which is not a contract section and was reachable from no step.**
+   Item 2 is scoped to contract sections and item 2's own closing rule bars touching `## Procedure`
+   prose — correctly — but a handbook's `tools:`, `disallowedTools:` and `model:` lines sit outside
+   both, so a defect there had a detector in `wf-conform` and no authorized fix anywhere in this
+   procedure. Apply what `wf-conform` reports on this handbook: a **phantom tool grant** (a `tools:`
+   entry naming something the host has no registry entry for — `Grep`, `Glob` and `WebFetch` are the
+   standing cases, measured absent from the subagent namespace in `platform.md` fact 4) is removed and
+   the work re-grounded in `Bash`; a ceiling declared under `allowed-tools:` is renamed to `tools:`;
+   an IC missing either half of the tier ceiling gains it. **Never widen a grant here** — removing an
+   entry that resolves to nothing changes no capability, while adding one is an org-shape decision that
+   belongs to Step 2. *Added 2026-09-10: measured on `apps-odyssey-alive`, five of nine governed
+   handbooks granted `Grep, Glob`; fact 13b measured that such an entry is dropped with no signal of
+   any kind, so each was running with less reach than its own frontmatter claimed and the row saying so
+   was advisory-only, which item 4 below forbids treating as a license to report and move on.*
+
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
    `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens
    (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked
@@ -1560,9 +1580,29 @@ what neither reached.
 
 **This step deletes and rewires without asking**, on the same authority as every other write in
 `audit`: the user's 2026-08-05 directive, and the verified backup the Atomic-or-Absent gate makes a
-precondition of the run. What it may never touch is `.claude/workforce/**` project state, which
-`update.md` step 5 promises is byte-identical across an update and which no heal has any reason to
-enter.
+precondition of the run. What it may never touch is the org's **records** under
+`.claude/workforce/` — the chart, `org-config.md`, `personnel/`, `directives/`, the journal, the
+`staging/<name>/SKILL.md.orig` undo — which `update.md` step 5 promises is byte-identical across an
+update and which no heal has any reason to enter.
+
+***This sentence used to read `.claude/workforce/**`, whole, and that is why nothing has ever reaped a
+run directory.*** Records and scratch live in the same tree and the prohibition swept both in.
+`work/<run-id>/` is written by this procedure, per run, and is scratch by construction. MEASURED
+2026-09-10 on `apps-odyssey-alive`: **236 run directories, 298 MB, 846 markdown files, the oldest from
+August**, with nothing in any procedure authorized to look at them — and they were the source of that
+org's only hard `verify` failure, because the sacred-block scan read a finished run's report as live
+doctrine. **Report the count and the total size in the Execution Summary, always** — a number nobody
+prints is how 236 of these accumulated unnoticed.
+
+**Reaping one is a DELETION and it goes through the only step that deletes.** Never `rm` here. A run
+directory can hold quoted sacred spans — the measured case had them in a report — so a target is staged
+through Step 6-S with its **T2 extraction blocking**, exactly as any other removal target, and Step 6c
+unlinks it. **Retain the report.** What is stageable is a run directory whose `report.md` has been
+copied to the org's own records and which no surviving record still points at; anything a record cites
+stays, and a run this audit did not itself finish is never a target. Where that leaves a project with
+hundreds of directories and no policy to thin them, say so with the numbers and let the user set the
+retention — that is a genuine either/or about their own history, resolved this run by applying their
+answer, never parked as an optional refinement.
 
 ### Step 6-S — Stage the removal set (the step the sweep was reading and nobody was writing)
 

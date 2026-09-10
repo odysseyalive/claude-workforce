@@ -220,11 +220,32 @@ def normalize(text):
 # second file is the drift Core Principle 9a exists for.
 DEFAULT_LENGTH_CEILING = 172
 
+# THE CEILING IS A CONTEXT BUDGET EXPRESSED IN LINES, AND LINES ONLY PROXY IT.
+# 172 was measured by relocating ONE IC handbook (`engineering-site`) block by
+# block until it would not shrink — a document whose lines are ordinary prose:
+# median 96 characters, 113 bytes per line across the file. The number bounds a
+# handbook only while that density holds, and nothing was checking that it did.
+#
+# MEASURED 2026-09-10 on a live 9-handbook org (`apps-odyssey-alive`): every one
+# of its five IC handbooks sits at 169-172 lines — right at the ceiling — while
+# ranging from 30 KB to 95,832 B. The largest passes `body_lines <= ceiling` at
+# 172 lines and 557 bytes per line, with one line of 14,540 characters. It is
+# 4.9x the byte weight of the artifact the ceiling was measured on, and every
+# byte is injected into that employee's context on every spawn. A line count
+# cannot see this, and the whole reason the ceiling exists is the cost it cannot
+# see.
+#
+# DERIVED, not invented: the budget is the measured ceiling at the measured
+# density. It is stated here and in procedure-for-procedures.md § The handbook
+# length ceiling, and `bin/check` asserts the two agree (Core Principle 9a).
+MEASURED_BYTES_PER_LINE = 113
+
 
 class Result:
     def __init__(self):
         self.rows = []
         self.unreadable = []
+        self.scratch_skipped = 0
 
     def add(self, ok, name, detail=""):
         self.rows.append({"ok": bool(ok), "check": name, "detail": detail})
@@ -458,6 +479,27 @@ def check_handbook(path, body, res, ceiling):
                 "exist, so this agent can call nothing while reading as unrestricted. "
                 "Omit the field to inherit the default grant")
 
+        # A NAME THE HOST HAS NO REGISTRY ENTRY FOR IS DROPPED SILENTLY (fact 13b),
+        # so an allowlist can promise reach the agent never receives, with no error,
+        # no warning, and no degraded mode. `Grep`, `Glob` and `WebFetch` are the
+        # standing cases: MEASURED absent from the subagent namespace loaded and
+        # deferred alike on 2.1.220 and again on 2.1.266, and absent from the main
+        # session too. Found 2026-09-10 in this distribution's OWN shipped agents —
+        # three of seven granted `Grep, Glob` while four reference files told every
+        # handbook author never to assume them, and nothing checked the artifacts.
+        # REPORTED, never blocking: the measurement is of one host, the grant is
+        # harmless where the tool does exist, and the remedy is a one-line edit —
+        # do the searching through `Bash`, which is granted everywhere.
+        _phantom = sorted({t.strip() for t in _tools_raw.split(",")}
+                          & {"Grep", "Glob", "WebFetch"})
+        if _phantom:
+            res.advise(
+                f"{n}: `tools:` grants {', '.join(_phantom)}",
+                "measured absent from the subagent namespace (platform.md fact 4), "
+                "and an unresolvable grant entry is dropped with no signal of any "
+                "kind (fact 13b). This agent very likely runs with less reach than "
+                "its frontmatter claims. Ground the work in `Bash` instead")
+
     if tier == 3:
         # THE OTHER HALF OF RULE 3, which had no mechanical enforcement anywhere.
         # SKILL.md marks both lines BLOCKING; only the denylist was ever checked, so
@@ -599,6 +641,13 @@ def check_handbook(path, body, res, ceiling):
     # would make a Lead ceiling real is the `engineering-site` exercise repeated on a
     # Lead; until someone runs it, this states the count and names what is owed.
     body_lines = len(body.splitlines())
+    # The byte budget is the measured ceiling at the measured density (see
+    # MEASURED_BYTES_PER_LINE). Reported on EVERY row, whatever the tier, because a
+    # line count that passes says nothing about what the employee is actually handed.
+    body_bytes = len(body.encode("utf-8"))
+    byte_budget = ceiling * MEASURED_BYTES_PER_LINE
+    _over_bytes = body_bytes > byte_budget
+    _density = f"{body_bytes:,} B ({body_bytes // max(body_lines, 1)} B/line)"
     _tier_m = TIER_RX.search(body)
     if _tier_m and _tier_m.group(1) == "2":
         res.advise(
@@ -609,16 +658,40 @@ def check_handbook(path, body, res, ceiling):
             # against — `conform-tier-sections` forbids exactly those strings, because
             # its whole point is that an IC is never asked for a Lead's sections.
             # A row should say what it measured and where the rule lives.
-            f"{body_lines} lines. The {ceiling}-line ceiling was measured on an IC "
-            f"handbook; no Lead floor has ever been measured, so none is asserted and "
-            f"no relocation is ordered here. Why, and what measurement is owed: "
-            f"procedure-for-procedures.md § The handbook length ceiling. ADVISORY: this row "
-            f"blocks nothing")
-    elif body_lines <= ceiling:
+            f"{body_lines} lines, {_density}. The {ceiling}-line ceiling was measured "
+            f"on an IC handbook; no Lead floor has ever been measured, so none is "
+            f"asserted and no relocation is ordered here. Why, and what measurement is "
+            f"owed: procedure-for-procedures.md § The handbook length ceiling. ADVISORY: "
+            f"this row blocks nothing")
+    elif body_lines <= ceiling and not _over_bytes:
         res.add(True, f"{n}: within the {ceiling}-line ceiling")
     else:
+        # WHICH BUDGET WAS BLOWN CHANGES NOTHING ABOUT THE REMEDY — relocation is the
+        # same act either way — but it changes what the author goes looking for, so the
+        # row says which. A handbook under the line count and over the byte budget is
+        # carrying its weight in a few enormous lines, and skimming it for "long
+        # sections" will find nothing.
+        if body_lines > ceiling and _over_bytes:
+            _why = (f"{body_lines} lines AND {_density}, against {ceiling} lines / "
+                    f"{byte_budget:,} B")
+        elif body_lines > ceiling:
+            _why = f"{body_lines} lines, against {ceiling}"
+        else:
+            # WHERE the weight sits is MEASURED, never asserted. A handbook can be
+            # over the byte budget because a handful of lines are enormous, or
+            # because every line is dense — and an author told to look for "a few
+            # very long lines" in a uniformly dense document is sent hunting for
+            # something that is not there.
+            _longest = max((len(l) for l in body.splitlines()), default=0)
+            _shape = (f"the weight is concentrated — longest line {_longest:,} "
+                      f"characters" if _longest > 4 * MEASURED_BYTES_PER_LINE
+                      else f"the prose is uniformly dense — longest line "
+                           f"{_longest:,} characters")
+            _why = (f"{_density} — WITHIN the {ceiling}-line count and over the "
+                    f"{byte_budget:,} B the same ceiling buys at the density it was "
+                    f"measured at ({MEASURED_BYTES_PER_LINE} B/line); {_shape}")
         res.advise(f"{n}: within the {ceiling}-line ceiling",
-                   f"{body_lines} lines — the split is PERFORMED this run: relocate the "
+                   f"{_why} — the split is PERFORMED this run: relocate the "
                    f"heavy material (worked examples, mapping tables, reference data) into "
                    f"the grounding library or a data skill, leaving a lean core that reads "
                    f"it on demand. Never trimmed, never condensed, never handed back as a "
@@ -1390,11 +1463,40 @@ def check_sidecar(root, res):
     # through `wf-census` so that what counts as project content is decided in one
     # place; the directory-name prune this loop used to carry is gone, because it
     # answered a question the project alone is allowed to answer (`_load_census`).
+    # WORKFORCE DOES NOT SURVEY ITS OWN SCRATCH AS IF IT WERE PROJECT CONTENT.
+    #
+    # This is NOT the `fixtures/` default the census doctrine bars (procedures/audit.md
+    # § .censusignore: "declared, never inferred ... no guess from directory names").
+    # That rule protects the PROJECT's content from inference. These two paths are not
+    # the project's — they are where this procedure itself writes, and what they hold
+    # is COPIES: a run report quoting a directive, and a staged tree awaiting the
+    # sweep. Both originals are guarded at their source, and Step 6-S's T2 extraction
+    # is blocking precisely so a staged tree's spans are already in
+    # `.claude/workforce/directives/` before it is ever staged. Stamping the copy
+    # guards nothing and makes the sidecar describe bytes that exist to be deleted.
+    #
+    # MEASURED 2026-09-10 on apps-odyssey-alive: 846 markdown files under work/ and
+    # staging/ — 236 run directories, 298 MB, none of it ever reaped — walked by every
+    # verify, producing the org's ONLY hard failure: 8 unstamped blocks, 5 of them
+    # inside an August run report and a staged tree already dispositioned for removal.
+    # A check whose only failure is its own leftovers is the check that stops being read.
+    _SCRATCH = (os.path.join(root, ".claude", "workforce", "work"),
+                os.path.join(root, ".claude", "workforce", "staging"))
+    # Counted over the whole subtree, not at its head. The prune below clears
+    # `dirnames` so the walk never descends, which means the loop itself can only ever
+    # see the files directly inside `work/` — it reported 1 where the tree held 846.
+    _scratch_skipped = 0
+    for _sr in _SCRATCH:
+        for _dp, _dn, _fns in os.walk(_sr):
+            _scratch_skipped += len([f for f in _fns if f.endswith(".md")])
     unstamped = []
     census = _load_census().Census(root)
     census.load_ignore()
     claude_dir = os.path.join(root, ".claude")
     for dirpath, dirnames, filenames in os.walk(claude_dir):
+        if any(dirpath == d or dirpath.startswith(d + os.sep) for d in _SCRATCH):
+            dirnames[:] = []
+            continue
         dirnames[:] = [d for d in dirnames
                        if not census.ignored(os.path.join(dirpath, d))]
         for fn in sorted(filenames):
@@ -1412,8 +1514,18 @@ def check_sidecar(root, res):
             for i in range(1, n + 1):
                 if i not in rows.get(rel, {}):
                     unstamped.append(f"{rel}:directive:{i}")
+    # NEVER SILENT. An exclusion that does not print is indistinguishable from a scan
+    # that found nothing, and under-reporting is the direction that hurts (audit.md
+    # § The dangerous direction).
+    # Carried to the summary line rather than only into this row's name: a passing row
+    # is not printed, so an exclusion reported only here would be invisible in exactly
+    # the case it is meant to qualify — a clean scan.
+    res.scratch_skipped = _scratch_skipped
+    _scope = (f" · {_scratch_skipped} file(s) in run scratch not scanned"
+              if _scratch_skipped else "")
     res.add(not unstamped,
-            f"sidecar: every sacred block on disk is stamped ({len(unstamped)} unstamped)",
+            f"sidecar: every sacred block on disk is stamped "
+            f"({len(unstamped)} unstamped{_scope})",
             f"{unstamped[:5]} — a block the sidecar does not name is guarded by nothing, and "
             "coverage counted against the sidecar's own row set reports N of N while short. "
             "Regenerate the sidecar with the `checksums` command")
@@ -1862,6 +1974,10 @@ def main():
               f"{len(res.adopted_findings)} adopted-agent note(s) · "
               f"{len(res.advisory_findings)} advisory · "
               f"{len(res.unreadable)} unreadable")
+        if res.scratch_skipped:
+            print(f"  {res.scratch_skipped} file(s) under .claude/workforce/"
+                  f"{{work,staging}}/ not scanned for sacred blocks — run scratch "
+                  f"holds copies whose originals are guarded at source")
         for r in res.failed:
             print(f"  ✗ {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))
         for r in res.advisory_findings:

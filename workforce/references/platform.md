@@ -292,6 +292,18 @@ built-in `Grep`/`Glob`/`WebFetch`.
 
 **Both observations above are of the DEFAULT grant** — agents that declared no `tools:` field.
 
+**Re-measured 2026-09-10 on Claude Code 2.1.266** — `measurements/2026-09-10-subagent-grant.md`. The
+loaded set came back byte-identical; `Grep`, `Glob` and `WebFetch` are still absent loaded and deferred
+alike; every configured MCP server is still deferred behind `ToolSearch`. Two details this fact never
+carried: **`WebSearch` IS granted, deferred** — the fact named `WebFetch` and said nothing either way
+about `WebSearch`, and four files reasoned from that silence — and the deferred namespace is **194**
+names, not "~150". So a delegating employee runs the *discover* half of a discover-then-verify pass
+itself and reaches the *verify* half through `mcp__playwright-mcp`, never through `WebFetch`.
+
+**`Grep` and `Glob` are absent from this host's registry entirely, not merely from the subagent grant** —
+the main session does not carry them either. Naming one in an explicit `tools:` list is therefore a
+fact-13b silent drop, and three shipped panel agents were doing exactly that until 2026-09-10.
+
 ### Fact 4b — an explicit `tools:` list is exact, not a filter ✅ MEASURED
 
 Evidence: `measurements/2026-07-29-ceiling.md` (2026-07-29), observed while measuring fact 2c.

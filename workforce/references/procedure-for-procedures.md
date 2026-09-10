@@ -267,6 +267,25 @@ Measure don't assume; `platform.md` § DOCUMENTED bars only the unmeasured from 
 the number and 150 is retired. Recorded 2026-08-25 from the live `engineering-site` audit
 (measurements stamped, Principle 9b).
 
+**THE CEILING IS A CONTEXT BUDGET EXPRESSED IN LINES, AND A LINE COUNT ONLY PROXIES IT.** The
+relocation exercise that produced 172 was run on a document of ordinary prose — `engineering-site`
+runs a median line of 96 characters and 113 bytes per line across the file — so the number bounds
+what an employee is handed only while that density holds. **The companion figure is therefore
+DERIVED, not chosen: `172 × 113 = 19,436 B`**, the measured ceiling at the measured density. It is
+stated here and once in `wf-conform` (`MEASURED_BYTES_PER_LINE`), and `bin/check` asserts the two
+agree, because a constant restated in a second file is the drift Core Principle 9a exists for.
+
+MEASURED 2026-09-10 on the live `apps-odyssey-alive` org: **all five of its IC handbooks sit at
+169–172 lines — right at the ceiling — while ranging from 30,156 B to 95,832 B.** The largest passes
+`body_lines <= 172` at 172 lines and 557 bytes per line, carrying one line of 14,540 characters; it
+is 4.9× the byte weight of the artifact the ceiling was measured on, and every byte of it is injected
+into that employee's context on every spawn. A line count cannot see this, and **the cost it cannot
+see is the entire reason the ceiling exists.** So `wf-conform` measures both, fires the
+split-is-PERFORMED row on either budget, and says which one was blown — the remedy is the same
+relocation either way, but an author told a document is too long will skim it for long sections and
+find none. Where the weight sits is measured too, never asserted: the row reports the longest line
+and calls the shape concentrated or uniformly dense from it.
+
 **172 IS AN IC NUMBER AND IS NOT APPLIED TO A LEAD.** It was measured once, on one IC handbook,
 by relocating it block by block until it would not shrink further. A Lead is a different document:
 it has no `## Procedure` to relocate at all, and it carries two sections an IC does not — a full

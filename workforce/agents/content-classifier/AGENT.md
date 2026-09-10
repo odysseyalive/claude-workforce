@@ -3,7 +3,7 @@
 name: wf-content-classifier
 description: "Classifies a block of skill content by what it DOES — rule, mechanism, reference, scaffolding, or directive-statement — so conversion can move it without first resolving who wrote it."
 disallowedTools: Agent
-tools: Read, Grep, Glob
+tools: Read
 effort: high
 ---
 

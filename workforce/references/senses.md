@@ -150,7 +150,7 @@ Three parts, cheap to expensive, so the expensive one only runs when it is earne
    sense went unopened it blocks the stop, and writes a flag naming what is unopened.
 3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **No flag, it
    returns `ok: true` and spends nothing.** With a flag, it spawns a reader carrying
-   Read/Grep/Glob and none of the finishing turn's context, and judges whether the
+   Read and Bash and none of the finishing turn's context, and judges whether the
    EVIDENCE supports the CONCLUSION for that ASK — verifying against the repository
    rather than taking the turn's word for it.
 

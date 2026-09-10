@@ -51,13 +51,19 @@ on a default-disposition SIGTERM either.
 
 USAGE
 
-    bin/prove                    every case (~30 min: 722 x 9.6 s of bin/check / 4 workers)
+    bin/prove                    every case (~30 min; the exact count prints at start)
     bin/prove <substring>        the cases whose CHECK NAME contains it
     bin/prove --since <ref>      the cases whose TARGET FILE changed since <ref>
 
 `--since` is the one to reach for after an edit. The name filter still asks you to know
 which assertion your change touched; `--since HEAD` asks git instead and is exact,
-because every case names its target file. MEASURED 2026-09-10: 18 s against 30 minutes.
+because every case names its target file.
+
+ITS COST SCALES WITH WHAT YOU CHANGED, and stating one number for it is an overclaim.
+MEASURED 2026-09-10, both in this repository on the same day: a small change selected a
+handful of cases and finished in 18 s; a 12-file change touching audit.md, wf-conform and
+platform.md selected 166 of 726 and took 7m43s. Still the right run — the full sweep was
+~30 minutes and is the only one that reports coverage.
 
 THREE VERDICTS, NOT TWO, and the third is why the other two can be trusted:
 
@@ -1982,7 +1988,7 @@ CASES_ALL = CASES
 # file I touched", and git already knows. Every case names its target file, so the
 # selection is exact and needs no new bookkeeping.
 #
-# WHY IT MATTERS MORE THAN THE NAME FILTER. A full run is ~717 cases at 9.6 s of
+# WHY IT MATTERS MORE THAN THE NAME FILTER. A full run is every case at ~9.6 s of
 # `bin/check` each across 4 workers — about half an hour, MEASURED 2026-09-10. A gate that
 # costs half an hour is run a few times a day; one that costs seconds after each edit is
 # run every time, which is the difference between catching a vacuous assertion when you
@@ -2013,6 +2019,39 @@ if SINCE:
     CASES = [c for c in CASES if c[1] in _changed]
     print(f"--since {SINCE}: {len(_changed)} file(s) changed, "
           f"{len(CASES)} case(s) point at them")
+# A BARE RUN IN A DIRTY TREE IS ALMOST ALWAYS THE WRONG ONE, AND ONLY THIS SCRIPT CAN
+# SEE THAT IT IS. `--since HEAD` is documented at the top of --help as "the one to reach
+# for after an edit", and --help is the one place it is written down: no procedure, no
+# DEVELOPMENT.md rule and no session-end step names an invocation, so a session that did
+# not think to ask gets the full sweep. MEASURED 2026-09-10 in this repository: a bare
+# run was launched against 12 changed files, backgrounded under a 900 s timeout, and was
+# 12 minutes into a ~30 minute sweep — guaranteed to be killed having proven nothing —
+# while `--since HEAD` selected 166 of 726 cases and finished in 7m43s.
+#
+# It NOTIFIES and never blocks. A full sweep before a release is the correct run and the
+# only thing that reports coverage; refusing it here would break the one invocation that
+# answers the question this script exists for.
+if not SINCE and not SELECT:
+    try:
+        _dirty = set(subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"], cwd=ROOT,
+            capture_output=True, text=True, timeout=30).stdout.split())
+    except Exception:                                    # noqa: BLE001
+        _dirty = set()
+    if _dirty:
+        _would = len([c for c in CASES if c[1] in _dirty])
+        # flush=True IS THE WHOLE POINT. stdout is block-buffered to a pipe, so a
+        # notice about a 30-minute run that prints when the run ENDS is not a notice.
+        # Measured here: the first version of this block produced an empty file for
+        # 40 seconds and would have surfaced at minute 30, after the cost it exists
+        # to avoid had already been paid.
+        print(f"NOTE  {len(_dirty)} file(s) differ from HEAD. This is the FULL sweep: "
+              f"{len(CASES)} case(s), around 30 minutes.", flush=True)
+        print(f"      `bin/prove --since HEAD` proves the {_would} case(s) that point "
+              f"at what you changed.", flush=True)
+        print(f"      Full is right before a release — it is the only run that reports "
+              f"coverage. Continuing.", flush=True)
+
 if SELECT:
     CASES = [c for c in CASES if any(sel.lower() in c[0].lower() for sel in SELECT)]
     if not CASES:
