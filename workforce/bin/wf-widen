@@ -119,7 +119,7 @@ def widen_flag(payload):
     return os.path.join(d, f"wf-widen-flag.{sid}.json")
 
 
-def raise_flag(payload, why, rows, counts, sampled=False, reply=""):
+def raise_flag(payload, why, rows, counts, unopened, sampled=False, reply=""):
     """Record what the auditing agent needs to judge RESULTS against the ASK.
 
     The three things it carries are the directive, made concrete: "it's the evidence
@@ -147,7 +147,18 @@ def raise_flag(payload, why, rows, counts, sampled=False, reply=""):
                              "enumerating": counts[2], "outside": counts[3],
                              "ran": counts[4]},
                 "conclusion": (reply or "")[:4000],
-                "unopened": sorted({s for _, s, _ in why}),
+                # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
+                # APPLICABLE sense as unopened, which on a sampled turn is every sense
+                # the ask needed — including ones the turn opened 24 times.
+                #
+                # FOUND BY THE AUDITING AGENT, on its first real outing: it read
+                # `unopened: ["touch"]` beside `channels.touch: 24` and refused to
+                # judge, because the hand-off contradicted itself. That is the right
+                # refusal — an evaluator that guesses which half of an incoherent input
+                # to believe is worse than one that says the input is incoherent — and
+                # it is the independence directive paying for itself, since the session
+                # that wrote both fields saw no contradiction at all.
+                "unopened": sorted(unopened),
                 "why": [{"trigger": t, "sense": s, "reason": r} for t, s, r in why],
             }, fh)
     except OSError:
@@ -509,8 +520,11 @@ def main():
                           f"WIDEN  {shown} — required channels opened"}))
         return 0
 
+    # On a BLOCK, narrow `why` to the channels actually shut. On a SAMPLE nothing is
+    # shut, so the full list is the right context for the audit — but `unopened` travels
+    # separately either way and is never inferred from this list.
     why_rows = [(t, sn, r) for t, sn, r in why if sn in unopened] or why
-    raise_flag(payload, why_rows, rows, counts, sampled=sampled, reply=reply)
+    raise_flag(payload, why_rows, rows, counts, unopened, sampled=sampled, reply=reply)
 
     if sampled:
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
