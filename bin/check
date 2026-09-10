@@ -902,6 +902,119 @@ check(
     "; ".join(_lv_problems),
 )
 
+# THE CORPUS RESOLVES FROM THE INSTALL; THE HOUSE RULES STAY LOCAL. `wf-catalog` is the
+# resolver, and the properties below are the ones whose absence would make it dangerous
+# rather than merely wrong. MEASURED 2026-09-10 across thirteen projects: one corpus in
+# nine states, because a per-project copy is refreshed only by re-auditing that project
+# while `update` advances the install and reaches none of them (evaluators.md § Where a
+# catalog resolves from).
+_ct = read("workforce/bin/wf-catalog")
+_cat_problems = []
+# REMOVAL IS PER FILE AND PROVEN BY BYTE IDENTITY. The first design compared HEADINGS AND
+# TABLE ROWS and then `rmtree`'d the whole skill directory on a pass. An independent code
+# evaluation broke it in one move: append a prose project rule under an existing heading —
+# the shape local judgement is usually written in — and the copy introduces no new heading,
+# classifies as residue, and takes CATALOG-ANCHOR.md (the house rules and the supersession
+# register), the handbooks, and the never-examined hook scripts with it. Each property below
+# is one of the failures that made that possible.
+if "shutil.rmtree" in _ct:
+    _cat_problems.append("the skill directory is being removed wholesale again; removal is "
+                         "per FILE, because a copy's directory also holds SKILL.md, "
+                         "CATALOG-ANCHOR.md — the house rules this change exists to LEAVE "
+                         "local — the handbooks, and hook scripts")
+if "def norm(" not in _ct or "def corpus_pairs(" not in _ct:
+    _cat_problems.append("the byte-identity comparison is gone; a proof weaker than "
+                         "`the install ships this exact file` cannot see project judgement "
+                         "written as prose under an existing heading")
+if "def all_files(" not in _ct or 'if x != "hooks"' in _ct:
+    _cat_problems.append("the walk excludes files again; a file no analysis has READ is a "
+                         "file no analysis can authorise removing, and hook scripts were "
+                         "the ones excluded and then deleted")
+if "keep-symlink" not in _ct or "os.path.islink" not in _ct:
+    _cat_problems.append("the symlink refusal is gone; a copy laid down as a link classified "
+                         "residue and then raised out of the destructive loop, leaving a "
+                         "partial state with no definition")
+if "keep-user-span" not in _ct:
+    _cat_problems.append("the user-span refusal is gone — the user's own words are never "
+                         "removable on any evidence")
+if "hook_registrations" not in _ct or "REFUSED" not in _ct:
+    _cat_problems.append("the hook-registration refusal is gone; removing files a settings "
+                         "entry still points into leaves every later session invoking a path "
+                         "that is not there — measured live on hither-lands and "
+                         "apps-odyssey-alive, three registrations each")
+if "config_root(), \"settings.json\"" not in _ct.replace("'", '"'):
+    _cat_problems.append("user-scope settings are no longer read; a hook registered in "
+                         "~/.claude pointing at $CLAUDE_PROJECT_DIR/.claude/skills/<eval>/ "
+                         "is invisible to the refusal that exists to stop exactly that")
+# PROJECT-FIRST IS THE SAFETY PROPERTY, not a preference: an existing project must keep
+# being answered from its own copy until a migration proves the copy redundant.
+# Scoped to the RESOLVER BODY. Comparing offsets across the whole file compared this
+# against `config_root`'s own definition, which necessarily sits earlier — the guard fired
+# on correct code the first time it ran, which is the shape that gets a check disabled.
+_ct_fn = _ct.partition("def install_candidates(")[2].partition("\ndef ")[0]
+_ct_order = _ct_fn.find('".claude", "skills", "workforce", "references", "catalogs"')
+_ct_home = _ct_fn.find("config_root()")
+if not _ct_fn or _ct_order < 0 or _ct_home < 0 or _ct_order > _ct_home:
+    _cat_problems.append("the personal install is no longer resolved LAST; a project-scope "
+                         "install answered from the home copy reads whatever version happens "
+                         "to sit there, which is the drift this script exists to end")
+check(
+    "wf-catalog removes a file only when the install ships that exact file",
+    not _cat_problems,
+    "; ".join(_cat_problems),
+)
+
+# THE TWO SCRIPTS THAT RESOLVE A WORKFORCE INSTALL AGREE ON WHERE ONE CAN BE, AND IN WHAT
+# ORDER. Stated twice is a restated constant (Core Principle 9a); it is duplicated rather
+# than imported because a shipped script importing a sibling by path is its own fragility,
+# so the guard is that the two lists stay in step — add, drop or reorder a candidate in one
+# and this fails until the other matches.
+#
+# ORDER IS THE SAFETY HALF, not tidiness: a project-scope install answered from the home
+# copy reads whatever version happens to sit there, which is the drift wf-catalog exists to
+# end. So the SEQUENCE is asserted, never the membership.
+#
+# *This assertion is the second one. The first tested `"CLAUDE_CONFIG_DIR" in _ct` against
+# the WHOLE FILE and `bin/prove` returned VACUOUS: the literal appears twice in wf-catalog —
+# once in `config_root`'s docstring, once in its code — and a `del` case removes the first,
+# leaving the check satisfied by the surviving copy. That is the deleting-the-first-of-two
+# bug that produced 39 of 54 vacuous verdicts in one earlier sweep, reintroduced by someone
+# who had read about it. Both readings are now scoped to the RESOLVER BODY, where each
+# candidate appears exactly once.*
+_sd = read("workforce/bin/wf-seed")
+_sd_fn = _sd.partition("def _slot_candidates(")[2].partition("\ndef ")[0]
+
+
+def _candidate_order(body):
+    """The install candidates a resolver RETURNS, in the order it returns them.
+
+    Scoped to the returned list, not the function body. `wf-seed._slot_candidates` binds
+    `cfg = os.environ.get("CLAUDE_CONFIG_DIR")` on a line ABOVE its return, so a
+    first-mention reading put `personal` first and reported a divergence that does not
+    exist — a guard firing on correct code, which is the shape that gets a guard deleted.
+    The order that matters is the order a caller tries them in, and that is the list.
+    """
+    lst = body.partition("return [")[2].partition("]")[0]
+    marks = [
+        ("project-install", lst.find('".claude", "skills", "workforce"')),
+        ("maintainer-tree", lst.find('root, "workforce", "references"')),
+        ("personal", max(lst.find("config_root()"), lst.find("cfg,"))),
+    ]
+    return [name for name, at in sorted(marks, key=lambda m: m[1]) if at >= 0]
+
+
+_ct_seq, _sd_seq = _candidate_order(_ct_fn), _candidate_order(_sd_fn)
+_want_seq = ["project-install", "maintainer-tree", "personal"]
+check(
+    "wf-catalog and wf-seed resolve an install through the same three candidates",
+    bool(_ct_fn) and bool(_sd_fn) and _ct_seq == _sd_seq == _want_seq,
+    "wf-catalog resolves %s; wf-seed resolves %s; both must be %s. One resolves an install "
+    "somewhere the other does not, or in a different order — so the corpus and its additions "
+    "can be read from two different copies in the same run, and a project-scope install can "
+    "be answered from the home copy."
+    % (_ct_seq or "nothing", _sd_seq or "nothing", _want_seq),
+)
+
 # EVERY PRODUCER HAS A READER — the anti-bloat invariant, and the one every
 # accumulation defect in this repo turns out to be an instance of.
 #
@@ -4938,6 +5051,7 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
 _READER_INVENTORY = {
     "bin/check": 3,
     "bin/baseline": 1,
+    "workforce/bin/wf-catalog": 1,
     "workforce/bin/wf-census": 1,
     "workforce/bin/wf-claude-md": 1,
     "workforce/bin/wf-conform": 2,

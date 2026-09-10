@@ -81,6 +81,25 @@ written down, and both were believed. Nothing here is stored, so nothing here ca
 reader is told to run it. `stale` is a name mentioned anywhere else — often correctly, since a change
 record naming a swept mechanism is a change record doing its job. Only the first tier is a failure.
 
+## Where the evaluator catalogs resolve from
+
+`wf-catalog --root ${CLAUDE_PROJECT_DIR}` prints, per kind, whether this project reads its catalog from
+its own copy or from the workforce install, the version each carries, and whether a copy is behind the
+install. Print its `INV-CATALOG` line.
+
+**This is the `verify` leg of the three-paths rule** (`enforcement.md`): the install ships the corpus,
+`audit` migrates a project onto it (§ Step 6-F), and this row reports a project still reading a copy —
+including the two states that are invisible from inside a project, `STALE (install is vN)` and
+`no version anchor`. Without it the corpus reaches exactly the projects somebody re-audited, which is
+the drift that forced the change: nine copies of one text catalog measured at versions **2, 1, 2, 2, 1,
+absent, 2, 1, absent** (`evaluators.md` § Where a catalog resolves from).
+
+**Read-only, like every row above.** A project copy is never removed here, and a stale one is never
+refreshed here — the remedy is `audit`, or `wf-catalog --migrate` to see what a migration would do.
+`unresolved` is the one row that is this command's own error rather than the project's: workforce ships
+a catalog for every kind, so a kind that resolves nowhere means the install is incomplete, and the row
+names every candidate path it tried.
+
 ## Install and scope
 
 | Check | Failure it catches |

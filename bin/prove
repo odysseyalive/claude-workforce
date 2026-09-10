@@ -10,10 +10,19 @@ before and after rather than from this sentence.
 
 Why it is built this way — MEASURED 2026-08-04, all three numbers from this host:
 
-    bin/check, one run ......................  1.8 s
+    bin/check, one run ......................  1.8 s   (2026-08-04)
+    bin/check, one run ......................  9.1 s   (2026-09-10, 441 cases)
     bin/prove, sequential and in place ...... 181 s
     bin/prove, parallel against copies ...... 60-88 s (4 workers, 4 cores; the
                                                        spread is machine load)
+
+RE-MEASURED 2026-09-10, same host, and the figures above are STALE BY ~25x. `bin/check`
+now takes 9.1 s rather than 1.8 s and CASES holds 441 entries, so a full run is
+441 x 9.1 / 4 = ~17 min floor and ~33 min real. The 60-88 s line is kept rather than
+overwritten because Core Principle 9b says a measurement carries the day it was taken:
+it was true, and what it now records is how fast this suite grew. **The remedy is the
+case filter, not a faster claim** — `bin/prove <substring>` runs only the cases whose
+check name matches, which is ~14 s for the handful a single change actually adds.
     default harness Bash timeout ............ 120 s
 
 The old design broke files in the real tree and restored them in a `finally`, so a
@@ -196,11 +205,37 @@ PGRD = "workforce/bin/wf-plain-guard"
 TMPL = "workforce/references/templates.md"
 DBUD = "workforce/references/procedure-for-procedures.md"
 CNFM = "workforce/bin/wf-conform"
+CATL = "workforce/bin/wf-catalog"
 
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── wf-catalog: removal is per file, proven by byte identity (2026-09-10) ──
+    # Each break below is one of the ways the FIRST design failed. An independent code
+    # evaluation broke it before it shipped: append a prose project rule under an
+    # existing heading and the copy introduced no new heading, classified as residue,
+    # and `residue` then rmtree'd the skill — house rules, register, handbooks, and
+    # hook scripts that had been excluded from the walk and so read by nothing. Every
+    # gate protecting that verdict was a chance to fail open and three of them did.
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "append", "\nshutil.rmtree  # reinstated whole-directory removal\n"),
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "def corpus_pairs(root, kind):"),
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "def all_files(d):"),
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "keep-symlink"),
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "keep-user-span"),
+    # TARGET THE RETURNED LINE, NOT THE LITERAL. `del "CLAUDE_CONFIG_DIR"` returned VACUOUS:
+    # the literal appears twice in wf-catalog, once in config_root's docstring and once in
+    # its code, and `del` removes the FIRST — leaving the check satisfied by the survivor.
+    # This line occurs exactly once, and removing it is the real regression: the personal
+    # install stops being a candidate, so a host install answers nothing.
+    ("wf-catalog and wf-seed resolve an install through the same three candidates",
+     CATL, "del",
+     'os.path.join(config_root(), "skills", "workforce", "references", "catalogs"),'),
     # ── say the state, not the journey (2026-09-07) ──────────────────────────
     # Seven carriers, seven breaks. The user scoped this to "any project using
     # workforce", so the handbook template and wf-conform are load-bearing in a way
@@ -1767,6 +1802,26 @@ print(f"baseline: 0 failures · {len(CASES)} cases "
       f"({len(CASES) - len(DERIVED)} written, {len(DERIVED)} derived) "
       f"across {WORKERS} workers\n")
 
+# CASE FILTERING, and the reason it is worth ten lines. Every case is a full `bin/check`
+# against a disposable copy. MEASURED 2026-09-10 on this host: `bin/check` is 9.1 s and
+# there are 441 cases, so a full run is 441 x 9.1 / 4 workers = ~17 min floor, ~33 min
+# real. A maintainer adding ONE assertion paid that to prove one case, which is the tax
+# that gets a gate skipped rather than run.
+#
+# `bin/prove <substring>` runs the cases whose CHECK NAME contains the substring —
+# the same interface `bin/script-conformance` already ships, so this is the house
+# convention rather than a new one. Six catalog cases take ~14 s this way.
+#
+# THE FULL RUN REMAINS THE DEFAULT and the filtered run says so in its header, because a
+# subset that reports like a full run is how a green line comes to mean less than it says.
+SELECT = [a for a in sys.argv[1:] if not a.startswith("-")]
+CASES_ALL = CASES
+if SELECT:
+    CASES = [c for c in CASES if any(sel.lower() in c[0].lower() for sel in SELECT)]
+    if not CASES:
+        print("no case name matches %s — nothing to prove" % ", ".join(SELECT))
+        raise SystemExit(2)
+
 results = []
 interrupted = ""
 shards = [CASES[i::WORKERS] for i in range(WORKERS)]
@@ -1838,10 +1893,20 @@ try:
             _all_assertions.add(_n.args[0].value)
 except (OSError, SyntaxError):
     pass
-if _all_assertions:
+if _all_assertions and not SELECT:
     _nocase = len(_all_assertions - _covered)
     print(f"assertions with a case:  {len(_all_assertions) - _nocase} of "
           f"{len(_all_assertions)} · {_nocase} structural, provable only by hand")
+elif SELECT:
+    # A FILTERED RUN NEVER PRINTS THE COVERAGE LINE, and this is not cosmetic. That line
+    # divides the cases that RAN by every assertion in bin/check, so on a filtered run it
+    # reported `2 of 850 · 848 structural, provable only by hand` — which reads as a
+    # coverage collapse and is really just the subset it was asked for. A subset that
+    # reports in the shape of a full run is how a green line comes to mean less than it
+    # says, which is the defect this whole harness exists to prevent.
+    print(f"FILTERED RUN — matched {', '.join(SELECT)}. Coverage NOT reported: this run "
+          f"proves the cases it selected and says nothing about the other "
+          f"{len(CASES_ALL) - len(CASES)} case(s). Run bin/prove with no argument for that.")
 
 print(f"working tree untouched: {'yes' if untouched else 'NO — run `git status`'}")
 print(f"baseline still clean:   {'yes' if not after else 'NO — ' + str(sorted(after))}")

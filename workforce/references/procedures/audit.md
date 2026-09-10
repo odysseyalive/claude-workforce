@@ -1715,6 +1715,40 @@ Then refresh the house rules (§ Step 4, "Refresh the house rules in every insta
 carries the RULES the evaluator applies them under — both are "never skipped, never offered, never a
 question," and both run here before `verify` so `verify` checks their result.
 
+### Step 6-F — Migrate the project onto the installed corpus
+
+**The corpus is one text; a copy per project made it nine.** MEASURED 2026-09-10 across thirteen
+projects: the shipped text catalog stamps `creative-scrub-ref-version: 2`, and its copies stamp
+**2, 1, 2, 2, 1, absent, 2, 1, absent**. A copy is refreshed only by re-auditing *that* project while
+`update` advances the install and reaches none of them — the three-paths rule failing on the corpus
+itself (`evaluators.md` § Where a catalog resolves from). This step is the second row of that table.
+
+```
+wf-catalog --root ${CLAUDE_PROJECT_DIR} --migrate
+```
+
+Print `INV-CATMIG`. **Run it in display mode first and read what it lists**, then `--execute` only
+when the run reports at least one `identical` file. **Removal is per FILE and the proof is byte
+identity** — the install ships a file of that name and the two match once the machine-owned additions
+region, the version anchor and trailing whitespace are normalised away. Every other file is listed
+`STAYS` and is never touched, and **the skill directory itself is never removed**, so
+`CATALOG-ANCHOR.md` — the house rules and the supersession register — the handbooks, the scripts and
+the `hooks/` survive by construction (`evaluators.md` § Migration).
+
+**A `STAYS` file is NOT a deferred row and never becomes one** (SKILL.md § Directives, 2026-08-10). It
+is a verdict with its reason attached: the file stays because the install does not ship it, or ships a
+different one, which is directive one operating rather than a decision postponed. Report it as
+`stays: <reason>`, never as an optional refinement for the user to resolve later. Where a project
+genuinely holds corpus content the install lacks, lifting it into `references/evaluator-additions/` is
+a maintainer act with a version anchor — raise it, do not perform it here.
+
+**The hook registrations are a REFUSAL, not a warning.** `wf-catalog` reads project AND user scope and
+refuses to remove from a copy any registration still points into, exiting 1 so the run can tell a
+refusal from a clean migration. Name them and say the copy is held on them; unregistering is `hooks`'
+job. **Duplicated registrations are their own finding** — `odyssey-alive` carried
+`chain-image-eval.sh` twice on `PostToolUse` before this step existed, which is the double activation
+this migration exists to end rather than to create.
+
 ### Step 6-H — Wire the shipped hooks and select the output style (the heal path)
 
 **This step is what makes a shipped mechanism reach a machine that installed before it existed.** The

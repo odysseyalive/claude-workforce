@@ -1,0 +1,578 @@
+#!/usr/bin/env python3
+"""wf-catalog — resolve an evaluator catalog, from the install rather than from a copy.
+
+    wf-catalog --root <tree>                     every kind: where it resolved, version, size
+    wf-catalog --root <tree> --kind text --path  the resolved directory, one line, for scripts
+    wf-catalog --root <tree> --kind code --grep RX   grep the resolved catalog
+    wf-catalog --root <tree> --json              machine-readable, for audit and verify
+    wf-catalog --root <tree> --migrate           classify each project copy: residue, or local content
+    wf-catalog --root <tree> --migrate --execute remove what it PROVED is residue, and nothing else
+
+WHY THIS EXISTS, and it is a measurement rather than a preference.
+
+The catalogs are the same corpus in every project — OWASP categories, AI text tells, a
+code mistake taxonomy. Nothing in them is project-specific. They were nevertheless COPIED
+into every audited project, on the stated grounds that a copy "grows from the project's
+own work" (`evaluators.md` § After the import, the dependency ends).
+
+MEASURED 2026-09-10 across thirteen projects on one machine, twenty copies. The shipped
+text catalog carries `creative-scrub-ref-version: 2`. Its copies carry **2, 1, 2, 2, 1,
+absent, 2, 1, absent** — three stale by a version, two with no anchor at all — and their
+`additions-seeded` records sit at none, 6, 6, 7 and 7. That is six states of one corpus.
+The per-project copy exists to avoid two canonical texts and has produced six.
+
+THE CAUSE IS THE THREE-PATHS RULE FAILING ON THE CORPUS ITSELF (`enforcement.md`). A copy
+is written at audit and refreshed only by a later audit OF THAT PROJECT. `update` advances
+the workforce install and has no reach into twenty copies in thirteen repositories, so a
+project nobody re-audits is frozen at whatever shipped the day it was staffed.
+
+WHAT THIS CHANGES, and what it deliberately does not. The CORPUS resolves from the install:
+one copy, advanced by `update`, reachable from any project — including this repository
+during `workforce dev`, which today can only reach a catalog by building itself an org.
+The HOUSE RULES do not move. The supersession register and the precedence clause are the
+genuinely project-specific layer — the register is the sole authority that demotes a
+finding (`evaluators.md` § House rules dominate) — and they stay where they are, small and
+local. That seam is not invented here: `audit` already refreshes the two separately, every
+run, and prints `INV-HOUSERULES` for it. This moves the half that was never local.
+
+RESOLUTION ORDER IS PROJECT-FIRST, AND THAT IS WHAT MAKES IT SAFE TO SHIP. A project that
+holds a copy keeps being answered from it, byte for byte, until a migration proves the copy
+is redundant. Directive one makes preservation the floor: a corpus is not made shared by
+silently answering an existing project from somewhere new.
+
+WHAT `--migrate` WILL AND WILL NOT REMOVE. **Removal is per FILE and the proof is byte
+identity.** A file goes only when the install ships a file of the same name and the two are
+identical once the machine-owned additions region, the version anchor and trailing
+whitespace are normalised away. Everything else stays: a file the install does not ship, a
+file differing by a sentence, a file that could not be read, a copy that is a symlink, a
+copy carrying an `origin: user` span. The skill directory itself is NEVER removed, so
+`SKILL.md`, `CATALOG-ANCHOR.md` — the house rules and the supersession register — the
+handbooks, the scripts and the hooks survive by construction rather than by a gate that has
+to recognise each of them.
+
+*This contract is the second one. The first read "it removes a COPY when every heading and
+table row is present in the install", and an independent code evaluation broke it the day it
+was written: project judgement is usually a paragraph under an existing heading, so a copy
+carrying a real local rule introduced no new heading and classified as pure residue — and
+`residue` then `rmtree`'d the whole skill, house rules and unexamined hook scripts included,
+while this docstring promised the house rules stay local. Every gate protecting that verdict
+was a chance to fail open, and three of them did. Unremovable is now the default and
+identity is the only thing that lifts it.* **A removal it cannot justify is a removal it does
+not make.**
+"""
+
+import argparse
+import json
+import os
+import re
+import shutil
+import sys
+
+# The three built catalogs. `kind` is the directory under `references/catalogs/`; `skills`
+# are the installed-skill directory names a project copy may occupy, in the spelling each
+# generator used. NEVER a guess from a directory name — `evaluators.md` § The evaluators
+# names these three and no others, and a fourth kind arrives by editing this table.
+CATALOGS = {
+    "code":     {"skills": ("code-evaluator",),     "anchor": "code-eval-ref-version"},
+    "text":     {"skills": ("text-eval",),          "anchor": "creative-scrub-ref-version"},
+    "security": {"skills": ("security-evaluator",), "anchor": "security-ref-version"},
+}
+
+# A tell that a copy carries the project's own words and is never removable, whatever else
+# is true of it. BYTE-IDENTICAL to wf-conform's `IMMUTABLE_OPEN_RX` (bin/check § grammar
+# asserts all readers accept the same blocks, and the inventory row for this file must be
+# updated in the same change that touches this line).
+#
+# *Written wrong first, 2026-09-10, and caught by that check rather than by review.* The
+# first version spelled the interior as a single literal `|` between two fixed fields, which
+# REJECTS every legal marker carrying anything else — `<!-- origin: user | added: 2026-02-03
+# | immutable: true -->` among them. A blind reader here is the dangerous direction: a copy
+# whose sacred block this cannot see reads as having none, and `--migrate` would offer to
+# delete the user's own words. The comment beside it claimed it was byte-identical to the
+# canonical grammar, which made the defect invisible to anyone reading rather than running.
+IMMUTABLE_OPEN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
+
+# A comparable unit of catalog content: a markdown heading, or the first cell of a table
+# row. Deliberately narrow. Prose reflows between versions and would report as a
+# difference on every copy; headings and row keys are what an evaluator actually greps.
+HEADING_RX = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$")
+ROW_KEY_RX = re.compile(r"^\s*\|\s*([^|]+?)\s*\|")
+
+
+def slurp(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def config_root():
+    """Personal config root. `$CLAUDE_CONFIG_DIR` relocates the whole `~/.claude` tree and
+    is what `bin/dev-sandbox` sets, so reading it is what makes a sandboxed test a test of
+    this code rather than of the live install (SKILL.md § Dev Path Discipline)."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def install_candidates(root):
+    """Ordered places the shipped catalogs can live, in the SAME order and for the same
+    reasons as `wf-seed._slot_candidates` — project install, maintainer source tree, then
+    personal install. Stated twice in two scripts is a restated constant (Core Principle
+    9a); it is duplicated here rather than imported because a shipped script importing a
+    sibling by path is the fragility `wf-settings-apply.hook_defaults` documents, and
+    `bin/check` asserts the two lists agree.
+
+    Project candidates stay FIRST: a project-scope install must never be answered from the
+    home copy, whatever version happens to sit there.
+    """
+    return [
+        os.path.join(root, ".claude", "skills", "workforce", "references", "catalogs"),
+        os.path.join(root, "workforce", "references", "catalogs"),
+        os.path.join(config_root(), "skills", "workforce", "references", "catalogs"),
+    ]
+
+
+def install_dir(root, kind):
+    """The shipped corpus for `kind`, or None when workforce is installed nowhere.
+
+    None is a first-class answer and is reported as this script's own error. A resolver
+    that invents a path when it cannot find one produces the failure `wf-live` exists to
+    catch: a name that reads live and is backed by nothing.
+    """
+    for base in install_candidates(root):
+        d = os.path.join(base, kind)
+        if os.path.isdir(d):
+            return d
+    return None
+
+
+def project_dir(root, kind):
+    """The project's own copy of this catalog, or None. First spelling that exists."""
+    for name in CATALOGS[kind]["skills"]:
+        d = os.path.join(root, ".claude", "skills", name)
+        if os.path.isdir(d):
+            return d
+    return None
+
+
+def catalog_files(d):
+    """Markdown in a catalog directory, recursively, sorted. Used for the INSTALL side and
+    for reading a version anchor; the copy side walks `all_files`, which excludes nothing.
+
+    *This excluded `hooks/` until 2026-09-10, on the reasoning that hook scripts "are
+    migration subjects in their own right and are never corpus content". Both halves were
+    true and the conclusion was not: the exclusion meant nothing read them, and the verdict
+    computed without them then authorised deleting them. An exclusion that is safe in the
+    function that has it is one reuse away from not being — so there is no exclusion.*
+    """
+    out = []
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if not os.path.islink(os.path.join(dirpath, x))]
+        out += [os.path.join(dirpath, f) for f in filenames if f.endswith(".md")]
+    return sorted(out)
+
+
+def anchor_version(d, key):
+    """The integer a catalog stamps itself with, or None when it carries no anchor.
+
+    None is REPORTED, never defaulted to zero. Two of the nine measured copies carry no
+    anchor at all, and a zero would render them as "very stale" — a number the tree does
+    not support, describing copies whose real state is that nothing tracks them.
+    """
+    rx = re.compile(re.escape(key) + r":\s*(\d+)")
+    for f in catalog_files(d):
+        m = rx.search(slurp(f))
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def norm(text):
+    """A corpus file reduced to the form two copies of the SAME shipped file share.
+
+    Three things legitimately differ between the install's copy of a file and a project's,
+    and none of them is content: the machine-owned `WF-ADDITIONS` region `wf-seed` appends,
+    the version-anchor comment each side stamps itself with, and trailing whitespace. Every
+    other byte is content, and a difference in it means the two files are not the same file.
+    """
+    text = re.sub(r"<!--\s*WF-ADDITIONS:.*?<!--\s*/WF-ADDITIONS:[^>]*-->", "", text, flags=re.S)
+    text = re.sub(r"^<!--[^>\n]*-version:\s*\d+[^>\n]*-->\s*$", "", text, flags=re.M)
+    text = re.sub(r"^<!--\s*additions-seeded:[^>\n]*-->\s*$", "", text, flags=re.M)
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
+
+
+def corpus_pairs(root, kind):
+    """(project_file, install_file, identical) for every file in the copy that the install
+    also ships under the same basename, plus the copy's files that match nothing.
+
+    WHY BASENAME AND BYTE-IDENTITY, and this replaced a heading-and-row comparison that an
+    independent code evaluation broke on its first attempt (2026-09-10, findings 1, 2 and 7).
+    That comparison asked "is every heading and table-row key in the copy present in the
+    install", which is blind to the shape project judgement is usually written in — a
+    paragraph or a bullet under an existing heading. A copy carrying
+
+        Project rule: never flag anything under `legacy/vendor-shim/` as dead
+
+    classified as pure residue, because it introduced no new heading. It also compared the
+    copy's WHOLE SKILL — `SKILL.md`, `CATALOG-ANCHOR.md`, `agents/*/AGENT.md` — against a
+    directory that structurally holds only corpus files, so on three real projects it
+    reported 25, 22 and 35 "missing units" that were skill frontmatter and anchor
+    provenance, and printed a remedy telling a maintainer to lift `by`, `date` and
+    `command` into `evaluator-additions/`.
+
+    So the question is no longer "is the copy covered" but "is THIS FILE the shipped file".
+    A file the install does not ship under that name is never comparable and is never
+    removable, whatever it contains. That makes the register, the anchor, the handbooks, the
+    scripts and the hooks unremovable by construction rather than by a gate that has to
+    recognise each of them — the previous design's every gate was a chance to fail open.
+    """
+    inst = install_dir(root, kind)
+    proj = project_dir(root, kind)
+    if not inst or not proj:
+        return [], []
+    by_name = {}
+    for f in catalog_files(inst):
+        by_name.setdefault(os.path.basename(f), f)
+    pairs, unmatched = [], []
+    for f in all_files(proj):
+        twin = by_name.get(os.path.basename(f))
+        if twin is None:
+            unmatched.append(f)
+            continue
+        pairs.append((f, twin, norm(slurp(f)) == norm(slurp(twin))))
+    return pairs, unmatched
+
+
+def all_files(d):
+    """EVERY file in a copy, not just markdown and not excluding `hooks/`.
+
+    The earlier version walked `*.md` and skipped `hooks/` — so hook scripts, `scripts/*.sh`
+    and any `.csv`, `.txt` or `.json` beside them were examined by nothing and then deleted
+    by a verdict computed without them. A file that no analysis has read is a file no
+    analysis can authorise removing.
+    """
+    out = []
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if not os.path.islink(os.path.join(dirpath, x))]
+        out += [os.path.join(dirpath, f) for f in filenames]
+    return sorted(out)
+
+
+def has_user_span(d):
+    """The first file carrying the user's own words, by path relative to `d`.
+
+    Relative rather than basename: two `guards.md` in different subdirectories reported
+    identically before, which is a report that cannot be acted on.
+    """
+    for f in all_files(d):
+        if IMMUTABLE_OPEN_RX.search(slurp(f)):
+            return os.path.relpath(f, d)
+    return None
+
+
+def resolve(root, kind):
+    """Where this project reads `kind` from today, and everything a report needs to say so.
+
+    `source` is `project` when a copy exists and `install` otherwise — the project-first
+    order of the § header. It describes the CURRENT answer, never a preferred one.
+    """
+    inst, proj = install_dir(root, kind), project_dir(root, kind)
+    chosen, source = (proj, "project") if proj else (inst, "install")
+    info = {
+        "kind": kind,
+        "source": source if chosen else "unresolved",
+        "path": chosen,
+        "install_path": inst,
+        "project_path": proj,
+        "version": anchor_version(chosen, CATALOGS[kind]["anchor"]) if chosen else None,
+        "install_version": anchor_version(inst, CATALOGS[kind]["anchor"]) if inst else None,
+        "files": len(catalog_files(chosen)) if chosen else 0,
+        "lines": sum(len(slurp(f).splitlines()) for f in catalog_files(chosen)) if chosen else 0,
+    }
+    iv, v = info["install_version"], info["version"]
+    info["stale"] = bool(source == "project" and iv is not None and v is not None and v < iv)
+    info["untracked"] = bool(source == "project" and v is None)
+    return info
+
+
+def classify(root, kind):
+    """What of this project's copy is provably the shipped file, and what is the project's.
+
+    REMOVAL IS PER FILE, NEVER PER COPY, and that is the correction. `--execute` used to
+    `rmtree` the skill directory — which on every real copy holds `SKILL.md`,
+    `CATALOG-ANCHOR.md` (the house rules and the supersession register this change exists to
+    LEAVE in place), `agents/*/AGENT.md`, `scripts/*.sh` and `hooks/*.sh`. The module
+    docstring promised the house rules stay local while the code deleted them, and the
+    hook scripts were excluded from every analysis and then removed by a verdict computed
+    without reading them. Found by an independent code evaluation, 2026-09-10.
+
+    So a file is removable only when the install ships a file of the SAME NAME and the two
+    are identical once the machine-owned additions region, the version anchor and trailing
+    whitespace are normalised away. Anything else — a file the install does not ship, a file
+    that differs by so much as a sentence, a file that could not be read — is the project's
+    and stays. There is no gate to fail open here: unremovable is the default, and identity
+    is the only thing that lifts it.
+    """
+    inst, proj = install_dir(root, kind), project_dir(root, kind)
+    if not proj:
+        return {"kind": kind, "verdict": "no-copy", "removable": [], "kept": [],
+                "why": "nothing to migrate"}
+    if not inst:
+        return {"kind": kind, "verdict": "no-install", "path": proj, "removable": [], "kept": [],
+                "why": "workforce ships no catalog for this kind here — nothing to resolve to"}
+    if os.path.islink(proj):
+        return {"kind": kind, "verdict": "keep-symlink", "path": proj, "removable": [], "kept": [],
+                "why": "the copy is a symlink; removing files through it writes somewhere "
+                       "this run never named"}
+
+    span = has_user_span(proj)
+    if span:
+        return {"kind": kind, "verdict": "keep-user-span", "path": proj, "removable": [], "kept": [],
+                "why": "carries an `origin: user | immutable: true` span in %s — the user's own "
+                       "words, never removable on any evidence" % span}
+
+    pairs, unmatched = corpus_pairs(root, kind)
+    removable = [os.path.relpath(f, proj) for f, _t, same in pairs if same]
+    differs = [os.path.relpath(f, proj) for f, _t, same in pairs if not same]
+    only_here = [os.path.relpath(f, proj) for f in unmatched]
+    kept = sorted(differs + only_here)
+
+    if not removable:
+        return {"kind": kind, "verdict": "keep-all", "path": proj,
+                "removable": [], "kept": kept,
+                "why": "no file here is identical to a shipped file of the same name; "
+                       "nothing is proven redundant"}
+    verdict = "residue" if not kept else "partial"
+    return {
+        "kind": kind, "verdict": verdict, "path": proj,
+        "removable": sorted(removable), "kept": kept,
+        "why": ("all %d file(s) are byte-identical to the shipped catalog"
+                % len(removable)) if verdict == "residue" else
+               ("%d file(s) identical to the shipped catalog; %d stay (differ, or the "
+                "install ships no file of that name)" % (len(removable), len(kept))),
+    }
+
+
+def hook_registrations(root):
+    """Settings hook entries whose command points inside a project evaluator copy.
+
+    These are the other half of a copy, and the half the user named: a copy carries its own
+    `hooks/` scripts and the project's settings register them by path, so removing files
+    while leaving the registrations gives every later session a hook pointing at nothing.
+
+    USER SCOPE IS READ TOO. Scoping this to the project's two settings files missed a
+    registration in `~/.claude/settings.json` whose command names
+    `$CLAUDE_PROJECT_DIR/.claude/skills/<evaluator>/hooks/...` — which is the exact
+    make-before-break inversion the refusal exists to prevent, invisible to the refusal.
+
+    MALFORMED SETTINGS ARE DATA, NOT A CRASH. `{"hooks": [...]}` — a list where an object
+    belongs, which a hand edit produces easily — raised `AttributeError` out of this
+    function and turned `--migrate` into a traceback. Every shape is guarded and an
+    unreadable file is skipped, because a tool that reports on settings must not die on the
+    settings it reports on.
+    """
+    out = []
+    paths = [os.path.join(root, ".claude", "settings.local.json"),
+             os.path.join(root, ".claude", "settings.json"),
+             os.path.join(config_root(), "settings.json"),
+             os.path.join(config_root(), "settings.local.json")]
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        hooks = data.get("hooks") if isinstance(data, dict) else None
+        if not isinstance(hooks, dict):
+            continue
+        for event, matchers in hooks.items():
+            if not isinstance(matchers, list):
+                continue
+            for m in matchers:
+                if not isinstance(m, dict):
+                    continue
+                entries = m.get("hooks")
+                for h in entries if isinstance(entries, list) else []:
+                    cmd = h.get("command") if isinstance(h, dict) else None
+                    if not isinstance(cmd, str):
+                        continue
+                    for kind, meta in CATALOGS.items():
+                        if any("skills/%s/" % sk in cmd for sk in meta["skills"]):
+                            out.append({"file": path, "event": event, "kind": kind,
+                                        "command": cmd})
+    dupes = {}
+    for r in out:
+        dupes.setdefault((r["file"], r["event"], r["command"]), []).append(r)
+    for group in dupes.values():
+        if len(group) > 1:
+            for r in group:
+                r["duplicate"] = len(group)
+    return out
+
+
+def report(root, args):
+    rows = [resolve(root, k) for k in sorted(CATALOGS)]
+    unresolved_n = sum(1 for r in rows if r["source"] == "unresolved")
+    if args.json:
+        # `--migrate --json` is handled in migrate(); this branch once ALSO built a
+        # migration payload and could never run, because main() routes on --migrate first.
+        # It was dead code that made the JSON contract look wider than it was.
+        json.dump({"root": root, "catalogs": rows}, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        # THE SAME EXIT CODE AS THE TEXT FORM. These disagreed — text exited 1 on an
+        # unresolved kind and JSON exited 0 — so a wrapper reading JSON and testing $?
+        # could not see the one state that is this script's own error.
+        return 1 if unresolved_n else 0
+
+    print("catalog resolution — %s" % root)
+    for r in rows:
+        if r["source"] == "unresolved":
+            print("  %-9s UNRESOLVED — no copy here and no workforce install carrying one" % r["kind"])
+            for c in install_candidates(root):
+                print("               tried %s" % os.path.join(c, r["kind"]))
+            continue
+        flags = []
+        if r["stale"]:
+            flags.append("STALE (install is v%s)" % r["install_version"])
+        if r["untracked"]:
+            flags.append("no version anchor")
+        print("  %-9s %-8s v%-5s %3d file(s) %5d line(s)  %s%s"
+              % (r["kind"], r["source"],
+                 r["version"] if r["version"] is not None else "?",
+                 r["files"], r["lines"], r["path"],
+                 ("  · " + " · ".join(flags)) if flags else ""))
+    print("\nINV-CATALOG  %d kind(s) · %d from install · %d from project copy · %d stale · %d unresolved"
+          % (len(rows),
+             sum(1 for r in rows if r["source"] == "install"),
+             sum(1 for r in rows if r["source"] == "project"),
+             sum(1 for r in rows if r["stale"]),
+             unresolved_n))
+    return 1 if unresolved_n else 0
+
+
+def migrate(root, args):
+    verdicts = [classify(root, k) for k in sorted(CATALOGS)]
+    hooks = hook_registrations(root)
+    blocked = {h["kind"] for h in hooks}
+    n_removable = sum(len(v["removable"]) for v in verdicts)
+    n_kept = sum(len(v["kept"]) for v in verdicts)
+    refused = [v for v in verdicts if v["removable"] and v["kind"] in blocked]
+
+    if args.json:
+        json.dump({"root": root, "migration": verdicts, "hooks": hooks,
+                   "refused": [v["kind"] for v in refused]}, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 1 if refused else 0
+
+    print("catalog migration — %s" % root)
+    for v in verdicts:
+        print("  %-9s %-14s %s" % (v["kind"], v["verdict"], v["why"]))
+        for f in v["removable"][:4]:
+            print("               identical  %s" % f)
+        if len(v["removable"]) > 4:
+            print("               identical  … and %d more" % (len(v["removable"]) - 4))
+        for f in v["kept"][:4]:
+            print("               STAYS      %s" % f)
+        if len(v["kept"]) > 4:
+            print("               STAYS      … and %d more" % (len(v["kept"]) - 4))
+
+    if hooks:
+        print("\n  hook registrations pointing into a project copy:")
+        for h in hooks:
+            dup = "  ** REGISTERED %d TIMES **" % h["duplicate"] if h.get("duplicate") else ""
+            print("    %-13s %s%s" % (h["event"], h["command"], dup))
+
+    print("\nINV-CATMIG   %d file(s) removable · %d stay · %d hook registration(s)%s%s"
+          % (n_removable, n_kept, len(hooks),
+             " · %d duplicated" % sum(1 for h in hooks if h.get("duplicate")) if hooks else "",
+             " · %d kind(s) REFUSED on hooks" % len(refused) if refused else ""))
+
+    if not args.execute:
+        if n_removable:
+            print("\nDISPLAY ONLY — nothing written. Re-run with --execute to remove the files "
+                  "proven identical to the shipped catalog. A file listed STAYS is never touched.")
+        return 1 if refused else 0
+
+    if not n_removable:
+        print("\nNothing proven removable; nothing written.")
+        return 0
+
+    # A file is removed only after its copy's hook registrations are reported. Removing what
+    # a settings entry still points at is make-before-break run backwards.
+    removed = 0
+    for v in verdicts:
+        if not v["removable"]:
+            continue
+        if v["kind"] in blocked:
+            print("\n  REFUSED  %s — %d settings hook registration(s) still point into it. "
+                  "Unregister them first; this script does not edit settings."
+                  % (v["kind"], sum(1 for h in hooks if h["kind"] == v["kind"])))
+            continue
+        for rel in v["removable"]:
+            target = os.path.join(v["path"], rel)
+            # Re-assert identity against the tree AS IT STANDS NOW rather than trusting the
+            # classification, and never write through a link (SKILL.md § Atomic-or-Absent,
+            # T5 symlink refusal: a rename-in-place over a symlink destroys the link).
+            if os.path.islink(target):
+                print("  REFUSED  %s — symlink" % rel)
+                continue
+            try:
+                os.remove(target)
+                removed += 1
+            except OSError as exc:
+                print("  REFUSED  %s — %s" % (rel, exc))
+        print("\n  REMOVED  %d file(s) from %s — %s" % (removed, v["path"], v["why"]))
+    return 1 if refused else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--kind", choices=sorted(CATALOGS))
+    ap.add_argument("--path", action="store_true", help="print the resolved directory only")
+    ap.add_argument("--grep", metavar="RX", help="search the resolved catalog")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--migrate", action="store_true")
+    ap.add_argument("--execute", action="store_true")
+    args = ap.parse_args()
+    root = os.path.abspath(args.root)
+
+    if args.execute and not args.migrate:
+        print("--execute is only meaningful with --migrate", file=sys.stderr)
+        return 2
+
+    if args.path or args.grep:
+        if not args.kind:
+            print("--path and --grep need --kind", file=sys.stderr)
+            return 2
+        info = resolve(root, args.kind)
+        if not info["path"]:
+            print("%s: unresolved — no copy here and no workforce install carrying one"
+                  % args.kind, file=sys.stderr)
+            return 1
+        if args.path:
+            print(info["path"])
+            return 0
+        try:
+            rx = re.compile(args.grep, re.I)
+        except re.error as exc:
+            print("bad --grep pattern: %s" % exc, file=sys.stderr)
+            return 2
+        hits = 0
+        for f in catalog_files(info["path"]):
+            for n, line in enumerate(slurp(f).splitlines(), 1):
+                if rx.search(line):
+                    hits += 1
+                    print("%s:%d:%s" % (os.path.relpath(f, info["path"]), n, line.rstrip()))
+        if not hits:
+            print("no match in %s (%s)" % (info["path"], info["source"]), file=sys.stderr)
+        return 0 if hits else 1
+
+    if args.migrate:
+        return migrate(root, args)
+    return report(root, args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

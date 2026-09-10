@@ -705,8 +705,8 @@
     "script": "wf-commitments",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-09-09T10:00:00Z\", \"last_assistant_message\": \"Goal understood. I will wire the tag into wf-widen, manifest, hook set, docs, assertions, fixtures, then run every suite.\"}",
     "want": [
-          "COMMITMENTS",
-          "stated this turn"
+      "COMMITMENTS",
+      "stated this turn"
     ]
   },
   "commitments-ignores-a-report": {
@@ -2959,8 +2959,8 @@
     "script": "wf-task-tag",
     "stdin_raw": "{\"prompt\": \"why was wf-pin-check removed, should we restore it\", \"session_id\": \"fx\"}",
     "want": [
-          "history",
-          "HEARING"
+      "history",
+      "HEARING"
     ]
   },
   "tasktag-two-kinds": {
@@ -2969,10 +2969,10 @@
     "script": "wf-task-tag",
     "stdin_raw": "{\"prompt\": \"why was it removed and does it still work\", \"session_id\": \"fx\"}",
     "want": [
-          "history",
-          "behaviour",
-          "HEARING",
-          "TOUCH"
+      "history",
+      "behaviour",
+      "HEARING",
+      "TOUCH"
     ]
   },
   "tasktag-untagged-clears": {
@@ -3004,7 +3004,7 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"There is no hook wired for that event.\"}",
     "want": [
-          "taste NOT OPENED"
+      "taste NOT OPENED"
     ]
   },
   "widen-flag-agrees-with-evidence": {
@@ -3029,8 +3029,8 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Wired the manifest and the hook set.\\n\\nCarrying on with that.\"}",
     "want": [
-          "stopped mid-work",
-          "CONTINUING"
+      "stopped mid-work",
+      "CONTINUING"
     ]
   },
   "widen-question-is-silent": {
@@ -3039,7 +3039,7 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Wired it. Starting on the scripts unless you want to look first?\"}",
     "want": [
-          "not scored"
+      "not scored"
     ]
   },
   "widen-background-is-silent": {
@@ -3048,7 +3048,7 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Nothing to do but let it finish. Continuing to wait.\", \"background_tasks\": [{\"id\": \"x\"}]}",
     "want": [
-          "not scored"
+      "not scored"
     ]
   },
   "live-finds-phantoms": {
@@ -3089,6 +3089,67 @@
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Vendor is the only documented path for a remote repo.\"}",
     "want": [
       "1 reads"
+    ]
+  },
+  "catalog-resolves-install": {
+    "_why": "A project with no copy of its own is answered from the workforce install -- the whole point of the change, and the state this repository itself is in during `workforce dev`. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so the case is HERMETIC: without it the two kinds this fixture does not carry resolve to whoever ran the suite, and the counts differ per machine. That pin also buys the UNRESOLVED path, which must name every candidate it tried and exit 1 -- a resolver that invents a path when it cannot find one produces exactly the phantom `wf-live` exists to catch.",
+    "script": "wf-catalog",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "want": [
+      "text      install",
+      "UNRESOLVED",
+      "INV-CATALOG  3 kind(s) \u00b7 1 from install \u00b7 0 from project copy \u00b7 0 stale \u00b7 2 unresolved"
+    ],
+    "must_not": [
+      "from project copy \u00b7 1"
+    ]
+  },
+  "catalog-residue-but-hooked": {
+    "_why": "Both halves of a removal in one tree. `text-tells.md` IS proven identical to the shipped file, and it is still not removed, because a settings entry registers a hook inside the copy. Deleting files while leaving the registration gives every later session a hook pointing at nothing -- the double activation this migration exists to end rather than cause. Measured live the day it shipped: hither-lands and apps-odyssey-alive register three such hooks each, and odyssey-alive has one registered TWICE on PostToolUse. The refusal exits 1 so a caller can tell it from a clean migration -- it returned 0 at first, which made a refusal and a success indistinguishable. Display mode is asserted: the suite must never reach a path that deletes.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "want": [
+      "identical  text-tells.md",
+      "STAYS      hooks/post.sh",
+      "hook registrations pointing into a project copy",
+      "1 kind(s) REFUSED on hooks",
+      "DISPLAY ONLY"
+    ],
+    "must_not": [
+      "REMOVED"
+    ]
+  },
+  "catalog-prose-rule-stays": {
+    "_why": "THE REGRESSION CASE, and it is the attack that broke this script's first design. An independent code evaluation appended one PROSE line -- a real project rule -- under an existing heading, introducing no new heading and no new table row; the heading-and-row comparison then classified the copy as pure residue and authorised rmtree of the whole skill. This tree carries that exact shape plus the two other things that design deleted without ever reading them: a hook script and a CATALOG-ANCHOR holding a live supersession register. Removal is now per FILE and proven by byte identity, so only `version.md` -- genuinely identical to the shipped file -- is removable, and the prose-carrying twin, the anchor and the hook all STAY. `must_not` pins the three by name: a regression that widens the proof again fails here before it can reach anyone's project.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "text      partial",
+      "identical  version.md",
+      "STAYS      CATALOG-ANCHOR.md",
+      "STAYS      hooks/post.sh",
+      "STAYS      text-tells.md",
+      "INV-CATMIG   1 file(s) removable \u00b7 3 stay"
+    ],
+    "must_not": [
+      "identical  text-tells.md",
+      "identical  CATALOG-ANCHOR.md",
+      "identical  hooks/post.sh"
     ]
   }
 }

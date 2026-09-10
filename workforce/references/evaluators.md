@@ -330,6 +330,77 @@ embed that into the text-eval of this project so that this doesn't even need to 
 audit should update those rules"; "house rules always dominate and set the precedence". The 29 em-dashes
 were removed (29 → 0), and that instance is fixed; it is the raising example, not the rule.*
 
+## Where a catalog resolves from — `wf-catalog`
+
+**The corpus lives at the install; the house rules stay in the project.** `wf-catalog --root <tree>`
+answers "where does this project read the `code` / `text` / `security` catalog from", in one order:
+the project's own copy under `.claude/skills/<evaluator>/` if it has one, otherwise the shipped corpus
+at `references/catalogs/<kind>/`, resolved across project install → maintainer tree → personal install
+exactly as `wf-seed._slot_candidates` resolves the additions slots.
+
+**The measurement that forced it**, 2026-09-10, thirteen projects and twenty copies on one machine. The
+shipped text catalog carries `creative-scrub-ref-version: 2`; its copies carry **2, 1, 2, 2, 1, absent,
+2, 1, absent**, and their `additions-seeded` records sit at none, 6, 6, 7 and 7. Six states of one
+corpus. The per-project copy exists to prevent two canonical texts and produced six — because the copy
+is written at `audit` and refreshed only by a later audit *of that project*, while `update` advances the
+install and reaches none of them. **That is the three-paths rule (`enforcement.md`) failing on the
+corpus itself**, and it is why the corpus is the half that moves.
+
+**The house rules do not move, and that seam is not new.** The supersession register and the precedence
+clause are the genuinely project-specific layer — the register is the sole authority that demotes a
+finding (§ House rules dominate) — and `audit` already refreshes them separately every run under
+`INV-HOUSERULES`. This distribution had always treated corpus and rules as two things; it just copied
+both.
+
+**Project-first is what makes it safe to ship.** A project holding a copy keeps being answered from that
+copy, byte for byte. Directive one makes preservation the floor: a corpus is not made shared by silently
+answering an existing project from somewhere new.
+
+**It is also the tier-3 path made real.** § An IC READS the catalog says any employee may grep the
+catalog without a spawn; until now that was only true in a project that had been audited into owning a
+copy. `wf-catalog --kind text --grep <rx>` works in **any** project, including this repository under
+`workforce dev`, which has no org and could previously reach no catalog at all.
+
+### Migration — `wf-catalog --migrate`
+
+An existing copy is not left in place forever: residue is a defect in its own right (SKILL.md
+§ Directives, *"I don't want to leave any of the old system still there"*). **Removal is per FILE and
+the proof is byte identity.** A file goes only when the install ships a file of the same name and the
+two are identical once the machine-owned additions region, the version anchor and trailing whitespace
+are normalised away.
+
+| Outcome | Meaning |
+|---|---|
+| `identical` | the install ships this exact file — **the only removable state** |
+| `STAYS` | the install ships no file of that name, or ships a different one. Every other file in the copy |
+| `keep-user-span` | an `origin: user \| immutable: true` block anywhere in the copy — the whole copy is held |
+| `keep-symlink` | the copy is a link; removing through it writes somewhere the run never named |
+| `no-install` | workforce ships no catalog for this kind here — nothing to resolve to |
+
+**The skill directory is never removed.** `SKILL.md`, `CATALOG-ANCHOR.md` — the house rules and the
+supersession register — the handbooks, the scripts and the `hooks/` all survive by construction rather
+than by a gate that has to recognise each of them.
+
+*The first design did not work this way, and the record is kept because the failure is instructive.* It
+compared HEADINGS AND TABLE ROWS and removed a whole copy on a pass. An independent code evaluation
+broke it the day it was written, in one move: append a prose project rule — *"never flag anything under
+`legacy/vendor-shim/` as dead"* — under an existing heading. It introduces no new heading and no new
+row, so the copy classified as pure residue, and `residue` then deleted the skill: the register this
+very section says must stay local, and hook scripts that had been excluded from the walk and therefore
+read by nothing. **Every gate protecting that verdict was a chance to fail open and three of them did.**
+Unremovable is now the default and identity is the only thing that lifts it; the regression is pinned by
+`fixtures/scripts/catalog-prose-rule-stays`.
+
+**The hook registrations are reported and are a REFUSAL, not a warning.** A copy carries its own
+`hooks/` scripts and the project's settings register them by path — **project scope and user scope
+both**, since a registration in `~/.claude` naming `$CLAUDE_PROJECT_DIR/.claude/skills/<evaluator>/`
+is exactly what the refusal exists to catch. `wf-catalog` refuses to remove from a copy any
+registration still points into, and exits 1 so a caller can tell a refusal from a clean migration.
+Unregistering is `hooks`' job and this script does not edit settings — one owner per file.
+**Duplicated registrations are their own finding**: `odyssey-alive` carried `chain-image-eval.sh` twice
+on `PostToolUse` before this step existed, which is the double activation the migration exists to end
+rather than to create.
+
 ## Seeding the catalog
 
 The catalogs originate in claude-enforcer, which this project supersedes. That makes seeding a
