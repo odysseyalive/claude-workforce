@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.35.0 | 2026-09-09 | changes, installer | **yes** | A producer with no reader, caught by a check that first passed on its own comment |
 | 1.34.0 | 2026-09-09 | changes, hooks, scripts, installer | no | The largest measured defect was the one nobody had counted |
 | 1.33.0 | 2026-09-09 | update, changes, hooks, scripts, installer | **yes** | A hook that reports what the turn read, and the nine commands that never existed |
 | 1.32.7 | 2026-09-09 | changes, hooks, installer | no | The hook table described three hooks on a one-hook install |
