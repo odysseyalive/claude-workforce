@@ -36,8 +36,8 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 | # | Model ID | Context | Max output | Notes |
 |---|---|---|---|---|
 | 1 | `claude-fable-5-1` | 1M | 128K | the most capable model, priced above the Opus tier ($10/$50); sees what it judges. **Recommended for creative-visual** (graphics & frontend design); the session advisor's pick too (§ Session advisor) |
-| 2 | `claude-opus-5` | 1M | 128K | the Opus-tier workhorse ($5/$25); commits and drives. **Recommended for analytical Lead** (agents that coordinate) and **Recommended for code** |
-| 3 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical IC** (agents that do the work) |
+| 2 | `claude-opus-5` | 1M | 128K | the Opus-tier workhorse ($5/$25); commits and drives. **Recommended for code** |
+| 3 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical Lead** (agents that coordinate) and **Recommended for analytical IC** (agents that do the work) |
 | 4 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
 
 **One row may be recommended for several lanes.** Row 2 carries two `Recommended for` annotations, and
@@ -257,28 +257,31 @@ model as well as effort** — a change from the era when one model supplied both
 
 | Tier | Model | Effort |
 |---|---|---|
-| Lead (2) | `claude-opus-5` | high |
+| Lead (2) | `claude-opus-4-8` | high |
 | IC (3) | `claude-opus-4-8` | medium |
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
-Claude Code session, not a budget setting. (The recommendation for that seat is Opus — `claude-opus-5`,
-the same seat the Lead takes — but it is a `/model` choice, never written here.)
+Claude Code session, not a budget setting. (The recommendation for that seat is Opus — the Lead now
+takes `claude-opus-4-8`, and `claude-opus-5` remains the code-lane pick — but the CEO's is a `/model`
+choice, never written here.)
 
 A blank model cell means the employee inherits the session model.
 
-**The two tiers differ deliberately, and the reason is spawn COUNT, not seniority** — and it now drives
-both the model and the effort. `effort` is not a platform default this file is restating — absent the
+**The two tiers differ deliberately, and the reason is spawn COUNT, not seniority** — and as of
+2026-09-09 it drives **only the effort**. Both tiers run `claude-opus-4-8`, so the model is no longer a
+lever at all and `effort` carries the entire difference between a Lead and the wave beneath it. `effort` is not a platform default this file is restating — absent the
 field a subagent *inherits the session* (`references/platform.md` fact 12b, **DOCUMENTED, not measured**),
 so every value here is a deliberate override of whatever the user is running.
 
 - **IC `claude-opus-4-8` · `medium`.** ICs are the wide fan-out wave, and **only one lever points at
   cost now**: `medium` effort, because `high` across the wave is expensive and rarely changes mechanical
-  output (`references/procedure-for-procedures.md`). The model no longer does — `claude-opus-4-8` is the
-  same `$5/$25` tier as the Lead's `claude-opus-5`, so the IC wave costs what the Lead costs per token.
-  *Changed 2026-09-09 by user directive deprecating Sonnet. The predecessor was `claude-sonnet-5` at
-  `$2/$10`, and its entire rationale was that gap — read any older text about "~60% lower cost" as
-  describing a pool this one no longer has. Effort is now the only budget lever between the tiers, which
-  makes the `medium` setting load-bearing rather than a refinement.* For the *most mechanical* ICs
+  output (`references/procedure-for-procedures.md`). The model does not — the Lead runs the **same**
+  `claude-opus-4-8`, so an IC costs exactly what a Lead costs per token and only effort separates them.
+  *Changed 2026-09-09 by user directive, in two steps: Sonnet was deprecated from the pool, then both
+  tiers were set to `claude-opus-4-8`. The predecessor IC was `claude-sonnet-5` at `$2/$10` and its
+  entire rationale was that price gap — read any older text about "~60% lower cost" as describing a pool
+  this one no longer has. **A tier table whose two rows name one model is not a mistake here**; it is
+  the deliberate result of spending the model lever and keeping the effort one.* For the *most mechanical* ICs
   (pure classification, routing, lookups), pin `claude-haiku-4-5` per employee (§ Employee overrides) —
   it is cheaper still, though it takes no effort setting.
 - **Lead `claude-opus-5` · `high`.** Leads are 2–4 in the whole org and spawn once per work order, so

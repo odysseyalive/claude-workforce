@@ -571,6 +571,75 @@ check(
     "covering",
 )
 
+# wf-turn-ledger IS A COUNT, NOT A CLASSIFIER — the property that separates it from the
+# guard retired at a measured 7.0% false-positive rate (changes/1.30.1.md). Its first
+# version split Bash read-vs-write by substring and scored `grep -rn foo . 2>/dev/null`
+# as a WRITE because `>` was on the list, under-counting exactly the reads it exists to
+# surface. Re-introducing any command classification re-introduces a false-positive rate
+# in a mechanism whose whole claim is that it has none.
+_tl = read("workforce/bin/wf-turn-ledger")
+_tl_problems = []
+if "_BASH_WRITE" in _tl or "def classify_bash" in _tl:
+    _tl_problems.append("a Bash command classifier is back; a count has no false-positive "
+                        "rate and a classifier does")
+if "def mask_code" not in _tl or "_FENCE" not in _tl:
+    _tl_problems.append("code-span masking is gone; unmasked, the jargon scan fired on "
+                        "`dormant` inside filenames — 7.0% against 5.2% masked")
+if "distinct" not in _tl:
+    _tl_problems.append("the distinct-source count is gone; raw reads alone cannot show "
+                        "one document read three times")
+if "stop_hook_active" not in _tl:
+    _tl_problems.append("the re-entrancy guard is gone")
+check(
+    "wf-turn-ledger reports and never classifies",
+    not _tl_problems,
+    "; ".join(_tl_problems),
+)
+
+# EVERY PRODUCER HAS A READER — the anti-bloat invariant, and the one every
+# accumulation defect in this repo turns out to be an instance of.
+#
+# A script that ships and that no reference file names is a producer nobody can find;
+# a script that no assertion mentions is a producer nobody checks. Both look installed
+# and enforce nothing — the shape `enforcement.md` § Nothing ships dormant refuses, and
+# this project has paid for it repeatedly: four inherited hooks that never fired, nine
+# advertised commands with no procedure, eighteen `read()` calls against files that do
+# not ship, 107 prove cases naming deleted scripts, and — on the day this check was
+# written — `wf-turn-ledger` itself, wired into SHIPPED_HOOKS and the manifest while
+# ZERO markdown described it and no assertion touched it.
+#
+# It is stated as an invariant rather than as a habit because the habit failed. The
+# author of that hook had spent the same afternoon removing four separate instances of
+# this exact defect, and still shipped a fresh one three hours later.
+#
+# The two halves are deliberately different questions. NAMED-IN-REFERENCES is
+# discoverability: a reader looking for the mechanism can reach it. HAS-AN-ASSERTION is
+# enforcement: something fails when it breaks. A script can have either without the
+# other, and each absence is silent on its own.
+_ref_corpus = " ".join(
+    read(p_) for p_ in glob.glob("workforce/references/**/*.md", recursive=True)
+    if "/changes/" not in p_) + read("workforce/SKILL.md")
+# COMMENTS AND DOCSTRINGS ARE STRIPPED BEFORE THE ASSERTION HALF IS TESTED, and this
+# is not a refinement — the first version of THIS CHECK passed vacuously on its own
+# prose. It read bin/check whole, and the long comment above happens to name
+# `wf-turn-ledger` while explaining that wf-turn-ledger had no assertion. The check
+# reported the defect fixed by describing it. Caught by asking why it went green the
+# moment it was added rather than accepting the green.
+_check_corpus = "\n".join(
+    _l.split("#", 1)[0] for _l in read("bin/check").splitlines())
+_orphan_producers = []
+for _sp in sorted(os.path.basename(p_) for p_ in glob.glob("workforce/bin/wf-*")):
+    if _sp not in _ref_corpus:
+        _orphan_producers.append(f"{_sp}: ships, and no reference file names it")
+    if _sp not in _check_corpus:
+        _orphan_producers.append(f"{_sp}: ships, and no assertion mentions it")
+check(
+    "every shipped script has a reader — a reference that names it and a check that guards it",
+    not _orphan_producers,
+    "; ".join(_orphan_producers) + ". A producer with no reader looks installed and "
+    "enforces nothing. Either the script is described and checked, or it does not ship",
+)
+
 # THE HOOK COUNT IS DERIVED FROM SHIPPED_HOOKS, NEVER FROM PROSE. MEASURED 2026-09-09:
 # three statements of one countable fact — enforcement.md said "six hooks in its default
 # set and one opt-in" (naming five scripts that no longer ship), enforcement.md 200 lines
