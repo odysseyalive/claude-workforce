@@ -198,14 +198,23 @@ is a project whose work has not been written down yet.
 
 1. **Say what was found and what was not.** "No `CLAUDE.md`, no source, no build tooling — this looks
    like a brand-new project."
-2. **Run `charter`** (`charter.md` § Brand-new project). Its interview establishes what the project is
-   going to be. This is the one additional question a charter-first audit asks beyond the budgets.
+2. **Ask the charter question, inline, as the one extra setup question a bare project earns**
+   (`audit-setup.md` § charter-first). A bare directory has no evidence to read, so what the project
+   is going to be comes from the user; write the answer to `.claude/workforce/charter.md`, which is
+   what everything downstream reads. *Corrected 2026-09-10: this step said "Run `charter`
+   (`charter.md` § Brand-new project)". **There is no `charter` command and no
+   `references/procedures/charter.md`** — so the first-time path, on the emptiest possible project,
+   opened by telling the reader to run something that has never shipped. The ARTIFACT is real and
+   unchanged; only its imaginary producer is gone.*
 3. **Write nothing to `CLAUDE.md`.** The charter from step 2 is where those answers live, and
    everything downstream reads *it*. *Amended 2026-08-05 by user directive: this step read "Write
    `CLAUDE.md` if absent — the project needs one regardless", which would have this run creating the
    file the same run evacuates and deletes, and re-creating it on every subsequent audit of an
-   already-evacuated project.* The standing cold-reader request that used to justify the file lives in
-   the `wf-standing-request` hook, which re-injects it every turn.
+   already-evacuated project.* *Further corrected 2026-09-10: this closed by saying the standing
+   cold-reader request "lives in the `wf-standing-request` hook, which re-injects it every turn".
+   That hook was removed in 1.30.2 on the user's marks, so the sentence named a live carrier for a
+   thing nothing carries. Nothing is written to `CLAUDE.md` either way, which is what this step is
+   actually about.*
 4. **Design the org from the charter.** A stated intent *is* evidence: "a Next.js marketing site with a
    blog" implies engineering and content before a single file exists.
 5. **Hire the minimum, with provisional verification** where the real check does not exist yet
@@ -1132,8 +1141,8 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    clause** — every finding reports its outcome in the same breath, no work is handed up the chain
    that the employee could have done, and no finding is retroactively downgraded to a non-finding
    (`SKILL.md` § Directives, 2026-09-07). *That clause is scoped by the user to **every project using workforce**, and an employee
-   is where it is hardest to see: the output style and `wf-speak-guard` reach the main conversation
-   only, because a subagent runs its own system prompt. A handbook missing it is an org whose reports
+   is where it is hardest to see: the `Plain Speak` output style reaches the main conversation only,
+   because a subagent runs its own system prompt. A handbook missing it is an org whose reports
    read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
    completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
    one exists) carries verification step (4), the read-back against the REQUEST. **A producing

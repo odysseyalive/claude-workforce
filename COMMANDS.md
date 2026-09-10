@@ -124,6 +124,11 @@ org produced.
 
 | Command | Risk | Does |
 |---|---|---|
+| `/workforce hooks [--execute]` | high | Wire, report, or unwire the shipped hooks |
+| `/workforce preflight` | read-only | Find the settings that would refuse an audit's writes, and print the one command that clears each |
+| `/workforce discharge [--execute]` | high | Drain the deferred queue by doing the work — deletes nothing |
+| `/workforce sweep [--review]` | **destructive** | Complete a deferred deletion. Running it is the consent; `--review` writes nothing |
+| `/workforce wrap` | low | Close a session: roll its commits into one version bump |
 | `/workforce org index` | low | Rebuild the chart from disk |
 | `/workforce org embed` | high | Push chain-of-command facts into handbooks |
 | `/workforce principles` | low | The General Operating Principles |
@@ -218,8 +223,8 @@ minimal seed is written and marked `seed-only`. After that the catalog belongs t
 employee who owns it, and nothing re-reads the superseded project. A project seeded from the shipped set
 is fully functional rather than degraded.
 
-Full treatment: `references/evaluators.md`. **Not to be confused with `evals`** — those are per-employee
-measurement sets (`references/evals.md`). Similar names, unrelated jobs.
+Full treatment: `references/evaluators.md`. **Not to be confused with `evals`** — those are
+per-employee measurement sets. Similar names, unrelated jobs.
 
 ### What is measured and what is not
 
@@ -230,3 +235,20 @@ your work.
 That split exists because a documented behavior was falsified on a real host during this project's
 first day, after it had already been built into a blocking gate. Measurements expire on a harness
 upgrade; `verify` reports staleness, and a release can carry re-measured facts to every install.
+
+
+---
+
+## Where the evaluator catalogs live
+
+The `code`, `text` and `security` catalogs resolve from the **workforce install**, not from a copy in
+your project. One corpus, advanced by `update`, readable from any project:
+
+```
+/workforce verify                       # prints INV-CATALOG: where each kind resolved, and its version
+```
+
+A project that already holds its own copy keeps being answered from that copy, byte for byte. `audit`
+reports what a migration onto the shared corpus would remove, and removes only files it has proven
+identical to the shipped ones — never the skill directory, so your house rules and supersession
+register stay where they are.

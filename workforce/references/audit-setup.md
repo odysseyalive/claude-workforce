@@ -62,7 +62,8 @@ where a question is the obvious move and is refused:
 - **Department evidence exceeding the cap** resolves toward the evidence and reports the conflict
   loudly (`procedures/audit.md` § Step 2). `transfer` restructures later if the user disagrees.
 
-The only sanctioned addition is **charter-first** (`procedures/charter.md`): a bare directory has no
+The only sanctioned addition is **charter-first** (asked inline here, not by a command —
+*there is no `procedures/charter.md` and this line cited one until 2026-09-10*): a bare directory has no
 evidence to read, so the charter comes from the user. That is a seventh question on an empty project and
 nowhere else. **The ordinal is not decoration** — it grew as consent and the backup became questions and
 as the two budgets each split into two calls, and a stale ordinal here is how the ceiling quietly gains a

@@ -365,7 +365,8 @@ through an audit again."*
 - **A per-machine command is not a propagation path.** It reaches exactly the machines somebody typed
   it on, and everywhere else it is indistinguishable from dormancy — which is the state four inherited
   hooks were deleted for, arriving through the gesture rather than through the file. `wf-plain-guard`
-  shipped 2026-09-05 wired by nothing but a human running `hooks --execute`.
+  shipped 2026-09-05 wired by nothing but a human running `hooks --execute` — and was itself
+  retired in 1.30.2, so it survives here only as the measured example, never as a live mechanism.
 - **`audit.md` Step 6-G had claimed a sibling that did not exist.** It has read *"this sits alongside
   the settings-hook wiring of the same run"* since it was written, and **no step performed that
   wiring.** Same shape as the three v1.18.0 findings: a rule written, a reader pointed at it, nothing
@@ -434,6 +435,16 @@ alone. **The record was the right shape. Nothing could execute it.**
   cannot be a paragraph instructing an agent to hand-edit JSON.
 
 **Landed 2026-09-07 (v1.20.0) — the plain-output rule had three carriers and all three decay.**
+
+> **SUPERSEDED 2026-09-10.** Every mechanism this entry describes as a floor is gone.
+> `wf-speak-guard` was retired in 1.30.1 after measuring **7.0% false positives across 2,149
+> real replies**; `wf-plain-guard` and `references/plain-output.md` went in 1.30.2 on the
+> user's explicit marks. The entry is kept because it records why the rule needed carriers
+> that do not decay — that reasoning still holds. What carries the rule now is the `Plain
+> Speak` output style, the operating principles, `/org` dispatch, the handbook template and
+> `wf-conform`'s say-the-state row. `enforcement.md` states the banned-term row as **CANNOT**
+> rather than claiming an enforcement that no longer exists.
+
 Trigger: the user, two days after the 2026-09-05 plain-output batch, saying *"We've dealt with it in
 the past, but it appears nothing came of it. So the implemented solution obviously doesn't work."*
 They were right, and the reason is measurable.
@@ -516,6 +527,13 @@ is what does it, on that project's next `/workforce audit`, which is owed anyway
 stamped 1.13.0 against an installed 1.18.0, and `wf-conform` will now say so on every run.
 
 **Landed 2026-09-05 (dev session) — plain output: the register written for agents stops at the user
+
+> **SUPERSEDED 2026-09-10.** `wf-plain-guard` and `references/plain-output.md` were both
+> removed in 1.30.2 on the user's explicit marks, so the floor this entry describes and the
+> file it parses its term list from are gone. The rule is carried by the `Plain Speak` output
+> style, the operating principles and `/org` dispatch; `enforcement.md` records the row as
+> **CANNOT. Detection only.** rather than claiming enforcement that does not exist.
+
 (v1.16.0).** Trigger: the owner, mid-session — *"your responses back to me and the choices you give
 back to me are too cryptic"*, then *"the real issue is the communication style. I want all output to
 the user to be in a natural communication style and I want NO OVERBUILT explainations, sentences,

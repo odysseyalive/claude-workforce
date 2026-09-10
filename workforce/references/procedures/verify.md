@@ -242,7 +242,7 @@ agreeing against the third is a finding, not a tiebreak.
 | Every retained playbook has exactly one Records Owner | unowned shared data |
 | Each domain-overseeing Lead has a domain-model critic IC, or a recorded repin | `LANE-DRIFT` — a Lead judging what it cannot see |
 | Every edge re-derived from the child's `reports-to`, and each parent's `direct-reports` agrees | `EDGE-MISMATCH` — a real edge the chart does not draw |
-| Every Lead handbook carries the handoff boundary clause | `HANDOFF-UNWIRED` — the measurement ships with nothing calling it |
+
 | Chart header `workforce-version:` present, and equal to the installed `WORKFORCE-VERSION` | `ORG-STALE` — the org was last indexed by an older release, so shipped contract changes have not reached it |
 
 **`ORG-STALE` reports the state; it never fixes it.** The remedy is `audit`, whose Step 5d opens on
@@ -264,12 +264,13 @@ staffed. Report both handbooks by name. The remedy is `org index`, which rewrite
 `direct-reports` from the edge set (`org-chart-format.md` § Regeneration), or `audit` Step 5g when
 the org needs the rest of the heal too.
 
-**`HANDOFF-UNWIRED` is the `verify` leg of the three-paths rule** (`enforcement.md`):
-the installer ships `wf-handoff` and the templates carry the clause for new hires, `audit` Step 5g
-writes it into orgs installed before it existed, and this row reports a Lead that still lacks it.
-Without this row the clause reaches exactly the orgs somebody re-audited. Name each Lead; the
-remedy is `audit`, or `amend <lead> --execute` for a single one. **Read-only, like every row above
-— `verify` reports and never writes.**
+*`HANDOFF-UNWIRED` is REMOVED (2026-09-10), and its row above with it.* It read as the `verify`
+leg of the three-paths rule on the grounds that "the installer ships `wf-handoff`". It does not —
+the simplification release deleted that script, `references/handoff.md` went with it, and
+`audit.md` had already removed its own step saying exactly that. This file did not get the same
+edit, so a live row kept citing a producer, a spec and a reversal that were all gone. **A rule whose
+spec, producer and reversal are absent is not a weakened rule; it is a check that fails on every
+run.**
 
 **`LANE-DRIFT` is read-only, narrated like the reconciliation above.** For each Lead, IF its
 handbook describes domain judgment (visual or code seeing) AND no domain-model critic IC reports
@@ -307,7 +308,7 @@ Three advisory rows post-date most deployed handbooks and block nothing: `## Rep
 **say-the-state clause** (every finding reports its outcome in the same breath; no work handed up the
 chain the employee could have done; no finding retroactively downgraded), and the ORG-RECORD carries a
 `workforce-version:` stamp. **The say-the-state row is the only reader an employee's report shape
-has** — the output style and `wf-speak-guard` govern the main conversation, and a subagent runs its own
+has** — the `Plain Speak` output style governs the main conversation, and a subagent runs its own
 system prompt, so without this row an org can report every finding as an open problem forever and
 nothing says so. `audit` Step 5d is its fix. **The stamp is what makes staleness a finding instead of an unknown**:
 where it is present and older than the installed `WORKFORCE-VERSION` (`references/version.md`), report

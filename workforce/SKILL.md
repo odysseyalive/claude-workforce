@@ -34,10 +34,12 @@ hooks:
 | `/workforce preflight` | Discover the `.claude` settings that would refuse an audit's writes, and print the one command that clears each. Read-only; `audit` runs it first, at Step 0.05 |
 | `/workforce dev [command]` | Run any command with `workforce` itself included |
 
-*`hooks` also wires the commit-time git **pin guard** — a `core.hooksPath` pre-commit hook that keeps
-dependencies pinned and `dependabot.yml` present. It is folded into `hooks`, not a separate command:
-`audit` installs it (Step 6-G), `verify` reports whether it is wired, and it prints `INV-PINS`
-(`references/procedures/hooks.md` § The git pre-commit pin guard).*
+*The commit-time git **pin guard** is GONE, and this paragraph used to say it was live. It was a
+`core.hooksPath` pre-commit hook keeping dependencies pinned and `dependabot.yml` present; it was
+removed with its script `wf-pin-check` on the user's explicit marks, and `references/invariants.md`
+row 21 has recorded that as RETIRED ever since. `hooks` never wired it, `audit` Step 6-G is retired,
+and nothing prints `INV-PINS`. *Corrected 2026-09-10: the entry page and the invariant register
+disagreed, and this page is the one every reader loads first.**
 <!-- /origin -->
 
 ---
@@ -246,8 +248,10 @@ QUEUED** — that was already true for org shape and is now true for every refin
 The one row that legitimately survives is one whose resolution lies in **another repository** or past a
 **measured host limit**, and it is reported with that citation, never as "you chose to keep the stable
 state." Mechanics at `references/procedures/audit.md` § Step 7, `references/deferred.md`, and
-`references/procedures/discharge.md`; and `references/procedures/diagnose.md`, which drains to the same
-fixpoint against workforce's own three deliverables.*
+and `references/procedures/discharge.md`. *Corrected 2026-09-10: this also cited
+`references/procedures/diagnose.md` "which drains to the same fixpoint against workforce's own three
+deliverables" — there is no `diagnose` command and no such file, so the sentence sent a reader to a
+mechanism that has never existed.*
 
 > **"I think the main directive for the recruiter is, hire the most capable candidate."**
 
@@ -357,12 +361,11 @@ scoped too narrow to reach it**: `audit-setup.md` § How every question is worde
 questions, and the text-eval catalog's coffee test governed prose authored into files. A question asked
 outside setup, and every report handed back in the terminal, were governed by nothing — so the dense
 register this distribution writes for cold-reading agents reached the one reader it was never for.
-Mechanics at `references/plain-output.md`, which is now the single home of the rule and of the
-banned-term list `audit-setup.md` used to own. It reaches the user through three carriers and one
+Mechanics at the `Plain Speak` output style, which carries the rule and the banned-term list
+`audit-setup.md` used to own. It reaches the user through three carriers and one
 floor: operating-principles item 11 (`references/templates.md`), so every org workforce builds carries
 it; `/org` dispatch rung 13 (`references/procedures/org.md`), so it governs every routed reply and not
-just an audit's; `audit-setup.md`, which now points at it instead of restating a narrower copy; and
-`wf-plain-guard`, a `PreToolUse` hook that BLOCKS an `AskUserQuestion` using a banned term. The
+just an audit's; and `audit-setup.md`, which points at those instead of restating a narrower copy. The
 operational reading is — **say it the way you would say it out loud, answer first, one idea per
 sentence, and never make the reader decode a question before they can answer it.** The guard covers the
 mechanical half, a fixed word list; register and length are the coffee test, which is a human judgment
@@ -385,16 +388,15 @@ operating-principles item 11, `/org` rung 13, SKILL.md principle 8b — are all 
 context, so each was faintest exactly when a long run was writing its longest report. That is the same
 decay the 2026-08-05 CLAUDE.md directive names, arriving at a rule instead of at a file. **The
 `text-eval` catalog had the test and excluded the corpus**: § Conversational register exempted "run
-deliverables", which is the report handed to the user, and `plain-output.md` § The test cited that row
+deliverables", which is the report handed to the user, and the plain-output reference cited that row
 as its own authority — so the one written test that would have caught this had been cancelled at its
 source. The second clause is new and is not a style complaint: it names **caving under pushback**. The
 reply the user quotes opens "You're right", and Anthropic's own measurement puts sycophantic agreement
 at 18% once a user has pushed back against 9% when they have not — so the moment a reply most feels
 like agreement is the moment it is least likely to be earned. Mechanics at
-`references/plain-output.md` § Openers, § Reports, and § Where the rule is carried; the two carriers
-that do not decay are the `Plain Speak` output style (added to the system prompt, present at full
-strength on every turn) and `wf-speak-guard` (a `Stop` hook reading the finished reply, once per
-turn). The operational reading is — **lead with the answer, decide the small reversible things
+the `Plain Speak` output style, which carries openers, reports, and the rest of the rule; the carrier
+that does not decay is the `Plain Speak` output style, added to the system prompt and present at
+full strength on every turn. The operational reading is — **lead with the answer, decide the small reversible things
 instead of asking, never open with agreement, and never concede because someone objected: say what
 you still think and let them decide.***
 
@@ -415,8 +417,8 @@ included. Note what makes the second clause necessary rather than redundant: a f
 reaches new servers, and every org already in the world stays exactly where it was, on a tree that does
 not look broken. It generalizes the 2026-09-02 directive — *"This has to be fixed in workforce, and how
 the audit process heals broken structures like this"* — from handbook structure to **every** shipped
-mechanism. The measured case: `wf-plain-guard` shipped 2026-09-05 wired by nothing but a human typing
-`hooks --execute`, and `audit.md` Step 6-G had read "this sits alongside the settings-hook wiring of the
+mechanism. The measured case, and both halves are now history: `wf-plain-guard` shipped 2026-09-05 wired by
+nothing but a human typing `hooks --execute` — the guard was itself retired in 1.30.2 — and `audit.md` Step 6-G had read "this sits alongside the settings-hook wiring of the
 same run" the whole time while **no step performed that wiring**. Mechanics at `references/enforcement.md`
 § Three paths, or it does not propagate, `references/procedures/audit.md` § Step 6-H,
 `references/procedures/verify.md` § Output style, and `wf-settings-apply --wire-defaults`, which is the
@@ -441,10 +443,9 @@ forbade parking a row for a later run; this one forbids parking it in a QUESTION
 whose options are all "do less" is a deferment queue with a nicer interface — it spends the user's
 attention to buy the run permission to stop. Note the second message: its reach is **all aspects of
 audit deployment**, not this command, so it binds every generated org and not only this session.
-Mechanics at `references/plain-output.md` § Finish, do not hedge, and it carries through the three
+Mechanics at the `Plain Speak` output style § Finish, do not hedge, and it carries through the three
 paths: operating-principles item 12, so every company workforce builds has it; `/org` dispatch, so it
-governs every routed reply; and `wf-plain-guard`, which BLOCKS a question whose options are all
-retreats. The operational reading is — **when the work is doable, do it.** Ask only when the answer
+and `/org` dispatch, so it governs every routed reply. The operational reading is — **when the work is doable, do it.** Ask only when the answer
 changes what gets built and you genuinely cannot choose; never when one of the options is to stop, and
 never to obtain permission for work already asked for. Where a task is genuinely blocked, say what
 blocked it in one line and finish everything else — a partial result delivered beats a complete result
@@ -512,10 +513,10 @@ tier down** — and there it is worse, because the Lead integrating that report 
 saw. The seventh message widens it once more: **every project using workforce**, so this is a
 distribution rule and not a house rule for this repository. It rides the three paths that reach a
 stranger's machine — the shipped constitution and handbook template, `audit` (which force-refreshes
-both), and `verify` (which reports a handbook missing the clause). Mechanics at `references/plain-output.md` § Reports; carried
-by operating-principles item 13, `/org` dispatch rung 15, and `wf-speak-guard`, which BLOCKS a reply
-that hands work over without naming what refused, and flags one that lists defects with no outcome
-anywhere. The operational reading is — **say the state, not the journey.** Lead with what is true now.
+both), and `verify` (which reports a handbook missing the clause). Mechanics at the `Plain Speak` output style § Reports; carried
+by operating-principles item 13, `/org` dispatch rung 15, the handbook template every hire is
+authored from, and `wf-conform`, which reports a handbook whose `## Reporting` carries no
+say-the-state clause. The operational reading is — **say the state, not the journey.** Lead with what is true now.
 If it is fixed, it is fixed; the discovery is background and usually not worth a line. If something
 genuinely refuses you, name it in one sentence and finish everything else.*
 
@@ -571,6 +572,18 @@ because judging one's own prior from inside is the impaired faculty, and that ob
 dissolves the moment the judge is somebody else. Mechanics at `references/senses.md`;
 `references/enforcement.md` governs the overclaim half, since a number that reads as a
 grade and counts tool calls is that table's own defect one level up.*
+
+*Amended 2026-09-10, on the user's explicit instruction that `wf-plain-guard` and `wf-speak-guard`
+are deprecated and every vestige removed. **No quoted user text was touched** — directive one is that
+the user's verbiage is absolutely retained, and every `>` line in this block is byte-for-byte what it
+was. What changed is the model-authored mechanics prose around them, which named those two hooks as
+live carriers and cited `references/plain-output.md`. All three were removed in 1.30.2, on the user's
+marks, after the speech guard was measured firing on 7.0% of GOOD replies across 2,149 real replies —
+so the prose was describing enforcement that had not existed for two days, which is the overclaim Core
+Principle 6 forbids. The rules themselves are unchanged and are carried by the `Plain Speak` output
+style, the operating principles, `/org` dispatch, the handbook template, and `wf-conform`'s
+say-the-state row. The one surviving mention of a guard is the 2026-09-07 three-paths measurement,
+which is a record of what went wrong and is marked as history.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
@@ -706,18 +719,23 @@ other project on the machine resolves it, and a peer session may be running agai
 
 ## Display vs. Execute
 
-High-risk commands default to **display mode** and require `--execute`: `hire`, `promote`,
-`transfer`, `retire`, `handbook`, `org embed`, `ablate`, `reconcile`, `vendor`, `restore`,
-`disband`, `rollback`, `discharge`, `dev diagnose`. Low-risk and read-only commands run immediately: `roster`, `budget`,
-`org index`, `org status`, `review`, `ledger`, `verify`, `version`, `backup`, `preflight`.
+High-risk commands default to **display mode** and require `--execute`: `hire`, `retire`,
+`handbook`, `org embed`, `restore`, `disband`, `rollback`, `discharge`. Low-risk and
+read-only commands run immediately: `roster`, `org index`, `org status`, `review`, `ledger`,
+`verify`, `version`, `backup`, `preflight`.
+
+*Corrected 2026-09-10. These two lists carried EIGHT names with no procedure file behind them —
+`promote`, `transfer`, `ablate`, `reconcile`, `vendor`, `budget` and `diagnose`. § Grounding tells a reader to open
+`references/procedures/<command>.md` before acting, so each phantom dead-ended on instruction one.
+`vendor` was the sharpest: `COMMANDS.md` documents its removal while this page still listed it.
+Found by drawing a map of the option surface and checking every name against the tree.*
 
 `audit` and `sweep` are the exceptions: **running the command is the consent**, and both auto-execute.
 `--review` is the zero-write escape on each, and `audit --review` closes by naming the one command that
 would apply exactly what it displayed — report first, apply on a separate gesture.
 
 **The line between the two lists is whether the command DECIDES anything as it runs.** Display mode
-exists to show a user a judgment they have not seen yet — what `hire` will author, what `ablate` will
-strip, how `discharge` classified a row. `audit` is consent-on-invocation because the setup questions
+exists to show a user a judgment they have not seen yet — what `hire` will author, how `discharge` classified a row. `audit` is consent-on-invocation because the setup questions
 are the consent; **`sweep` is, because it decides nothing at all** — its removal set comes from
 COMMITTED `T7c` rows a prior `audit` wrote and gated, and every precondition is re-asserted against the
 tree as it stands now (`references/procedures/sweep.md` § Why there is no `--execute`). A preview of a
@@ -777,7 +795,9 @@ never let a run decline one it staged (`references/invariants.md` row 20, `INV-S
    was measured on. On a version change they are STALE: still usable as working assumptions, but
    barred from being blocking checks until re-measured.
    (c) **Prefer deleting to accumulating.** When a new model makes an instruction unnecessary, remove
-   it — `ablate` exists for exactly this. Guidance written for a past model's weakness is a live
+   it. *`ablate` was named here as the mechanism for exactly this and never shipped a procedure;
+   removal is done by hand, in the change that finds the guidance.* Guidance written for a past
+   model's weakness is a live
    cost, paid on every spawn, forever.
 
 ## Grounding
