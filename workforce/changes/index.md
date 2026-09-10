@@ -8,7 +8,8 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.47.0 | 2026-09-10 | installer | no | (pending — message lands on the next regeneration) |
+| 1.47.1 | 2026-09-10 | docs | no | (pending — message lands on the next regeneration) |
+| 1.47.0 | 2026-09-10 | changes, installer | no | The session boundary is a judgement, so it is a command |
 | 1.46.0 | 2026-09-10 | scripts | no | The reason is the deliverable, on every verdict |
 | 1.45.1 | 2026-09-10 | scripts | no | Nothing to try means no trial |
 | 1.45.0 | 2026-09-10 | scripts | no | Six jurors, yes or no, and the judge can finally see the ask |

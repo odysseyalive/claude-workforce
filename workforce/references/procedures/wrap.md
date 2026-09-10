@@ -24,6 +24,20 @@ hook is invocable by neither. This is directive two applied literally — a mech
 where mechanism works, a judgement where judgement is needed, and *when has this
 session ended* is a judgement.
 
+## Why the commit hook is gone, and stays gone
+
+`bin/pre-commit-version` exists and is **wired to nothing**, deliberately. As a git hook
+it refuses any commit touching a shipped file unless `WORKFORCE-VERSION` advances — so
+every commit becomes a release, and a working session becomes a column of version
+numbers.
+
+*"I would rather not spam version numbers for every commit that happens. It's a bad
+model."* — the user, 2026-09-10, on being shown twelve of them from one session.
+
+**That is the model this command replaces: one bump per SESSION, asked for rather than
+forced.** The script stays on disk as a callable check for a release that genuinely is
+one; nothing runs it automatically, and `core.hooksPath` is unset.
+
 ## When the operator should run it unasked
 
 On finalizing language from the user. It will not catch every case and is not meant to:

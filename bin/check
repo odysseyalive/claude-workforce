@@ -739,6 +739,13 @@ if "Never decide this silently" not in _wrap:
                           "depends on whether the work was one thing, and only the user "
                           "knows that — deciding it silently is the same self-assessment "
                           "every other mechanism here was built to remove")
+if "wired to nothing" not in _wrap:
+    _wrap_problems.append("the retired commit hook is no longer explained here. "
+                          "`bin/pre-commit-version` is on disk and must stay unwired: as "
+                          "a git hook it forces a bump on every commit touching a shipped "
+                          "file, turning a working session into a column of version "
+                          "numbers — twelve came out of one session under that rule, "
+                          "which is why this command exists")
 if "never pushes" not in _wrap.lower():
     _wrap_problems.append("the no-push clause is gone; a push releases to every machine "
                           "that runs update and stays the user's gesture")
@@ -1456,7 +1463,15 @@ check(
 # The product version is AUTHORED once — WORKFORCE-VERSION in references/version.md —
 # and MIRRORED in SKILL.md's frontmatter `version:`, which the skill schema requires.
 # They must be byte-equal, or an `update` reports one number while the skill declares
-# another. The maintainer hook `bin/pre-commit-version` forces the number to ADVANCE on
+# another. `bin/pre-commit-version` is NOT WIRED and is deliberately left that way — as
+# a git hook it forces a bump on every commit that touches a shipped file, which is the
+# model the user rejected on 2026-09-10: "I would rather not spam version numbers for
+# every commit that happens. It's a bad model." Twelve version numbers came out of one
+# session under exactly that rule. `/workforce dev wrap` replaces it — one bump per
+# SESSION, asked for rather than forced, because when a session ends is a judgement and
+# a commit hook cannot make one. The script stays on disk as a callable check for a
+# release that IS a release; nothing runs it automatically.
+# The historical note: it used to force the number to ADVANCE on
 # any shipped change; this asserts the mirror never drifts from the anchor. bin/prove
 # deletes the `WORKFORCE-VERSION:` key and confirms this fires.
 _ver_anchor = re.search(
