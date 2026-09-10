@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.36.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Read the hooks reference and found a limit I had invented and a bug I had shipped |
 | 1.35.2 | 2026-09-09 | changes, installer | no | Two cases that reported a verdict about neither the rule nor the mutation |
 | 1.35.1 | 2026-09-09 | audit, changes, hooks, installer | no | A rule whose spec, producer and reversal were all deleted, still printed every run |
 | 1.35.0 | 2026-09-09 | changes, installer | **yes** | A producer with no reader, caught by a check that first passed on its own comment |
