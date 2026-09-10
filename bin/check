@@ -657,6 +657,30 @@ check(
     "; ".join(_tt_problems),
 )
 
+# THE COMMITMENT LEDGER. It closes the defect one level above every other hook here:
+# a goal takes its definition of "done" from a list the tunneling head wrote, so it
+# inherits whatever that list left out. MEASURED — a goal's condition held, all four
+# suites went green, and the work was still half done.
+_cm = read("workforce/bin/wf-commitments")
+_cm_problems = []
+if "SessionStart" not in _cm:
+    _cm_problems.append("the read-back is gone; a ledger written and never read is the "
+                        "orphan hand-off this file already refuses one check above")
+if '"open"' not in _cm:
+    _cm_problems.append("the open list is gone")
+if ".claude" not in _cm or "commitments.json" not in _cm:
+    _cm_problems.append("the ledger is no longer per-PROJECT; a session-scoped file "
+                        "clears exactly when a new session makes it matter most")
+if "never judges" not in _cm and "never blocks" not in _cm.lower():
+    _cm_problems.append("the no-judgement property is undocumented; a regex deciding an "
+                        "item is done closes debts that are still open, and an item "
+                        "wrongly closed is invisible")
+check(
+    "wf-commitments records a stated intention and reads it back next session",
+    not _cm_problems,
+    "; ".join(_cm_problems),
+)
+
 # THE WIDENING IS AN ACT, AND THE ACT IS THE PART THAT KEPT NOT GETTING BUILT.
 # MEASURED over 92 stop summaries in the session that built these hooks: `wf-widen` ran
 # on every one, errored on none, and blocked on ZERO. A mechanism that reports what a
@@ -734,6 +758,17 @@ if "changes" not in _lv:
 if "BROKEN" not in _lv or "stale" not in _lv:
     _lv_problems.append("the two tiers collapsed; without them a correct past-tense "
                         "mention and an instruction to run something absent read alike")
+if "def orphan_handoffs(" not in _lv:
+    _lv_problems.append("the detector-with-its-actor rule is gone from the SHIPPED "
+                        "registry. It was first written into bin/check, which is "
+                        "maintainer-only and in no manifest — enforcement of a shipped "
+                        "directive living in the one place that does not ship, so every "
+                        "host carried the rule and nothing on any host could check it")
+if "agent_hooks" not in _lv:
+    _lv_problems.append("agent hooks are not known to be live; a type:\"agent\" hook has "
+                        "no file, so the phantom scan reports it as backed by nothing — "
+                        "a correct-looking false positive, which is what teaches a reader "
+                        "to skim the report")
 if "--root" not in _lv:
     _lv_problems.append("--root is gone; a registry that can only describe its own "
                         "directory answers the question for the one tree that least "

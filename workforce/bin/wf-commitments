@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""wf-commitments — capture what a turn SAID it would do, and surface it until it is done.
+
+WHY THIS EXISTS, and it is the defect one level above every other hook here.
+
+MEASURED, this session. The user set a goal — "don't stop until what I asked for is
+done completely" — and the next turn answered with a list: *wire the tag into wf-widen,
+manifest, hook set, docs, assertions, fixtures, then run every suite.* Every item on
+that list shipped. All four suites went green. The goal's condition held and it cleared
+correctly. **And the work was still half done**, because the list omitted the acting
+half of the mechanism being built, and nobody but the author could have known that.
+
+THE DEFECT IS THE LIST, NOT THE GOAL. A goal takes its definition of "done" from a list
+written inside the same head that is tunneling, so it inherits whatever that head left
+out. Checking the list is not a check; it is the tunnel grading its own homework with
+the answer key it wrote.
+
+WHAT CAN ACTUALLY BE MECHANISED. Not "was the right list written" — nothing on this
+machine knows that. What CAN be held is narrower and still worth having: **a list stated
+out loud is a debt, and a debt must not evaporate silently.** Every intention this
+operator announces gets recorded here at `Stop`, survives the session, and is read back
+at `SessionStart`. It cannot make the list complete. It can stop an incomplete list from
+being quietly forgotten, which is the failure that actually happened.
+
+IT IS THE DIRECTIVE APPLIED TO THE OPERATOR. `SKILL.md` § Directives, 2026-08-10: "all
+items in the deferment queue should be resolved one by one ... NO EXCEPTIONS! NO BLOCKS!
+NO EXCUSES!" That was written about a run's queue of deferred findings. This is the same
+rule pointed at the one queue nobody was keeping — the things the operator said it would
+do next.
+
+IT NEVER BLOCKS AND NEVER JUDGES. It records and it reports. Whether an item is really
+done is a judgment, and a regex deciding that would close debts that are still open —
+the worse of the two errors, since an open item wrongly closed is invisible and an open
+item wrongly kept is one line a reader dismisses.
+
+EXIT CODES: 0 always.
+"""
+
+import json
+import os
+import re
+import sys
+
+# A STATED INTENTION, not a description of work already done. Present and past tense are
+# excluded on purpose: "I wired the manifest" is a report and "I'll wire the manifest" is
+# a debt, and only the second one can go unpaid.
+INTENT = re.compile(
+    r"(?:^|[.\n]\s*)(?:now[, ]+)?"
+    r"(?:i'?ll|i will|i am going to|i'?m going to|next[,:]?\s+i)\s+"
+    r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?([^.\n]{6,160})", re.I)
+# A LIST inside one sentence — "wire the tag, the manifest, the hook set, then the docs".
+# The comma-series is where an incomplete list hides, because each item reads as done.
+SERIES = re.compile(r"\b(?:then|and then|after that|followed by)\b\s+([^.\n]{4,80})", re.I)
+
+MAX_OPEN = 40           # a ledger nobody can read is a ledger nobody reads
+
+
+def path(payload):
+    """Per-PROJECT, not per-session. A debt stated on Monday is still owed on Tuesday,
+    and a session-scoped file would clear the ledger exactly when a new session made it
+    matter most — which is the moment this exists for."""
+    cwd = payload.get("cwd") or os.getcwd()
+    d = os.path.join(cwd, ".claude", "workforce")
+    try:
+        os.makedirs(d, exist_ok=True)
+        return os.path.join(d, "commitments.json")
+    except OSError:
+        return None
+
+
+def load(p):
+    try:
+        with open(p, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {"open": []}
+    except (OSError, ValueError):
+        return {"open": []}
+
+
+def capture(reply):
+    """Every intention the reply states, deduplicated, most recent last."""
+    out = []
+    for m in INTENT.finditer(reply or ""):
+        txt = " ".join(m.group(1).split())[:140]
+        if txt and txt not in out:
+            out.append(txt)
+    for m in SERIES.finditer(reply or ""):
+        txt = " ".join(m.group(1).split())[:140]
+        # NOT A SECOND DEBT WHEN IT IS THE TAIL OF ONE ALREADY RECORDED. "…docs,
+        # assertions, then run every suite" is one commitment; listing its last clause
+        # again pads the ledger, and a ledger padded with duplicates is one a reader
+        # starts skimming — which costs exactly the attention this exists to buy.
+        if txt and txt not in out and not any(txt in prior for prior in out):
+            out.append(txt)
+    return out
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+
+    p = path(payload)
+    if not p:
+        return 0
+    book = load(p)
+    event = payload.get("hook_event_name") or ""
+
+    # ── SessionStart: read the debt back before the first request ──
+    if event == "SessionStart" or payload.get("source") in ("startup", "resume", "clear", "fork"):
+        items = book.get("open") or []
+        if not items:
+            return 0
+        lines = [f"{len(items)} thing(s) a previous turn in this project said it would do, "
+                 f"and no turn has since recorded doing:"]
+        for it in items[-MAX_OPEN:]:
+            lines.append(f"  · {it.get('text', '')}"
+                         + (f"   ({it['at']})" if it.get("at") else ""))
+        lines.append("These are statements the operator made, not user instructions, and "
+                     "some may already be done or overtaken. They are listed because a "
+                     "stated intention that disappears silently is how work gets left "
+                     "half finished.")
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": "\n".join(lines)}}))
+        return 0
+
+    # ── Stop: record what this turn said it would do ──
+    reply = payload.get("last_assistant_message")
+    if not isinstance(reply, str) or not reply.strip():
+        return 0
+    fresh = capture(reply)
+    if not fresh:
+        return 0
+    seen = {i.get("text") for i in (book.get("open") or [])}
+    stamp = payload.get("timestamp") or ""
+    for t in fresh:
+        if t not in seen:
+            book.setdefault("open", []).append({"text": t, "at": stamp[:10]})
+    book["open"] = (book.get("open") or [])[-MAX_OPEN:]
+    try:
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump(book, fh, indent=2)
+    except OSError:
+        return 0
+    print(json.dumps({"systemMessage":
+                      f"COMMITMENTS  {len(fresh)} stated this turn · "
+                      f"{len(book['open'])} open in this project"}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

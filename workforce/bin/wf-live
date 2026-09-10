@@ -146,9 +146,59 @@ def registry():
     sa = slurp(os.path.join(WF, "bin/wf-settings-apply"))
     block = re.search(r"SHIPPED_HOOKS = \{(.*?)\n\}", sa, re.S)
     hooks = sorted(set(re.findall(r'"(wf-[a-z0-9-]+)(?:@[a-z]+)?"', block.group(1)))) if block else []
+    # AGENT HOOKS ARE LIVE AND HAVE NO FILE. A `type: "agent"` hook is a prompt declared
+    # in AGENT_HOOKS, not a script in bin/ — so the phantom scan below, which asks "is
+    # there a file behind this name", reports one as backed by nothing and is wrong. It
+    # is exactly the kind of correct-looking false positive that teaches a reader to
+    # skim this report, which is the failure a 7.0% guard was retired for.
+    ablock = re.search(r"AGENT_HOOKS = \{(.*?)\n\}", sa, re.S)
+    agent_hooks = sorted(set(re.findall(r'"(wf-[a-z0-9-]+)"', ablock.group(1)))) if ablock else []
 
-    return {"scripts": scripts, "hooks": hooks, "procedures": procedures,
-            "agents": agents, "commands": commands}
+    return {"scripts": scripts, "hooks": hooks, "agent_hooks": agent_hooks,
+            "procedures": procedures, "agents": agents, "commands": commands}
+
+
+def orphan_handoffs(reg):
+    """Hooks that write a hand-off file nothing reads — a detector with no actor.
+
+    WHY THIS IS HERE AND NOT ONLY IN THE MAINTAINER'S SUITE. The rule it enforces is a
+    user directive — "A DETECTOR SHIPS WITH ITS FIX. Detection alone is not a
+    deliverable" (`SKILL.md` § Directives, 2026-08-05) — and it was first written into
+    `bin/check`, which is maintainer-only and in no manifest. That put the enforcement
+    of a shipped rule in the one place that does not ship: every host carried the
+    directive and nothing on any host could check it.
+
+    WHAT A MISSING ACTOR LEAVES BEHIND. Nothing can notice an absent component by
+    looking at present ones — a four-part design with three parts built leaves no
+    artifact. But a detector that records what it found, with nothing that consumes the
+    record, leaves exactly one trace: a file written and never read. That is what this
+    counts.
+
+    DELETING IS NOT ACTING. A hook that only clears the artifact is housekeeping, not a
+    consumer, and counting it as one is how the first version of this check passed while
+    the actor was absent.
+    """
+    scripts = {n: slurp(os.path.join(WF, "bin", n)) for n in reg["scripts"]}
+    apply_src = scripts.get("wf-settings-apply", "")
+    artifacts = set()
+    for src in scripts.values():
+        artifacts |= set(re.findall(r'f"(wf-[a-z-]+)\.\{', src))
+        artifacts |= set(re.findall(r'"(wf-[a-z-]+-flag)', src))
+    out = []
+    for a in sorted(artifacts):
+        writers = [n for n, src in scripts.items() if a in src and "json.dump" in src]
+        clearers = [n for n, src in scripts.items() if a in src and "os.remove" in src]
+        actors = [n for n, src in scripts.items()
+                  if a in src and n not in writers and n not in clearers]
+        if a in apply_src:                       # a type:"agent" reader has no file
+            actors.append("wf-settings-apply:AGENT_HOOKS")
+        if writers and not actors:
+            out.append(("DETECTOR", a,
+                        "written by %s%s, and acted on by NOTHING — a detector must "
+                        "ship with its fix (SKILL.md § Directives)"
+                        % (", ".join(writers),
+                           ", cleared by " + ", ".join(clearers) if clearers else "")))
+    return out
 
 
 def disagreements(reg):
@@ -156,13 +206,15 @@ def disagreements(reg):
     out = []
     live_script = set(reg["scripts"])
     # An agent is addressed as `wf-<dir>`; that name is backed by agents/<dir>/, not bin/.
-    live_agent = {"wf-" + a for a in reg["agents"]}
+    live_agent = {"wf-" + a for a in reg["agents"]} | set(reg.get("agent_hooks") or [])
 
     for c in reg["commands"]:
         if c not in reg["procedures"]:
             out.append(("command", c, "advertised in SKILL.md, no references/procedures/%s.md" % c))
 
     for h in reg["hooks"]:
+        if h in (reg.get("agent_hooks") or []):
+            continue                       # declared as a prompt, not a file
         if h not in live_script:
             out.append(("hook", h, "registered by wf-settings-apply, not in bin/"))
 
@@ -180,6 +232,8 @@ def disagreements(reg):
                     continue
                 imperative = fenced or RUNNABLE.search(line[:m.start()])
                 (broken if imperative else stale).setdefault(tok, []).append(f"{rel}:{lineno}")
+
+    out += orphan_handoffs(reg)
 
     for tok in sorted(broken):
         out.append(("BROKEN", tok, "a reader is told to run it, and it is not in bin/ or agents/ — "
@@ -206,6 +260,7 @@ def main():
 
     print("LIVE  what this distribution ships, read from the tree\n")
     for label, key in (("scripts", "scripts"), ("hooks", "hooks"), ("procedures", "procedures"),
+                       ("agent hooks", "agent_hooks"),
                        ("agents", "agents"), ("commands", "commands")):
         v = reg[key]
         head = ", ".join(v[:5]) + ("…" if len(v) > 5 else "")

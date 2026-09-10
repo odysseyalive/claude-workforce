@@ -40,6 +40,8 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-widen` | `SubagentStop` | *(none)* | the same widen on a spawned employee, for the reason the ledger has both rows: a subagent has zero residency and is the node most exposed to authoring from the thin surface in front of it. |
 | `wf-task-tag` | `UserPromptSubmit` | *(none)* | classifies the ASK before the turn runs and injects the sense that closes it — `history`/`world` need hearing, `behaviour` needs touch, `existence` needs taste. Names, never blocks: `decision: "block"` on this event erases the user's prompt. § The widen below |
 | `wf-widen-agent` | `Stop` | *(none)* | **the only hook here that ACTS.** A `type: "agent"` hook, not a command — it spawns a reader with Read/Grep/Glob and none of the finishing turn's context, opens the sense `wf-widen` flagged as unopened, and returns what it found as the next instruction. Returns `ok: true` and spends nothing when there is no flag. § The widen below |
+| `wf-commitments` | `Stop` | *(none)* | records what the turn said it would do NEXT — a stated intention is a debt, and this is the one queue nobody was keeping. Records and reports; never blocks, never judges whether an item is done. § The commitment ledger below |
+| `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -293,6 +295,34 @@ prompt-injection defences and gets surfaced to the user — which would turn an 
 into one more thing a human has to do.
 
 **`stop_hook_active` returns immediately.** A widen that can widen forever is a wedged session.
+
+## The commitment ledger
+
+**The defect this closes sits one level above every other hook here, and it is measured.**
+The user set a goal — *"don't stop until what I asked for is done completely"* — and the
+next turn answered with a list: wire the tag into `wf-widen`, the manifest, the hook set,
+docs, assertions, fixtures, then run every suite. Every item shipped. All four suites went
+green. The goal's condition held and it cleared, correctly. **And the work was still half
+done**, because the list omitted the acting half of the mechanism being built.
+
+**The defect is the list, not the goal.** A goal takes its definition of "done" from a list
+written inside the same head that is tunneling, so it inherits whatever that head left out.
+Checking the list is the tunnel grading its own homework against an answer key it wrote.
+
+**What can be mechanised is narrower, and still worth having.** Nothing on the machine knows
+whether the right list was written. What it can hold is that **a list stated out loud is a
+debt that must not evaporate silently** — recorded at `Stop`, surviving the session, read
+back at `SessionStart`. It cannot make a list complete. It stops an incomplete one from
+being quietly forgotten, which is the failure that actually happened.
+
+**It is `SKILL.md`'s deferment-queue directive pointed at the operator.** *"all items in the
+deferment queue should be resolved one by one ... NO EXCEPTIONS! NO BLOCKS! NO EXCUSES!"*
+was written about a run's deferred findings; this is the same rule applied to the queue of
+things the operator said it would do next.
+
+**It never judges whether an item is done.** That is a judgment, and a regex making it would
+close debts that are still open — the worse of the two errors, because an item wrongly
+closed is invisible while an item wrongly kept is one line a reader dismisses.
 
 ## The turn ledger
 

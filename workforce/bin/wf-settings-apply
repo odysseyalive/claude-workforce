@@ -106,6 +106,14 @@ SHIPPED_HOOKS = {
     # this one spawns a reader and opens the channel the turn left shut. Config shape is
     # in AGENT_HOOKS below — it is registered as `type: "agent"`, not `command`.
     "wf-widen-agent": ("Stop", None),
+    # THE DEBT LEDGER, ON BOTH ENDS OF A SESSION. `Stop` records what a turn said it
+    # would do next; `SessionStart` reads it back before the first request of the next
+    # session. Registered twice for the same reason the ledger is: a stated intention
+    # that disappears between sessions is how work gets left half finished, and the
+    # gap it closes is measured — a goal whose condition held while the work was still
+    # half done, because the list it checked was written by the head that was tunneling.
+    "wf-commitments": ("Stop", None),
+    "wf-commitments@sessionstart": ("SessionStart", None),
 }
 
 # AGENT-HOOK CONFIG, keyed by the same names SHIPPED_HOOKS uses.
