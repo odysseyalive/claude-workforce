@@ -62,6 +62,27 @@ READERS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}
 # skill, an MCP server. Counted apart from reads for the reason in `turn_counts`.
 OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
 
+# READING THE RECORD IS HEARING, and this set is why the guard blocked a turn that had
+# done exactly what it asked. `wf-task-tag`'s own SENSE_HOW tells a reader that hearing
+# means *"read the record that decided it (`git log`, `workforce/changes/`), or ask a
+# source outside this turn's own reasoning"* — and nothing counted either. A turn that
+# read `changes/1.30.1.md` and `1.30.2.md` before removing a mechanism scored `hearing 0`
+# and was blocked for not opening the channel it had opened.
+#
+# The two halves disagreed because they were written apart: the INSTRUCTION names the
+# change record and the git log; the DETECTOR named five tool types and no commands. Same
+# producer/consumer split as `SET_CMD`'s spelling list and `distinct`'s first token, and
+# the same cost — a guard that refuses the work it demands teaches its reader it is noise.
+#
+# Testimony is a command as much as a tool: `git log` and `git show` are the record
+# speaking, and `changes/` is this distribution's own. A point read of a source file is
+# NOT hearing and must not become it — that is sight, and conflating them would let any
+# turn satisfy hearing by reading anything.
+OUTSIDE_CMD = re.compile(
+    r"\bgit\s+(?:log|show|blame|diff)\b"
+    r"|\bchanges/[0-9]"
+    r"|\bwf-changes\b")
+
 # ── this distribution's OWN coined vocabulary ────────────────────────────────
 # Words that mean nothing to a reader who has not read these files. Not "hard
 # words" and not a style opinion: each one is a term this project invented, and a
@@ -299,7 +320,8 @@ def turn_counts(payload):
             # wrong reading came from outside the turn, none from re-reading inside
             # it. A repository read and a spawned second opinion are not the same
             # evidence, however alike they look in a raw tool count.
-            if name in OUTSIDE or name.startswith("mcp__"):
+            if (name in OUTSIDE or name.startswith("mcp__")
+                    or (name == "Bash" and OUTSIDE_CMD.search(str(inp.get("command", ""))))):
                 outside += 1
             # Bash counts as a read WITHOUT inspecting the command. A command that
             # also mutates still looked at something, and the read is the half that

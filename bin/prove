@@ -210,6 +210,12 @@ TLDG = "workforce/bin/wf-turn-ledger"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # Narrowing the record class is the regression: `changes/` and the git log stop
+    # reading as testimony, and the guard goes back to blocking turns that consulted the
+    # record. The whole alternative is deleted rather than a fragment of it — a fragment
+    # left `\bgit\s+` matching more, not less, which is how the wf-catalog case failed.
+    ("the ledger's detectors measure sources and set-reads, not shell verbs",
+     TLDG, "del", r'    r"\bgit\s+(?:log|show|blame|diff)\b"' + "\n"),
     # ── the registry is RUN, not described (2026-09-10) ──────────────────────
     # bin/check asserted wf-live's SOURCE still said "BROKEN" and never executed it, so
     # the failing tier was a net nobody attached and three classes of defect sat

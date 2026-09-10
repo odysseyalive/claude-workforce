@@ -1121,6 +1121,29 @@ if _tlmod is not None:
     # The measured failure: first-token extraction returned the shell verb, so one real
     # turn reported `8 distinct` that were timeout, grep, sed, python3, git, until, cat,
     # nohup. Forty greps over forty files scored 1; six utilities on one file scored 6.
+    # THE DETECTOR MUST COUNT THE CHANNEL THE INSTRUCTION NAMES. `wf-task-tag`'s SENSE_HOW
+    # tells a reader hearing means "read the record that decided it (`git log`,
+    # `workforce/changes/`)"; `OUTSIDE` named five tool types and no commands, so a turn
+    # that read two change records before removing a mechanism scored `hearing 0` and was
+    # BLOCKED for not opening the channel it had opened. Same producer/consumer split as
+    # SET_CMD's spelling list, and the same cost.
+    _oc = getattr(_tlmod, "OUTSIDE_CMD", None)
+    if _oc is None:
+        _det.append("OUTSIDE_CMD is gone; reading the change record or the git log no "
+                    "longer counts as hearing, so the guard blocks turns that did exactly "
+                    "what wf-task-tag told them to do")
+    else:
+        for _probe in ("sed -n 1,40p workforce/changes/1.30.1.md",
+                       "git log --oneline -1 -- workforce/bin/wf-task-tag"):
+            if not _oc.search(_probe):
+                _det.append(f"`{_probe}` no longer reads as hearing")
+        # And it must NOT swallow sight: a point read of any file would let every turn
+        # satisfy hearing by reading anything at all.
+        if _oc.search("cat workforce/references/senses.md"):
+            _det.append("OUTSIDE_CMD now matches an ordinary file read — hearing and sight "
+                        "have collapsed, and a channel that everything satisfies is not a "
+                        "channel")
+
     _tg = getattr(_tlmod, "read_targets", None)
     if not callable(_tg):
         _det.append("read_targets is gone; the distinct count is back to the first token "
