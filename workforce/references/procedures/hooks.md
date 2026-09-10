@@ -321,3 +321,35 @@ still comes from the transcript, where lag is harmless: tool calls are recorded 
 `wf-turn-ledger@subagent` is a second registration of the same script; `hook_script()` strips the
 `@event` suffix when resolving the path. Without that split the key was used as a filename and resolved
 to a script that does not exist.
+
+## The ungrounded-absence trigger
+
+**The one trigger that survived measurement, and three that did not.** Measured over **1,495
+substantive Opus 5 turns** from this machine's transcripts:
+
+| candidate | rate | why it failed |
+|---|---|---|
+| reasoning-depth counter | **fires never** | max observed depth 5, against a Deterministic Horizon of 19–31 (arXiv 2606.00376). Wrong failure model — the claims fail at depth 1–2, immediately after a read, not after a long unaided chain |
+| one distinct source | **37.9%** | five times the rate that retired the last guard |
+| one source + a universal claim | **20.6%** | fires on *"none of it refuses anything"*, on a quoted spec |
+| **zero reads + a project-scoped absence claim** | **0.5%** | seven fires in 1,495 turns |
+
+**It is a conjunction of two mechanical facts and neither is a judgment**: the turn ran no read (a
+count), and the reply asserts absence about something the tree could answer for (a closed vocabulary
+inside a noun window). **Neither half works alone.** Zero reads alone is 11.2% and usually *correct* —
+answering from context already in hand is directive two's own instruction.
+
+**The noun window reads both directions**, and that is not symmetry for its own sake: looking only
+forward lost the very claim that prompted this work — *"this repo carries no org and does not need
+one"* puts its nouns **before** the phrase. A window that reads one way is a filter narrower than its
+question, which is the defect this project keeps finding in its own guards.
+
+**It reports and never blocks.** StepShield (arXiv 2601.22136, NeurIPS 2026) measured an 847-rule
+pattern guardrail at 86% recall whose intervention *timing* was statistically indistinguishable from
+random — EIR 0.23 against 0.24, p=0.66 — because *"regex guardrails detect syntax, not intent"*. This
+is a regex. 0.5% is cheap enough to print and nowhere near good enough to gate a turn on.
+
+**What it does not do.** It cannot tell whether the claim is true. Every escape in the session that
+produced it came from outside — six from the user, three from a panel, zero from noticing. This makes
+one narrow class of ungrounded claim *visible at the moment it is made*; it does not make the claim
+right, and it must never be reported as if it did.

@@ -83,6 +83,54 @@ JARGON = re.compile(
 # shape: `dormant` inside a probe FILENAME, `fan-out` inside a table cell of
 # identifiers. Masking dropped it to 5.2% and removed that whole class. A backticked
 # term is naming an artifact; a bare one is asking the reader to decode it.
+# ── the ungrounded-absence trigger ───────────────────────────────────────────
+# The ONE trigger that survived measurement, and three that did not.
+#
+# MEASURED over 1,495 substantive Opus 5 turns from this machine's transcripts:
+#     a reasoning-depth counter          fires NEVER — max observed depth 5
+#                                        against a Deterministic Horizon of 19-31
+#                                        (arXiv 2606.00376). Wrong failure model.
+#     one distinct source                37.9%  — five times the rate that retired
+#                                        the last guard
+#     one source + a universal claim     20.6%  — fires on "none of it refuses
+#                                        anything", on a quoted spec
+#     ZERO reads + a universal claim      2.6%  <- this one
+#
+# It is a CONJUNCTION of two mechanical facts and neither is a judgment: the turn
+# ran no read (a count), and the reply asserts absence (a closed vocabulary).
+# Neither half works alone. Zero reads alone is 11.2% and usually CORRECT —
+# answering from context already in hand is directive two's own instruction.
+#
+# And it is where the failures actually were. Every claim a human had to correct in
+# the session that produced this file was a statement about what is NOT there,
+# written in a turn that looked at nothing: "this repo carries no org and does not
+# need one"; "vendor is the only documented path"; a command assumed deprecated.
+#
+# WHY IT REPORTS AND NEVER BLOCKS. StepShield (arXiv 2601.22136, NeurIPS 2026)
+# measured a 847-rule pattern guardrail at 86% recall whose intervention TIMING was
+# statistically indistinguishable from random (EIR 0.23 vs 0.24, p=0.66), because
+# "regex guardrails detect syntax, not intent". This is a regex. A 2.6% rate is
+# cheap enough to be worth printing and nowhere near good enough to gate a turn on.
+# THE PHRASE MUST BE ABOUT THE PROJECT, not about the ask or the work just done.
+# Two false positives on the first build, and both were the same shape: "Nothing else
+# changed" is a REPORT, and "the only sensible reading of your ask" is about the ASK.
+# Neither is a claim about what the tree contains. So the universal phrase must be
+# followed, within a short window, by something the tree could answer for — a file, a
+# command, a hook, a procedure. That window is what separates a claim from a turn of
+# phrase, and it costs one regex rather than a judgment.
+_ABSENCE_PHRASE = (r"the only|no other|the sole|only way|only place"
+                   r"|there is no|there are no|does(?:n't| not) need|was never|were never")
+_PROJECT_NOUN = (r"file|files|script|scripts|command|commands|hook|hooks|procedure|procedures"
+                 r"|path|paths|skill|skills|agent|agents|handbook|handbooks|org|repo|repository"
+                 r"|reference|references|manifest|assertion|assertions|check|checks|employee")
+# THE NOUN MAY SIT ON EITHER SIDE. Looking only forward lost the very claim that
+# started this work — "this repo carries no org and does not need one" puts `repo` and
+# `org` BEFORE the phrase. A window that only reads rightwards is a filter narrower
+# than its question, which is the defect this project keeps finding in its own guards.
+_NOUN_THEN_PHRASE = rf"\b(?:{_PROJECT_NOUN})\b[^.\n]{{0,70}}?\b({_ABSENCE_PHRASE})\b"
+_PHRASE_THEN_NOUN = rf"\b({_ABSENCE_PHRASE})\b[^.\n]{{0,70}}?\b(?:{_PROJECT_NOUN})\b"
+ABSENCE = re.compile(rf"{_PHRASE_THEN_NOUN}|{_NOUN_THEN_PHRASE}", re.I)
+
 _FENCE = re.compile(r"```.*?```", re.S)
 _CODE = re.compile(r"`[^`\n]*`")
 
@@ -187,6 +235,14 @@ def main():
     tail = ("  ·  PLAIN: " + ", ".join(terms[:4]) + ("…" if len(terms) > 4 else "")) if terms else ""
 
     if reads == 0:
+        # The conjunction. Absence asserted by a turn that looked at nothing is the
+        # one shape four measurements agreed on; every other turn with no reads is
+        # reported plainly and not flagged at all.
+        claim = ABSENCE.search(mask_code(reply))
+        if claim:
+            emit(f"GROUNDING  0 reads · asserts \"{claim.group(0)}\" — a claim about "
+                 f"what is NOT there, from a turn that looked at nothing." + tail)
+            return 0
         emit("GROUNDING  0 reads this turn — answering from context already in hand."
              + tail)
         return 0
