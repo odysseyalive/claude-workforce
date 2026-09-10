@@ -646,6 +646,12 @@ if '"block"' in _tt_code or "suppressOriginalPrompt" in _tt_code:
 if "for name, pat, sense, why in KINDS" not in _tt:
     _tt_problems.append("the all-matches loop is gone; first-match-wins names one sense "
                         "and silently drops the other on an ask that is two kinds at once")
+if "os.remove(tag_path(payload))" not in _tt:
+    _tt_problems.append("an untagged turn no longer clears the previous turn's tag; "
+                        "wf-widen then reads a stale tag at Stop as though it belonged "
+                        "to this turn, and blocks a message that carried no claim — a "
+                        "correct detector reading last turn's input, which is the 7.0% "
+                        "noise that retired wf-speak-guard arriving by another route")
 if "additionalContext" not in _tt:
     _tt_problems.append("the injection channel is gone; a tag nothing reads is a tag "
                         "that changes no turn")

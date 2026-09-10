@@ -4,7 +4,7 @@ name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, retire, handbook, org, principles, review, amend, defect, ledger, roster, model-map, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.42.1"
+version: "1.43.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -541,6 +541,36 @@ Mechanics at `bin/sync` § NEVER CREATE AN INSTALL THAT WAS NOT ALREADY THERE an
 whose removal runs in a `finally` block so a failing command, a traceback, and a Ctrl-C all still
 clean up. The operational reading is — **never materialize an install nobody asked for, and test
 against a copy you are about to delete.***
+
+> **"You know whenever you're doing an evaluation or whenever you're setting up an
+> evaluation during a project audit It's Absolutely needs to be the directive that
+> Evaluations are always done by the independent agent"**
+
+> **"Just running tools doesn't mean that you're doing a good job. It's the evidence
+> from the tool run comparative to the results from the ask that you would ascertain
+> whether what the score is. So you know you have to measure results, not measure what
+> you're doing and it has to be aligned with the current request."**
+
+*— Added 2026-09-09, source: user directive, two statements minutes apart and captured
+together because they are one rule seen from both ends. Stated on being shown that
+`wf-widen` scored a turn **100/100 because it made two Bash calls**, and that the score
+ran in the SAME session that did the work. Both halves were confirmed from the code
+before the directive was given: the counts are real transcript events, the
+`2/1/0 -> 100/50/0` thresholds appear **exactly once** (`wf-widen:339`) with no
+measurement anywhere in the repository, and the only independent component
+(`wf-widen-agent`) was gated so it **never saw a passing turn**. The operational reading
+is — **a session may never score its own work, and a score may never be a tally of
+activity.** The first clause is why: an agent that did the job and then grades it returns
+a good grade, or it would not have stopped. The second is the same failure one level
+down — running a tool is not evidence of anything, and what makes it evidence is what
+came back MEASURED AGAINST WHAT THE ASK WANTED. These compose rather than stack: you
+cannot measure results with a counter, because comparing evidence to a request requires
+reading both, so "measure results" FORCES "independent agent" rather than merely sitting
+beside it. It also unlocks the sixth sense — `intuition` shipped permanently unscored
+because judging one's own prior from inside is the impaired faculty, and that objection
+dissolves the moment the judge is somebody else. Mechanics at `references/senses.md`;
+`references/enforcement.md` governs the overclaim half, since a number that reads as a
+grade and counts tool calls is that table's own defect one level up.*
 
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission

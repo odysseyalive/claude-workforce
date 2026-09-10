@@ -140,6 +140,21 @@ def main():
 
     hits = classify(payload.get("prompt") or "")
     if not hits:
+        # AN UNTAGGED TURN MUST NOT INHERIT THE LAST ONE'S TAG. Returning here without
+        # clearing left the previous turn's tag file on disk, and `wf-widen` read it at
+        # `Stop` as though it belonged to this turn.
+        #
+        # MEASURED 2026-09-09, on a message with no technical content at all — "tunnel
+        # vision is never fun and it shouldn't be for you". It matched none of the four
+        # kinds, inherited `behaviour` from the turn before, and was blocked for not
+        # running a shell command to close a remark about tunnel vision. A guard that
+        # fires on a turn carrying no claim is the 7.0% noise that retired
+        # `wf-speak-guard`, arriving by a different route: not a bad detector, but a
+        # correct detector reading last turn's input.
+        try:
+            os.remove(tag_path(payload))
+        except OSError:
+            pass
         return 0
 
     try:
