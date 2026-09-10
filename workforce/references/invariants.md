@@ -1,6 +1,6 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 22 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can

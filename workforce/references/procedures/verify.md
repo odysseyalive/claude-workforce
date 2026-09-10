@@ -1,6 +1,6 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 37 assertion(s) in bin/check name this file; 70 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
 executes immediately.
 

@@ -1,6 +1,6 @@
 # Install Scopes — where the skill lives, where the company lives
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — read before writing any path, or before changing where state is stored. -->
 
 claude-workforce installs **personally by default** (`~/.claude/skills/workforce/`): one copy per

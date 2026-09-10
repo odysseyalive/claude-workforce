@@ -1,6 +1,6 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 12 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without

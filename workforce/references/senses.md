@@ -1,5 +1,6 @@
 # The six senses
 
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 10 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 *How a turn takes something in, and which channel settles which kind of claim.*
 
 A tunnel is not too little evidence. It is all of the evidence through one aperture — and

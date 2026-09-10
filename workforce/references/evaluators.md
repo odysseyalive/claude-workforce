@@ -1,6 +1,6 @@
 # Evaluators — code, text, and security quality review
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 47 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 51 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — these are what make tier-4 verification defensible.
      NAMING WARNING: "evaluators" (this file) are quality reviewers with catalogs.
      "evals" (evals.md) are per-employee measurement sets. Different things, similar

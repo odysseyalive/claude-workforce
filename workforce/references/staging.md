@@ -1,6 +1,6 @@
 # Staging — lint, probe, and canary
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — nothing is registered without passing these. -->
 
 Three phases, run in order, each proving something the others cannot. The value of this file is in
