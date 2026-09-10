@@ -11623,6 +11623,22 @@ check(
     "a check stops being read. Excluded silently is the other half of the defect",
 )
 
+# THE INDEX ROW MUST NAME THE WORK, NOT THE BOOKKEEPING.
+# `wrap` ends every session with "Roll the session into one release (vX.Y.Z)" and a
+# record regeneration, so a subject taken from the range's tip is the bump commit every
+# time. MEASURED 2026-09-10: 1.48.0 and 1.49.0 — both the releases that existed after
+# `wrap` shipped — both read "Roll the session into one release" in the index, which
+# tells a reader scanning it nothing about either. The archive regenerates whole, so the
+# fix repaired both retroactively.
+_gc = read("bin/gen-changes")
+check(
+    "change index: the release subject skips the bump and record-regeneration commits",
+    "_BOOKKEEPING" in _gc and "roll the session into one release" in _gc
+    and "regenerate the change record" in _gc,
+    "the subject comes from the tip of the range, which `wrap` guarantees is the version "
+    "bump — so every release reads identically and the index stops distinguishing them",
+)
+
 check(
     "directives sidecar: wf-stamp implements the producer, not only the contract half",
     "--directives" in _ds_stamp and "def stamp_directives" in _ds_stamp

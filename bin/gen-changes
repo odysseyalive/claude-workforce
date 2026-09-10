@@ -176,8 +176,28 @@ def main():
         date = git("log", "-1", "--format=%ad", "--date=short", bump).strip()
         surf = surfaces_for(paths)
         heal = any(any(h in p for p in paths) for h in HEAL_PATHS)
-        subj = git("log", "-1", "--format=%s", bump).strip()
-        subj = re.sub(r"\s*\(v[\d.]+\)\s*$", "", subj)
+        # THE BUMP COMMIT IS THE WORST SUBJECT IN THE RANGE, AND SINCE `wrap` IT IS
+        # ALWAYS THE LAST ONE. `wrap` ends every session with "Roll the session into
+        # one release (vX.Y.Z)" followed by a record regeneration, so taking the tip's
+        # subject makes every future release read identically. MEASURED 2026-09-10:
+        # 1.48.0 and 1.49.0 — both releases that existed after `wrap` shipped — both
+        # said "Roll the session into one release", which tells a reader scanning the
+        # index nothing about either. Take the newest commit in the range that is not
+        # bookkeeping; fall back to the tip only when there is nothing else, which is
+        # the genuine "this release IS the bump" case.
+        _BOOKKEEPING = ("roll the session into one release",
+                        "regenerate the change record",
+                        "bump to ")
+        subj = ""
+        for _c in commits:                     # newest first, as `git log` returns
+            _s = re.sub(r"\s*\(v[\d.]+\)\s*$", "",
+                        git("log", "-1", "--format=%s", _c).strip())
+            if not any(_s.lower().startswith(b) for b in _BOOKKEEPING):
+                subj = _s
+                break
+        if not subj:
+            subj = re.sub(r"\s*\(v[\d.]+\)\s*$", "",
+                          git("log", "-1", "--format=%s", bump).strip())
 
         rows.append((ver, date, surf, heal, subj, len(commits), len(paths)))
 

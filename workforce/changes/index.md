@@ -8,8 +8,8 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.49.0 | 2026-09-10 | audit, changes, hooks, scripts, installer, platform | no | Roll the session into one release |
-| 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | Roll the session into one release |
+| 1.49.0 | 2026-09-10 | audit, changes, hooks, scripts, installer, platform | no | A grant naming a tool the host does not have, and a ceiling that counts the wrong unit |
+| 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | No regex reads between the lines, so a share of everything gets an outside read |
 | 1.47.1 | 2026-09-10 | changes, installer | no | The hook that forced a version number per commit is gone |
 | 1.47.0 | 2026-09-10 | changes, installer | no | The session boundary is a judgement, so it is a command |
 | 1.46.0 | 2026-09-10 | scripts | no | The reason is the deliverable, on every verdict |
@@ -22,7 +22,7 @@
 | 1.42.0 | 2026-09-09 | hooks, scripts, installer | no | The list was written by the head that was tunneling |
 | 1.41.0 | 2026-09-09 | hooks, scripts | no | The alarm had no response |
 | 1.40.0 | 2026-09-09 | hooks, scripts, installer | no | Tag the ask, not the answer |
-| 1.39.1 | 2026-09-09 | audit, verify, hooks | **yes** | Bump to 1.39.1 — the healing pass shipped on an unchanged version |
+| 1.39.1 | 2026-09-09 | audit, verify, hooks | **yes** | The heal reported 171 and missed four |
 | 1.39.0 | 2026-09-09 | audit, verify, changes, hooks, scripts, installer | no | The stop and the report were the same act |
 | 1.38.0 | 2026-09-09 | changes, hooks, scripts, installer | no | The class that needed a human: a true citation supporting a false claim |
 | 1.37.0 | 2026-09-09 | changes, hooks, scripts, installer | no | Four triggers measured against 1,495 real turns; one survived at 0.5% |
@@ -42,7 +42,7 @@
 | 1.32.0 | 2026-09-09 | update, scripts | no | An update that finished still read as broken, and eight hooks died quietly |
 | 1.31.0 | 2026-09-09 | audit, update, changes, scripts, installer | no | A version number nothing could explain |
 | 1.30.3 | 2026-09-09 | chart, audit, verify, installer | **yes** | The prune could not reach the hosts it was written for |
-| 1.30.2 | 2026-09-09 | handbook, chart, principles, audit, verify, hooks, scripts, installer, platform | **yes** | Bump to 1.30.2 — the strip shipped on an unchanged version |
+| 1.30.2 | 2026-09-09 | handbook, chart, principles, audit, verify, hooks, scripts, installer, platform | **yes** | A rule written sixteen times is a rule that is not working |
 | 1.30.1 | 2026-09-08 | scripts | no | A guard that fires on 7% of good replies teaches you to ignore it |
 | 1.30.0 | 2026-09-08 | scripts, installer | no | Date the observation, do not grade the prose |
 | 1.29.0 | 2026-09-08 | audit, verify, hooks, scripts, installer | no | A rule with no producer is a description |
