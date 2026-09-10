@@ -45,6 +45,14 @@ needs. Asking for a channel the claim never required is how a guard earns its wa
 being ignored — one was retired from this distribution at a measured 7.0% false-positive
 rate for that (`changes/1.30.1.md`).
 
+**A DESIGN ASK IS THE KIND THE OTHER FOUR MISS.** History, world, behaviour and existence
+all ask about FACTS — what the record says, what the world says, what a script does, what is in a
+set. A proposal is none of those, and it is where a tunnel forms: the design looks right from
+inside, which is what "all of the evidence through one aperture" feels like. *Added 2026-09-10
+after a session in which two of ten asks carried a docket, and the three design asks that carried
+none produced a reading an independent reader broke in one move.* Its sense is hearing for the same
+reason the whole file exists — the escape comes from a voice that is not this turn's own.
+
 **Match the channel to the claim, not to the effort.**
 
 - "There is no X" / "X is the only one" → **taste.** A point read samples a set; it cannot
@@ -73,6 +81,7 @@ scores against that tag at `Stop` rather than re-guessing.
 |---|---|---|---|
 | `history` | why was this removed · should we restore it · was it deliberate | **hearing** | a tree shows what is there; only the record says whether an absence was a decision |
 | `world` | is it deprecated · what is current · still supported | **hearing** | this repository cannot know the world |
+| `judgment` | should we · why not · is that a good idea · what do you think | **hearing** | a proposal you authored cannot be judged from inside; nine of ten escapes came from outside the turn |
 | `behaviour` | does it work · why does it fail · what does it return | **touch** | prose says what a script does; running it says what it did |
 | `existence` | is there any · how many · list every · anywhere else | **taste** | a claim about a set is closed by enumerating it |
 

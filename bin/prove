@@ -211,6 +211,10 @@ TTAG = "workforce/bin/wf-task-tag"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # Removing the judgment kind restores the gap: design asks carry no docket, so the
+    # jury can never convene on the turns where a reading forms unchecked.
+    ("the tagger reads the user's ask, and tells a question from a statement",
+     TTAG, "del", '    ("judgment", re.compile(\n'),
     # ── the docket must come from the user's own words (2026-09-10) ──────────
     # Measured over 1,909 real prompts: 469 turns carried a docket built from injected
     # preamble the user never wrote. Deleting the guard restores that.

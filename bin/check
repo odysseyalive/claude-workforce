@@ -1193,6 +1193,26 @@ if _ttm is not None:
     if not any(h["kind"] == "world" for h in _ttm.classify("aren't those deprecated?")):
         _tag.append("a genuine world question no longer tags; the `world` gate has gone "
                     "from too loose to too tight")
+    # THE KIND THE TUNNELS FORMED IN. The other four ask about facts; a design ask
+    # proposes something, and a proposal its author judges from inside is the impaired
+    # faculty this whole mechanism is built around. Measured at 2.5% of 1,323 real
+    # non-injected prompts.
+    for _q in ("why not just install them centrally?", "should we audit workforce itself?",
+               "is that a good idea or would that confuse things?"):
+        if not any(h["kind"] == "judgment" and h["sense"] == "hearing"
+                   for h in _ttm.classify(_q)):
+            _tag.append(f"a design ask carries no docket — `{_q}` — so the jury cannot "
+                        f"convene on the asks where a reading forms unchecked, which is "
+                        f"the gap that let this session's tunnels form")
+            break
+    # And it must not swallow plain instructions, which is what `should be` unhedged did.
+    for _i in ("please commit all the changes to main", "fix the failing test",
+               "that should be in the email"):
+        if any(h["kind"] == "judgment" for h in _ttm.classify(_i)):
+            _tag.append(f"`{_i}` tags as a design ask — an instruction is not a proposal, "
+                        f"and unhedged `should be` was measured doubling the rate on "
+                        f"exactly this shape and rejected")
+            break
     if not any(h["kind"] == "behaviour" for h in _ttm.classify("run the baseline test now")):
         _tag.append("an imperative no longer tags `behaviour` — the asymmetry is the "
                     "point, and gating every kind on a question mark suppresses the "
