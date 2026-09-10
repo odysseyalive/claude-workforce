@@ -2989,13 +2989,22 @@
     "stdin_raw": "{\"prompt\": \"make the button blue\", \"session_id\": \"fx\"}",
     "want": []
   },
+  "widen-sampled-not-blocked": {
+    "_why": "A PASSING turn picked by the 1-in-5 audit sample is reported and NOT blocked. It opened every channel its ask required, so this hook has nothing to object to - the audit is the agent's job on the same Stop, and blocking here would punish a turn for being picked. The sample exists because auditing only self-declared failures is the self-scoring bias one step removed: looking fine is exactly what a tunnel does from inside.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"There is no hook wired for that event. Enumerated the set. run 12\"}",
+    "want": [
+      "sampled for audit"
+    ]
+  },
   "widen-absence-widens": {
     "_why": "The measured trigger: a claim that something is NOT there is a claim about a SET, and point reads sample a set rather than close it. Fires at 0.5% over 1,495 real turns, so it is inside the 7.0% budget that retired this distribution's last speech guard.",
     "exit": 0,
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"There is no hook wired for that event.\"}",
     "want": [
-          "WIDENING"
+          "taste NOT OPENED"
     ]
   },
   "widen-promise-continues": {

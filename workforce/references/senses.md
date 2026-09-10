@@ -93,8 +93,24 @@ Three parts, cheap to expensive, so the expensive one only runs when it is earne
    sense went unopened it blocks the stop, and writes a flag naming what is unopened.
 3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **No flag, it
    returns `ok: true` and spends nothing.** With a flag, it spawns a reader carrying
-   Read/Grep/Glob and none of the finishing turn's context, opens the named channel
-   itself, and returns what it found.
+   Read/Grep/Glob and none of the finishing turn's context, and judges whether the
+   EVIDENCE supports the CONCLUSION for that ASK — verifying against the repository
+   rather than taking the turn's word for it.
+
+**Nothing in steps 1 and 2 scores anything, and that is a directive rather than a
+design taste.** *"you have to measure results, not measure what you're doing and it has
+to be aligned with the current request"*, and *"Evaluations are always done by the
+independent agent"* (`SKILL.md` § Directives, 2026-09-09). An earlier version returned
+0-100 from thresholds nobody had measured — two Bash calls scored 100 — and graded its
+own work in-session. A count of recorded calls against zero is a fact; whether the work
+was good is a judgement, and the judge did not do the work.
+
+**Passing turns are audited too, at `WF_AUDIT_SAMPLE` (default 1 in 5).** Auditing only
+the turns that fail their own dispatch is the same bias one step removed: a turn that
+looks fine would be judged by nothing but the session that produced it, and looking fine
+is exactly what a tunnel does from inside. `1` audits every claim-carrying turn, `0`
+disables sampling. It is a cost dial, not a correctness one — systematic self-flattery
+shows up across turns rather than inside any single one.
 
 **The agent is the point.** A command hook has no model: it can decide a sense went
 unopened and it cannot open one. A spawn is not self-checking — fresh context, no

@@ -601,6 +601,16 @@ check(
 # that it has no false-positive rate because it never judges, and this one does judge,
 # so it carries the burden the ledger is exempt from.
 _wd = read("workforce/bin/wf-widen")
+# TEST THE CODE, NOT THE PROSE ABOUT THE CODE. This file explains at length why the
+# invented score was removed, so it necessarily contains the strings "100/100" and
+# "2/1/0 -> 100/50/0" — and a whole-file substring test fails on the file DOCUMENTING
+# the property it checks. Third time this shape has bitten here (the producer-has-a-
+# reader check passing on its own comment, wf-task-tag's never-blocks clause), so it
+# is stripped properly rather than special-cased: every docstring and every comment
+# out, then match what is left.
+_wd_code = re.sub(r'"""(?:.|\n)*?"""', " ", _wd)
+_wd_code = re.sub(r"(?m)^\s*#.*$", " ", _wd_code)
+_wd_code = re.sub(r"(?m)\s+#.*$", " ", _wd_code)
 _wd_problems = []
 if "stop_hook_active" not in _wd:
     _wd_problems.append("the re-entrancy guard is gone; a widen that can widen forever "
@@ -617,6 +627,22 @@ if "dont_write_bytecode" not in _wd:
     _wd_problems.append("bytecode suppression is gone; importing a sibling by path drops "
                         "a __pycache__/ inside the SHIPPED directory on every host, "
                         "every turn")
+if ("100 if n >= 2" in _wd_code or "/100" in _wd_code
+        or "WF_WIDEN_THRESHOLD" in _wd_code):
+    _wd_problems.append("the invented score is back. SKILL.md § Directives: a score may "
+                        "never be a tally of activity. The 2/1/0 -> 100/50/0 thresholds "
+                        "appeared exactly once in this repository with no measurement "
+                        "anywhere behind them, and 100/100 read as 'this work was "
+                        "complete' while meaning 'two shell commands ran'")
+if "WF_AUDIT_SAMPLE" not in _wd_code:
+    _wd_problems.append("the passing-turn sample is gone; auditing only the turns that "
+                        "fail their own dispatch is the self-scoring bias wearing a "
+                        "different hat, because looking fine is what a tunnel does")
+if ('"conclusion"' not in _wd_code or '"ask"' not in _wd_code
+        or '"evidence"' not in _wd_code):
+    _wd_problems.append("the hand-off no longer carries ask/evidence/conclusion, so the "
+                        "auditing agent cannot compare results against the request — "
+                        "which is the whole of the measure-results directive")
 if "applicable" not in _wd:
     _wd_problems.append("the moving denominator is gone; scoring a turn on senses its "
                         "claim never needed marks down correct work, which is how the "
@@ -706,6 +732,13 @@ if "_same_agent(h, agent_cfg)" not in _sa_agent or _sa_agent.count("_same_agent(
                         "and the post-write re-read; when only one knew about agent "
                         "hooks, a correct write came back UNVERIFIED and a verifier that "
                         "cries failure on a good write is worse than the write it doubts")
+if "prompt CHANGED" not in _sa_agent:
+    _ag_problems.append("a rewritten agent prompt no longer updates in place. An agent "
+                        "hook IS its prompt, identity is deliberately coarse so a rename "
+                        "cannot orphan a live registration, and without a separate "
+                        "equality check a rewritten prompt reports NOOP forever while "
+                        "the machine keeps running the old one — measured on the "
+                        "widening agent, whose entire redesign reached nothing")
 if "def _same_agent(" not in _sa_agent:
     _ag_problems.append("agent-hook identity is gone; agent hooks carry no `command`, so "
                         "_same_command answers False forever and every --wire-defaults "

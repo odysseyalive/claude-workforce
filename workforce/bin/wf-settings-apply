@@ -139,15 +139,18 @@ AGENT_HOOKS = {
         "prompt": (
             "Hook input: $ARGUMENTS. Read the file "
             "<scratchpad_dir>/wf-widen-flag.<session_id>.json. If it does not exist, "
-            "respond {\"ok\": true} and do nothing else. If it exists, it names one or "
-            "more SENSES the finishing turn left unopened and why. Read "
-            "references/senses.md in the workforce skill directory for what each sense "
-            "means, then OPEN those senses yourself against this repository — read the "
-            "git record and workforce/changes/ for hearing, run the thing for touch, "
-            "enumerate the set with Glob/grep -l for taste — and respond "
-            "{\"ok\": false, \"reason\": \"<what you actually found, with file:line or "
-            "commit SHAs>\"}. Report findings only. Do not restate the turn's "
-            "conclusion, and do not edit anything."
+            "respond {\"ok\": true} and do nothing else.\n"
+            "It holds three things: `ask` (what the user requested), `evidence` (which "
+            "channels the finishing turn opened and how much), and `conclusion` (what "
+            "the turn told the user). Your job is NOT to score activity. Judge whether "
+            "the EVIDENCE actually supports the CONCLUSION for that ASK, and verify it "
+            "yourself against this repository with Read/Grep/Glob and the git record. "
+            "Read references/senses.md in the workforce skill directory for what each "
+            "sense means.\n"
+            "Respond {\"ok\": true} only if the conclusion is supported. Otherwise "
+            "respond {\"ok\": false, \"reason\": \"<what you verified, with file:line "
+            "or commit SHAs, and what the conclusion got wrong or left unchecked>\"}. "
+            "Report findings only. Do not edit anything."
         ),
     },
 }
@@ -975,13 +978,30 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         data = {}
     hooks = data.get("hooks")
     existing = hooks.get(event) if isinstance(hooks, dict) else None
-    present = False
+    present, stale_agent = False, []
     if isinstance(existing, list):
         for e in existing:
             for h in (e.get("hooks", []) if isinstance(e, dict) else []):
                 if agent_cfg is not None:
                     if _same_agent(h, agent_cfg):
-                        present = True
+                        # OURS — BUT IS IT THE CURRENT PROMPT? An agent hook IS its
+                        # prompt: change the prompt and you have changed what the hook
+                        # does, entirely. Identity is deliberately coarse (a marker, so
+                        # a rename does not orphan a live registration), which means
+                        # equality has to be checked separately or a rewritten prompt
+                        # reports NOOP forever and the machine keeps running the old one.
+                        #
+                        # MEASURED 2026-09-09: the widening agent was rewritten from
+                        # "open the named channel" to "judge whether the evidence
+                        # supports the conclusion" — the entire point of the release —
+                        # and `--wire-defaults --execute` said "already registered,
+                        # NOOP". The old prompt stayed live and the redesign reached
+                        # nothing. Found by reading settings.json instead of trusting
+                        # the word NOOP.
+                        if (h.get("prompt") or "") == (agent_cfg.get("prompt") or ""):
+                            present = True
+                        else:
+                            stale_agent.append((e, h))
                 elif _same_command(h, command, root):
                     present = True
 
@@ -989,6 +1009,24 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
     # are reported independently and neither short-circuits the other: a hook already
     # registered whose config file is absent must still get the file, or the artifact
     # this command is the producer for would depend on the order a human wired things.
+    if stale_agent and not present:
+        for _e, _h in stale_agent:
+            _h.clear()
+            _h.update(agent_cfg)
+        if not execute:
+            print(f"  ~ {name}  {event}  prompt CHANGED — would update in place")
+            return 0
+        dump(spath, data)
+        back, _ = load(spath)
+        ok = any(_same_agent(h, agent_cfg)
+                 and (h.get("prompt") or "") == (agent_cfg.get("prompt") or "")
+                 for e in (back.get("hooks", {}).get(event, []) if isinstance(back, dict) else [])
+                 for h in (e.get("hooks", []) if isinstance(e, dict) else []))
+        print(f"  * {name}  {event}  prompt updated in place"
+              if ok else
+              f"wf-settings-apply: HOOK UNVERIFIED — {name} prompt did not update")
+        return 0 if ok else 1
+
     if present:
         print(f"  . {name} already registered on {event} — NOOP")
         rc, pending = do_stamp(root, name, execute)

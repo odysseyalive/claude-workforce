@@ -58,6 +58,7 @@ it watches.
 
 import importlib.machinery
 import importlib.util
+import hashlib
 import json
 import os
 import re
@@ -118,17 +119,36 @@ def widen_flag(payload):
     return os.path.join(d, f"wf-widen-flag.{sid}.json")
 
 
-def raise_flag(payload, why, rows, counts):
-    """Record what the agent should go and open. Never fatal: a widen that cannot write
-    its own hand-off still blocks with a reason, which is the old behaviour."""
+def raise_flag(payload, why, rows, counts, sampled=False, reply=""):
+    """Record what the auditing agent needs to judge RESULTS against the ASK.
+
+    The three things it carries are the directive, made concrete: "it's the evidence
+    from the tool run comparative to the results from the ask that you would ascertain
+    whether what the score is" (`SKILL.md` § Directives, 2026-09-09).
+
+      ask         what the user actually requested, and the kind it was tagged
+      evidence    what the turn's tool calls returned — the channels it opened
+      conclusion  what the turn told the user
+
+    Nothing here is a score. The earlier version wrote a number and the number was
+    invented; this writes the material a judgement is made FROM, and the judgement is
+    made by something that did not do the work.
+
+    Never fatal: a widen that cannot write its hand-off still blocks with a reason.
+    """
     try:
         with open(widen_flag(payload), "w", encoding="utf-8") as fh:
             json.dump({
+                "sampled": sampled,
+                "ask": {"prompt": (payload.get("prompt") or "")[:2000],
+                        "kinds": [h.get("kind") for h in (task_tag(payload) or [])]},
+                "evidence": {"channels": {k: v for k, v in rows},
+                             "reads": counts[0], "distinct": len(counts[1] or []),
+                             "enumerating": counts[2], "outside": counts[3],
+                             "ran": counts[4]},
+                "conclusion": (reply or "")[:4000],
                 "unopened": sorted({s for _, s, _ in why}),
                 "why": [{"trigger": t, "sense": s, "reason": r} for t, s, r in why],
-                "scores": {k: v for k, v in rows},
-                "counts": {"reads": counts[0], "distinct": len(counts[1] or []),
-                           "setreads": counts[2], "outside": counts[3], "direct": counts[4]},
             }, fh)
     except OSError:
         pass
@@ -325,37 +345,35 @@ def senses(counts, applicable):
                  subject — the measured absence and universal-claim triggers. Smell is
                  what selects the applicable senses; it never scores them.
       INTUITION  the prior. The one channel with no input behind it: what the turn
-                 asserted because it seemed right. Deliberately unscored — scoring it
-                 means judging it, and judging one's own prior from inside is the exact
-                 faculty the measurement found impaired. It is what the other five are
-                 for.
+                 asserted because it seemed right. It was shipped permanently unscored
+                 on the argument that judging one's own prior from inside is the exact
+                 faculty the measurement found impaired — TRUE, and it only ever ruled
+                 out SELF-judgement. `wf-widen-agent` did not form the prior and can
+                 read it: what did this turn assume, and does anything support it. The
+                 sixth sense was unmeasurable because of an architecture flaw, not
+                 because of anything about intuition, and the independence directive
+                 dissolves it.
     """
-    rows = []
+    rows, unopened = [], []
     for name in ("sight", "hearing", "touch", "taste"):
         if name not in applicable:
             rows.append((name, None))
             continue
         n = SENSE_COUNT[name](counts) or 0
-        rows.append((name, 100 if n >= 2 else (50 if n == 1 else 0)))
-    scored = [v for _, v in rows if v is not None]
-    return (sum(scored) // len(scored) if scored else 100), rows
+        rows.append((name, n))          # the COUNT, not a grade derived from it
+        if n == 0:
+            unopened.append(name)
+    return unopened, rows
 
 
-def widen_reason(total, threshold, why, rows, inst, counts):
-    """The block payload: the sense this claim needed, and what was there to open it.
+def widen_reason(unopened, why, rows, inst, counts):
+    """The block payload: which required channel is shut, and what is here to open it.
 
-    "Insufficient, try harder" hands the tunnel back to itself and is worth nothing.
-    What blocks instead is a REGISTRY — the instruments on this machine, for this
-    project, during this turn, that went untouched, named one by one.
-
-    Written as statements of fact about the environment rather than as commands. The
-    hooks reference is explicit that text framed as an out-of-band instruction trips
-    the prompt-injection defences and gets surfaced to the user instead of acted on,
-    which would turn an automatic widen back into one more thing a human has to do.
+    NO SCORE AND NO THRESHOLD, because neither was ever measured. What this states is a
+    fact — a channel the ask required recorded zero calls — and the instruments on this
+    machine that went untouched. "Insufficient" hands the tunnel back to itself.
     """
-    _tagged = any(t.startswith("TAG:") for t, _, _ in why)
-    lines = [f"Turn score {total}/100 against a {threshold} threshold, scored only on "
-             f"the senses this {'ask' if _tagged else 'claim'} needs.",
+    lines = ["Channels this ask requires, and what the turn recorded:",
              "  " + " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows), ""]
     for trip, sense, reason in why:
         if trip.startswith("TAG:"):
@@ -363,27 +381,25 @@ def widen_reason(total, threshold, why, rows, inst, counts):
                     f"That kind is closed by {sense.upper()}: ")
         else:
             article = "an" if trip[0] in "aeiou" else "a"
-            head = (f"The reply makes {article} {trip} claim. That is settled by "
+            head = (f"The reply makes {article} {trip} claim, settled by "
                     f"{sense.upper()}: ")
         lines.append(head + f"{reason}.")
-    lines.append("")
-    lines.append("On this machine, unused this turn:")
+    lines += ["", f"{', '.join(unopened).upper()} recorded zero calls this turn.",
+              "", "On this machine, unused:"]
     if not counts[3]:
         lines.append("  · hearing — no web search, no web fetch, no spawned reader")
     if not counts[2]:
-        lines.append("  · taste — nothing enumerated a set: no Glob, no find, no ls, "
-                     "no grep -l")
+        lines.append("  · taste — nothing enumerated a set: no Glob, find, ls, grep -l")
     if inst["agents"]:
-        lines.append(f"  · {len(inst['agents'])} agent(s) available to read this "
-                     f"independently: " + ", ".join(inst["agents"][:8]))
+        lines.append(f"  · {len(inst['agents'])} agent(s) available: "
+                     + ", ".join(inst["agents"][:8]))
     if inst["skills"]:
         lines.append(f"  · {len(inst['skills'])} skill(s) installed: "
                      + ", ".join(inst["skills"][:8]))
     lines += ["",
               "Nine of ten recorded escapes from a settled wrong reading in this project "
               "came from outside the turn that formed it; none came from re-examining it. "
-              "Opening a channel this turn has not opened is what changes the answer; "
-              "restating the conclusion is not."]
+              "Opening a channel this turn has not opened is what changes the answer."]
     return "\n".join(lines)
 
 
@@ -398,7 +414,10 @@ def main():
     if payload.get("stop_hook_active"):
         return 0
 
-    threshold = int(os.environ.get("WF_WIDEN_THRESHOLD") or 50)
+    # WF_WIDEN_THRESHOLD is gone with the score it gated. A threshold implies a scale,
+    # the scale was invented, and a dial on an invented number is a second invented
+    # number. Dispatch is now a fact — a required channel recorded zero calls — and the
+    # only knob left is WF_AUDIT_SAMPLE, which sets how often a PASSING turn is audited.
     cwd = payload.get("cwd") or os.getcwd()
 
     counts = TL.turn_counts(payload)
@@ -462,20 +481,48 @@ def main():
                           "WIDEN  not scored — no claim this turn that evidence settles"}))
         return 0
 
-    total, rows = senses(counts, applicable)
+    unopened, rows = senses(counts, applicable)
     shown = " · ".join(f"{k} {'n/a' if v is None else v}" for k, v in rows)
-    summary = f"WIDEN  {total}/100 · {shown}"
 
-    if total >= threshold:
-        print(json.dumps({"systemMessage": summary}))
+    # THE SAMPLE. Auditing only the turns that fail their own dispatch is the
+    # self-scoring bias wearing a different hat: a turn that looks fine is then judged
+    # by nothing but the session that produced it, and looking fine is exactly what a
+    # tunnel does from inside. So a share of PASSING turns is audited too.
+    #
+    # Default 1 in 5, decided here rather than asked, and changeable without editing
+    # code: `WF_AUDIT_SAMPLE=1` audits every claim-carrying turn, `0` disables sampling
+    # and leaves only the unopened-channel dispatch. It is a cost dial, not a
+    # correctness one — what it guards against is systematic self-flattery, which shows
+    # up across turns rather than inside any single one.
+    try:
+        rate = int(os.environ.get("WF_AUDIT_SAMPLE") or 5)
+    except ValueError:
+        rate = 5
+    sampled = False
+    if rate > 0 and not unopened:
+        # Deterministic per turn, never random: the same reply always gets the same
+        # verdict, so a run is reproducible and a fixture can pin it.
+        sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
+
+    if not unopened and not sampled:
+        print(json.dumps({"systemMessage":
+                          f"WIDEN  {shown} — required channels opened"}))
         return 0
 
-    raise_flag(payload, why, rows, counts)
+    why_rows = [(t, sn, r) for t, sn, r in why if sn in unopened] or why
+    raise_flag(payload, why_rows, rows, counts, sampled=sampled, reply=reply)
+
+    if sampled:
+        # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
+        # this hook has nothing to object to. The audit is the agent's job and runs on
+        # the same `Stop`; blocking here would punish a turn for being picked.
+        print(json.dumps({"systemMessage": f"WIDEN  {shown} — sampled for audit"}))
+        return 0
+
     print(json.dumps({
         "decision": "block",
-        "reason": widen_reason(total, threshold, why, rows,
-                               instruments(cwd), counts),
-        "systemMessage": summary + " — WIDENING",
+        "reason": widen_reason(unopened, why_rows, rows, instruments(cwd), counts),
+        "systemMessage": f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED",
     }))
     return 0
 
