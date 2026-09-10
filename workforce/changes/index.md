@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.33.0 | 2026-09-09 | update, changes, hooks, scripts, installer | **yes** | A hook that reports what the turn read, and the nine commands that never existed |
 | 1.32.7 | 2026-09-09 | changes, hooks, installer | no | The hook table described three hooks on a one-hook install |
 | 1.32.6 | 2026-09-09 | changes, installer | no | A case that cannot run HERE is not a case to delete |
 | 1.32.5 | 2026-09-09 | changes, installer | no | The guard against unproven cases had been cancelled by a wildcard |
