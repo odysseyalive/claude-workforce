@@ -657,6 +657,55 @@ check(
     "; ".join(_tt_problems),
 )
 
+# THE WIDENING IS AN ACT, AND THE ACT IS THE PART THAT KEPT NOT GETTING BUILT.
+# MEASURED over 92 stop summaries in the session that built these hooks: `wf-widen` ran
+# on every one, errored on none, and blocked on ZERO. A mechanism that reports what a
+# turn failed to consult, and then relies on that same turn to go and consult it, has
+# rebuilt the decision-from-inside it was written to remove. These assertions hold the
+# acting half in place.
+_sa_agent = read("workforce/bin/wf-settings-apply")
+_ag_problems = []
+if '"wf-widen-agent"' not in _sa_agent or "AGENT_HOOKS" not in _sa_agent:
+    _ag_problems.append("the widening agent is not in the shipped hook set; the score "
+                        "blocks and nothing opens the channel it named")
+if '"type": "agent"' not in _sa_agent:
+    _ag_problems.append("the agent entry shape is gone — a command hook has no model, "
+                        "so it can decide a sense went unopened and can never open one")
+if "_same_agent(h, agent_cfg)" not in _sa_agent or _sa_agent.count("_same_agent(h, agent_cfg)") < 2:
+    _ag_problems.append("the agent identity test is not used by BOTH the presence check "
+                        "and the post-write re-read; when only one knew about agent "
+                        "hooks, a correct write came back UNVERIFIED and a verifier that "
+                        "cries failure on a good write is worse than the write it doubts")
+if "def _same_agent(" not in _sa_agent:
+    _ag_problems.append("agent-hook identity is gone; agent hooks carry no `command`, so "
+                        "_same_command answers False forever and every --wire-defaults "
+                        "leaves another duplicate, each spawning its own subagent per Stop")
+if "wf-widen-flag" not in _sa_agent:
+    _ag_problems.append("the flag gate is gone from the agent prompt; without it the "
+                        "hook analyses every Stop and spends a subagent per turn to "
+                        "conclude there was nothing to do")
+if "do not edit" not in _sa_agent.lower():
+    _ag_problems.append("the read-only clause is gone; a widening that edits is a second "
+                        "author working from a partial view of the task")
+check(
+    "wf-widen-agent ships as an agent hook, gated on the flag, and never edits",
+    not _ag_problems,
+    "; ".join(_ag_problems),
+)
+check(
+    "wf-widen writes the flag the widening agent reads",
+    "def raise_flag(" in _wd and "wf-widen-flag" in _wd,
+    "wf-widen no longer hands off to the widening agent. Cheap decides and expensive "
+    "acts: without the flag the agent hook either never fires or fires on every turn",
+)
+check(
+    "wf-task-tag clears the flag at the head of every turn",
+    "wf-widen-flag" in read("workforce/bin/wf-task-tag"),
+    "a flag left behind sends a reader after a question the user has moved past, on a "
+    "turn that raised no flag of its own — a widening nobody asked for, charged to "
+    "somebody's token budget",
+)
+
 # THE TAG BEATS THE REPLY SCAN, and wf-widen must actually read it. A tagger that
 # injects context while the Stop half re-guesses from prose is two mechanisms that
 # agree by luck.
@@ -749,18 +798,32 @@ check(
 # must appear in the authority table and be declared in the manifest.
 _shipped_hooks = set(re.findall(r'^\s*"(wf-[\w-]+)":\s*\(',
                                 read("workforce/bin/wf-settings-apply"), re.M))
+# AGENT HOOKS SHIP NO FILE, so they cannot be a manifest `hook` row — those rows name
+# a path for both installers to fetch and chmod, and there is nothing to fetch. A
+# `type: "agent"` hook is a prompt inlined into settings.json by `wf-settings-apply`,
+# which IS shipped and IS in the manifest. Excluded from the file comparison and NOT
+# from the authority table below: a hook that ships undescribed is the dormancy
+# enforcement.md refuses, and that argument does not care whether a file was fetched.
+_agent_hooks = set(re.findall(r'^\s*"(wf-[\w-]+)":\s*\{',
+                              read("workforce/bin/wf-settings-apply"), re.M))
 _manifest_hooks = {os.path.basename(l.split()[1])
                    for l in read("manifest.txt").splitlines()
                    if l.startswith("hook ") and len(l.split()) > 1}
 _hooks_md = read("workforce/references/procedures/hooks.md")
 _hook_problems = []
-if _shipped_hooks != _manifest_hooks:
+# THE FILE COMPARISON DROPS AGENT HOOKS; THE AUTHORITY TABLE DOES NOT. Both halves are
+# deliberate. A `type: "agent"` hook has no script to fetch, so requiring a manifest row
+# would demand a path that cannot exist — but nothing about being file-less excuses it
+# from being described, and an undescribed hook is the dormancy enforcement.md refuses
+# whichever way it arrived.
+if (_shipped_hooks - _agent_hooks) != _manifest_hooks:
     _hook_problems.append(
-        f"SHIPPED_HOOKS {sorted(_shipped_hooks)} != manifest {sorted(_manifest_hooks)}")
+        f"SHIPPED_HOOKS {sorted(_shipped_hooks - _agent_hooks)} != "
+        f"manifest {sorted(_manifest_hooks)}")
 for _h in sorted(_shipped_hooks):
     if f"`{_h}`" not in _hooks_md:
         _hook_problems.append(f"{_h} is wired but absent from hooks.md § What is wired")
-    if not os.path.exists(f"workforce/bin/{_h}"):
+    if _h not in _agent_hooks and not os.path.exists(f"workforce/bin/{_h}"):
         _hook_problems.append(f"{_h} is wired but does not ship")
 check(
     "hooks: the wired set, the manifest, and the authority table agree",
@@ -769,6 +832,72 @@ check(
     "a hook that ships undescribed is the dormancy enforcement.md refuses, arriving from "
     "the other side — wired, and documented nowhere",
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A DETECTOR SHIPS WITH ITS FIX — ENFORCED OVER HOOK ARTIFACTS (2026-09-09)
+#
+# THE DIRECTIVE HAS BEEN IN `SKILL.md` SINCE 2026-08-05 AND NOTHING ENFORCED IT HERE:
+# "A DETECTOR SHIPS WITH ITS FIX. Detection alone is not a deliverable." Asked where
+# the completeness check broke, the answer was that it never covered this. The
+# producer-has-a-reader check above operates over things that EXIST — every shipped
+# script must have a reference and an assertion — and `wf-widen` passed it perfectly
+# while being half a mechanism. It had a reference, an assertion and four fixtures. It
+# also had, MEASURED over 92 stop summaries, zero blocks and no actor: it named what a
+# turn failed to consult and relied on that same turn to go and consult it.
+#
+# NOTHING CAN NOTICE AN ABSENT COMPONENT BY LOOKING AT PRESENT ONES. A four-part design
+# with three parts built produces three well-wired parts and no complaint, because the
+# missing part leaves no artifact. So this checks the one thing a missing actor DOES
+# leave behind: a hand-off file that is written and never read.
+#
+# STRUCTURAL, NOT PROSE. Matching hooks.md for words like "reports" or "detects" would
+# be a substring test over English with no measured error rate — the shape that retired
+# `wf-speak-guard` at 7.0%. This derives the artifact names the hooks actually pass
+# between themselves and requires each to have both ends.
+_sa_agent_src = read("workforce/bin/wf-settings-apply")
+_hook_srcs = {}
+for _h in sorted(_shipped_hooks):
+    _hp = f"workforce/bin/{_h}"
+    if os.path.exists(_hp):
+        _hook_srcs[_h] = read(_hp)
+# A hand-off artifact is a per-session filename a hook composes. `wf-widen-flag` is the
+# live one; the pattern catches any sibling added later without this check being edited.
+_artifacts = set()
+for _src in _hook_srcs.values():
+    _artifacts |= set(re.findall(r'f"(wf-[a-z-]+)\.\{', _src))
+    _artifacts |= set(re.findall(r'"(wf-[a-z-]+-flag)', _src))
+_orphan_artifacts = []
+for _a in sorted(_artifacts):
+    # THREE ROLES, AND THE FIRST VERSION OF THIS CHECK CONFLATED TWO OF THEM. It counted
+    # any hook that mentioned the artifact and called `os.remove` as a READER, so
+    # `wf-task-tag` — which only CLEARS the flag at the head of a turn — satisfied the
+    # requirement for an actor, and the assertion passed while the actor was absent.
+    # Caught by breaking it on purpose and watching it stay green: a vacuous assertion
+    # is worse than no assertion, because it reports a property nobody has.
+    #
+    # Deleting is not acting. A clearer is housekeeping.
+    _writers = [n for n, src in _hook_srcs.items() if _a in src and "json.dump" in src]
+    _clearers = [n for n, src in _hook_srcs.items() if _a in src and "os.remove" in src]
+    _actors = [n for n, src in _hook_srcs.items()
+               if _a in src and n not in _writers and n not in _clearers]
+    # A `type: "agent"` reader has no file of its own — it is a prompt declared in
+    # `wf-settings-apply`'s AGENT_HOOKS, and that is where its consumption is visible.
+    if _a in _sa_agent_src:
+        _actors.append("wf-settings-apply:AGENT_HOOKS")
+    if _writers and not _actors:
+        _orphan_artifacts.append(
+            f"{_a} is written by {', '.join(_writers)}"
+            + (f", cleared by {', '.join(_clearers)}" if _clearers else "")
+            + ", and acted on by NOTHING")
+check(
+    "hooks: a detector ships with its actor — no hand-off is written and never read",
+    not _orphan_artifacts,
+    "; ".join(_orphan_artifacts) + ". SKILL.md § Directives: a detector ships with its "
+    "fix, and detection alone is not a deliverable. A hook that records what a turn "
+    "failed to do, with nothing that acts on the record, hands the decision back to the "
+    "turn that already failed to make it",
+)
+
 
 # EVERY PROVE CASE MUST STILL BE RUNNABLE, and nothing watched that. A case names a
 # shipped file and a literal inside it; a release that deletes the file or the literal

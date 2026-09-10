@@ -125,6 +125,19 @@ def main():
     except json.JSONDecodeError:
         return 0
 
+    # CLEAR LAST TURN'S WIDEN FLAG FIRST, and do it before anything can return early.
+    # The flag tells the widening agent to go open a sense; one left behind would send
+    # a reader after a question the user has already moved past, and would do it on a
+    # turn that raised no flag of its own — a widening nobody asked for, charged to
+    # somebody's token budget. This event is the head of every turn, so it is the one
+    # place a per-turn artifact can be guaranteed cleared.
+    try:
+        d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+        sid = (payload.get("session_id") or "nosession")[:64]
+        os.remove(os.path.join(d, f"wf-widen-flag.{sid}.json"))
+    except OSError:
+        pass
+
     hits = classify(payload.get("prompt") or "")
     if not hits:
         return 0

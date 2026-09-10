@@ -96,6 +96,44 @@ TL = _ledger()
 OUTSIDE = {"WebSearch", "WebFetch", "Agent", "Task", "Skill"}
 
 
+def widen_flag(payload):
+    """Path to the hand-off file the WIDENING AGENT reads.
+
+    The split is the architecture. THIS hook is deterministic, free, and decides
+    WHETHER a sense went unopened. It cannot open one — a command hook has no model and
+    cannot read a repository, search the web, or hold an opinion. So it writes down what
+    it found and a `type: "agent"` hook picks it up, spawns a reader with Read/Grep/Glob
+    and none of this turn's context, and actually opens the channel.
+
+    Cheap decides, expensive acts. An agent hook that ran its own analysis on every
+    `Stop` would spend a subagent per turn to conclude "nothing to do" in the ~90% case;
+    gating it on a file this hook writes for free means the spawn happens only on the
+    turns that earned one.
+
+    Cleared at the START of every turn by `wf-task-tag` on `UserPromptSubmit`, so a flag
+    can never outlive the turn that raised it and drive a widening nobody asked for.
+    """
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    return os.path.join(d, f"wf-widen-flag.{sid}.json")
+
+
+def raise_flag(payload, why, rows, counts):
+    """Record what the agent should go and open. Never fatal: a widen that cannot write
+    its own hand-off still blocks with a reason, which is the old behaviour."""
+    try:
+        with open(widen_flag(payload), "w", encoding="utf-8") as fh:
+            json.dump({
+                "unopened": sorted({s for _, s, _ in why}),
+                "why": [{"trigger": t, "sense": s, "reason": r} for t, s, r in why],
+                "scores": {k: v for k, v in rows},
+                "counts": {"reads": counts[0], "distinct": len(counts[1] or []),
+                           "setreads": counts[2], "outside": counts[3], "direct": counts[4]},
+            }, fh)
+    except OSError:
+        pass
+
+
 def task_tag(payload):
     """The tag `wf-task-tag` set on this turn's ask, or None.
 
@@ -432,6 +470,7 @@ def main():
         print(json.dumps({"systemMessage": summary}))
         return 0
 
+    raise_flag(payload, why, rows, counts)
     print(json.dumps({
         "decision": "block",
         "reason": widen_reason(total, threshold, why, rows,

@@ -78,6 +78,33 @@ match would drop the other silently.
 **The tag is additive to the claim triggers, never a replacement.** A turn can answer a
 tagged ask and make a claim; both senses are required.
 
+## Widening — the act, not the alarm
+
+**A score that reports is an alarm. The widening is what answers it**, and it is
+deliberately not performed by the turn that failed the score: that turn is the one
+holding the reading, and asking it to go and check itself is the decision-from-inside
+that the measurement at the top of this file rules out.
+
+Three parts, cheap to expensive, so the expensive one only runs when it is earned:
+
+1. **`wf-task-tag`** (`UserPromptSubmit`, free) classifies the ask and names the sense
+   that closes it, before any of the answer exists.
+2. **`wf-widen`** (`Stop`, free) scores the finished turn against that sense. If the
+   sense went unopened it blocks the stop, and writes a flag naming what is unopened.
+3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **No flag, it
+   returns `ok: true` and spends nothing.** With a flag, it spawns a reader carrying
+   Read/Grep/Glob and none of the finishing turn's context, opens the named channel
+   itself, and returns what it found.
+
+**The agent is the point.** A command hook has no model: it can decide a sense went
+unopened and it cannot open one. A spawn is not self-checking — fresh context, no
+history, none of the reasoning that built the tunnel — which is why three of the ten
+recorded escapes came from one and why this fires it without anybody choosing to.
+
+**It reports findings and never edits.** A widening that could change files would be a
+second author working from a partial view of the task, and the finding is the whole
+deliverable: `file:line`, a commit SHA, what the record actually says.
+
 ## Where this is enforced
 
 `wf-widen` scores the turn at `Stop` and `SubagentStop`, and blocks rather than stopping
