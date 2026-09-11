@@ -10,6 +10,9 @@ Claude Workforce turns that instinct into a company. One command reads your proj
 
 > **PAIRS WELL WITH:** [playwright-mcp](https://github.com/odysseyalive/playwright-mcp). Web-facing employees are the hardest to hire, because clicking around a page rarely leaves behind a clean pass-or-fail signal the way finished code does. This tool records you logging into a site once, then turns that recording into a repeatable test the employee can run, so the proof is a test that passes, not a model's say-so. It also handles fetching web pages, which these employees otherwise can't do on their own.
 
+> [!TIP]
+> 😎 **If Claude Workforce is part of your workflow, [give it a star](https://github.com/odysseyalive/claude-workforce).** It helps other people find the project.
+
 ![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists](assets/images/conductor.png)
 
 ## Contents
