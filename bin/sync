@@ -100,7 +100,7 @@ def manifest_entries():
     """Every shipped source path, with its executable flag. Parsed BEFORE anything is
     removed, because the runtime-first scan below has to read the copies this script
     is about to delete."""
-    out, bad, styles = [], [], []
+    out, bad, styles, siblings, agents = [], [], [], [], []
     for line in open("manifest.txt", encoding="utf-8"):
         s = line.strip()
         if not s or s.startswith("#"):
@@ -137,6 +137,33 @@ def manifest_entries():
             else:
                 styles.append(s)
             continue
+        # `sibling ` is a WHOLE SKILL OF ITS OWN — one of the five evaluators — installed
+        # beside `skills/workforce/` rather than inside it, because a skill is discoverable
+        # at `<skills-root>/<name>/SKILL.md` and nowhere else. Collected separately like a
+        # style: the copy loop places it under the skills root derived from each target.
+        # Syncing these matters as much as syncing the skill tree — a maintainer editing a
+        # catalog and not seeing it in the sandbox is the drift this script exists to remove.
+        # `agent ` REGISTERS a shipped evaluator agent: the host reads `<name>.md` in an
+        # `agents/` directory, never a nested `AGENT.md`, so the definition ships as a
+        # sibling and the registration is written separately from the same source file.
+        if s.startswith("agent "):
+            s = s[len("agent "):].strip()
+            if not os.path.isfile(s):
+                bad.append(f"{s} (declared agent, not on disk)")
+            else:
+                agents.append(s)
+            continue
+        sib_exec = False
+        if s.startswith("exec-sibling "):
+            s, sib_exec = s[len("exec-sibling "):].strip(), True
+        if sib_exec or s.startswith("sibling "):
+            if not sib_exec:
+                s = s[len("sibling "):].strip()
+            if not os.path.isfile(s):
+                bad.append(f"{s} (declared sibling, not on disk)")
+            else:
+                siblings.append((s, sib_exec))
+            continue
         if not s.startswith(PREFIX):
             bad.append(f"{s} (path does not start with {PREFIX!r})")
             continue
@@ -144,10 +171,32 @@ def manifest_entries():
             bad.append(f"{s} (declared, not on disk)")
             continue
         out.append((s, executable))
-    return out, bad, styles
+    return out, bad, styles, siblings, agents
 
 
-ENTRIES, missing, STYLES = manifest_entries()
+ENTRIES, missing, STYLES, SIBLINGS, AGENTS = manifest_entries()
+
+
+def _record_lines(target):
+    """`.installed-external` as it stood BEFORE this run, one path per line.
+
+    READ BEFORE THE REBUILD, which is the whole point of where this sits. This script
+    rmtree's the workforce skill tree and rebuilds it from the manifest — and the ownership
+    record lives INSIDE that tree, so reading it after the rebuild reads an empty file.
+    Observed on the live personal install: every sibling was written as a lone `SKILL.md`,
+    the record was destroyed, and the next run then read its own absence as proof that the
+    five evaluators were the project's own and kept all five stubs. A guard fed a destroyed
+    record does not fail safe; it fails to the answer that does nothing, forever.
+    """
+    try:
+        with open(os.path.join(os.path.abspath(target), ".installed-external"),
+                  encoding="utf-8") as fh:
+            return [l.strip() for l in fh if l.strip()]
+    except OSError:
+        return []
+
+
+_prior = {t: _record_lines(t) for t in targets}
 
 # ── REFUSE to destroy a runtime-first edit ───────────────────────────────────
 # This script is delete-then-rebuild, so every byte in a target that is not in source
@@ -233,6 +282,104 @@ for s, executable in ENTRIES:
             os.chmod(dest, os.stat(dest).st_mode | 0o111)
     copied += 1
 
+# The five evaluator skills. `<X>/skills/workforce` implies `<X>/skills`, the same
+# derivation the styles use one level up, so a sibling can never land in a skills root
+# other than the one being synced.
+sibs = 0
+written = {t: [] for t in targets}
+
+
+_kept = {t: set() for t in targets}
+
+
+_owns_memo = {}
+
+
+def _sync_owns(target, skill):
+    """May this sync write into `<skills-root>/<skill>/`?
+
+    THE SAME GUARD `install` HAS, AND IT WAS MISSING HERE. The sibling copy was a bare
+    `shutil.copy2` per file: no ownership test, and the runtime-first refusal above covers
+    only the workforce skill tree, so a user's own evaluator was overwritten silently. An
+    independent review reproduced it — a `SKILL.md` carrying an
+    `origin: user | immutable: true` block, gone after one `--personal` run, with no
+    message. Three things make that the worst place for the gap: `--personal` aims at the
+    live `~/.claude/skills`, `bin/check`'s own failure text prescribes this command, and
+    `bin/dev-sandbox` builds its sandbox with it — so the sandbox exercised sync and never
+    `install`, which is how a critical installer bug survived a green test.
+    """
+    # DECIDED ONCE PER (target, skill), and memoised — the tree moves under this loop.
+    # Without the memo the FIRST row of a skill finds no `SKILL.md`, writes it, and every
+    # later row then sees that just-written file, finds it absent from the pre-run record,
+    # and skips: one file per skill, silently. Observed on the live personal install, where
+    # `ui-design` landed as a lone `SKILL.md`. It is the same defect an independent review
+    # found in `install`, in the sibling tool, and it is why the answer has to come from a
+    # snapshot of the tree as it stood BEFORE the run rather than from the tree itself.
+    key = (os.path.abspath(target), skill)
+    if key not in _owns_memo:
+        root = os.path.dirname(os.path.abspath(target))
+        marker = os.path.join(root, skill, "SKILL.md")
+        _owns_memo[key] = (not os.path.isfile(marker)) or marker in _prior[target]
+    return _owns_memo[key]
+
+
+for src, sib_exec in SIBLINGS:
+    rel = src[len("workforce/skills/"):]
+    skill = rel.split("/")[0]
+    _wrote = False
+    for target in targets:
+        if not _sync_owns(target, skill):
+            if skill not in _kept[target]:
+                _kept[target].add(skill)
+                print(f"  keeping {os.path.dirname(os.path.abspath(target))}/{skill} "
+                      f"(not written by this installer — the project's own)")
+            continue
+        dest = os.path.join(os.path.dirname(os.path.abspath(target)), rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(src, dest)
+        if sib_exec:
+            os.chmod(dest, os.stat(dest).st_mode | 0o111)
+        written[target].append(dest)
+        _wrote = True
+    if _wrote:
+        sibs += 1
+
+agents_n = 0
+for src in AGENTS:
+    name = os.path.basename(os.path.dirname(src)) + ".md"
+    for target in targets:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(target)))
+        dest = os.path.join(base, "agents", name)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(src, dest)
+        written[target].append(dest)
+    agents_n += 1
+
+# THE OWNERSHIP RECORD, written exactly as `install` writes it. `.installed-external` is what
+# separates a SHIPPED evaluator from a project's own hand-authored one — they occupy the same
+# path at project scope — and `wf-catalog.installer_owned` is the reader. Sync wrote the files
+# and not the record, so a synced tree looked unowned: `install_dir` refused it, every kind
+# reported `no-install`, and `--migrate` did nothing while appearing to run. A maintainer
+# sandbox that behaves differently from a real install is not a test of anything.
+for target, paths in written.items():
+    if not paths:
+        continue
+    # MERGED, NOT REPLACED. The record is shared with `install`, which also lists output
+    # styles and canary fixtures; rewriting it from this run's siblings alone dropped those
+    # rows, and a path that falls out of the record can never be pruned again. Order is
+    # preserved and duplicates are collapsed, so the file stays diffable.
+    rec = os.path.join(os.path.abspath(target), ".installed-external")
+    merged, seen = [], set()
+    for line in _prior[target] + paths:
+        if line not in seen:
+            seen.add(line)
+            merged.append(line)
+    try:
+        with open(rec, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(merged) + "\n")
+    except OSError as exc:
+        print(f"  ! could not write {rec}: {exc}")
+
 # Output styles, placed beside the settings file rather than inside the skill tree.
 # The target is derived from each skill target: `<X>/skills/workforce` implies `<X>`,
 # which is the config root for the personal copy and the project's `.claude` for the
@@ -248,6 +395,10 @@ for src in STYLES:
 
 for t in targets:
     print(f"synced {copied} files to {t}")
+if sibs:
+    print(f"synced {sibs} evaluator-skill file(s) beside each skills root")
+if agents_n:
+    print(f"registered {agents_n} evaluator agent(s) in each agents directory")
 if styled:
     print(f"synced {styled} output style(s) beside each settings file")
 

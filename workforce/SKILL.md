@@ -585,6 +585,51 @@ style, the operating principles, `/org` dispatch, the handbook template, and `wf
 say-the-state row. The one surviving mention of a guard is the 2026-09-07 three-paths measurement,
 which is a record of what went wrong and is marked as history.*
 
+> **"I've given explicit instructions that the five evaluations and workforce should be
+> self-contained in the user during install so that I don't have to run an audit every time
+> there are changes. All I have to do is update workforce. Do you understand? Is that not so
+> difficult to understand? So you have to make it happen and what you're doing is you're not
+> following through with that ask."**
+
+> **"You have to perform this exactly the way I said. If it doesn't work, exactly the way I said
+> it is not acceptable. So you have to do exactly what I said and structure the project around
+> this."**
+
+> **"There are no other options. I'm tired of messing with you.I'm tired of you taking
+> shortcuts. Maybe you should add that to your frickin directive."**
+
+*— Added 2026-09-10, source: user directive, stated during `/workforce dev` across three messages
+as one ask. The user notes they had given it before — "I've given explicit instructions" — which is
+why it is captured rather than answered in the run. **Two rules, and the second is the one that was
+broken.**
+
+**The first is the DELIVERABLE.** The five evaluators — `text-eval`, `code-evaluator`,
+`security-evaluator`, `image-eval`, `ui-design` — and `workforce` itself are **self-contained in the
+user install**. `install` and `update` place them; **`update` is the whole propagation path**, and
+running an `audit` is never a precondition for a project to get a change. The measurement that forced
+it, taken this session: v1.48.0 moved the catalog CORPUS into the install and left the five SKILLS
+per-project, so `~/.claude/skills` held `workforce` alone while `odyssey-alive/.claude/skills` held
+all five. `update` ran, reported success, and reached none of them; three of five then resolved from
+the project copy and the shipped corpus reached no reader there. A propagation path that ends at a
+corpus while the skill stays local is not a propagation path — it is the three-paths rule
+(`references/enforcement.md`) failing one layer up from where it was last fixed.
+
+**The second is about HOW AN ASK IS ANSWERED, and it is the reason this block exists.** The user had
+stated the deliverable; the run answered with a narrower version of it — the corpus migration —
+offered it back as a menu of options, and built from the answer. That is the shortcut the third
+message names. **A stated ask is not a starting point to negotiate down from.** Where a request is
+clear, it is performed as stated and the project is restructured to make it true, not approximated by
+the nearest change that was already easy. This is the 2026-09-07 finish-do-not-hedge directive on a
+new surface: that one forbade a question whose options were all "do less"; this one forbids
+DELIVERING less and describing it as the ask. **"If it doesn't work, exactly the way I said, it is not
+acceptable"** sets the acceptance test literally — the deliverable is the user's sentence, not a
+defensible reading of it.
+
+Mechanics at `references/evaluators.md` § The five skills ship in the install, `manifest.txt`
+(`sibling` rows), `install` § sibling destinations, and `references/procedures/update.md`; the
+operational reading is — **ship the five evaluators and workforce into the user install, make
+`update` the only thing a user runs, and when an ask is clear, build that ask.***
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a

@@ -113,7 +113,45 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-10
+## Open, as of 2026-09-11
+
+**Landed 2026-09-11 — the five evaluators ship in the install; `update` is the whole path.**
+v1.48.0 moved the catalog CORPUS into the install and left the five SKILLS per-project, so
+`~/.claude/skills` held `workforce` alone while `odyssey-alive/.claude/skills` held all five.
+`update` ran, verified 368/368 files, and reached none of them. They now install as SIBLINGS of
+`skills/workforce/` — each complete, with its corpus and its agents — and resolution is
+INSTALL-FIRST, so all 13 projects on this machine read 5 of 5 from the install without an audit.
+`audit` Step 6-F retires a project's old copies, lifting every `origin: user` span into
+`CATALOG-ANCHOR.md` with a blocking readback and archiving the removed set under
+`.claude/workforce/retired/` before anything goes.
+
+**An independent review broke the installer and the failure is the interesting part.** The
+ownership guard read `.installed-external` live while the fetch loop wrote into the same tree, so
+row 1 of each skill installed `SKILL.md` and every later row then read that just-written file as
+proof the skill was the project's own. A fresh install shipped ONE file per evaluator under
+`Verified: 195/195 files present`, and never self-healed. The guard now reads a SNAPSHOT taken
+before the first write. The same defect was live in `bin/sync` — which is where it reached the
+real personal install — and `bin/dev-sandbox` builds its sandbox with `bin/sync`, so every test
+exercised the tool that had the bug and never the installer.
+
+Three more from that review: a prune branch printed "keeping the project's own skill" and then
+deleted its recorded files; the `origin: user` pattern required the two fields in one ORDER, so a
+reversed marker was invisible and its words would have gone silently; and a project-only
+`scripts/` or `hooks/` file had no make-before-break protection.
+
+**`bin/check` died on an empty file rather than failing.** The security-anchor assertion indexed
+`splitlines()[0]`, so a `bin/prove` case that empties a file to confirm the gate notices took the
+whole 736-case sweep down with an `IndexError` instead of producing a failing case. A diagnostic
+must not die on the input it exists to diagnose.
+
+**Open — the instruction corpus is over Anthropic's stated targets.** `workforce/SKILL.md` is 858
+lines against a documented 500-line target for a SKILL.md body; `procedures/audit.md` is 2,487;
+the shipped corpus totals ~24,600 lines. Anthropic's current guidance is explicit that
+prescriptive instruction written for earlier models *"can degrade output quality"* on Fable 5 and
+that verification scaffolding should be REMOVED rather than rewritten for Opus 5, and it names
+over-explanation as the Opus-specific failure mode to test a skill for. Not started: it is a large
+separable reduction and mixing it into an install-path release would make both unreviewable.
+
 
 **Landed 2026-09-10 — the corpus resolved from the install and nothing read it that way.**
 v1.48.0 moved the evaluator corpus to the install (`wf-catalog`) so a tweak advances by

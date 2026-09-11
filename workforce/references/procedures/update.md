@@ -185,6 +185,28 @@ repo root.** For an update this is normally already satisfied, since the copy be
 have been installed without it. If the file has since been deleted the installer stops with a bootstrap
 prompt — report that as the precondition it is, and do not work around it.
 
+### The five evaluators come with it
+
+**`update` installs six skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
+`image-eval` and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
+corpus it grades against and the agents it runs — and the same rows register those agents where the
+host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
+workforce."* Nothing about an evaluator reaches a project through an audit any more, so **a catalog
+change propagates by `update` alone**.
+
+**A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
+on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's
+own hand-authored `text-eval` carries the user's words and resolves to the identical path at project
+scope. When a skill is kept, the run says so by name and the prune leaves its recorded files alone.
+
+*Measured 2026-09-10, and it is why the snapshot matters: with the guard reading the live record while
+the tree moved under it, each evaluator installed its `SKILL.md`, then read that just-written file as
+proof the skill was the project's own and skipped every remaining row. One file per evaluator, no
+corpus, no agents — under `Verified: 195/195 files present`.*
+
+**Retiring the old project copies is `audit`'s half, not this one** (`audit.md` § Step 6-F). `update`
+syncs and stops; it never walks a project.
+
 ### One fetch implementation
 
 **`update` does not carry its own copy of the download loop.** Earlier this step read "re-fetch every

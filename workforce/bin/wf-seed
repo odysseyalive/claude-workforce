@@ -90,13 +90,15 @@ _ANCHOR_LINE_RX = re.compile(r"^<!-- additions-seeded:.*-->\s*$", re.MULTILINE)
 CATALOGS = {
     "code": {
         "match": lambda d: "code" in d and ("eval" in d),
-        "slot": "code-eval.md",
+        "slot": "additions.md",
+        "skill": "code-evaluator",
         "version_key": "code-additions-version",
         "targets": ["mistake-taxonomy.md"],
     },
     "text": {
         "match": lambda d: "text" in d and "eval" in d and "voice" not in d,
-        "slot": "text-tells.md",
+        "slot": "additions.md",
+        "skill": "text-eval",
         "version_key": "text-additions-version",
         "targets": ["text-tells.md", "ai-patterns.md"],
     },
@@ -121,17 +123,37 @@ def _slot_candidates(root):
     """
     cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
     return [
-        os.path.join(root, ".claude", "skills", "workforce", "references", "evaluator-additions"),
-        os.path.join(root, "workforce", "references", "evaluator-additions"),
-        os.path.join(cfg, "skills", "workforce", "references", "evaluator-additions"),
+        os.path.join(root, ".claude", "skills"),
+        os.path.join(root, "workforce", "skills"),
+        os.path.join(cfg, "skills"),
     ]
 
 
-def _slot_dir(root):
-    """First existing slot directory, or None when workforce is installed nowhere."""
+def _slot_dir(root, skill=None, slot=None):
+    """The directory holding the shipped additions slot, or None.
+
+    THE SLOT MOVED INSIDE THE EVALUATOR SKILL, 2026-09-10. The five evaluators now ship as
+    siblings of `skills/workforce/` (`manifest.txt` § The five evaluator skills), so each
+    one's additions file is `<skills-root>/<skill>/references/additions.md` rather than a
+    shared `evaluator-additions/` directory inside workforce. One file per skill, beside the
+    corpus it extends, advanced by `update` with the skill that owns it.
+
+    `skill` is required to resolve a real slot; None returns the first existing skills root,
+    which is all the "is workforce installed at all" check needs.
+    """
     for c in _slot_candidates(root):
-        if os.path.isdir(c):
-            return c
+        if skill is None:
+            if os.path.isdir(c):
+                return c
+            continue
+        d = os.path.join(c, skill, "references")
+        # THE SLOT FILE DECIDES, NOT THE DIRECTORY. The first candidate is the project's own
+        # `.claude/skills`, and a project holding its own `code-evaluator/references/` would
+        # otherwise WIN the resolution and then report `additions slot not found` — a real
+        # shipped slot sitting unread one candidate further down, reported as absent.
+        # Observed exactly that on a copy of `odyssey-alive` before this line existed.
+        if os.path.isfile(os.path.join(d, slot)) if slot else os.path.isdir(d):
+            return d
     return None
 
 
@@ -238,10 +260,17 @@ def _region_version(target_text, tag):
     return int(m.group(1)) if m else None
 
 
-def plan_catalog(root, ev_dir, slot_dir):
-    """Compute the disposition for one evaluator directory without writing anything."""
+def plan_catalog(root, ev_dir, slot_dir=None):
+    """Compute the disposition for one evaluator directory without writing anything.
+
+    `slot_dir` is resolved PER SPEC now rather than passed in: the additions slot lives
+    inside the shipped evaluator skill that owns it, so there is no single directory holding
+    every slot (§ `_slot_dir`). It is still accepted as an argument for callers that pin one.
+    """
     dname = ev_dir.lower()
     spec = next((s for s in CATALOGS.values() if s["match"](dname)), None)
+    if spec is not None and slot_dir is None:
+        slot_dir = _slot_dir(root, spec["skill"], spec["slot"])
     ev_path = os.path.join(root, ".claude", "skills", ev_dir)
     anchor_rel = _resolve_one(ev_path, "CATALOG-ANCHOR.md", default="CATALOG-ANCHOR.md")
     anchor_path = os.path.join(ev_path, anchor_rel)
@@ -249,6 +278,21 @@ def plan_catalog(root, ev_dir, slot_dir):
 
     if spec is None:
         result.update(action="skip", detail="no additions slot maps to this evaluator")
+        return result
+
+    # A RETIRED SHELL IS A FINISHED STATE, NOT A FAILURE. Once `wf-catalog --migrate` has
+    # retired a project copy the directory holds its house rules and nothing else — there is
+    # no corpus file to append a region to, and there must not be: the additions ship inside
+    # the user-install evaluator and are read from there. Without this branch every
+    # correctly migrated project reports `ERR region target not found` on every audit,
+    # forever, with no action that could ever clear it. Observed on a fully retired copy of
+    # `odyssey-alive`: `INV-SEED 2 evaluator(s) · 2 error`, both of them the success case.
+    if not any(f for f in os.listdir(ev_path)
+               if f not in ("CATALOG-ANCHOR.md",) and not f.startswith(".")) \
+       or not os.path.isdir(os.path.join(ev_path, "references")):
+        result.update(action="retired",
+                      detail="retired in favour of the shipped evaluator; the additions ship "
+                             "with it and are read from the install")
         return result
 
     tag = next(k for k, v in CATALOGS.items() if v is spec)
@@ -330,7 +374,7 @@ def _write_anchor(anchor_text, tag, slot_ver, target_rel):
 
 def apply_catalog(plan):
     """Perform the writes for a `seed` plan. Atomic per file: render fully, then write."""
-    slot_rel = os.path.join("references", "evaluator-additions", os.path.basename(plan["slot"]))
+    slot_rel = os.path.join("references", os.path.basename(plan["slot"]))
     target_text = open(plan["target"], encoding="utf-8").read()
     new_target = _render(target_text, plan["tag"], plan["slot"], plan["slot_version"], slot_rel)
     anchor_text = open(plan["anchor"], encoding="utf-8").read() if os.path.isfile(plan["anchor"]) else ""
@@ -344,7 +388,7 @@ def apply_catalog(plan):
 
 def run(root, execute):
     sk = os.path.join(root, ".claude", "skills")
-    slot_dir = _slot_dir(root)
+    slot_dir = None
     plans = []
     if os.path.isdir(sk):
         evs = sorted(d for d in os.listdir(sk)

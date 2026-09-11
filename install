@@ -405,6 +405,11 @@ prune_scope() {
     _skill_dir="$1"
     _agents_dir="$2"
     _styles_dir="$3"
+    # The skills root is DERIVED from the skill directory rather than passed, so it can
+    # never name a different tree than the one being pruned. Rule 3 below has already
+    # asserted that $_skill_dir ends in `/skills/workforce`, which makes the parent the
+    # skills root by construction.
+    _skills_root="$(dirname "$_skill_dir")"
 
     # Rule 3, asserted. Refusing is the correct outcome — an un-pruned install is
     # untidy, and a prune pointed at the wrong root destroys a user's project state.
@@ -442,13 +447,35 @@ prune_scope() {
             "exec "*)   ppath="${pline#exec }" ;;
             "canary "*) pflag="canary"; ppath="${pline#canary }" ;;
             "style "*)  pflag="style";  ppath="${pline#style }" ;;
+            "sibling "*) pflag="sibling"; ppath="${pline#sibling }" ;;
+            "exec-sibling "*) pflag="sibling"; ppath="${pline#exec-sibling }" ;;
+            "agent "*) pflag="agentreg"; ppath="${pline#agent }" ;;
             # A retired path is NOT expected on disk and is NOT written to
             # $_ext_now — that file is "what we ship now", and shipping is exactly
             # what a retired path stopped doing. It goes to the seed list instead.
             "retired "*) pflag="retired"; ppath="${pline#retired }" ;;
         esac
-        if [ "$pflag" = "canary" ]; then
+        if [ "$pflag" = "agentreg" ]; then
+            _padir="${ppath%/AGENT.md}"
+            echo "$_agents_dir/$(basename "$_padir").md" >> "$_ext_now"
+        elif [ "$pflag" = "canary" ]; then
             echo "$_agents_dir/$(basename "$ppath")" >> "$_ext_now"
+        elif [ "$pflag" = "sibling" ]; then
+            # A KEPT SKILL IS NOT CLAIMED. `$_ext_now` becomes the new
+            # `.installed-external`, so writing a kept skill's paths there would record
+            # this installer as the author of files it deliberately did not touch — and
+            # the next run would then refresh them over the user's words, with the guard
+            # reading its own false record as permission.
+            _psib="${ppath#workforce/skills/}"
+            case " ${SIBLING_KEPT:-} " in
+                *" ${_psib%%/*} "*) continue ;;
+            esac
+            # Rule 2 territory: a sibling skill lives OUTSIDE the workforce skill
+            # directory, in a shared skills root holding the user's own skills. It is
+            # removed only when `.installed-external` records that a previous run of
+            # this installer wrote that exact path — never by a basename match, and
+            # never because a directory happens to carry an evaluator's name.
+            echo "$_skills_root/${ppath#workforce/skills/}" >> "$_ext_now"
         elif [ "$pflag" = "style" ]; then
             echo "$_styles_dir/$(basename "$ppath")" >> "$_ext_now"
         elif [ "$pflag" = "retired" ]; then
@@ -502,9 +529,33 @@ prune_scope() {
     fi
 
     # Rule 2 — outside it, only files a previous run of this installer wrote.
+    #
+    # A KEPT SKILL IS EXEMPT FROM THE WALK, and this is the second half of not claiming it.
+    # `$_ext_now` is both the new record AND the whitelist this loop deletes against, so
+    # omitting a kept skill's paths from it — correct for ownership — made every one of
+    # them an orphan to delete. MEASURED by an independent review before this shipped: with
+    # a record listing a sibling's files but not its `SKILL.md`, the installer printed
+    # `Keeping …/text-eval (the project's own)` and then pruned `text-tells.md`,
+    # `additions.md` and the rest out from under it — one of them holding an
+    # `origin: user | immutable: true` block — while reporting the install complete.
+    # A removal with no preservation pass, in the branch whose own message says the files
+    # are being kept.
+    #
+    # So a recorded path under a kept skill is carried forward untouched: not deleted, and
+    # not re-claimed either — it stays in the record exactly as the previous run left it,
+    # which is what it is: a file some earlier run wrote, in a directory now held by the
+    # project.
     if [ -f "$_record" ]; then
         while IFS= read -r pf || [ -n "$pf" ]; do
             [ -n "$pf" ] || continue
+            _kept_path=""
+            for _ks in ${SIBLING_KEPT:-}; do
+                case "$pf" in "$_skills_root/$_ks/"*) _kept_path="yes" ;; esac
+            done
+            if [ -n "$_kept_path" ]; then
+                echo "$pf" >> "$_ext_now"
+                continue
+            fi
             if [ -f "$pf" ] && ! grep -Fxq "$pf" "$_ext_now"; then
                 rm -f "$pf" && _pruned=$((_pruned + 1))
                 echo "  Pruned $pf"
@@ -551,6 +602,9 @@ verify_scope() {
             "hook "*) vflag="hook"; vpath="${vline#hook }" ;;
             "exec "*) vflag="hook"; vpath="${vline#exec }" ;;
             "canary "*) vflag="canary"; vpath="${vline#canary }" ;;
+            "sibling "*) vflag="sibling"; vpath="${vline#sibling }" ;;
+            "exec-sibling "*) vflag="sibling"; vpath="${vline#exec-sibling }" ;;
+            "agent "*) vflag="agentreg"; vpath="${vline#agent }" ;;
             "style "*) vflag="style"; vpath="${vline#style }" ;;
         esac
 
@@ -558,12 +612,26 @@ verify_scope() {
             vdest="$agents_dir/$(basename "$vpath")"
         elif [ "$vflag" = "style" ]; then
             vdest="$styles_dir/$(basename "$vpath")"
+        elif [ "$vflag" = "agentreg" ]; then
+            _vadir="${vpath%/AGENT.md}"
+            vdest="$agents_dir/$(basename "$_vadir").md"
+        elif [ "$vflag" = "sibling" ]; then
+            vdest="$(dirname "$vdir")/${vpath#workforce/skills/}"
         else
             vdest="$vdir/${vpath#workforce/}"
         fi
         v_total=$((v_total + 1))
 
         if [ ! -s "$vdest" ]; then
+            # A SIBLING THE FETCH LOOP DELIBERATELY KEPT IS NOT A MISSING FILE. The
+            # guard leaves a project's own evaluator standing, which means the shipped
+            # path is legitimately absent there — reporting it as an incomplete install
+            # would fail every project that owns its own text-eval, and an installer
+            # that cries incomplete on a correct tree gets its verification ignored.
+            vsib="${vpath#workforce/skills/}"
+            case " $SIBLING_KEPT " in
+                *" ${vsib%%/*} "*) continue ;;
+            esac
             v_missing="$v_missing $vpath"
             continue
         fi
@@ -590,6 +658,7 @@ install_to_scope() {
     case "$scope" in
         user)
             skill_dir="$PERSONAL_SKILL_DIR"
+            skills_root="$CONFIG_ROOT/skills"
             agents_dir="$CONFIG_ROOT/agents"
             styles_dir="$CONFIG_ROOT/output-styles"
             settings_file="$CONFIG_ROOT/settings.json"
@@ -597,12 +666,34 @@ install_to_scope() {
             ;;
         project)
             skill_dir="$PROJECT_SKILL_DIR"
+            skills_root="$(pwd)/.claude/skills"
             agents_dir="$(pwd)/.claude/agents"
             styles_dir="$(pwd)/.claude/output-styles"
             settings_file=".claude/settings.local.json"
             scope_label="project ($(pwd)/.claude/skills)"
             ;;
     esac
+
+    # Reset per scope. `install_to_scope` runs twice on a both-scopes install, and a
+    # skill kept at project scope is not evidence about the personal tree.
+    SIBLING_KEPT=""
+    SIBLING_OURS=""
+
+    # SNAPSHOT THE OWNERSHIP RECORD BEFORE THE FIRST WRITE, and read the snapshot for the
+    # rest of the run. `prune_scope` rewrites `.installed-external` AFTER this loop, so the
+    # live file describes the PREVIOUS run — but the files this run writes start existing
+    # immediately, and a guard that consults a record while the tree moves under it reads
+    # its own output as evidence.
+    #
+    # MEASURED by an independent review of this change, before it shipped: with the guard
+    # reading the live path, row 1 of each skill (`SKILL.md`) found no file and installed
+    # it; from row 2 on, that same `SKILL.md` existed and was still absent from the record,
+    # so the guard concluded the skill was the project's own and skipped every remaining
+    # file. A fresh install produced ONE file per evaluator — no corpus, no agents — and
+    # reported `Verified: 195/195 files present`. It never self-heals: on run 2 the
+    # `SKILL.md` is there and the guard skips the skill entirely, forever.
+    SIBLING_RECORD="$(mktemp)"
+    [ -f "$skill_dir/.installed-external" ] && cp "$skill_dir/.installed-external" "$SIBLING_RECORD"
 
     echo
     echo "Scope: $scope_label"
@@ -618,6 +709,7 @@ install_to_scope() {
         esac
 
         flag=""
+        sib_exec=""
         path="$line"
         case "$line" in
             "keep "*) flag="keep"; path="${line#keep }" ;;
@@ -641,14 +733,76 @@ install_to_scope() {
             # prompt, which is why the plain-speak rule lands here rather than in
             # a reference the model has to still be paying attention to.
             "style "*) flag="style"; path="${line#style }" ;;
+            # `sibling` files do NOT live in the workforce skill directory: they are
+            # WHOLE SKILLS OF THEIR OWN — the five evaluators — and a skill is only
+            # discoverable at `<skills-root>/<name>/SKILL.md`. Shipping them here is
+            # the user directive of 2026-09-10: the five evaluators and workforce are
+            # self-contained in the user install, and `update` is the entire
+            # propagation path. Nesting them under `skills/workforce/` would install
+            # five directories the host never reads, which is how the corpus-only
+            # move looked like it worked while reaching nobody.
+            "sibling "*) flag="sibling"; path="${line#sibling }" ;;
+            # `exec-sibling` is `sibling`'s mechanical twin, exactly as `exec` is `hook`'s:
+            # the same destination plus chmod +x. A shipped evaluator carrying a script
+            # (`code-evaluator/scripts/lint-delta.sh`) is unusable without the bit, and a
+            # lost executable bit fails identically to a missing file.
+            "exec-sibling "*) flag="sibling"; sib_exec="yes"; path="${line#exec-sibling }" ;;
+            # `agent` REGISTERS a shipped evaluator agent with the host. The definition
+            # itself arrives as a `sibling` row inside the skill; this row writes the
+            # `<name>.md` the host actually reads, where `<name>` is the agent directory —
+            # `agents/character-scanner/AGENT.md` registers as `character-scanner.md`.
+            # Same destination directory as `canary`, and the same `.installed-external`
+            # record, so `disband` and the prune remove it and nothing else.
+            "agent "*) flag="agentreg"; path="${line#agent }" ;;
         esac
 
         if [ "$flag" = "canary" ]; then
             dest="$agents_dir/$(basename "$path")"
         elif [ "$flag" = "style" ]; then
             dest="$styles_dir/$(basename "$path")"
+        elif [ "$flag" = "agentreg" ]; then
+            _adir="${path%/AGENT.md}"
+            dest="$agents_dir/$(basename "$_adir").md"
+        elif [ "$flag" = "sibling" ]; then
+            dest="$skills_root/${path#workforce/skills/}"
         else
             dest="$skill_dir/${path#workforce/}"
+        fi
+
+        # A SIBLING NEVER OVERWRITES A SKILL THIS INSTALLER DID NOT WRITE, and the
+        # reason is measured rather than theoretical. `odyssey-alive/.claude/skills/
+        # text-eval/SKILL.md` carries an `origin: user | immutable: true` block of the
+        # user's own directives, and `image-eval` carries project voice rules. At
+        # project scope the shipped `text-eval` resolves to that exact path, so an
+        # unguarded fetch would replace the user's words with the distribution's copy
+        # — the one act directive one forbids outright. `.installed-external` is the
+        # authority: a path this installer recorded writing is ours to refresh, and
+        # anything else is the project's and is left where it stands.
+        if [ "$flag" = "sibling" ]; then
+            # OWNERSHIP IS DECIDED PER SKILL, ONCE, ON ITS `SKILL.md`. Deciding per file
+            # would half-install a project's evaluator: its own `SKILL.md` kept while the
+            # distribution's `references/` landed underneath it, which is a skill whose
+            # prose and whose corpus come from two different authors and agrees with
+            # neither. The directory is the unit a user owns.
+            sib_name="${path#workforce/skills/}"
+            sib_name="${sib_name%%/*}"
+            # Decided ONCE per skill. Both answers are remembered, because the question is
+            # only answerable from the tree as it stood before this run touched it.
+            case " $SIBLING_KEPT " in
+                *" $sib_name "*) continue ;;
+            esac
+            case " $SIBLING_OURS " in
+                *" $sib_name "*) : ;;
+                *)
+                    if [ -f "$skills_root/$sib_name/SKILL.md" ] \
+                       && ! grep -Fxq "$skills_root/$sib_name/SKILL.md" "$SIBLING_RECORD"; then
+                        echo "  Keeping $skills_root/$sib_name (the project's own — not written by this installer)"
+                        SIBLING_KEPT="$SIBLING_KEPT $sib_name"
+                        continue
+                    fi
+                    SIBLING_OURS="$SIBLING_OURS $sib_name"
+                    ;;
+            esac
         fi
 
         if [ "$flag" = "keep" ] && [ -f "$dest" ]; then
@@ -668,10 +822,20 @@ install_to_scope() {
             continue
         fi
 
-        if [ "$flag" = "hook" ]; then
+        if [ "$flag" = "hook" ] || [ -n "$sib_exec" ]; then
             chmod +x "$dest"
         fi
     done < "$MANIFEST_TMP"
+
+    if [ -n "${SIBLING_KEPT:-}" ]; then
+        echo
+        echo "  NOTE: kept the project's own copy of:$SIBLING_KEPT"
+        echo "        Those directories were not written by this installer, so they hold"
+        echo "        the project's words rather than the distribution's. The shipped"
+        echo "        evaluator is not installed over them."
+    fi
+
+    rm -f "$SIBLING_RECORD"
 
     prune_scope "$skill_dir" "$agents_dir" "$styles_dir"
 

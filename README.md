@@ -150,6 +150,23 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
+**Update is the whole path.** Installing puts six skills on your machine, not one. You get
+`workforce` itself plus five evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
+`image-eval`, `ui-design`), each one complete, with the catalog it grades against and the agents it
+runs. They sit side by side in your skills directory and every project on the machine reaches them.
+When an evaluator's catalog changes, `/workforce update` is all you run. You never re-audit a project
+to collect a change. Earlier versions copied them into each project instead, which meant an update
+reached none of them.
+
+Your projects get cleaned up on the next audit. A project holding an old copy has that copy retired,
+and reads the shipped one from then on. Nothing is lost on the way. Every rule you wrote yourself is
+moved into that evaluator's house-rules file word for word first, and everything removed is filed
+where you can still read it. Your house rules stay, and so does any agent or script the shipped
+evaluator doesn't replace.
+
+A skill you wrote yourself is never touched. If a `text-eval` in your tree wasn't written by the
+installer, it's yours. The install says so and leaves it alone.
+
 ## Talking to the Company
 
 Describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can actually do it. You don't name an employee or pick a tier. You say what you need, and working out who gets it is the company's job. The examples below are all the same gesture, grouped by the rule each one shows.
@@ -433,11 +450,11 @@ If the skill is gone and you can't run the command, the restore kit inside `.cla
 
 Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Three evaluators do that, and each has its own catalog.
 
-**text-eval reads prose the way an editor hunting for a robot would.** It looks for the tells that give away machine writing: the em-dash leaned on as a crutch, the "it's not X, it's Y" reasoning models reach for, a sentence built like a paragraph when a person would just say it. One tell is only a word choice. It flags a passage when several cluster together. The whole catalog is here, and every rule comes with a test you can hold it to: [text-tells.md](workforce/references/catalogs/text/text-tells.md).
+**text-eval reads prose the way an editor hunting for a robot would.** It looks for the tells that give away machine writing: the em-dash leaned on as a crutch, the "it's not X, it's Y" reasoning models reach for, a sentence built like a paragraph when a person would just say it. One tell is only a word choice. It flags a passage when several cluster together. The whole catalog is here, and every rule comes with a test you can hold it to: [text-tells.md](workforce/skills/text-eval/references/text-tells.md).
 
-**code-evaluator does the same for the shipped scripts.** Its catalog is a list of the ways code goes wrong: mistakes that repeat, checks that get skipped, the small traps a reviewer learns to watch for. It's split across a [mistake taxonomy](workforce/references/catalogs/code/mistake-taxonomy.md), [cross-file consistency](workforce/references/catalogs/code/cross-file-detection.md), [guards](workforce/references/catalogs/code/guards.md), and [gotchas](workforce/references/catalogs/code/gotchas.md).
+**code-evaluator does the same for the shipped scripts.** Its catalog is a list of the ways code goes wrong: mistakes that repeat, checks that get skipped, the small traps a reviewer learns to watch for. It's split across a [mistake taxonomy](workforce/skills/code-evaluator/references/mistake-taxonomy.md), [cross-file consistency](workforce/skills/code-evaluator/references/cross-file-detection.md), [guards](workforce/skills/code-evaluator/references/guards.md), and [gotchas](workforce/skills/code-evaluator/references/gotchas.md).
 
-**security-evaluator reads the same code for a different kind of danger.** code-evaluator asks whether the code is clean; this one asks whether it's safe to put on the web: a query built by pasting a request straight into it, a password hard-coded where every reader of the repo can see it, a redirect that trusts whatever address it's handed. Its catalog is the OWASP Top 10 written out as signals you can grep for, one per flaw and tagged by language, so a change only pulls in the checks its own code could trip. The catalog can be exhaustive that way without every review carrying all of it. Where a real scanner like semgrep is installed, that's the verdict; where it isn't, the catalog flags candidates and says plainly what a static read can't prove. It's [security-taxonomy.md](workforce/references/catalogs/security/security-taxonomy.md), an [analyzer map](workforce/references/catalogs/security/native-tool-map.md), and [guards](workforce/references/catalogs/security/guards.md).
+**security-evaluator reads the same code for a different kind of danger.** code-evaluator asks whether the code is clean; this one asks whether it's safe to put on the web: a query built by pasting a request straight into it, a password hard-coded where every reader of the repo can see it, a redirect that trusts whatever address it's handed. Its catalog is the OWASP Top 10 written out as signals you can grep for, one per flaw and tagged by language, so a change only pulls in the checks its own code could trip. The catalog can be exhaustive that way without every review carrying all of it. Where a real scanner like semgrep is installed, that's the verdict; where it isn't, the catalog flags candidates and says plainly what a static read can't prove. It's [security-taxonomy.md](workforce/skills/security-evaluator/references/security-taxonomy.md), an [analyzer map](workforce/skills/security-evaluator/references/native-tool-map.md), and [guards](workforce/skills/security-evaluator/references/guards.md).
 
 You never turn these on. The audit wires them in on its own, one evaluator for each department whose work a catalog covers, so prose goes to the writers and code to the script authors. The catalog installs as a skill anyone can check their own work against, and the review is a step the lead runs before the work is called done. How that gets decided is written up in [evaluators.md](workforce/references/evaluators.md).
 

@@ -125,7 +125,7 @@ within the em-dash supersession scope (`evaluators.md` § A register scoped by e
 stale). The **Conversational register** test fires only on conversational-target content and
 **exempts formal technical and reference prose**, where a formal register is correct. That exempt
 corpus is a constant, so it is stated once and not here: the authoritative exemption list lives in
-`evaluator-additions/text-tells.md` § Conversational register (mirrored in the CATALOG-ANCHOR
+`text-eval/references/additions.md` § Conversational register (mirrored in the CATALOG-ANCHOR
 supersession register), and this section points at it rather than restating it, so the two cannot
 drift. So the always-pass rule bites every prose deliverable;
 the register test inside it bites only conversational-target content. Both hold at once.

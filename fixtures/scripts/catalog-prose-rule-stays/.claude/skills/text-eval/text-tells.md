@@ -4,3 +4,7 @@
 | Balanced hedging | performed nuance |
 
 Project rule, added 2026-03: never flag anything under `legacy/vendor-shim/` as dead.
+
+<!-- immutable: true | origin: user -->
+> **"Never flag anything under `legacy/vendor-shim/` as dead."**
+<!-- /origin -->

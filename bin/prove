@@ -190,7 +190,7 @@ DEV = "DEVELOPMENT.md"
 WCM = "workforce/bin/wf-claude-md"
 WBG = "workforce/bin/wf-budget-guard"
 STY = "workforce/output-styles/plain-speak.md"
-TTL = "workforce/references/evaluator-additions/text-tells.md"
+TTL = "workforce/skills/text-eval/references/additions.md"
 INS = "install"
 INSP = "install.ps1"
 PLO = "workforce/references/plain-output.md"
@@ -217,21 +217,21 @@ CEN2 = "workforce/bin/wf-census"
 EVL  = "workforce/references/evaluators.md"
 EVLS = "workforce/references/evals.md"
 RCR  = "workforce/references/recruiter.md"
-ADDT = "workforce/references/evaluator-additions/text-tells.md"
-CEA  = "workforce/references/evaluator-additions/code-eval.md"
+ADDT = "workforce/skills/text-eval/references/additions.md"
+CEA  = "workforce/skills/code-evaluator/references/additions.md"
 PTL  = "workforce/references/personnel-templates.md"
 DGN  = "workforce/references/procedures/diagnose.md"
 WPC  = "workforce/bin/wf-pin-check"
 ORGP = "workforce/references/procedures/org.md"
 PRIN = "workforce/references/principles.md"
 PRINP = "workforce/references/procedures/principles.md"
-CTV  = "workforce/references/catalogs/text/version.md"
+CTV  = "workforce/skills/text-eval/references/version.md"
 VSRC = "workforce/references/version.md"   # the product version anchor (WORKFORCE-VERSION)
 DBUD = "workforce/references/procedure-for-procedures.md"
 AUS  = "workforce/references/audit-setup.md"
-SECG = "workforce/references/catalogs/security/guards.md"
+SECG = "workforce/skills/security-evaluator/references/guards.md"
 REC  = "workforce/references/recruiter.md"
-UIS  = "workforce/references/catalogs/ui/ui-checks.md"
+UIS  = "workforce/skills/ui-design/references/design-quality-catalog.md"
 OCF  = "workforce/references/org-chart-format.md"
 PFL  = "workforce/references/procedures/preflight.md"
 RVW  = "workforce/references/procedures/review.md"
@@ -354,10 +354,24 @@ CASES = [
      CATL, "del", "def corpus_pairs(root, kind):"),
     ("wf-catalog removes a file only when the install ships that exact file",
      CATL, "del", "def all_files(d):"),
+    # Removal is unconditional now, so the ARCHIVE is what makes it reversible. Break it and
+    # the gate must fail — an unarchived removal has no way back. TARGETED AT A DOCSTRING
+    # PHRASE, not at `def archive_copy`: deleting a `def` leaves the file syntactically
+    # broken, six unrelated assertions fail, and this one never runs — which prove reports
+    # as BAD-CASE, an assertion left unproven rather than disproven.
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "an unarchived removal is a removal with no way back"),
     ("wf-catalog removes a file only when the install ships that exact file",
      CATL, "del", "keep-symlink"),
+    # THE PRESERVATION, not a refusal. A retirement removes the copy unconditionally
+    # (SKILL.md § Directives, 2026-09-10), so what protects the user's own words is that
+    # they are lifted into CATALOG-ANCHOR.md and READ BACK before a file goes. Break the
+    # readback and the check must fail: an extraction nobody verified may not authorise a
+    # deletion.
     ("wf-catalog removes a file only when the install ships that exact file",
-     CATL, "del", "keep-user-span"),
+     CATL, "del", "return all(span in back"),
+    ("wf-catalog removes a file only when the install ships that exact file",
+     CATL, "del", "archive = archive_copy("),
     # TARGET THE RETURNED LINE, NOT THE LITERAL. `del "CLAUDE_CONFIG_DIR"` returned VACUOUS:
     # the literal appears twice in wf-catalog, once in config_root's docstring and once in
     # its code, and `del` removes the FIRST — leaving the check satisfied by the survivor.
@@ -365,7 +379,7 @@ CASES = [
     # install stops being a candidate, so a host install answers nothing.
     ("wf-catalog and wf-seed resolve an install through the same three candidates",
      CATL, "del",
-     'os.path.join(config_root(), "skills", "workforce", "references", "catalogs"),'),
+     'os.path.join(config_root(), "skills"),'),
     # ── say the state, not the journey (2026-09-07) ──────────────────────────
     # Seven carriers, seven breaks. The user scoped this to "any project using
     # workforce", so the handbook template and wf-conform are load-bearing in a way
@@ -500,11 +514,11 @@ CASES = [
     # reads it". Deleting the manifest row and deleting the seeding path both leave
     # a perfectly valid additions file on disk that reaches no installed catalog.
     ("additions: declared, present, and OUTSIDE the vendored set",
-     MAN, "del", "workforce/references/evaluator-additions/text-tells.md\n"),
+     MAN, "del", "workforce/skills/text-eval/references/additions.md\n"),
     ("additions: each carries its own anchor and declares workforce as author",
      ADDT, "del", "additions-version:"),
     ("additions: the seeding step names both files BY PATH",
-     EVL, "del", "`references/evaluator-additions/text-tells.md`"),
+     EVL, "del", "`skills/text-eval/references/additions.md`"),
     ("additions: manifest states the authored-vs-vendored distinction where it ships them",
      MAN, "del", "AUTHORED HERE, NOT VENDORED"),
     ("additions: the vendored version anchor cross-references the authored slot",
@@ -662,7 +676,7 @@ CASES = [
     # companion gate reads stops naming it. Each payload is grep -c == 1 so the
     # single del actually flips the check.
     ("catalogs: the authored security catalog ships (all five files)",
-     MAN, "del", "workforce/references/catalogs/security/guards.md\n"),
+     MAN, "del", "workforce/skills/security-evaluator/references/guards.md\n"),
     ("catalogs: every security file carries a security-ref-version anchor on line 1",
      SECG, "del", "<!-- security-ref-version: 1 -->"),
     ("security: the standing catalog gate is written where verification is enforced",
@@ -1440,8 +1454,11 @@ CASES = [
      AUD2, "del", "INV-REMEDIATE  employees"),
     ("evaluators: ui-design is a design employee's tier-3 gate",
      EVL, "del", "grep-checks `ui-design` as its"),
+    # The rule is IMG-01 in the shipped catalog, which carries stable rule IDs; the earlier
+    # single-file seed stated it as a heading. Same rule, addressed the way an evaluator
+    # actually cites it.
     ("ui catalog: a blank or placeholder media slot FAILS",
-     UIS, "del", "No missing art — a blank or placeholder media slot FAILS"),
+     UIS, "del", "missing, broken, blank, or a placeholder"),
     ("recruiter: research is FORCED, not optional",
      REC, "del", "The research — FORCED, not optional"),
     ("recruiter: most-capable is reconciled to budget with a receipt",

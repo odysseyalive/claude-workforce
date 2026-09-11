@@ -1796,7 +1796,7 @@ T-step tells the user something broke; it does not tell them what to type.
 ### Step 6-E — Seed evaluator additions and refresh the house rules
 
 The evaluator wiring in Step 4 is a DESIGN decision; **this is where the writes happen**, and until this
-step existed they did not — the append that carries `references/evaluator-additions/` into an installed
+step existed they did not — the append that carries the evaluator skill's own `references/additions.md` into an installed
 catalog was prose-only, performed by whoever ran the audit and remembered. `code-evaluator` is the proof:
 its own additions sat unseeded from 2026-08-06 to 2026-08-25 while its anchor reported the gap every run.
 A detector without its fix is a flag (SKILL.md § Directives), and the fix is a step that always runs.
@@ -1820,39 +1820,53 @@ Then refresh the house rules (§ Step 4, "Refresh the house rules in every insta
 carries the RULES the evaluator applies them under — both are "never skipped, never offered, never a
 question," and both run here before `verify` so `verify` checks their result.
 
-### Step 6-F — Migrate the project onto the installed corpus
+### Step 6-F — Retire the project's evaluator copies
 
-**The corpus is one text; a copy per project made it nine.** MEASURED 2026-09-10 across thirteen
-projects: the shipped text catalog stamps `creative-scrub-ref-version: 2`, and its copies stamp
-**2, 1, 2, 2, 1, absent, 2, 1, absent**. A copy is refreshed only by re-auditing *that* project while
-`update` advances the install and reaches none of them — the three-paths rule failing on the corpus
-itself (`evaluators.md` § Where a catalog resolves from). This step is the second row of that table.
+**The five evaluators ship in the install, and the project's old copies go.** The user directive of
+2026-09-10 (SKILL.md § Directives) states both halves: *"the five evaluations and workforce should be
+self-contained in the user during install so that I don't have to run an audit every time there are
+changes"*, and *"the audit of a project removes the old ones of the project so that the one in the user
+space is the one that's being used ... No exceptions."* This step is the second half.
+
+**It is not optional and it is not offered.** Run it, in this order, and print both lines:
 
 ```
 wf-catalog --root ${CLAUDE_PROJECT_DIR} --migrate
+wf-catalog --root ${CLAUDE_PROJECT_DIR} --migrate --execute
 ```
 
-Print `INV-CATMIG`. **Run it in display mode first and read what it lists**, then `--execute` only
-when the run reports at least one `identical` file. **Removal is per FILE and the proof is byte
-identity** — the install ships a file of that name and the two match once the machine-owned additions
-region, the version anchor and trailing whitespace are normalised away. Every other file is listed
-`STAYS` and is never touched, and **the skill directory itself is never removed**, so
-`CATALOG-ANCHOR.md` — the house rules and the supersession register — the handbooks, the scripts and
-the `hooks/` survive by construction (`evaluators.md` § Migration).
+Display first so the run can read what it lists, then execute. There is no threshold to clear: a
+project copy of a kind the install carries is the old one, whatever it contains.
 
-**A `STAYS` file is NOT a deferred row and never becomes one** (SKILL.md § Directives, 2026-08-10). It
-is a verdict with its reason attached: the file stays because the install does not ship it, or ships a
-different one, which is directive one operating rather than a decision postponed. Report it as
-`stays: <reason>`, never as an optional refinement for the user to resolve later. Where a project
-genuinely holds corpus content the install lacks, lifting it into `references/evaluator-additions/` is
-a maintainer act with a version anchor — raise it, do not perform it here.
+**What the retirement does before it removes anything, in this order.** Every `origin: user |
+immutable: true` span in the copy is lifted verbatim into its `CATALOG-ANCHOR.md` and **read back**;
+the whole removed set is copied byte-for-byte into `.claude/workforce/retired/<skill>-<stamp>/`. Either
+failing is BLOCKING for that kind and nothing is removed. Directive one is retention, and retention
+means the words reach the component governed by them — the house-rules file outranks the catalog, so a
+lifted span is promoted, not moved.
+
+**What survives, and each is make-before-break rather than an exception.** `CATALOG-ANCHOR.md`, the
+house rules and supersession register. A bundled `agents/<name>/` the shipped evaluator does not also
+ship — a project's own voice-carrying agent has no replacement, and leaving a named capability
+reachable by zero paths is the one thing a retirement may never do. A `scripts/` or `hooks/` file the
+shipped skill does not ship, for the same reason. Report each as `stays: <reason>` — **a `STAYS` file
+is NOT a deferred row and never becomes one** (SKILL.md § Directives, 2026-08-10).
+
+**Registrations are cleaned only when the replacement is on disk.** A `.claude/agents/<name>.md`
+symlink into the retired copy is dangling; it is removed when the install registers an agent of that
+name, and left with a named remedy when it does not. A dangling registration is worse than an absent
+one — the host lists the agent type and the spawn fails at use.
 
 **The hook registrations are a REFUSAL, not a warning.** `wf-catalog` reads project AND user scope and
-refuses to remove from a copy any registration still points into, exiting 1 so the run can tell a
-refusal from a clean migration. Name them and say the copy is held on them; unregistering is `hooks`'
-job. **Duplicated registrations are their own finding** — `odyssey-alive` carried
-`chain-image-eval.sh` twice on `PostToolUse` before this step existed, which is the double activation
-this migration exists to end rather than to create.
+refuses to retire a copy any registration still points into, exiting 1 so the run can tell a refusal
+from a clean migration. That is an ORDERING requirement, not an exception: `hooks` unregisters in the
+same audit and this step then completes. **Duplicated registrations are their own finding** —
+`odyssey-alive` carried `chain-image-eval.sh` twice on `PostToolUse` before this step existed, which is
+the double activation this migration exists to end rather than to create.
+
+**Report `INV-CATMIG`, then re-run `wf-catalog` and report `INV-CATALOG`.** The run is not finished
+until every kind reads `install`. A kind still reading `project` after this step is a defect in the
+step, not a state to report.
 
 ### Step 6-H — Wire the shipped hooks and select the output style (the heal path)
 

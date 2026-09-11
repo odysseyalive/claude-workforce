@@ -8,7 +8,7 @@
      an offline or first-run hire still gets a real bar rather than the author's
      unexamined default.
 
-     Sibling in spirit to the image catalog at references/catalogs/image/. Version anchor: 1
+     Sibling in spirit to the image catalog at skills/image-eval/references/. Version anchor: 1
 -->
 
 These are baseline quality bars for the role families a common web or app build involves. Each family

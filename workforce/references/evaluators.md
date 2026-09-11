@@ -14,7 +14,7 @@ project imports them **verbatim** (vendored). `security-evaluator` originates **
 is not vendored: it is workforce-authored, **distilled from three pinned upstream corpora and cited to
 them** rather than copied from a predecessor (§ Seeding). The remaining two, `image-eval` and
 `ui-design`, are also authored here and **shipped as built catalogs since 2026-09-10**
-(`references/catalogs/image/`, `references/catalogs/ui/`). *They shipped as single seed specs until
+(`skills/image-eval/references/`, `skills/ui-design/references/`). *They shipped as single seed specs until
 then — `image-eval-seed.md` and `ui-design-seed.md`, copied into a project once on absence and tracked
 by nothing afterwards. Measured that day: 8 projects held an `image-eval` copy, 1 a `ui-design`, 1 a
 `design-eval` under a third spelling, and not one carried a version anchor. A seed is a corpus that
@@ -77,14 +77,14 @@ cited pins (§ Seeding).
 
 The table below details the three built catalogs and `image-eval`. **`ui-design` is the fifth
 capability**, a seed spec sibling of `image-eval`: it **reviews** UI design (applied theme, visual
-hierarchy, present art, responsiveness, accessibility), ships as `references/catalogs/ui/`, is **owned** by a
+hierarchy, present art, responsiveness, accessibility), ships as `skills/ui-design/references/`, is **owned** by a
 design or front-end IC, and is **hired when** the project ships a user interface.
 
 | | `code-evaluator` | `text-eval` | `security-evaluator` | `image-eval` |
 |---|---|---|---|---|
 | Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix | image authenticity — AI generation tells, technique violations, metadata provenance |
 | Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
-| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | authored here, promoted from `image-eval-seed.md` to `references/catalogs/image/` on 2026-09-10 (this project only — no enforcer predecessor) |
+| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | authored here, promoted from `image-eval-seed.md` to `skills/image-eval/references/` on 2026-09-10 (this project only — no enforcer predecessor) |
 | Owner | an engineering IC | a content IC | a security or engineering IC | a content or design IC |
 | Hired when | the project has code | the project produces prose | the project has web-facing code | the project produces or ships images |
 
@@ -370,7 +370,7 @@ were removed (29 → 0), and that instance is fixed; it is the raising example, 
 **The corpus lives at the install; the house rules stay in the project.** `wf-catalog --root <tree>`
 answers "where does this project read the `code` / `text` / `security` catalog from", in one order:
 the project's own copy under `.claude/skills/<evaluator>/` if it has one, otherwise the shipped corpus
-at `references/catalogs/<kind>/`, resolved across project install → maintainer tree → personal install
+at `skills/<evaluator>/references/`, resolved across project install → maintainer tree → personal install
 exactly as `wf-seed._slot_candidates` resolves the additions slots.
 
 **The measurement that forced it**, 2026-09-10, thirteen projects and twenty copies on one machine. The
@@ -444,13 +444,13 @@ project to be installed in order to function.
 
 Seeding, in order:
 
-1. **This project ships the catalogs. Copy them.** `references/catalogs/text/` and
-   `references/catalogs/code/` carry the portable corpora **verbatim**, each with its own version anchor
+1. **This project ships the catalogs. Copy them.** `skills/text-eval/references/` and
+   `skills/code-evaluator/references/` carry the portable corpora **verbatim**, each with its own version anchor
    on line 1 (`creative-scrub-ref-version`, `code-eval-ref-version`). No predecessor needs to be
    installed and no machine-dependent branch decides what a project gets.
 
-   1b. **Then append this project's own additions.** `references/evaluator-additions/text-tells.md`
-   and `references/evaluator-additions/code-eval.md` are **authored here, not vendored**, each with
+   1b. **Then append this project's own additions.** `skills/text-eval/references/additions.md`
+   and `skills/code-evaluator/references/additions.md` are **authored here, not vendored**, each with
    its own anchor (`text-additions-version`, `code-additions-version`). A seeded catalog is the
    concatenation: vendored first, additions second. **Record both provenances separately in the
    anchor** — a later reconcile has to tell an upstream row from one of ours, and a merged file it
@@ -465,14 +465,14 @@ source carries ~126 pattern rows; one real project's hand-grown catalog had ~57 
 reconciled; a second had ~49. Workforce shipped **zero**, so a fresh install on any machine without the
 predecessor was strictly thinner than the system it supersedes — which is the one outcome the standing
 directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what closes it.*
-3. **For `image-eval`**, this project ships `references/catalogs/image/` as the corpus. It covers AI image
+3. **For `image-eval`**, this project ships `skills/image-eval/references/` as the corpus. It covers AI image
    patterns, technique authenticity (watercolor, oil, ink), visual clarity, metadata provenance, and
    image-set evaluation. Where a project already carries an `image-eval` (e.g. odyssey-alive's
    watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
    new entries through the forcible-append mechanism. The project's customizations, medium-specific
    checks, and user directives are never overwritten.
 
-   3b. **For `ui-design`**, this project ships `references/catalogs/ui/` as the corpus. It covers the required
+   3b. **For `ui-design`**, this project ships `skills/ui-design/references/` as the corpus. It covers the required
    checks — no missing art (a blank or placeholder media slot FAILS), applied theme (no default
    palette), contrast and accessibility — plus visual hierarchy, responsive layout, and default-design
    tells. It installs on absence alone, the same as `image-eval`, and where a project already carries a
@@ -480,7 +480,7 @@ directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what clo
    the forcible-append mechanism. It is a **separate** catalog from `image-eval` because UI design and
    image authenticity are medium-disjoint (§ The evaluators).
 4. **For `security-evaluator`, the catalog is authored here and distilled — not vendored.** Its five
-   files under `references/catalogs/security/` carry `origin: workforce · modifiable: true`, and they
+   files under `skills/security-evaluator/references/` carry `origin: workforce · modifiable: true`, and they
    are **distilled from three pinned upstream corpora** — OWASP/CheatSheetSeries @c735a6e,
    swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63 — with every flaw class
    anchored to a **CWE**, because semgrep's own 2025 OWASP tags are transitional and inconsistent. A
@@ -523,7 +523,7 @@ claude-enforcer and never hand-edited) and **workforce-distilled** (`security`, 
 re-distilled from its pins). Both are read-mostly, version-anchored, and greppable; they differ in
 origin and in who may edit them.
 
-**So growth goes to `references/evaluator-additions/`, and that is the whole reason it exists.**
+**So growth goes to the evaluator skill's own `references/additions.md`, and that is the whole reason it exists.**
 Until 2026-08-06 there were two slots and neither could take a new entry authored here: the vendored
 corpus may not be edited, and a project's own catalog under `.claude/skills/<evaluator>/` does not
 ship. The paragraph below called growing the seed a release task while the paragraph above forbade
@@ -533,8 +533,8 @@ tracked, shipped, and attributable to this project rather than to a predecessor 
 them.
 
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
-carry more of the weight — **which now means adding to `references/evaluator-additions/`, never to
-`references/catalogs/`.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
+carry more of the weight — **which now means adding to the evaluator skill's own `references/additions.md`, never to
+the evaluator skill's shipped `references/`.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
 was, and that checklist has five items and has never carried one for the seed, and the honest signal
 is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
 corpus.
@@ -655,7 +655,7 @@ receives the unconditional append. Nothing above weakens that case.
 
 **And the workforce-authored additions are a SEPARATE append with a SEPARATE gate.** Everything in this
 section governs the vendored corpus and the supersession register that guards it.
-`references/evaluator-additions/` is neither vendored nor superseded — it is workforce's own — so its append
+the evaluator skill's own `references/additions.md` is neither vendored nor superseded — it is workforce's own — so its append
 (§ Seeding step 1b) is stopped by **exactly one** thing, the insertion-point blocker above, and by nothing
 else: not an empty supersession register, not a foreign version anchor, not foreign ownership of the skill.
 A run that withholds the additions for any of those reasons has confused the two appends — the error

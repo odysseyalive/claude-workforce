@@ -3092,8 +3092,9 @@
     ]
   },
   "catalog-resolves-install": {
-    "_why": "A project with no copy of its own is answered from the workforce install -- the whole point of the change, and the state this repository itself is in during `workforce dev`. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so the case is HERMETIC: without it the two kinds this fixture does not carry resolve to whoever ran the suite, and the counts differ per machine. That pin also buys the UNRESOLVED path, which must name every candidate it tried and exit 1 -- a resolver that invents a path when it cannot find one produces exactly the phantom `wf-live` exists to catch.",
+    "_why": "A project with no copy of its own is answered from the shipped evaluator skill -- the whole point of the 2026-09-10 directive, and the state this repository itself is in during `workforce dev`. The corpus is the SKILL's own `references/`, so the candidate that answers here is the maintainer tree at `<root>/workforce/skills/`. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so the case is HERMETIC: without it the four kinds this fixture does not carry resolve to whoever ran the suite, and the counts differ per machine. That pin also buys the UNRESOLVED path, which must name every candidate it tried BY THE EVALUATOR'S REAL DIRECTORY NAME -- naming the kind printed three paths the resolver never looked at -- and exit 1. A resolver that invents a path when it cannot find one produces exactly the phantom `wf-live` exists to catch.",
     "script": "wf-catalog",
+    "args": [],
     "env": {
       "CLAUDE_CONFIG_DIR": "/nonexistent-config"
     },
@@ -3101,14 +3102,16 @@
     "want": [
       "text      install",
       "UNRESOLVED",
-      "INV-CATALOG  3 kind(s) \u00b7 1 from install \u00b7 0 from project copy \u00b7 0 stale \u00b7 2 unresolved"
+      "tried",
+      "skills/code-evaluator/references",
+      "INV-CATALOG  5 kind(s) \u00b7 1 from install \u00b7 0 from project copy \u00b7 0 stale \u00b7 0 additions unseeded \u00b7 0 additions stale \u00b7 4 unresolved"
     ],
     "must_not": [
       "from project copy \u00b7 1"
     ]
   },
   "catalog-residue-but-hooked": {
-    "_why": "Both halves of a removal in one tree. `text-tells.md` IS proven identical to the shipped file, and it is still not removed, because a settings entry registers a hook inside the copy. Deleting files while leaving the registration gives every later session a hook pointing at nothing -- the double activation this migration exists to end rather than cause. Measured live the day it shipped: hither-lands and apps-odyssey-alive register three such hooks each, and odyssey-alive has one registered TWICE on PostToolUse. The refusal exits 1 so a caller can tell it from a clean migration -- it returned 0 at first, which made a refusal and a success indistinguishable. Display mode is asserted: the suite must never reach a path that deletes.",
+    "_why": "A retirement is REFUSED while a settings entry still registers a hook inside the copy. Removing files and leaving the registration gives every later session a hook pointing at nothing -- the double activation this migration exists to end rather than cause. Measured live the day it shipped: hither-lands and apps-odyssey-alive register three such hooks each, and odyssey-alive has one registered TWICE on PostToolUse. This is an ORDERING requirement and not an exception to the directive: `hooks` unregisters in the same audit and the next run retires the copy. The refusal exits 1 so a caller can tell it from a clean migration -- it returned 0 at first, which made a refusal and a success indistinguishable. Display mode is asserted: the suite must never reach a path that deletes.",
     "script": "wf-catalog",
     "args": [
       "--migrate"
@@ -3118,18 +3121,20 @@
     },
     "exit": 1,
     "want": [
-      "identical  text-tells.md",
+      "text      retire",
+      "retire     text-tells.md",
       "STAYS      hooks/post.sh",
       "hook registrations pointing into a project copy",
       "1 kind(s) REFUSED on hooks",
       "DISPLAY ONLY"
     ],
     "must_not": [
-      "REMOVED"
+      "REMOVED",
+      "ARCHIVED"
     ]
   },
   "catalog-prose-rule-stays": {
-    "_why": "THE REGRESSION CASE, and it is the attack that broke this script's first design. An independent code evaluation appended one PROSE line -- a real project rule -- under an existing heading, introducing no new heading and no new table row; the heading-and-row comparison then classified the copy as pure residue and authorised rmtree of the whole skill. This tree carries that exact shape plus the two other things that design deleted without ever reading them: a hook script and a CATALOG-ANCHOR holding a live supersession register. Removal is now per FILE and proven by byte identity, so only `version.md` -- genuinely identical to the shipped file -- is removable, and the prose-carrying twin, the anchor and the hook all STAY. `must_not` pins the three by name: a regression that widens the proof again fails here before it can reach anyone's project.",
+    "_why": "THE PRESERVATION CASE, and it is the attack that broke this script's first design. An independent code evaluation appended one PROSE line -- a real project rule -- under an existing heading, introducing no new heading and no new table row; the heading-and-row comparison then classified the copy as pure residue and authorised rmtree of the whole skill. The user directive of 2026-09-10 now REQUIRES the copy to go, no exceptions, so the safeguard is no longer a proof that keeps a file -- it is what the retirement DOES before removing one. This tree pins every half at once: the `origin: user` span is PRESERVEd verbatim into CATALOG-ANCHOR.md first, and its marker writes the two fields in REVERSED order, which an earlier pattern was blind to; the anchor itself stays; a hook script the shipped skill does not ship stays, because leaving a capability reachable by zero paths is the one thing a retirement may never do; and everything removed is archived first. `must_not` pins the two that may never be listed for removal.",
     "script": "wf-catalog",
     "args": [
       "--migrate"
@@ -3139,17 +3144,17 @@
     },
     "exit": 0,
     "want": [
-      "text      partial",
-      "identical  version.md",
+      "text      retire",
+      "PRESERVE   text-tells.md",
+      "CATALOG-ANCHOR.md (verbatim)",
+      "retire     text-tells.md",
       "STAYS      CATALOG-ANCHOR.md",
       "STAYS      hooks/post.sh",
-      "STAYS      text-tells.md",
-      "INV-CATMIG   1 file(s) removable \u00b7 3 stay"
+      "INV-CATMIG   2 file(s) removable \u00b7 2 stay"
     ],
     "must_not": [
-      "identical  text-tells.md",
-      "identical  CATALOG-ANCHOR.md",
-      "identical  hooks/post.sh"
+      "retire     CATALOG-ANCHOR.md",
+      "retire     hooks/post.sh"
     ]
   }
 }

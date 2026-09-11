@@ -158,6 +158,12 @@ CANCEL_RX = re.compile(
 def manifest_paths():
     """Shipped files.
 
+    `sibling ` / `exec-sibling ` files are WHOLE SKILLS of their own — the five
+    evaluators — installed beside `skills/workforce/` rather than inside it, because a
+    skill is discoverable only at `<skills-root>/<name>/SKILL.md`. `agent ` REGISTERS one
+    of their bundled agents as `<agents-dir>/<name>.md`; the host does not read a nested
+    `AGENT.md`, so shipping the definition and registering it are two rows over one file.
+
     `exec `, `hook `, `canary ` and `style ` are in use and are stripped here so every
     downstream check sees a plain path. `keep ` remains unused and is caught below
     rather than silently parsed.
@@ -183,7 +189,13 @@ def manifest_paths():
         # and a retired path is neither.
         if s.startswith("retired "):
             continue
-        for flag in ("exec ", "hook ", "canary ", "style "):
+        # `agent ` rows name a file ALREADY declared by a `sibling ` row — the definition
+        # ships once and is registered once. Counting it twice would report the tree as
+        # having a duplicate shipped file.
+        if s.startswith("agent "):
+            continue
+        for flag in ("exec ", "hook ", "canary ", "style ",
+                     "exec-sibling ", "sibling "):
             if s.startswith(flag):
                 s = s[len(flag):].strip()
                 break
@@ -215,6 +227,17 @@ def manifest_style_paths():
     return [l.strip()[len("style "):].strip()
             for l in read("manifest.txt").splitlines()
             if l.strip().startswith("style ")]
+
+
+def manifest_sibling_paths():
+    """Paths carrying `sibling` or `exec-sibling` — the five evaluator skills, installed
+    beside `skills/workforce/`."""
+    return _flagged("sibling") + _flagged("exec-sibling")
+
+
+def manifest_agent_paths():
+    """Paths carrying `agent` — a bundled evaluator agent registered as `<name>.md`."""
+    return _flagged("agent")
 
 
 def manifest_canary_paths():
@@ -291,7 +314,7 @@ dfr = read("workforce/references/deferred.md")
 upd = read("workforce/references/procedures/update.md")
 _prin = read("workforce/references/principles.md")
 _rcrt = read("workforce/references/recruiter.md")
-_uis = read("workforce/references/catalogs/ui/ui-checks.md")
+_uis = read("workforce/skills/ui-design/references/design-quality-catalog.md") + read("workforce/skills/ui-design/references/rendered-checks.md")
 _hbk_p = read("workforce/references/procedures/handbook.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -319,9 +342,39 @@ declared = manifest_paths()
 # authoring rule above applies to it. Vendoring it would exempt authored prose from
 # the checks it is meant to pass — the honesty defect the manifest re-filing fixed.
 # ─────────────────────────────────────────────────────────────────────────────
+# The corpora moved INSIDE the evaluator skills on 2026-09-10 (`manifest.txt` § The five
+# evaluator skills), so the prefix follows them. Everything above still holds: a vendored
+# corpus keeps its source project's conventions and workforce's authoring rules must not
+# demand an edit to it. `security/` stays excluded from the exemption for the same reason
+# as before — it is authored here — and so does every `SKILL.md`, which IS authored here
+# and must pass the authoring rules like any other shipped prose.
+# VENDORED IS EXACTLY THE TWO IMPORTED CORPORA, NAMED, and nothing else under the new
+# prefix. `workforce/skills/` now holds four kinds of file with four different contracts —
+# an imported corpus (read-only, byte-identical to claude-enforcer), workforce's own
+# authored `additions.md`, a `SKILL.md` authored here, and bundled agent definitions
+# authored here — and a prefix test cannot tell them apart. A wide exemption is the
+# dangerous direction: it would quietly excuse authored prose from the authoring rules,
+# which is the honesty defect the manifest re-filing fixed once already.
+#
+# image, ui and security are authored-and-cited by workforce (see `manifest.txt`), so they
+# are NOT vendored and every authoring rule applies to them.
+# IMPORTED, not authored here: every corpus file and every bundled agent definition in the
+# five evaluator skills. They follow their SOURCE project's conventions — single-line
+# `origin:` annotations rather than paired blocks, their own heading structure, their own
+# version anchors, a frontmatter `model:` pin — and workforce's authoring rules must not
+# demand an edit to them, because editing one forks a corpus that has a single origin.
+#
+# THREE THINGS ARE AUTHORED HERE AND STAY UNDER EVERY RULE, and the exclusions are named
+# rather than inferred from a prefix: each `SKILL.md`, each `additions.md` — the one
+# sanctioned place to GROW a catalog — and the whole `security-evaluator` corpus, which is
+# distilled and cited by workforce rather than copied. A wide exemption is the dangerous
+# direction: it excuses authored prose from the checks it exists to pass.
 VENDORED = {p_ for p_ in declared
-            if p_.startswith("workforce/references/catalogs/")
-            and "/security/" not in p_}
+            if p_.startswith("workforce/skills/")
+            and ("/references/" in p_ or "/agents/" in p_)
+            and not p_.endswith("/SKILL.md")
+            and not p_.endswith("/additions.md")
+            and "/security-evaluator/" not in p_}
 
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
@@ -1014,9 +1067,32 @@ if "keep-symlink" not in _ct or "os.path.islink" not in _ct:
     _cat_problems.append("the symlink refusal is gone; a copy laid down as a link classified "
                          "residue and then raised out of the destructive loop, leaving a "
                          "partial state with no definition")
-if "keep-user-span" not in _ct:
-    _cat_problems.append("the user-span refusal is gone — the user's own words are never "
-                         "removable on any evidence")
+if not all(k in _ct for k in ("def user_spans", "def preserve_spans", "IMMUTABLE_SPAN_RX")):
+    _cat_problems.append("the user-span preservation is gone — a retirement removes the "
+                         "copy, so the user's own words must be lifted into "
+                         "CATALOG-ANCHOR.md verbatim before a single file goes")
+if "return all(span in back" not in _ct:
+    _cat_problems.append("the preservation READBACK is gone — an extraction that was not "
+                         "verified may never authorise a deletion (T2 of the "
+                         "Atomic-or-Absent gate); a short write would lose the words "
+                         "silently and report a clean migration")
+# THE ARCHIVE, asserted on a phrase rather than on a `def`. Removal is unconditional now, so
+# the archive is the only thing that makes it reversible — and it had no assertion at all: a
+# `bin/prove` case aimed at `def archive_copy` broke the file instead of flipping a check, and
+# reported BAD-CASE rather than proving anything.
+if "an unarchived removal is a removal with no way back" not in _ct:
+    _cat_problems.append("the retirement no longer archives what it removes — an unarchived "
+                         "removal is a removal with no way back, and removal is "
+                         "unconditional (SKILL.md § Directives, 2026-09-10)")
+# The CALL, not the `if` guarding it: deleting an `if` line orphans its block and breaks the
+# file, which is a BAD-CASE rather than a proof. Deleting this binding leaves valid Python and
+# stops the archive ever being taken.
+if "archive = archive_copy(" not in _ct:
+    _cat_problems.append("the retirement no longer TAKES an archive — nothing may be removed "
+                         "for a kind whose removed set was never written somewhere readable")
+if "if not preserve_spans(" not in _ct:
+    _cat_problems.append("preservation is no longer BLOCKING — removal must not proceed "
+                         "for a kind whose spans could not be written and verified")
 if "hook_registrations" not in _ct or "REFUSED" not in _ct:
     _cat_problems.append("the hook-registration refusal is gone; removing files a settings "
                          "entry still points into leaves every later session invoking a path "
@@ -1026,13 +1102,21 @@ if "config_root(), \"settings.json\"" not in _ct.replace("'", '"'):
     _cat_problems.append("user-scope settings are no longer read; a hook registered in "
                          "~/.claude pointing at $CLAUDE_PROJECT_DIR/.claude/skills/<eval>/ "
                          "is invisible to the refusal that exists to stop exactly that")
-# PROJECT-FIRST IS THE SAFETY PROPERTY, not a preference: an existing project must keep
-# being answered from its own copy until a migration proves the copy redundant.
+# INSTALL-FIRST IS THE SAFETY PROPERTY NOW, and the reversal is the 2026-09-10 directive:
+# *"the audit of a project removes the old ones of the project so that the one in the user
+# space is the one that's being used ... No exceptions."* Project-first was right while the
+# corpus lived inside workforce and the five skills were per-project; once the skills ship,
+# it means a stale local copy wins over a current install and `update` can never change
+# that. What pays for preservation is no longer the ORDER but the MIGRATION: every
+# `origin: user` span is lifted into `CATALOG-ANCHOR.md` and read back before a file goes.
+#
+# ORDER WITHIN THE CANDIDATES IS STILL ASSERTED: project tree, maintainer tree, personal
+# last, so a project-scope install is never answered from the home copy.
 # Scoped to the RESOLVER BODY. Comparing offsets across the whole file compared this
 # against `config_root`'s own definition, which necessarily sits earlier — the guard fired
 # on correct code the first time it ran, which is the shape that gets a check disabled.
 _ct_fn = _ct.partition("def install_candidates(")[2].partition("\ndef ")[0]
-_ct_order = _ct_fn.find('".claude", "skills", "workforce", "references", "catalogs"')
+_ct_order = _ct_fn.find('".claude", "skills"')
 _ct_home = _ct_fn.find("config_root()")
 if not _ct_fn or _ct_order < 0 or _ct_home < 0 or _ct_order > _ct_home:
     _cat_problems.append("the personal install is no longer resolved LAST; a project-scope "
@@ -1075,9 +1159,13 @@ def _candidate_order(body):
     The order that matters is the order a caller tries them in, and that is the list.
     """
     lst = body.partition("return [")[2].partition("]")[0]
+    # The candidates are SKILLS ROOTS now, not directories inside workforce: the five
+    # evaluators ship as siblings and each one's `references/` is its catalog
+    # (`manifest.txt` § The five evaluator skills). The three places and their order are
+    # unchanged — project tree, maintainer tree, personal config — only what sits at each.
     marks = [
-        ("project-install", lst.find('".claude", "skills", "workforce"')),
-        ("maintainer-tree", lst.find('root, "workforce", "references"')),
+        ("project-install", lst.find('".claude", "skills"')),
+        ("maintainer-tree", lst.find('root, "workforce", "skills"')),
         ("personal", max(lst.find("config_root()"), lst.find("cfg,"))),
     ]
     return [name for name, at in sorted(marks, key=lambda m: m[1]) if at >= 0]
@@ -2184,17 +2272,31 @@ check(
 # ─────────────────────────────────────────────────────────────────────────────
 _execs = manifest_exec_paths()
 _hooks = manifest_hook_paths()
+# `exec-sibling` is the third declaration, and it carries the same obligation as `exec`:
+# chmod +x, invoked by something, registered to nothing. It exists because the file lands
+# in an evaluator skill beside workforce rather than inside it — a destination difference,
+# not a contract difference. Its invoker is the SKILL.md that ships with it, which the
+# dead-script check below reads.
+_execsib = _flagged("exec-sibling")
 _stray = [
     p_ for p_ in declared
     if (p_.endswith((".sh", ".ps1")) or os.access(p_, os.X_OK))
-    and p_ not in _execs and p_ not in _hooks
+    and p_ not in _execs and p_ not in _hooks and p_ not in _execsib
 ]
 check(
-    "shipped files: every executable declares itself `exec` or `hook`",
+    "shipped files: every executable declares itself `exec`, `exec-sibling` or `hook`",
     not _stray,
     f"executable but unflagged: {_stray} — the flag is what decides which obligation "
     "applies: an `exec` must be invoked by a procedure, a `hook` must have a wiring "
     "command and a wired/orphaned report. An unflagged executable has neither",
+)
+check(
+    "shipped files: every `exec-sibling` is invoked by the skill that ships it",
+    all(os.path.basename(p_) in read(os.path.join(p_.split("/scripts/")[0], "SKILL.md"))
+        for p_ in _execsib if "/scripts/" in p_),
+    "a script shipped into an evaluator skill that the skill's own SKILL.md never names is "
+    "dead weight on every install — the same failure as an agent definition convened by "
+    "nothing, one directory over",
 )
 # The COMPLEMENT of the check above, and the class behind a single instance. Both
 # installers alias `exec` to `hook` (install:250,319) and chmod +x on fetch, so an
@@ -2454,8 +2556,8 @@ check(
 # fresh install on a machine without the predecessor was strictly thinner than the
 # system it supersedes — the one outcome the standing directive forbids.
 # ─────────────────────────────────────────────────────────────────────────────
-_vend_text = [p_ for p_ in VENDORED if "/text/" in p_]
-_vend_code = [p_ for p_ in VENDORED if "/code/" in p_]
+_vend_text = [p_ for p_ in VENDORED if "/text-eval/" in p_]
+_vend_code = [p_ for p_ in VENDORED if "/code-evaluator/" in p_]
 # Every shipped script has a RE-RUNNABLE test, not a prose anecdote. The four were
 # released on negative tests run by hand in a scratch directory and written up in
 # plan/. bin/baseline's own docstring: "A census that can be re-run is the only kind
@@ -2524,7 +2626,8 @@ check(
 # semgrep), so it is NOT in VENDORED and every authoring rule already applies to
 # it; these add the tier-specific facts a generic authoring check cannot see.
 # ─────────────────────────────────────────────────────────────────────────────
-_authored_sec = [p_ for p_ in declared if "/catalogs/security/" in p_]
+_authored_sec = [p_ for p_ in declared
+                 if "/security-evaluator/references/" in p_]
 check(
     "catalogs: the authored security catalog ships (all five files)",
     len(_authored_sec) >= 5 and all(os.path.exists(p_) for p_ in _authored_sec),
@@ -2534,9 +2637,15 @@ check(
 )
 check(
     "catalogs: every security file carries a security-ref-version anchor on line 1",
+    # `[:1]` rather than `[0]`, because an EMPTY file is the state this is meant to catch
+    # and indexing it raised IndexError out of bin/check instead. That took the whole
+    # diagnostic down: `bin/prove` empties a file to confirm a gate notices, retried three
+    # times, and aborted the 736-case sweep with a traceback rather than a failing case.
+    # A missing anchor and an empty file are the same verdict here, and a check must not
+    # die on the input it exists to diagnose.
     all(
-        read(p_).splitlines()[0].startswith("<!--")
-        and "security-ref-version:" in read(p_).splitlines()[0]
+        (read(p_).splitlines()[:1] or [""])[0].startswith("<!--")
+        and "security-ref-version:" in (read(p_).splitlines()[:1] or [""])[0]
         for p_ in _authored_sec
     ),
     "the anchor is what a re-distillation compares against; a security file without "
@@ -2673,8 +2782,8 @@ check(
 # machinery whose whole job is catching written-and-unwired.
 # ─────────────────────────────────────────────────────────────────────────────
 _ADDITIONS = [
-    "workforce/references/evaluator-additions/text-tells.md",
-    "workforce/references/evaluator-additions/code-eval.md",
+    "workforce/skills/text-eval/references/additions.md",
+    "workforce/skills/code-evaluator/references/additions.md",
 ]
 check(
     "additions: declared, present, and OUTSIDE the vendored set",
@@ -2737,11 +2846,11 @@ check(
     "counterpart the next reader sees two catalog blocks with one rule between them "
     "and applies the read-only rule to both, which closes the slot again",
 )
-_ctv = read("workforce/references/catalogs/text/version.md")
+_ctv = read("workforce/skills/text-eval/references/version.md")
 check(
     "additions: the vendored version anchor cross-references the authored slot",
     "text-additions-version" in _ctv
-    and "evaluator-additions/text-tells.md" in _ctv
+    and "references/additions.md" in _ctv
     and "track the vendored import ONLY" in _ctv,
     "version.md narrates only the vendored creative-integrity set; a reader who reaches "
     "it by the `catalogs/` path never learns the authored slot exists and diffs the wrong "
@@ -2756,7 +2865,7 @@ check(
 # if either the band or the formula ships, both "never a gate" and "do not gate on it" must
 # ship with it. Enforcing the COUPLING, not the presence, is what a detector-with-its-fix
 # looks like here — the metric may be removed wholesale, but never gutted of its caveat.
-_ce_add = read("workforce/references/evaluator-additions/code-eval.md")
+_ce_add = read("workforce/skills/code-evaluator/references/additions.md")
 check(
     "additions: complexity mass-ranking ships with its anti-gate caveat, inseparable",
     ("0.68" not in _ce_add and "mass = CC" not in _ce_add)
@@ -2804,7 +2913,7 @@ _seed_src = read("workforce/bin/wf-seed")
 check(
     "wf-seed: the personal-scope install is a slot-directory candidate",
     'os.environ.get("CLAUDE_CONFIG_DIR")' in _seed_src
-    and 'os.path.join(cfg, "skills", "workforce", "references", "evaluator-additions")' in _seed_src,
+    and 'os.path.join(cfg, "skills")' in _seed_src,
     "a personal-scope project has NO local `.claude/skills/workforce` (references/scopes.md), "
     "so with only the project candidates every catalog of every personal-scope install "
     "reports `additions slot not found` and nothing propagates. The path follows the "
@@ -2842,7 +2951,11 @@ def _wf_seed_shape(kind):
     import tempfile as _tfm
     _ev = "text-eval" if kind == "renamed" else "code-evaluator"
     _cat = "references/ai-patterns.md" if kind == "renamed" else "references/mistake-taxonomy.md"
-    _slot = "text-tells.md" if kind == "renamed" else "code-eval.md"
+    # The slot filename is `additions.md` for every kind now: it ships INSIDE the evaluator
+    # skill that owns it, so the skill directory disambiguates and the old per-kind
+    # filenames (`text-tells.md`, `code-eval.md`) would collide with the corpus beside them.
+    _slot = "additions.md"
+    _slot_skill = "text-eval" if kind == "renamed" else "code-evaluator"
     _tag, _ver = ("text", 6) if kind == "renamed" else ("code", 2)
 
     def _put(path, body):
@@ -2860,8 +2973,7 @@ def _wf_seed_shape(kind):
             # slots exist only under the home config dir. HOME is redirected for every
             # shape, so the project-scope shapes cannot be answered by the real one.
             _base = _home if kind == "home" else _proj
-            _put(os.path.join(_base, ".claude", "skills", "workforce", "references",
-                              "evaluator-additions", _slot),
+            _put(os.path.join(_base, ".claude", "skills", _slot_skill, "references", _slot),
                  f"<!-- {_tag}-additions-version: {_ver} -->\n# slot (probe)\n")
             _env = dict(os.environ, HOME=_home, USERPROFILE=_home)
             _env.pop("CLAUDE_CONFIG_DIR", None)
@@ -3681,7 +3793,7 @@ check(
 check(
     "verification: the register exemption list is cross-referenced, not restated",
     "the authoritative exemption list lives in" in " ".join(_vf.split())
-    and "evaluator-additions/text-tells.md` § Conversational" in " ".join(_vf.split()),
+    and "text-eval/references/additions.md` § Conversational" in " ".join(_vf.split()),
     "the Conversational-register exemption corpus is a constant, authoritative in "
     "`evaluator-additions/text-tells.md` § Conversational register. This section pointed "
     "at it AND restated the six-path list; a constant in two places drifts. The list is "
@@ -5356,7 +5468,7 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
 _READER_INVENTORY = {
     "bin/check": 3,
     "bin/baseline": 1,
-    "workforce/bin/wf-catalog": 1,
+    "workforce/bin/wf-catalog": 2,
     "workforce/bin/wf-census": 1,
     "workforce/bin/wf-claude-md": 1,
     "workforce/bin/wf-conform": 2,
@@ -8686,6 +8798,7 @@ if os.path.isdir(_personal):
     # reports a permanent phantom absence and sends the reader to `bin/sync` for a
     # file sync already placed correctly. Compared in their own row below.
     _style_set = set(manifest_style_paths())
+    _sibling_set = set(manifest_sibling_paths())
     for _src in sorted(declared):
         if _src in _canary_set or _src in _style_set:
             continue
@@ -8696,7 +8809,16 @@ if os.path.isdir(_personal):
         if not _src.startswith("workforce/") or not os.path.exists(_src):
             continue
         _rel = _src[len("workforce/"):]
-        _b = os.path.join(_personal, _rel)
+        # SIBLINGS LAND BESIDE THE SKILL, NOT INSIDE IT. The five evaluators install to
+        # `<skills-root>/<name>/…` (`manifest.txt` § The five evaluator skills), so comparing
+        # them against `<personal>/skills/workforce/skills/<name>/…` reports 30 permanent
+        # absences on a correctly synced tree — a drift check that cries stale on a correct
+        # install is one nobody reads twice.
+        if _src in _sibling_set:
+            _b = os.path.join(os.path.dirname(_personal.rstrip("/")),
+                              _rel[len("skills/"):])
+        else:
+            _b = os.path.join(_personal, _rel)
         _compared += 1
         if not os.path.exists(_b):
             _missing.append(_rel)
@@ -9424,7 +9546,7 @@ check("plain guard: the banned-term row states CANNOT, because nothing enforces 
 # script explains itself at length — so `"stop_hook_active" in _wsg` was satisfied by
 # the docstring that describes the loop guard, and stayed green with the guard deleted.
 # Caught by bin/prove reporting the case VACUOUS, which is exactly what it is for.
-_ttl = read("workforce/references/evaluator-additions/text-tells.md")
+_ttl = read("workforce/skills/text-eval/references/additions.md")
 check("text-eval: the conversational-register row no longer exempts what the user reads",
       "`DEVELOPMENT.md`, and run deliverables)" not in _ttl
       and "and to anything a human reads in the terminal" in _ttl
@@ -10952,7 +11074,7 @@ check(
 )
 check(
     "ui catalog: a blank or placeholder media slot FAILS",
-    "No missing art — a blank or placeholder media slot FAILS" in _uis,
+    "**IMG-01**" in _uis and "missing, broken, blank, or a placeholder" in _uis,
     "the no-missing-art rule — the hole that let a missing card image pass 451 e2e "
     "tests; softening it reopens it",
 )
@@ -12105,7 +12227,7 @@ check("conform: a catalog read grounded on a literal path has a detector, and it
 check("catalog: the resolver returns the additions slot, not the vendored corpus alone",
       "def additions_file" in _cat_s and "def corpus_files" in _cat_s
       and "ADDITIONS SLOT MISSING" in _cat_s
-      and '"additions": "text-tells.md"' in _cat_s,
+      and '"additions": "additions.md"' in _cat_s,
       "the corpus a project reads is vendored + additions (`evaluators.md` § Seeding step "
       "1b) and a project COPY holds both, because wf-seed appends the additions into it. "
       "An install-resolved reader got the vendored half alone — 205 lines of text tells, "
