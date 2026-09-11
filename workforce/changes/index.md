@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.52.0 | 2026-09-11 | docs | no | (pending — message lands on the next regeneration) |
 | 1.51.2 | 2026-09-11 | changes, scripts, installer | no | The citation rule the detector could not see, as a release |
 | 1.51.1 | 2026-09-11 | changes, scripts, installer | no | Cover the two commits that landed after the bump |
 | 1.51.0 | 2026-09-11 | audit, update, changes, scripts, installer | no | The corpus shipped to the install and the five skills stayed behind |
