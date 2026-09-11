@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.51.2 | 2026-09-11 | docs | no | (pending — message lands on the next regeneration) |
 | 1.51.1 | 2026-09-11 | changes, scripts, installer | no | Cover the two commits that landed after the bump |
 | 1.51.0 | 2026-09-11 | audit, update, changes, scripts, installer | no | The corpus shipped to the install and the five skills stayed behind |
 | 1.50.0 | 2026-09-10 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | The corpus moved to the install and the readers were left pointing at the copy |
