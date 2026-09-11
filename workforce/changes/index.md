@@ -1,6 +1,5 @@
 # Change index
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **One row per release, newest first.** Read this to decide WHICH versions matter; read `<version>.md` only for the ones that do. Both are queried by `wf-changes`, which is a script — no agent is spawned to answer "what changed".
 
 `Org` says whether an existing org carries a copy of something the release changed. **`yes` means `/workforce audit` has real work to do**; `no` means the change is self-contained in the skill directory and installing it was the whole update.
@@ -9,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.50.0 | 2026-09-10 | docs | no | (pending — message lands on the next regeneration) |
 | 1.49.0 | 2026-09-10 | audit, changes, hooks, scripts, installer, platform | no | A grant naming a tool the host does not have, and a ceiling that counts the wrong unit |
 | 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | No regex reads between the lines, so a share of everything gets an outside read |
 | 1.47.1 | 2026-09-10 | changes, installer | no | The hook that forced a version number per commit is gone |
