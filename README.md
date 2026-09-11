@@ -16,6 +16,7 @@ Claude Workforce turns that instinct into a company. One command reads your proj
 
 - [Install](#install)
 - [Quick Start](#quick-start)
+- [Uninstall](#uninstall)
 - [Why This Exists](#why-this-exists)
 - [The Full Theory](#the-full-theory)
 - [Standing on Shoulders](#standing-on-shoulders)
@@ -38,19 +39,33 @@ irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install
 
 First install asks one question: personal or project scope. Personal puts one copy at `~/.claude/skills/` and serves every project on this machine. That's the right answer for almost everyone. Project puts a copy inside the repo so it travels with a clone.
 
-Then restart Claude Code and run your first audit:
+Then restart Claude Code. You're already running. The install ships skills you can use right now: a text evaluator, a code evaluator, a security reviewer, an image evaluator, and a UI design reviewer. You can also hire individual agents and build new skills before anything else happens.
+
+```
+/workforce hire accessibility auditor
+```
+
+```
+/text-eval check the copy on the landing page
+```
+
+No audit needed for any of that.
+
+### Running the audit
+
+When you're ready to build the full company, run the audit. This is the step that reads your project, picks the right model for each kind of work, writes handbooks, and wires the org chart. It backs up your `.claude/` directory first.
 
 ```
 /workforce audit
 ```
 
-The audit reads your project, its layout, its tooling, its purpose, and designs the smallest company that can do its work. It asks one question (which models at which tiers) and works out everything else on its own. Preview without writing anything: `audit --review`.
+This takes a while. It's building tools, converting skills, and designing roles for your specific project. Preview the plan without writing anything: `audit --review`.
 
 Update anytime with `/workforce update`. Full command reference in [COMMANDS.md](COMMANDS.md).
 
 ## Quick Start
 
-Describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can do it. You don't name an employee or pick a tier. You say what you need.
+Once the audit has run, describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can do it. You don't name an employee or pick a tier. You say what you need.
 
 ```
 /org fix the pricing copy on the homepage
@@ -99,6 +114,16 @@ Spins up nobody. The answer is already sitting in the org chart, so the company 
 The copywriter won't take this. Patching a test is engineering's work, outside its lane, so it hands an escalation back to its manager. The refusal is the point. An employee that quietly does work it was never scoped for is an employee whose lane means nothing.
 
 More examples and the reasoning behind each rule are in [DOCTRINE.md](DOCTRINE.md).
+
+## Uninstall
+
+```
+/workforce disband
+```
+
+Reverses the conversion for this project using the journal it kept during the audit. Work you did after the audit stays. Personnel records stay too, so if you change your mind later, the expensive part is already done.
+
+If you want to go further back, `/workforce restore` overwrites everything from the backup the audit took before it started.
 
 ## Why This Exists
 
