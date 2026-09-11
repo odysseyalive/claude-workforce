@@ -188,6 +188,69 @@ SENSE_HOW = {
 }
 
 
+# Explicit enumeration only, and that restraint is the design. Segmenting free-flowing
+# natural language into distinct requests is a judgment task, and a regex that guessed at
+# it would report `asks: 3` on one long sentence and `asks: 1` on three short ones — a
+# number that is wrong in both directions is worse than no number, because the reply gets
+# sectioned against it. So this fires on the shapes a user uses when they MEAN to
+# enumerate, and returns 1 otherwise.
+#
+# WHY IT EXISTS. `classify` already returns an array, deliberately — an ask can be two
+# KINDS at once. But the flag carries `ask.prompt` as ONE string, so nothing anywhere
+# counted how many THINGS were asked. MEASURED 2026-09-11: a user sent three numbered
+# issues in one message, got one smeared answer, and had to say so — "if I'm confusing
+# you and causing you to mix up the different issues, let me know that too." The
+# dissection was real and ran along the wrong axis.
+ENUM_PATTERNS = (
+    # "there's three things", "two issues", "3 questions"
+    re.compile(r"\b(two|three|four|five|\d+)\s+(things?|issues?|questions?|parts?|items?|points?)\b", re.I),
+    # "number two", "second thing", "and third"
+    re.compile(r"\b(number\s+(two|three|four|2|3|4)|second(ly)?\b|third(ly)?\b)", re.I),
+    # a numbered or bulleted list on its own lines
+    re.compile(r"^\s{0,3}(\d+[.)]|[-*])\s+\S", re.M),
+)
+
+# The count itself, when the user states it. "three things" is a better answer than any
+# inference, so it is read literally and preferred over every other signal.
+WORD_NUM = {"two": 2, "three": 3, "four": 4, "five": 5}
+STATED_COUNT = re.compile(
+    r"\b(two|three|four|five|\d+)\s+(?:things?|issues?|questions?|parts?|items?|points?)\b", re.I)
+
+
+def count_asks(prompt):
+    """How many DISTINCT requests this prompt makes, when it says so. 1 otherwise.
+
+    Returns (n, how) — `how` names the evidence, because a bare number gives a reader
+    nothing to check and this one drives how a reply is shaped.
+    """
+    text = prompt or ""
+    if INJECTED.search(text):
+        return (1, "injected preamble — not the user's ask")
+
+    m = STATED_COUNT.search(text)
+    if m:
+        raw = m.group(1).lower()
+        n = WORD_NUM.get(raw)
+        if n is None:
+            try:
+                n = int(raw)
+            except ValueError:
+                n = None
+        # A stated count is authority, but not an unbounded one: "a hundred things" is
+        # exasperation, not a docket.
+        if n and 2 <= n <= 9:
+            return (n, f"the user stated it: {m.group(0)!r}")
+
+    listed = len(ENUM_PATTERNS[2].findall(text))
+    if listed >= 2:
+        return (listed, f"{listed} enumerated lines")
+
+    if ENUM_PATTERNS[1].search(text):
+        return (2, "ordinal marker present; count not stated, so this is a FLOOR")
+
+    return (1, "no explicit enumeration")
+
+
 def classify(prompt):
     """Every kind the ask matches, in the order the list declares them.
 
@@ -259,8 +322,9 @@ def main():
         # the blind sample in `wf-widen` (§ THE BLIND SAMPLE).
         try:
             with open(tag_path(payload), "w", encoding="utf-8") as fh:
+                _n, _how = count_asks(payload.get("prompt") or "")
                 json.dump({"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
-                           "senses": []}, fh)
+                           "senses": [], "asks": _n, "asks_why": _how}, fh)
         except OSError:
             pass
         return 0
@@ -275,7 +339,13 @@ def main():
                        # missing. This event is the only one that sees it.
                        "prompt": (payload.get("prompt") or "")[:2000],
                        # THE JURY DOCKET: which senses sit on this ask.
-                       "senses": sorted({h["sense"] for h in hits})}, fh)
+                       "senses": sorted({h["sense"] for h in hits}),
+                       # HOW MANY THINGS WERE ASKED, and the evidence for the number.
+                       # A reply to a multi-ask prompt carries a heading per ask; one
+                       # blended answer to three questions is how a reader loses track
+                       # of which were addressed, and re-reading it later is worse.
+                       "asks": count_asks(payload.get("prompt") or "")[0],
+                       "asks_why": count_asks(payload.get("prompt") or "")[1]}, fh)
     except OSError:
         pass        # the injection below still lands; the Stop half degrades quietly
 

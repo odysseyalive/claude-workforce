@@ -166,14 +166,14 @@ You have never seen this project before. Read <staged handbook path> and follow 
 Task: <the handbook's ## Probe task, verbatim>
 Constraints (from the run order, verbatim — these OUTRANK the handbook you are following):
 <the `Constraints:` block of ${run-dir}/RUN-ORDER.md, quoted unedited; `(none)` if empty>
-You are proving this handbook is FOLLOWABLE BY A STRANGER. You are not proving the project
-works. So: do not run the project's test suite, e2e or integration targets, migrations, seeds,
-fixtures or deploys, and do not write to a database — not even when the handbook's
-`## Verification` names one and you are following it exactly. A check named there is DECLARED,
-and declared is all a probe needs (`verification.md` § tiers: RUNS and DISCRIMINATES are run BY
-HAND, and no shipped tool executes them). If the `## Probe` task cannot be done without a
-side effect, that is a FAIL of the handbook, not a licence: return
-`FAIL: probe task requires a side effect` and run nothing.
+The Constraints are the whole of what is forbidden here. With `(none)`, follow the handbook as
+written, its `## Verification` included — running a project's own suite during an audit is a
+legitimate thing to want, and this gate does not decide that for anybody. Where a constraint
+forbids something the handbook would have you do, the CONSTRAINT WINS: skip that step, name it in
+your return, and finish everything it does not block. If the `## Probe` task cannot be completed
+at all under the constraints, return `FAIL: probe blocked by constraint <the one that blocked it>`
+rather than working around it — a task that needs what the user forbade is a finding about the
+handbook.
 This dispatch carries no `REQUEST (verbatim):` block, and that is by design — this is a probe,
 not a work order, and its originating ask IS the `## Probe` task above. Your handbook's
 `## Reporting` tells you to return `QUESTION: no originating ask in the work order` when the
@@ -185,7 +185,13 @@ Then return ONLY: PASS | FAIL:<one line> | AMBIGUOUS:<the question you would hav
 ```
 
 *The `Constraints:` lines were added 2026-09-11, after a user reported that an audit ran their
-project's e2e suite and wrote junk rows into a live database. The executor is spawned
+project's e2e suite and wrote junk rows into a live database. **They carry the user's words and
+nothing else.** The first version of this block also hard-coded a prohibition on test suites,
+e2e, migrations and database writes for every project everywhere — which the same user corrected
+within the hour: "some of my accounts have E2E tests, and I don't mind them being tested. I just
+want the parameters, that extra argument to work throughout the audit process." A gate that
+decides a global policy from one incident is not honoring the ask, it is widening it; the ask was
+that direction be FORWARDED, and forwarding is all this does. The executor is spawned
 `tools: Read, Write, Bash` and told to follow the handbook exactly — so a handbook whose
 `## Verification` names an e2e target IS an instruction to run it, and this dispatch was
 explicitly built to carry no user ask. The gate fires before every registration and after every

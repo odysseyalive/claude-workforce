@@ -142,6 +142,12 @@ what success depends on, and what it will not do.>
     only as an explicit correction. Accuracy is not the standard — the standard is that the reader
     finishes the reply knowing the state. A true report that leaves someone unsure whether their
     project is broken has done the damage a false one would.
+14. **One heading per thing asked.** When a message asks for more than one thing, the reply carries
+    a labeled section per ask, in the order they were raised, and every one of them is answered or
+    explicitly named as not answered. Never blend several answers into one flowing reply: the reader
+    cannot tell which of their questions was addressed, and neither can anyone re-reading it later —
+    including you, which is how two separate problems become one confused thread. `wf-task-tag`
+    reports `asks: N` with the evidence for the number; N greater than 1 means N headings.
 <!-- WF-PRINCIPLES END -->
 
 <!-- origin: user | immutable: true -->

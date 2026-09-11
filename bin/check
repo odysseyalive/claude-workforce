@@ -12008,6 +12008,42 @@ _ds_orgmd = read("workforce/references/procedures/org.md")
 # into a live database.
 _ds_stg = read("workforce/references/staging.md")
 
+# HOW MANY THINGS WERE ASKED — an axis nothing measured. `wf-task-tag.classify` already
+# returned an array, deliberately ("an ask can be two KINDS at once"), but the flag
+# carries `ask.prompt` as ONE string, so nothing counted distinct REQUESTS. MEASURED
+# 2026-09-11: a user sent three numbered issues and got one blended answer, then had to
+# ask "if I'm confusing you and causing you to mix up the different issues, let me know."
+# The dissection was real and ran along the wrong axis.
+_ds_tt = read("workforce/bin/wf-task-tag")
+_ds_tmpl_early = read("workforce/references/templates.md")
+
+check(
+    "asks: the prompt is counted by REQUEST, not only classified by kind",
+    "def count_asks" in _ds_tt and '"asks":' in _ds_tt
+    # The number carries its evidence. A bare count gives a reader nothing to check, and
+    # this one decides how a reply is shaped.
+    and '"asks_why":' in _ds_tt
+    # Explicit enumeration ONLY. A regex guessing at free prose reports 3 on one long
+    # sentence and 1 on three short ones, and a number wrong in both directions is worse
+    # than none because the reply gets sectioned against it.
+    and "STATED_COUNT" in _ds_tt and "no explicit enumeration" in _ds_tt,
+    "nothing anywhere counted how many things a message asked for, so a three-part ask "
+    "and a one-part ask were the same shape to every downstream consumer",
+)
+
+check(
+    "asks: the detector ships with its fix — a heading per thing asked",
+    "One heading per thing asked" in _ds_tmpl_early
+    and "asks: N" in _ds_tmpl_early
+    # Inside the machine-owned region, so `wf-companion` heals it into orgs that already
+    # exist rather than reaching new installs only.
+    and (_ds_tmpl_early.find("One heading per thing asked")
+         < _ds_tmpl_early.find("<!-- WF-PRINCIPLES END -->")),
+    "a counter that reports `asks: 3` and changes nothing about the reply is a flag, and "
+    "a flag is not a fix (SKILL.md § Directives, 2026-08-05). The rule belongs in the "
+    "shipped constitution, inside the refreshable region, or it reaches new orgs only",
+)
+
 check(
     "run order: the ask is captured verbatim, the root is resolved once, both are echoed",
     "REQUEST (verbatim):" in _asu and "RUN-ORDER.md" in _asu
@@ -12025,12 +12061,15 @@ check(
 check(
     "run order: constraints are FORWARDED into the probe, the hop with a shell",
     "Constraints (from the run order, verbatim" in _ds_stg
-    # Named side effects, because "don't be destructive" is a category the executor has
-    # to classify into and a handbook's own ## Verification is what it classified wrong.
-    and "do not run the project's test suite" in _ds_stg
-    and "not even when the handbook's" in _ds_stg
-    # And a blocked probe FAILS the handbook rather than proceeding anyway.
-    and "FAIL: probe task requires a side effect" in _ds_stg,
+    # THE CONSTRAINT IS THE WHOLE POLICY. An earlier version of this check demanded a
+    # hard-coded ban on test suites and database writes; the user corrected it the same
+    # hour — running a project's own suite during an audit is a legitimate thing to want,
+    # and a gate that sets global policy from one incident has widened the ask rather
+    # than honoured it. What must hold is that the words are FORWARDED and that they WIN.
+    and "The Constraints are the whole of what is forbidden here" in _ds_stg
+    and "the CONSTRAINT WINS" in _ds_stg
+    # And a blocked probe FAILS naming the constraint rather than working around it.
+    and "FAIL: probe blocked by constraint" in _ds_stg,
     "the cold executor is spawned `tools: Read, Write, Bash` and told to follow the "
     "handbook exactly, and this dispatch was built to carry no user ask BY DESIGN — so a "
     "handbook whose ## Verification names an e2e target is an instruction to run it. "
