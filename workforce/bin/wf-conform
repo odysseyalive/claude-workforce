@@ -755,7 +755,7 @@ def check_handbook(path, body, res, ceiling):
 
     # SAY THE STATE, NOT THE JOURNEY (2026-09-07, SKILL.md § Directives). The user
     # scoped this to "any project using workforce", and an employee is where it is
-    # hardest to see: the `Plain Speak` output style governs the MAIN conversation
+    # hardest to see: every operator-facing carrier governs the MAIN conversation
     # only, because a subagent runs its own system prompt. So this
     # row is the only reader an employee's report shape has. Without it an org can
     # return every finding as an open problem forever — with the work already done —
@@ -1663,8 +1663,43 @@ def check_canary_record(root, res):
 # run's own account of itself. The list below is the one restatement of
 # `invariants.md` row 23 / `audit-setup.md` Step 0.3, and it is restated because an
 # enforcement cannot import prose; if the six ever change, they change in both.
-CORE_COMPANIONS = ("org", "operating-principles", "personnel-ledger",
-                   "code-evaluator", "text-eval", "security-evaluator")
+# TWO GROUPS, BECAUSE THEY LIVE IN TWO SCOPES, AND ONE LIST GOT THIS WRONG FOR A
+# RELEASE. The three Core companions are PROJECT-LOCAL by design — `/org` dispatches
+# against *this* project's chart and a personal copy silently shadows every project's own
+# (`scopes.md` § The `/org` receptionist is project-local). The three evaluators are the
+# opposite: the user directive of 2026-09-10 makes them self-contained in the USER
+# install, and `audit` Step 6-F RETIRES the project's copies in the same run that Step
+# 0.3 was still being read as materializing them.
+#
+# MEASURED 2026-09-11: this list demanded all six under `<root>/.claude/skills/`, so a
+# correctly-audited project failed `INV-COMPANIONS` naming three evaluators that the same
+# audit had deliberately removed. That is not a cosmetic wrong number — the row was RED ON
+# EVERY HEALTHY TREE, so the one detector that names an absent `/org` had become
+# indistinguishable from noise, which is the "a check that always fails stops being read"
+# failure this script already carries a scar from. A `/org` absence was arriving as a
+# fourth name in a row nobody had reason to read.
+CORE_COMPANIONS = ("org", "operating-principles", "personnel-ledger")
+
+# Satisfied in EITHER scope, project first, resolved the way `wf-catalog.install_dir`
+# resolves the corpus itself. A project copy is not a defect here: Step 6-F retires it,
+# and this check asks whether the capability is REACHABLE, not which scope won.
+EVALUATOR_COMPANIONS = ("code-evaluator", "text-eval", "security-evaluator")
+
+
+def companion_scopes(root):
+    """Skill roots a companion may resolve from, project first.
+
+    Mirrors `wf-catalog.install_candidates` — including the maintainer source tree, so a
+    check run inside this repository resolves the evaluators it actually ships rather
+    than reporting a distribution that carries them as missing them.
+    """
+    config_root = (os.environ.get("CLAUDE_CONFIG_DIR")
+                   or os.path.join(os.path.expanduser("~"), ".claude"))
+    return [
+        os.path.join(root, ".claude", "skills"),
+        os.path.join(root, "workforce", "skills"),
+        os.path.join(config_root, "skills"),
+    ]
 
 
 # Bounded to a NAME, not to the next delimiter. `([^|>]+)` on
@@ -1857,25 +1892,46 @@ def check_companions(root, res, governed_n):
 
     missing = [n for n in CORE_COMPANIONS
                if not os.path.isfile(os.path.join(root, ".claude", "skills", n, "SKILL.md"))]
-    if not missing:
-        res.add(True, f"INV-COMPANIONS: all {len(CORE_COMPANIONS)} core companion "
-                      f"skills exist")
+    scopes = companion_scopes(root)
+    unreachable = [n for n in EVALUATOR_COMPANIONS
+                   if not any(os.path.isfile(os.path.join(d, n, "SKILL.md"))
+                              for d in scopes)]
+    total = len(CORE_COMPANIONS) + len(EVALUATOR_COMPANIONS)
+    if not missing and not unreachable:
+        res.add(True, f"INV-COMPANIONS: all {total} core companion skills exist "
+                      f"({len(CORE_COMPANIONS)} project-local, "
+                      f"{len(EVALUATOR_COMPANIONS)} resolved in the install)")
         return
 
     # NAMES EVERY MISSING ONE, not a count. "3 companions missing" sends the reader
     # back to the source to find out which, and the whole defect this is written
     # against was a step that quietly did nothing.
-    detail = ("ABSENT after an audit: "
-              + " · ".join(f".claude/skills/{n}/SKILL.md" for n in missing) + ". ")
+    parts = []
+    if missing:
+        parts.append("ABSENT after an audit: "
+                     + " · ".join(f".claude/skills/{n}/SKILL.md" for n in missing))
+    if unreachable:
+        # NAMES THE SCOPES IT LOOKED IN. "text-eval is missing" against an install that
+        # has it one directory up sends the reader hunting; the list of roots is the
+        # whole diagnosis.
+        parts.append("UNREACHABLE IN EVERY SCOPE: " + " · ".join(unreachable)
+                     + " — searched " + " · ".join(scopes)
+                     + ". These three ship in the user install (`update` is the whole "
+                       "propagation path) and `audit` Step 6-F retires the project's "
+                       "copies, so an absence here means the install never placed them: "
+                       "the remedy is `/workforce update`, not an audit")
+    detail = ". ".join(parts) + ". "
     if "org" in missing:
         detail += ("`/org` is ABSENT and it is the hard failure: the receptionist is "
                    "GENERATED by `org index`, ships in no distribution, and no "
                    "installer will ever fetch it — so nothing else in the run will "
                    "notice. ")
-    detail += ("The distribution ships NO companion skill directory; companions are "
-               "MATERIALIZED from shipped doctrine, never copied, so 'ships none' is "
-               "not a licence to install none. Generate each missing one "
-               "(`audit-setup.md` Step 0.3) and re-run.")
+    if missing:
+        detail += ("The distribution ships NO companion skill directory; the three "
+                   "project-local companions are MATERIALIZED from shipped doctrine, "
+                   "never copied, so 'ships none' is not a licence to install none. "
+                   "`wf-companion --root <tree> --execute` is the producer — it creates "
+                   "each absent one from shipped source and reads it back.")
     res.add(False, "INV-COMPANIONS: every core companion skill exists after an audit",
             detail)
 

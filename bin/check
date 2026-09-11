@@ -4891,19 +4891,47 @@ check(
 # list's one canonical home; assert the tuple equals what doctrine enumerates, so the
 # six change in both places or this fails. Names carry no slash; the `references/...`
 # citation on the Evaluators bullet is filtered out.
+# TWO TUPLES SINCE 2026-09-11, because the six are owed in two SCOPES: the three Core
+# companions are project-local and the three evaluators ship in the user install (Step
+# 6-F retires the project's copies in the same audit). The union is still exactly the six
+# doctrine enumerates, which is what this binds — a name moved between the groups is
+# fine, a name that leaves the union or appears in neither is not.
 _wfc = read("workforce/bin/wf-conform")
-_tuple_m = re.search(r"CORE_COMPANIONS\s*=\s*\(([^)]*)\)", _wfc)
-_tuple_names = set(re.findall(r'"([\w-]+)"', _tuple_m.group(1))) if _tuple_m else set()
+_tuple_names = set()
+for _grp in ("CORE_COMPANIONS", "EVALUATOR_COMPANIONS"):
+    _m = re.search(_grp + r"\s*=\s*\(([^)]*)\)", _wfc)
+    if _m:
+        _tuple_names |= set(re.findall(r'"([\w-]+)"', _m.group(1)))
 _doc_names = set()
 for _line in _asu.splitlines():
     if re.match(r"\s*-\s*\*\*(?:Core|Evaluators)\*\*\s*—", _line):
         _doc_names |= {t for t in re.findall(r"`([\w./-]+)`", _line) if "/" not in t}
 check(
-    "invariants: wf-conform's CORE_COMPANIONS equals the six audit-setup Step 0.3 names",
+    "invariants: wf-conform's companion tuples union to the six audit-setup Step 0.3 names",
     bool(_tuple_names) and _tuple_names == _doc_names,
     f"tuple {sorted(_tuple_names)} vs doctrine {sorted(_doc_names)} — the companion list "
     "is restated in an enforcement that cannot import prose; a comment promising they "
     "change together is not the mechanism a restated constant owes (Principle 9a)",
+)
+
+check(
+    "invariants: the two companion groups are DISJOINT and neither is empty",
+    bool(re.search(r'CORE_COMPANIONS\s*=\s*\(([^)]*)\)', _wfc))
+    and bool(re.search(r'EVALUATOR_COMPANIONS\s*=\s*\(([^)]*)\)', _wfc))
+    and all(
+        len(set(re.findall(r'"([\w-]+)"',
+                           re.search(_g + r'\s*=\s*\(([^)]*)\)', _wfc).group(1)))) >= 3
+        for _g in ("CORE_COMPANIONS", "EVALUATOR_COMPANIONS")
+    )
+    and not (set(re.findall(r'"([\w-]+)"',
+                            re.search(r'CORE_COMPANIONS\s*=\s*\(([^)]*)\)', _wfc).group(1)))
+             & set(re.findall(r'"([\w-]+)"',
+                              re.search(r'EVALUATOR_COMPANIONS\s*=\s*\(([^)]*)\)', _wfc).group(1)))),
+    "the union check above passes if one group swallows the other and the second goes "
+    "empty — which would silently restore the project-local demand on the evaluators "
+    "that made this row red on every healthy tree. MEASURED: emptying "
+    "EVALUATOR_COMPANIONS gave an empty intersection and passed a disjointness test "
+    "alone, so each group is also required to be non-empty",
 )
 
 # The instruction must REQUIRE the block, not merely mention it. An audit passed
@@ -9165,6 +9193,11 @@ CANONICAL_HOME = {
     "ORG-RECORD": {"workforce/references/handbook-templates.md",
                    "workforce/references/org-chart-format.md"},
     "NAME": {"workforce/references/legacy-markers.md"},
+    # The shipped half of the constitution. `templates.md` is its one home: the region
+    # exists so `wf-companion` can refresh an EXISTING org's constitution to current
+    # doctrine without touching the project's own ratified items, which live below the
+    # END marker inside an `origin: user` span (added 2026-09-11).
+    "WF-PRINCIPLES": {"workforce/references/templates.md"},
 }
 BODY_MIN = 200
 
@@ -11865,6 +11898,7 @@ check(
 
 _ds_aud = read("workforce/references/procedures/audit.md")
 _ds_ver = read("workforce/references/procedures/verify.md")
+_ds_conf = read("workforce/bin/wf-conform")
 
 # ── the Core-skill refresh producer (2026-09-08) ─────────────────────────────
 # audit.md Step 4 carried the rule "force-refresh the Core skills to current shipped
@@ -11909,6 +11943,178 @@ check(
     and "INV-CORE" in _ds_ver,
     "three paths or it does not propagate: audit writes it, verify reports it absent. "
     "Without this an org drifts silently in the stretch between audits",
+)
+
+# ── The /org PRODUCER, and the numbered rules 1.30.2 deleted while naming them ──
+#
+# THE DEFECT, MEASURED 2026-09-11 on a fresh project on a remote host: a two-hour `audit`
+# finished with no `.claude/skills/org/SKILL.md`, and every exit code in the run was 0.
+# `/org` is GENERATED, so no installer fetches it; three files said a step created it
+# (`audit-setup.md` Step 0.3, `audit.md` Step 6, `procedures/org.md` step 2) and all three
+# were prose. The one script that touched the path REFUSED the absent case by design —
+# "ABSENT is not this script's job to fix. Step 0.3 materializes companions" — to avoid
+# giving absence two owners. Step 0.3 being prose, it had zero.
+#
+# The checks below are on the PRODUCER and on the exit code, because the previous
+# generation of this block asserted the refresh and a refresh cannot fire on a file that
+# is not there.
+
+check(
+    "org producer: wf-companion CREATES an absent core companion, not just refreshes",
+    "def materialize_org(wf):" in _ds_comp
+    and '"materialize": "materialize_org",' in _ds_comp
+    # Late-bound by NAME, so a renamed producer resolves to None at runtime and the row
+    # silently degrades to UNPRODUCIBLE. The two spellings must agree, and a prefix test
+    # ("def materialize_org" in ...) passes on `def materialize_org_DISABLED` — measured
+    # against exactly that mutation, which is why this is pinned on `(wf):`.
+    and "globals().get(entry.get(\"materialize\")" in _ds_comp
+    # The body must be COPIED from the canonical span, never composed — procedures/org.md
+    # § Canonical Dispatch CHECKPOINT: "COPY THE BLOCK. DO NOT WRITE ONE." Pinned on the
+    # span call rather than on the function name, which a rewrite would keep.
+    and "sp = span(src, CHECKPOINT_MARKERS)" in _ds_comp,
+    "/org is generated and ships in no tarball, so a producer is the only way it ever "
+    "exists. Without one, Step 0.3 is a paragraph and a fresh project finishes an audit "
+    "with no receptionist at exit 0 (MEASURED 2026-09-11)",
+)
+
+check(
+    "org producer: Step 0.3 CALLS the producer instead of describing materialization",
+    '"$WF/bin/wf-companion"' in _asu and "--execute  # materialize it" in _asu,
+    "three paths or it does not propagate. Step 0.3 was prose for the whole life of the "
+    "companion gate — it read exactly like a step that runs, and on a fresh remote "
+    "project it did not, so /org was absent after a two-hour audit at exit 0. A gate "
+    "that names no producer is a gate nothing performs",
+)
+
+check(
+    "org producer: creation and refresh read ONE span through ONE constant",
+    "CHECKPOINT_MARKERS = " in _ds_comp
+    and '"region": CHECKPOINT_MARKERS,' in _ds_comp,
+    "a created /org and a refreshed /org that resolve their canonical text separately "
+    "drift apart on the first edit to either path. Core Principle 9a: the constant is "
+    "stated once",
+)
+
+check(
+    "org producer: an absent core companion is a NON-ZERO exit in both modes",
+    "return 1 if (failed or absent) else 0" in _ds_comp,
+    "invariants.md row 23: absence is a FAIL, not a report. This script printed ABSENT "
+    "and returned 0, so nothing in a run's exit codes distinguished six companions "
+    "materialized from none",
+)
+
+check(
+    "org producer: the read-back checks the file LOADS, not only the span it wrote",
+    "def frontmatter_ok" in _ds_comp and "fm_ok, why = frontmatter_ok" in _ds_comp,
+    "the first generated /org opened with `---` twice — the template's yaml block "
+    "already carries its own delimiters — and read back CURRENT, because the read-back "
+    "compared the CHECKPOINT region and the region was byte-perfect. A verifier that "
+    "checks only the part it wrote last is not verifying the file",
+)
+
+# ── The six numbered rules commit 90fb341 (v1.30.2) deleted ──────────────────────
+#
+# 1.30.2 retired `wf-plain-guard`, `wf-speak-guard` and `references/plain-output.md` on
+# the user's explicit marks — correctly; the speech guard was firing on 7.0% of GOOD
+# replies. In the SAME commit it also deleted `/org` dispatch rungs 13, 14, 15 and
+# operating-principles items 11, 12, 13, while its own amendment note in SKILL.md closed
+# by saying the rules "are unchanged and are carried by the `Plain Speak` output style,
+# the operating principles, `/org` dispatch, the handbook template, and wf-conform's
+# say-the-state row." Three of those five were gone, and the style is in manifest.txt's
+# `retired` list, which the installer PRUNES.
+#
+# So the user's communication directives — stated four separate times, on four dates —
+# reached no generated org, no routed reply and no operator for a full release. NOTHING
+# COUNTED IT, because a deleted numbered item leaves no hole: the list simply ends
+# earlier. These two checks are the hole.
+_ds_org_md = read("workforce/references/procedures/org.md")
+_ds_tmpl = read("workforce/references/templates.md")
+
+
+def _numbered(text, start_marker, end_marker):
+    """Top-level numbered items between two markers — [] when either is missing."""
+    m = re.search(r"^" + re.escape(start_marker), text, re.M)
+    if not m:
+        return []
+    tail = text[m.start():]
+    m2 = re.search(r"^" + re.escape(end_marker), tail, re.M)
+    if not m2:
+        return []
+    return [int(n) for n in re.findall(r"^\s{0,3}(\d+)\.\s", tail[:m2.end()], re.M)]
+
+
+_ds_rungs = _numbered(_ds_org_md, "<!-- ORG-DISPATCH-CHECKPOINT START",
+                      "<!-- ORG-DISPATCH-CHECKPOINT END -->")
+
+check(
+    "dispatch ladder: the canonical CHECKPOINT carries a GAPLESS 1..N, N >= 15",
+    _ds_rungs == list(range(1, len(_ds_rungs) + 1)) and len(_ds_rungs) >= 15
+    # Named, not merely counted. A renumbering that keeps 15 rungs while dropping the
+    # communication rules passes a count and fails here.
+    and "Whatever reaches the user is written the way you would say it" in _ds_org_md
+    and "Finish rather than hedge" in _ds_org_md
+    and "Say the state, not the journey" in _ds_org_md,
+    "rungs 13-15 (plain speak, finish-not-hedge, say-the-state) were deleted by "
+    "90fb341 in the commit that asserted /org dispatch still carried them. /org is the "
+    "carrier for every routed reply; without them the user's four communication "
+    "directives govern nothing a router says",
+)
+
+_ds_items = _numbered(_ds_tmpl, "## `operating-principles` — the Strategic Objective",
+                      "## The CLAUDE.md Constitution Gate")
+
+check(
+    "constitution: the shipped operating-principles carries a GAPLESS 1..N, N >= 13",
+    _ds_items == list(range(1, len(_ds_items) + 1)) and len(_ds_items) >= 13
+    and "Never open a reply\n    with agreement" in _ds_tmpl
+    and "Finish rather than hedge" in _ds_tmpl
+    and "Say the state, not the journey" in _ds_tmpl,
+    "items 11-13 were deleted by 90fb341 while SKILL.md went on naming operating "
+    "principles as their carrier. This is the constitution every non-fork employee "
+    "preloads and every audit force-refreshes, so a missing item reaches every org "
+    "workforce builds and no org is able to report it",
+)
+
+check(
+    "constitution: the shipped items sit in a machine-owned region an audit can heal",
+    "<!-- WF-PRINCIPLES START" in _ds_tmpl and "<!-- WF-PRINCIPLES END -->" in _ds_tmpl
+    and '"region": ("<!-- WF-PRINCIPLES START", "<!-- WF-PRINCIPLES END -->"),' in _ds_comp
+    # The seam has to hold in BOTH directions: shipped items refreshable, the project's
+    # own ratified items outside the region and inside an origin span.
+    and "Add this project's own principles BELOW the END marker" in _ds_tmpl,
+    "restoring items 11-13 to the template reaches every org built AFTER the restoration "
+    "and no org that already exists: operating-principles declared no region, so "
+    "wf-companion reported it UNMANAGED and refused to write. A fix that reaches new "
+    "installs and strands existing ones is what the 2026-09-07 propagation directive "
+    "forbids (SKILL.md § Directives, second clause)",
+)
+
+check(
+    "carriers: no shipped file names the retired Plain Speak style as a live carrier",
+    # `wf-settings-apply` documents WHY the setter is gone and the reverser stays, and
+    # `hooks.md` records the reversal. Those are history and must survive. What may not
+    # survive is a file telling a reader the style CARRIES a rule or is SELECTED.
+    not any(
+        "Plain Speak" in read(f)
+        for f in ("workforce/references/templates.md",
+                  "workforce/references/audit-setup.md")
+    )
+    and "selects the `Plain Speak`" not in _ds_aud
+    and "carrier\nthat does not decay is the `Plain Speak` output style" not in read("workforce/SKILL.md"),
+    "plain-speak.md sits in manifest.txt under `retired` and the installer PRUNES it, so "
+    "a file promising it as the carrier that does not decay promises a mechanism the "
+    "distribution actively removes. Core Principle 6: never describe an advisory or "
+    "absent mechanism as enforced",
+)
+
+check(
+    "companions: INV-COMPANIONS splits the two scopes it is owed in",
+    "EVALUATOR_COMPANIONS" in _ds_conf and "def companion_scopes" in _ds_conf
+    and 'CORE_COMPANIONS = ("org", "operating-principles", "personnel-ledger")' in _ds_conf,
+    "the row demanded all six under <root>/.claude/skills while Step 6-F of the same "
+    "audit retires the project's evaluator copies, so it was RED ON EVERY HEALTHY TREE. "
+    "An absent /org then arrived as a fourth name in a row nobody had reason to read — "
+    "a detector that cries wolf is not weaker than none, it is the same as none",
 )
 
 check(

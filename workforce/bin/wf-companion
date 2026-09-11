@@ -51,10 +51,14 @@ import sys
 # shipped file carrying the canonical span between the SAME markers. Reading the
 # canonical from between its own markers is what makes this a copy rather than a
 # re-composition — `procedures/org.md` § step 5: "COPY THE BLOCK. DO NOT WRITE ONE."
+CHECKPOINT_MARKERS = ("<!-- ORG-DISPATCH-CHECKPOINT START",
+                      "<!-- ORG-DISPATCH-CHECKPOINT END -->")
+
 CORE = [
     {
         "name": "org",
-        "region": ("<!-- ORG-DISPATCH-CHECKPOINT START", "<!-- ORG-DISPATCH-CHECKPOINT END -->"),
+        "materialize": "materialize_org",
+        "region": CHECKPOINT_MARKERS,
         "source": ("references", "procedures", "org.md"),
         # A rung is a numbered top-level item inside the span. Counted only to make the
         # report legible ("11 rungs vs 15"); the REFRESH decision is byte equality, never
@@ -63,12 +67,23 @@ CORE = [
     },
     {
         "name": "operating-principles",
-        "region": None,
+        "materialize": "materialize_operating_principles",
+        # A REGION AT LAST, AND IT IS WHAT MAKES THE HEAL PATH EXIST. This read `None`
+        # until 2026-09-11, with the reasoning that a constitution is customized per
+        # project and "a force-refresh that won would delete them" — true of the FILE and
+        # false of the shipped HALF of it. `templates.md` now seams the two: the shipped
+        # items sit inside `WF-PRINCIPLES`, the project's own ratified items sit below the
+        # END marker inside an `origin: user` span, and only the region is replaced. So
+        # `90fb341`'s deletion of items 11-13 is repaired in every org on its next audit
+        # rather than in new orgs only — the 2026-09-07 propagation directive's second
+        # clause, which a restoration to the template alone does not satisfy.
+        "region": ("<!-- WF-PRINCIPLES START", "<!-- WF-PRINCIPLES END -->"),
         "source": ("references", "templates.md"),
         "unit": "item",
     },
     {
         "name": "personnel-ledger",
+        "materialize": "materialize_personnel_ledger",
         "region": None,
         "source": ("references", "personnel-templates.md"),
         "unit": "record type",
@@ -137,17 +152,232 @@ def count_units(text):
     return len(re.findall(r"^\s{0,3}(\d+)\.\s", text, re.M))
 
 
+def template_frontmatter(wf, heading):
+    """The literal ```yaml block under a `templates.md` section heading.
+
+    COPIED, never composed. `templates.md` § `/org` states the frontmatter as a fenced
+    yaml block and the rest of that section as points the body must carry; the block is
+    the only part that is byte-canonical, so it is the only part taken verbatim.
+    """
+    src = read(os.path.join(wf, "references", "templates.md"))
+    if src is None:
+        return None
+    i = src.find(heading)
+    if i < 0:
+        return None
+    m = re.search(r"^```ya?ml\n(.*?)^```\n", src[i:], re.S | re.M)
+    if not m:
+        return None
+    # THE FENCED BLOCK ALREADY CARRIES ITS OWN `---` DELIMITERS, because it is shown in
+    # `templates.md` as a complete frontmatter block. Returning it raw and wrapping it in
+    # a second pair produced a file opening `---\n---\nname: org`, which no host parses as
+    # frontmatter. Caught by reading the first generated `/org`, not by the read-back —
+    # which is why `frontmatter_ok` below now exists.
+    body = m.group(1).strip("\n")
+    lines = body.split("\n")
+    if lines and lines[0].strip() == "---":
+        lines = lines[1:]
+    while lines and lines[-1].strip() == "---":
+        lines = lines[:-1]
+    return "\n".join(lines)
+
+
+def materialize_org(wf):
+    """The full body of an ABSENT `/org`, assembled from shipped source only.
+
+    THIS IS THE PRODUCER THE RULE NEVER HAD. `audit-setup.md` Step 0.3 deferred `/org`
+    to `org index`, `audit.md` Step 6 said `org index` "runs UNCONDITIONALLY", and
+    `procedures/org.md` step 2 said "Missing -> bootstrap it there from templates.md".
+    Three files stated it and nothing performed it: `/org` is GENERATED, so no installer
+    fetches it, and the only mechanism that touched the path refused the absent case and
+    exited 0. MEASURED on a fresh project on a remote host, 2026-09-11: a two-hour audit
+    finished and `.claude/skills/org/SKILL.md` did not exist.
+
+    Every span below is copied from a shipped file. The frontmatter comes from
+    `templates.md` § `/org`; the dispatch ladder is the canonical CHECKPOINT lifted
+    byte-for-byte from between its own markers in `procedures/org.md`
+    (§ Canonical Dispatch CHECKPOINT: "COPY THE BLOCK. DO NOT WRITE ONE."). Returns None
+    when either source is unreadable, because a receptionist assembled from half its
+    doctrine is worse than an absence somebody can see.
+    """
+    fm = template_frontmatter(wf, "## `/org` — the receptionist")
+    if fm is None:
+        return None
+    src = read(os.path.join(wf, "references", "procedures", "org.md"))
+    if src is None:
+        return None
+    sp = span(src, CHECKPOINT_MARKERS)
+    if sp is None:
+        return None
+    checkpoint = src[sp[0]:sp[1]]
+
+    return f"""---
+{fm.strip()}
+---
+
+# org — hand a task to the right employee
+
+Read the org chart at `.claude/workforce/org-chart.md` and dispatch to the **lowest competent
+node**, ties resolving downward. Announcing a dispatch without issuing it is the failure this
+skill exists to prevent, so the ladder below is the procedure, not a summary of one.
+
+{checkpoint}
+
+## What this receptionist never does
+
+- **Never asks the user to switch models.** Every employee is model-pinned by its own handbook
+  frontmatter, so there is no lane preflight to run here and none is to be added.
+- **Never sets `context: fork`.** A forked skill runs inside a subagent and consumes a delegation
+  tier, flattening the chain of command by one level.
+- **Never re-specifies the steps** of the work it hands off. The handbook owns the procedure; a
+  work order that restates it has two procedures that can disagree.
+
+## Modes
+
+```
+/org <ask>        dispatch the ask down the ladder above
+/org status [emp] read-only — why routing would choose what it chooses
+/org log <ask>    dispatch with run telemetry ON
+/org log          read-only — summarize this project's telemetry, write nothing
+```
+
+`log` appends one JSON object per line to `.claude/workforce/telemetry/<run-id>.jsonl`, in the
+project and never under `~/.claude`. **The emitter records; it never assesses** — every field is
+copied from the `.spawn` edge, the harness's own completion notification, or the returned
+`OUTPUT.md`, and a field that cannot be read is written `null` rather than guessed.
+
+<!-- Generated by `wf-companion` from shipped doctrine: frontmatter from
+     `references/templates.md` § `/org`, dispatch ladder from
+     `references/procedures/org.md` § Canonical Dispatch CHECKPOINT. Hand-written content
+     outside the CHECKPOINT markers is preserved by every later refresh. -->
+"""
+
+
+def materialize_operating_principles(wf):
+    """The constitution SCAFFOLD — the shipped items verbatim, the project's own blank.
+
+    `templates.md` § `operating-principles` is half literal and half placeholder by
+    design: the numbered General Operating Principles are shipped text, and the Strategic
+    Objective is one page the CEO drafts and the user ratifies. So this produces the
+    shipped half byte-for-byte and leaves the project's half as the template's own
+    placeholder, wrapped in the `origin: user | immutable: true` spans the template
+    specifies. **A scaffold is not a finished constitution and does not pretend to be** —
+    the placeholder is the audit's own instruction to fill it, and it is visible rather
+    than absent, which is the difference between a step that still has to run and a step
+    nothing will ever notice was skipped.
+    """
+    fm = template_frontmatter(wf, "## `operating-principles` — the Strategic Objective")
+    if fm is None:
+        return None
+    src = read(os.path.join(wf, "references", "templates.md"))
+    if src is None:
+        return None
+    # The structure block is the ```markdown fence inside that same section. Bounded to
+    # the section, never to the file: `templates.md` carries several such fences and a
+    # bare search would lift whichever came first.
+    i = src.find("## `operating-principles` — the Strategic Objective")
+    j = src.find("\n## The CLAUDE.md Constitution Gate", i)
+    m = re.search(r"^```markdown\n(.*?)^```\n", src[i:j if j > i else len(src)], re.S | re.M)
+    if not m:
+        return None
+    return f"---\n{fm.strip()}\n---\n\n{m.group(1).rstrip()}\n"
+
+
+def materialize_personnel_ledger(wf):
+    """The personnel data skill, from the contract table `personnel-templates.md` states.
+
+    A data skill's body IS its contract (`data-skills.md`), and that contract is a table
+    in shipped doctrine with one row per required section. So the body is generated from
+    those rows rather than composed: the section headings and their contents come from
+    the table, and the record FORMATS stay where they are, cited rather than copied — two
+    canonical copies of a record template is the failure this project refuses everywhere.
+    """
+    src = read(os.path.join(wf, "references", "personnel-templates.md"))
+    if src is None:
+        return None
+    i = src.find("## `personnel-ledger` — the skill that holds these records")
+    if i < 0:
+        return None
+    j = src.find("\n### What makes this better", i)
+    rows = re.findall(r"^\| `(## [^`]+)` \| (.*?) \|\s*$",
+                      src[i:j if j > i else len(src)], re.M)
+    if not rows:
+        return None
+    body = "\n\n".join(f"{h}\n\n{cell.strip()}" for h, cell in rows)
+    return f"""---
+name: personnel-ledger
+description: "The org's personnel records — EMP, PERF, DEF, AMD, RFI, ORG, and the project family DEC, INC, PAT, FLW."
+when_to_use: "When reading or writing an employee record, a performance record, a defect, or an amendment"
+---
+
+# personnel-ledger
+
+The personnel dataset for this org. **Record formats are not restated here** — they are shipped
+doctrine at `references/personnel-templates.md`, and a second copy of a template is a second
+canonical text.
+
+{body}
+
+<!-- Generated by `wf-companion` from `references/personnel-templates.md`
+     § `personnel-ledger`. Hand-written content added below is preserved. -->
+"""
+
+
+def frontmatter_ok(text):
+    """A generated companion opens with exactly one closed frontmatter block.
+
+    THE READ-BACK COULD NOT SEE THE ONE DEFECT THE FIRST GENERATION HAD. It compared the
+    CHECKPOINT region and nothing else, so a `/org` whose frontmatter was a doubled `---`
+    read back CURRENT — the region was byte-perfect and the file was unloadable. A
+    verifier that only checks the part it wrote last is not verifying the file.
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return False, "does not open with `---`"
+    for k in range(1, len(lines)):
+        stripped = lines[k].strip()
+        if stripped == "---":
+            return (True, "") if k > 1 else (False, "empty frontmatter block (`---` twice)")
+        if not stripped or ":" in stripped or stripped.startswith(("#", "-")):
+            continue
+        return False, f"line {k + 1} is not a frontmatter key: {lines[k]!r}"
+    return False, "frontmatter block is never closed"
+
+
 def evaluate(root, wf, entry):
     """One row: (state, detail, installed_path, new_body_or_None)."""
     name = entry["name"]
     inst_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
     inst = read(inst_path)
     if inst is None:
-        # ABSENT is not this script's job to fix. Step 0.3 materializes companions and
-        # `INV-COMPANIONS` counts them; a second mechanism creating them here would give
-        # absence two owners that can disagree.
-        return ("ABSENT", "no SKILL.md — Step 0.3 materializes it, not this step",
-                inst_path, None)
+        # ABSENT IS THIS SCRIPT'S JOB NOW, AND THAT IS THE FIX, NOT AN EXPANSION OF
+        # SCOPE. This branch used to read "Step 0.3 materializes companions and
+        # INV-COMPANIONS counts them; a second mechanism creating them here would give
+        # absence two owners that can disagree." The reasoning was sound and the premise
+        # was false: Step 0.3 is PROSE, `INV-COMPANIONS` only COUNTS, and absence
+        # therefore had ZERO owners rather than one. Giving it one owner is what removes
+        # the disagreement — the refresh path and the create path now read the same
+        # shipped source through the same `span()`, so a `/org` this script creates and a
+        # `/org` it later refreshes cannot drift apart.
+        #
+        # MEASURED 2026-09-11: a two-hour `audit` on a fresh project on a remote host
+        # finished with no `.claude/skills/org/SKILL.md`. Nothing failed — this row
+        # printed its precondition and `main()` returned 0, because an absent companion
+        # was "a reported state with a named reason."
+        builder = globals().get(entry.get("materialize") or "")
+        if builder is None:
+            return ("UNPRODUCIBLE",
+                    "no SKILL.md and no shipped producer for this companion — "
+                    "`audit-setup.md` Step 0.3 must materialize it by hand",
+                    inst_path, None)
+        body = builder(wf)
+        if body is None:
+            return ("UNREADABLE",
+                    "no SKILL.md, and the shipped doctrine it would be built from is "
+                    "unreadable — a companion assembled from half its source is worse "
+                    "than an absence somebody can see",
+                    inst_path, None)
+        return ("ABSENT", "no SKILL.md; a producer exists for it", inst_path, body)
 
     src_path = os.path.join(wf, *entry["source"])
     src = read(src_path)
@@ -211,6 +441,7 @@ def main():
           f"{ver if ver else '<unreadable — no staleness claim made>'}\n")
 
     refreshed = unrefreshed = current = 0
+    materialized = absent = 0
     failed = False
     print("CORE SKILLS")
     for entry in CORE:
@@ -222,12 +453,22 @@ def main():
             print(f"  = {name:22s} current   {detail}")
             continue
 
-        if state == "DRIFTED":
+        if state in ("DRIFTED", "ABSENT"):
+            verb, past = (("refresh", "refreshed") if state == "DRIFTED"
+                          else ("materialize", "materialized"))
             if not args.execute:
                 unrefreshed += 1
-                print(f"  ~ {name:22s} DRIFTED   {detail} — would refresh")
+                if state == "ABSENT":
+                    absent += 1
+                print(f"  ~ {name:22s} {state:9s} {detail} — would {verb}")
                 continue
             try:
+                # MATERIALIZING CREATES THE DIRECTORY; REFRESHING NEVER DOES. A refresh
+                # whose parent is missing is a target that moved under the run, and
+                # `makedirs` would turn that into a confident write to a path nobody
+                # named.
+                if state == "ABSENT":
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
                 # WRITE THROUGH A SYMLINK, NEVER OVER IT. A Core skill may be symlinked
                 # into a shared doctrine tree, and `open(path, "w")` truncates the TARGET
                 # rather than replacing the link (SKILL.md Atomic-or-Absent rule 3).
@@ -235,15 +476,35 @@ def main():
                     fh.write(new_body)
                 # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
                 # its own output has not finished (`checksums.md` rule 2).
-                back_state, _, _, _ = evaluate(root, wf, entry)
-                if back_state != "CURRENT":
+                # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot
+                # verify its own output has not finished (`checksums.md` rule 2).
+                #
+                # A MATERIALIZED companion with no machine-owned region reads back
+                # UNMANAGED, not CURRENT, and that is correct rather than a failure:
+                # `operating-principles` and `personnel-ledger` define no marker pair, so
+                # the refresh path has nothing to compare and says so. What this read-back
+                # must establish for them is that the FILE IS THERE AND PARSES — anything
+                # stricter would fail every successful creation, which is the
+                # always-fails-so-nobody-reads-it defect this script already carries a
+                # scar from.
+                back_state, back_detail, _, _ = evaluate(root, wf, entry)
+                ok = (back_state == "CURRENT" or
+                      (verb == "materialize" and back_state in ("UNMANAGED", "NO-REGION")))
+                if ok and verb == "materialize":
+                    fm_ok, why = frontmatter_ok(read(path) or "")
+                    if not fm_ok:
+                        ok, back_state = False, f"unloadable frontmatter ({why})"
+                if not ok:
                     failed = True
                     unrefreshed += 1
-                    print(f"  ! {name:22s} FAILED    wrote the region and read back "
-                          f"{back_state} — not counted as refreshed", file=sys.stderr)
+                    print(f"  ! {name:22s} FAILED    {past} and read back "
+                          f"{back_state} — not counted", file=sys.stderr)
                     continue
-                refreshed += 1
-                print(f"  + {name:22s} refreshed {detail}")
+                if verb == "materialize":
+                    materialized += 1
+                else:
+                    refreshed += 1
+                print(f"  + {name:22s} {past:13s} {detail}")
             except OSError as exc:
                 failed = True
                 unrefreshed += 1
@@ -255,16 +516,31 @@ def main():
         # nothing — the uncited-refusal shape `INV-SWEPT` and `INV-HOUSERULES` both use,
         # so a run cannot skip the refresh silently and still close clean.
         unrefreshed += 1
+        if state in ("UNPRODUCIBLE", "UNREADABLE") and not os.path.exists(path):
+            absent += 1
         print(f"  ~ {name:22s} {state:9s} {detail}")
 
     total = len(CORE)
+    # MATERIALIZED AND REFRESHED ARE PRINTED APART, for `INV-REMAINDER`'s reason: a run
+    # that created three companions and a run that refreshed three regions are different
+    # events, and one number cannot tell a reader which happened.
     print(f"\nINV-CORE  {total} core skill(s) · current {current} · refreshed {refreshed} "
-          f"· unrefreshed {unrefreshed} · each unrefreshed names its precondition")
+          f"· materialized {materialized} · unrefreshed {unrefreshed} · absent {absent} "
+          f"· each unrefreshed names its precondition")
     if not args.execute and unrefreshed:
-        print("Re-run with --execute to refresh the machine-owned regions. A row reading "
-              "UNMANAGED or NO-REGION is not refreshed by --execute either: it names the "
-              "precondition instead, because a customized Core skill is never overwritten.")
-    return 1 if failed else 0
+        print("Re-run with --execute to materialize the absent companions and refresh the "
+              "machine-owned regions. A row reading UNMANAGED or NO-REGION is not "
+              "refreshed by --execute either: it names the precondition instead, because "
+              "a customized Core skill is never overwritten.")
+    # AN ABSENT CORE COMPANION IS A NON-ZERO EXIT IN BOTH MODES, and that is the whole
+    # point of this release. `invariants.md` row 23: "Absence of any is a FAIL, not a
+    # report." This script printed an absence and returned 0 for it, so `/org` could go
+    # missing through a two-hour audit on a fresh project with nothing in the run's own
+    # exit codes to say so (MEASURED 2026-09-11, a remote host). Report mode exits 1
+    # because the companion is OWED and not there; `--execute` exits 1 only if creating
+    # it then failed, which is the actionable distinction between "not done yet" and
+    # "cannot be done."
+    return 1 if (failed or absent) else 0
 
 
 if __name__ == "__main__":

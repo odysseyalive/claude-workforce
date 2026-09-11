@@ -23,7 +23,11 @@ procedure — it gets decided here. That is what keeps handbooks followable.
    dispositions marked `PRINCIPLE`.
 2. **Ratify** — the user approves each item. Captured **verbatim** from their wording. Mechanics
    implementing a principle live in `references/`, never inside the immutable block.
-3. **Write** into `operating-principles/SKILL.md`, inside `<!-- origin: user | immutable: true -->`.
+3. **Write** into `operating-principles/SKILL.md`, **below the `<!-- WF-PRINCIPLES END -->` marker**,
+   inside `<!-- origin: user | immutable: true -->`. The region above that marker is workforce's
+   shipped doctrine and is refreshed byte-for-byte by `wf-companion` on every audit
+   (`references/templates.md` § Two halves, two owners); an item written inside it is silently
+   reverted on the next run, and an item written below it is never touched.
 4. **Assert five things on every write:**
    - the skill does **not** set `disable-model-invocation: true` — such skills cannot be preloaded,
      and preloading is the entire delivery mechanism
@@ -34,6 +38,11 @@ procedure — it gets decided here. That is what keeps handbooks followable.
    - the written `operating-principles/SKILL.md` carries the session-artifact clause — a complex
      issue or a visual asset example is communicated in one shareable artifact, reused and updated
      across the session, with its examples kept as a labeled progression (`references/session-artifact.md`)
+   - **the shipped region is intact and current** — `WF-PRINCIPLES` present, both markers, and every
+     ratified project item BELOW the END marker. *This bullet is the fifth; the list said "five
+     things" and carried four from the day it was written, which is how a constitution can lose
+     shipped items and satisfy its own gate. Added 2026-09-11, with the region that makes it
+     checkable.*
 
 ## Growth and its limit
 

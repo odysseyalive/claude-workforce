@@ -361,8 +361,8 @@ scoped too narrow to reach it**: `audit-setup.md` § How every question is worde
 questions, and the text-eval catalog's coffee test governed prose authored into files. A question asked
 outside setup, and every report handed back in the terminal, were governed by nothing — so the dense
 register this distribution writes for cold-reading agents reached the one reader it was never for.
-Mechanics at the `Plain Speak` output style, which carries the rule and the banned-term list
-`audit-setup.md` used to own. It reaches the user through three carriers and one
+Mechanics at operating-principles item 11 and `/org` dispatch rung 13. It reaches the user through
+three carriers and one
 floor: operating-principles item 11 (`references/templates.md`), so every org workforce builds carries
 it; `/org` dispatch rung 13 (`references/procedures/org.md`), so it governs every routed reply and not
 just an audit's; and `audit-setup.md`, which points at those instead of restating a narrower copy. The
@@ -394,9 +394,15 @@ source. The second clause is new and is not a style complaint: it names **caving
 reply the user quotes opens "You're right", and Anthropic's own measurement puts sycophantic agreement
 at 18% once a user has pushed back against 9% when they have not — so the moment a reply most feels
 like agreement is the moment it is least likely to be earned. Mechanics at
-the `Plain Speak` output style, which carries openers, reports, and the rest of the rule; the carrier
-that does not decay is the `Plain Speak` output style, added to the system prompt and present at
-full strength on every turn. The operational reading is — **lead with the answer, decide the small reversible things
+operating-principles item 11, which carries openers, reports, and the rest of the rule. **There is no
+operator-facing carrier that does not decay, and saying otherwise was the overclaim.** This paragraph
+named the `Plain Speak` output style as that carrier — "added to the system prompt and present at full
+strength on every turn" — and the style was retired in the simplification release and is in
+`manifest.txt`'s `retired` list, which the installer PRUNES. So the sentence promised a mechanism the
+distribution actively removes. What reaches a stranger's machine is the shipped constitution, `/org`
+dispatch, and the handbook template — all three of which govern EMPLOYEES; for the operating session
+itself the live carriers are the `Stop`/`SubagentStop` hooks (`wf-widen`, whose `reason` becomes the
+next instruction) and this file, and both are honestly weaker than a system prompt. The operational reading is — **lead with the answer, decide the small reversible things
 instead of asking, never open with agreement, and never concede because someone objected: say what
 you still think and let them decide.***
 
@@ -443,9 +449,8 @@ forbade parking a row for a later run; this one forbids parking it in a QUESTION
 whose options are all "do less" is a deferment queue with a nicer interface — it spends the user's
 attention to buy the run permission to stop. Note the second message: its reach is **all aspects of
 audit deployment**, not this command, so it binds every generated org and not only this session.
-Mechanics at the `Plain Speak` output style § Finish, do not hedge, and it carries through the three
-paths: operating-principles item 12, so every company workforce builds has it; `/org` dispatch, so it
-and `/org` dispatch, so it governs every routed reply. The operational reading is — **when the work is doable, do it.** Ask only when the answer
+Mechanics at operating-principles item 12, so every company workforce builds has it,
+and `/org` dispatch rung 14, so it governs every routed reply. The operational reading is — **when the work is doable, do it.** Ask only when the answer
 changes what gets built and you genuinely cannot choose; never when one of the options is to stop, and
 never to obtain permission for work already asked for. Where a task is genuinely blocked, say what
 blocked it in one line and finish everything else — a partial result delivered beats a complete result
@@ -513,7 +518,7 @@ tier down** — and there it is worse, because the Lead integrating that report 
 saw. The seventh message widens it once more: **every project using workforce**, so this is a
 distribution rule and not a house rule for this repository. It rides the three paths that reach a
 stranger's machine — the shipped constitution and handbook template, `audit` (which force-refreshes
-both), and `verify` (which reports a handbook missing the clause). Mechanics at the `Plain Speak` output style § Reports; carried
+both), and `verify` (which reports a handbook missing the clause). Mechanics carried
 by operating-principles item 13, `/org` dispatch rung 15, the handbook template every hire is
 authored from, and `wf-conform`, which reports a handbook whose `## Reporting` carries no
 say-the-state clause. The operational reading is — **say the state, not the journey.** Lead with what is true now.
@@ -580,10 +585,26 @@ was. What changed is the model-authored mechanics prose around them, which named
 live carriers and cited `references/plain-output.md`. All three were removed in 1.30.2, on the user's
 marks, after the speech guard was measured firing on 7.0% of GOOD replies across 2,149 real replies —
 so the prose was describing enforcement that had not existed for two days, which is the overclaim Core
-Principle 6 forbids. The rules themselves are unchanged and are carried by the `Plain Speak` output
-style, the operating principles, `/org` dispatch, the handbook template, and `wf-conform`'s
-say-the-state row. The one surviving mention of a guard is the 2026-09-07 three-paths measurement,
+Principle 6 forbids. The one surviving mention of a guard is the 2026-09-07 three-paths measurement,
 which is a record of what went wrong and is marked as history.*
+
+*Amended 2026-09-11, and this one is a correction of the amendment directly above rather than of the
+directives. That note closed by saying the rules "are unchanged and are carried by the `Plain Speak`
+output style, the operating principles, `/org` dispatch, the handbook template, and `wf-conform`'s
+say-the-state row" — **and the same release, 1.30.2, deleted three of those five carriers in the very
+commit that named them.** Measured from the diff, not recalled: `90fb341` removed `/org` dispatch rungs
+13, 14 and 15 and operating-principles items 11, 12 and 13, and `plain-speak.md` sits in `manifest.txt`
+under `retired`, which means the installer PRUNES it from hosts that still have it. So for a full
+release the communication rules the user had stated four separate times reached no generated org, no
+routed reply, and no operator — the two survivors, the handbook template and `wf-conform`'s advisory
+row, both govern employees only. **This is the user's own three-paths directive of 2026-09-07 failing
+on its own author**: a simplification that reached every new install and stranded every existing one,
+described as a no-op. All six items and rungs are restored here from `90fb341^`, with the citations
+re-pointed at carriers that exist; no quoted user text was touched, and the restored text is the
+user's rules as they were written, not a fresh paraphrase. The lesson is recorded rather than
+generalized: **a commit that removes a mechanism may not also be the commit that asserts the mechanism
+survives elsewhere** — the assertion has to be checked against the tree, and here nothing checked it,
+because a deleted numbered item leaves no hole anybody counts. `bin/check` now counts them.*
 
 > **"I've given explicit instructions that the five evaluations and workforce should be
 > self-contained in the user during install so that I don't have to run an audit every time

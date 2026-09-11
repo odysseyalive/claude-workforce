@@ -502,6 +502,52 @@ CASES = [
      VFY, "del", "## Core companion freshness"),
     ("core refresh: INV-CORE is a counted row, not a stray print",
      INV, "del", "`INV-CORE`"),
+
+    # ── the /org PRODUCER, and the six rules 1.30.2 deleted (2026-09-11) ──────
+    # MEASURED on a fresh project on a remote host: a two-hour `audit` finished with no
+    # `.claude/skills/org/SKILL.md` at exit 0. Counting companions was the previous fix
+    # and counting is not creating: both mechanisms on the path declined the ABSENT case,
+    # so absence had zero owners. These break the producer in each of the three ways it
+    # can be present and still not work — no builder, no verified read-back, and a
+    # non-failure exit for the state the invariant calls a FAIL.
+    ("org producer: Step 0.3 CALLS the producer instead of describing materialization",
+     "workforce/references/audit-setup.md", "del", "--execute  # materialize it"),
+    ("org producer: wf-companion CREATES an absent core companion, not just refreshes",
+     "workforce/bin/wf-companion", "del", "def materialize_org(wf):"),
+    ("org producer: creation and refresh read ONE span through ONE constant",
+     "workforce/bin/wf-companion", "del", '"region": CHECKPOINT_MARKERS,'),
+    ("org producer: an absent core companion is a NON-ZERO exit in both modes",
+     "workforce/bin/wf-companion", "del", "return 1 if (failed or absent) else 0"),
+    ("org producer: the read-back checks the file LOADS, not only the span it wrote",
+     "workforce/bin/wf-companion", "del", "def frontmatter_ok"),
+
+    # THE SILENT-DELETION PAIR, and they are the reason this class needs a prove case at
+    # all. A deleted numbered item leaves NO HOLE — the list just ends earlier — so
+    # commit 90fb341 removed `/org` rungs 13-15 and operating-principles items 11-13 in
+    # the same commit whose own note said those carriers still carried the rules, and
+    # nothing anywhere reported it for a release. "del" on the last item is exactly the
+    # mutation that went unnoticed in production.
+    ("dispatch ladder: the canonical CHECKPOINT carries a GAPLESS 1..N, N >= 15",
+     "workforce/references/procedures/org.md", "del",
+     "Say the state, not the journey"),
+    ("constitution: the shipped operating-principles carries a GAPLESS 1..N, N >= 13",
+     TMPL, "del", "Finish rather than hedge"),
+
+    # The retired `Plain Speak` style re-asserted as a live carrier — Core Principle 6's
+    # overclaim, in the form it actually shipped in.
+    ("constitution: the shipped items sit in a machine-owned region an audit can heal",
+     "workforce/bin/wf-companion", "del",
+     '"region": ("<!-- WF-PRINCIPLES START", "<!-- WF-PRINCIPLES END -->"),'),
+    ("carriers: no shipped file names the retired Plain Speak style as a live carrier",
+     AUD, "append", "\nIt selects the `Plain Speak` output style on every wire.\n"),
+
+    # The companion groups re-merged into one project-local demand, which is the state
+    # that made INV-COMPANIONS red on every healthy tree.
+    ("companions: INV-COMPANIONS splits the two scopes it is owed in",
+     "workforce/bin/wf-conform", "del", "def companion_scopes"),
+    ("invariants: the two companion groups are DISJOINT and neither is empty",
+     "workforce/bin/wf-conform", "del",
+     'EVALUATOR_COMPANIONS = ("code-evaluator", "text-eval", "security-evaluator")'),
     # The tier count restated in a shape the literal alternatives missed. This is the
     # ACTUAL sentence conversion-taxonomy.md carried for weeks while the check passed
     # it, so the case proves the widened CONST_RX on the real defect rather than on a

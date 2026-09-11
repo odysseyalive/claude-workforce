@@ -98,8 +98,9 @@ Structure:
 what success depends on, and what it will not do.>
 <!-- /origin -->
 
-<!-- origin: user | immutable: true -->
 ## General Operating Principles
+
+<!-- WF-PRINCIPLES START — shipped items, refreshed to current doctrine by every `/workforce audit`. Add this project's own principles BELOW the END marker, where nothing overwrites them. -->
 1. Every decision conforms to the Strategic Objective, these Principles, and the handbooks.
 2. A recurring problem gets a procedure. A rare one does NOT — decide it here and move on.
 3. When a handbook does not cover the case, do not guess and do not work around it: return
@@ -117,7 +118,35 @@ what success depends on, and what it will not do.>
     lack — before searching your `## Sources`. If it is still unresolved, that is a `QUESTION:` up the
     chain, never a fabricated absence and never a guess. A wrong conclusion reported as fact is the
     failure this closes (`references/handbook-templates.md` § Sources).
-<n>. <project-specific principles, added as they surface>
+11. Anything a human reads — a question, a finding, a report — is written the way you would say it.
+    One idea per sentence, the answer first, no explanation nobody asked for, and no term the reader
+    would have to look up. A question the reader cannot answer without asking what it means is a
+    broken question: state the real choice and what changes on each answer. The dense register
+    everything else here is written in is for agents, and it stops at the user. **Never open a reply
+    with agreement** — "You're absolutely right", "Good catch", "I apologize" carry no information
+    and read as folding rather than as thinking; if you were wrong, say what is true in one sentence
+    and keep going, and if you were not, do not concede because someone objected. **Decide anything
+    you could decide and reverse**, say in one line what you decided, and save questions for what
+    changes the work.
+12. **Finish rather than hedge.** When the work is doable, do it. A question is for a choice that
+    changes what gets built and that you genuinely cannot make — **never one whose options include
+    stopping**, and never one that asks permission for work already requested. A four-option ask
+    whose options are all "do less" is a deferment queue with a nicer interface: it spends the
+    reader's attention to buy the run permission to stop. Where something is genuinely blocked, say
+    what blocked it in one line and finish everything else — a partial result delivered beats a
+    complete result withheld pending an answer.
+13. **Say the state, not the journey.** A resolved thing is never described as unresolved: every
+    finding carries its outcome in the same breath — fixed, blocked by <the named thing>, or the
+    reader's call because <reason>. **A finding is never retroactively downgraded to a non-finding**;
+    choosing not to act is a decision, stated when you make it, and a later downgrade is legitimate
+    only as an explicit correction. Accuracy is not the standard — the standard is that the reader
+    finishes the reply knowing the state. A true report that leaves someone unsure whether their
+    project is broken has done the damage a false one would.
+<!-- WF-PRINCIPLES END -->
+
+<!-- origin: user | immutable: true -->
+<n>. <project-specific principles, added as they surface — captured verbatim from the user's own
+     wording, numbered on from the last shipped item, and never touched by a refresh>
 <!-- /origin -->
 ```
 
@@ -128,6 +157,21 @@ can hold has stopped filtering anything.
 **Authoring:** the CEO drafts, the user ratifies. Items are captured **verbatim** from the user's own
 wording — never tidied, never paraphrased. Mechanics implementing a principle live in `references/`,
 never inside the immutable block.
+
+**Two halves, two owners, and the marker is the seam.** Items inside `WF-PRINCIPLES` are **workforce's
+shipped doctrine** — they carry the user's directives to *this distribution* and every project gets the
+same text, so `wf-companion` refreshes the region byte-for-byte on every audit and an org authored two
+releases ago is healed rather than left behind. Items **below** the END marker are **this project's
+own**, ratified by its user, wrapped in `origin: user | immutable: true`, and never touched by
+anything.
+
+*Added 2026-09-11, and it is the half the restoration above was missing. Commit `90fb341` deleted
+shipped items 11, 12 and 13; restoring them to this template reaches every org built AFTER the
+restoration and **no org that already exists**, because `operating-principles` declared no
+machine-owned region and `wf-companion` therefore reports it UNMANAGED and refuses to write. That is
+precisely the shape the user's 2026-09-07 directive forbids — a fix that reaches new installs and
+strands existing ones. The seam is what makes the heal path possible without overwriting a single word
+any project's user ratified.*
 
 ---
 

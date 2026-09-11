@@ -1149,7 +1149,7 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    clause** — every finding reports its outcome in the same breath, no work is handed up the chain
    that the employee could have done, and no finding is retroactively downgraded to a non-finding
    (`SKILL.md` § Directives, 2026-09-07). *That clause is scoped by the user to **every project using workforce**, and an employee
-   is where it is hardest to see: the `Plain Speak` output style reaches the main conversation only,
+   is where it is hardest to see: every operator-facing carrier reaches the main conversation only,
    because a subagent runs its own system prompt. A handbook missing it is an org whose reports
    read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
    completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
@@ -1509,11 +1509,20 @@ Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6
 principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sat between `checksums` and `verify` and is RETIRED — its script was removed on the user's marks; the step number is held as a placeholder so nothing else shifts.)*
 
-**`org index` runs UNCONDITIONALLY here — every audit, every mode.** It generates the project-local
+**`org index` runs UNCONDITIONALLY here — every audit, every mode.** It maintains the project-local
 `/org` receptionist at `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md` (`procedures/org.md` step 2,
-`references/scopes.md` § The `/org` receptionist is project-local), which is why `/org` is materialized
-by its generator rather than copied at Step 0.3, and why a missing `/org` after the run is an
-`INV-COMPANIONS` failure (`references/invariants.md` row 23), never a "ships none" skip. The Step 0.3
+`references/scopes.md` § The `/org` receptionist is project-local), and a missing `/org` after the run
+is an `INV-COMPANIONS` failure (`references/invariants.md` row 23), never a "ships none" skip.
+
+**`/org` IS CREATED BY A PRODUCER AT STEP 0.3, NOT BY THIS STEP, AND THAT IS THE CORRECTION.** This
+paragraph read "which is why `/org` is materialized by its generator rather than copied at Step 0.3" —
+so creation was owed to an `org index` that is itself a procedure a run performs by reading prose, at
+the far end of a long execution phase. **MEASURED 2026-09-11: a two-hour audit on a fresh remote
+project reached Step 6 and `/org` was never written, and every exit code in the run was 0.** Step 0.3
+now runs `wf-companion --execute`, which creates it from the same canonical span this step refreshes;
+by the time `org index` runs, `/org` exists and this step is a refresh with a NOOP path. **Creation and
+refresh read one span through one function** (`wf-companion.CHECKPOINT_MARKERS`), so the two cannot
+disagree. The Step 0.3
 companion materialization and the Step 4 Core-skill force-refresh are likewise unconditional; between
 them every companion is materialized or refreshed on every run, and `INV-COMPANIONS` counts the result.
 
@@ -1888,12 +1897,14 @@ Per target:
 wf-settings-apply --root <tree> --wire-defaults --execute
 ```
 
-**One call, one producer.** It registers every hook in `DEFAULT_HOOKS` and selects the `Plain Speak`
-output style, and it is the same call both installers make — so the wired set cannot drift between
-install-time and audit-time, which two separate lists would guarantee within one release.
+**One call, one producer.** It registers every hook in `DEFAULT_HOOKS`, and it is the same call both
+installers make — so the wired set cannot drift between install-time and audit-time, which two separate
+lists would guarantee within one release. **It selects no output style.** This sentence said it selected
+`Plain Speak` until 2026-09-11, and that style was retired in the simplification release and is pruned
+by the installer — so the step named a write the producer had stopped performing. `--unwire-defaults`
+still CLEARS a style selected by an older release, which is the half that had to survive.
 
-**Every write is idempotent and reversible.** A hook already registered is a reported NOOP; a style
-already selected is a reported NOOP. Each write records itself in `.claude/workforce/.settings-owned.json`,
+**Every write is idempotent and reversible.** A hook already registered is a reported NOOP. Each write records itself in `.claude/workforce/.settings-owned.json`,
 so `disband` and `/workforce hooks --remove` reverse exactly these and nothing else.
 
 **`OPT_IN_HOOKS` is never wired here.** `wf-loop-guard` is PROPOSED and reaches a settings file only

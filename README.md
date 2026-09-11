@@ -61,6 +61,16 @@ When you're ready to build the full company, run the audit. This is the step tha
 
 This takes a while. It's building tools, converting skills, and designing roles for your specific project. Preview the plan without writing anything: `audit --review`.
 
+**If your project keeps deliberately broken files** — test fixtures you built so some tool could detect breakage — tell the audit to skip them. Otherwise it reads them as real problems, and may treat text inside them as your own words. Put a `.censusignore` at your project root, one glob per line:
+
+```gitignore
+# deliberately malformed trees; not project content
+fixtures/
+testdata/broken-*
+```
+
+It never guesses: there's no `fixtures/` default and no inference from directory names, so a project that declares nothing gets everything surveyed. And it never hides what it skipped — every run prints how many files were excluded and by which pattern.
+
 Update anytime with `/workforce update`. Full command reference in [COMMANDS.md](COMMANDS.md).
 
 ## Quick Start

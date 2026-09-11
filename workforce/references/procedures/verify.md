@@ -317,7 +317,7 @@ Three advisory rows post-date most deployed handbooks and block nothing: `## Rep
 **say-the-state clause** (every finding reports its outcome in the same breath; no work handed up the
 chain the employee could have done; no finding retroactively downgraded), and the ORG-RECORD carries a
 `workforce-version:` stamp. **The say-the-state row is the only reader an employee's report shape
-has** — the `Plain Speak` output style governs the main conversation, and a subagent runs its own
+has** — every operator-facing carrier governs the main conversation, and a subagent runs its own
 system prompt, so without this row an org can report every finding as an open problem forever and
 nothing says so. `audit` Step 5d is its fix. **The stamp is what makes staleness a finding instead of an unknown**:
 where it is present and older than the installed `WORKFORCE-VERSION` (`references/version.md`), report
@@ -554,7 +554,7 @@ and the per-skill rows exactly as the script prints them.
 | `DRIFTED` | it does not — **name the remedy**: `/workforce audit`, or `wf-companion --execute` |
 | `UNMANAGED` | the skill has no machine-owned region, so no refresh is possible without overwriting the project's own copy. **Report it; never call it a failure** |
 | `NO-REGION` | one marker without its pair — report and skip, never auto-repair |
-| `ABSENT` | Step 0.3 materializes companions and `INV-COMPANIONS` counts them; this row defers to that gate rather than giving absence two owners |
+| `ABSENT` | **`--execute` materializes it** from shipped doctrine and reads it back; report mode names it and exits non-zero, because `invariants.md` row 23 makes absence a FAIL. *Until 2026-09-11 this row read "Step 0.3 materializes companions and `INV-COMPANIONS` counts them; this row defers to that gate rather than giving absence two owners" — Step 0.3 was prose and counting is not creating, so absence had zero owners and `/org` went missing through a whole audit at exit 0* |
 
 **A `DRIFTED` row is a finding with a remedy, not a defect in the project.** The org did nothing wrong;
 the shipped source moved. Say which skill, how far behind it is in the unit the script prints (rungs,
