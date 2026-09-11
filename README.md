@@ -49,11 +49,11 @@ Then restart Claude Code. You're already running. The install ships skills you c
 /text-eval check the copy on the landing page
 ```
 
-No audit needed for any of that.
+The install also gives you something you can't get from prompting alone: your AI stops being allowed to make claims it hasn't checked. Say it tells you a test passes but never ran it, or says a file doesn't exist but never listed the directory. The hooks catch that and block the answer before it reaches you. Every claim has to come through the right channel, and the model can't skip the channel and still deliver the conclusion. More on why that matters in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
 
 ### Running the audit
 
-When you're ready to build the full company, run the audit. This is the step that reads your project, picks the right model for each kind of work, writes handbooks, and wires the org chart. It backs up your `.claude/` directory first.
+When you're ready to build the full company, run the audit. This is the step that reads your project, picks the right model for each kind of work, writes handbooks, and wires the org chart. Choose the backup option when prompted so any changes the audit makes can be undone.
 
 ```
 /workforce audit
@@ -159,7 +159,7 @@ The fix is structure, borrowed from how real companies already work.
 
 A set of instructions with those three things is an employee. A set of employees is a company you can talk to. The audit builds that company for your project: a CEO (your session), leads that coordinate departments, and individual contributors that do the actual work. Each runs on the model built for its job. Each follows a handbook. Each stays inside a lane.
 
-### The tunnel nobody sees from inside
+### Breaking out of the tunnel vision
 
 ![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
 *The focused worker can't see the crack in the wall. The person outside can't miss it.*
