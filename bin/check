@@ -643,6 +643,17 @@ if "distinct" not in _tl:
                         "one document read three times")
 if "stop_hook_active" not in _tl:
     _tl_problems.append("the re-entrancy guard is gone")
+# THE REPLY FALLBACK MUST MEAN WHAT THE FIELD MEANS. `reply` is the turn's CONCLUSION —
+# `wf-widen` hands it to the jury under that name — and the fallback for a host that sends
+# no `last_assistant_message` joined EVERY text block in the turn. On a long turn that is
+# dozens of mid-turn narrations, so the jury judged "the conclusion" against text the turn
+# said forty tool calls earlier and could convict on a sentence that was never the
+# conclusion. A guard that misquotes is the guard that earns its way into being ignored.
+if "next((t for t in reversed(said)" not in _tl:
+    _tl_problems.append("the reply fallback no longer takes the LAST assistant block — "
+                        "joining every block in the turn makes `conclusion` a wall of "
+                        "mid-turn narration, and a jury handed that judges a sentence "
+                        "that was never the conclusion")
 check(
     "wf-turn-ledger reports and never classifies",
     not _tl_problems,

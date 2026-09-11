@@ -374,7 +374,15 @@ def turn_counts(payload):
     # the last message, which is exactly the field provided for it.
     reply = payload.get("last_assistant_message")
     if not isinstance(reply, str) or not reply.strip():
-        reply = "\n".join(said)      # older hosts that do not send the field
+        # THE LAST BLOCK, NOT EVERY BLOCK. The fallback has to MEAN what the field means —
+        # "what the turn told the user" — and joining every text block in the turn does not:
+        # on a long turn that is dozens of mid-turn narrations, and the thing a reader calls
+        # "the conclusion" is buried somewhere in the middle of it. A jury handed that judges
+        # the conclusion against text the turn said forty tool calls earlier, and convicts on
+        # a sentence that was never the conclusion. A guard that misquotes is the guard that
+        # earns its way into being ignored (`references/senses.md` § Guidelines, on the one
+        # retired here at a measured 7.0% false-positive rate).
+        reply = next((t for t in reversed(said) if t and t.strip()), "")
     seen, uniq = set(), []
     for t in targets:
         if t not in seen:
