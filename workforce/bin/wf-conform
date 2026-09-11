@@ -1768,6 +1768,76 @@ def check_anti_gaslight(n, body, res):
         "absence and never a guess. ADVISORY: this row blocks nothing")
 
 
+# Catalog skill directory name -> the `--kind` that resolves it. ONLY the kinds
+# `wf-catalog` actually serves, and this table must never outrun `CATALOGS` there. It
+# listed `image-eval` and `ui-design` for a few hours while the resolver served only three
+# kinds, and 5 of 13 flagged handbooks on odyssey-alive then cited ONLY unresolvable
+# catalogs — 38% false positives whose prescribed remedy was a command that exits 2.
+# **A detector that fires where the fix cannot run is worse than silence.** Both were added
+# back on 2026-09-10, when the catalogs themselves shipped, so every name here resolves;
+# `bin/check` asserts the two tables agree, which is what stops the drift in either
+# direction.
+CATALOG_KIND = {
+    "text-eval": "text",
+    "code-evaluator": "code",
+    "security-evaluator": "security",
+    "image-eval": "image",
+    "ui-design": "ui",
+    "design-eval": "ui",          # a third spelling, measured on apps-odyssey-alive
+}
+CATALOG_PATH_RX = re.compile(
+    r"\.claude/skills/(text-eval|code-evaluator|security-evaluator|image-eval|ui-design"
+    r"|design-eval)\b")
+
+
+def check_catalog_read(n, body, res, tally):
+    """INV-CATREAD — a handbook still reaching its catalog by literal path.
+
+    ADVISORY, and for the reason this file's other advisory rows exist: every org authored
+    before 2026-09-10 carries the old form, so blocking would fail whole orgs at once for
+    following the instruction that shipped. The fix is authorized in `audit` Step 5d item
+    2c, which runs before Step 6-F migrates.
+
+    THE EARLY-OUT IS PER LINE, NOT PER FILE. A whole-body `"wf-catalog" in body` test
+    silences every literal path in a handbook that mentions the tool anywhere — one Sources
+    row naming it, one migration note — and a half-healed handbook is exactly the state
+    worth reporting. Zero live instances today; a blind spot is not less blind for being
+    unoccupied.
+
+    THE REMEDY DIFFERS BY WHERE THE CITATION SITS, because `## Sources` is a path
+    declaration by contract and "rewrite it to a command" is ill-typed there. Measured:
+    `content-drafter.md:64` declares `` `.claude/skills/text-eval/references/**` `` as a
+    source glob, which is the most common match shape on a real org.
+    """
+    sources = section(body, "## Sources") or ""
+    hits = []
+    for line in body.splitlines():
+        if "wf-catalog" in line:
+            continue
+        m = CATALOG_PATH_RX.search(line)
+        if m:
+            hits.append((m.group(0), m.group(1), line.strip() in sources))
+    if not hits:
+        tally["clean"] += 1
+        return
+    tally["flagged"] += 1
+    cite, skill, in_sources = hits[0]
+    kind = CATALOG_KIND[skill]
+    where = ("a `## Sources` declaration — replace the glob with the resolver as the read "
+             "mechanism, keeping the source named; a Sources row is a path by contract and "
+             "a bare command is ill-typed there"
+             if in_sources else
+             f"a read instruction — rewrite it as a `wf-catalog` resolver read for kind "
+             f"`{kind}`, keeping the pattern it already searches for")
+    res.advise(
+        f"{n}: catalog read grounded on a literal path ({len(hits)} citation(s))",
+        f"cites `{cite}` — the migration removes the CORPUS FILES inside that directory "
+        "once the install ships them byte for byte, leaving the directory standing and "
+        "empty, so this read resolves and returns nothing. This is "
+        f"{where}. See `references/evaluators.md` § An IC READS the catalog; the fix is "
+        "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
+
+
 def check_companions(root, res, governed_n):
     """INV-COMPANIONS — after an audit, every core companion skill is on disk.
 
@@ -1856,6 +1926,7 @@ def main():
     # Under `--strict-adopted` an adopted agent is held to the contract but was still
     # never staffed here, so it must not make the tree look audited.
     governed_n = 0
+    _catread = {"flagged": 0, "clean": 0}
     org_edge_map = {}
     for p in sorted(handbooks):
         body = read(p, res)
@@ -1867,6 +1938,7 @@ def main():
             _name = os.path.basename(p)[:-3]
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
+            check_catalog_read(_name, body, res, _catread)
         elif args.strict_adopted:
             check_handbook(p, body, res, args.ceiling)
         else:
@@ -1956,6 +2028,24 @@ def main():
     check_sidecar(root, res)
     check_canary_record(root, res)
     check_org_edges(org_edge_map, res)
+    # INV-CATREAD — PRINTED, including the zero. The first draft of this row named an
+    # invariant in a docstring and emitted nothing, so `verify.md` and `audit` 2c both
+    # instructed printing a count no tool produced. A named invariant that nothing emits is
+    # the overclaim this project's own enforcement table exists to catch.
+    if governed_n:
+        _cr_line = (f"INV-CATREAD: {governed_n} handbook(s) · {_catread['flagged']} on a "
+                    f"literal catalog path · {_catread['clean']} resolver-form or no "
+                    f"citation")
+        _cr_why = ("a handbook reaching its catalog by path reads a directory the "
+                   "migration empties. The fix is `audit` Step 5d item 2c, which runs "
+                   "before Step 6-F migrates. Rows above name each one; this is the count")
+        # Clean is a PASSING row and flagged is an ADVISORY one — `advise()` is the only
+        # non-blocking channel, and it has no clean state, so the two are separate calls
+        # rather than one call with a flag this class does not take.
+        if _catread["flagged"]:
+            res.advise(_cr_line, _cr_why + ". ADVISORY: this row blocks nothing")
+        else:
+            res.add(True, _cr_line, _cr_why)
     check_companions(root, res, governed_n)
     check_journal(root, res)
     check_defects(root, res)

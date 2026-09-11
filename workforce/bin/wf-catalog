@@ -72,10 +72,24 @@ import sys
 # are the installed-skill directory names a project copy may occupy, in the spelling each
 # generator used. NEVER a guess from a directory name — `evaluators.md` § The evaluators
 # names these three and no others, and a fourth kind arrives by editing this table.
+# `additions` is workforce's OWN authored slot for this kind, shipped beside the vendored
+# corpus at `references/evaluator-additions/<slot>` and named exactly as `wf-seed.CATALOGS`
+# names it. A kind workforce has authored nothing for carries None, which is a first-class
+# answer and never an empty file.
 CATALOGS = {
-    "code":     {"skills": ("code-evaluator",),     "anchor": "code-eval-ref-version"},
-    "text":     {"skills": ("text-eval",),          "anchor": "creative-scrub-ref-version"},
-    "security": {"skills": ("security-evaluator",), "anchor": "security-ref-version"},
+    "code":     {"skills": ("code-evaluator",),     "anchor": "code-eval-ref-version",
+                 "additions": "code-eval.md",  "additions_anchor": "code-additions-version"},
+    "text":     {"skills": ("text-eval",),          "anchor": "creative-scrub-ref-version",
+                 "additions": "text-tells.md", "additions_anchor": "text-additions-version"},
+    "security": {"skills": ("security-evaluator",), "anchor": "security-ref-version",
+                 "additions": None,            "additions_anchor": None},
+    # `design-eval` is a third spelling of the same concern, measured on `apps-odyssey-alive`
+    # 2026-09-10. It is listed because a catalog nobody can NAME is a catalog nobody can
+    # resolve, and the alternative is a copy that drifts under a synonym.
+    "image":    {"skills": ("image-eval",),         "anchor": "image-eval-ref-version",
+                 "additions": None,            "additions_anchor": None},
+    "ui":       {"skills": ("ui-design", "design-eval"), "anchor": "ui-design-ref-version",
+                 "additions": None,            "additions_anchor": None},
 }
 
 # A tell that a copy carries the project's own words and is never removable, whatever else
@@ -147,11 +161,79 @@ def install_dir(root, kind):
     return None
 
 
+def additions_file(root, kind):
+    """The shipped additions slot for `kind`, or None.
+
+    WHY THIS IS PART OF RESOLUTION AND NOT A SEPARATE CONCERN. The corpus a project reads
+    is the concatenation of two texts — the vendored catalog and workforce's own additions
+    (`evaluators.md` § Seeding step 1b) — and a project COPY holds both, because `wf-seed`
+    appends the additions into the copy as a machine-owned region. So a reader answered
+    from the install and a reader answered from a copy were reading different corpora: the
+    install side silently dropped every authored addition, 205 lines of text tells among
+    them, and reported a clean resolution while doing it. Resolving the slot here is what
+    makes `install` and `project` the same corpus rather than two.
+
+    The directory is derived from `install_candidates` rather than listed again — the slot
+    dir is the catalogs dir's sibling, and a second hardcoded list is the restated constant
+    Core Principle 9a forbids and `bin/check` asserts against.
+    """
+    slot = CATALOGS[kind]["additions"]
+    if not slot:
+        return None
+    # SAME TREE AS THE CORPUS, never a second independent walk. Two loops over the same
+    # candidate list can still land in two different installs: a project-scope install
+    # carrying `catalogs/text` but no `evaluator-additions/` resolved its corpus from the
+    # repo and its additions from `$HOME`, printed as a plain `+ additions v7`, with no
+    # mixing visible anywhere. `bin/check` names that exact state in a failure message and
+    # passed green, because it compares the two SOURCE LISTS and both loops obeyed both
+    # lists. The corpus decides the tree; the slot is read from it or it is absent.
+    inst = install_dir(root, kind)
+    if not inst:
+        return None
+    base = os.path.dirname(os.path.dirname(inst))       # …/references
+    f = os.path.join(base, "evaluator-additions", slot)
+    return f if os.path.isfile(f) else None
+
+
+# Files a catalog skill carries that are NOT corpus. `SKILL.md` is the skill's own
+# frontmatter and `CATALOG-ANCHOR.md` is the house rules and provenance record — the two
+# files § Migration guarantees survive. A directory holding only these holds no corpus.
+NON_CORPUS = {"SKILL.md", "CATALOG-ANCHOR.md"}
+
+
+def corpus_bearing(d):
+    """Does this directory still hold catalog content, as opposed to only its shell?
+
+    THE MIGRATION EMPTIES A COPY AND LEAVES THE DIRECTORY STANDING — by design, because the
+    house rules, handbooks and hooks live in it (§ Migration, "The skill directory is never
+    removed"). So `os.path.isdir` is not the question. It was, until 2026-09-10, and the
+    consequence was measured on a copy of odyssey-alive's `security-evaluator`: before
+    migration `project v1 · 6 files · 573 lines`, after it `project v1 · 2 files · 142
+    lines`, still answering `project`, with the taxonomy gone and the install never
+    consulted. `--grep SSRF` then returned ONE hit — the `description:` line of `SKILL.md` —
+    and **exited 0**, so a tier-3 IC reading the resolver got a plausible-looking answer
+    from a corpus that was not there. A hollow copy is more dangerous than a missing one
+    precisely because it resolves.
+    """
+    for f in catalog_files(d):
+        rel = os.path.relpath(f, d)
+        if os.path.basename(f) in NON_CORPUS and os.sep not in rel:
+            continue
+        if rel.split(os.sep)[0] in ("agents", "hooks"):
+            continue
+        return True
+    return False
+
+
 def project_dir(root, kind):
-    """The project's own copy of this catalog, or None. First spelling that exists."""
+    """The project's own copy of this catalog, or None when it holds no corpus.
+
+    First spelling that exists AND still bears corpus. A migrated copy falls through to the
+    install, which is what makes `--migrate` a completed act rather than a severed read.
+    """
     for name in CATALOGS[kind]["skills"]:
         d = os.path.join(root, ".claude", "skills", name)
-        if os.path.isdir(d):
+        if os.path.isdir(d) and corpus_bearing(d):
             return d
     return None
 
@@ -188,6 +270,57 @@ def anchor_version(d, key):
     return None
 
 
+def anchor_version_in(path, key):
+    """The integer a single FILE stamps itself with, or None. Separate from
+    `anchor_version`, which scans a directory: the additions slot is one file and asking a
+    directory scanner for it would read the whole catalog looking for the wrong anchor."""
+    if not path or not key:
+        return None
+    m = re.search(re.escape(key) + r":\s*(\d+)", slurp(path))
+    return int(m.group(1)) if m else None
+
+
+# The version stamp `wf-seed` writes into the region it appends, and the record it keeps in
+# CATALOG-ANCHOR.md. Either answers "how far have the additions propagated into this copy";
+# the region is authoritative because it is the content itself rather than a note about it.
+# LINE-ANCHORED, both of them. An unanchored marker pattern reads prose ABOUT a marker as
+# the marker — the failure this project has hit six times in one session, once
+# under-reporting sacred blocks 21-against-59 while the extraction gate read that count.
+SEEDED_REGION_RX = re.compile(
+    r"^<!--\s*WF-ADDITIONS:[A-Za-z0-9_-]+\s+BEGIN\s+version=(\d+)", re.M)
+SEEDED_RECORD_RX = re.compile(r"^<!--\s*additions-seeded:[^>]*?version=(\d+)", re.M)
+
+
+def seeded_version(d):
+    """The additions version a project COPY carries, or None when it carries none.
+
+    WHY A COPY NEEDS THIS AND THE INSTALL DOES NOT. An install-resolved reader gets the slot
+    file itself, at whatever version the install ships. A copy gets whatever `wf-seed` last
+    appended into it — and `wf-seed` runs only inside an audit OF THAT PROJECT, so the
+    additions drift exactly the way the vendored corpus did before the install became the
+    source. MEASURED 2026-09-10 across `~/lab`: of twelve projects holding copies, **six
+    carry no region at all** and three sit at text additions v6 against the install's v7.
+    Every one of them reported `0 stale · 0 unresolved`, because staleness was measured on
+    the vendored anchor alone and the additions were nobody's column.
+    """
+    best = None
+    for f in catalog_files(d):
+        text = slurp(f)
+        for rx in (SEEDED_REGION_RX, SEEDED_RECORD_RX):
+            for m in rx.finditer(text):
+                v = int(m.group(1))
+                best = v if best is None else max(best, v)
+    return best
+
+
+def corpus_files(d, additions=None):
+    """Every file a reader of this corpus reads: the catalog directory, plus the shipped
+    additions slot when the answer came from the install. This is the list `--grep` walks
+    and the list the report counts, so the two can never disagree about what the corpus is.
+    """
+    return catalog_files(d) + ([additions] if additions else [])
+
+
 def norm(text):
     """A corpus file reduced to the form two copies of the SAME shipped file share.
 
@@ -196,7 +329,18 @@ def norm(text):
     the version-anchor comment each side stamps itself with, and trailing whitespace. Every
     other byte is content, and a difference in it means the two files are not the same file.
     """
-    text = re.sub(r"<!--\s*WF-ADDITIONS:.*?<!--\s*/WF-ADDITIONS:[^>]*-->", "", text, flags=re.S)
+    # THE CLOSING MARKER IS `<!-- WF-ADDITIONS:<tag> END -->`, which is what `wf-seed`
+    # writes (`wf-seed._REGION_END`). This pattern demanded `<!-- /WF-ADDITIONS:… -->`, a
+    # spelling nothing has ever emitted, so the region was never stripped and the ONE file
+    # per catalog that wf-seed seeds could never normalise equal. Measured 2026-09-10 on
+    # odyssey-alive's `mistake-taxonomy.md`: 24940 normed bytes against the install's 9606,
+    # classified `STAYS (differs)`; with this grammar the two are byte-identical. Both
+    # spellings are accepted, because a tree seeded by some earlier hand-mirror may carry
+    # either and a stripper that is wrong in one direction is how this defect started.
+    text = re.sub(
+        r"<!--\s*WF-ADDITIONS:(?P<tag>[A-Za-z0-9_-]+)\s+BEGIN.*?"
+        r"<!--\s*/?WF-ADDITIONS:(?P=tag)(?:\s+END)?\s*-->",
+        "", text, flags=re.S)
     text = re.sub(r"^<!--[^>\n]*-version:\s*\d+[^>\n]*-->\s*$", "", text, flags=re.M)
     text = re.sub(r"^<!--\s*additions-seeded:[^>\n]*-->\s*$", "", text, flags=re.M)
     return "\n".join(line.rstrip() for line in text.splitlines()).strip()
@@ -279,17 +423,36 @@ def resolve(root, kind):
     """
     inst, proj = install_dir(root, kind), project_dir(root, kind)
     chosen, source = (proj, "project") if proj else (inst, "install")
+    # The additions slot completes an INSTALL-side answer only. A project copy carries the
+    # same text already, inlined by `wf-seed` as a `WF-ADDITIONS` region, so adding the slot
+    # there would grep it twice and count it twice.
+    adds = additions_file(root, kind) if (chosen and source == "install") else None
     info = {
         "kind": kind,
         "source": source if chosen else "unresolved",
         "path": chosen,
         "install_path": inst,
         "project_path": proj,
+        "additions_path": adds,
+        "additions_version": (
+            anchor_version_in(adds, CATALOGS[kind]["additions_anchor"]) if adds else None),
         "version": anchor_version(chosen, CATALOGS[kind]["anchor"]) if chosen else None,
         "install_version": anchor_version(inst, CATALOGS[kind]["anchor"]) if inst else None,
-        "files": len(catalog_files(chosen)) if chosen else 0,
-        "lines": sum(len(slurp(f).splitlines()) for f in catalog_files(chosen)) if chosen else 0,
+        "files": len(corpus_files(chosen, adds)) if chosen else 0,
+        "lines": sum(len(slurp(f).splitlines()) for f in corpus_files(chosen, adds)) if chosen else 0,
     }
+    # ADDITIONS STALENESS, project side. The install ships the slot; a copy holds a snapshot
+    # of it, and until now nothing compared the two.
+    info["seeded_version"] = seeded_version(chosen) if (chosen and source == "project") else None
+    slot_v = anchor_version_in(
+        additions_file(root, kind), CATALOGS[kind]["additions_anchor"])
+    info["slot_version"] = slot_v
+    info["additions_missing"] = bool(
+        source == "project" and slot_v is not None and info["seeded_version"] is None)
+    info["additions_stale"] = bool(
+        source == "project" and slot_v is not None
+        and info["seeded_version"] is not None and info["seeded_version"] < slot_v)
+
     iv, v = info["install_version"], info["version"]
     info["stale"] = bool(source == "project" and iv is not None and v is not None and v < iv)
     info["untracked"] = bool(source == "project" and v is None)
@@ -437,16 +600,32 @@ def report(root, args):
             flags.append("STALE (install is v%s)" % r["install_version"])
         if r["untracked"]:
             flags.append("no version anchor")
+        if r["additions_missing"]:
+            flags.append("additions NEVER seeded (install ships v%s)" % r["slot_version"])
+        if r["additions_stale"]:
+            flags.append("additions v%s < install v%s"
+                         % (r["seeded_version"], r["slot_version"]))
+        if r["additions_path"]:
+            flags.append("+ additions v%s" % (r["additions_version"]
+                                              if r["additions_version"] is not None else "?"))
+        elif r["source"] == "install" and CATALOGS[r["kind"]]["additions"]:
+            # An install answer missing its own authored slot is this script's defect, not
+            # the project's: the reader gets the vendored corpus and none of the additions,
+            # which is the silent half-corpus this resolution exists to end.
+            flags.append("ADDITIONS SLOT MISSING (%s)" % CATALOGS[r["kind"]]["additions"])
         print("  %-9s %-8s v%-5s %3d file(s) %5d line(s)  %s%s"
               % (r["kind"], r["source"],
                  r["version"] if r["version"] is not None else "?",
                  r["files"], r["lines"], r["path"],
                  ("  · " + " · ".join(flags)) if flags else ""))
-    print("\nINV-CATALOG  %d kind(s) · %d from install · %d from project copy · %d stale · %d unresolved"
+    print("\nINV-CATALOG  %d kind(s) · %d from install · %d from project copy · %d stale · "
+          "%d additions unseeded · %d additions stale · %d unresolved"
           % (len(rows),
              sum(1 for r in rows if r["source"] == "install"),
              sum(1 for r in rows if r["source"] == "project"),
              sum(1 for r in rows if r["stale"]),
+             sum(1 for r in rows if r["additions_missing"]),
+             sum(1 for r in rows if r["additions_stale"]),
              unresolved_n))
     return 1 if unresolved_n else 0
 
@@ -560,11 +739,16 @@ def main():
             print("bad --grep pattern: %s" % exc, file=sys.stderr)
             return 2
         hits = 0
-        for f in catalog_files(info["path"]):
+        # The additions slot lives OUTSIDE the catalog directory, so a name relative to it
+        # would climb out with `../`. A file under the corpus keeps its relative name; the
+        # slot is labelled for what it is, which is also what the reader needs to see.
+        for f in corpus_files(info["path"], info["additions_path"]):
+            label = ("additions:" + os.path.basename(f)
+                     if f == info["additions_path"] else os.path.relpath(f, info["path"]))
             for n, line in enumerate(slurp(f).splitlines(), 1):
                 if rx.search(line):
                     hits += 1
-                    print("%s:%d:%s" % (os.path.relpath(f, info["path"]), n, line.rstrip()))
+                    print("%s:%d:%s" % (label, n, line.rstrip()))
         if not hits:
             print("no match in %s (%s)" % (info["path"], info["source"]), file=sys.stderr)
         return 0 if hits else 1

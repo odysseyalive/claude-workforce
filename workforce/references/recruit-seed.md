@@ -8,7 +8,7 @@
      an offline or first-run hire still gets a real bar rather than the author's
      unexamined default.
 
-     Sibling in spirit to image-eval-seed.md. Version anchor: 1
+     Sibling in spirit to the image catalog at references/catalogs/image/. Version anchor: 1
 -->
 
 These are baseline quality bars for the role families a common web or app build involves. Each family
@@ -46,7 +46,7 @@ slot is blank or a placeholder in a shipped view; contrast meets WCAG AA.
 - Fails contrast or keyboard reachability.
 
 *The design-critic role is a front-end/design role whose whole job is this gate — it grep-checks
-`ui-design-seed.md` as its tier-3 check (`evaluators.md`).*
+the `ui` catalog as its tier-3 check (`evaluators.md`).*
 
 ---
 

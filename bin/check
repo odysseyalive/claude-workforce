@@ -291,7 +291,7 @@ dfr = read("workforce/references/deferred.md")
 upd = read("workforce/references/procedures/update.md")
 _prin = read("workforce/references/principles.md")
 _rcrt = read("workforce/references/recruiter.md")
-_uis = read("workforce/references/ui-design-seed.md")
+_uis = read("workforce/references/catalogs/ui/ui-checks.md")
 _hbk_p = read("workforce/references/procedures/handbook.md")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -10951,7 +10951,7 @@ check(
     "symmetric to security-evaluator; without it visual work has no gate",
 )
 check(
-    "ui-design-seed: a blank or placeholder media slot FAILS",
+    "ui catalog: a blank or placeholder media slot FAILS",
     "No missing art — a blank or placeholder media slot FAILS" in _uis,
     "the no-missing-art rule — the hole that let a missing card image pass 451 e2e "
     "tests; softening it reopens it",
@@ -12069,6 +12069,104 @@ check("conform: the anti-gaslighting clause has a detector, and it is advisory",
       "whole detector; it did not exist. Advisory because 18 of 23 live handbooks "
       "predate it, and failing them all at once is the 9-false-failures run this "
       "project cites as the lesson it must not repeat")
+# The catalog-resolution batch, 2026-09-10: the corpus resolves from the install, so the
+# handbooks that read it must resolve too, and the heal must land before the migration.
+_cat_n = read("workforce/bin/wf-conform")
+_cat_s = read("workforce/bin/wf-catalog")
+_cat_e = read("workforce/references/evaluators.md")
+_cat_a = read("workforce/references/procedures/audit.md")
+check("conform: a catalog read grounded on a literal path has a detector, and it is advisory",
+      "def check_catalog_read" in _cat_n and "CATALOG_PATH_RX" in _cat_n
+      and "catalog read grounded on a literal path" in _cat_n
+      # EMITTED, not merely named in a docstring: audit 2c and verify.md both instruct
+      # printing this line, and the first draft produced no such row anywhere.
+      and 'f"INV-CATREAD:' in _cat_n
+      # THE TWO TABLES AGREE. Every name the detector flags must be a kind the resolver
+      # serves, or the remedy it prescribes cannot run — measured at 38% false positives
+      # when the detector listed image-eval and ui-design against a three-kind resolver.
+      # Asserted as a set relation rather than a literal, so adding a sixth catalog to one
+      # table and not the other fails here instead of on somebody's org.
+      and set(re.findall(r'"([a-z-]+)":\s*"[a-z]+",', 
+                         _cat_n.split("CATALOG_KIND = {")[1].split("}")[0]))
+          <= {n for c in re.findall(r'"skills":\s*\(([^)]*)\)', _cat_s)
+              for n in re.findall(r'"([a-z-]+)"', c)}
+      # Per LINE, so a single mention of the tool cannot silence a real path beside it.
+      and 'if "wf-catalog" in line:' in _cat_n,
+      "`wf-catalog --migrate` empties the directory the pre-2026-09-10 tier-3 instruction "
+      "cites — the corpus files go, the directory stays — so a migrated org reads a "
+      "directory that RESOLVES and returns nothing, which is quieter than a missing path. "
+      "Measured 2026-09-10 on odyssey-alive: 13 governed handbooks, and 5 on "
+      "apps-odyssey-alive including one citing `design-eval`, a third spelling of the ui "
+      "catalog. The row briefly ran at 8 while the resolver served only three kinds and "
+      "the other 5 citations had no runnable remedy; both catalogs shipped the same day, "
+      "and the two tables are now asserted to agree. "
+      "Advisory because every org authored before that date carries the form that shipped; "
+      "the fix is audit Step 5d item 2c, which runs BEFORE Step 6-F migrates")
+check("catalog: the resolver returns the additions slot, not the vendored corpus alone",
+      "def additions_file" in _cat_s and "def corpus_files" in _cat_s
+      and "ADDITIONS SLOT MISSING" in _cat_s
+      and '"additions": "text-tells.md"' in _cat_s,
+      "the corpus a project reads is vendored + additions (`evaluators.md` § Seeding step "
+      "1b) and a project COPY holds both, because wf-seed appends the additions into it. "
+      "An install-resolved reader got the vendored half alone — 205 lines of text tells, "
+      "version 7, silently absent — and the report called it clean. install and project "
+      "are the same corpus or the resolution is a lie")
+check("catalog: a copy the migration emptied no longer answers as the corpus",
+      "def corpus_bearing" in _cat_s and "NON_CORPUS" in _cat_s
+      and "and corpus_bearing(d)" in _cat_s,
+      "`--migrate` never removes the skill directory, so `os.path.isdir` kept answering "
+      "`project` for a copy holding only SKILL.md and CATALOG-ANCHOR.md. MEASURED on a "
+      "copy of odyssey-alive's security-evaluator: after migration it reported `project · "
+      "2 file(s) · 142 line(s)` and `--grep SSRF` returned the SKILL.md description line "
+      "and EXITED 0. A hollow copy does not fail, it answers — and the install it should "
+      "have fallen through to was never consulted")
+check("catalog: norm() strips the region wf-seed actually writes",
+      "WF-ADDITIONS:(?P<tag>" in _cat_s and "(?P=tag)(?:\\s+END)?" in _cat_s,
+      "wf-seed closes its region `<!-- WF-ADDITIONS:<tag> END -->`; norm() demanded "
+      "`<!-- /WF-ADDITIONS:… -->`, a spelling nothing emits. So the ONE file per catalog "
+      "that wf-seed seeds never normalised equal — odyssey-alive's mistake-taxonomy.md at "
+      "24940 normed bytes against the install's 9606, classified STAYS — while the "
+      "docstring and Step 6-F both claimed the region is normalised away")
+check("catalog: a copy whose additions were never seeded, or seeded stale, is REPORTED",
+      "def seeded_version" in _cat_s and "additions NEVER seeded" in _cat_s
+      and "additions unseeded" in _cat_s,
+      "a copy holds whatever wf-seed last appended, and wf-seed runs only inside an audit "
+      "OF THAT PROJECT — the same drift that moved the vendored corpus to the install, one "
+      "layer up and uncounted. MEASURED across ~/lab: of twelve projects holding copies, "
+      "six carry no WF-ADDITIONS region at all and three sit at text v6 against the "
+      "install's v7, and every one printed `0 stale · 0 unresolved` because staleness was "
+      "measured on the vendored anchor alone")
+check("catalog: the additions slot is read from the SAME install as the corpus",
+      "inst = install_dir(root, kind)" in _cat_s
+      and "SAME TREE AS THE CORPUS" in _cat_s,
+      "two independent walks of one candidate list can still land in two trees: a "
+      "project-scope install carrying catalogs/text but no evaluator-additions/ resolved "
+      "its corpus from the repo and its additions from $HOME, printed as a plain "
+      "`+ additions v7`. The list-agreement check passed green the whole time, because "
+      "both loops obeyed both lists")
+check("evaluators: the tier-3 read is the resolver, and the old path is named as corrected",
+      '"$WF/bin/wf-catalog" --kind <kind> --grep' in _cat_e
+      and "and this is a correction" in _cat_e
+      and "never a bare `wf-catalog`" in _cat_e,
+      "the row instructed a literal `.claude/skills/<catalog>/references/<file>.md` until "
+      "2026-09-10 — the path the migration deletes, and a path that named nothing at all "
+      "in an unaudited project. Leaving the old form unmarked would make every handbook "
+      "authored from it look correct")
+check("audit: the catalog read path is healed BEFORE the migration removes what it cites",
+      "INV-CATREAD" in _cat_a and "2c." in _cat_a
+      and "Step 5d and the migration in Step 6-F" in _cat_a
+      # POSITIONAL, because the label sells an ordering and three substring tests cannot
+      # see one: move item 2c below Step 6-F and every string above still appears. An
+      # independent review found exactly that and called the check unable to see the
+      # property it names.
+      and _cat_a.index("2c. **Heal the CATALOG READ PATH")
+          < _cat_a.index("### Step 6-F")
+      # …and the heal must not be gated on the same stamp Step 5-STAMP has already
+      # advanced, which is the reachable skip the same review found one level down.
+      and "UNCONDITIONALLY, not on the stamp" in _cat_a,
+      "ordering is the whole safety property: heal in Step 5d, migrate in Step 6-F. A run "
+      "that migrates first has broken every reader it was healing, and the two steps sit "
+      "600 lines apart in one file")
 check("conform: the IC ceiling is not applied to a Lead it was never measured on",
       "Lead handbook length OBSERVED, not judged" in _n6
       and "172 IS AN IC NUMBER AND IS NOT APPLIED TO A LEAD" in _d6,

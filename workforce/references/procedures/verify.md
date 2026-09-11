@@ -94,6 +94,15 @@ including the two states that are invisible from inside a project, `STALE (insta
 the drift that forced the change: nine copies of one text catalog measured at versions **2, 1, 2, 2, 1,
 absent, 2, 1, absent** (`evaluators.md` § Where a catalog resolves from).
 
+**Also report how the HANDBOOKS reach the corpus**, which is the half a resolution line cannot see.
+`wf-conform` carries `INV-CATREAD` — a governed handbook whose tier-3 self-check is grounded on a
+literal `.claude/skills/<catalog>/…` path rather than on `wf-catalog`. That path is what Step 6-F
+removes, so a project reading clean on `INV-CATALOG` can still hold a dozen handbooks that a migration
+would break: measured 2026-09-10 on `odyssey-alive`, **13 of them**. Print the count beside
+`INV-CATALOG`, including a zero, and name the fix as `audit` Step 5d item 2c. The row is ADVISORY in
+`wf-conform` and stays advisory here — every org authored before 2026-09-10 carries the old form,
+because it is the form that shipped.
+
 **Read-only, like every row above.** A project copy is never removed here, and a stale one is never
 refreshed here — the remedy is `audit`, or `wf-catalog --migrate` to see what a migration would do.
 `unresolved` is the one row that is this command's own error rather than the project's: workforce ships

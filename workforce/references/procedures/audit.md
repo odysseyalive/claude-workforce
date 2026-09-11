@@ -786,6 +786,14 @@ the two verification paths — a **catalog grep** into each producing employee's
 and the **evaluator as reviewer** into that department's Lead handbook (tier 4, because ICs cannot
 delegate).
 
+**The tier-3 grep is written in the RESOLVER form, on a fresh org and a healed one alike** —
+`"$WF/bin/wf-catalog" --kind <kind> --grep '<rx>'` — the `$WF` prefix, never a bare command name —
+never a literal `.claude/skills/<catalog>/…` path
+(`evaluators.md` § An IC READS the catalog). A new org authored against a path would be born holding
+the defect Step 5d item 2c exists to heal, and Step 6-F would break it on its first migration. Creation
+and optimization are one workflow (`SKILL.md` Core Principle 7c), so this is the same sentence in both
+places rather than a heal that only reaches orgs that already exist.
+
 **Concretely, a web-working department gets a `security-evaluator`**: proposed, made the security
 catalog's Records Owner, granted `security-taxonomy.md` via `skills:`, with the tier-3
 `security-taxonomy` grep wired into its producing employees' `## Verification` and `security-evaluator`
@@ -1173,6 +1181,54 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    handbooks granted `Grep, Glob`; fact 13b measured that such an entry is dropped with no signal of
    any kind, so each was running with less reach than its own frontmatter claimed and the row saying so
    was advisory-only, which item 4 below forbids treating as a license to report and move on.*
+
+2c. **Heal the CATALOG READ PATH — UNCONDITIONALLY, not on the stamp — and do it before Step 6-F can
+   empty what the old form points at.** *This item is explicitly exempt from item 1's refresh-due
+   gate.* Items 2 and 2b run only where a handbook's own `workforce-version:` is older than installed,
+   which is right for a contract delta and wrong here: what endangers the citation is not the
+   handbook's age, it is **Step 6-F running in this same run**, which is unconditional. Two reachable
+   states make that real rather than theoretical — a run that reaches the Step 5 restamp (which stamps
+   every amended handbook to the installed version) and aborts before Step 6 leaves a re-run finding every
+   handbook `equal` and skipping 2c while 6-F still migrates; and a handbook Step 5c amended and
+   stamped earlier in this same run is already `equal` when this item reads it. So **read the citation,
+   never the stamp** — `wf-conform`'s `INV-CATREAD` answers it for the whole org in one call,
+   independent of any version.
+
+   A handbook authored before 2026-09-10 grounds its tier-3 self-check on a literal path —
+   `.claude/skills/<catalog>/references/<file>.md` — which is what `evaluators.md` § An IC READS the
+   catalog instructed until that date. The migration removes **the corpus files inside that
+   directory**, never the directory itself, which holds the house rules and survives by construction —
+   so an org migrated without this item is an org whose evaluator-grounded ICs read a directory that is
+   still there and **empty**. That is worse than a missing path: measured 2026-09-10 on a copy of
+   `odyssey-alive`'s `security-evaluator`, the migrated copy answered `project · 2 file(s) · 142
+   line(s)`, and a search for `SSRF` returned one hit — the `description:` line of the surviving
+   `SKILL.md` — and **exited 0**. A hollow copy does not fail; it answers. *The resolver no longer
+   resolves a hollow copy at all, falling through to the install instead, so that fix and this item are
+   two halves of one repair: the resolver stops lying, and the handbooks stop asking the wrong thing.*
+
+   Rewrite each citation to the resolver form given in `evaluators.md` § An IC READS the catalog,
+   keeping the PATTERN the handbook already searched for and changing only how it reaches the corpus,
+   with the `$WF` prefix that section shows because nothing here puts `bin/` on `PATH`. **A citation in
+   `## Sources` takes a different edit**: that section declares sources by path as a matter of
+   contract, so name the resolver as the read mechanism and keep the source named, rather than dropping
+   a bare command into a path list. **Only the three resolvable kinds are healed** — `text-eval`,
+   `code-evaluator`, `security-evaluator`. `image-eval`, `ui-design` and any other catalog are not in
+   the resolver's table, the migration never touches their files, and rewriting those citations would
+   replace a working read with a command that exits 2. *Measured 2026-09-10: an earlier draft flagged
+   all five, and 5 of 13 flagged handbooks on `odyssey-alive` cited only unresolvable catalogs — 38%
+   false positives carrying a breaking remedy.* **This is a relocation, not a rewrite**, and it is authorized here on the same footing as the
+   Sources heal above: the check the handbook performs is unchanged, and item 2's bar on rewriting
+   `## Procedure` prose does not reach a citation whose target the same run is about to delete.
+   **Ordering is not a preference — 2c runs in Step 5d and the migration in Step 6-F**, so the
+   instruction is current before the files move. A run that migrates first has broken every reader it
+   was healing.
+
+   Report `wf-conform`'s `INV-CATREAD` line, including the zeroes — it is the one this org actually
+   emits, and it counts handbooks on a literal path against handbooks that are resolver-form or cite no
+   catalog at all. *Do not invent a `healed` column: this step's own before/after is the difference
+   between two runs of that line, and the script cannot distinguish "healed" from "never cited a
+   catalog" — an earlier draft specified a count no tool produced, which is the overclaim
+   `references/enforcement.md` exists to catch.*
 
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
    `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens

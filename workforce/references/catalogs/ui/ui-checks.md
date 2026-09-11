@@ -1,8 +1,10 @@
-# UI Design Evaluator — shipped seed catalog
+<!-- ui-design-ref-version: 1 -->
+<!-- origin: workforce | modifiable: true -->
+# UI Design Checks — the interface classes a design evaluator looks for
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
-<!-- This is the SEED for projects that ship a user interface and have no UI-design
-     evaluator. It installs on absence alone (evaluators.md). A project that already
+<!-- This is the shipped UI-design CORPUS. It resolves from the install for every
+     project (`wf-catalog --kind ui`), and installs into a project that ships a user
+     interface and has no UI-design evaluator (evaluators.md). A project that already
      carries a ui-design catalog receives only NEW entries through the
      forcible-append mechanism, never a replacement of its existing catalog.
 

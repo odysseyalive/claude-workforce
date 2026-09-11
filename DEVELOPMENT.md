@@ -113,7 +113,44 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
-## Open, as of 2026-09-09
+## Open, as of 2026-09-10
+
+**Landed 2026-09-10 — the corpus resolved from the install and nothing read it that way.**
+v1.48.0 moved the evaluator corpus to the install (`wf-catalog`) so a tweak advances by
+`update` instead of by re-auditing thirteen projects. What it did not move was the READERS.
+`evaluators.md` still told every tier-3 IC to grep `.claude/skills/<catalog>/references/<file>.md`
+— the exact files `--migrate` removes — so the migration and the instruction were pointed at
+each other. MEASURED on `odyssey-alive`: 13 governed handbooks on a literal path, 5 more on
+`apps-odyssey-alive` including one citing `design-eval`, a third spelling nothing resolved.
+
+**An independent review broke the first attempt and the failure is the interesting part.**
+`--migrate` never removes the skill directory (the house rules live in it), and `project_dir`
+tested only `isdir` — so a migrated project kept answering `project` from a directory the
+migration had just emptied. Reproduced on a copy of `security-evaluator`: `project v1 · 2
+file(s) · 142 line(s)`, and a grep for `SSRF` returned ONE hit, the `description:` line of the
+surviving `SKILL.md`, and **exited 0**. A hollow copy does not fail; it answers. Resolution now
+requires corpus-bearing, so an emptied copy falls through to the install.
+
+Four more from the same review, each a claim the code did not perform: `norm()` stripped a
+`WF-ADDITIONS` closing marker nothing has ever written (`wf-seed` writes `… END -->`), so the
+one file per catalog that gets seeded could never classify identical — 24,940 normed bytes
+against 9,606; the additions slot was resolved by a second independent walk and could be read
+from a different install than the corpus; `INV-CATREAD` was named in two procedures and emitted
+by nothing; and the detector flagged two kinds the resolver could not serve, 38% false
+positives whose prescribed remedy exits 2.
+
+**Then the two unresolvable kinds stopped being unresolvable.** `image-eval` and `ui-design`
+shipped as single seed specs — no anchor, so never reportable as stale; no resolver entry, so
+`--kind image` was a parser error; not in the migration table, so nothing reconciled the copies.
+ENUMERATED: 8 projects held an `image-eval`, 1 a `ui-design`, 1 a `design-eval`, none carrying a
+version anchor. Both are catalogs now (`catalogs/image/`, `catalogs/ui/`), promoted by `git mv`
+with the content unchanged, and the `ui` kind maps both spellings. Five of five resolve.
+
+**Still open.** The heal itself has not run anywhere: 13 handbooks on `odyssey-alive` and 5 on
+`apps-odyssey-alive` are waiting on those projects' next audit, which is where Step 5d item 2c
+fires. `krull-ai` reports `1 additions unseeded` — a code catalog that never received the
+authored additions, which is the new reporting doing its job rather than new damage.
+
 
 **Landed 2026-09-09 — a version number that nothing could explain (v1.31.0).** Asked for
 by the user during `/workforce update`: *"does every version number come with some kind of
@@ -909,7 +946,7 @@ nobody encoded the industry bar for the craft, and the available design skills (
   (conversion, hire, refresh), so `hire` and `audit`'s greenfield batch both recruit (Core Principle
   7c). The dossier's failure modes become `## Verification` bar entries; its matched skills become
   `## Procedure` steps. `org-design.md`, `hire.md` (`INV-RECRUIT`), and `evaluators.md` carry the rest.
-- **The design critic — `ui-design-seed.md`, the fifth evaluator capability.** Medium-disjoint from
+- **The design critic — the `ui` catalog, the fifth evaluator capability.** Medium-disjoint from
   `image-eval`; its `[hard]` rule is **no missing art — a blank or placeholder media slot FAILS**, the
   exact hole the blowout exposed. Tier-3 grep for a design employee, tier-4 via the evaluator, installed
   on absence.

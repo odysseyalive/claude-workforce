@@ -13,8 +13,14 @@ claude-enforcer, where they are force-installed companion skills carrying shippe
 project imports them **verbatim** (vendored). `security-evaluator` originates **here**, and its catalog
 is not vendored: it is workforce-authored, **distilled from three pinned upstream corpora and cited to
 them** rather than copied from a predecessor (§ Seeding). The remaining two, `image-eval` and
-`ui-design`, are not yet built catalogs — they ship as **seed specs** (`image-eval-seed.md`,
-`ui-design-seed.md`), also authored here.
+`ui-design`, are also authored here and **shipped as built catalogs since 2026-09-10**
+(`references/catalogs/image/`, `references/catalogs/ui/`). *They shipped as single seed specs until
+then — `image-eval-seed.md` and `ui-design-seed.md`, copied into a project once on absence and tracked
+by nothing afterwards. Measured that day: 8 projects held an `image-eval` copy, 1 a `ui-design`, 1 a
+`design-eval` under a third spelling, and not one carried a version anchor. A seed is a corpus that
+cannot be resolved, cannot be reported stale, and reaches an existing project only through a
+re-audit — which is the drift the install-side corpus exists to end (§ Where a catalog resolves from).
+The content was promoted unchanged; what it gained is an anchor and a resolver entry.*
 
 **`image-eval` and `ui-design` are medium-disjoint, and that is why they are two catalogs, not one.**
 `image-eval` reviews image **authenticity** — is a picture AI-generated, does a rendered medium respect
@@ -71,14 +77,14 @@ cited pins (§ Seeding).
 
 The table below details the three built catalogs and `image-eval`. **`ui-design` is the fifth
 capability**, a seed spec sibling of `image-eval`: it **reviews** UI design (applied theme, visual
-hierarchy, present art, responsiveness, accessibility), ships as `ui-design-seed.md`, is **owned** by a
+hierarchy, present art, responsiveness, accessibility), ships as `references/catalogs/ui/`, is **owned** by a
 design or front-end IC, and is **hired when** the project ships a user interface.
 
 | | `code-evaluator` | `text-eval` | `security-evaluator` | `image-eval` |
 |---|---|---|---|---|
 | Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix | image authenticity — AI generation tells, technique violations, metadata provenance |
 | Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
-| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | `image-eval-seed.md` (this project only — no enforcer predecessor) |
+| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | authored here, promoted from `image-eval-seed.md` to `references/catalogs/image/` on 2026-09-10 (this project only — no enforcer predecessor) |
 | Owner | an engineering IC | a content IC | a security or engineering IC | a content or design IC |
 | Hired when | the project has code | the project produces prose | the project has web-facing code | the project produces or ships images |
 
@@ -164,11 +170,40 @@ phrasing *"pre-empted that conflict rather than leaving me stuck."*
 
 | Tier | What the handbook says |
 |---|---|
-| **IC, tier-3 self-check** | **read the catalog's reference files by path** — `.claude/skills/<catalog>/references/<file>.md`. Never invoke the skill |
+| **IC, tier-3 self-check** | **read the catalog through the resolver** — `"$WF/bin/wf-catalog" --kind <kind> --grep '<rx>'`, and `--path` when it needs the directory. Never invoke the skill |
 | **Lead, tier-4 review** | dispatch the evaluator **employee** by name. A Lead may delegate; that is the whole reason the evaluator exists as an employee |
 
-**Name the reference file, not the skill directory.** *"Grep against `.claude/skills/text-eval/`"* is
-a directory; an executor has to guess which file and which section. Name the file and the heading.
+**Name what you are looking for, not where it happens to sit.** *"Grep against
+`.claude/skills/text-eval/`"* is a directory; an executor has to guess which file and which section.
+A handbook names the KIND and the pattern — `"$WF/bin/wf-catalog" --kind text --grep 'em-dash'` — and
+the resolver answers with the file and line.
+
+**Write the `$WF` prefix, never a bare `wf-catalog`.** Nothing in this distribution puts `bin/` on
+`PATH` — every other procedure invokes `"$WF/bin/wf-stamp"`, `"$WF/bin/wf-seed"` and the rest through
+the two-line resolver at `references/scopes.md` § Resolving the shipped scripts, and a bare command
+name in a handbook is a `command not found` in a fresh subagent context with nobody to ask. That is
+the same failure this row exists to remove, relocated from a missing file to a missing command:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-catalog" --kind text --grep 'em-dash'
+```
+
+**Why the resolver and not a path, and this is a correction.** Until 2026-09-10 this row read *"read
+the catalog's reference files by path — `.claude/skills/<catalog>/references/<file>.md`"*, and that
+path is the one `wf-catalog --migrate` removes once the install ships the same file: the instruction
+every IC follows pointed at exactly the files the migration deletes. It was also wrong in the other
+direction, before any migration ran — a personal-scope install writes no such directory until an audit
+builds one, so the path named nothing in a project that had never been audited, and `workforce dev` in
+this repository could reach no catalog at all.
+
+**One form answers every case, which is why there is no branch and no version check.** Resolution is
+project-first (§ Where a catalog resolves from): a project still holding its copy is answered from that
+copy byte for byte, a **migrated** project falls through to the install because an emptied copy no
+longer bears corpus, a project-scope install is
+answered from the repo, and a personal-scope one from `$CLAUDE_CONFIG_DIR`. The handbook line is
+identical in all four. A handbook written before this change keeps working until its project migrates,
+and `audit` § Step 5d rewrites it before that can happen.
 
 **This is the second collision of its shape.** The first was `disallowedTools: Agent` versus a
 handbook that instructed delegation — caught by the Tier-Ceiling Gate. This one is the same conflict
@@ -430,14 +465,14 @@ source carries ~126 pattern rows; one real project's hand-grown catalog had ~57 
 reconciled; a second had ~49. Workforce shipped **zero**, so a fresh install on any machine without the
 predecessor was strictly thinner than the system it supersedes — which is the one outcome the standing
 directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what closes it.*
-3. **For `image-eval`**, this project ships `image-eval-seed.md` as the seed. It covers AI image
+3. **For `image-eval`**, this project ships `references/catalogs/image/` as the corpus. It covers AI image
    patterns, technique authenticity (watercolor, oil, ink), visual clarity, metadata provenance, and
    image-set evaluation. Where a project already carries an `image-eval` (e.g. odyssey-alive's
    watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
    new entries through the forcible-append mechanism. The project's customizations, medium-specific
    checks, and user directives are never overwritten.
 
-   3b. **For `ui-design`**, this project ships `ui-design-seed.md` as the seed. It covers the required
+   3b. **For `ui-design`**, this project ships `references/catalogs/ui/` as the corpus. It covers the required
    checks — no missing art (a blank or placeholder media slot FAILS), applied theme (no default
    palette), contrast and accessibility — plus visual hierarchy, responsive layout, and default-design
    tells. It installs on absence alone, the same as `image-eval`, and where a project already carries a
