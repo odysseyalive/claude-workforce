@@ -75,6 +75,64 @@ instead.
 
 ---
 
+## Step 0.01 — The RUN ORDER: capture the ask verbatim, resolve the root, echo both
+
+**This runs before every other gate, and nothing writes until it has printed.**
+
+`/workforce audit` is routinely invoked with direction attached — *"focus on the plugin and the
+logs"*, *"don't run the e2e suite or touch the database"*. `procedures/intent-router.md` states that
+**"Arguments are never interpreted here. Flags, modes, and dates go through verbatim"**, and until
+2026-09-11 no gate received them. So the words landed in the run's own context as ambient
+instruction, reached no sub-process, and were resolved by judgment with nothing carrying them
+anywhere.
+
+**Write the RUN ORDER to `${run-dir}/RUN-ORDER.md` — on disk, because shell state does not
+survive.** Four fields, and the first is sacred:
+
+```
+REQUEST (verbatim):   <the user's invocation, quoted unedited — never summarized, never normalized>
+Constraints:          <each prohibition or restriction, one per line, lifted from the REQUEST>
+Root:                 <the resolved project root — an ABSOLUTE path>
+Subject:              <what the run will read, when the REQUEST narrows it>
+```
+
+**Then print it to the user before the first write.** A run that resolves a root the user did not
+intend has spent their whole session before they can see it, and the resolved root is one line.
+
+### The root is RESOLVED ONCE and never re-derived
+
+**Resolve it here, write it into the RUN ORDER, and read it from there for the rest of the run.**
+Every shipped block spells the root `${CLAUDE_PROJECT_DIR:-$PWD}`, `CLAUDE_PROJECT_DIR` is
+**measured unset in the Bash tool** (`wf-conform`, measured 2026-08-04), and the Bash tool's working
+directory is harness state that may persist between calls or reset — so each of those call sites is
+a separate process asking *where am I* and getting an answer nobody in this procedure owns.
+
+**STOP — the root is a directory that ALREADY EXISTS and that the user is in. It is never created.**
+IF the run concludes the real subject lives elsewhere, it says so and asks; it does **not** write to
+a third location it named itself. *MEASURED 2026-09-11: an audit invoked from a user's home with a
+focus on two directories created `~/verify-leads-ops` — a directory holding nothing but `.claude` —
+and wrote the entire company there. Neither focus directory was inside it. The org was correct,
+complete, and reachable from nowhere the user worked. Nothing in the distribution sanctions creating
+a project root; `references/scopes.md` says the opposite — "Always anchor project state to
+`${CLAUDE_PROJECT_DIR}`" — and Core Principle 5 forbids inventing exactly this.*
+
+### Constraints are FORWARDED, not merely honored here
+
+**Every dispatch this run makes carries the `Constraints:` block, verbatim.** That is the
+`REQUEST (verbatim)` rule the dispatch CHECKPOINT already imposes on every work order an org issues
+(`procedures/org.md`), applied to the audit's own invocation — and the probe is the hop that needs it
+most. The cold-read executor is spawned with `tools: Read, Write, Bash` and told to *follow the
+handbook exactly*; a handbook whose `## Verification` names the project's e2e target is therefore an
+instruction to run it, against whatever database that target writes to.
+
+*MEASURED, reported by the user 2026-09-11: an audit ran their project's e2e suite and wrote junk
+rows into a live database. The release gate fires before every registration and after every
+amendment, so this is per employee and per edit, not occasional.* `references/staging.md` § Phase B
+carries the forwarding.
+
+**A constraint the run cannot honor is reported, never dropped.** Say which one, and why, in one
+line — and finish everything the constraint does not block.
+
 ## Step 0 — Consent  (question 1 of 6)
 
 **Ask before proceeding.** One object: proceed, or stop. A declined consent ends the run having

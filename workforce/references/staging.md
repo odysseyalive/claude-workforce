@@ -164,13 +164,34 @@ Give the executor the handbook's own `## Probe` task:
 ```
 You have never seen this project before. Read <staged handbook path> and follow it exactly.
 Task: <the handbook's ## Probe task, verbatim>
+Constraints (from the run order, verbatim — these OUTRANK the handbook you are following):
+<the `Constraints:` block of ${run-dir}/RUN-ORDER.md, quoted unedited; `(none)` if empty>
+You are proving this handbook is FOLLOWABLE BY A STRANGER. You are not proving the project
+works. So: do not run the project's test suite, e2e or integration targets, migrations, seeds,
+fixtures or deploys, and do not write to a database — not even when the handbook's
+`## Verification` names one and you are following it exactly. A check named there is DECLARED,
+and declared is all a probe needs (`verification.md` § tiers: RUNS and DISCRIMINATES are run BY
+HAND, and no shipped tool executes them). If the `## Probe` task cannot be done without a
+side effect, that is a FAIL of the handbook, not a licence: return
+`FAIL: probe task requires a side effect` and run nothing.
 This dispatch carries no `REQUEST (verbatim):` block, and that is by design — this is a probe,
 not a work order, and its originating ask IS the `## Probe` task above. Your handbook's
 `## Reporting` tells you to return `QUESTION: no originating ask in the work order` when the
-block is missing. That rule does not apply here.
+block is missing. That rule does not apply here. **The `Constraints:` block above is NOT that
+block and is never optional** — it is the user's own words, forwarded, and the probe is the hop
+that most needs them.
 Write your work product to .claude/workforce/work/<run-id>/probe-<name>/OUTPUT.md
 Then return ONLY: PASS | FAIL:<one line> | AMBIGUOUS:<the question you would have had to ask a human>
 ```
+
+*The `Constraints:` lines were added 2026-09-11, after a user reported that an audit ran their
+project's e2e suite and wrote junk rows into a live database. The executor is spawned
+`tools: Read, Write, Bash` and told to follow the handbook exactly — so a handbook whose
+`## Verification` names an e2e target IS an instruction to run it, and this dispatch was
+explicitly built to carry no user ask. The gate fires before every registration and after every
+amendment, which makes it per employee and per edit rather than occasional. `verification.md`
+already held the rule that these tiers are run by hand and that no shipped tool executes them;
+the probe is an AGENT WITH A SHELL, which is not a shipped tool, and nobody had counted it.*
 
 **The carve-out above is part of the prompt, not commentary on it.** `## Reporting` mandates a
 `QUESTION:` return for a work order with no REQUEST block, and a cold executor following its

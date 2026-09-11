@@ -11998,6 +11998,46 @@ _ds_agent_block = _ds_wsa[_ds_wsa.find("AGENT_HOOKS"):][:4000]
 # is not the same file as far as a cold reader deep in a run is concerned.
 _ds_orgmd = read("workforce/references/procedures/org.md")
 
+# THE RUN ORDER — the audit's own invocation, treated the way it treats every work
+# order it issues. `intent-router.md` says "Arguments are never interpreted here", and
+# until 2026-09-11 no gate received them: direction attached to `/workforce audit` landed
+# in the run's context as ambient instruction, reached no sub-process, and was resolved
+# by judgment. Two MEASURED costs on one user's machine, same day: an audit CREATED
+# `~/verify-leads-ops` and wrote the whole company into a directory holding nothing but
+# `.claude`, neither focus directory inside it; and an audit ran that project's e2e suite
+# into a live database.
+_ds_stg = read("workforce/references/staging.md")
+
+check(
+    "run order: the ask is captured verbatim, the root is resolved once, both are echoed",
+    "REQUEST (verbatim):" in _asu and "RUN-ORDER.md" in _asu
+    and "Root:" in _asu and "Constraints:" in _asu
+    # The root must be pinned AND forbidden from being invented — the second is the one
+    # that cost a session, and a pin alone would not have prevented it.
+    and "the root is a directory that ALREADY EXISTS" in _asu
+    and "It is never created" in _asu,
+    "35 call sites across 9 files each re-resolve ${CLAUDE_PROJECT_DIR:-$PWD} at call "
+    "time; the variable is measured unset in the Bash tool and cwd is harness state. So "
+    "the root was whatever the shell happened to be in, and a run that invented one wrote "
+    "a correct org to a path the user never visits",
+)
+
+check(
+    "run order: constraints are FORWARDED into the probe, the hop with a shell",
+    "Constraints (from the run order, verbatim" in _ds_stg
+    # Named side effects, because "don't be destructive" is a category the executor has
+    # to classify into and a handbook's own ## Verification is what it classified wrong.
+    and "do not run the project's test suite" in _ds_stg
+    and "not even when the handbook's" in _ds_stg
+    # And a blocked probe FAILS the handbook rather than proceeding anyway.
+    and "FAIL: probe task requires a side effect" in _ds_stg,
+    "the cold executor is spawned `tools: Read, Write, Bash` and told to follow the "
+    "handbook exactly, and this dispatch was built to carry no user ask BY DESIGN — so a "
+    "handbook whose ## Verification names an e2e target is an instruction to run it. "
+    "verification.md already said these tiers are run by hand and no shipped tool "
+    "executes them; an agent with a shell is not a shipped tool and nobody counted it",
+)
+
 check(
     "mechanicals: the enumeration imperative names what it may NOT run, in its own bullet",
     "Run THE DISCOVERY MODE — never the command itself" in _ds_orgmd
