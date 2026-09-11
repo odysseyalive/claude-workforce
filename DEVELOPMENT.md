@@ -181,12 +181,17 @@ positives whose prescribed remedy exits 2.
 shipped as single seed specs — no anchor, so never reportable as stale; no resolver entry, so
 `--kind image` was a parser error; not in the migration table, so nothing reconciled the copies.
 ENUMERATED: 8 projects held an `image-eval`, 1 a `ui-design`, 1 a `design-eval`, none carrying a
-version anchor. Both are catalogs now (`catalogs/image/`, `catalogs/ui/`), promoted by `git mv`
-with the content unchanged, and the `ui` kind maps both spellings. Five of five resolve.
+version anchor. Both are catalogs now, promoted by `git mv` with the content unchanged, and the
+`ui` kind maps both spellings. Five of five resolve. *Path corrected 2026-09-11: this read
+`catalogs/image/`, `catalogs/ui/`, which v1.51.0 moved into the shipped evaluator skills —
+`skills/image-eval/references/`, `skills/ui-design/references/`. A record naming a path that is no
+longer there sends its next reader to a mechanism that does not exist.*
 
 **Still open.** The heal itself has not run anywhere: 13 handbooks on `odyssey-alive` and 5 on
 `apps-odyssey-alive` are waiting on those projects' next audit, which is where Step 5d item 2c
-fires. `krull-ai` reports `1 additions unseeded` — a code catalog that never received the
+fires. *Re-checked 2026-09-11 and still true — v1.51.0 changed where the corpora live and which
+step retires a copy (Step 6-F), and it did not run an audit anywhere, so the handbook heal is
+exactly where it was.* `krull-ai` reports `1 additions unseeded` — a code catalog that never received the
 authored additions, which is the new reporting doing its job rather than new damage.
 
 
