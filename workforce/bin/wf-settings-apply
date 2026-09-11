@@ -137,7 +137,18 @@ AGENT_HOOKS = {
         "type": "agent",
         "timeout": 120,
         "prompt": (
-            "Hook input: $ARGUMENTS. Read "
+            "Hook input: $ARGUMENTS. IF it carries `stop_hook_active: true`, respond "
+            "{\"ok\": true} and do nothing else — this Stop is the CONTINUATION of a "
+            "turn you already judged, and the flag on disk still holds THAT turn's "
+            "conclusion. `wf-task-tag` clears the flag at `UserPromptSubmit`, which a "
+            "continuation never fires, so re-reading it re-judges text the session has "
+            "already moved past and blocks again on the same verdict — unbounded until "
+            "the user types something. MEASURED 2026-09-11: three consecutive blocks "
+            "quoting one stale conclusion, through two corrections of it. `wf-widen` "
+            "carries this guard at line 485 and `wf-turn-ledger` at 400; this hook is "
+            "the only one of the three that can BLOCK, and it was the only one without "
+            "it.\n"
+            "Otherwise read "
             "<scratchpad_dir>/wf-widen-flag.<session_id>.json. If it does not exist, "
             "respond {\"ok\": true} and do nothing else.\n"
             "It carries `ask` (what the user requested, and `ask.senses`, the jurors "

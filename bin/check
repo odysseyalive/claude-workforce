@@ -11977,6 +11977,32 @@ check(
     "with no receptionist at exit 0 (MEASURED 2026-09-11)",
 )
 
+# THE BLOCKING HOOK IS THE ONE THAT NEEDS THE LOOP STOP, and it was the one without it.
+# `stop_hook_active` is true on the second and later Stop firings of one turn. A hook that
+# returns early on it cannot block forever; a hook that ignores it can. MEASURED
+# 2026-09-11: three consecutive blocks in this session, each re-judging ONE stale
+# conclusion through two corrections of it, because `wf-task-tag` clears the widen flag at
+# `UserPromptSubmit` and a Stop-block continuation never fires that event. `wf-widen`
+# (line 485) and `wf-turn-ledger` (line 400) both carried the guard. `wf-widen-agent` —
+# the only one of the three whose verdict can hold the session — did not.
+#
+# An autonomous `audit` is the worst case: one `UserPromptSubmit` at `/workforce audit`
+# and none for the next hour, so nothing clears the flag for the rest of the run.
+_ds_wsa = read("workforce/bin/wf-settings-apply")
+_ds_agent_block = _ds_wsa[_ds_wsa.find("AGENT_HOOKS"):][:4000]
+
+check(
+    "widen agent: the hook that can BLOCK honours stop_hook_active",
+    "stop_hook_active" in _ds_agent_block
+    # Pinned on the verdict it must return, not merely on the token appearing. A prompt
+    # that mentions the field without saying to stop on it is the same loop.
+    and "stop_hook_active: true" in _ds_agent_block,
+    "wf-widen-agent is the only hook of the three whose `ok: false` holds the session, "
+    "and it was the only one missing the guard its two siblings carry. Without it a "
+    "blocked Stop re-reads a flag nothing clears during a continuation and blocks again "
+    "on the same stale conclusion, unbounded until the user types",
+)
+
 check(
     "org producer: Step 0.3 CALLS the producer instead of describing materialization",
     '"$WF/bin/wf-companion"' in _asu and "--execute  # materialize it" in _asu,
