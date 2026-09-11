@@ -80,6 +80,20 @@ NAME = re.compile(r"\bwf-[a-z][a-z0-9]*(?:-[a-z0-9]+)*\b(?![-\w])")
 # quoted in an example table — reads as a workforce reference and is reported missing.
 # Two such false positives appeared on the first sweep and neither was a defect.
 REFCITE = re.compile(r"(?:^|[\s`(\[])references/([A-Za-z0-9_./-]+\.md)")
+
+# ATTRIBUTION, for the citations the leading boundary cannot reach. The rule above
+# resolves `skills/text-eval/references/additions.md` because the path carries its own
+# skill root. It cannot help when the prose carries the ownership and the path is
+# written bare — "the evaluator skill's own `references/additions.md`" is relative to
+# THAT skill, not to ours. MEASURED 2026-09-11: four such citations (evaluators.md:526,
+# :536, :658 and procedures/audit.md:1799) were reported missing while both files they
+# name were present on disk. Same class as the two false positives the leading boundary
+# closed in 1.48.0, different shape.
+#
+# BOTH CONDITIONS ARE REQUIRED, so this cannot become a phrase that hides a real defect:
+# the sentence must attribute the file to a skill, AND the file must actually resolve
+# under one of the shipped skills. Prose attributing a file nobody has still reports.
+SKILL_OWNED = re.compile(r"skill's\s+own\s+$")
 NOT_A_NAME = re.compile(r"^wf-\d")
 
 # TWO TIERS, BECAUSE A GUARD THAT CRIES WOLF GETS IGNORED. That is not a guess: a
@@ -260,6 +274,10 @@ def disagreements(reg):
                 # path inside a project's own skill and is never ours to resolve — two
                 # such citations read as defects on the first sweep and were not.
                 if os.path.isfile(os.path.join(WF, "references", target)):
+                    continue
+                if SKILL_OWNED.search(line[:m.start()]) and any(
+                        os.path.isfile(os.path.join(WF, "skills", s, "references", target))
+                        for s in names_in(os.path.join(WF, "skills"), want_dirs=True)):
                     continue
                 imperative = fenced or RUNNABLE.search(line[:m.start()])
                 kind = "BROKEN" if imperative else "stale"

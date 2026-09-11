@@ -1046,6 +1046,51 @@ check(
     "; ".join(_lv_problems),
 )
 
+
+# ── THE ATTRIBUTION RULE, RUN RATHER THAN READ (2026-09-11) ──────────────────────
+# A citation written bare but attributed to another skill in the prose — "the evaluator
+# skill's own `references/additions.md`" — is relative to THAT skill, not to ours. The
+# leading-boundary rule closed the shape that carries its own root
+# (`skills/text-eval/references/ai-patterns.md`, 1.48.0) and cannot see this one: four
+# citations were reported missing while both files they name were present on disk.
+#
+# BEHAVIOURAL, not a source string, for the reason the wf-seed block states: every
+# source assertion here would also pass on a comment. Three shapes go into a throwaway
+# copy and the shipped CLI decides them. The third is the fix; the first two are what
+# stop it becoming a phrase that hides a real defect, which is why they are asserted
+# in the same check rather than trusted to the rule's wording.
+_attr = []
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf)
+        with open(os.path.join(_wf, "references", "evaluators.md"),
+                  "a", encoding="utf-8") as _fh:
+            _fh.write("\nA bare citation of `references/gone-forever.md`, owned by nobody.\n")
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/never-existed.md`.\n")
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/additions.md`.\n")
+        _o = subprocess.run([sys.executable, os.path.join(_wf, "bin", "wf-live"),
+                             "--root", _wf],
+                            capture_output=True, text=True, timeout=120).stdout
+    if "references/gone-forever.md" not in _o:
+        _attr.append("an unattributed citation of a missing file went unreported — "
+                     "the rule swallowed the tier it lives in")
+    if "references/never-existed.md" not in _o:
+        _attr.append("`skill's own` hid a file no skill has — the attribution phrase "
+                     "became a way to silence a real defect")
+    if "references/additions.md" in _o:
+        _attr.append("a citation attributed to a skill that really holds the file is "
+                     "still reported missing — the false positive is back")
+except Exception as _exc:                                # noqa: BLE001
+    _attr.append(f"the attribution probe would not run ({_exc}) — an unrun probe is "
+                 f"indistinguishable from a passing one")
+check(
+    "wf-live: a bare citation attributed to a skill that holds it is not ours; every other shape still reports",
+    not _attr,
+    "; ".join(_attr),
+)
+
 # THE CORPUS RESOLVES FROM THE INSTALL; THE HOUSE RULES STAY LOCAL. `wf-catalog` is the
 # resolver, and the properties below are the ones whose absence would make it dangerous
 # rather than merely wrong. MEASURED 2026-09-10 across thirteen projects: one corpus in
