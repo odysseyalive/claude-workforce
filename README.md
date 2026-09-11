@@ -70,6 +70,36 @@ Goes to a lead, because it crosses two people's work and someone has to coordina
 
 The whole company on a single job. Design, content, engineering. Each proves its slice before anything ships.
 
+### Hiring
+
+```
+/org we need someone who can audit accessibility
+```
+
+No one owns that job yet, so it becomes a hiring request. HR researches the industry standard for the role before writing the handbook, so the new employee is held to the bar the field actually expects, not a title invented on the spot.
+
+```
+/org the blog posts keep coming out in the wrong voice
+```
+
+That looks like a new hire and usually isn't. The content writer already owns voice, so the fix is to amend its handbook rather than hire a second writer beside it. The company extends before it hires.
+
+### Quick answers and pushback
+
+```
+/org who owns the checkout flow?
+```
+
+Spins up nobody. The answer is already sitting in the org chart, so the company reads it back. No agent started, no cost spent.
+
+```
+/org have the copywriter also fix the failing checkout test
+```
+
+The copywriter won't take this. Patching a test is engineering's work, outside its lane, so it hands an escalation back to its manager. The refusal is the point. An employee that quietly does work it was never scoped for is an employee whose lane means nothing.
+
+More examples and the reasoning behind each rule are in [DOCTRINE.md](DOCTRINE.md).
+
 ## Why This Exists
 
 ### One brain can't do every job
