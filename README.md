@@ -134,6 +134,17 @@ The fix is structure, borrowed from how real companies already work.
 
 A set of instructions with those three things is an employee. A set of employees is a company you can talk to. The audit builds that company for your project: a CEO (your session), leads that coordinate departments, and individual contributors that do the actual work. Each runs on the model built for its job. Each follows a handbook. Each stays inside a lane.
 
+### The tunnel nobody sees from inside
+
+![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
+*The focused worker can't see the crack in the wall. The person outside can't miss it.*
+
+A model deep in a task locks onto its first reading and stops questioning it. The more powerful the model, the worse this gets. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) in *Nature Machine Intelligence* (2026): seeing its own prior answer drops a model's willingness to change by 71%. Sharma et al. at Anthropic [documented sycophancy](https://arxiv.org/abs/2310.13548), models telling users what they want to hear. Jhaveri et al. [showed confirmation bias](https://arxiv.org/abs/2604.02485) in hypothesis exploration. Put those together and you get a model that walks confidently in the wrong direction.
+
+We measured it on this project. Ten tunnels, ten wrong readings. Nine of the ten escapes came from outside the turn that formed the reading. Zero came from the model noticing on its own.
+
+So the fix is never "look again." The widening mechanism classifies each ask before the turn starts, what kind of evidence would settle it, and checks whether that evidence was actually gathered when the turn finishes. If it wasn't, a fresh reader spawns in its own context with none of the original reasoning. That reader looks at what the turn concluded versus what the repository actually says. It never edits. The finding is the whole deliverable, and a perspective that sends you somewhere you weren't looking has done its job even when its own conclusion turns out wrong.
+
 ### "Done" means proven
 
 ![A craftsperson holding a finished piece up to a measuring gauge on the wall that reads PASSED, with completed items tagged green in a row on the bench and one rejected piece tagged red set apart](assets/images/done-means-proven.png)
@@ -142,21 +153,6 @@ A set of instructions with those three things is an employee. A set of employees
 This is the part that separates the system from a prompt template. Every employee names something that proves the work is finished: a command that returns successful, a set of tests that pass, a file that has to exist. Work that can't be checked by a command gets checked against a written catalog, a list of specific tells a reviewer grades against. *"Does this read as machine-written?"* is a matter of opinion. *"Does this trip three of these twelve specific tells?"* is close to mechanical.
 
 No employee is allowed to call the job finished without its check clearing. A role whose check can't be named gets reported as unstaffed, not quietly hired with no bar to clear. An honest "not proven yet" beats a department that rubber-stamps itself.
-
-### The tunnel nobody sees from inside
-
-![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
-*The focused worker can't see the crack in the wall. The person outside can't miss it.*
-
-Putting the right model on the right job solves the routing problem. It does not solve a second one: a model that is deep in a task locks onto its reading of the situation and stops questioning it. The more powerful the model, the worse this gets. A model built for careful reasoning will reason carefully about the wrong thing and never notice. It feels like thoroughness from inside, which is exactly why noticing does not work.
-
-This is not a guess. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) and published in *Nature Machine Intelligence* (2026): when an LLM can see its own prior answer, its willingness to change drops by 71%, and its confidence in that answer rises, even with no new information. They call it choice-supportive bias. It showed up in every model they tested. Separately, Sharma et al. at Anthropic [documented](https://arxiv.org/abs/2310.13548) that models consistently tell users what they want to hear rather than what is true, a behavior they named sycophancy. And Jhaveri et al. [showed](https://arxiv.org/abs/2604.02485) that LLMs exhibit confirmation bias in hypothesis exploration: they propose evidence to confirm rather than to challenge. Together, a model that sticks with its first reading, agrees with the person talking to it, and seeks confirming evidence is a model that can walk confidently in the wrong direction.
-
-We measured it too, on this project. Ten tunnels, ten wrong readings that felt right at the time. Nine of the ten escapes came from outside the turn that formed the reading. Six from the user, three from a spawned reader running in its own separate context. Zero came from the model noticing on its own. So the fix is never "look again." It is "ask someone who hasn't been looking."
-
-That is what the widening mechanism does. Before a turn starts, a small classifier tags the ask by what kind of evidence would settle it: a question about how something behaves needs the thing to be run. A question about whether something exists needs a directory listing, not a confident assertion. When the turn finishes, a check looks at whether that kind of evidence was actually gathered. If it wasn't, an independent reader is spawned: fresh context, no history, none of the reasoning that built the tunnel. That reader looks at what the turn concluded and what the repository actually says, and reports what it found. It never edits. The finding is the whole deliverable.
-
-The reader doesn't need to be right every time. A gate needs accuracy, because a wrong gate blocks good work. This is not a gate. It is a perspective, and a perspective that sends you to look at something you were not looking at has already done its job, even when its own conclusion turns out to be wrong. Every finding this mechanism has surfaced came from reading two things together that the original turn had only ever read apart.
 
 ## The Full Theory
 
