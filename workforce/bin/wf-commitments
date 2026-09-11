@@ -95,6 +95,57 @@ def capture(reply):
     return out
 
 
+# ── The reply half of `asks: N` ────────────────────────────────────────────────
+#
+# `wf-task-tag` counts how many things a message asked for; that is the PROMPT half and
+# on its own it is a flag. This is the fix: a reply to a multi-ask prompt is expected to
+# carry a section per ask, and this says so when it does not.
+#
+# IT LIVES HERE AND NOT IN `wf-widen`, deliberately. `wf-widen-agent` BLOCKS, and on
+# 2026-09-11 it blocked three turns in a row on one stale conclusion. A reply-shape
+# observation is worth a sentence, never a held session — and this hook has never
+# blocked anything.
+#
+# WHY IT SHOULD NOT REPEAT THE SPEECH-GUARD FAILURE (7.0% of GOOD replies, which retired
+# `wf-speak-guard` two days ago). That guard judged PROSE QUALITY on EVERY reply. This
+# counts STRUCTURE, and only on turns where the user explicitly enumerated — so the
+# population is small and the property is countable rather than aesthetic. A reply with
+# no enumeration in its prompt is never looked at.
+SECTION_FAMILIES = (
+    re.compile(r"^#{1,6}\s+\S", re.M),        # markdown headings
+    re.compile(r"^\*\*[^*\n]{2,60}\*\*", re.M),  # a bolded label opening a line
+    re.compile(r"^\s{0,3}\d+[.)]\s+\S", re.M),    # a numbered section
+)
+
+
+def section_count(reply):
+    """The best-supported section count in a reply — the MAX family, never the sum.
+
+    Summing would double-count a reply that numbers its sections AND bolds their labels,
+    which is the ordinary way to write one, and an inflated count makes this check pass
+    on exactly the replies it exists to catch.
+    """
+    return max((len(rx.findall(reply)) for rx in SECTION_FAMILIES), default=0)
+
+
+def asks_expected(payload):
+    """`asks` from this turn's task tag, or None when there is no tag to read.
+
+    None is not 1. A turn with no tag was never classified — an injected preamble, or a
+    `Stop` in a session that started mid-flight — and asserting a shape against a count
+    nobody took is the vacuous-pass shape this project refuses everywhere.
+    """
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    try:
+        with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
+            tag = json.load(fh)
+    except (OSError, ValueError):
+        return None, ""
+    n = tag.get("asks")
+    return (n if isinstance(n, int) else None), (tag.get("asks_why") or "")
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -131,8 +182,26 @@ def main():
     reply = payload.get("last_assistant_message")
     if not isinstance(reply, str) or not reply.strip():
         return 0
+    # THE ASKS LINE IS COMPUTED BEFORE THE COMMITMENTS EARLY-RETURN, and that ordering is
+    # the whole difference between a check and a dead branch. Placed after it, this fired
+    # only on turns that ALSO stated a commitment — and a turn that blends three answers
+    # into one reply is under no obligation to promise anything, so the population it was
+    # written for was exactly the population it could not see. MEASURED by running it:
+    # a 3-ask prompt against a 1-section reply printed nothing at all.
+    asks_line = ""
+    n, why = asks_expected(payload)
+    if isinstance(n, int) and n >= 2:
+        got = section_count(reply)
+        if got < n:
+            asks_line = (f"ASKS  the prompt made {n} request(s) ({why}) and this reply "
+                         f"carries {got} section(s). One heading per thing asked, in the "
+                         f"order raised — each answered, or named as not answered "
+                         f"(operating principles, item 14).")
+
     fresh = capture(reply)
     if not fresh:
+        if asks_line:
+            print(json.dumps({"systemMessage": asks_line}))
         return 0
     seen = {i.get("text") for i in (book.get("open") or [])}
     stamp = payload.get("timestamp") or ""
@@ -145,9 +214,11 @@ def main():
             json.dump(book, fh, indent=2)
     except OSError:
         return 0
-    print(json.dumps({"systemMessage":
-                      f"COMMITMENTS  {len(fresh)} stated this turn · "
-                      f"{len(book['open'])} open in this project"}))
+    msg = (f"COMMITMENTS  {len(fresh)} stated this turn · "
+           f"{len(book['open'])} open in this project")
+    if asks_line:
+        msg += "\n" + asks_line
+    print(json.dumps({"systemMessage": msg}))
     return 0
 
 

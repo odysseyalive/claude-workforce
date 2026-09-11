@@ -152,6 +152,16 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
                 "sampled": sampled,
                 "ask": {"prompt": (_tag or {}).get("prompt") or "",
                         "kinds": [h.get("kind") for h in ((_tag or {}).get("hits") or [])],
+                        # HOW MANY THINGS WERE ASKED, so a juror can ask whether each
+                        # one was ANSWERED. The COUNT is checked mechanically and for
+                        # free by `wf-commitments` on every multi-ask turn — "cheap
+                        # decides, expensive acts", and a subagent spent counting `##`
+                        # is the waste the user's second directive names. What only a
+                        # reader can judge is whether section 2 addressed ask 2, and
+                        # that question was unaskable while the flag carried the prompt
+                        # as one undifferentiated string.
+                        "asks": (_tag or {}).get("asks"),
+                        "asks_why": (_tag or {}).get("asks_why") or "",
                         # THE DOCKET IS THE APPLICABLE SET, never a fallback to the
                         # unopened one. On a SAMPLED turn nothing is unopened by
                         # definition, so falling back handed the jury an EMPTY docket —

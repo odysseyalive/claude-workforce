@@ -12031,6 +12031,37 @@ check(
     "and a one-part ask were the same shape to every downstream consumer",
 )
 
+_ds_cmt = read("workforce/bin/wf-commitments")
+_ds_wdn = read("workforce/bin/wf-widen")
+
+check(
+    "asks: the REPLY half is measured, in a hook that cannot block",
+    "def section_count" in _ds_cmt and "def asks_expected" in _ds_cmt
+    and "ASKS  the prompt made" in _ds_cmt
+    # MAX, never SUM. A reply that numbers its sections AND bolds their labels is the
+    # ordinary way to write one, and summing the families inflates the count so the
+    # check passes on exactly the replies it exists to catch.
+    and "return max((len(rx.findall(reply))" in _ds_cmt
+    # Computed BEFORE the commitments early-return. Placed after it, the line fired only
+    # on turns that also stated a commitment — and a turn that blends three answers into
+    # one reply promises nothing, so its population was invisible to it. Measured dead
+    # by running it before this assertion existed.
+    and _ds_cmt.find("asks_line = \"\"") < _ds_cmt.find("fresh = capture(reply)"),
+    "`asks: N` on the prompt is a flag; the fix is that the reply carries N sections. It "
+    "lives in wf-commitments because that hook has never blocked anything — wf-widen-agent "
+    "blocks, and on 2026-09-11 it held three turns on one stale conclusion. A reply-shape "
+    "observation is worth a sentence, never a held session",
+)
+
+check(
+    "asks: the jury can ask whether each ask was ANSWERED, not just counted",
+    '"asks": (_tag or {}).get("asks")' in _ds_wdn,
+    "counting sections is a regex and free, so it runs on every multi-ask turn (cheap "
+    "decides). Whether section 2 addressed ask 2 is a reader's judgment and rides the "
+    "sampled jury (expensive acts) — and it was unaskable while the flag carried the "
+    "prompt as one undifferentiated string",
+)
+
 check(
     "asks: the detector ships with its fix — a heading per thing asked",
     "One heading per thing asked" in _ds_tmpl_early
