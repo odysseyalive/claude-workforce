@@ -11991,6 +11991,29 @@ check(
 _ds_wsa = read("workforce/bin/wf-settings-apply")
 _ds_agent_block = _ds_wsa[_ds_wsa.find("AGENT_HOOKS"):][:4000]
 
+# THE IMPERATIVE MUST CARRY ITS OWN CONSTRAINT. `org.md` bullet 1 ended "It must execute
+# nothing" and bullet 2 began "Run it" — the guard in one bullet, the actionable verb in
+# the next. MEASURED 2026-09-11 on a user's live WordPress site: an audit ran the
+# project's e2e target and wrote junk rows into the production database. Four lines apart
+# is not the same file as far as a cold reader deep in a run is concerned.
+_ds_orgmd = read("workforce/references/procedures/org.md")
+
+check(
+    "mechanicals: the enumeration imperative names what it may NOT run, in its own bullet",
+    "Run THE DISCOVERY MODE — never the command itself" in _ds_orgmd
+    # The destructive families by name, because "not a discovery mode" is a category a
+    # run has to classify into and `wp db` is the classification that went wrong.
+    and "wp db" in _ds_orgmd and "artisan migrate" in _ds_orgmd
+    # And resolution must name a non-executing method, or "verify it resolves" is an
+    # invitation to run it.
+    and "RESOLUTION IS CHECKED WITHOUT EXECUTING" in _ds_orgmd
+    and "command -v <bin>" in _ds_orgmd,
+    "an audit that enumerates a project's commands is one careless antecedent away from "
+    "running them. `index` is documented low-risk and executes immediately, so there is "
+    "no display gate in front of this and no deny rule behind it — the wording is the "
+    "whole guard, and it has already cost a user their database contents",
+)
+
 check(
     "widen agent: the hook that can BLOCK honours stop_hook_active",
     "stop_hook_active" in _ds_agent_block

@@ -56,6 +56,13 @@ section existed and was populated.*
 not. A row is an instruction to run something; a row for a command that is not there is dead wiring
 with a dispatcher pointed at it, which is worse than the absence it records. Report every drop by name.
 
+**RESOLUTION IS CHECKED WITHOUT EXECUTING, AND THE METHOD IS NAMED HERE BECAUSE ITS ABSENCE WAS
+DESTRUCTIVE.** `command -v <bin>`, the script's own existence on disk, or the `scripts` key that
+declares it — never by running the thing to see whether it runs. *MEASURED 2026-09-11 on a user's
+live WordPress project: an audit ran the project's e2e target and wrote junk rows into the
+production database. This sentence had said "verify each command resolves" with no method for four
+weeks, and running a command is the most obvious way to learn whether it resolves.*
+
 **DERIVE every `Covers` cell by enumerating the command. Never write one** (`org-chart-format.md`
 § `Covers` is DERIVED, never authored). Per row:
 
@@ -63,9 +70,20 @@ with a dispatcher pointed at it, which is worse than the absence it records. Rep
    `--print-config`, or whatever its own docs name. **It must execute nothing.** A mode that runs,
    writes, or deploys is not a discovery mode, and calling one here would make `index` a destructive
    command.
-2. **Run it and derive `Covers` from the output** — the enumerated set, counted and located, never a
-   paraphrase of what the command is *for*. `Does NOT cover` is the complement, and the project's own
-   sibling commands (a separate `lint`, `typecheck`, or e2e target) name most of it already.
+2. **Run THE DISCOVERY MODE — never the command itself — and derive `Covers` from its output**: the
+   enumerated set, counted and located, never a paraphrase of what the command is *for*. `Does NOT
+   cover` is the complement, and the project's own sibling commands (a separate `lint`, `typecheck`,
+   or e2e target) name most of it already.
+
+   **STOP — this bullet used to read "Run it", and "it" meant the discovery mode from bullet 1 while
+   the prohibition that made that safe sat in bullet 1 with it.** The imperative was here and the
+   constraint was there, so the actionable line carried no guard. IF the invocation you are about to
+   make would execute the target, migrate, deploy, seed, or touch a database, STOP: that is not a
+   discovery mode, and bullet 4 is the correct outcome. **A command with no safe enumeration is
+   `Scope: declared`, which costs one hop and keeps the capability** — it is never a reason to run
+   the thing. Specifically forbidden here, whatever a `scripts` key calls them: any e2e or
+   integration target, any `db`/`migrate`/`seed`/`fixture` command, `wp db`, `drush`, `rails db:*`,
+   `artisan migrate`, and anything whose own help text says it writes.
 3. **Set `Scope: derived <today>`.**
 4. **No discovery mode → `Scope: declared`**, scope from the project's docs, and the row is a step-only
    row. That is a normal outcome, not a defect: it costs a hop and keeps a capability.
