@@ -12,6 +12,8 @@ Claude Workforce turns that instinct into a company. One command reads your proj
 
 > [!TIP]
 > 😎 **If Claude Workforce is part of your workflow, [give it a star](https://github.com/odysseyalive/claude-workforce).** It helps other people find the project.
+> 
+> [![GitHub stars](https://img.shields.io/github/stars/odysseyalive/claude-workforce?style=social)](https://github.com/odysseyalive/claude-workforce)
 
 ![A conductor standing before a diverse orchestra in a warm-lit hall, hands raised mid-gesture, directing many specialists](assets/images/conductor.png)
 
