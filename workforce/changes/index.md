@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.50.0 | 2026-09-10 | docs | no | (pending — message lands on the next regeneration) |
+| 1.50.0 | 2026-09-10 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | The corpus moved to the install and the readers were left pointing at the copy |
 | 1.49.0 | 2026-09-10 | audit, changes, hooks, scripts, installer, platform | no | A grant naming a tool the host does not have, and a ceiling that counts the wrong unit |
 | 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | No regex reads between the lines, so a share of everything gets an outside read |
 | 1.47.1 | 2026-09-10 | changes, installer | no | The hook that forced a version number per commit is gone |
