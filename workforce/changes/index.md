@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.54.0 | 2026-09-11 | docs | no | (pending — message lands on the next regeneration) |
+| 1.54.0 | 2026-09-11 | update, changes, scripts, installer | no | Plan-only in auto mode, and the contracts six cold reads found |
 | 1.53.0 | 2026-09-11 | chart, principles, audit, changes, scripts | **yes** | The reply half of asks: N — counted for free, judged where judgment belongs |
 | 1.52.0 | 2026-09-11 | chart, principles, audit, verify, changes, scripts, installer | **yes** | The /org receptionist had a rule in three files and a producer in none |
 | 1.51.2 | 2026-09-11 | changes, scripts, installer | no | The citation rule the detector could not see, as a release |
