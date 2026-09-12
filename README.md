@@ -20,7 +20,7 @@ Claude Workforce turns that instinct into a company. One command reads your proj
 ## Contents
 
 - [Install](#install)
-- [Quick Start](#quick-start)
+- [How to Use](#how-to-use)
 - [Uninstall](#uninstall)
 - [Why This Exists](#why-this-exists)
 - [The Full Theory](#the-full-theory)
@@ -44,7 +44,9 @@ irm https://raw.githubusercontent.com/odysseyalive/claude-workforce/main/install
 
 First install asks one question: personal or project scope. Personal puts one copy at `~/.claude/skills/` and serves every project on this machine. That's the right answer for almost everyone. Project puts a copy inside the repo so it travels with a clone.
 
-Then restart Claude Code. You're already running. The install ships skills you can use right now: a text evaluator, a code evaluator, a security reviewer, an image evaluator, and a UI design reviewer. You can also hire individual agents and build new skills before anything else happens.
+### Quick start
+
+Then restart Claude Code. You're already running. The install ships skills you can use right now: a text evaluator, a code evaluator, a security reviewer, an image evaluator, a UI design reviewer, and a plan writer. You can also hire individual agents and build new skills before anything else happens.
 
 ```
 /workforce hire accessibility auditor
@@ -54,7 +56,13 @@ Then restart Claude Code. You're already running. The install ships skills you c
 /text-eval check the copy on the landing page
 ```
 
-The install also gives you something you can't get from prompting alone: your AI stops being allowed to make claims it hasn't checked. Say it tells you a test passes but never ran it, or says a file doesn't exist but never listed the directory. The hooks catch that and block the answer before it reaches you. Every claim has to come through the right channel, and the model can't skip the channel and still deliver the conclusion. More on why that matters in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
+The install gives you one thing prompting can't: your AI stops being allowed to make claims it hasn't checked. It says the test passed, but it never ran the test. It says the file isn't there, but it never listed the directory. The hooks catch both and block the answer before it reaches you. A claim has to arrive through the channel that can actually produce it, and the model can't skip the channel and still hand you the conclusion. More on why that matters in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
+
+And now you can ask for a plan without dropping out of auto mode. `/blueprint` researches the work, writes the plan into your project's plan directory, and stops there. It won't turn around and start building the thing it just planned.
+
+```
+/blueprint the migration off the legacy auth service
+```
 
 ### Running the audit
 
@@ -66,7 +74,7 @@ When you're ready to build the full company, run the audit. This is the step tha
 
 This takes a while. It's building tools, converting skills, and designing roles for your specific project. Preview the plan without writing anything: `audit --review`.
 
-**If your project keeps deliberately broken files** — test fixtures you built so some tool could detect breakage — tell the audit to skip them. Otherwise it reads them as real problems, and may treat text inside them as your own words. Put a `.censusignore` at your project root, one glob per line:
+**If your project keeps deliberately broken files** (test fixtures you built so some tool could detect breakage), tell the audit to skip them. Otherwise it reads them as real problems, and may treat text inside them as your own words. Put a `.censusignore` at your project root, one glob per line:
 
 ```gitignore
 # deliberately malformed trees; not project content
@@ -74,11 +82,11 @@ fixtures/
 testdata/broken-*
 ```
 
-It never guesses: there's no `fixtures/` default and no inference from directory names, so a project that declares nothing gets everything surveyed. And it never hides what it skipped — every run prints how many files were excluded and by which pattern.
+It never guesses: there's no `fixtures/` default and no inference from directory names, so a project that declares nothing gets everything surveyed. And it never hides what it skipped. Every run prints how many files were excluded and by which pattern.
 
 Update anytime with `/workforce update`. Full command reference in [COMMANDS.md](COMMANDS.md).
 
-## Quick Start
+## How to Use
 
 Once the audit has run, describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can do it. You don't name an employee or pick a tier. You say what you need.
 

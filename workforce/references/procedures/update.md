@@ -185,14 +185,20 @@ repo root.** For an update this is normally already satisfied, since the copy be
 have been installed without it. If the file has since been deleted the installer stops with a bootstrap
 prompt — report that as the precondition it is, and do not work around it.
 
-### The five evaluators come with it
+### The five evaluators come with it, and so does `blueprint`
 
-**`update` installs six skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
+**`update` installs seven skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
 `image-eval` and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
 workforce."* Nothing about an evaluator reaches a project through an audit any more, so **a catalog
 change propagates by `update` alone**.
+
+**`blueprint` rides the same rows and is not an evaluator.** It authors an implementation plan as a
+file rather than grading one against a catalog, so it ships no corpus, carries no drift anchor, and is
+registered in neither `wf-catalog` nor `wf-conform` (`manifest.txt` § blueprint). It is listed here
+because the install count is what a reader checks against, and a skill missing from that count reads
+as a failed install.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

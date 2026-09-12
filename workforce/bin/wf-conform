@@ -1873,6 +1873,233 @@ def check_catalog_read(n, body, res, tally):
         "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
 
 
+# ── THE PROBE SUBSTITUTION TABLE (handbook-templates.md § Probe) ──────────────
+# A citation is the BACKTICKED heading, never the bare words: the right-hand cell of
+# every row is prose that names sections in passing ("for the reason in the `## Procedure`
+# 7 row"), and this reads the LEFT cell only for that reason.
+#
+# GREEDY BODY, TRIMMED IN CODE — and this is a ReDoS fix, MEASURED rather than reasoned.
+# The first form was `` `##\s+([^`\n]+?)\s*` ``, and `\s` is a subset of `[^`\n]`, so the
+# lazy body and the trailing `\s*` can divide the same run of spaces every way there is.
+# Timed on this host against a `` `##  `` opener with no closing backtick: 0.31 s at 800
+# characters, 2.65 s at 1,600, 21.1 s at 3,200 — cubic. This script's own length check
+# records a REAL handbook line of 14,540 characters on a live org, so the input that hangs
+# it is not hypothetical. ONE repeat operator is the fix, and half a fix is not one: a
+# separate `[ \t]+` for the space after `##` is ambiguous with the body in exactly the same
+# way and still measured quadratic (2.3 s at 16,000 characters, 38 s at 64,000). So the
+# separator is not in the pattern at all — `[^`\n]+` against a literal closer has one way to
+# match, and the whitespace comes off with `.strip()`, where it costs nothing.
+PROBE_CITE_RX = re.compile(r"`##([^`\n]+)`")
+# `1`, `1-2`, `1–2` (en dash, which is what a writer's editor produces). The spans a real
+# table uses are `1-2`, `rows 1, 4, 5`, `steps 6 and 7` — so the connector is never parsed,
+# only the numbers between the citation and the next citation in the same cell.
+PROBE_SPAN_RX = re.compile(r"(\d+)\s*(?:[-–]\s*(\d+))?")
+# A section the table need not carry a row for: `## Procedure` and `## Verification` are
+# covered PER STEP and PER ROW below, which is strictly stronger than one row naming the
+# section, and `## Probe` is the section doing the substituting.
+PROBE_EXEMPT_RX = re.compile(r"^(Procedure|Verification|Probe)\b")
+
+
+def _unfenced_headings(body):
+    """Every `## ` heading, skipping fenced blocks — a heading in an example is not a
+    section, and a handbook that quotes the template would otherwise be measured against
+    its own illustration."""
+    out, fenced = [], False
+    for line in body.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        m = re.match(r"^## (.+?)[ \t]*$", line)
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+def _same_heading(a, b):
+    """`## Verification` cites the section headed `## Verification (mechanical)`.
+
+    The same trailing-text tolerance `section()` already applies, for the same measured
+    reason: this file's own presence check is a substring match, so a heading carrying a
+    parenthetical passes every other row here and must not be reported uncovered by this
+    one. Compared both directions — the citation may be the longer string or the shorter.
+    """
+    return a == b or a.startswith(b + " ") or b.startswith(a + " ")
+
+
+def _substitution_coverage(probe):
+    """{cited heading -> the set of step/row numbers that citation covers}.
+
+    LEFT CELL ONLY. Read over the whole Probe section this returns coverage from prose —
+    `content-writer`'s own table says "row 2's file set under this order is the `OUTPUT.md`
+    you write" in a RIGHT cell, and a whole-section scan would score `## Verification` row 2
+    as covered from a sentence that is not a mapping row at all.
+    """
+    covered = {}
+    for line in probe.splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        left = s.strip("|").split("|")[0].strip()
+        if not left or set(left) <= set("-: "):      # the header's alignment rule
+            continue
+        cites = list(PROBE_CITE_RX.finditer(left))
+        for i, m in enumerate(cites):
+            end = cites[i + 1].start() if i + 1 < len(cites) else len(left)
+            nums = covered.setdefault(m.group(1).strip(), set())
+            for sm in PROBE_SPAN_RX.finditer(left[m.end():end]):
+                a = int(sm.group(1))
+                b = int(sm.group(2) or sm.group(1))
+                # A span is a step range, and no handbook has 50 of them. An unbounded
+                # `range()` off a typo (`1-9999`) would cover every step by accident,
+                # which is the one failure a coverage check must never have.
+                nums.update(range(a, b + 1) if 0 <= b - a <= 50 else (a, b))
+    return covered
+
+
+def _covered_nums(covered, label):
+    nums = set()
+    for cite, ns in covered.items():
+        if _same_heading(cite, label):
+            nums |= ns
+    return nums
+
+
+def check_probe_substitution(n, body, res):
+    """Every section, Procedure step and Verification row has a row in the probe's
+    substitution table.
+
+    `handbook-templates.md` § Probe makes this BLOCKING — "A PROBE THAT SUBSTITUTES ITS
+    CONTEXT ENUMERATES HOW EVERY OTHER SECTION READS UNDER THE SUBSTITUTION" — and closes
+    the table with "No clause of any other section is left for you to interpret." The
+    contract has been mandatory since 2026-08-07 and was never measured: a table missing
+    one row is a promise the document breaks, and the cost lands on the cold reader as a
+    burned probe cycle. Run hire-20260912T013734Z spent FOUR of them on defects this reads
+    mechanically (records DEF-content-writer-001, DEF-engineering-coder-001).
+
+    THE GATE IS THE TABLE'S EXISTENCE, and that is this script's own rule: whether a probe
+    SUBSTITUTES its context is judgment, which `verify` owns, and this command decides
+    nothing it cannot decide. A probe carrying a mapping table has been declared a
+    substituting probe by its author; one carrying none is not classified here at all.
+
+    ADVISORY, not blocking, for the reason every heuristic row in this file is advisory.
+    The coverage parse reads FREE-FORM TABLE PROSE: a compliant table that writes "every
+    step of `## Procedure`" instead of enumerating the numbers is scored uncovered, and a
+    blocking row would then fail a handbook for a phrasing rather than a gap. The remedy is
+    a row, the fix path is `audit` Step 5d, and both cost seconds — a reported gap converges
+    and a false block does not.
+    """
+    probe = section(body, "## Probe")
+    if probe is None:
+        return
+    covered = _substitution_coverage(probe)
+    # Two citations, not one: a probe whose task line happens to name one section in a
+    # table-shaped row has not declared a mapping.
+    if len(covered) < 2:
+        return
+
+    missing = []
+    for head in _unfenced_headings(body):
+        if PROBE_EXEMPT_RX.match(head):
+            continue
+        if not any(_same_heading(head, cite) for cite in covered):
+            missing.append(f"`## {head}`")
+    for label, unit in (("Procedure", "step"), ("Verification", "row")):
+        seg = section(body, f"## {label}")
+        if seg is None:                      # a Lead carries no `## Procedure` at all
+            continue
+        nums = _covered_nums(covered, label)
+        missing += [f"`## {label}` {unit} {m.group(1)}"
+                    for m in re.finditer(r"^(\d+)\.", seg, re.M)
+                    if int(m.group(1)) not in nums]
+    if not missing:
+        return
+    res.advise(
+        f"{n}: probe substitution table leaves {len(missing)} item(s) uncovered",
+        "uncovered by the substitution table: " + ", ".join(missing[:8])
+        + (" …" if len(missing) > 8 else "")
+        + ". The table closes with \"No clause of any other section is left for you to "
+        "interpret\", so an item with no row is a promise the handbook breaks — and the "
+        "reader who finds it returns a QUESTION instead of the work. Give each one a row "
+        "naming it on the left (handbook-templates.md § Probe, BLOCKING); the fix path for "
+        "a handbook already shipped is `audit` Step 5d. ADVISORY: this row blocks nothing")
+
+
+# THE DEFERRAL FORMS. A bullet under the preamble must POINT AT the section that owns its
+# condition rather than write the condition's value. These are the phrasings the contract
+# itself uses; the message names them so the remedy is a literal, not a category.
+EXIT_PREAMBLE_RX = re.compile(r"never restates what they mean", re.I)
+EXIT_DEFER_RX = re.compile(
+    r"exactly as |that section |that step |those steps |the section that owns", re.I)
+
+
+def check_exit_criteria_defers(n, body, res):
+    """A `## Exit criteria` that promises it never restates a value must not write one.
+
+    ORG-exit-criteria-restates-001, opened 2026-09-11 under Off-the-Street Release Gate
+    rule 5: `content-writer` failed its cold read TWICE on different clauses with this one
+    section on one side of the contradiction both times, so the cause is structural. The
+    template already names the hazard for a single case — "Its expected result is stated on
+    the `Check:` line and nowhere else — two statements of one value drift, and a reader
+    honors the first while the employee honors the second" — and the second probe is that
+    sentence coming true in the handbook that quotes it (`## Verification` stated the
+    Check's expectation as a printed count of `0`, `## Exit criteria` as "exits 0"; for
+    `grep -c` those are mutually exclusive).
+
+    RESTATEMENT IS NOT A SYNONYM FOR DISAGREEMENT, which is why the check is on the FORM
+    and not on a diff of the two values. The measured third instance had not diverged in
+    verdict, it had NARROWED: `## Procedure` 4 governs "a shipped file" and the bullet said
+    "every NEW shipped file", silently exempting a file whose git tracking breaks by rename.
+    Nothing comparing the two strings for equality sees that, and a reader honoring the
+    bullet ships the defect.
+
+    SCOPED TO THE PREAMBLE, so it is opt-in by construction: a handbook whose
+    `## Exit criteria` makes no such promise is not under this rule and is not read here.
+
+    ADVISORY, for the reason the coverage row above is: compliance is recognised by a
+    phrase list, so a bullet that defers in a wording not on the list is a false positive on
+    a conforming handbook. A detector that fires where the author already complied is the
+    failure this file's own catalog table records at 38%.
+    """
+    ec = section(body, "## Exit criteria")
+    if ec is None or not EXIT_PREAMBLE_RX.search(ec):
+        return
+    # A wrapped bullet is ONE bullet. Its deferral phrase lands on the continuation line
+    # about as often as on the first, and reading lines independently reports a conforming
+    # handbook for where its line breaks fell.
+    bullets, cur = [], None
+    for line in ec.splitlines():
+        if line.startswith("- "):
+            if cur:
+                bullets.append(cur)
+            cur = line[2:].strip()
+        elif cur is not None:
+            if line.strip():
+                cur += " " + line.strip()
+            else:
+                bullets.append(cur)
+                cur = None
+    if cur:
+        bullets.append(cur)
+    # The trailing space is the phrase boundary — `that section ` must not match a bullet
+    # that merely contains the word `section`. Appending one lets the phrase close a
+    # bullet, which is where a deferral most often sits: "…, exactly as that step states."
+    bad = [b for b in bullets if not EXIT_DEFER_RX.search(b + " ")]
+    if not bad:
+        return
+    res.advise(
+        f"{n}: exit criteria restates a value another section owns ({len(bad)} bullet(s))",
+        "this section's own preamble says it never restates what a condition means, and "
+        f"these bullets state one instead of citing its owner: \"{bad[0][:70]}\""
+        + (f" and {len(bad) - 1} more" if len(bad) > 1 else "")
+        + ". Name the condition and defer — `exactly as that section states`, `exactly as "
+        "that step states` — so the value has one author. Two statements of one value "
+        "drift, and the measured drift was a NARROWING the reader honored. See "
+        "ORG-exit-criteria-restates-001; the fix path is `audit` Step 5d. ADVISORY: this "
+        "row blocks nothing")
+
+
 def check_companions(root, res, governed_n):
     """INV-COMPANIONS — after an audit, every core companion skill is on disk.
 
@@ -1995,6 +2222,13 @@ def main():
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
             check_catalog_read(_name, body, res, _catread)
+            # GOVERNED ONLY, and deliberately outside `check_handbook` for that reason:
+            # `--strict-adopted` holds an adopted agent to the handbook contract, and
+            # neither of these is a contract workforce can hold a file it did not author
+            # to — a probe table and an exit-criteria preamble are shapes this skill
+            # writes. Same placement, same reason, as the two rows above.
+            check_probe_substitution(_name, body, res)
+            check_exit_criteria_defers(_name, body, res)
         elif args.strict_adopted:
             check_handbook(p, body, res, args.ceiling)
         else:
