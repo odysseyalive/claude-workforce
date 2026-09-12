@@ -153,7 +153,7 @@ If you want to go further back, `/workforce restore` overwrites everything from 
 ### One brain can't do every job
 
 ![An overwhelmed craftsperson at a cluttered workbench trying to do too many trades at once, while through doorways behind them specialists each work calmly at their own station](assets/images/one-brain-every-job.png)
-*One worker doing every trade at once. Through the doorways, specialists who each do one thing well.*
+*Three specialists standing in three doorways, and we're still asking the one at the bench to do all of it.*
 
 You ask your AI assistant to write homepage copy, then debug the checkout flow, then review a design comp. It does all three. The copy reads like a machine wrote it because the model that was running is built to write code, not sentences. The design review says "looks good" when the hero image is missing because a code model doesn't know what to look for in a layout. And the debug takes three passes because it's running on a model optimized for prose.
 
@@ -172,7 +172,7 @@ There is a second problem, and it compounds the first. Instructions you give at 
 Managing by hand works until it doesn't, and the failure is invisible. The assistant stops following a rule it was given an hour ago, and you don't notice because it doesn't announce that it forgot.
 
 ![A forest path where breadcrumbs are being eaten by woodland creatures, but ahead the path leads to a warmly lit village of distinct workshops](assets/images/from-breadcrumbs-to-company.png)
-*Instructions left at the start of a conversation get consumed by everything after. Employees don't fade. They have an address.*
+*Instructions vanish about halfway through. Nobody announces it. The workshop with a sign on the door? Still there.*
 
 ### Name an owner, a scope, a check
 
@@ -185,7 +185,7 @@ A set of instructions with those three things is an employee. A set of employees
 ### Breaking out of the tunnel vision
 
 ![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
-*The focused worker can't see the crack in the wall. The person outside can't miss it.*
+*You stop seeing the crack when you've been looking through the loupe all day. The person outside the window just got here.*
 
 A model deep in a task locks onto its first reading and stops questioning it. The more powerful the model, the worse this gets. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) in *Nature Machine Intelligence* (2026): seeing its own prior answer drops a model's willingness to change by 71%. Sharma et al. at Anthropic [documented sycophancy](https://arxiv.org/abs/2310.13548), models telling users what they want to hear. Jhaveri et al. [showed confirmation bias](https://arxiv.org/abs/2604.02485) in hypothesis exploration. Put those together and you get a model that walks confidently in the wrong direction.
 
@@ -196,7 +196,7 @@ So the fix is never "look again." The widening mechanism classifies each ask bef
 ### "Done" means proven
 
 ![A craftsperson holding a finished piece up to a measuring gauge on the wall that reads PASSED, with completed items tagged green in a row on the bench and one rejected piece tagged red set apart](assets/images/done-means-proven.png)
-*The gauge doesn't care who built it. It passes or it doesn't.*
+*We always have a good reason it should pass. The gauge didn't ask.*
 
 This is the part that separates the system from a prompt template. Every employee names something that proves the work is finished: a command that returns successful, a set of tests that pass, a file that has to exist. Work that can't be checked by a command gets checked against a written catalog, a list of specific tells a reviewer grades against. *"Does this read as machine-written?"* is a matter of opinion. *"Does this trip three of these twelve specific tells?"* is close to mechanical.
 
