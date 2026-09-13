@@ -252,6 +252,21 @@ TTAG = "workforce/bin/wf-task-tag"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # THE LOOP BOUND. Deleting the argument leaves `os.remove` as a bare name: valid
+    # Python that removes nothing, so a continuation Stop keeps the stale flag.
+    ("widen agent: a continuation Stop finds no flag, so the agent blocks once per turn",
+     WDN, "del", "(widen_flag(payload))"),
+    # THE ASKS CHECKLIST, two ways to break it. Without the early return a finished list
+    # still blocks; without the injected test a background notification gets a list.
+    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
+     WDN, "del", "    if items and not still:\n        return out\n"),
+    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
+     TTAG, "del", "INJECTED.search(prompt) or "),
+    # THE READER ROLE. Deleting the whole `roles.add` line leaves an `if` with no body and
+    # bin/check dies before any assertion runs. Deleting only the call leaves `roles` as a
+    # bare name, so nothing is ever a reader and every hand-off reads as orphaned.
+    ("hooks: a detector ships with its actor — no hand-off is written and never read",
+     "bin/check", "del", '.add("reader")'),
     # Removing the write weighting spends the same attention on a read-only turn as on
     # one that rewrote the tree unclassified.
     # TARGET A LITERAL, NOT A LINE. Deleting the whole `rate = ...` line left another
