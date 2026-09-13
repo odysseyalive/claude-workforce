@@ -12177,6 +12177,33 @@ check(
     "on the same stale conclusion, unbounded until the user types",
 )
 
+# THE CHECK ABOVE PASSED WHILE THE LOOP RAN. It tests that the prompt SAYS to stop, and an
+# agent is free to ignore what its prompt says. MEASURED 2026-09-12 in claude-enforcer: the
+# guard sentence was live and the agent still blocked four continuations in a row on one
+# stale conclusion. So the bound is run here, not read: a continuation Stop must delete the
+# flag, and a SubagentStop continuation must leave it, because a subagent finishing mid-turn
+# is not the main turn's continuation and must not cancel the audit of it.
+def _widen_consumes(event):
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        flag = os.path.join(d, "wf-widen-flag.s1.json")
+        with open(flag, "w") as fh:
+            fh.write("{}")
+        subprocess.run([os.path.join(ROOT, "workforce/bin/wf-widen")], input=json.dumps(
+            {"stop_hook_active": True, "hook_event_name": event, "session_id": "s1",
+             "scratchpad_dir": d}), capture_output=True, text=True, timeout=30)
+        return not os.path.exists(flag)
+
+check(
+    "widen agent: a continuation Stop finds no flag, so the agent blocks once per turn",
+    _widen_consumes("Stop") and not _widen_consumes("SubagentStop")
+    and "never grounds for a no" in _ds_agent_block,
+    "the prompt's own stop_hook_active line is advisory; the agent ignored it and held a "
+    "session through five Stops until the user typed. Deleting the flag on the continuation "
+    "is the mechanical bound, and the offer clause stops a juror reading \"want me to push "
+    "it?\" as a plan the turn failed to carry out",
+)
+
 check(
     "org producer: Step 0.3 CALLS the producer instead of describing materialization",
     '"$WF/bin/wf-companion"' in _asu and "--execute  # materialize it" in _asu,

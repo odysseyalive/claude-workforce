@@ -155,6 +155,14 @@ Three parts, cheap to expensive, so the expensive one only runs when it is earne
    EVIDENCE supports the CONCLUSION for that ASK — verifying against the repository
    rather than taking the turn's word for it.
 
+**The agent can block once per turn, and that bound is mechanical.** A blocked Stop
+continues with `stop_hook_active: true`, and on that firing `wf-widen` deletes the flag, so
+the agent finds none and returns `ok: true`. The prompt says the same thing as a second
+layer; the deletion is the guard. MEASURED 2026-09-12: with the guard only in the prompt,
+the agent blocked five Stops in a row, four of them continuations re-reading one stale
+conclusion. The agent had read "commit it (or push it too)", an offer to the user, as a
+plan the turn had failed to carry out, and the loop ended only when the user typed.
+
 **Nothing in steps 1 and 2 scores anything, and that is a directive rather than a
 design taste.** *"you have to measure results, not measure what you're doing and it has
 to be aligned with the current request"*, and *"Evaluations are always done by the

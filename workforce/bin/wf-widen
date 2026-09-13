@@ -492,7 +492,24 @@ def main():
         return 0
     # THE LOOP STOP. Set on the second and later firings for one turn; without this a
     # widen that keeps scoring low blocks forever and the session is dead.
+    #
+    # IT ALSO CONSUMES THE FLAG, because this hook's return is not the one that can hold
+    # the session. `wf-widen-agent` blocks, and nothing clears its flag on a continuation
+    # (`wf-task-tag` fires only when the user types), so it re-read the first Stop's
+    # conclusion on every continuation. Its prompt told it to stop on `stop_hook_active`,
+    # and MEASURED 2026-09-12 it did not: four continuations blocked in a row on one stale
+    # conclusion. A missing file is a bound a prompt cannot talk its way past. The same
+    # ordering already carries the flag's write on the first Stop: this command finishes in
+    # ~50ms, and the agent needs a model round-trip before its first Read.
+    #
+    # Main `Stop` only. A subagent finishing mid-turn is not the main turn's continuation,
+    # and deleting the flag there would cancel an audit nobody had run yet.
     if payload.get("stop_hook_active"):
+        if payload.get("hook_event_name") != "SubagentStop":
+            try:
+                os.remove(widen_flag(payload))
+            except OSError:
+                pass
         return 0
 
     # WF_WIDEN_THRESHOLD is gone with the score it gated. A threshold implies a scale,
