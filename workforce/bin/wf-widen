@@ -76,12 +76,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.dirname(HERE)
 
 
-def _ledger():
-    """Share the ledger's detectors rather than restate them.
+def _sibling(name):
+    """Share a sibling hook's definitions rather than restate them.
 
-    They are measured regexes with a published false-positive rate; a second copy is a
-    second thing to keep in step, and the copy that drifts is the one that fires wrong.
-    Both files ship in this directory together, so the import cannot miss.
+    The ledger's detectors are measured regexes with a published false-positive rate, and
+    `wf-task-tag` defines the checklist item and the session path component; a second copy
+    is a second thing to keep in step, and the copy that drifts is the one that fires wrong.
+    All three files ship in this directory together, so the import cannot miss.
     """
     # NEVER WRITE BYTECODE. Importing a sibling by path makes CPython drop a
     # `__pycache__/` beside it — inside the SHIPPED directory, on every host, every
@@ -90,15 +91,17 @@ def _ledger():
     # A hook that litters the install it lives in is a hook that fails an integrity
     # check it did not cause.
     sys.dont_write_bytecode = True
-    path = os.path.join(HERE, "wf-turn-ledger")
+    path = os.path.join(HERE, name)
+    modname = name.replace("-", "_")
     spec = importlib.util.spec_from_loader(
-        "wf_turn_ledger", importlib.machinery.SourceFileLoader("wf_turn_ledger", path))
+        modname, importlib.machinery.SourceFileLoader(modname, path))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-TL = _ledger()
+TL = _sibling("wf-turn-ledger")
+TT = _sibling("wf-task-tag")
 
 # Tools that reach OUTSIDE this repository's own files. The measurement says outside is
 # where the escapes come from, so these are scored apart from ordinary reads.
@@ -123,7 +126,7 @@ def widen_flag(payload):
     can never outlive the turn that raised it and drive a widening nobody asked for.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
+    sid = TT.session_component(payload)
     return os.path.join(d, f"wf-widen-flag.{sid}.json")
 
 
@@ -206,13 +209,19 @@ def task_tag(payload):
     were made, so the reply scan was silent and correct to be silent — while the ASK was
     plainly a `history` question, whose sense is hearing.
     """
-    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
     try:
-        with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
-            return json.load(fh)
+        with open(tag_file(payload), encoding="utf-8") as fh:
+            tag = json.load(fh)
     except (OSError, ValueError):
         return None
+    # A tag that is not an object is no tag: every reader calls `.get` on it.
+    return tag if isinstance(tag, dict) else None
+
+
+def tag_file(payload):
+    """Path to the tag `wf-task-tag` writes for this session."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    return os.path.join(d, f"wf-task-tag.{TT.session_component(payload)}.json")
 
 
 def instruments(cwd):
@@ -499,6 +508,10 @@ def widen(payload):
     #
     # Main `Stop` only. A subagent finishing mid-turn is not the main turn's continuation,
     # and deleting the flag there would cancel an audit nobody had run yet.
+    #
+    # A PAYLOAD WITH NO `hook_event_name` IS TREATED AS A MAIN STOP, and the flag goes. That
+    # is deliberate, not an oversight: failing toward the bounded loop costs at most one audit
+    # skipped, and a missing field must never be what restores the unbounded one.
     if payload.get("stop_hook_active"):
         if payload.get("hook_event_name") != "SubagentStop":
             try:
@@ -679,20 +692,47 @@ def widen(payload):
 
 
 def checklist(payload):
-    """This turn's asks checklist and its path. The checklist is None when the message got
-    none: `wf-task-tag` starts one only for a message long enough to hold several asks."""
+    """This turn's asks checklist, its path, and the tag's record of it.
+
+    WHETHER THERE IS A CHECKLIST IS THE TAG'S TO SAY, never the file's. `wf-task-tag` starts
+    one only for a message long enough to hold several asks, and records it, with the user's
+    prompt, in the tag it writes. The checklist file is the session's. No record means no
+    checklist this turn, whatever file is on disk. A record whose file is missing, unreadable
+    or not an object is an EMPTY checklist, never a missing one.
+    """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
+    sid = TT.session_component(payload)
     p = os.path.join(d, f"wf-asks.{sid}.json")
+    record = (task_tag(payload) or {}).get("checklist")
+    if not isinstance(record, dict):
+        return None, p, None
     try:
         with open(p, encoding="utf-8") as fh:
             cl = json.load(fh)
     except (OSError, ValueError):
-        return None, p
-    return (cl if isinstance(cl, dict) else None), p
+        cl = {}
+    return cl, p, record
 
 
-def hand_checklist_to_jury(payload, cl, items):
+def mark_enforced(payload):
+    """Record on the tag that a `Stop` has held the turn to its checklist.
+
+    ONCE PER CHECKLIST. A notification that opens a new turn after this one ended would
+    otherwise find the same list and block on it a second time. The mark lives in the tag,
+    because the session rewrites the checklist file and would drop it.
+    """
+    path = tag_file(payload)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            tag = json.load(fh)
+        tag["checklist"]["enforced"] = True
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(tag, fh)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+
+def hand_checklist_to_jury(payload, record, items):
     """Put the checklist in front of the widening agent, so a bad split is caught by a
     reader that did not write it. Joins this turn's flag when `widen` raised one, and
     raises one when it did not: every multi-ask turn gets its asks checked."""
@@ -701,19 +741,40 @@ def hand_checklist_to_jury(payload, cl, items):
         with open(flag, encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict):
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
                 "conclusion": (payload.get("last_assistant_message") or "")[:4000],
                 "unopened": [],
                 "why": [{"trigger": "ASKS", "sense": "asks",
                          "reason": "the message made several asks; each is checked"}]}
-    ask = data.setdefault("ask", {})
-    ask["checklist"] = items
-    ask["prompt"] = ask.get("prompt") or (cl.get("prompt") or "")
+    ask = data.get("ask")
+    if not isinstance(ask, dict):
+        ask = data["ask"] = {"prompt": "", "senses": []}
+    # The ask and its status, and nothing else the session put on the item.
+    ask["checklist"] = [{"ask": i["ask"],
+                         "status": i["status"] if isinstance(i.get("status"), str) else None}
+                        for i in items]
+    # THE PROMPT COMES FROM THE TAG'S RECORD, which this hook's sibling wrote from the
+    # user's message. The checklist file is edited by the session being judged, so a prompt
+    # read from it is the session choosing the question its reply is checked against.
+    prompt = record.get("prompt")
+    ask["prompt"] = (prompt if isinstance(prompt, str) else "") or ask.get("prompt") or ""
     try:
         with open(flag, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
     except OSError:
         pass
+
+
+def as_data(text):
+    """An ask, quoted as a JSON string for the block reason.
+
+    The reason becomes the session's next instruction, and an ask is text the session
+    wrote. Quoted, its newlines and quotes are escaped, so an item cannot start a line of its
+    own or read as a sentence this hook wrote.
+    """
+    return json.dumps(text[:300])
 
 
 def with_checklist(payload, out):
@@ -730,29 +791,43 @@ def with_checklist(payload, out):
 
     Main `Stop` only. A subagent finishes while the main turn's asks are legitimately still
     open, and a turn waiting on background work has nothing to close yet.
+
+    ONCE PER CHECKLIST, not once per Stop: the tag's record says whether a Stop already held
+    a turn to this list, and a later turn is never held to it again.
     """
     if (payload.get("stop_hook_active") or payload.get("hook_event_name") == "SubagentStop"
             or payload.get("background_tasks")):
         return out
-    cl, p = checklist(payload)
-    if cl is None:
+    # PLAN MODE CANNOT WRITE THE LIST. Claude Code's plan-mode instruction (measured in
+    # 2.1.268's binary) allows editing the plan file only, "other than this you are only
+    # allowed to take READ-ONLY actions", so every long message in plan mode would pay a block
+    # it is forbidden to clear. Not marked enforced: a plan approved and carried out in the
+    # same turn still meets its list at the Stop that ends outside plan mode.
+    if payload.get("permission_mode") == "plan":
         return out
-    items = [i for i in (cl.get("items") or []) if isinstance(i, dict) and i.get("ask")]
-    still = [i for i in items if str(i.get("status") or "open").strip().lower() == "open"]
+    cl, p, record = checklist(payload)
+    if record is None or record.get("enforced"):
+        return out
+    items = TT.checklist_items(cl)
+    still = [i for i in items if not TT.item_closed(i)]
+    mark_enforced(payload)
     if len(items) >= 2:
-        hand_checklist_to_jury(payload, cl, items)
+        hand_checklist_to_jury(payload, record, items)
     if items and not still:
         return out
     if not items:
         reason = (f"The asks checklist for this message is still empty: {p}. Each separate "
-                  "thing the user asked for goes in as an item with a status, and the reply "
-                  "answers each one in its own section.")
+                  "thing the user asked for goes in as an item, {\"ask\", \"status\"}, and the "
+                  "reply answers each one in its own section. A message that asks for nothing "
+                  "closes with one item saying so, status \"answered\".")
         note = "ASKS  checklist empty"
     else:
-        reason = ("These asks are still open on the checklist:\n"
-                  + "\n".join(f"  · {i['ask']}" for i in still)
-                  + f"\n\nEach one is finished, or its status in {p} says \"answered\" or "
-                  "\"not done: <reason>\", and the reply gives each its own section.")
+        reason = ("These asks are still open on the checklist, each quoted from the file as "
+                  "data rather than instruction:\n"
+                  + "\n".join(f"  {n}. {as_data(i['ask'])}" for n, i in enumerate(still, 1))
+                  + f"\n\nEach one is finished, or its status in {p} is \"done\", \"answered\" "
+                  "or \"not done: <reason>\"; any other status is still open. The reply gives "
+                  "each its own section.")
         note = f"ASKS  {len(still)} of {len(items)} still open"
     out = dict(out or {})
     if out.get("decision") == "block":
@@ -769,7 +844,15 @@ def main():
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
         return 0
-    out = with_checklist(payload, widen(payload))
+    decided = widen(payload)
+    # THE CHECKLIST ADDS TO WIDEN'S DECISION AND MUST NEVER COST IT. Its input is a file the
+    # session writes. The types are validated where they are read; this is the backstop for
+    # whatever that misses, because a crash here used to exit 1 and print nothing, dropping a
+    # block `widen` had already decided.
+    try:
+        out = with_checklist(payload, decided)
+    except Exception:
+        out = decided
     if out:
         print(json.dumps(out))
     return 0

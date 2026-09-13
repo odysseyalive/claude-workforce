@@ -95,6 +95,13 @@ INJECTED = re.compile(
     # 2026-09-13: the first live asks checklist opened on a task notification.
     r"|<(?:[a-z-]+-message|system-reminder|task-notification)\b)", re.I)
 
+# THE ONE PREFIX THAT MAY LEAVE A CHECKLIST STANDING, and it is narrower than INJECTED on
+# purpose. A background task finishing is the only harness text MEASURED firing this event in
+# the middle of a turn (2026-09-13). Every other INJECTED prefix is also something a user can
+# paste at the start of a real message ("Stop hook feedback: ...", "Caveat:", a copied
+# reminder), and a real message must never inherit last turn's asks.
+NOTIFICATION = re.compile(r"^\s*<task-notification\b", re.I)
+
 KINDS = [
     ("history", re.compile(
         r"\b(why (?:was|were|did|is it)|when (?:was|were|did)|who (?:removed|changed|added)"
@@ -276,11 +283,55 @@ def classify(prompt):
     return hits
 
 
+_UNSAFE_SID = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def session_component(payload):
+    """The session id as ONE filename component, for every per-session path the hooks build.
+
+    These paths are written and removed. A raw id of `x/../../escaped` walked out of the
+    scratchpad whenever an intermediate directory existed. A real id is a UUID and passes
+    through unchanged. `wf-widen` and `wf-commitments` import this rather than restate it.
+    """
+    sid = str(payload.get("session_id") or "")
+    sid = _UNSAFE_SID.sub("_", sid)
+    return sid[:64] or "nosession"
+
+
 def tag_path(payload):
     """Where the tag waits for `Stop`. Session-scoped, so two sessions never cross."""
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
+    sid = session_component(payload)
     return os.path.join(d, f"wf-task-tag.{sid}.json")
+
+
+# WHAT AN ITEM IS AND WHAT CLOSES ONE, defined once. `wf-widen` blocks on these and
+# `wf-commitments` counts them, and the two used to disagree: one counted items with no `ask`,
+# the other dropped them, and any status but "open" counted as closed, "in progress" included.
+CLOSED_STATUSES = ("done", "answered")
+
+
+def checklist_items(cl):
+    """The items on a checklist: JSON objects with a non-empty string `ask`. An `items` that is
+    not a list holds no items, so a malformed file reads as an empty checklist."""
+    items = cl.get("items") if isinstance(cl, dict) else None
+    if not isinstance(items, list):
+        return []
+    return [i for i in items
+            if isinstance(i, dict) and isinstance(i.get("ask"), str) and i["ask"].strip()]
+
+
+def item_closed(item):
+    """Closed is "done", "answered", or "not done: <reason>" with a reason. Anything else is
+    open, a missing status included."""
+    status = item.get("status")
+    if not isinstance(status, str):
+        return False
+    status = " ".join(status.split()).lower()
+    if status in CLOSED_STATUSES:
+        return True
+    reason = status[len("not done:"):].strip() if status.startswith("not done:") else ""
+    return bool(reason)
 
 
 # THE ASKS CHECKLIST. `count_asks` stays regex-only and numbered-only, for the reason given
@@ -304,44 +355,67 @@ CHECKLIST_MIN_WORDS = 12
 def checklist_path(payload):
     """Where this turn's asks checklist lives. Session-scoped, like the tag."""
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
+    sid = session_component(payload)
     return os.path.join(d, f"wf-asks.{sid}.json")
 
 
-def start_checklist(payload):
-    """Replace last turn's checklist with an empty one for this ask. Returns the context
-    line naming it, or "" when this message gets no checklist.
+def previous_checklist(payload):
+    """The checklist record the last tag carried, or None. The record is this hook's, kept in
+    the tag file, because the checklist file is the session's to rewrite and cannot be trusted
+    to hold the user's prompt or whether `Stop` already held the turn to it."""
+    try:
+        with open(tag_path(payload), encoding="utf-8") as fh:
+            tag = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    rec = tag.get("checklist") if isinstance(tag, dict) else None
+    return rec if isinstance(rec, dict) else None
 
-    Last turn's file is always removed first, so a short reply never inherits a list of
-    asks it was never given.
+
+def start_checklist(payload, prev=None):
+    """Replace last turn's checklist with an empty one for this ask. Returns the context line
+    naming it ("" when this message gets none) and the record the tag carries (None when none).
+
+    Last turn's file is removed first, so a short reply never inherits a list of asks it was
+    never given.
     """
     prompt = payload.get("prompt") or ""
-    # INJECTED TEXT IS NOT A NEW MESSAGE, so it leaves the checklist alone. MEASURED
-    # 2026-09-13: a background task finished mid-turn, its notification fired this event,
-    # and the remove below erased the checklist for the user's real message.
-    if INJECTED.search(prompt):
-        return ""
     p = checklist_path(payload)
+    # A NOTIFICATION MID-TURN LEAVES THE CHECKLIST ALONE. MEASURED 2026-09-13: a background task
+    # finished mid-turn, its notification fired this event, and the remove below erased the
+    # checklist for the user's real message.
+    #
+    # BOTH CONDITIONS, and each closes a measured stale case. The prefix is NOTIFICATION, not
+    # INJECTED, so a real message that starts "Stop hook feedback:" gets a clean slate. The
+    # record must not be enforced yet: once `wf-widen` has held a turn to the list, that turn
+    # is over, and a notification that opens a NEW turn afterwards must not keep a list that
+    # was already enforced.
+    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("enforced")
+            and os.path.exists(p)):
+        return "", prev
     try:
         os.remove(p)
     except OSError:
         pass
-    if len(prompt.split()) < CHECKLIST_MIN_WORDS:
-        return ""
+    # Injected text opens no list of its own: it is not the user's ask.
+    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+        return "", None
     try:
         with open(p, "w", encoding="utf-8") as fh:
             json.dump({"prompt": prompt[:2000], "items": []}, fh)
     except OSError:
-        return ""
+        return "", None
+    record = {"prompt": prompt[:2000], "enforced": False}
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
     return (f"Asks checklist for this message: {p}. It holds {{\"prompt\", \"items\"}} and "
             "starts with no items. Each separate thing the message asks for is one item, "
             "{\"ask\": <in the user's words>, \"status\": \"open\"}, written before the work "
             "starts. Status becomes \"done\", \"answered\", or \"not done: <reason>\" as the "
-            "work goes, and an ask found along the way is added as a new item. At Stop an "
-            "empty list or an open item sends the turn back once, and the reply gives each "
-            "item its own section, in order.")
+            "work goes; any other status is still open. An ask found along the way is added "
+            "as a new item, and a message that asks for nothing gets one item saying so, "
+            "with status \"answered\". At Stop an empty list or an open item sends the turn "
+            "back once, and the reply gives each item its own section, in order."), record
 
 
 def main():
@@ -359,12 +433,13 @@ def main():
     # place a per-turn artifact can be guaranteed cleared.
     try:
         d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-        sid = (payload.get("session_id") or "nosession")[:64]
+        sid = session_component(payload)
         os.remove(os.path.join(d, f"wf-widen-flag.{sid}.json"))
     except OSError:
         pass
 
-    checklist_line = start_checklist(payload)
+    # Read before either write below replaces the tag that holds it.
+    checklist_line, checklist_record = start_checklist(payload, previous_checklist(payload))
 
     hits = classify(payload.get("prompt") or "")
     if not hits:
@@ -389,7 +464,8 @@ def main():
             with open(tag_path(payload), "w", encoding="utf-8") as fh:
                 _n, _how = count_asks(payload.get("prompt") or "")
                 json.dump({"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
-                           "senses": [], "asks": _n, "asks_why": _how}, fh)
+                           "senses": [], "asks": _n, "asks_why": _how,
+                           "checklist": checklist_record}, fh)
         except OSError:
             pass
         if checklist_line:
@@ -415,7 +491,11 @@ def main():
                        # blended answer to three questions is how a reader loses track
                        # of which were addressed, and re-reading it later is worse.
                        "asks": count_asks(payload.get("prompt") or "")[0],
-                       "asks_why": count_asks(payload.get("prompt") or "")[1]}, fh)
+                       "asks_why": count_asks(payload.get("prompt") or "")[1],
+                       # THE CHECKLIST RECORD: the user's prompt and whether `Stop` has
+                       # enforced it. Kept here, in a file this hook writes, and never in the
+                       # checklist file the session edits.
+                       "checklist": checklist_record}, fh)
     except OSError:
         pass        # the injection below still lands; the Stop half degrades quietly
 

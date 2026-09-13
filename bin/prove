@@ -260,8 +260,45 @@ CASES = [
     # still blocks; without the injected test a background notification gets a list.
     ("asks checklist: opened per message, and an empty or open list sends the turn back once",
      WDN, "del", "    if items and not still:\n        return out\n"),
+    # Retargeted 2026-09-13 when the keep rule narrowed: the mid-turn keep is now its own
+    # branch, and deleting it lets a notification erase the list again.
     ("asks checklist: opened per message, and an empty or open list sends the turn back once",
-     TTAG, "del", '    if INJECTED.search(prompt):\n        return ""\n'),
+     TTAG, "del", '    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("enforced")\n'
+                  '            and os.path.exists(p)):\n        return "", prev\n'),
+    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
+     TTAG, "del", "INJECTED.search(prompt) or "),
+    # THE REVIEW FIXES, 2026-09-13, one break per fix.
+    # A list that is not a list reaches iteration and the backstop swallows the checklist.
+    ("asks checklist: a malformed checklist, tag or flag never costs widen its own block",
+     TTAG, "del", "    if not isinstance(items, list):\n        return []\n"),
+    # Each enforce-once layer alone: the tag hook keeps an enforced list, or widen re-reads one.
+    ("asks checklist: held to once, so a later turn never blocks on a list already enforced",
+     TTAG, "del", ' and not prev.get("enforced")'),
+    ("asks checklist: held to once, so a later turn never blocks on a list already enforced",
+     WDN, "del", ' or record.get("enforced")'),
+    ("asks checklist: a user message that looks injected never inherits the last turn's list",
+     TTAG, "del", "NOTIFICATION.search(prompt) and "),
+    ("asks checklist: an open item reaches the block as quoted data, and the jury's prompt is the hook's",
+     WDN, "del", "json.dumps(text[:300])"),
+    ("asks checklist: an open item reaches the block as quoted data, and the jury's prompt is the hook's",
+     WDN, "del", 'prompt if isinstance(prompt, str) else ""'),
+    # Without the docstring strip, a function whose only mention is prose is a reader again.
+    ("hooks: a hand-off named only in a comment or docstring does not make its function a reader",
+     "bin/check", "del", "    tree = _NoProse().visit(tree)\n"),
+    # "in progress"[9:] is "ss": without the prefix test every status reads as a reason.
+    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
+     TTAG, "del", ' if status.startswith("not done:") else ""'),
+    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
+     TTAG, "del", ' and isinstance(i.get("ask"), str) and i["ask"].strip()'),
+    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
+     WDN, "del", "A message that asks for nothing "),
+    ("hooks: a session id cannot walk a per-session path out of the scratchpad",
+     TTAG, "del", '    sid = _UNSAFE_SID.sub("_", sid)\n'),
+    # `if payload.get("hook_event_name"):` keeps the flag when the field is missing.
+    ("widen: a continuation Stop with no hook_event_name still consumes the flag",
+     WDN, "del", ' != "SubagentStop"'),
+    ("asks checklist: plan mode, which cannot write the list, is never blocked for it",
+     WDN, "del", '    if payload.get("permission_mode") == "plan":\n        return out\n'),
     # THE READER ROLE. Deleting the whole `roles.add` line leaves an `if` with no body and
     # bin/check dies before any assertion runs. Deleting only the call leaves `roles` as a
     # bare name, so nothing is ever a reader and every hand-off reads as orphaned.

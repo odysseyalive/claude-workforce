@@ -36,10 +36,28 @@ item wrongly kept is one line a reader dismisses.
 EXIT CODES: 0 always.
 """
 
+import importlib.machinery
+import importlib.util
 import json
 import os
 import re
 import sys
+
+
+def _task_tag():
+    """`wf-task-tag`, imported for its checklist item and session path definitions. They are
+    shared rather than restated because `wf-widen` blocks on the same items this counts."""
+    # Importing by path would drop a __pycache__ into the shipped directory.
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-task-tag")
+    spec = importlib.util.spec_from_loader(
+        "wf_task_tag", importlib.machinery.SourceFileLoader("wf_task_tag", path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+TT = _task_tag()
 
 # A STATED INTENTION, not a description of work already done. Present and past tense are
 # excluded on purpose: "I wired the manifest" is a report and "I'll wire the manifest" is
@@ -136,22 +154,26 @@ def asks_expected(payload):
     nobody took is the vacuous-pass shape this project refuses everywhere.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = (payload.get("session_id") or "nosession")[:64]
+    sid = TT.session_component(payload)
     try:
         with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
             tag = json.load(fh)
     except (OSError, ValueError):
         return None, ""
+    if not isinstance(tag, dict):
+        return None, ""
     # THE CHECKLIST BEATS THE COUNT. `count_asks` only sees numbered asks; the checklist
     # holds the asks the session split out of plain prose, so when it has items it is the
-    # better number.
-    try:
-        with open(os.path.join(d, f"wf-asks.{sid}.json"), encoding="utf-8") as fh:
-            items = [i for i in (json.load(fh).get("items") or []) if isinstance(i, dict)]
+    # better number. Only a checklist the tag records as started counts, and its items are
+    # counted by `wf-task-tag`'s definition, the one `wf-widen` blocks on.
+    if isinstance(tag.get("checklist"), dict):
+        try:
+            with open(os.path.join(d, f"wf-asks.{sid}.json"), encoding="utf-8") as fh:
+                items = TT.checklist_items(json.load(fh))
+        except (OSError, ValueError):
+            items = []
         if items:
             return len(items), f"{len(items)} item(s) on the asks checklist"
-    except (OSError, ValueError, AttributeError):
-        pass
     n = tag.get("asks")
     return (n if isinstance(n, int) else None), (tag.get("asks_why") or "")
 
