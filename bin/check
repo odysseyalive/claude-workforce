@@ -6725,8 +6725,11 @@ _CMD_WRITE_RX = re.compile(
     r"|`?CLAUDE\.md`?[^.\n]{0,60}?" + _CMD_VERBS,
     re.I)
 _claude_md_producers = []
-for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + [
-        "install", "install.ps1", "README.md"]:
+# A change record is commit history projected by bin/gen-changes, never a step; its one
+# instruction (the heal line) is gen-changes' own fixed text, so the generator is scanned.
+for _p in sorted(_q for _q in glob.glob("workforce/**/*.md", recursive=True)
+                 if not _q.startswith("workforce/changes/")) + [
+        "install", "install.ps1", "README.md", "bin/gen-changes"]:
     try:
         _b = open(_p, encoding="utf-8").read()
     except OSError:

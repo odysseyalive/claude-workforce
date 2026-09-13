@@ -749,6 +749,13 @@ CASES = [
      TPL2, "del", "WORKFORCE WRITES NOTHING INTO `CLAUDE.md`"),
     ("no shipped file instructs writing or creating CLAUDE.md",
      CHK, "del", '"USED TO", "used to", "stops", "no longer",'),
+    # The changes/ exclusion is load-bearing: workforce/changes/1.57.1.md:23 is a past-tense
+    # producer-shaped line, so scanning release records again must turn the check red.
+    ("no shipped file instructs writing or creating CLAUDE.md",
+     CHK, "del", 'if not _q.startswith("workforce/changes/")'),
+    # ...and the generator that writes a record's one instruction is scanned in its place.
+    ("no shipped file instructs writing or creating CLAUDE.md",
+     "bin/gen-changes", "append", "\n# Then write CLAUDE.md at the repo root.\n"),
     ("wf-census publishes immutable spans per file, with line numbers",
      CEN, "del", "sacred_lines.append(lineno)"),
     ("wf-conform computes T2 coverage for a removal target",
