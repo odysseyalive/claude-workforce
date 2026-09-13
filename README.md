@@ -20,12 +20,13 @@ Claude Workforce turns that instinct into a company. One command reads your proj
 ## Contents
 
 - [Install](#install)
-- [How to Use](#how-to-use)
+- [Getting Started](#getting-started)
+- [Advanced Use](#advanced-use)
+- [Blueprints](#blueprints)
 - [Uninstall](#uninstall)
 - [Why This Exists](#why-this-exists)
 - [The Full Theory](#the-full-theory)
 - [Standing on Shoulders](#standing-on-shoulders)
-- [Personal Project](#personal-project)
 - [License](#license)
 
 ## Install
@@ -56,17 +57,52 @@ Then restart Claude Code. You're already running. The install ships skills you c
 /text-eval check the copy on the landing page
 ```
 
-The install gives you one thing prompting can't: your AI stops being allowed to make claims it hasn't checked. It says the test passed, but it never ran the test. It says the file isn't there, but it never listed the directory. The hooks catch both and block the answer before it reaches you. A claim has to arrive through the channel that can actually produce it, and the model can't skip the channel and still hand you the conclusion. More on why that matters in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
+The install gives you one thing prompting can't: your AI stops being allowed to make claims it hasn't checked. It says the test passed, but it never ran the test. It says the file isn't there, but it never listed the directory. The hooks catch both, and Claude can't move on until the evidence is actually gathered. A claim has to arrive through the channel that can actually produce it, and the model can't skip the channel and still hand you the conclusion. More on why that matters in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
 
-And now you can ask for a plan without dropping out of auto mode. `/blueprint` researches the work, writes the plan into your project's plan directory, and stops there. It won't turn around and start building the thing it just planned.
+And now you can ask for a plan without dropping out of auto mode. That's `/blueprint`, and [Blueprints](#blueprints) walks through it.
+
+Update anytime with `/workforce update`. Full command reference in [COMMANDS.md](COMMANDS.md).
+
+## Getting Started
+
+![A young apprentice in a flat cap and canvas apron stands at an open workshop door holding a folded note, looking in at two experienced workers checking a finished wooden box: a grey-bearded man peers at a joint through a loupe while a woman with auburn hair runs a fingertip along its edge, with tools on a pegboard, wood shavings, and a window onto a green garden in morning light](assets/images/getting-started.png)
+*You bring the question. The people who didn't do the work are the ones who check it before it leaves.*
+
+You just installed. Type what you need in plain words.
 
 ```
-/blueprint the migration off the legacy auth service
+are there any pages still using the old logo?
 ```
+
+The thing is, before Claude even starts answering, the question gets sized up. What kind of proof would actually settle this? That's an "are there any" question, so every page has to be checked. When the answer comes back, it gets a second look to make sure Claude went and did it. And if it didn't, someone new who wasn't part of that answer checks what Claude said against the files. A grounding officer, basically.
+
+```
+should we switch our payments over to Stripe?
+```
+
+Then there's the jury. Say Claude recommends Stripe. A juror who wasn't part of that answer checks whether an outside voice was consulted. If not, Claude has to answer that objection before it can move on. The jurors are the six senses: sight, hearing, touch, taste, smell, intuition. Four of those gather evidence and the other two (smell and intuition) just flag concerns. Not every one sits for every question, either. More on why in [Breaking out of the tunnel vision](#breaking-out-of-the-tunnel-vision).
+
+And when Claude says "I'll update the docs next," that promise gets written down and read back to you at your next session. It stays on the books.
+
+> [!TIP]
+> **Start by just using the tools.** Don't over-direct. Everyone says that about AI and they're right. The second step is having a workflow that keeps the model grounded. That's what you get when you line up your skills and agents with Claude Workforce. Either you have a workflow or you don't. [Advanced Use](#advanced-use) shows how: `org index` to keep what you have, or an audit to convert it.
+
+## Advanced Use
+
+The audit is a big step. It reads your project and builds an org from what it finds. If you have existing skills, it converts them: the judgment part of each skill moves into an employee's handbook, the mechanical part stays behind as a leaner skill, and a skill with nothing mechanical left is deleted. It relocates every instruction in your `CLAUDE.md` into the employees, skills, and hooks that own them, then deletes the file. And it wires hooks into your settings. Before any of that, it asks whether to back up. Say yes. The backup copies `.claude/` and `CLAUDE.md` into a zip, and `/workforce restore` puts everything back exactly as it was. Skip it and the run still works, but your existing skills stay where they are instead of being cleaned up, so a few jobs end up with two copies until you delete the old ones yourself.
+
+> [!TIP]
+> But a full audit isn't necessary. If you don't want your skills, agents, or `CLAUDE.md` touched, run `org index` instead. It charts the agents you already have exactly as they are, without editing a single one, and sets up `/org` so you can hand work to them.
+
+```
+/workforce org index
+```
+
+That's it. It reads your agent files and writes two things: the org chart and the `/org` skill. It doesn't back anything up, because it doesn't change anything that would need a backup. It doesn't convert your skills, research roles, write handbooks, run cold-read tests on each one, or start agents. It just maps what you have and gives you a dispatcher.
 
 ### Running the audit
 
-When you're ready to build the full company, run the audit. This is the step that reads your project, picks the right model for each kind of work, writes handbooks, and wires the org chart. Choose the backup option when prompted so any changes the audit makes can be undone.
+When you're ready to build the full company, run the audit.
 
 ```
 /workforce audit
@@ -84,11 +120,9 @@ testdata/broken-*
 
 It never guesses: there's no `fixtures/` default and no inference from directory names, so a project that declares nothing gets everything surveyed. And it never hides what it skipped. Every run prints how many files were excluded and by which pattern.
 
-Update anytime with `/workforce update`. Full command reference in [COMMANDS.md](COMMANDS.md).
+### Using the company
 
-## How to Use
-
-Once the audit has run, describe the task in plain language. `/org` reads the org chart and hands the work to the lowest desk that can do it. You don't name an employee or pick a tier. You say what you need.
+Once you have an org chart, whether from an audit or from `org index`, describe the task in plain language. `/org` reads the chart and hands the work to the lowest desk that can do it. You don't name an employee or pick a tier. You say what you need.
 
 ```
 /org fix the pricing copy on the homepage
@@ -138,6 +172,37 @@ The copywriter won't take this. Patching a test is engineering's work, outside i
 
 More examples and the reasoning behind each rule are in [DOCTRINE.md](DOCTRINE.md).
 
+## Blueprints
+
+![A draftsperson at a slanted table drawing a blueprint by lamplight, beside a wall checklist with samples clipped beside the ticked boxes, while two builders holding a hammer and a saw wait in the hallway outside the open door](assets/images/drafting-before-building.png)
+*The builders wait outside until you call them in.*
+
+Have you ever wanted to plan something in auto mode without sitting through permission prompts? `/blueprint` takes care of that. Plan mode blocks writes, so every file it reads is a prompt you approve. `/blueprint` is instructions, not a permission mode, and it runs in whatever mode you're already in.
+
+```
+/blueprint the migration off the legacy auth service
+```
+
+Plan mode finishes by asking to start building. `/blueprint` doesn't. You get one markdown file and its path. Building happens when you say so in a new message.
+
+The file lands wherever your project already keeps plans. If you don't have a plan directory yet, it creates one.
+
+Every claim in the plan cites what backs it: a file and line, a commit, a command you can run again. Anything the session remembered but couldn't verify on disk gets labeled unverified. An unverified claim can't be the reason for a step.
+
+Before you get the path, a separate agent checks the plan. It re-reads every citation and looks for claims the evidence doesn't support. The session that wrote the plan doesn't grade it.
+
+```
+/blueprint track the billing module rebuild
+```
+
+`track` is for work that runs across sessions. You get a living checklist where nothing gets ticked without proof, and a status block that tells the next session where you left off. Items that no longer apply get struck through with a date and a reason. Nothing ever gets deleted.
+
+```
+/blueprint revise plan/billing-module-rebuild.md
+```
+
+`revise` is the per-session update. It re-checks recent ticks, unticks any that don't hold up, refreshes the status block, and adds what the work turned up. Then it stops.
+
 ## Uninstall
 
 ```
@@ -153,7 +218,7 @@ If you want to go further back, `/workforce restore` overwrites everything from 
 ### One brain can't do every job
 
 ![An overwhelmed craftsperson at a cluttered workbench trying to do too many trades at once, while through doorways behind them specialists each work calmly at their own station](assets/images/one-brain-every-job.png)
-*Three specialists standing in three doorways, and we're still asking the one at the bench to do all of it.*
+*The people who actually do those jobs are one room away. We keep handing everything to the one person we already have.*
 
 You ask your AI assistant to write homepage copy, then debug the checkout flow, then review a design comp. It does all three. The copy reads like a machine wrote it because the model that was running is built to write code, not sentences. The design review says "looks good" when the hero image is missing because a code model doesn't know what to look for in a layout. And the debug takes three passes because it's running on a model optimized for prose.
 
@@ -172,7 +237,7 @@ There is a second problem, and it compounds the first. Instructions you give at 
 Managing by hand works until it doesn't, and the failure is invisible. The assistant stops following a rule it was given an hour ago, and you don't notice because it doesn't announce that it forgot.
 
 ![A forest path where breadcrumbs are being eaten by woodland creatures, but ahead the path leads to a warmly lit village of distinct workshops](assets/images/from-breadcrumbs-to-company.png)
-*Instructions vanish about halfway through. Nobody announces it. The workshop with a sign on the door? Still there.*
+*The crumbs get eaten along the way. The workshops don't go anywhere.*
 
 ### Name an owner, a scope, a check
 
@@ -185,7 +250,7 @@ A set of instructions with those three things is an employee. A set of employees
 ### Breaking out of the tunnel vision
 
 ![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
-*You stop seeing the crack when you've been looking through the loupe all day. The person outside the window just got here.*
+*You look through the loupe long enough, you stop seeing the crack in the wall. Someone who just walked up sees it right away.*
 
 A model deep in a task locks onto its first reading and stops questioning it. The more powerful the model, the worse this gets. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) in *Nature Machine Intelligence* (2026): seeing its own prior answer drops a model's willingness to change by 71%. Sharma et al. at Anthropic [documented sycophancy](https://arxiv.org/abs/2310.13548), models telling users what they want to hear. Jhaveri et al. [showed confirmation bias](https://arxiv.org/abs/2604.02485) in hypothesis exploration. Put those together and you get a model that walks confidently in the wrong direction.
 
@@ -196,7 +261,7 @@ So the fix is never "look again." The widening mechanism classifies each ask bef
 ### "Done" means proven
 
 ![A craftsperson holding a finished piece up to a measuring gauge on the wall that reads PASSED, with completed items tagged green in a row on the bench and one rejected piece tagged red set apart](assets/images/done-means-proven.png)
-*We always have a good reason it should pass. The gauge didn't ask.*
+*You can think it's ready all day. It still has to pass the gauge.*
 
 This is the part that separates the system from a prompt template. Every employee names something that proves the work is finished: a command that returns successful, a set of tests that pass, a file that has to exist. Work that can't be checked by a command gets checked against a written catalog, a list of specific tells a reviewer grades against. *"Does this read as machine-written?"* is a matter of opinion. *"Does this trip three of these twelve specific tells?"* is close to mechanical.
 
@@ -231,14 +296,6 @@ Special thanks to **Joe Loudermilk**, who helped me understand why giving an LLM
 Special thanks to **Wouter Dieters**, who helped me connect organizational theory to agency. An agent behaves differently once it has a role, a scope it won't leave, a check to pass, and someone it answers to. That observation is the design.
 
 Thanks to **Sjoerd Tiemensma**, who convinced me to toss CLAUDE.md in favor of more agency. Thanks to **Jeff Polack**, who pointed out that this should support a personal install. Thanks to **Goda Go**, who never stops saying *save everything*. Thanks also to [**Autonomee**](https://www.skool.com/autonomee/about?ref=ab20c334980842ac864a041f7c84f88c) for hooking together some of the sharpest minds in the business.
-
-## Personal Project
-
-This is a personal tool, built for my own projects and shared in case it's useful. It isn't affiliated with or endorsed by Anthropic.
-
-It edits your `.claude/` directory, converts skills, and writes agent definitions, so take the backup when the audit offers it.
-
-Issues and pull requests are welcome. I can't promise a response time.
 
 ## License
 
