@@ -1587,6 +1587,34 @@ for _src in _hook_srcs.values():
     _artifacts |= set(re.findall(r'f"(wf-[a-z-]+)\.\{', _src))
     _artifacts |= set(re.findall(r'"(wf-[a-z-]+-flag)', _src))
 _orphan_artifacts = []
+# ROLES ARE DECIDED PER FUNCTION, NOT PER FILE. The file-level version called any hook
+# that saved ANY file a writer of EVERY artifact it named, so `wf-widen` and
+# `wf-commitments` could never be readers of anything: both save files of their own.
+# MEASURED 2026-09-12 when the asks checklist landed: `wf-widen` blocks on `wf-asks` and
+# `wf-commitments` counts it, and the check reported it "acted on by NOTHING".
+# A path helper (names the artifact, joins a path, opens nothing) is transparent: a call to
+# it is a mention of the artifact in the calling function.
+def _artifact_roles(src, art):
+    funcs = re.split(r"\n(?=def )", src)
+    helpers = [m.group(1) for f in funcs
+               if art in f and "os.path.join" in f and "open(" not in f
+               for m in [re.match(r"def (\w+)\(", f)] if m]
+    roles = set()
+    for f in funcs:
+        m = re.match(r"def (\w+)\(", f)
+        if m and m.group(1) in helpers:
+            continue
+        if not (art in f or any(f"{h}(" in f for h in helpers)):
+            continue
+        if "json.dump(" in f:
+            roles.add("writer")
+        if "os.remove(" in f:
+            roles.add("clearer")
+        if "json.dump(" not in f and "os.remove(" not in f and "open(" in f:
+            roles.add("reader")
+    return roles
+_sa_agent_region = _sa_agent_src[_sa_agent_src.find("AGENT_HOOKS = {"):]
+_sa_agent_region = _sa_agent_region[:_sa_agent_region.find("\n}\n")]
 for _a in sorted(_artifacts):
     # THREE ROLES, AND THE FIRST VERSION OF THIS CHECK CONFLATED TWO OF THEM. It counted
     # any hook that mentioned the artifact and called `os.remove` as a READER, so
@@ -1596,13 +1624,15 @@ for _a in sorted(_artifacts):
     # is worse than no assertion, because it reports a property nobody has.
     #
     # Deleting is not acting. A clearer is housekeeping.
-    _writers = [n for n, src in _hook_srcs.items() if _a in src and "json.dump" in src]
-    _clearers = [n for n, src in _hook_srcs.items() if _a in src and "os.remove" in src]
-    _actors = [n for n, src in _hook_srcs.items()
-               if _a in src and n not in _writers and n not in _clearers]
+    _roles = {n: _artifact_roles(src, _a) for n, src in _hook_srcs.items()}
+    _writers = [n for n, r in _roles.items() if "writer" in r]
+    _clearers = [n for n, r in _roles.items() if "clearer" in r]
+    _actors = [n for n, r in _roles.items() if "reader" in r]
     # A `type: "agent"` reader has no file of its own — it is a prompt declared in
     # `wf-settings-apply`'s AGENT_HOOKS, and that is where its consumption is visible.
-    if _a in _sa_agent_src:
+    # The PROMPT REGION only: the whole file names every hook in its wiring tables, so a
+    # whole-file match passed for any artifact named after a hook.
+    if _a in _sa_agent_region:
         _actors.append("wf-settings-apply:AGENT_HOOKS")
     if _writers and not _actors:
         _orphan_artifacts.append(
@@ -12030,7 +12060,10 @@ check(
 # An autonomous `audit` is the worst case: one `UserPromptSubmit` at `/workforce audit`
 # and none for the next hour, so nothing clears the flag for the rest of the run.
 _ds_wsa = read("workforce/bin/wf-settings-apply")
-_ds_agent_block = _ds_wsa[_ds_wsa.find("AGENT_HOOKS"):][:4000]
+# To the end of the AGENT_HOOKS dict, not a fixed length: a prompt that grows must not push
+# its own asserted lines out of the slice (it did, 2026-09-12, when the asks juror landed).
+_ds_agent_start = _ds_wsa.find("AGENT_HOOKS = {")
+_ds_agent_block = _ds_wsa[_ds_agent_start:_ds_wsa.find("\n}\n", _ds_agent_start)]
 
 # THE IMPERATIVE MUST CARRY ITS OWN CONSTRAINT. `org.md` bullet 1 ended "It must execute
 # nothing" and bullet 2 began "Run it" — the guard in one bullet, the actionable verb in
@@ -12202,6 +12235,56 @@ check(
     "session through five Stops until the user typed. Deleting the flag on the continuation "
     "is the mechanical bound, and the offer clause stops a juror reading \"want me to push "
     "it?\" as a plan the turn failed to carry out",
+)
+
+# THE ASKS CHECKLIST, RUN RATHER THAN READ. The user's spec, 2026-09-12: each ask "gets a
+# checkpoint and they each get evaluated. And when the response comes back, each response
+# keeps the topic separated. It has to work that way." `count_asks` only ever saw numbered
+# asks, so on a plain-prose message none of that started. `wf-task-tag` now opens a
+# checklist the session fills in, and `wf-widen` holds the turn to it once.
+def _asks_run(items, words=20, event="Stop", lead=""):
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        base = {"session_id": "a1", "scratchpad_dir": d, "cwd": d}
+        prompt = lead + " ".join(["word"] * words)
+        subprocess.run([os.path.join(ROOT, "workforce/bin/wf-task-tag")], input=json.dumps(
+            {**base, "hook_event_name": "UserPromptSubmit", "prompt": prompt}),
+            capture_output=True, text=True, timeout=30)
+        path = os.path.join(d, "wf-asks.a1.json")
+        created = os.path.exists(path)
+        if created and items is not None:
+            with open(path, "w") as fh:
+                json.dump({"prompt": prompt, "items": items}, fh)
+        r = subprocess.run([os.path.join(ROOT, "workforce/bin/wf-widen")], input=json.dumps(
+            {**base, "hook_event_name": event, "last_assistant_message": "ok"}),
+            capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout) if r.stdout.strip() else {}
+        flag = os.path.exists(os.path.join(d, "wf-widen-flag.a1.json"))
+        return created, out.get("decision"), flag
+
+_OPEN = [{"ask": "a", "status": "open"}, {"ask": "b", "status": "done"}]
+_CLOSED = [{"ask": "a", "status": "answered"}, {"ask": "b", "status": "not done: waiting"}]
+_asks_short = _asks_run(None, words=5)
+_asks_empty = _asks_run([])
+_asks_open = _asks_run(_OPEN)
+_asks_closed = _asks_run(_CLOSED)
+_asks_sub = _asks_run(_OPEN, event="SubagentStop")
+# A background task finishing arrives as a user row. The first live checklist opened on one.
+_asks_notice = _asks_run(None, lead="<task-notification> ")
+check(
+    "asks checklist: opened per message, and an empty or open list sends the turn back once",
+    not _asks_short[0]
+    and not _asks_notice[0]
+    and _asks_empty[:2] == (True, "block")
+    and _asks_open[:2] == (True, "block")
+    and _asks_closed[1] is None
+    # Every multi-ask turn reaches the outside reader, blocked or not.
+    and _asks_open[2] and _asks_closed[2]
+    and _asks_sub[1] is None
+    and "sit as the asks juror" in _ds_agent_block,
+    f"short={_asks_short} empty={_asks_empty} open={_asks_open} closed={_asks_closed} "
+    f"subagent={_asks_sub}. A split nobody checks is a flag, and a checklist a subagent "
+    "can block on would stop every dispatch whose parent still has work open",
 )
 
 check(

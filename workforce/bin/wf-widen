@@ -484,12 +484,7 @@ def widen_reason(unopened, why, rows, inst, counts):
     return "\n".join(lines)
 
 
-def main():
-    raw = sys.stdin.read()
-    try:
-        payload = json.loads(raw) if raw.strip() else {}
-    except json.JSONDecodeError:
-        return 0
+def widen(payload):
     # THE LOOP STOP. Set on the second and later firings for one turn; without this a
     # widen that keeps scoring low blocks forever and the session is dead.
     #
@@ -510,7 +505,7 @@ def main():
                 os.remove(widen_flag(payload))
             except OSError:
                 pass
-        return 0
+        return None
 
     # WF_WIDEN_THRESHOLD is gone with the score it gated. A threshold implies a scale,
     # the scale was invented, and a dial on an invented number is a second invented
@@ -520,7 +515,7 @@ def main():
 
     counts = TL.turn_counts(payload)
     if counts is None:
-        return 0
+        return None
     reply = counts[-1]
 
     # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
@@ -534,7 +529,7 @@ def main():
     # against the 7.0% budget that retired this distribution's last speech guard.
     promise = unfinished(reply, payload)
     if promise:
-        print(json.dumps({
+        return {
             "decision": "block",
             "reason": (
                 f'The turn ended immediately after saying "{promise}", and asked '
@@ -547,8 +542,7 @@ def main():
                 "The announced work has not been done yet. Stopping mid-task is correct "
                 "only when input is genuinely needed and is being asked for."),
             "systemMessage": f"WIDEN  stopped mid-work after \u201c{promise}\u201d — CONTINUING",
-        }))
-        return 0
+        }
 
     masked = TL.mask_code(reply or "")
     trips = []
@@ -620,17 +614,15 @@ def main():
             # A turn carrying no claim that evidence settles is not scored — that is what
             # it was before the blind sample existed and it is still true; the sample adds
             # a second outcome above, it does not reword this one.
-            print(json.dumps({"systemMessage":
-                              "WIDEN  not scored — no claim this turn that evidence settles"}))
-            return 0
+            return {"systemMessage":
+                              "WIDEN  not scored — no claim this turn that evidence settles"}
         raise_flag(payload, [("BLIND", "intuition",
                               "no pattern classified this ask, so nobody but this turn has "
                               "read it" + (" — and it changed the tree" if counts[5] else ""))],
                    [(k, None) for k in ("sight", "hearing", "touch", "taste")],
                    counts, [], BLIND_DOCKET, sampled=True, reply=reply)
-        print(json.dumps({"systemMessage":
-                          "WIDEN  unclassified ask · blind-sampled for an outside read"}))
-        return 0
+        return {"systemMessage":
+                          "WIDEN  unclassified ask · blind-sampled for an outside read"}
 
     unopened, rows = senses(counts, applicable)
     shown = describe(why, rows, unopened)
@@ -656,9 +648,8 @@ def main():
         sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
 
     if not unopened and not sampled:
-        print(json.dumps({"systemMessage":
-                          f"WIDEN  {shown} — required channels opened"}))
-        return 0
+        return {"systemMessage":
+                          f"WIDEN  {shown} — required channels opened"}
 
     # On a BLOCK, narrow `why` to the channels actually shut. On a SAMPLE nothing is
     # shut, so the full list is the right context for the audit — but `unopened` travels
@@ -669,9 +660,8 @@ def main():
     # question — measured twice in a row on this session, the second time citing the
     # turn that diagnosed the first. Cheaper and quieter: no docket, no flag, no spawn.
     if not applicable:
-        print(json.dumps({"systemMessage":
-                          "WIDEN  no docket — nothing this ask requires to be checked"}))
-        return 0
+        return {"systemMessage":
+                          "WIDEN  no docket — nothing this ask requires to be checked"}
     raise_flag(payload, why_rows, rows, counts, unopened, applicable,
                sampled=sampled, reply=reply)
 
@@ -679,14 +669,109 @@ def main():
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
         # this hook has nothing to object to. The audit is the agent's job and runs on
         # the same `Stop`; blocking here would punish a turn for being picked.
-        print(json.dumps({"systemMessage": f"WIDEN  {shown} — sampled for audit"}))
-        return 0
+        return {"systemMessage": f"WIDEN  {shown} — sampled for audit"}
 
-    print(json.dumps({
+    return {
         "decision": "block",
         "reason": widen_reason(unopened, why_rows, rows, instruments(cwd), counts),
         "systemMessage": f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED",
-    }))
+    }
+
+
+def checklist(payload):
+    """This turn's asks checklist and its path. The checklist is None when the message got
+    none: `wf-task-tag` starts one only for a message long enough to hold several asks."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    p = os.path.join(d, f"wf-asks.{sid}.json")
+    try:
+        with open(p, encoding="utf-8") as fh:
+            cl = json.load(fh)
+    except (OSError, ValueError):
+        return None, p
+    return (cl if isinstance(cl, dict) else None), p
+
+
+def hand_checklist_to_jury(payload, cl, items):
+    """Put the checklist in front of the widening agent, so a bad split is caught by a
+    reader that did not write it. Joins this turn's flag when `widen` raised one, and
+    raises one when it did not: every multi-ask turn gets its asks checked."""
+    flag = widen_flag(payload)
+    try:
+        with open(flag, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
+                "conclusion": (payload.get("last_assistant_message") or "")[:4000],
+                "unopened": [],
+                "why": [{"trigger": "ASKS", "sense": "asks",
+                         "reason": "the message made several asks; each is checked"}]}
+    ask = data.setdefault("ask", {})
+    ask["checklist"] = items
+    ask["prompt"] = ask.get("prompt") or (cl.get("prompt") or "")
+    try:
+        with open(flag, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+    except OSError:
+        pass
+
+
+def with_checklist(payload, out):
+    """Hold the turn to its asks checklist, on top of whatever `widen` decided.
+
+    WHY IT BLOCKS, when `wf-commitments` deliberately never does. A section count is an
+    observation about shape. An ask still open when the turn ends is the defect the user
+    named: "each ask ... gets a checkpoint and they each get evaluated." It blocks once:
+    the continuation carries `stop_hook_active` and this returns before reading the list.
+
+    MERGED, NEVER REPLACING. `widen` may already be blocking for an unopened sense, and a
+    continuation skips every check, so the checklist reason is appended to that block
+    rather than taking its place.
+
+    Main `Stop` only. A subagent finishes while the main turn's asks are legitimately still
+    open, and a turn waiting on background work has nothing to close yet.
+    """
+    if (payload.get("stop_hook_active") or payload.get("hook_event_name") == "SubagentStop"
+            or payload.get("background_tasks")):
+        return out
+    cl, p = checklist(payload)
+    if cl is None:
+        return out
+    items = [i for i in (cl.get("items") or []) if isinstance(i, dict) and i.get("ask")]
+    still = [i for i in items if str(i.get("status") or "open").strip().lower() == "open"]
+    if len(items) >= 2:
+        hand_checklist_to_jury(payload, cl, items)
+    if items and not still:
+        return out
+    if not items:
+        reason = (f"The asks checklist for this message is still empty: {p}. Each separate "
+                  "thing the user asked for goes in as an item with a status, and the reply "
+                  "answers each one in its own section.")
+        note = "ASKS  checklist empty"
+    else:
+        reason = ("These asks are still open on the checklist:\n"
+                  + "\n".join(f"  · {i['ask']}" for i in still)
+                  + f"\n\nEach one is finished, or its status in {p} says \"answered\" or "
+                  "\"not done: <reason>\", and the reply gives each its own section.")
+        note = f"ASKS  {len(still)} of {len(items)} still open"
+    out = dict(out or {})
+    if out.get("decision") == "block":
+        out["reason"] = (out.get("reason") or "") + "\n\n" + reason
+    else:
+        out["decision"], out["reason"] = "block", reason
+    out["systemMessage"] = " · ".join(x for x in (out.get("systemMessage"), note) if x)
+    return out
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    out = with_checklist(payload, widen(payload))
+    if out:
+        print(json.dumps(out))
     return 0
 
 

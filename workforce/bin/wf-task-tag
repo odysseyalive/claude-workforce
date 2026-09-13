@@ -91,7 +91,9 @@ INJECTED = re.compile(
     r"|Another Claude session sent a message"
     r"|Stop hook feedback"
     r"|\d+ background agents? (?:was|were) stopped"
-    r"|<[a-z-]+-message\b)", re.I)
+    # A background task finishing arrives as a user row wrapped in these. MEASURED
+    # 2026-09-13: the first live asks checklist opened on a task notification.
+    r"|<(?:[a-z-]+-message|system-reminder|task-notification)\b)", re.I)
 
 KINDS = [
     ("history", re.compile(
@@ -281,6 +283,62 @@ def tag_path(payload):
     return os.path.join(d, f"wf-task-tag.{sid}.json")
 
 
+# THE ASKS CHECKLIST. `count_asks` stays regex-only and numbered-only, for the reason given
+# above it: splitting free prose into requests is a judgment task. So the split is not done
+# here. The operating session is already a model reading the message, and it writes the
+# asks into this file itself, before it starts, then updates each item as the work goes.
+# `wf-widen` sends the turn back once at `Stop` while the list is empty or an item is still
+# open, and the widening agent checks the list against the prompt, so a bad split is caught
+# by a reader that did not write it.
+#
+# WHY NOT A MODEL CALL HERE. MEASURED 2026-09-12: a headless Haiku split through `claude -p`
+# was accurate on real messages and took 9.6-11.7s per call, a wait in front of every
+# message before the turn even starts. The session reading the message costs nothing.
+#
+# Under a dozen words a message is almost always one ask, and a checklist for "commit it"
+# or "yes" is a chore the reader pays for on every short reply. Over 1,012 real prompts on
+# this machine, 275 are under eight words.
+CHECKLIST_MIN_WORDS = 12
+
+
+def checklist_path(payload):
+    """Where this turn's asks checklist lives. Session-scoped, like the tag."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = (payload.get("session_id") or "nosession")[:64]
+    return os.path.join(d, f"wf-asks.{sid}.json")
+
+
+def start_checklist(payload):
+    """Replace last turn's checklist with an empty one for this ask. Returns the context
+    line naming it, or "" when this message gets no checklist.
+
+    Last turn's file is always removed first, so a short reply never inherits a list of
+    asks it was never given.
+    """
+    p = checklist_path(payload)
+    try:
+        os.remove(p)
+    except OSError:
+        pass
+    prompt = payload.get("prompt") or ""
+    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+        return ""
+    try:
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump({"prompt": prompt[:2000], "items": []}, fh)
+    except OSError:
+        return ""
+    # Stated as facts about the file, never as an out-of-band command (see the note above
+    # the injection in `main`).
+    return (f"Asks checklist for this message: {p}. It holds {{\"prompt\", \"items\"}} and "
+            "starts with no items. Each separate thing the message asks for is one item, "
+            "{\"ask\": <in the user's words>, \"status\": \"open\"}, written before the work "
+            "starts. Status becomes \"done\", \"answered\", or \"not done: <reason>\" as the "
+            "work goes, and an ask found along the way is added as a new item. At Stop an "
+            "empty list or an open item sends the turn back once, and the reply gives each "
+            "item its own section, in order.")
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -300,6 +358,8 @@ def main():
         os.remove(os.path.join(d, f"wf-widen-flag.{sid}.json"))
     except OSError:
         pass
+
+    checklist_line = start_checklist(payload)
 
     hits = classify(payload.get("prompt") or "")
     if not hits:
@@ -327,6 +387,11 @@ def main():
                            "senses": [], "asks": _n, "asks_why": _how}, fh)
         except OSError:
             pass
+        if checklist_line:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": checklist_line,
+            }}))
         return 0
 
     try:
@@ -358,6 +423,8 @@ def main():
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
                      f"In practice: {SENSE_HOW[h['sense']]}.")
     lines.append("Senses are described at `references/senses.md`.")
+    if checklist_line:
+        lines += ["", checklist_line]
 
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit",

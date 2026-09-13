@@ -142,6 +142,16 @@ def asks_expected(payload):
             tag = json.load(fh)
     except (OSError, ValueError):
         return None, ""
+    # THE CHECKLIST BEATS THE COUNT. `count_asks` only sees numbered asks; the checklist
+    # holds the asks the session split out of plain prose, so when it has items it is the
+    # better number.
+    try:
+        with open(os.path.join(d, f"wf-asks.{sid}.json"), encoding="utf-8") as fh:
+            items = [i for i in (json.load(fh).get("items") or []) if isinstance(i, dict)]
+        if items:
+            return len(items), f"{len(items)} item(s) on the asks checklist"
+    except (OSError, ValueError, AttributeError):
+        pass
     n = tag.get("asks")
     return (n if isinstance(n, int) else None), (tag.get("asks_why") or "")
 
