@@ -105,7 +105,7 @@ the user's prose, and the distinction is mechanical rather than editorial.
 | Class | Disposition | Why |
 |---|---|---|
 | the generated region | rewritten every audit | between `WORKFORCE-CLAUDE-MD` markers; everything outside is untouched |
-| the standing cold-reader request | **inside the region, while a region exists** | the remedy `enforcement.md` names, given a producer. The durable carrier is the `wf-standing-request` hook; the region carries it only until that hook is wired — see below |
+| the standing cold-reader request | **inside the region, while a region exists** | the remedy `enforcement.md` names, given a producer. The `wf-standing-request` hook that was to be its durable carrier was removed, so the region is its only carrier — see below |
 | `DUPLICATED` | **removed** | the line exists **verbatim** in a handbook or an extracted directive |
 | `DERIVABLE` | reported, never removed | directory listings, dependency names, restated build commands |
 | `USER` | never touched, never proposed | everything else |
@@ -190,7 +190,7 @@ thirty-five conversions, and the sweep behind them.
 
 **The generated region is now the live carrier for EVERY project that needs the request**, because the
 hook that would have replaced it does not ship. The region is doing the asking and there is no hook,
-which is why `wf-claude-md` still imports the text instead of dropping it.
+which is why `wf-claude-md` holds the text itself instead of dropping it.
 
 **So deleting `CLAUDE.md` removes the live carrier and puts nothing in its place.** Spawning silently
 reverts to UNAVAILABLE, every handbook registers unprobed, and the file that would have explained why is

@@ -9654,15 +9654,35 @@ check("INV-SPAWN prints an attempt count, not a bare verdict",
       "a run that printed UNAVAILABLE with zero attempts measured nothing, and is otherwise "
       "indistinguishable from one that tried")
 
-# RE-HOMED 2026-08-05, and this is the load-bearing case of the whole evacuation.
-# The request used to live in CLAUDE.md's generated region. That file is now deleted,
-# so the one piece of its content that must be present on EVERY turn moved to a
-# UserPromptSubmit hook — and it is strictly better there, because CLAUDE.md is
-# injected once at the head and was faintest exactly when a long audit was spawning.
-#
-# STATED ONCE. wf-claude-md IMPORTS the text for projects that still carry a region;
-# a second copy would be two canonical askings that drift, and the drift would be
-# invisible until a run degraded to UNAVAILABLE for no visible reason.
+# THE REGION CARRIES THE STANDING REQUEST, SO THIS RUNS THE SCRIPT AND READS THE REGION.
+# wf-claude-md loaded the text from the wf-standing-request hook, removed in 1.31.0, and the
+# loader returned "" for the missing file. From then on every generated region had no
+# request in it, while claude-md.md, audit-setup.md and SKILL.md rule 3b all named the
+# region as the carrier. A string check on the source could not see that. The written
+# region can.
+def _region_request():
+    import tempfile
+    # A script that hangs or will not exec degrades to a failed row, never a crashed suite.
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            subprocess.run([os.path.join(ROOT, "workforce/bin/wf-claude-md"), "--root", d,
+                            "--ensure-region", "--execute"],
+                           capture_output=True, text=True, timeout=30)
+            with open(os.path.join(d, "CLAUDE.md"), encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, subprocess.SubprocessError):
+            body = ""
+    i, j = body.find("WORKFORCE-CLAUDE-MD START"), body.find("WORKFORCE-CLAUDE-MD END")
+    return body[i:j] if 0 <= i < j else ""
+
+_rq = _region_request()
+check("claude-md: the generated region carries the standing cold-reader request",
+      "Cold-reader agents are requested, standing." in _rq
+      and "this line is the asking." in _rq,
+      "the region is the only carrier of the request since its hook was removed, and "
+      "ambient policy that suppresses spawning *unless the user asks* needs the asking. "
+      "An empty region leaves spawning UNAVAILABLE and every handbook unprobed, and "
+      "nothing reports it")
 
 # THE BUDGET PICKER HAS A FLOOR. Three prose restatements of "render the emitter's LANE
 # blocks verbatim" (2026-08-20, 2026-08-26, and the fixture that froze them) did not
@@ -13243,7 +13263,7 @@ check("settings-apply: a hook wired in both scopes is REPORTED, never silently u
       "the installer wires user scope so /workforce reaches every project; the "
       "three-paths directive has audit wire project scope so a fix travels with the "
       "repo. Both are wanted, neither knows about the other, and the hook fires twice "
-      "per turn — visible in a transcript as the standing-request context injected "
+      "per turn — seen then as the since-removed standing-request context injected "
       "twice. Measured 2026-09-08: all six defaults doubled on a live machine and "
       "nothing said so. Reported and not repaired, because which scope keeps the "
       "registration is the user's call and a tool that picked one would be deciding it")

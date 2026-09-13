@@ -42,8 +42,8 @@ another function reads; it cannot see WHICH BRANCH of the writer the reader reli
 
 DANGLING is an edge whose far end does not exist: a registration, load or run naming no
 script, a use naming no top-level definition, or a hand-off file something reads and nothing
-writes. `bin/check` fails on one. KNOWN_DANGLING holds the one that predates this catalog,
-with its reason, and it is printed on every run rather than hidden.
+writes. `bin/check` fails on one. KNOWN_DANGLING holds any kept on record, with its reason,
+and each is printed on every run rather than hidden.
 
 Exit code is always 0: a map, not a gate.
 """
@@ -60,13 +60,9 @@ DOCS = ("workforce/references", "workforce/skills", "workforce/agents")
 SCRIPT_RX = re.compile(r"^wf-[a-z]+(?:-[a-z]+)*$")
 DEFS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
-# Found by this catalog's first run, on 1.56.0, and left for the operator: removing the loader
-# is outside the order that built the catalog. Keyed (from, kind, to).
-KNOWN_DANGLING = {
-    ("wf-claude-md:_standing_request", "loads", "wf-standing-request"):
-        "the hook was removed (workforce/references/claude-md.md, THE DURABLE CARRIER WAS "
-        "REMOVED) and wf-claude-md still loads it; the loader returns \"\" when the file is absent",
-}
+# Keyed (from, kind, to) -> reason. Empty since 1.57.1, when wf-claude-md stopped loading the
+# removed wf-standing-request, the one edge this catalog's first run found.
+KNOWN_DANGLING = {}
 
 
 def _src(path):

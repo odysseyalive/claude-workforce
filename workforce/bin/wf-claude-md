@@ -71,31 +71,16 @@ END = "<!-- WORKFORCE-CLAUDE-MD END -->"
 # than hidden: ~260 B against a measured 15,459 B IDENTITY (1.7%) buys the tier canary and
 # every cold-read probe. A run without it registers every handbook unprobed, which is the
 # one gate whose whole job is catching what the author cannot see in their own work.
-# IMPORTED, never restated. `wf-standing-request` owns this text because it is the
-# hook that re-injects it every turn once CLAUDE.md is gone (2026-08-05 evacuation
-# directive). A second copy here would be two canonical askings that could drift
-# apart, which Core Principle 9a refuses. Falls back to an empty region section
-# rather than dying: this script must still classify a CLAUDE.md on a tree where the
-# hook was never installed.
-def _standing_request():
-    import importlib.util
-    from importlib.machinery import SourceFileLoader
-    # Never leave a __pycache__ beside a shipped script — residue in a directory the
-    # installer owns. Second instance of this defect: wf-apply had it first, and both
-    # arrived the same way, by importing a sibling to avoid restating a constant.
-    sys.dont_write_bytecode = True
-    _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-standing-request")
-    try:
-        _s = importlib.util.spec_from_loader(
-            "wf_standing_request", SourceFileLoader("wf_standing_request", _p))
-        _m = importlib.util.module_from_spec(_s)
-        _s.loader.exec_module(_m)
-        return _m.STANDING_REQUEST
-    except Exception:
-        return ""
-
-
-STANDING_REQUEST = _standing_request()
+# THE TEXT LIVES HERE, BECAUSE THE REGION IS ITS ONLY CARRIER. It used to be imported
+# from `wf-standing-request`, a prompt-submit hook removed in 1.31.0
+# (`changes/1.31.0.md`). The loader swallowed the missing file and returned "", so every
+# region from then on was generated with the request missing and nothing said so.
+# Recovered byte-for-byte from `git show 90fb341^:workforce/bin/wf-standing-request`.
+STANDING_REQUEST = "\n".join([
+    "**Cold-reader agents are requested, standing.** `/workforce` audit, verify, and review",
+    "spawn throwaway subagents to cold-read handbooks and to measure this host's tier ceiling.",
+    "Ambient policy commonly permits spawning *unless the user asks* — this line is the asking.",
+])
 REGION_RX = re.compile(
     r"^<!--\s*WORKFORCE-CLAUDE-MD START.*?^<!--\s*WORKFORCE-CLAUDE-MD END\s*-->\s*$\n?",
     re.S | re.M)
@@ -188,13 +173,14 @@ def relocated_lines(root):
                 #
                 # AND THEY HAVE NO EXTENSION, which is what this filter used to miss.
                 # Every shipped script and hook in this distribution is extensionless —
-                # `wf-census`, `wf-conform`, `wf-standing-request`, twelve of them — so
-                # the extension list excluded the exact destinations the comment above
-                # promises to include, and the 2026-08-05 directive names explicitly
+                # `wf-census`, `wf-conform` and the rest — so the extension list
+                # excluded the exact destinations the comment above promises to
+                # include, and the 2026-08-05 directive names explicitly
                 # ("agents/skills/scripts/hooks componants"). MEASURED 2026-08-06: four
-                # lines relocated verbatim into `wf-standing-request` stayed UNPLACED,
-                # so CLAUDE.md could never have been deleted for a rule that had in
-                # fact arrived at the only always-on component there is.
+                # lines relocated verbatim into `wf-standing-request` (a hook since
+                # removed) stayed UNPLACED, so CLAUDE.md could never have been deleted
+                # for a rule that had in fact arrived at the only always-on component
+                # there is.
                 #
                 # A shebang is the test, because that is what makes a file a script
                 # whatever it is called. Read the first line before deciding.
@@ -443,9 +429,8 @@ def main():
         #
         # The front door is the org: `/workforce`, `/org`, the chart and the charter,
         # which the harness surfaces from the skill listing with nothing at the repo
-        # root. The standing cold-reader request moved to `wf-standing-request`, a
-        # prompt-submit hook that re-injects it every turn — strictly better than a
-        # file read once at the head of the conversation.
+        # root. The standing cold-reader request is the exception: its hook was removed
+        # in 1.31.0, so the generated region is its only carrier.
         target = os.path.join(root, "CLAUDE.md")
         if os.path.exists(target):
             print(f"wf-claude-md: {target} exists but could not be read", file=sys.stderr)
@@ -453,8 +438,9 @@ def main():
         print(f"wf-claude-md — {target}")
         print("  ABSENT — this is the goal state (SKILL.md § Directives, 2026-08-05). "
               "Nothing created.")
-        print("  The standing cold-reader request lives in the wf-standing-request hook; "
-              "check it is wired with `/workforce hooks`.")
+        print("  The standing cold-reader request is carried only by the generated region; "
+              "there is no hook for it. Where spawning is suppressed, --ensure-region "
+              "--execute writes it (audit-setup.md § Step 0.9).")
         return 0
 
     saved = sum(len(l) + 1 for _, l in r["duplicated"])
