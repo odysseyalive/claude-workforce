@@ -163,6 +163,15 @@ the agent blocked five Stops in a row, four of them continuations re-reading one
 conclusion. The agent had read "commit it (or push it too)", an offer to the user, as a
 plan the turn had failed to carry out, and the loop ended only when the user typed.
 
+**A side query's Stop does not judge the same flag again.** Claude Code fires `Stop` for a side
+query too, with that query's own output as the reply, and `wf-widen-agent` runs on it like any other.
+`wf-widen` judges nothing on a Stop whose reply the transcript does not hold. It removes the flag only
+once the transcript shows that the Stop which raised it has finished its hooks, the agent's included:
+a `stop_hook_summary` row newer than the flag. Deleting it sooner can drop the real audit. MEASURED
+2026-09-13: one side query arrived 9 seconds after its turn's stop summary, and another about 3
+seconds after its turn ended, while that Stop's agent was still running. A side query that lands in
+that window can still meet the flag, because nothing a command hook sees tells the two agents apart.
+
 **Nothing in steps 1 and 2 scores anything, and that is a directive rather than a
 design taste.** *"you have to measure results, not measure what you're doing and it has
 to be aligned with the current request"*, and *"Evaluations are always done by the

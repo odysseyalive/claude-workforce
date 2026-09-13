@@ -256,53 +256,53 @@ CASES = [
     # Python that removes nothing, so a continuation Stop keeps the stale flag.
     ("widen agent: a continuation Stop finds no flag, so the agent blocks once per turn",
      WDN, "del", "(widen_flag(payload))"),
-    # THE ASKS CHECKLIST, two ways to break it. Without the early return a finished list
-    # still blocks; without the injected test a background notification gets a list.
-    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
-     WDN, "del", "    if items and not still:\n        return out\n"),
-    # Retargeted 2026-09-13 when the keep rule narrowed: the mid-turn keep is now its own
-    # branch, and deleting it lets a notification erase the list again.
-    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
-     TTAG, "del", '    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("enforced")\n'
+    # THE ASKS CHECKLIST. Without the mid-turn keep a notification erases the list; without the
+    # injected test a notification gets one; without the tag's count an unwritten list mutes
+    # the juror.
+    ("asks checklist: opened per message, and handed to the widening agent once, never blocking",
+     TTAG, "del", '    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("ended")\n'
                   '            and os.path.exists(p)):\n        return "", prev\n'),
-    ("asks checklist: opened per message, and an empty or open list sends the turn back once",
+    ("asks checklist: opened per message, and handed to the widening agent once, never blocking",
      TTAG, "del", "INJECTED.search(prompt) or "),
+    ("asks checklist: opened per message, and handed to the widening agent once, never blocking",
+     WDN, "del", " or (isinstance(asks, int) and asks >= 2)"),
     # THE REVIEW FIXES, 2026-09-13, one break per fix.
-    # A list that is not a list reaches iteration and the backstop swallows the checklist.
+    # A list that is not a list reaches iteration and the backstop swallows the hand-off.
     ("asks checklist: a malformed checklist, tag or flag never costs widen its own block",
      TTAG, "del", "    if not isinstance(items, list):\n        return []\n"),
-    # Each enforce-once layer alone: the tag hook keeps an enforced list, or widen re-reads one.
-    ("asks checklist: held to once, so a later turn never blocks on a list already enforced",
-     TTAG, "del", ' and not prev.get("enforced")'),
-    ("asks checklist: held to once, so a later turn never blocks on a list already enforced",
-     WDN, "del", ' or record.get("enforced")'),
+    # Each once layer alone: the tag hook keeps a list whose turn ended, or widen re-hands one.
+    ("asks checklist: handed over once, so a later turn never gets a list whose turn has ended",
+     TTAG, "del", ' and not prev.get("ended")'),
+    ("asks checklist: handed over once, so a later turn never gets a list whose turn has ended",
+     WDN, "del", ' or record.get("ended")'),
     ("asks checklist: a user message that looks injected never inherits the last turn's list",
      TTAG, "del", "NOTIFICATION.search(prompt) and "),
-    ("asks checklist: an open item reaches the block as quoted data, and the jury's prompt is the hook's",
-     WDN, "del", "json.dumps(text[:300])"),
-    ("asks checklist: an open item reaches the block as quoted data, and the jury's prompt is the hook's",
+    ("asks checklist: the jury's prompt is the one the hook recorded, never the file's",
      WDN, "del", 'prompt if isinstance(prompt, str) else ""'),
     # Without the docstring strip, a function whose only mention is prose is a reader again.
     ("hooks: a hand-off named only in a comment or docstring does not make its function a reader",
-     "bin/check", "del", "    tree = _NoProse().visit(tree)\n"),
-    # "in progress"[9:] is "ss": without the prefix test every status reads as a reason.
-    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
-     TTAG, "del", ' if status.startswith("not done:") else ""'),
-    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
+     "bin/components", "del", "    tree = _NoProse().visit(tree)\n"),
+    ("asks checklist: an item is an object with a non-empty ask, and only items count",
      TTAG, "del", ' and isinstance(i.get("ask"), str) and i["ask"].strip()'),
-    ("asks checklist: one definition of an item and of closed, in the blocking hook and the counting hook",
-     WDN, "del", "A message that asks for nothing "),
     ("hooks: a session id cannot walk a per-session path out of the scratchpad",
      TTAG, "del", '    sid = _UNSAFE_SID.sub("_", sid)\n'),
     # `if payload.get("hook_event_name"):` keeps the flag when the field is missing.
     ("widen: a continuation Stop with no hook_event_name still consumes the flag",
      WDN, "del", ' != "SubagentStop"'),
-    ("asks checklist: plan mode, which cannot write the list, is never blocked for it",
-     WDN, "del", '    if payload.get("permission_mode") == "plan":\n        return out\n'),
     # THE CONFIRMED REPLY, 2026-09-13, one break per rule. Without the early return an
-    # unmatched reply on an unclassified ask prints "not scored" and no note.
+    # unmatched reply is scanned as an empty one and prints no note.
     ("reply: text the transcript does not hold is never judged, flagged or recorded",
-     WDN, "del", '    if not applicable and unmatched:\n        return {"systemMessage": note}\n'),
+     WDN, "del", '        return {"systemMessage": note}\n'),
+    # The same break judges a side query on its tag: a world-tagged ask blocks for hearing.
+    ("reply: a side query's Stop judges nothing — no block, flag, hand-off or marker",
+     WDN, "del", '        return {"systemMessage": note}\n'),
+    # A side query reaching the checklist marks its turn ended and hands the jury a flag.
+    ("reply: a side query's Stop judges nothing — no block, flag, hand-off or marker",
+     WDN, "del", " or TL.confirmed_reply(payload)[0] is None"),
+    # Without the timestamp test every side query deletes the flag, and a real audit whose agent
+    # has not read it yet is dropped.
+    ("widen agent: a side query's Stop removes a flag only after the Stop that raised it has finished",
+     WDN, "del", " > raised"),
     # A match that never records itself confirms nothing, so every genuine reply is dropped.
     ("reply: a genuine final reply is judged exactly as before",
      TLDG, "del", '                out = (field, "confirmed")\n'),
@@ -322,7 +322,11 @@ CASES = [
     # bin/check dies before any assertion runs. Deleting only the call leaves `roles` as a
     # bare name, so nothing is ever a reader and every hand-off reads as orphaned.
     ("hooks: a detector ships with its actor — no hand-off is written and never read",
-     "bin/check", "del", '.add("reader")'),
+     "bin/components", "del", '.add("reader")'),
+    # THE COMPONENT CATALOG. Renaming the definition two hooks import leaves valid Python and
+    # pulls the dependency out from under both: `def session(payload):`.
+    ("components: no component depends on something that no longer exists",
+     TTAG, "del", "_component"),
     # Removing the write weighting spends the same attention on a read-only turn as on
     # one that rewrote the tree unclassified.
     # TARGET A LITERAL, NOT A LINE. Deleting the whole `rate = ...` line left another
@@ -2190,6 +2194,17 @@ if SINCE:
     CASES = [c for c in CASES if c[1] in _changed]
     print(f"--since {SINCE}: {len(_changed)} file(s) changed, "
           f"{len(CASES)} case(s) point at them")
+    # WHAT IS WIRED TO WHAT CHANGED, printed before a case runs. The cases above prove the
+    # assertions that point at the changed files; they say nothing about the components that
+    # still run through them, which is what a removal pulls out from under (`bin/components`).
+    try:
+        _deps = subprocess.run([sys.executable, str(ROOT / "bin/components"), "--dependents",
+                                *sorted(_changed)], cwd=ROOT, capture_output=True, text=True,
+                               timeout=60).stdout
+    except Exception as _exc:                            # noqa: BLE001
+        _deps = f"  could not read bin/components ({_exc})\n"
+    if _deps.strip():
+        print("components that depend on what changed:\n" + _deps, flush=True)
 # A BARE RUN IN A DIRTY TREE IS ALMOST ALWAYS THE WRONG ONE, AND ONLY THIS SCRIPT CAN
 # SEE THAT IT IS. `--since HEAD` is documented at the top of --help as "the one to reach
 # for after an edit", and --help is the one place it is written down: no procedure, no

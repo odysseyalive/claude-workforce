@@ -46,8 +46,8 @@ import sys
 
 def _sibling(name):
     """A sibling hook, imported so its definitions are shared rather than restated:
-    `wf-task-tag`'s checklist item and session path, because `wf-widen` blocks on the same
-    items this counts, and `wf-turn-ledger`'s confirmed reply, which every reply reader uses."""
+    `wf-task-tag`'s session path and `wf-turn-ledger`'s confirmed reply, which every reply
+    reader uses."""
     # Importing by path would drop a __pycache__ into the shipped directory.
     sys.dont_write_bytecode = True
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
@@ -165,18 +165,6 @@ def asks_expected(payload):
         return None, ""
     if not isinstance(tag, dict):
         return None, ""
-    # THE CHECKLIST BEATS THE COUNT. `count_asks` only sees numbered asks; the checklist
-    # holds the asks the session split out of plain prose, so when it has items it is the
-    # better number. Only a checklist the tag records as started counts, and its items are
-    # counted by `wf-task-tag`'s definition, the one `wf-widen` blocks on.
-    if isinstance(tag.get("checklist"), dict):
-        try:
-            with open(os.path.join(d, f"wf-asks.{sid}.json"), encoding="utf-8") as fh:
-                items = TT.checklist_items(json.load(fh))
-        except (OSError, ValueError):
-            items = []
-        if items:
-            return len(items), f"{len(items)} item(s) on the asks checklist"
     n = tag.get("asks")
     return (n if isinstance(n, int) else None), (tag.get("asks_why") or "")
 

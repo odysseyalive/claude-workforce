@@ -1,0 +1,452 @@
+#!/usr/bin/env python3
+"""
+Component catalog: every shipped script, hand-off file and agent hook, what each one uses,
+and what uses it.
+
+    python3 bin/components                       # the map
+    python3 bin/components wf-widen              # one component, both directions
+    python3 bin/components wf-widen:as_data      # one function: what it uses, what uses it
+    python3 bin/components --json                # machine form
+    python3 bin/components --dependents <path>…  # what depends on these files (bin/prove --since)
+
+WHY IT EXISTS. 2026-09-13: a removal plan listed `wf-task-tag`'s NOTIFICATION keep-rule and
+the tag's `enforced` marker for deletion, and nothing flagged that the asks juror in
+`wf-widen` depends on both. An outside reader caught it. A removal is checked against this
+map before it lands, so the next one does not need an outside reader to catch it.
+
+GENERATED FROM THE CODE ON EVERY RUN, never hand-kept, for the reason `bin/coverage` gives: a
+hand-written copy of a fact stated a file away drifts, and the drifting copy is the one
+believed.
+
+WHAT IT SEES, each edge from what it can read:
+  registers   `wf-settings-apply` SHIPPED_HOOKS naming a hook
+  loads       a sibling imported through SourceFileLoader
+  uses        a name read off a loaded sibling (`TT.session_component`)
+  runs        a code string naming another script's `bin/` path
+  calls       one top-level function calling another in the same file
+  reads / written by / clears   a per-session hand-off file, decided per function
+  field       a JSON key read in one component and written by a function of another that
+              writes a hand-off file they share; an agent hook reads the backticked fields
+              its prompt names
+  pinned      a `bin/prove` case whose literal sits inside the function
+  names       a reference, skill or agent file naming the script. Never dangling: the record
+              names retired scripts on purpose
+
+WHAT IT CANNOT SEE. Coupling that runs through no shared file, function, import, call or JSON
+key: two components that each spell out the same regex or status word, the host's event order
+(a notification firing UserPromptSubmit mid-turn), a load whose script name is computed, a
+module handed back from a loader and used under another name, and what the session itself
+writes into a hand-off file. Roles are per function, so a function that writes one hand-off
+file and clears another counts as writing both. And it sees that a function writes a file
+another function reads; it cannot see WHICH BRANCH of the writer the reader relies on.
+
+DANGLING is an edge whose far end does not exist: a registration, load or run naming no
+script, a use naming no top-level definition, or a hand-off file something reads and nothing
+writes. `bin/check` fails on one. KNOWN_DANGLING holds the one that predates this catalog,
+with its reason, and it is printed on every run rather than hidden.
+
+Exit code is always 0: a map, not a gate.
+"""
+
+import ast
+import json
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BIN = "workforce/bin"
+DOCS = ("workforce/references", "workforce/skills", "workforce/agents")
+SCRIPT_RX = re.compile(r"^wf-[a-z]+(?:-[a-z]+)*$")
+DEFS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+# Found by this catalog's first run, on 1.56.0, and left for the operator: removing the loader
+# is outside the order that built the catalog. Keyed (from, kind, to).
+KNOWN_DANGLING = {
+    ("wf-claude-md:_standing_request", "loads", "wf-standing-request"):
+        "the hook was removed (workforce/references/claude-md.md, THE DURABLE CARRIER WAS "
+        "REMOVED) and wf-claude-md still loads it; the loader returns \"\" when the file is absent",
+}
+
+
+def _src(path):
+    try:
+        with open(os.path.join(ROOT, path), encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+# ── Per-function hand-off roles. `bin/check`'s actor check uses these; one copy. ──────────
+def artifact_names(src):
+    """The per-session hand-off files a source composes: `f"wf-x.{sid}…"` or a `-flag`."""
+    return set(re.findall(r'f"(wf-[a-z-]+)\.\{', src)) | set(re.findall(r'"(wf-[a-z-]+-flag)', src))
+
+
+# CODE ONLY, NEVER PROSE. Splitting the raw source on `\n(?=def )` hung the comment block above
+# a def on the function before it, and a name in a comment or docstring counted as a mention,
+# so a function that opened any file became a "reader" of an artifact only its prose named.
+# Found 2026-09-13 by review. Each function is re-rendered from its syntax tree with every
+# docstring and bare string statement dropped, and a tree carries no comments.
+def code_chunks(src):
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        # Not Python: fall back to the split, with whole-line and trailing comments removed.
+        return re.split(r"\n(?=def )", re.sub(r"(?m)(^|\s)#.*$", r"\1", src))
+
+    class _NoProse(ast.NodeTransformer):
+        def visit_Expr(self, node):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return None
+            return node
+
+    tree = _NoProse().visit(tree)
+    defs = (ast.FunctionDef, ast.AsyncFunctionDef)
+    chunks = [ast.unparse(n) for n in tree.body if isinstance(n, defs)]
+    rest = [n for n in tree.body if not isinstance(n, defs)]
+    return chunks + [ast.unparse(ast.Module(body=rest, type_ignores=[]))]
+
+
+def function_roles(src, art):
+    """{function name, or "" for module code: {"writer", "reader", "clearer"}} for one file.
+
+    A path helper (names the artifact, joins a path, opens nothing) is transparent: a call to
+    it is a mention of the artifact in the calling function. Deleting is not acting, so a
+    clearer is never a reader.
+    """
+    funcs = code_chunks(src)
+    helpers = [m.group(1) for f in funcs
+               if art in f and "os.path.join" in f and "open(" not in f
+               for m in [re.match(r"def (\w+)\(", f)] if m]
+    out = {}
+    for f in funcs:
+        m = re.match(r"def (\w+)\(", f)
+        if m and m.group(1) in helpers:
+            continue
+        if not (art in f or any(f"{h}(" in f for h in helpers)):
+            continue
+        roles = set()
+        if "json.dump(" in f:
+            roles.add("writer")
+        if "os.remove(" in f:
+            roles.add("clearer")
+        if "json.dump(" not in f and "os.remove(" not in f and "open(" in f:
+            roles.add("reader")
+        if roles:
+            out[m.group(1) if m else ""] = roles
+    return out
+
+
+def artifact_roles(src, art):
+    return set().union(*function_roles(src, art).values())
+
+
+def prove_cases(src):
+    """Every (name, path, mode, payload, line) case literal in `bin/prove`, read statically."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+    consts = {n.targets[0].id: n.value.value for n in tree.body
+              if isinstance(n, ast.Assign) and len(n.targets) == 1
+              and isinstance(n.targets[0], ast.Name) and _string(n.value)}
+
+    def lit(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        return consts.get(node.id) if isinstance(node, ast.Name) else None
+
+    rows = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Tuple) and len(n.elts) == 4:
+            name, path, mode, payload = (lit(e) for e in n.elts)
+            # KEYED ON THE MODE, not on the path's shape: the mode is what makes a 4-tuple a case.
+            if isinstance(path, str) and mode in ("del", "delall", "append"):
+                rows.append((name, path, mode, payload, n.lineno))
+    return rows
+
+
+# ── The catalog ───────────────────────────────────────────────────────────────────────────
+def _string(n):
+    return isinstance(n, ast.Constant) and isinstance(n.value, str)
+
+
+def _top_names(tree):
+    """Every name a module defines at top level, inside module-level `if` and `try` too."""
+    names, stack = set(), list(tree.body)
+    while stack:
+        n = stack.pop()
+        if isinstance(n, DEFS):
+            names.add(n.name)
+        elif isinstance(n, (ast.Assign, ast.AnnAssign)):
+            for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                names |= {e.id for e in ast.walk(t) if isinstance(e, ast.Name)}
+        elif isinstance(n, (ast.Import, ast.ImportFrom)):
+            names |= {(a.asname or a.name).split(".")[0] for a in n.names}
+        elif isinstance(n, (ast.If, ast.Try)):
+            stack += n.body + n.orelse + getattr(n, "finalbody", []) + [
+                s for h in getattr(n, "handlers", []) for s in h.body]
+    return names
+
+
+def _keys(node):
+    """(keys written, keys read) as JSON fields anywhere under one node."""
+    wrote, read = set(), set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Dict):
+            wrote |= {k.value for k in n.keys if _string(k)}
+        elif isinstance(n, ast.Subscript) and _string(n.slice):
+            (wrote if isinstance(n.ctx, ast.Store) else read).add(n.slice.value)
+        elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+              and n.func.attr == "get" and n.args and _string(n.args[0])):
+            read.add(n.args[0].value)
+    return wrote, read
+
+
+def _script_edges(name, tree, trees, edge):
+    """Loads, uses, runs and calls for one script."""
+    parent = {c: p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
+    tops = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+    def top(node):
+        while node in parent and parent[node] is not tree:
+            node = parent[node]
+        return node
+
+    def where(node):
+        t = top(node)
+        return f"{name}:{t.name}" if isinstance(t, DEFS) else name
+
+    def gone(script, attr=None):
+        if script not in trees:
+            return True
+        return attr is not None and attr not in _top_names(trees[script])
+
+    loaders = {f: fn for f, fn in tops.items()
+               if any(getattr(n, "id", getattr(n, "attr", None)) == "SourceFileLoader"
+                      for n in ast.walk(fn))}
+    # A loader with no parameter names its script inside; one with a parameter takes it per call.
+    fixed = {f: sorted({n.value for n in ast.walk(fn) if _string(n) and SCRIPT_RX.match(n.value)})
+             for f, fn in loaders.items() if not fn.args.args}
+    aliases = []                                    # (name or None, scope node, script)
+    for f, targets in fixed.items():
+        mods = {tg.id for n in ast.walk(loaders[f]) if isinstance(n, ast.Assign)
+                and getattr(getattr(n.value, "func", None), "attr", "") == "module_from_spec"
+                for tg in n.targets if isinstance(tg, ast.Name)}
+        for t in targets:
+            edge(f"{name}:{f}", t, "loads", gone(t))
+            aliases += [(m, loaders[f], t) for m in mods]
+    for call in ast.walk(tree):
+        if not (isinstance(call, ast.Call) and getattr(call.func, "id", None) in loaders):
+            continue
+        if call.func.id in fixed:
+            targets = fixed[call.func.id]
+        elif call.args and _string(call.args[0]) and SCRIPT_RX.match(call.args[0].value):
+            targets = [call.args[0].value]
+            edge(where(call), targets[0], "loads", gone(targets[0]))
+        else:
+            continue
+        up = parent.get(call)
+        for t in targets:
+            if isinstance(up, ast.Attribute):
+                aliases.append((None, up, t))
+            elif isinstance(up, ast.Assign):
+                scope = tree if parent.get(up) is tree else top(up)
+                aliases += [(tg.id, scope, t) for tg in up.targets if isinstance(tg, ast.Name)]
+    for alias, scope, t in aliases:
+        attrs = [scope] if alias is None else [
+            n for n in ast.walk(scope) if isinstance(n, ast.Attribute)
+            and isinstance(n.value, ast.Name) and n.value.id == alias]
+        for a in attrs:
+            edge(where(a), f"{t}:{a.attr}", "uses", t in trees and gone(t, a.attr))
+    for n in ast.walk(tree):
+        if _string(n) and not isinstance(parent.get(n), ast.Expr):
+            for t in set(re.findall(r"(?<![\w-])bin/(wf-[a-z]+(?:-[a-z]+)*)(?![\w-])", n.value)):
+                if t != name:
+                    edge(where(n), t, "runs", gone(t))
+        elif isinstance(n, ast.Call) and getattr(n.func, "id", None) in tops:
+            if where(n) != f"{name}:{n.func.id}":
+                edge(where(n), f"{name}:{n.func.id}", "calls")
+
+
+def catalog():
+    scripts = {}
+    for line in _src("manifest.txt").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] in ("hook", "exec") and parts[1].startswith(BIN + "/"):
+            scripts[os.path.basename(parts[1])] = {"kind": parts[0], "path": parts[1], "events": []}
+    edges, dangling, known = [], [], []
+
+    def edge(frm, to, kind, is_gone=False):
+        edges.append({"from": frm, "to": to, "kind": kind})
+        if is_gone:
+            why = KNOWN_DANGLING.get((frm, kind, to))
+            (known if why else dangling).append(
+                f"{frm} {kind} {to}, which does not exist" + (f" ({why})" if why else ""))
+
+    sources, trees = {}, {}
+    for name in sorted(os.listdir(os.path.join(ROOT, BIN))):
+        sources[name] = _src(f"{BIN}/{name}")
+        try:
+            trees[name] = ast.parse(sources[name])
+        except SyntaxError:
+            pass
+    comps = dict(scripts)
+    for name in scripts:
+        if name in trees:
+            _script_edges(name, trees[name], trees, edge)
+
+    # Registrations and agent hooks, from wf-settings-apply's two tables.
+    tables = {}
+    for n in (trees["wf-settings-apply"].body if "wf-settings-apply" in trees else []):
+        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") in ("SHIPPED_HOOKS", "AGENT_HOOKS"):
+            try:
+                tables[n.targets[0].id] = ast.literal_eval(n.value)
+            except ValueError:
+                pass
+    agents = tables.get("AGENT_HOOKS", {})
+    for key, (event, _matcher) in tables.get("SHIPPED_HOOKS", {}).items():
+        script = key.split("@", 1)[0]
+        kind = "agent hook" if key in agents else "hook"
+        comps.setdefault(script, {"kind": kind, "path": f"{BIN}/{script}", "events": []})
+        comps[script]["events"].append(event)
+        edge("wf-settings-apply", script, "registers", kind == "hook" and script not in trees)
+
+    roles, fields = {}, {}
+    for name in scripts:
+        for art in artifact_names(sources.get(name, "")):
+            for fn, rs in function_roles(sources[name], art).items():
+                roles.setdefault(art, []).append((f"{name}:{fn}" if fn else name, rs))
+        if name in trees:
+            fields[name] = {n.name: _keys(n) for n in trees[name].body
+                            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    for key, cfg in agents.items():
+        prompt = cfg.get("prompt", "") if isinstance(cfg, dict) else ""
+        for art in roles:
+            if f"{art}." in prompt:
+                roles[art].append((key, {"reader"}))
+        wanted = {p for m in re.findall(r"`([a-z_]+(?:\.[a-z_]+)*)`", prompt) for p in m.split(".")}
+        fields[key] = {"": (set(), wanted)}
+
+    comp = lambda node: node.split(":", 1)[0]  # noqa: E731
+    for art, holders in sorted(roles.items()):
+        node = f"{art}.<session>.json"
+        comps[node] = {"kind": "hand-off file", "path": "", "events": []}
+        writers = [h for h, rs in holders if "writer" in rs]
+        readers = [h for h, rs in holders if "reader" in rs]
+        for h, rs in holders:
+            if "reader" in rs:
+                edge(h, node, "reads")
+            if "clearer" in rs:
+                edge(h, node, "clears")
+        for w in writers:
+            edge(node, w, "written by")
+            wrote = fields.get(comp(w), {}).get(w.partition(":")[2], (set(), set()))[0]
+            for other in sorted({comp(r) for r in readers} - {comp(w)}):
+                for fn, (_w, read) in fields.get(other, {}).items():
+                    for k in sorted(wrote & read):
+                        edge(f"{other}:{fn}" if fn else other, w, f'field "{k}"')
+        if readers and not writers:
+            dangling.append(f"{node} is read by {', '.join(readers)} and written by nothing")
+
+    docs = {}
+    for d in DOCS:
+        for dirpath, _dirs, files in os.walk(os.path.join(ROOT, d)):
+            for fname in files:
+                rel = os.path.relpath(os.path.join(dirpath, fname), ROOT)
+                docs[rel] = set(re.findall(r"(?<![\w-])wf-[a-z]+(?:-[a-z]+)*(?![\w-])", _src(rel)))
+    for rel, named in sorted(docs.items()):
+        for name in sorted(named & set(scripts)):
+            edge(rel, name, "names")
+    for case, path, mode, payload, _ln in prove_cases(_src("bin/prove")):
+        script = os.path.basename(path)
+        if path.startswith(BIN + "/") and script in trees and isinstance(payload, str) and mode != "append":
+            at = sources[script].find(payload)
+            line = sources[script].count("\n", 0, at) + 1 if at >= 0 else 0
+            fn = next((n.name for n in trees[script].body
+                       if isinstance(n, DEFS) and n.lineno <= line <= n.end_lineno), "")
+            edge(f"bin/prove: {case}", f"{script}:{fn}" if fn else script, "pinned")
+    unique = {json.dumps(e, sort_keys=True): e for e in edges}
+    return {"components": comps, "edges": list(unique.values()),
+            "dangling": sorted(set(dangling)), "known": sorted(set(known))}
+
+
+# ── Queries ───────────────────────────────────────────────────────────────────────────────
+def _under(node, target):
+    return node == target or node.startswith(target + ":")
+
+
+def dependents(cat, target):
+    """Edges into `target` or any of its functions, and the readers of the files it writes."""
+    into = [e for e in cat["edges"] if _under(e["to"], target) and not _under(e["from"], target)]
+    files = {e["from"] for e in into if e["kind"] == "written by"}
+    return [e for e in into if e["kind"] != "written by"] + [
+        dict(e, via=f) for f in sorted(files) for e in cat["edges"]
+        if e["to"] == f and e["kind"] == "reads" and not _under(e["from"], target)]
+
+
+def uses(cat, target):
+    return [e for e in cat["edges"] if _under(e["from"], target) and not _under(e["to"], target)]
+
+
+def main(argv):
+    cat = catalog()
+    asked = [a for a in argv if not a.startswith("--")]
+    if "--json" in argv:
+        print(json.dumps(cat, indent=1, sort_keys=True))
+    elif "--dependents" in argv:
+        # Grouped by the component that depends, code edges only. `names` and `pinned` are
+        # counted, not listed, so a change to a large script prints what is WIRED to it rather
+        # than every paragraph that mentions it.
+        for name, c in sorted(cat["components"].items()):
+            if c["path"] not in asked or c["kind"] == "agent hook":
+                continue
+            deps, by = dependents(cat, name), {}
+            for e in deps:
+                if e["kind"] in ("names", "pinned", "calls"):
+                    continue
+                kind, _, key = e["kind"].partition(" ")
+                what = key.strip('"') or e.get("via") or (e["to"].partition(":")[2] if kind == "uses" else "")
+                by.setdefault(e["from"].split(":")[0], {}).setdefault(kind, set()).add(what)
+            print(f"  {name}")
+            for dep, kinds in sorted(by.items()):
+                print(f"      {dep:<18} " + " · ".join(
+                    kind + (" " + ", ".join(sorted(w for w in ws if w)) if any(ws) else "")
+                    for kind, ws in sorted(kinds.items())))
+            print(f"      {sum(e['kind'] == 'pinned' for e in deps)} bin/prove case(s) pin it"
+                  + ("" if by else "; nothing in code depends on it"))
+    elif asked:
+        for target in asked:
+            print(f"# {target}\n\n  uses:")
+            print("\n".join(sorted({f"    {e['kind']:<12} {e['to']}" for e in uses(cat, target)}))
+                  or "    (nothing)")
+            print("  used by:")
+            print("\n".join(sorted({f"    {e['kind']:<12} {e['from']}"
+                                    + (f"  (reads {e['via']})" if e.get("via") else "")
+                                    for e in dependents(cat, target)})) or "    (nothing)")
+            print()
+    else:
+        print("# Components — generated from the code on this run\n")
+        print(f"{len(cat['components'])} components · {len(cat['edges'])} edges · "
+              f"{len(cat['dangling'])} dangling · {len(cat['known'])} dangling on record")
+        for d in cat["dangling"] + cat["known"]:
+            print(f"  DANGLING  {d}")
+        for name, c in sorted(cat["components"].items()):
+            deps = dependents(cat, name)
+            out = sorted({comp for e in uses(cat, name) if e["kind"] != "calls"
+                          for comp in [e["to"].split(":")[0]]})
+            into = sorted({e["from"].split(":")[0] for e in deps
+                           if e["kind"] not in ("names", "pinned", "calls")})
+            events = f" · {', '.join(sorted(set(c['events'])))}" if c["events"] else ""
+            print(f"\n{name}  ({c['kind']}{events})")
+            print(f"  uses     {', '.join(out) or '-'}")
+            print(f"  used by  {', '.join(into) or '-'}")
+            print(f"  named by {len({e['from'] for e in deps if e['kind'] == 'names'})} doc(s) · "
+                  f"pinned by {len({e['from'] for e in deps if e['kind'] == 'pinned'})} bin/prove case(s)")
+        print("\nOne component: `bin/components <name>`. One function: `bin/components <name>:<function>`.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

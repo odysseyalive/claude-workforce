@@ -305,12 +305,9 @@ def tag_path(payload):
     return os.path.join(d, f"wf-task-tag.{sid}.json")
 
 
-# WHAT AN ITEM IS AND WHAT CLOSES ONE, defined once. `wf-widen` blocks on these and
-# `wf-commitments` counts them, and the two used to disagree: one counted items with no `ask`,
-# the other dropped them, and any status but "open" counted as closed, "in progress" included.
-CLOSED_STATUSES = ("done", "answered")
-
-
+# WHAT AN ITEM IS, defined beside the list it belongs to. `wf-widen` counts these toward the
+# hand-off to the widening agent. The status is the session's to word; only the ask decides
+# whether an entry is an item.
 def checklist_items(cl):
     """The items on a checklist: JSON objects with a non-empty string `ask`. An `items` that is
     not a list holds no items, so a malformed file reads as an empty checklist."""
@@ -321,26 +318,12 @@ def checklist_items(cl):
             if isinstance(i, dict) and isinstance(i.get("ask"), str) and i["ask"].strip()]
 
 
-def item_closed(item):
-    """Closed is "done", "answered", or "not done: <reason>" with a reason. Anything else is
-    open, a missing status included."""
-    status = item.get("status")
-    if not isinstance(status, str):
-        return False
-    status = " ".join(status.split()).lower()
-    if status in CLOSED_STATUSES:
-        return True
-    reason = status[len("not done:"):].strip() if status.startswith("not done:") else ""
-    return bool(reason)
-
-
 # THE ASKS CHECKLIST. `count_asks` stays regex-only and numbered-only, for the reason given
 # above it: splitting free prose into requests is a judgment task. So the split is not done
 # here. The operating session is already a model reading the message, and it writes the
 # asks into this file itself, before it starts, then updates each item as the work goes.
-# `wf-widen` sends the turn back once at `Stop` while the list is empty or an item is still
-# open, and the widening agent checks the list against the prompt, so a bad split is caught
-# by a reader that did not write it.
+# At the end of the turn `wf-widen` hands the list and the reply to the widening agent, which
+# checks both against the message, so a bad split is caught by a reader that did not write it.
 #
 # WHY NOT A MODEL CALL HERE. MEASURED 2026-09-12: a headless Haiku split through `claude -p`
 # was accurate on real messages and took 9.6-11.7s per call, a wait in front of every
@@ -362,7 +345,7 @@ def checklist_path(payload):
 def previous_checklist(payload):
     """The checklist record the last tag carried, or None. The record is this hook's, kept in
     the tag file, because the checklist file is the session's to rewrite and cannot be trusted
-    to hold the user's prompt or whether `Stop` already held the turn to it."""
+    to hold the user's prompt or whether a `Stop` has ended the turn it belongs to."""
     try:
         with open(tag_path(payload), encoding="utf-8") as fh:
             tag = json.load(fh)
@@ -387,10 +370,9 @@ def start_checklist(payload, prev=None):
     #
     # BOTH CONDITIONS, and each closes a measured stale case. The prefix is NOTIFICATION, not
     # INJECTED, so a real message that starts "Stop hook feedback:" gets a clean slate. The
-    # record must not be enforced yet: once `wf-widen` has held a turn to the list, that turn
-    # is over, and a notification that opens a NEW turn afterwards must not keep a list that
-    # was already enforced.
-    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("enforced")
+    # list's turn must not have ended: once a `Stop` has ended it, a notification that opens a
+    # NEW turn afterwards must not keep the list, or the widening agent is handed it twice.
+    if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("ended")
             and os.path.exists(p)):
         return "", prev
     try:
@@ -405,17 +387,15 @@ def start_checklist(payload, prev=None):
             json.dump({"prompt": prompt[:2000], "items": []}, fh)
     except OSError:
         return "", None
-    record = {"prompt": prompt[:2000], "enforced": False}
+    record = {"prompt": prompt[:2000], "ended": False}
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
     return (f"Asks checklist for this message: {p}. It holds {{\"prompt\", \"items\"}} and "
-            "starts with no items. Each separate thing the message asks for is one item, "
-            "{\"ask\": <in the user's words>, \"status\": \"open\"}, written before the work "
-            "starts. Status becomes \"done\", \"answered\", or \"not done: <reason>\" as the "
-            "work goes; any other status is still open. An ask found along the way is added "
-            "as a new item, and a message that asks for nothing gets one item saying so, "
-            "with status \"answered\". At Stop an empty list or an open item sends the turn "
-            "back once, and the reply gives each item its own section, in order."), record
+            "starts empty. Each separate ask is one item, {\"ask\": <in the user's words>, "
+            "\"status\": \"open\"}, written before the work starts; statuses are updated as the "
+            "work goes, and an ask found along the way is added. The reply gives each item its "
+            "own section. At Stop the widening agent checks the list and the reply against the "
+            "message."), record
 
 
 def main():
@@ -492,9 +472,9 @@ def main():
                        # of which were addressed, and re-reading it later is worse.
                        "asks": count_asks(payload.get("prompt") or "")[0],
                        "asks_why": count_asks(payload.get("prompt") or "")[1],
-                       # THE CHECKLIST RECORD: the user's prompt and whether `Stop` has
-                       # enforced it. Kept here, in a file this hook writes, and never in the
-                       # checklist file the session edits.
+                       # THE CHECKLIST RECORD: the user's prompt and whether a `Stop` has
+                       # ended its turn. Kept here, in a file this hook writes, and never in
+                       # the checklist file the session edits.
                        "checklist": checklist_record}, fh)
     except OSError:
         pass        # the injection below still lands; the Stop half degrades quietly

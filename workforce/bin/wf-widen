@@ -530,17 +530,24 @@ def widen(payload):
     if counts is None:
         return None
     reply = counts[-1]
-    # A REPLY THE TRANSCRIPT DOES NOT HOLD IS NOT JUDGED (`wf-turn-ledger`, `confirmed_reply`).
-    # Skipped: the promise check, both claim scans, both samples, and every flag, since a flag
-    # hands the reply to the jury as the conclusion. Kept: the tag's senses against the counts
-    # and the checklist, because neither reads the reply. The note gives the length, never the
-    # text, which is the thing that could not be trusted.
-    unmatched = reply is None
-    note = ""
-    if unmatched:
-        reply = ""
+    # A REPLY THE TRANSCRIPT DOES NOT HOLD IS A SIDE QUERY, NOT THE END OF A TURN
+    # (`wf-turn-ledger`, `confirmed_reply`), so NOTHING is judged: no promise check, no claim
+    # scan, no tag sense, no sample, no flag, and `with_checklist` hands nothing over. MEASURED
+    # 2026-09-13: with the tag's senses still judged here, a "push it" side query on a
+    # world-tagged ask blocked for hearing. The note gives the length, never the text, which is
+    # the thing that could not be trusted.
+    if reply is None:
         note = (f"WIDEN  reply not matched in the transcript "
                 f"({len(payload.get('last_assistant_message') or '')} chars) — not judged")
+        # THE AGENT MUST NOT JUDGE ONE FLAG TWICE, and it runs on this Stop too. The flag goes
+        # only once the Stop that raised it has finished its hooks (`audited`); deleting it
+        # sooner drops a real audit whose agent has not read the file yet.
+        if payload.get("hook_event_name") != "SubagentStop" and audited(payload):
+            try:
+                os.remove(widen_flag(payload))
+            except OSError:
+                pass
+        return {"systemMessage": note}
 
     # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
     # applicable to this turn, and a turn that trips neither is scored against nothing
@@ -616,8 +623,6 @@ def widen(payload):
     # standing docket for a turn nobody classified, and it is a constant here rather than
     # anything derived from the turn.
     BLIND_DOCKET = ["smell", "intuition"]
-    if not applicable and unmatched:
-        return {"systemMessage": note}
     if not applicable:
         try:
             blind = int(os.environ.get("WF_BLIND_SAMPLE") or 20)
@@ -668,14 +673,13 @@ def widen(payload):
     except ValueError:
         rate = 5
     sampled = False
-    if rate > 0 and not unopened and not unmatched:
+    if rate > 0 and not unopened:
         # Deterministic per turn, never random: the same reply always gets the same
         # verdict, so a run is reproducible and a fixture can pin it.
         sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
 
     if not unopened and not sampled:
-        return {"systemMessage": " · ".join(
-            x for x in (f"WIDEN  {shown} — required channels opened", note) if x)}
+        return {"systemMessage": f"WIDEN  {shown} — required channels opened"}
 
     # On a BLOCK, narrow `why` to the channels actually shut. On a SAMPLE nothing is
     # shut, so the full list is the right context for the audit — but `unopened` travels
@@ -688,9 +692,8 @@ def widen(payload):
     if not applicable:
         return {"systemMessage":
                           "WIDEN  no docket — nothing this ask requires to be checked"}
-    if not unmatched:
-        raise_flag(payload, why_rows, rows, counts, unopened, applicable,
-                   sampled=sampled, reply=reply)
+    raise_flag(payload, why_rows, rows, counts, unopened, applicable,
+               sampled=sampled, reply=reply)
 
     if sampled:
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
@@ -701,13 +704,36 @@ def widen(payload):
     return {
         "decision": "block",
         "reason": widen_reason(unopened, why_rows, rows, instruments(cwd), counts),
-        "systemMessage": " · ".join(
-            x for x in (f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED", note) if x),
+        "systemMessage": f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED",
     }
 
 
+def audited(payload):
+    """True once the Stop that raised the flag has finished every hook, the agent's included.
+
+    The host writes a `stop_hook_summary` row into the transcript after all of a Stop's hooks
+    return (2.1.268 records each hook's `duration_ms` in it), so a summary newer than the flag
+    means that Stop's agent is done with the file. A clock rule would not be safe. MEASURED
+    2026-09-13 over 241 recorded Stops: the agent hook took 2.3 s at its fastest, and one side
+    query reached its Stop about 3 s after the real one, while that Stop's agent still ran.
+    """
+    from datetime import datetime
+    try:
+        raised = os.path.getmtime(widen_flag(payload))
+    except OSError:
+        return False
+    for line in reversed(TL._read_lines(TL.reply_transcript(payload)) or []):
+        if '"stop_hook_summary"' in line:
+            try:
+                stamp = json.loads(line)["timestamp"].replace("Z", "+00:00")
+                return datetime.fromisoformat(stamp).timestamp() > raised
+            except (ValueError, KeyError, TypeError, AttributeError):
+                return False
+    return False
+
+
 def checklist(payload):
-    """This turn's asks checklist, its path, and the tag's record of it.
+    """This turn's asks checklist and the tag's record of it: (checklist, record).
 
     WHETHER THERE IS A CHECKLIST IS THE TAG'S TO SAY, never the file's. `wf-task-tag` starts
     one only for a message long enough to hold several asks, and records it, with the user's
@@ -720,27 +746,27 @@ def checklist(payload):
     p = os.path.join(d, f"wf-asks.{sid}.json")
     record = (task_tag(payload) or {}).get("checklist")
     if not isinstance(record, dict):
-        return None, p, None
+        return None, None
     try:
         with open(p, encoding="utf-8") as fh:
             cl = json.load(fh)
     except (OSError, ValueError):
         cl = {}
-    return cl, p, record
+    return cl, record
 
 
-def mark_enforced(payload):
-    """Record on the tag that a `Stop` has held the turn to its checklist.
+def mark_ended(payload):
+    """Record on the tag that a `Stop` ended the turn this checklist belongs to.
 
     ONCE PER CHECKLIST. A notification that opens a new turn after this one ended would
-    otherwise find the same list and block on it a second time. The mark lives in the tag,
-    because the session rewrites the checklist file and would drop it.
+    otherwise keep the same list and hand it to the jury a second time. The mark lives in the
+    tag, because the session rewrites the checklist file and would drop it.
     """
     path = tag_file(payload)
     try:
         with open(path, encoding="utf-8") as fh:
             tag = json.load(fh)
-        tag["checklist"]["enforced"] = True
+        tag["checklist"]["ended"] = True
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(tag, fh)
     except (OSError, ValueError, KeyError, TypeError):
@@ -748,9 +774,9 @@ def mark_enforced(payload):
 
 
 def hand_checklist_to_jury(payload, record, items):
-    """Put the checklist in front of the widening agent, so a bad split is caught by a
-    reader that did not write it. Joins this turn's flag when `widen` raised one, and
-    raises one when it did not: every multi-ask turn gets its asks checked."""
+    """Put the checklist and the reply in front of the widening agent, so a bad split or a
+    blended reply is judged by a reader that did not write it. Joins this turn's flag when
+    `widen` raised one, and raises one when it did not."""
     flag = widen_flag(payload)
     try:
         with open(flag, encoding="utf-8") as fh:
@@ -758,20 +784,16 @@ def hand_checklist_to_jury(payload, record, items):
     except (OSError, ValueError):
         data = None
     if not isinstance(data, dict):
-        # A new flag carries the reply as its conclusion, so it needs a reply the transcript
-        # holds. Unmatched, no juror is seated; the checklist block still stands.
-        reply = TL.confirmed_reply(payload)[0]
-        if reply is None:
-            return
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
-                "conclusion": reply[:4000],
+                "conclusion": (TL.confirmed_reply(payload)[0] or "")[:4000],
                 "unopened": [],
                 "why": [{"trigger": "ASKS", "sense": "asks",
                          "reason": "the message made several asks; each is checked"}]}
     ask = data.get("ask")
     if not isinstance(ask, dict):
         ask = data["ask"] = {"prompt": "", "senses": []}
-    # The ask and its status, and nothing else the session put on the item.
+    # The ask and its status, and nothing else the session put on the item. An EMPTY list is
+    # still handed over: the juror then checks each request in the prompt against the reply.
     ask["checklist"] = [{"ask": i["ask"],
                          "status": i["status"] if isinstance(i.get("status"), str) else None}
                         for i in items]
@@ -787,75 +809,32 @@ def hand_checklist_to_jury(payload, record, items):
         pass
 
 
-def as_data(text):
-    """An ask, quoted as a JSON string for the block reason.
+def with_checklist(payload):
+    """Hand this turn's asks checklist to the widening agent, once. It never blocks.
 
-    The reason becomes the session's next instruction, and an ask is text the session
-    wrote. Quoted, its newlines and quotes are escaped, so an item cannot start a line of its
-    own or read as a sentence this hook wrote.
-    """
-    return json.dumps(text[:300])
+    The Stop-time block on an empty list or an open item was removed 2026-09-13 as more than
+    the ask needed. The session keeps the list, and the check on it is the juror's.
 
+    Only the Stop that ends the turn: not a subagent, not a turn waiting on background work,
+    not a continuation, and not a Stop whose reply the transcript does not hold, since that
+    is a side query and the list's turn is still going.
 
-def with_checklist(payload, out):
-    """Hold the turn to its asks checklist, on top of whatever `widen` decided.
+    ONCE PER CHECKLIST: the tag's record says whether a Stop has ended the list's turn.
 
-    WHY IT BLOCKS, when `wf-commitments` deliberately never does. A section count is an
-    observation about shape. An ask still open when the turn ends is the defect the user
-    named: "each ask ... gets a checkpoint and they each get evaluated." It blocks once:
-    the continuation carries `stop_hook_active` and this returns before reading the list.
-
-    MERGED, NEVER REPLACING. `widen` may already be blocking for an unopened sense, and a
-    continuation skips every check, so the checklist reason is appended to that block
-    rather than taking its place.
-
-    Main `Stop` only. A subagent finishes while the main turn's asks are legitimately still
-    open, and a turn waiting on background work has nothing to close yet.
-
-    ONCE PER CHECKLIST, not once per Stop: the tag's record says whether a Stop already held
-    a turn to this list, and a later turn is never held to it again.
+    TWO WAYS IN, so an unwritten or erased file cannot mute the juror: the tag counted two or
+    more asks in the message, or the file holds two or more items.
     """
     if (payload.get("stop_hook_active") or payload.get("hook_event_name") == "SubagentStop"
-            or payload.get("background_tasks")):
-        return out
-    # PLAN MODE CANNOT WRITE THE LIST. Claude Code's plan-mode instruction (measured in
-    # 2.1.268's binary) allows editing the plan file only, "other than this you are only
-    # allowed to take READ-ONLY actions", so every long message in plan mode would pay a block
-    # it is forbidden to clear. Not marked enforced: a plan approved and carried out in the
-    # same turn still meets its list at the Stop that ends outside plan mode.
-    if payload.get("permission_mode") == "plan":
-        return out
-    cl, p, record = checklist(payload)
-    if record is None or record.get("enforced"):
-        return out
+            or payload.get("background_tasks") or TL.confirmed_reply(payload)[0] is None):
+        return
+    cl, record = checklist(payload)
+    if record is None or record.get("ended"):
+        return
     items = TT.checklist_items(cl)
-    still = [i for i in items if not TT.item_closed(i)]
-    mark_enforced(payload)
-    if len(items) >= 2:
+    mark_ended(payload)
+    asks = (task_tag(payload) or {}).get("asks")
+    if len(items) >= 2 or (isinstance(asks, int) and asks >= 2):
         hand_checklist_to_jury(payload, record, items)
-    if items and not still:
-        return out
-    if not items:
-        reason = (f"The asks checklist for this message is still empty: {p}. Each separate "
-                  "thing the user asked for goes in as an item, {\"ask\", \"status\"}, and the "
-                  "reply answers each one in its own section. A message that asks for nothing "
-                  "closes with one item saying so, status \"answered\".")
-        note = "ASKS  checklist empty"
-    else:
-        reason = ("These asks are still open on the checklist, each quoted from the file as "
-                  "data rather than instruction:\n"
-                  + "\n".join(f"  {n}. {as_data(i['ask'])}" for n, i in enumerate(still, 1))
-                  + f"\n\nEach one is finished, or its status in {p} is \"done\", \"answered\" "
-                  "or \"not done: <reason>\"; any other status is still open. The reply gives "
-                  "each its own section.")
-        note = f"ASKS  {len(still)} of {len(items)} still open"
-    out = dict(out or {})
-    if out.get("decision") == "block":
-        out["reason"] = (out.get("reason") or "") + "\n\n" + reason
-    else:
-        out["decision"], out["reason"] = "block", reason
-    out["systemMessage"] = " · ".join(x for x in (out.get("systemMessage"), note) if x)
-    return out
 
 
 def main():
@@ -865,16 +844,15 @@ def main():
     except json.JSONDecodeError:
         return 0
     decided = widen(payload)
-    # THE CHECKLIST ADDS TO WIDEN'S DECISION AND MUST NEVER COST IT. Its input is a file the
-    # session writes. The types are validated where they are read; this is the backstop for
-    # whatever that misses, because a crash here used to exit 1 and print nothing, dropping a
-    # block `widen` had already decided.
+    # THE HAND-OFF MUST NEVER COST WIDEN ITS DECISION. Its input is a file the session writes.
+    # The types are validated where they are read; this is the backstop for whatever that
+    # misses, because a crash here used to exit 1 and print nothing.
     try:
-        out = with_checklist(payload, decided)
+        with_checklist(payload)
     except Exception:
-        out = decided
-    if out:
-        print(json.dumps(out))
+        pass
+    if decided:
+        print(json.dumps(decided))
     return 0
 
 

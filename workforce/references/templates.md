@@ -149,7 +149,8 @@ what success depends on, and what it will not do.>
     including you, which is how two separate problems become one confused thread. `wf-task-tag`
     reports `asks: N` with the evidence for the number; N greater than 1 means N headings. In the
     operating session a message of a dozen words or more also gets a checklist of its asks, written
-    before the turn starts and updated as it works, and `wf-widen` sends a turn back once while the list is empty or an item is still open.
+    before the work starts and updated as it goes, and a reader that did not write it checks the list
+    and the reply against the message.
 <!-- WF-PRINCIPLES END -->
 
 <!-- origin: user | immutable: true -->

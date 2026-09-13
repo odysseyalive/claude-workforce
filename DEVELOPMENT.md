@@ -31,6 +31,16 @@ itself. Two processes, one file, and only one of them knew the file was a histor
 | `plan/<topic>-<date>.md` | *"why is it built this way, and what did running it cost?"* | mock audits, design records, negative-test results |
 | the commit message | *"what was learned, in the author's own words?"* | every change. **These are the richest record this project has** — 844 lines on 2026-08-03 alone |
 
+**Before removing a mechanism, ask `bin/components <name>` what runs through it.** The catalog is
+generated from the code on every run: every shipped script, per-session hand-off file and agent hook,
+with what each loads, uses, reads, writes and registers, and which `bin/prove` cases pin it.
+`bin/components <name>:<function>` narrows it to one function, `bin/prove --since` prints the
+dependents of whatever changed, and `bin/check` fails when a component still depends on something that
+no longer exists. It cannot see coupling that runs through no shared file, name, call or JSON key;
+its header lists what that leaves out. *Built 2026-09-13, after a removal plan marked the
+NOTIFICATION keep-rule and the tag's `enforced` marker for deletion while the asks juror depended on
+both.*
+
 **And this file is the index.** It is what a fresh session reads, and it is the only store that goes
 stale silently — the others are append-only. **Update the open list in the same change that closes an
 item**, or a later session is oriented by a snapshot of a day that has passed.
