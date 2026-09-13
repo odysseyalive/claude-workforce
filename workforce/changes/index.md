@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.56.0 | 2026-09-13 | principles, changes, hooks, scripts, installer | **yes** | Fix what the independent code and security reviews found in the asks checklist |
 | 1.55.0 | 2026-09-12 | chart, principles, audit, update, changes | **yes** | README: Getting Started, Advanced Use, and the voice pass |
 | 1.54.0 | 2026-09-11 | update, changes, scripts, installer | no | Plan-only in auto mode, and the contracts six cold reads found |
 | 1.53.0 | 2026-09-11 | chart, principles, audit, changes, scripts | **yes** | The reply half of asks: N — counted for free, judged where judgment belongs |
