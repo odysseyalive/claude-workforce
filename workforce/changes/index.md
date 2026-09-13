@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.57.1 | 2026-09-13 | changes, scripts, installer | no | The generated region carries the standing cold-reader request again |
 | 1.57.0 | 2026-09-13 | principles, changes, hooks, scripts, installer | **yes** | A generated component catalog first, then the asks checklist without its block |
 | 1.56.0 | 2026-09-13 | principles, changes, hooks, scripts, installer | **yes** | Fix what the independent code and security reviews found in the asks checklist |
 | 1.55.0 | 2026-09-12 | chart, principles, audit, update, changes | **yes** | README: Getting Started, Advanced Use, and the voice pass |
