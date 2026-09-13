@@ -1,6 +1,5 @@
 # Change index
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **One row per release, newest first.** Read this to decide WHICH versions matter; read `<version>.md` only for the ones that do. Both are queried by `wf-changes`, which is a script — no agent is spawned to answer "what changed".
 
 `Org` says whether an existing org carries a copy of something the release changed. **`yes` means `/workforce audit` has real work to do**; `no` means the change is self-contained in the skill directory and installing it was the whole update.
@@ -9,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.55.0 | 2026-09-12 | chart, principles, audit, update, changes | **yes** | README: Getting Started, Advanced Use, and the voice pass |
 | 1.54.0 | 2026-09-11 | update, changes, scripts, installer | no | Plan-only in auto mode, and the contracts six cold reads found |
 | 1.53.0 | 2026-09-11 | chart, principles, audit, changes, scripts | **yes** | The reply half of asks: N — counted for free, judged where judgment belongs |
 | 1.52.0 | 2026-09-11 | chart, principles, audit, verify, changes, scripts, installer | **yes** | The /org receptionist had a rule in three files and a producer in none |
