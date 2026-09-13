@@ -1,6 +1,6 @@
 # Org Chart Format
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — `org index` writes this; `/org` dispatches from it; `verify` reconciles it. -->
 
 **Location:** `${CLAUDE_PROJECT_DIR}/.claude/workforce/org-chart.md` — project state, never inside the
@@ -230,6 +230,7 @@ rather than omitting the section — an absent table and an empty one must not l
 
 ## Roster
 | Employee | Tier | Dept | Reports to | Model / Effort | Owns records | Triggers | Status |
+| hand-reviewer | — | — | — | sonnet / — | — | — | adopted |
 
 ## Departments
 ### Engineering
@@ -254,6 +255,15 @@ emitted block never applied by hand) — a false safety claim repeated nine time
 The sentence states the design; this line states this install.
 `Orchestrators` is a real
 section, not an appendix: those skills are visible in the org without being in the chain.
+
+### Adopted rows
+
+An agent with no `ORG-RECORD` marker and no COMMITTED journal row is an adopted row
+(`procedures/org.md` step 1a). It is a `## Roster` row with `Tier`, `Dept` and `Reports to` written
+`—`, because the file declares none of them and the chart never infers one. It carries `Status`
+`adopted`, and its `## Per-Employee Detail` entry reads `Release: not probed (pre-existing)`. It is not
+drawn into `## Chain of Command` and is never flagged `ORPHAN`. Its first amendment gives it an
+ORG-RECORD, and from then on it is an ordinary governed row.
 
 ---
 
@@ -287,11 +297,13 @@ difference. `audit`'s closing report says the same thing in words.
 `org index` globs `.claude/agents/**/*.md`, parses frontmatter + ORG-RECORD, diffs against the prior
 chart, and reports **NEW / REMOVED / UPDATED / UNCHANGED**.
 
-- Written **last**, and **only from COMMITTED conversion-journal rows** — never from the plan. A
-  half-converted project gets an honest chart, not an aspirational one.
+- Written **last**. Converted and hired employees come **only from COMMITTED conversion-journal
+  rows**, never from the plan, so a half-converted project gets an honest chart, not an aspirational
+  one. Adopted rows (§ Adopted rows) are not journal rows, and this rule never drops them.
 - Recomputes worst-case fan-out (`procedure-for-procedures.md`) into the header.
-- **Re-derives every edge from `reports-to` and rewrites `direct-reports` to match**, printing
-  `INV-EDGES` (`references/invariants.md` row 34) with every count and reporting each
+- **Re-derives every edge from `reports-to` and rewrites `direct-reports` to match** in governed
+  handbooks only (an adopted file has no ORG-RECORD mirror, and index changes zero bytes of it),
+  printing `INV-EDGES` (`references/invariants.md` row 34) with every count and reporting each
   `EDGE-MISMATCH` it healed. This runs on every `index`, so an org repaired once cannot silently
   drift back — and `audit` Step 5f runs it against orgs that already exist rather than only new ones.
 - Never invents a row. An employee absent from disk is absent from the chart.

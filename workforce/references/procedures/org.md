@@ -1,6 +1,6 @@
 # org — index, embed, status
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 28 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 17 assertion(s) in bin/check name this file; 42 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Maintain the `/org` receptionist and the org chart, and push each employee's chain-of-command
 facts into its own handbook.**
 
@@ -19,6 +19,32 @@ Format spec: `references/org-chart-format.md`. Bootstrap template: `references/t
 **1. Inventory.** Glob `${CLAUDE_PROJECT_DIR}/.claude/agents/**/*.md`. For each: parse frontmatter and
 the `ORG-RECORD` block; recompute the `contract-stamp` over the normalized `## Procedure` +
 `## Verification` sections.
+
+**1a. Adopt what no audit converted.** An agent file with no `ORG-RECORD` marker and no COMMITTED
+conversion-journal row is charted as ADOPTED: `conversion-taxonomy.md` ADOPT, *censused into the
+chart, zero bytes changed*. On a project that has never been audited, that is every agent it has,
+and this step is what fills the roster. The marker block decides it, never the word in prose
+(`verify.md` § GOVERNED vs ADOPTED). An adopted row carries only what the file states and what the
+gates already fix (`org-chart-format.md` § Adopted rows):
+
+- **`Tier`, `Dept` and `Reports to` are `—`.** A file with no ORG-RECORD declares none of them, and
+  index never infers a tier from a `tools:` line, assigns it a department, or names a manager for it.
+  The Tier-Ceiling Gate resolves tier from a record this file does not have, so the tier is set by the
+  agent's first amendment. The row sits in `## Roster` and is not drawn into `## Chain of Command`.
+  It is never `ORPHAN`, which is for a `reports-to` naming nobody; an adopted file has no
+  `reports-to` at all.
+- **`Status: adopted` and `Release Record: not probed (pre-existing)`** (SKILL.md § Off-the-Street
+  Release Gate rule 8). `Model / Effort` is read from its frontmatter; absent keys are written `—`.
+- **No stamp is recomputed and no `CONTRACT-DRIFT` is raised**, because there is no stamp to differ
+  from. The first amendment gives it an ORG-RECORD, and from then on it is governed.
+
+**Index changes zero bytes of any adopted agent, of any skill except `/org`, and of any `CLAUDE.md`.**
+It writes the chart (step 6) and `/org` (steps 2 and 5). The one handbook edit index owns, rewriting a
+governed manager's `direct-reports` mirror (`org-chart-format.md` § Regeneration), needs an ORG-RECORD
+to exist, so it never reaches an adopted file. Marker blocks inside handbooks are `embed`'s job.
+
+**The audit path needs no change for this.** Audit runs `org index` unconditionally (`audit.md`
+§ Step 6), so an ADOPT disposition reaches the chart through step 1a like any other adopted agent.
 
 Also inventory **orchestrator skills** (`conversion-taxonomy.md`) — they appear in the chart without
 being in the chain.
@@ -167,10 +193,13 @@ block; every one of them matched `procedures/org.md` as a whole, so they were sa
 that *explains* the block while the block itself went unchecked. **They would all have passed against
 an empty block.** They now extract the span between the markers and assert against that.
 
-**6. Write the chart** — last, and **only from COMMITTED conversion-journal rows**. Never from the
-plan. A half-converted project gets an honest chart, not an aspirational one. Recompute worst-case
-fan-out into the header (`procedure-for-procedures.md`). Zero employees is valid: write the explicit
-"no employees yet" notice.
+**6. Write the chart** — last. **Converted and hired employees are charted only from COMMITTED
+conversion-journal rows**, never from the plan. A half-converted project gets an honest chart, not an
+aspirational one. **Adopted rows from step 1a are not journal rows and are never erased by this rule**:
+the Atomic-or-Absent Conversion Gate's rule 8 fires at conversion T-steps, and adopting an agent is not
+a conversion. Recompute worst-case fan-out into the header (`procedure-for-procedures.md`). Zero
+employees is valid: write the explicit "no employees yet" notice only when there are no COMMITTED
+rows and no adopted rows.
 
 **Stamp the header with the running release.** Read `WORKFORCE-VERSION` from the installed
 `references/version.md` and write it into the `Generated:` line as `| workforce-version: <value>`
@@ -219,6 +248,13 @@ someone can read instead of re-derive.
    visible, because a `review` cannot detect spec loss in an edge that never recorded the spec.
    Measured 2026-09-01 on a real org before this clause existed: 252 recorded edges, mean 3.5 lines,
    2% carrying exit criteria — an audit trail that could not see the loss it was built to catch.
+
+   1b. **An adopted employee is announced as adopted, never given a tier.** A roster row with
+   `Status` `adopted` writes `Tier`, `Dept` and `Reports to` as `—`, because its file has no
+   ORG-RECORD to declare them. Its announcement is therefore
+   `→ Dispatching to @agent-<name> (adopted) — <why this is the lowest competent node>`, followed
+   by the same edge file and the same `Agent` call. A tier or department printed for it states
+   something the chart does not, which is the invention rung 8 forbids.
 
 2. **A command that already does the job beats an agent.** Read the chart's `## Mechanicals` table
    before choosing anyone. A row can answer the whole ask only if its `Scope` cell says `derived` — a
@@ -278,6 +314,13 @@ someone can read instead of re-derive.
    department, or work that has to be sequenced inside it → that Lead. Two or more departments, no clear
    owner, or strategic and ambiguous work → the CEO. **Ties go downward** — cheaper, fewer hops. The CEO
    is never a mandatory funnel.
+
+   3a. **An adopted employee is weighed as an IC with no Lead.** Its row has no tier, so it is never
+   picked as a Lead or as the CEO. Its scope is what its own file says it does, and where the file
+   states no scope, its `description:` line. When that covers the whole ask, it is the node. When the
+   work needs it and anyone else, no Lead sits above it to sequence the work, so the ask goes to the
+   CEO, which in the ordinary org is this main session (rung 6e). Never route it through a Lead or a
+   department the chart does not give it.
 
 4. **Never ask the user about models.** Every employee pins its own model in its frontmatter, so the
    session model does not affect the work. Never suggest `/model`, and never carry a model preflight
@@ -352,10 +395,11 @@ someone can read instead of re-derive.
    the agent was never started. Starting it now," and make the call. A command run under rung 2 is the
    one case where `Bash` *is* the dispatch; that is not a bypass.
 
-8. **Never invent a name.** Dispatch only to employees on the roster and commands in `## Mechanicals`.
-   One exception, for a stale chart: glob `.claude/agents/**/*.md`, and a file on disk whose `name:`
-   matches wins over the chart — say "stale chart — run /workforce org index". Disk evidence wins both
-   ways for commands too: one listed in the table but missing from disk is not run.
+8. **Never invent a name.** Dispatch only to employees on the roster, adopted rows included, and to
+   commands in `## Mechanicals`. One exception, for a stale chart: glob `.claude/agents/**/*.md`, and
+   a file on disk whose `name:` matches wins over the chart — say "stale chart — run /workforce org
+   index". A file found that way with no ORG-RECORD is announced in rung 1b's adopted form. Disk
+   evidence wins both ways for commands too: one listed in the table but missing from disk is not run.
 
 9. **A newly written employee is not reachable yet.** If the chart marks it `PENDING-RESTART`, do not
    dispatch. Say: "<name> is registered but not loaded in this session. It loads later in this session;

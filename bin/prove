@@ -228,7 +228,6 @@ PRINP = "workforce/references/procedures/principles.md"
 CTV  = "workforce/skills/text-eval/references/version.md"
 VSRC = "workforce/references/version.md"   # the product version anchor (WORKFORCE-VERSION)
 DBUD = "workforce/references/procedure-for-procedures.md"
-AUS  = "workforce/references/audit-setup.md"
 SECG = "workforce/skills/security-evaluator/references/guards.md"
 REC  = "workforce/references/recruiter.md"
 UIS  = "workforce/skills/ui-design/references/design-quality-catalog.md"
@@ -743,8 +742,12 @@ CASES = [
     # Four breaks, each a different way the third catalog can silently vanish: its
     # files stop shipping, an anchor a re-distillation compares against goes missing,
     # the standing gate drops out of verification.md, or the evaluator set the
-    # companion gate reads stops naming it. Each payload is grep -c == 1 so the
-    # single del actually flips the check.
+    # companion gate reads stops naming it. The first three payloads are grep -c == 1
+    # so the single del actually flips the check. The fourth breaks evaluators.md
+    # with delall, and audit-setup.md is the wrong target for it: it holds the name
+    # twice, and a first-occurrence del removes the Step 0.3 companion line, which the
+    # wf-conform companion-tuple invariant also pins. That broke the invariant, left
+    # the line-432 copy in place, and reported BAD-CASE (2026-09-13).
     ("catalogs: the authored security catalog ships (all five files)",
      MAN, "del", "workforce/skills/security-evaluator/references/guards.md\n"),
     ("catalogs: every security file carries a security-ref-version anchor on line 1",
@@ -752,7 +755,7 @@ CASES = [
     ("security: the standing catalog gate is written where verification is enforced",
      VER, "del", "Every security-relevant change passes the catalog before it is done"),
     ("catalogs: security-evaluator is enumerated in the evaluator set beside code and text",
-     AUS, "del", "security-evaluator"),
+     EVL, "delall", "security-evaluator"),
     # The class check scans EVERY bash block in EVERY read-only procedure, so an
     # append fires — which the narrow first version did not. That is the point: the
     # narrow one permitted an executing block anywhere but the first.
@@ -956,6 +959,16 @@ CASES = [
      SCO, "del", 'WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"'),
     ("org: step 2 names the project skill root as the /org bootstrap destination",
      ORGP, "del", "The destination is the project, always"),
+    # Delete the adoption clause from step 1a. The file stays valid prose, index loses the
+    # rule that charts a never-audited project's agents, and only the adoption assertion
+    # reads the phrase. Unique contiguous line in org.md (grep -c == 1).
+    ("org: index charts un-audited agents as ADOPTED with zero bytes changed, and step 6 does not erase them",
+     ORGP, "del", "row is charted as ADOPTED"),
+    # Delete the adopted announcement's target from rung 1b inside the canonical block. The
+    # rung keeps its prose and no longer states the form, and only the adopted-dispatch
+    # assertion reads the literal. Unique in org.md (grep -c == 1).
+    ("org: the dispatch CHECKPOINT announces, weighs, and names adopted employees without a tier",
+     ORGP, "del", "@agent-<name> (adopted)"),
     # ── receiver-side of resolve-before-escalate, dispatch rung 12 (2026-08-24) ──
     # Deletes the rung's lead anchor from the byte-canonical CHECKPOINT block; the
     # assertion reads the extracted block, so the receiver rung vanishes and the

@@ -3439,6 +3439,47 @@ check(
     "clause 2 dispatches from this table; an absent table and an empty one must not "
     "look the same to a reader",
 )
+# INDEX ADOPTS WHAT NO AUDIT CONVERTED. Until 2026-09-13 step 6 read "only from COMMITTED
+# conversion-journal rows" with no exception, and a never-audited project has no journal,
+# so a literal reading wrote "no employees yet" over a directory of working hand-written
+# agents, while README told users to run `org index` instead of an audit to chart exactly
+# those agents. ADOPT ("zero bytes changed") already existed in conversion-taxonomy.md and
+# verify.md; index was the one producer that never applied it.
+check(
+    "org: index charts un-audited agents as ADOPTED with zero bytes changed, and step 6 does not erase them",
+    "row is charted as ADOPTED" in _org
+    and "Index changes zero bytes of any adopted agent" in _org
+    and "Release Record: not probed (pre-existing)" in _org
+    and "are never erased by this rule" in _org
+    and "— last, and **only from COMMITTED conversion-journal rows**" not in _org
+    and "### Adopted rows" in _ocf
+    and "this rule never drops them" in _ocf,
+    "org.md step 1a must adopt an agent with no ORG-RECORD, state the zero-bytes write "
+    "boundary and the adopted row's Release Record, and step 6's COMMITTED-rows rule must "
+    "carry its adopted exception; org-chart-format.md must define the adopted row and keep "
+    "Regeneration from dropping it. Without these, index on a never-audited project charts "
+    "zero employees over working agents",
+)
+# AN ADOPTED EMPLOYEE HAS NO TIER TO ANNOUNCE. Once index charted never-audited agents as
+# adopted (2026-09-13), rung 1's only announcement form was `(T<n>, <dept>)`, and an adopted
+# row writes both as `—`. A dispatcher following the block would print an invented tier, or
+# stall on a form it could not fill. Rung 3 picked only among ICs, Leads and the CEO, and rung
+# 8's stale-chart exception reached files that have no tier at all. Reads THE BLOCK, because
+# the block is what index copies into every project's /org.
+check(
+    "org: the dispatch CHECKPOINT announces, weighs, and names adopted employees without a tier",
+    "An adopted employee is announced as adopted, never given a tier" in _org_block
+    and "`→ Dispatching to @agent-<name> (adopted) — <why this is the lowest competent node>`" in _org_block
+    and "An adopted employee is weighed as an IC with no Lead" in _org_block
+    and "adopted rows included" in _org_block
+    and "rung 1b's adopted form" in _org_block
+    and "`Tier`, `Dept` and `Reports to` written" in _ocf,
+    "rung 1b must give an adopted row its own announcement form, rung 3a must say how a "
+    "tierless row is weighed, and rung 8 must keep adopted rows dispatchable and name the "
+    "form for a stale-chart file with no ORG-RECORD; org-chart-format.md must write the "
+    "adopted row's Dept as `—`. Without these the block has nothing true to print for "
+    "every agent `org index` adopts",
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data-in-hand, landed 2026-08-03 — clause 2f.
