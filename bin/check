@@ -12271,10 +12271,30 @@ _asks_closed = _asks_run(_CLOSED)
 _asks_sub = _asks_run(_OPEN, event="SubagentStop")
 # A background task finishing arrives as a user row. The first live checklist opened on one.
 _asks_notice = _asks_run(None, lead="<task-notification> ")
+# And one arriving MID-TURN must not erase the checklist of the message it interrupted.
+def _asks_survives_notice():
+    import tempfile
+    tag = os.path.join(ROOT, "workforce/bin/wf-task-tag")
+    with tempfile.TemporaryDirectory() as d:
+        base = {"session_id": "a1", "scratchpad_dir": d, "cwd": d}
+        subprocess.run([tag], input=json.dumps({**base, "prompt": " ".join(["word"] * 20)}),
+                       capture_output=True, text=True, timeout=30)
+        path = os.path.join(d, "wf-asks.a1.json")
+        with open(path, "w") as fh:
+            json.dump({"prompt": "p", "items": _OPEN}, fh)
+        subprocess.run([tag], input=json.dumps(
+            {**base, "prompt": "<task-notification> " + " ".join(["word"] * 20)}),
+            capture_output=True, text=True, timeout=30)
+        try:
+            with open(path) as fh:
+                return json.load(fh).get("items") == _OPEN
+        except (OSError, ValueError):
+            return False
+_asks_kept = _asks_survives_notice()
 check(
     "asks checklist: opened per message, and an empty or open list sends the turn back once",
     not _asks_short[0]
-    and not _asks_notice[0]
+    and not _asks_notice[0] and _asks_kept
     and _asks_empty[:2] == (True, "block")
     and _asks_open[:2] == (True, "block")
     and _asks_closed[1] is None

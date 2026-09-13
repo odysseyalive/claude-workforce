@@ -315,13 +315,18 @@ def start_checklist(payload):
     Last turn's file is always removed first, so a short reply never inherits a list of
     asks it was never given.
     """
+    prompt = payload.get("prompt") or ""
+    # INJECTED TEXT IS NOT A NEW MESSAGE, so it leaves the checklist alone. MEASURED
+    # 2026-09-13: a background task finished mid-turn, its notification fired this event,
+    # and the remove below erased the checklist for the user's real message.
+    if INJECTED.search(prompt):
+        return ""
     p = checklist_path(payload)
     try:
         os.remove(p)
     except OSError:
         pass
-    prompt = payload.get("prompt") or ""
-    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+    if len(prompt.split()) < CHECKLIST_MIN_WORDS:
         return ""
     try:
         with open(p, "w", encoding="utf-8") as fh:
