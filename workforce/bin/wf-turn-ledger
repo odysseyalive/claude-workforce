@@ -41,6 +41,7 @@ import json
 import os
 import re
 import sys
+import time
 
 # Tools that ACQUIRE information about the world. There is NO write column and no
 # command classification, and that is the fix rather than an omission.
@@ -274,27 +275,12 @@ def read_targets(name, inp):
     return out
 
 
-def turn_counts(payload):
-    """Walk THIS turn and return (reads, distinct, setreads, outside, reply), or None.
+def current_turn(lines):
+    """Index of the row that opens THIS turn: the last genuine user message, else 0.
 
-    Split out of `main` so `wf-widen` scores the same turn off the same walk. Two
-    copies of a transcript reader is two things to keep in step, and the copy that
-    drifts is the one that reports wrong — which is the whole defect class this
-    distribution keeps finding in itself. Nothing here judges; it counts.
+    THE CURRENT TURN ONLY. A ledger spanning the whole session would grow monotonically
+    and stop meaning anything, which is the dormancy shape enforcement.md refuses.
     """
-    tpath = payload.get("transcript_path") or ""
-    if not tpath or not os.path.isfile(tpath):
-        return None
-
-    try:
-        lines = open(tpath, encoding="utf-8", errors="replace").readlines()
-    except OSError:
-        return None
-
-    # THE CURRENT TURN ONLY — everything after the last genuine user message. A
-    # ledger spanning the whole session would grow monotonically and stop meaning
-    # anything, which is the dormancy shape enforcement.md refuses.
-    start = 0
     for i in range(len(lines) - 1, -1, -1):
         try:
             d = json.loads(lines[i])
@@ -307,10 +293,147 @@ def turn_counts(payload):
         if isinstance(c, list) and any(
                 isinstance(b, dict) and b.get("type") == "tool_result" for b in c):
             continue
-        start = i
-        break
+        return i
+    return 0
 
-    reads, targets, said, setreads, outside, direct, wrote = 0, [], [], 0, 0, 0, 0
+
+# ── the reply is CONFIRMED before anything judges it ─────────────────────────
+# `last_assistant_message` IS NOT ALWAYS THE REPLY. MEASURED 2026-09-13: widen flags on this
+# machine held "push it" (session a46eaa5b, the 1.55.0 wrap) and "Reading wf-widen and
+# wf-commitments" (session 16fe43d4, written nine seconds AFTER that turn's own Stop
+# summary). Neither is message text in any transcript here, and the claude-enforcer
+# reports add "push it" and "commit and push it". Claude Code 2.1.268 builds the field
+# from the last assistant message of the message list the Stop was fired with
+# (`Pr(Pg(messages).message.content," ").trim()` in its binary), so a side query that
+# fires the Stop hooks with its own list hands over its own output. `wf-widen` stored one
+# as the jury's conclusion, and the jury blocked a turn on a phrase the user never saw.
+#
+# THE RULE IS THE HOST'S OWN DEFINITION: the field counts only when it equals the text of
+# the transcript's last assistant row, whitespace-normalised because the host trims and
+# joins a row's text blocks with one space. The last row of the FILE, not of the turn: a
+# user message typed while the hooks run lands after the reply and would move the turn.
+#
+# THE WAIT COMES FROM THE WRITER. The host batches transcript appends on a 100ms timer
+# (`FLUSH_INTERVAL_MS=100`, same binary), which is the lag the hooks reference warns of.
+# One re-read after 500ms, five of those intervals, and only when the first read did not
+# match, so a confirmed reply costs nothing.
+REPLY_WAIT = 0.5
+_CONFIRMED = {}
+
+
+def reply_transcript(payload):
+    """The transcript holding THIS stop's reply: on SubagentStop, the subagent's own.
+
+    The host fills `transcript_path` from the session, so on SubagentStop it is the PARENT's,
+    and `agent_transcript_path` is the finishing agent's. Against the parent's, a subagent's
+    reply would be compared with the parent's narration.
+    """
+    key = "agent_transcript_path" if payload.get("hook_event_name") == "SubagentStop" \
+        else "transcript_path"
+    p = payload.get(key)
+    return p if isinstance(p, str) else ""
+
+
+def _read_lines(path):
+    """The transcript's lines, or None when there is no file to read."""
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.readlines()
+    except OSError:
+        return None
+
+
+def last_assistant_blocks(lines, start=0):
+    """The content blocks of the last assistant row at or after `start`, or []."""
+    for line in reversed(lines[start:]):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(d, dict) or d.get("type") != "assistant":
+            continue
+        m = d.get("message")
+        c = m.get("content") if isinstance(m, dict) else None
+        if isinstance(c, str):
+            return [{"type": "text", "text": c}]
+        return [b for b in c if isinstance(b, dict)] if isinstance(c, list) else []
+    return []
+
+
+def _texts(blocks):
+    return [b["text"] for b in blocks if b.get("type") == "text" and isinstance(b.get("text"), str)]
+
+
+def confirmed_reply(payload):
+    """The stop's final reply and how it was established: (reply, how).
+
+      confirmed   the field is the transcript's last assistant row
+      unmatched   it is not, even after the wait; reply is None and nothing may judge it
+      unverified  no transcript file to check against, so the field stands unchecked
+      absent      no field; the reply is the text that ENDED the last row, or ""
+
+    Memoised per process, so a hook that asks twice waits once.
+    """
+    field = payload.get("last_assistant_message")
+    path = reply_transcript(payload)
+    key = (path, field if isinstance(field, str) else None)
+    if key in _CONFIRMED:
+        return _CONFIRMED[key]
+    lines = _read_lines(path)
+    if not isinstance(field, str) or not field.strip():
+        # THE LAST BLOCK, NOT EVERY BLOCK. The fallback has to MEAN what the field means —
+        # "what the turn told the user" — and joining every text block in the turn does not:
+        # on a long turn that is dozens of mid-turn narrations, and the thing a reader calls
+        # "the conclusion" is buried somewhere in the middle of it. A jury handed that judges
+        # the conclusion against text the turn said forty tool calls earlier, and convicts on
+        # a sentence that was never the conclusion. A guard that misquotes is the guard that
+        # earns its way into being ignored (`references/senses.md` § Guidelines, on the one
+        # retired here at a measured 7.0% false-positive rate).
+        #
+        # AND ONLY TEXT THAT ENDED THE TURN. The host omits the field exactly when its last
+        # assistant message has no text, so the last text block ANYWHERE in the turn was, by
+        # construction, said before something else. Only text after the last row's final
+        # tool call counts; a row that ends on a tool call is mid-turn, or a reply not yet
+        # written.
+        blocks = last_assistant_blocks(lines, current_turn(lines)) if lines else []
+        called = [i for i, b in enumerate(blocks) if b.get("type") == "tool_use"]
+        said = _texts(blocks[called[-1] + 1:] if called else blocks)
+        out = (next((t for t in reversed(said) if t and t.strip()), ""), "absent")
+    elif lines is None:
+        out = (field, "unverified")
+    else:
+        out = (None, "unmatched")
+        want = " ".join(field.split())
+        for attempt in range(2):
+            if attempt:
+                time.sleep(REPLY_WAIT)
+                lines = _read_lines(path) or []
+            if " ".join(" ".join(_texts(last_assistant_blocks(lines))).split()) == want:
+                out = (field, "confirmed")
+                break
+    _CONFIRMED[key] = out
+    return out
+
+
+def turn_counts(payload):
+    """Walk THIS turn and return (reads, distinct, setreads, outside, direct, wrote, reply),
+    or None. `reply` is None when the field did not match the transcript
+    (`confirmed_reply`), and nothing may judge it then.
+
+    Split out of `main` so `wf-widen` scores the same turn off the same walk. Two
+    copies of a transcript reader is two things to keep in step, and the copy that
+    drifts is the one that reports wrong — which is the whole defect class this
+    distribution keeps finding in itself. Nothing here judges; it counts.
+    """
+    tpath = payload.get("transcript_path")
+    lines = _read_lines(tpath if isinstance(tpath, str) else "")
+    if lines is None:
+        return None
+
+    start = current_turn(lines)
+    reads, targets, setreads, outside, direct, wrote = 0, [], 0, 0, 0, 0
     for line in lines[start:]:
         try:
             d = json.loads(line)
@@ -319,8 +442,6 @@ def turn_counts(payload):
         if d.get("type") != "assistant":
             continue
         for b in d.get("message", {}).get("content") or []:
-            if isinstance(b, dict) and b.get("type") == "text":
-                said.append(b.get("text", ""))
             if not (isinstance(b, dict) and b.get("type") == "tool_use"):
                 continue
             name = b.get("name") or ""
@@ -358,31 +479,14 @@ def turn_counts(payload):
                     setreads += 1
                 targets += read_targets(name, inp)
 
-    # THE REPLY COMES FROM `last_assistant_message`, NOT FROM THE TRANSCRIPT.
+    # THE REPLY COMES FROM `last_assistant_message`, CONFIRMED AGAINST THE TRANSCRIPT.
     # The transcript "is written asynchronously and may lag the in-memory
-    # conversation, so it may not yet include the current turn's most recent
-    # messages when a hook fires" — the hooks reference says outright that a hook
-    # needing the final assistant text of the current turn should read
-    # `last_assistant_message` on Stop and SubagentStop instead.
-    #
-    # This shipped reading the transcript, which means the jargon scan could be
-    # examining a turn that does not yet contain the reply it exists to check —
-    # silently, and looking identical to a clean turn. Found by reading the hooks
-    # documentation AFTER building against remembered behaviour. The transcript
-    # remains the source for the READ COUNT, where lag is harmless because tool
-    # calls are already recorded by the time the turn ends; it is wrong only for
-    # the last message, which is exactly the field provided for it.
-    reply = payload.get("last_assistant_message")
-    if not isinstance(reply, str) or not reply.strip():
-        # THE LAST BLOCK, NOT EVERY BLOCK. The fallback has to MEAN what the field means —
-        # "what the turn told the user" — and joining every text block in the turn does not:
-        # on a long turn that is dozens of mid-turn narrations, and the thing a reader calls
-        # "the conclusion" is buried somewhere in the middle of it. A jury handed that judges
-        # the conclusion against text the turn said forty tool calls earlier, and convicts on
-        # a sentence that was never the conclusion. A guard that misquotes is the guard that
-        # earns its way into being ignored (`references/senses.md` § Guidelines, on the one
-        # retired here at a measured 7.0% false-positive rate).
-        reply = next((t for t in reversed(said) if t and t.strip()), "")
+    # conversation", so the hooks reference sends hooks to the field for the final
+    # text; the field is also sometimes a side query's output. `confirmed_reply` takes
+    # the text from the field and uses the transcript only to confirm it, re-reading
+    # once for the lag. The READ COUNT stays on the transcript, where lag is harmless:
+    # tool calls are recorded before the turn ends.
+    reply = confirmed_reply(payload)[0]
     seen, uniq = set(), []
     for t in targets:
         if t not in seen:
@@ -404,6 +508,8 @@ def main():
     if counts is None:
         return 0
     reads, uniq, setreads, _outside, _direct, _wrote, reply = counts
+    # An unmatched reply is not scanned: the counts below never read it, the scans do.
+    reply = reply or ""
 
     terms = []
     for m in JARGON.finditer(mask_code(reply)):

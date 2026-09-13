@@ -299,6 +299,25 @@ CASES = [
      WDN, "del", ' != "SubagentStop"'),
     ("asks checklist: plan mode, which cannot write the list, is never blocked for it",
      WDN, "del", '    if payload.get("permission_mode") == "plan":\n        return out\n'),
+    # THE CONFIRMED REPLY, 2026-09-13, one break per rule. Without the early return an
+    # unmatched reply on an unclassified ask prints "not scored" and no note.
+    ("reply: text the transcript does not hold is never judged, flagged or recorded",
+     WDN, "del", '    if not applicable and unmatched:\n        return {"systemMessage": note}\n'),
+    # A match that never records itself confirms nothing, so every genuine reply is dropped.
+    ("reply: a genuine final reply is judged exactly as before",
+     TLDG, "del", '                out = (field, "confirmed")\n'),
+    # Sleeping without re-reading compares the stale lines twice.
+    ("reply: a reply written after the first read is confirmed on the re-read",
+     TLDG, "del", "                lines = _read_lines(path) or []\n"),
+    # `key = "transcript_path"` on every event reads the parent's transcript for a subagent.
+    ("reply: SubagentStop confirms against the agent's own transcript",
+     TLDG, "del", '"agent_transcript_path" if payload.get("hook_event_name") == "SubagentStop" \\\n        else '),
+    # Every text block in the last row, narration before its tool call included.
+    ("reply: with no field, only text that ended the turn stands in for it",
+     TLDG, "del", "blocks[called[-1] + 1:] if called else "),
+    # The fallback reply reaching the commitment ledger records a debt from a narration.
+    ("reply: with no field, only text that ended the turn stands in for it",
+     "workforce/bin/wf-commitments", "del", 'how == "absent" or '),
     # THE READER ROLE. Deleting the whole `roles.add` line leaves an `if` with no body and
     # bin/check dies before any assertion runs. Deleting only the call leaves `roles` as a
     # bare name, so nothing is ever a reader and every hand-off reads as orphaned.

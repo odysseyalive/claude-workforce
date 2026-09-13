@@ -44,20 +44,23 @@ import re
 import sys
 
 
-def _task_tag():
-    """`wf-task-tag`, imported for its checklist item and session path definitions. They are
-    shared rather than restated because `wf-widen` blocks on the same items this counts."""
+def _sibling(name):
+    """A sibling hook, imported so its definitions are shared rather than restated:
+    `wf-task-tag`'s checklist item and session path, because `wf-widen` blocks on the same
+    items this counts, and `wf-turn-ledger`'s confirmed reply, which every reply reader uses."""
     # Importing by path would drop a __pycache__ into the shipped directory.
     sys.dont_write_bytecode = True
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-task-tag")
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    modname = name.replace("-", "_")
     spec = importlib.util.spec_from_loader(
-        "wf_task_tag", importlib.machinery.SourceFileLoader("wf_task_tag", path))
+        modname, importlib.machinery.SourceFileLoader(modname, path))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-TT = _task_tag()
+TT = _sibling("wf-task-tag")
+TL = _sibling("wf-turn-ledger")
 
 # A STATED INTENTION, not a description of work already done. Present and past tense are
 # excluded on purpose: "I wired the manifest" is a report and "I'll wire the manifest" is
@@ -211,8 +214,11 @@ def main():
         return 0
 
     # ── Stop: record what this turn said it would do ──
-    reply = payload.get("last_assistant_message")
-    if not isinstance(reply, str) or not reply.strip():
+    # ONLY A REPLY THE TRANSCRIPT HOLDS (`wf-turn-ledger`, `confirmed_reply`). A side query's
+    # text recorded here is a debt nobody stated, read back at every session start. No field
+    # is no record, as before: the transcript fallback is for the scans, not for this ledger.
+    reply, how = TL.confirmed_reply(payload)
+    if how == "absent" or not isinstance(reply, str) or not reply.strip():
         return 0
     # THE ASKS LINE IS COMPUTED BEFORE THE COMMITMENTS EARLY-RETURN, and that ordering is
     # the whole difference between a check and a dead branch. Placed after it, this fired

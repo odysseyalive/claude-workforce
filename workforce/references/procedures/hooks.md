@@ -389,6 +389,21 @@ the transcript"*. This shipped reading the transcript, so the jargon scan could 
 not yet contain the reply it exists to check — silently, and identical to a clean turn. The read count
 still comes from the transcript, where lag is harmless: tool calls are recorded before the turn ends.
 
+**The field is confirmed against the transcript before any hook judges it.** MEASURED 2026-09-13: Stop
+handed the hooks `last_assistant_message` values that are message text in no transcript on this
+machine, "push it" and "Reading wf-widen and wf-commitments", and the widening jury blocked a turn on
+one. Claude Code 2.1.268 builds the field from the last assistant message of the message list the Stop
+fired with, so a side query hands over its own output. `confirmed_reply` in `wf-turn-ledger` accepts
+the field only when it equals the text of the transcript's last assistant row, whitespace-normalised.
+On a mismatch it re-reads once after 500ms, because the host flushes the transcript on a 100ms timer.
+Still unmatched, `wf-widen` raises no flag and no reply-based block and prints the reply's length,
+`wf-commitments` records nothing, and the ledger skips its reply scans. The tag's senses and the
+checklist never read the reply and still apply. On `SubagentStop` the transcript is
+`agent_transcript_path`, because `transcript_path` there is the parent's. Over 1,069 genuine final
+replies on this machine (890 Stops, 179 subagents) the rule rejected none. With no field, only text
+that ended the turn stands in for it: the host omits the field exactly when its last message has no
+text, so any earlier text block was said before something else.
+
 **One script, two registrations.** `SHIPPED_HOOKS` is keyed by REGISTRATION rather than by file, so
 `wf-turn-ledger@subagent` is a second registration of the same script; `hook_script()` strips the
 `@event` suffix when resolving the path. Without that split the key was used as a filename and resolved

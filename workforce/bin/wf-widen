@@ -530,6 +530,17 @@ def widen(payload):
     if counts is None:
         return None
     reply = counts[-1]
+    # A REPLY THE TRANSCRIPT DOES NOT HOLD IS NOT JUDGED (`wf-turn-ledger`, `confirmed_reply`).
+    # Skipped: the promise check, both claim scans, both samples, and every flag, since a flag
+    # hands the reply to the jury as the conclusion. Kept: the tag's senses against the counts
+    # and the checklist, because neither reads the reply. The note gives the length, never the
+    # text, which is the thing that could not be trusted.
+    unmatched = reply is None
+    note = ""
+    if unmatched:
+        reply = ""
+        note = (f"WIDEN  reply not matched in the transcript "
+                f"({len(payload.get('last_assistant_message') or '')} chars) — not judged")
 
     # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
     # applicable to this turn, and a turn that trips neither is scored against nothing
@@ -605,6 +616,8 @@ def widen(payload):
     # standing docket for a turn nobody classified, and it is a constant here rather than
     # anything derived from the turn.
     BLIND_DOCKET = ["smell", "intuition"]
+    if not applicable and unmatched:
+        return {"systemMessage": note}
     if not applicable:
         try:
             blind = int(os.environ.get("WF_BLIND_SAMPLE") or 20)
@@ -655,14 +668,14 @@ def widen(payload):
     except ValueError:
         rate = 5
     sampled = False
-    if rate > 0 and not unopened:
+    if rate > 0 and not unopened and not unmatched:
         # Deterministic per turn, never random: the same reply always gets the same
         # verdict, so a run is reproducible and a fixture can pin it.
         sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
 
     if not unopened and not sampled:
-        return {"systemMessage":
-                          f"WIDEN  {shown} — required channels opened"}
+        return {"systemMessage": " · ".join(
+            x for x in (f"WIDEN  {shown} — required channels opened", note) if x)}
 
     # On a BLOCK, narrow `why` to the channels actually shut. On a SAMPLE nothing is
     # shut, so the full list is the right context for the audit — but `unopened` travels
@@ -675,8 +688,9 @@ def widen(payload):
     if not applicable:
         return {"systemMessage":
                           "WIDEN  no docket — nothing this ask requires to be checked"}
-    raise_flag(payload, why_rows, rows, counts, unopened, applicable,
-               sampled=sampled, reply=reply)
+    if not unmatched:
+        raise_flag(payload, why_rows, rows, counts, unopened, applicable,
+                   sampled=sampled, reply=reply)
 
     if sampled:
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
@@ -687,7 +701,8 @@ def widen(payload):
     return {
         "decision": "block",
         "reason": widen_reason(unopened, why_rows, rows, instruments(cwd), counts),
-        "systemMessage": f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED",
+        "systemMessage": " · ".join(
+            x for x in (f"WIDEN  {shown} — {', '.join(unopened)} NOT OPENED", note) if x),
     }
 
 
@@ -743,8 +758,13 @@ def hand_checklist_to_jury(payload, record, items):
     except (OSError, ValueError):
         data = None
     if not isinstance(data, dict):
+        # A new flag carries the reply as its conclusion, so it needs a reply the transcript
+        # holds. Unmatched, no juror is seated; the checklist block still stands.
+        reply = TL.confirmed_reply(payload)[0]
+        if reply is None:
+            return
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
-                "conclusion": (payload.get("last_assistant_message") or "")[:4000],
+                "conclusion": reply[:4000],
                 "unopened": [],
                 "why": [{"trigger": "ASKS", "sense": "asks",
                          "reason": "the message made several asks; each is checked"}]}

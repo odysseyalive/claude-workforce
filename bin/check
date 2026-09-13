@@ -12627,6 +12627,149 @@ check(
     "the turn ends outside plan mode",
 )
 
+# ── THE REPLY IS CONFIRMED, 2026-09-13 ───────────────────────────────────────────────────
+# Stop handed the hooks `last_assistant_message` values that are message text in no transcript
+# on this machine ("push it", "Reading wf-widen and wf-commitments"), and the jury blocked a
+# turn on one. `wf-turn-ledger`'s `confirmed_reply` lets a hook judge the field only when it
+# is the transcript's last assistant row. Measured over 1,069 genuine final replies here (890
+# Stops, 179 subagents), none failed that rule. Every assertion below RUNS the hooks.
+_RC_CLAIM = ("There is no hook wired for that event. Routed at rung 10. "
+             "I will wire the manifest into the installer next.")
+_RC_PROMISE = "Part one is finished. I'll continue with the rest"
+_RC_OTHER = "Part one is done.\n\nThe manifest and the hook set are wired, and the check passes."
+
+
+def _rc_row(text):
+    return json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": text}]}}) + "\n"
+
+
+def _rc_transcript(d, final, name="t.jsonl", narration=None):
+    """A turn that read one file and then ended on `final`; None writes no final row yet."""
+    call = [{"type": "tool_use", "name": "Read", "input": {"file_path": "/a/hooks.md"}}]
+    if narration:
+        call.insert(0, {"type": "text", "text": narration})
+    path = os.path.join(d, name)
+    with open(path, "w") as fh:
+        fh.write(json.dumps({"type": "user", "message": {"content": "please do"}}) + "\n")
+        fh.write(json.dumps({"type": "assistant", "message": {"content": call}}) + "\n")
+        if final is not None:
+            fh.write(_rc_row(final))
+    return path
+
+
+def _rc_run(final, said, event="Stop", agent=None, narration=None):
+    """One Stop through all three reply readers: (decision, note, flag conclusion, ledger
+    named jargon, commitments recorded)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": "please do"})
+        payload = {"hook_event_name": event,
+                   "transcript_path": _rc_transcript(d, final, narration=narration)}
+        if said is not None:
+            payload["last_assistant_message"] = said
+        if agent is not None:
+            payload["agent_transcript_path"] = _rc_transcript(d, agent, "agent.jsonl")
+        out = _cl_hook(d, "wf-widen", payload, {"WF_BLIND_SAMPLE": "1"})[1]
+        try:
+            with open(os.path.join(d, "wf-widen-flag.c1.json")) as fh:
+                conclusion = json.load(fh).get("conclusion")
+        except (OSError, ValueError, AttributeError):
+            conclusion = None
+        ledger = _cl_hook(d, "wf-turn-ledger", payload)[1].get("systemMessage") or ""
+        _cl_hook(d, "wf-commitments", payload)
+        recorded = os.path.exists(os.path.join(d, ".claude", "workforce", "commitments.json"))
+        return (out.get("decision"), out.get("systemMessage") or "", conclusion,
+                "PLAIN:" in ledger, recorded)
+
+
+_rc_bad = {"push": _rc_run(_RC_OTHER, "push it"), "claim": _rc_run(_RC_OTHER, _RC_CLAIM),
+           "promise": _rc_run(_RC_OTHER, _RC_PROMISE)}
+check(
+    "reply: text the transcript does not hold is never judged, flagged or recorded",
+    all(v[0] is None and v[2] is None and v[3:] == (False, False) for v in _rc_bad.values())
+    and "reply not matched in the transcript (7 chars)" in _rc_bad["push"][1]
+    and "push it" not in _rc_bad["push"][1],
+    f"(decision, note, conclusion, jargon named, commitments recorded)={_rc_bad}. The field "
+    "held a side query's output twice on this machine and the jury blocked a turn on it; "
+    "unmatched, no hook may flag, block on, scan or record it, and the note gives its length "
+    "and never its text",
+)
+
+_rc_good = {"push": _rc_run("push it", "push it"), "claim": _rc_run(_RC_CLAIM, _RC_CLAIM),
+            "promise": _rc_run(_RC_PROMISE, _RC_PROMISE)}
+check(
+    "reply: a genuine final reply is judged exactly as before",
+    _rc_good["push"][2] == "push it" and "blind-sampled" in _rc_good["push"][1]
+    and _rc_good["claim"][0] == "block" and "taste NOT OPENED" in _rc_good["claim"][1]
+    and _rc_good["claim"][2:] == (_RC_CLAIM, True, True)
+    and _rc_good["promise"][0] == "block" and "stopped mid-work" in _rc_good["promise"][1]
+    and not any("not matched" in v[1] for v in _rc_good.values()),
+    f"(decision, note, conclusion, jargon named, commitments recorded)={_rc_good}. The same "
+    "texts, now written as the transcript's last reply, must reach the blind sample, the claim "
+    "scan, the promise check, the ledger and the commitments exactly as they did",
+)
+
+
+def _rc_lagged():
+    """The final row lands during the wait: the hook's own sleep appends it."""
+    import tempfile
+    boot = ("import runpy, sys, time\n"
+            "tpath, row, hook = sys.argv[1:4]\n"
+            "def late(_s):\n"
+            "    with open(tpath, 'a') as fh:\n"
+            "        fh.write(row)\n"
+            "    sys.stderr.write('WAITED')\n"
+            "time.sleep = late\n"
+            "sys.argv = [hook]\n"
+            "runpy.run_path(hook, run_name='__main__')\n")
+    with tempfile.TemporaryDirectory() as d:
+        tpath = _rc_transcript(d, None)
+        r = subprocess.run(
+            [sys.executable, "-c", boot, tpath, _rc_row(_RC_PROMISE),
+             os.path.join(ROOT, "workforce/bin/wf-widen")],
+            input=json.dumps({"session_id": "c1", "scratchpad_dir": d, "cwd": d,
+                              "hook_event_name": "Stop", "transcript_path": tpath,
+                              "last_assistant_message": _RC_PROMISE}),
+            capture_output=True, text=True, timeout=30, env={**os.environ, **_CL_NOBLIND})
+        try:
+            out = json.loads(r.stdout) if r.stdout.strip() else {}
+        except ValueError:
+            out = {}
+        return r.returncode, "WAITED" in r.stderr, out.get("decision"), out.get("systemMessage")
+
+
+_rc_lag = _rc_lagged()
+check(
+    "reply: a reply written after the first read is confirmed on the re-read",
+    _rc_lag[:3] == (0, True, "block") and "stopped mid-work" in (_rc_lag[3] or ""),
+    f"(exit, waited, decision, note)={_rc_lag}. The host flushes the transcript on a 100ms "
+    "timer, so a genuine reply can be missing from the first read; without the re-read a "
+    "lagging transcript would silence every check on a real turn",
+)
+
+_rc_sub = (_rc_run(_RC_OTHER, _RC_PROMISE, event="SubagentStop", agent=_RC_PROMISE),
+           _rc_run(_RC_PROMISE, _RC_PROMISE, event="SubagentStop", agent=_RC_OTHER))
+check(
+    "reply: SubagentStop confirms against the agent's own transcript",
+    _rc_sub[0][0] == "block" and "stopped mid-work" in _rc_sub[0][1]
+    and _rc_sub[1][0] is None and "reply not matched" in _rc_sub[1][1],
+    f"(agent's reply, parent's reply)={_rc_sub}. On SubagentStop `transcript_path` is the "
+    "parent's and `agent_transcript_path` the agent's; confirming against the parent's "
+    "compares a subagent's reply with the parent's narration",
+)
+
+_rc_absent = (_rc_run(None, None, narration="There is no hook wired for that event."),
+              _rc_run(_RC_CLAIM, None))
+check(
+    "reply: with no field, only text that ended the turn stands in for it",
+    _rc_absent[0][0] is None and "not scored" in _rc_absent[0][1]
+    and _rc_absent[1][0] == "block" and _rc_absent[1][4] is False,
+    f"(narration before a tool call, final row)={_rc_absent}. The host omits the field exactly "
+    "when its last message has no text, so the last text block elsewhere in the turn is a "
+    "narration; and a missing field records no commitments, as it never did",
+)
+
 check(
     "org producer: Step 0.3 CALLS the producer instead of describing materialization",
     '"$WF/bin/wf-companion"' in _asu and "--execute  # materialize it" in _asu,
