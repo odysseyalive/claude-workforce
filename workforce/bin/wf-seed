@@ -298,7 +298,15 @@ def plan_catalog(root, ev_dir, slot_dir=None):
     tag = next(k for k, v in CATALOGS.items() if v is spec)
     slot_path = os.path.join(slot_dir, spec["slot"]) if slot_dir else None
     if not slot_path or not os.path.isfile(slot_path):
-        result.update(action="error", detail=f"additions slot not found: {spec['slot']}")
+        # NAME WHERE IT LOOKED AND WHAT PUTS IT THERE. A host whose evaluators the installer
+        # kept had no slot until `install` learned to place one beside a kept corpus
+        # (2026-09-14); the bare message sent a peer hunting for a file nothing had written.
+        # De-duplicated: under scope collapse the project and personal candidates are one path.
+        tried = list(dict.fromkeys(os.path.join(c, spec["skill"], "references", spec["slot"])
+                                   for c in _slot_candidates(root)))
+        result.update(action="error",
+                      detail=f"additions slot not found: {spec['slot']} — tried "
+                             + ", ".join(tried) + "; `workforce update` places it")
         return result
     slot_ver = _slot_version(slot_path)
     if slot_ver is None:

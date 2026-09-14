@@ -248,6 +248,25 @@ TTAG = "workforce/bin/wf-task-tag"
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # KEPT-SIBLING SLOT (DEF-Q-011/012), one break per clause of `kept_slot_due`. Without the
+    # claim the slot lands unrecorded, so the next run cannot refresh it.
+    ("install: a kept evaluator receives workforce's own additions slot, recorded and refreshed",
+     "install", "del", '        [ "$sib_slot" = "claim" ] && echo "$dest" >> "$SIBLING_SLOT_CLAIMED"\n'),
+    # Without the absent clause a host already on 1.58.0 never receives a slot at all.
+    ("install: a kept evaluator receives workforce's own additions slot, recorded and refreshed",
+     "install", "del", '    [ ! -e "$_ks_dest" ] && return 0\n'),
+    # Without the record clause a recorded slot is never refreshed.
+    ("install: a kept evaluator receives workforce's own additions slot, recorded and refreshed",
+     "install", "del", '    grep -Fxq "$_ks_dest" "$SIBLING_RECORD" && return 0\n'),
+    # Without the slot filter every absent shipped file lands inside the kept skill.
+    ("install: a kept evaluator receives workforce's own additions slot, recorded and refreshed",
+     "install", "del", '    is_workforce_slot "$_ks_path" || return 1\n'),
+    # Without the corpus test a retired shell is handed a slot and resolves as a copy again.
+    ("install: the slot rule never writes over the project's own additions, into a retired shell, or through a symlink",
+     "install", "del", """    [ -n "$(find "$_ks_skill/references" -maxdepth 1 -type f -name '*.md' ! -name additions.md 2>/dev/null | head -n 1)" ] || return 1\n"""),
+    # Without the skill-directory symlink test the slot is written into the link's target.
+    ("install: the slot rule never writes over the project's own additions, into a retired shell, or through a symlink",
+     "install", "del", '[ -L "$_ks_skill" ] || '),
     # THE LOOP BOUND. Deleting the argument leaves `os.remove` as a bare name: valid
     # Python that removes nothing, so a continuation Stop keeps the stale flag.
     ("widen agent: a continuation Stop finds no flag, so the agent blocks once per turn",

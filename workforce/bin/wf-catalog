@@ -241,21 +241,27 @@ def install_dir(root, kind):
     # what `workforce dev` reads.
     maintainer = os.path.join(root, "workforce", "skills")
     personal = os.path.realpath(os.path.join(config_root(), "skills"))
-    collapsed_scope = scopes_collapse(root)
     for base in install_candidates(root):
+        # THE PERSONAL SKILLS ROOT IS NOT OWNERSHIP-TESTED. The test separates a PROJECT's
+        # copy from the install at the one path the two share, and at the personal root there
+        # is no project copy to separate: a corpus-bearing evaluator there is the one the host
+        # loads in every project, whoever wrote it. Two measured states needed this.
+        #   UNDER SCOPE COLLAPSE `<root>/.claude/skills` IS this directory (the project is
+        #   `$HOME`), so the test rejected the personal install's own address, `install_dir`
+        #   returned None, and `classify` refused with `no-install` about the only corpus on
+        #   the machine. See scopes_collapse.
+        #   OUTSIDE ANY PROJECT the personal root is the only candidate. MEASURED 2026-09-14
+        #   at a peer host on 1.58.0 whose customized evaluators pre-dated the install, so
+        #   `install` kept them and recorded none: from `/tmp` with `CLAUDE_PROJECT_DIR` unset,
+        #   `--kind code|text|security|ui --path` answered `unresolved` while `image`, the one
+        #   kind the installer had placed, resolved. The corpus was on disk and in use.
+        at_personal = os.path.realpath(base) == personal
         for name in CATALOGS[kind]["skills"]:
             skill = os.path.join(base, name)
             d = os.path.join(skill, "references")
             if not (os.path.isdir(d) and corpus_bearing(d)):
                 continue
-            # THE OWNERSHIP TEST NEEDS TWO DIRECTORIES TO SEPARATE, and under scope
-            # collapse there is one. `<root>/.claude/skills` IS `config_root()/skills`
-            # when the project is `$HOME`, so the path this test would reject as "the
-            # project's own" is the personal install's own address. Rejecting it left
-            # `install_dir` returning None and `classify` refusing with `no-install`
-            # about the only corpus on the machine. See scopes_collapse.
-            collapsed = collapsed_scope and os.path.realpath(base) == personal
-            if base != maintainer and not collapsed and not installer_owned(root, skill):
+            if base != maintainer and not at_personal and not installer_owned(root, skill):
                 continue
             return d
     return None
@@ -495,7 +501,12 @@ def corpus_files(d, additions=None):
     additions slot when the answer came from the install. This is the list `--grep` walks
     and the list the report counts, so the two can never disagree about what the corpus is.
     """
-    return catalog_files(d) + ([additions] if additions else [])
+    # THE SLOT SITS INSIDE `d`. Since the sibling layout (2026-09-10) `additions.md` is a file
+    # of the skill's own `references/`, so `catalog_files` already lists it, and appending it
+    # again read it twice: every `--grep` hit in the additions printed twice and the report
+    # counted 8 code files where 7 ship. MEASURED 2026-09-14 on this repository.
+    files = catalog_files(d)
+    return files + ([additions] if additions and additions not in files else [])
 
 
 def norm(text):

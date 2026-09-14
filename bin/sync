@@ -323,6 +323,32 @@ def _sync_owns(target, skill):
     return _owns_memo[key]
 
 
+def _kept_slot_due(target, rel):
+    """May this sync place workforce's own slot file inside a skill it KEPT?
+
+    `install`'s `kept_slot_due`, clause for clause, so a synced sandbox receives what a real
+    install receives: a slot row only (`<skill>/references/additions.md`), into a skill that
+    still bears corpus under `references/`, never through a symlink, and only where the file
+    is absent or the pre-run record says this installer wrote it.
+    """
+    parts = rel.split("/")
+    if parts[1:] != ["references", "additions.md"]:
+        return False
+    skills_root = os.path.dirname(os.path.abspath(target))
+    refs = os.path.join(skills_root, parts[0], "references")
+    dest = os.path.join(skills_root, rel)
+    if any(os.path.islink(p) for p in (os.path.dirname(refs), refs, dest)):
+        return False
+    try:
+        # A regular file, as `find -type f` counts it in `install`: a symlink is not corpus.
+        corpus = any(n.endswith(".md") and n != "additions.md"
+                     and os.path.isfile(os.path.join(refs, n))
+                     and not os.path.islink(os.path.join(refs, n)) for n in os.listdir(refs))
+    except OSError:
+        return False
+    return corpus and (not os.path.exists(dest) or dest in _prior[target])
+
+
 for src, sib_exec in SIBLINGS:
     rel = src[len("workforce/skills/"):]
     skill = rel.split("/")[0]
@@ -333,7 +359,8 @@ for src, sib_exec in SIBLINGS:
                 _kept[target].add(skill)
                 print(f"  keeping {os.path.dirname(os.path.abspath(target))}/{skill} "
                       f"(not written by this installer — the project's own)")
-            continue
+            if not _kept_slot_due(target, rel):
+                continue
         dest = os.path.join(os.path.dirname(os.path.abspath(target)), rel)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copy2(src, dest)

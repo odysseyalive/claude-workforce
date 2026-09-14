@@ -401,6 +401,45 @@ SETTINGS_FAILED=""
 # A partial install never prunes. If any fetch failed, the manifest set on disk is
 # incomplete, and deleting "everything not in the set" would delete working files
 # whose replacements did not arrive.
+# A KEPT SIBLING STILL RECEIVES WORKFORCE'S OWN SLOT FILES, and nothing else of the shipped
+# skill. MEASURED 2026-09-14 at a peer host on 1.58.0 whose project root is $HOME: four
+# customized evaluators pre-dated the install, the sibling guard kept them (correctly), and
+# with them it skipped `references/additions.md`, which is not vendored corpus but workforce's
+# OWN authored slot (manifest.txt § The five evaluator skills; evaluators.md § Seeding 1b). No
+# copy existed anywhere under ~/.claude, so `wf-seed --execute` failed `additions slot not
+# found` on every audit, and with `update` the whole propagation path (SKILL.md § Directives,
+# 2026-09-10) nothing could ever deliver one.
+#
+# THE RULE IS NARROW, and each clause closes a way the old failure could come back:
+#   - a slot row only (`is_workforce_slot`), never the kept skill's SKILL.md or its corpus;
+#   - into a skill that still bears corpus under `references/`, because a retired shell
+#     handed a slot would resolve as a project copy again;
+#   - where the file is ABSENT, or where the pre-run record says this installer wrote it. An
+#     `additions.md` the record does not name is the project's own and is never overwritten;
+#     one it does name is refreshed, which is how the next `update` heals an existing host;
+#   - never through a symlink — the skill directory, its `references/` or the file itself —
+#     which writes somewhere this run never named (wf-catalog refuses a symlinked copy too).
+# Exactly the paths placed are recorded (`SIBLING_SLOT_CLAIMED`, read by prune_scope), so the
+# kept skill's `SKILL.md` stays unrecorded and the skill stays the project's.
+is_workforce_slot() {
+    case "$1" in
+        workforce/skills/*/references/additions.md) return 0 ;;
+    esac
+    return 1
+}
+
+kept_slot_due() {
+    _ks_path="$1"
+    _ks_skill="$2"
+    _ks_dest="$3"
+    is_workforce_slot "$_ks_path" || return 1
+    { [ -L "$_ks_skill" ] || [ -L "$_ks_skill/references" ] || [ -L "$_ks_dest" ]; } && return 1
+    [ -n "$(find "$_ks_skill/references" -maxdepth 1 -type f -name '*.md' ! -name additions.md 2>/dev/null | head -n 1)" ] || return 1
+    [ ! -e "$_ks_dest" ] && return 0
+    grep -Fxq "$_ks_dest" "$SIBLING_RECORD" && return 0
+    return 1
+}
+
 prune_scope() {
     _skill_dir="$1"
     _agents_dir="$2"
@@ -468,7 +507,12 @@ prune_scope() {
             # reading its own false record as permission.
             _psib="${ppath#workforce/skills/}"
             case " ${SIBLING_KEPT:-} " in
-                *" ${_psib%%/*} "*) continue ;;
+                *" ${_psib%%/*} "*)
+                    # ...except the slot files this run placed into it, which ARE this
+                    # installer's writes, recorded by exact path (kept_slot_due).
+                    grep -Fxq "$_skills_root/$_psib" "${SIBLING_SLOT_CLAIMED:-/dev/null}" \
+                        && echo "$_skills_root/$_psib" >> "$_ext_now"
+                    continue ;;
             esac
             # Rule 2 territory: a sibling skill lives OUTSIDE the workforce skill
             # directory, in a shared skills root holding the user's own skills. It is
@@ -553,7 +597,7 @@ prune_scope() {
                 case "$pf" in "$_skills_root/$_ks/"*) _kept_path="yes" ;; esac
             done
             if [ -n "$_kept_path" ]; then
-                echo "$pf" >> "$_ext_now"
+                grep -Fxq "$pf" "$_ext_now" || echo "$pf" >> "$_ext_now"
                 continue
             fi
             if [ -f "$pf" ] && ! grep -Fxq "$pf" "$_ext_now"; then
@@ -694,6 +738,9 @@ install_to_scope() {
     # `SKILL.md` is there and the guard skips the skill entirely, forever.
     SIBLING_RECORD="$(mktemp)"
     [ -f "$skill_dir/.installed-external" ] && cp "$skill_dir/.installed-external" "$SIBLING_RECORD"
+    # The slot paths this run places inside KEPT siblings (kept_slot_due). A file rather than a
+    # word list, because a path can carry a space and prune_scope records exactly these lines.
+    SIBLING_SLOT_CLAIMED="$(mktemp)"
 
     echo
     echo "Scope: $scope_label"
@@ -710,6 +757,7 @@ install_to_scope() {
 
         flag=""
         sib_exec=""
+        sib_slot=""
         path="$line"
         case "$line" in
             "keep "*) flag="keep"; path="${line#keep }" ;;
@@ -789,20 +837,27 @@ install_to_scope() {
             # Decided ONCE per skill. Both answers are remembered, because the question is
             # only answerable from the tree as it stood before this run touched it.
             case " $SIBLING_KEPT " in
-                *" $sib_name "*) continue ;;
+                *" $sib_name "*) sib_slot="kept" ;;
             esac
-            case " $SIBLING_OURS " in
+            case " $SIBLING_KEPT $SIBLING_OURS " in
                 *" $sib_name "*) : ;;
                 *)
                     if [ -f "$skills_root/$sib_name/SKILL.md" ] \
                        && ! grep -Fxq "$skills_root/$sib_name/SKILL.md" "$SIBLING_RECORD"; then
                         echo "  Keeping $skills_root/$sib_name (the project's own — not written by this installer)"
                         SIBLING_KEPT="$SIBLING_KEPT $sib_name"
-                        continue
+                        sib_slot="kept"
+                    else
+                        SIBLING_OURS="$SIBLING_OURS $sib_name"
                     fi
-                    SIBLING_OURS="$SIBLING_OURS $sib_name"
                     ;;
             esac
+            # A kept skill is skipped whole EXCEPT for workforce's own slot files.
+            if [ "$sib_slot" = "kept" ]; then
+                kept_slot_due "$path" "$skills_root/$sib_name" "$dest" || continue
+                echo "  Placing workforce's own ${path#workforce/skills/} beside the kept corpus"
+                sib_slot="claim"
+            fi
         fi
 
         if [ "$flag" = "keep" ] && [ -f "$dest" ]; then
@@ -822,6 +877,8 @@ install_to_scope() {
             continue
         fi
 
+        [ "$sib_slot" = "claim" ] && echo "$dest" >> "$SIBLING_SLOT_CLAIMED"
+
         if [ "$flag" = "hook" ] || [ -n "$sib_exec" ]; then
             chmod +x "$dest"
         fi
@@ -840,6 +897,7 @@ install_to_scope() {
     prune_scope "$skill_dir" "$agents_dir" "$styles_dir"
 
     verify_scope "$skill_dir"
+    rm -f "$SIBLING_SLOT_CLAIMED"
 
     # Echo the version just installed to this scope, read from the copy that actually
     # landed (`<skill_dir>/references/version.md`), so the report reflects disk, not the

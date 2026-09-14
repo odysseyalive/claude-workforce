@@ -3119,6 +3119,146 @@ check(
     "seed into the file the evaluator actually reads. Got: "
     + "; ".join(f"{k}={v}" for k, v in _seed_shapes.items()),
 )
+
+
+# A KEPT EVALUATOR STILL RECEIVES WORKFORCE'S OWN ADDITIONS SLOT (DEF-Q-011/012, 2026-09-14).
+#
+# MEASURED at a peer host on 1.58.0 whose project root IS $HOME: the four customized evaluators
+# pre-dated the install, so `install` kept them — correctly — and skipped every shipped file,
+# `references/additions.md` included. That file is workforce's own authored slot, not vendored
+# corpus (`manifest.txt`, `evaluators.md` § Seeding 1b), and with no copy anywhere under
+# `~/.claude` `wf-seed --execute` failed `additions slot not found` on every audit with no
+# action that could clear it. The directive of 2026-09-10 makes `update` the whole propagation
+# path, so "a customized evaluator can never receive additions" is not a legal end state.
+#
+# BEHAVIOURAL, against the SHIPPED installer, in a throwaway HOME that is also the project root
+# (scope collapse). The manifest is filtered from the real one — same rows, same order — so the
+# run takes a fraction of a second rather than fetching ~400 files.
+def _kept_slot_probe():
+    import tempfile as _tfm
+    res = {}
+
+    def _put(p, body):
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as _fh:
+            _fh.write(body)
+
+    def _get(p):
+        try:
+            with open(p, encoding="utf-8") as _fh:
+                return _fh.read()
+        except OSError:
+            return None
+
+    try:
+        with _tfm.TemporaryDirectory(prefix="wf-check-keptslot-") as _t:
+            _repo = os.path.join(_t, "repo")
+            os.makedirs(_repo)
+            os.symlink(os.path.join(ROOT, "workforce"), os.path.join(_repo, "workforce"))
+            _keep = ("workforce/skills/code-evaluator/", "workforce/skills/text-eval/")
+            _rows = [l for l in read("manifest.txt").splitlines()
+                     if l.split(" ")[-1].startswith(_keep) or l == "workforce/references/version.md"]
+            _put(os.path.join(_repo, "manifest.txt"), "\n".join(_rows) + "\n")
+            _shipped = _get(os.path.join(ROOT, "workforce/skills/code-evaluator/references/additions.md"))
+
+            def _install(home):
+                _env = dict(os.environ, HOME=home, WORKFORCE_REPO_URL="file://" + _repo,
+                            WORKFORCE_NO_WIRE="1")
+                for _k in ("CLAUDE_CONFIG_DIR", "CLAUDE_PROJECT_DIR", "WORKFORCE_SCOPE",
+                           "WORKFORCE_CONFIG_DIR"):
+                    _env.pop(_k, None)
+                return subprocess.run(["bash", os.path.join(ROOT, "install"), "--user",
+                                       "--no-automode", "--force"], cwd=home, env=_env,
+                                      capture_output=True, text=True, timeout=120)
+
+            # SHAPE A — a customized code-evaluator with a corpus and no slot: the peer host.
+            _a = os.path.join(_t, "a")
+            _ce = os.path.join(_a, ".claude", "skills", "code-evaluator")
+            _skill_md = "---\nname: code-evaluator\n---\n<!-- origin: user | immutable: true -->\nmine\n<!-- /origin -->\n"
+            _tax = "<!-- code-eval-ref-version: 5 -->\n# taxonomy (the project's own)\n"
+            _put(os.path.join(_ce, "SKILL.md"), _skill_md)
+            _put(os.path.join(_ce, "references", "mistake-taxonomy.md"), _tax)
+            _r = _install(_a)
+            _slot = os.path.join(_ce, "references", "additions.md")
+            _rec = _get(os.path.join(_a, ".claude", "skills", "workforce", ".installed-external")) or ""
+            res["placed"] = _r.returncode == 0 and _get(_slot) == _shipped
+            res["recorded"] = _rec.splitlines().count(_slot) == 1
+            res["not_claimed"] = os.path.join(_ce, "SKILL.md") not in _rec.splitlines()
+            res["only_slot"] = sorted(os.path.relpath(os.path.join(dp, f), _ce)
+                                     for dp, _dn, fn in os.walk(_ce) for f in fn) == [
+                "SKILL.md", os.path.join("references", "additions.md"),
+                os.path.join("references", "mistake-taxonomy.md")]
+            res["kept_untouched"] = (_get(os.path.join(_ce, "SKILL.md")) == _skill_md
+                                     and _get(os.path.join(_ce, "references", "mistake-taxonomy.md")) == _tax)
+            _env = dict(os.environ, HOME=_a)
+            _env.pop("CLAUDE_CONFIG_DIR", None)
+            _s = subprocess.run([sys.executable, os.path.join(ROOT, "workforce/bin/wf-seed"),
+                                 "--root", _a, "--json"], capture_output=True, text=True,
+                                timeout=60, env=_env)
+            try:
+                _plans = json.loads(_s.stdout)["catalogs"]
+                res["seeds"] = next(p for p in _plans if p["evaluator"] == "code-evaluator")["action"] == "seed"
+            except (ValueError, KeyError, StopIteration):
+                res["seeds"] = False
+            # THE HEAL IS A REFRESH. A slot this installer recorded writing is ours on the next run.
+            _put(_slot, "<!-- code-additions-version: 1 -->\n# stale\n")
+            _r = _install(_a)
+            _rec = _get(os.path.join(_a, ".claude", "skills", "workforce", ".installed-external")) or ""
+            res["refreshed"] = _r.returncode == 0 and _get(_slot) == _shipped
+            res["recorded_once"] = _rec.splitlines().count(_slot) == 1
+            res["still_untouched"] = _get(os.path.join(_ce, "SKILL.md")) == _skill_md
+
+            # SHAPE B — the project's OWN slot, and a retired shell with no corpus.
+            _b = os.path.join(_t, "b")
+            _te = os.path.join(_b, ".claude", "skills", "text-eval")
+            _own = "<!-- text-additions-version: 9 -->\n# the project's own additions\n"
+            _put(os.path.join(_te, "SKILL.md"), "---\nname: text-eval\n---\n")
+            _put(os.path.join(_te, "references", "text-tells.md"), "# tells\n")
+            _put(os.path.join(_te, "references", "additions.md"), _own)
+            _sh = os.path.join(_b, ".claude", "skills", "code-evaluator")
+            _put(os.path.join(_sh, "SKILL.md"), "---\nname: code-evaluator\n---\n")
+            _put(os.path.join(_sh, "CATALOG-ANCHOR.md"), "# house rules\n")
+            _r = _install(_b)
+            _rec = _get(os.path.join(_b, ".claude", "skills", "workforce", ".installed-external")) or ""
+            res["own_slot_kept"] = (_r.returncode == 0
+                                    and _get(os.path.join(_te, "references", "additions.md")) == _own
+                                    and os.path.join(_te, "references", "additions.md") not in _rec.splitlines())
+            res["shell_stays_shell"] = not os.path.exists(os.path.join(_sh, "references"))
+
+            # SHAPE C — a kept skill that is a SYMLINK into a tree this run never named.
+            _c = os.path.join(_t, "c")
+            _real = os.path.join(_t, "elsewhere-repo", "code-evaluator")
+            _put(os.path.join(_real, "SKILL.md"), "---\nname: code-evaluator\n---\n")
+            _put(os.path.join(_real, "references", "mistake-taxonomy.md"), "# taxonomy\n")
+            os.makedirs(os.path.join(_c, ".claude", "skills"))
+            os.symlink(_real, os.path.join(_c, ".claude", "skills", "code-evaluator"))
+            _r = _install(_c)
+            res["symlink_not_followed"] = (_r.returncode == 0 and not os.path.exists(
+                os.path.join(_real, "references", "additions.md")))
+    except Exception as _e:
+        res["probe"] = f"failed: {type(_e).__name__}: {_e}"
+    return res
+
+
+_ks = _kept_slot_probe()
+check(
+    "install: a kept evaluator receives workforce's own additions slot, recorded and refreshed",
+    all(_ks.get(k) is True for k in ("placed", "recorded", "not_claimed", "only_slot", "kept_untouched",
+                                     "seeds", "refreshed", "recorded_once", "still_untouched")),
+    "a customized evaluator the installer keeps must still receive `references/additions.md` "
+    "when it is absent, record exactly that path, refresh it on the next run, and leave every "
+    "file of the kept skill byte-identical; `wf-seed` must then plan a seed instead of "
+    "`additions slot not found`. Got: " + ", ".join(f"{k}={v}" for k, v in _ks.items()),
+)
+check(
+    "install: the slot rule never writes over the project's own additions, into a retired shell, or through a symlink",
+    all(_ks.get(k) is True for k in ("own_slot_kept", "shell_stays_shell", "symlink_not_followed")),
+    "an `additions.md` this installer did not record is the project's own and is never "
+    "overwritten, a retired shell (no corpus under `references/`) must not be handed a slot "
+    "that makes it resolve as a copy again, and a kept skill that is a symlink is never written "
+    "through into a tree the run never named. Got: "
+    + ", ".join(f"{k}={v}" for k, v in _ks.items()),
+)
 check(
     "records: a predecessor's knowledge base converts its ownership, not its record types",
     "converted, never re-typed" in ds

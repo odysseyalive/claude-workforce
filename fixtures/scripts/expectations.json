@@ -3396,6 +3396,52 @@
       "1 reads"
     ]
   },
+  "catalog-personal-kept-path-outside-project": {
+    "_why": "DEF-Q-012, MEASURED 2026-09-14 at a peer host on 1.58.0 whose project root is $HOME. Its customized evaluators pre-dated the install, so `install` kept them and recorded none, and from `/tmp` with CLAUDE_PROJECT_DIR unset `wf-catalog --kind code --path` answered `unresolved` while the corpus sat at the personal skills root, loaded by the host in every project. `install_dir` ownership-tested the personal root, and the ownership test only separates a PROJECT copy from the install at the path they share -- there is no project copy at the personal root. Measured against HEAD's wf-catalog on this identical tree: `code: unresolved`, exit 1. `elsewhere/` carries no .claude/, standing in for /tmp; HOME points at `home/`, whose record names only another skill.",
+    "script": "wf-catalog",
+    "args": [
+      "--root",
+      "${TREE}/elsewhere",
+      "--kind",
+      "code",
+      "--path"
+    ],
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_CONFIG_DIR": null,
+      "CLAUDE_PROJECT_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "home/.claude/skills/code-evaluator/references"
+    ],
+    "not": [
+      "unresolved"
+    ]
+  },
+  "catalog-personal-kept-reads-once": {
+    "_why": "The same kept personal copy read through the report, which asserts the half an IC greps. Since the sibling layout the additions slot is a file INSIDE `references/`, and `corpus_files` appended it a second time: every `--grep` hit in the additions printed twice and the report counted one file too many (8 code files where 7 ship, measured on this repository 2026-09-14). This copy holds two corpus files, so `2 file(s)` is the correct count and `3 file(s)` is the double read. Measured against HEAD's wf-catalog on this identical tree: `code      UNRESOLVED`.",
+    "script": "wf-catalog",
+    "args": [
+      "--root",
+      "${TREE}/elsewhere"
+    ],
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_CONFIG_DIR": null,
+      "CLAUDE_PROJECT_DIR": null
+    },
+    "exit": 1,
+    "want": [
+      "code      install  v5       2 file(s)",
+      "+ additions v2",
+      "1 from install"
+    ],
+    "not": [
+      "code      UNRESOLVED",
+      "3 file(s)"
+    ]
+  },
   "catalog-resolves-install": {
     "_why": "A project with no copy of its own is answered from the shipped evaluator skill -- the whole point of the 2026-09-10 directive, and the state this repository itself is in during `workforce dev`. The corpus is the SKILL's own `references/`, so the candidate that answers here is the maintainer tree at `<root>/workforce/skills/`. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so the case is HERMETIC: without it the four kinds this fixture does not carry resolve to whoever ran the suite, and the counts differ per machine. That pin also buys the UNRESOLVED path, which must name every candidate it tried BY THE EVALUATOR'S REAL DIRECTORY NAME -- naming the kind printed three paths the resolver never looked at -- and exit 1. A resolver that invents a path when it cannot find one produces exactly the phantom `wf-live` exists to catch.",
     "script": "wf-catalog",
