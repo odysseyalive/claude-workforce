@@ -55,15 +55,82 @@ BODY_CAP = 60_000
 # A release "reaches into an existing org" when it changes something the org holds a
 # COPY of. Those copies are what `audit`'s heal passes rewrite; everything else lives
 # only in the skill directory and is replaced wholesale by the install.
+#
+# `procedures/principles.md` IS NOT HERE, because nothing copies from it. No script
+# reads it, and the operating-principles text an org holds comes from `templates.md`
+# (`wf-companion` CORE, region `WF-PRINCIPLES`). It sat here until 2026-09-14 and marked
+# 1.59.1 `YES` for a citation fix that no org carries.
 HEAL_PATHS = (
     "workforce/references/handbook-templates.md",
     "workforce/references/templates.md",
     "workforce/references/org-chart-format.md",
     "workforce/references/personnel-templates.md",
     "workforce/references/procedures/org.md",
-    "workforce/references/procedures/principles.md",
     "workforce/references/org-config.template.md",
 )
+
+# THE HEAL PATHS AN ORG COPIES ONLY PART OF. The org does not hold the whole file for
+# these. It holds the marker-delimited blocks, and a release reaches it only when one
+# of those blocks changed. In `procedures/org.md` the blocks are `ORG-DISPATCH-CHECKPOINT`,
+# which `wf-companion` lifts into `/org`, and `ORG-CHAIN`, which `org embed` writes into
+# every handbook. The rest of the file is procedure, read from the installed skill.
+# MEASURED 2026-09-14: 1.59.1 fixed two citations in § Mode: `index`, outside both
+# blocks, and still told every user to re-audit.
+#
+# The blocks come from the file's own line-anchored markers at each end of the range,
+# never from a list kept here. Every other heal path stays whole-file: agents copy
+# `templates.md` fences outside `WF-PRINCIPLES`, and the remaining templates have no
+# markers bounding what gets copied. Where the markers cannot be read — unpaired, absent,
+# or a file created or deleted — the path flags. A false "no" leaves an org stale with
+# nothing to say so; a false "yes" costs one audit.
+REGIONED = ("workforce/references/procedures/org.md",)
+_MARKER_RX = re.compile(r"<!-- ([A-Z][A-Z0-9-]*) (START|END)\b")
+
+
+def copied_regions(text):
+    """[(name, block)] for each line-anchored marker pair, START and END lines included.
+
+    None when the markers do not pair: a START with no END, an END with no START, or a
+    START inside another block. None is the uncertain answer, and the caller flags it.
+    """
+    out, start = [], None
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        m = _MARKER_RX.match(line)
+        if not m:
+            continue
+        if m.group(2) == "START":
+            if start is not None:
+                return None
+            start = (m.group(1), i)
+        else:
+            if start is None or start[0] != m.group(1):
+                return None
+            out.append((start[0], "\n".join(lines[start[1]:i + 1])))
+            start = None
+    return None if start is not None else out
+
+
+def heal_hits(paths, old_text, new_text):
+    """The heal paths through which a change reaches an existing org, in HEAL_PATHS order.
+
+    `paths` is the set of files the range changed. `old_text(path)` and `new_text(path)`
+    return the file at the range's two ends, or None when it does not exist there.
+    """
+    hits = []
+    for h in HEAL_PATHS:
+        if h not in paths:
+            continue
+        if h in REGIONED:
+            before, after = old_text(h), new_text(h)
+            if before == after:
+                continue
+            ra = copied_regions(before) if before is not None else None
+            rb = copied_regions(after) if after is not None else None
+            if ra and rb and ra == rb:
+                continue
+        hits.append(h)
+    return hits
 
 # Surface labels, in the order they are reported. First match wins per path.
 SURFACES = (
@@ -86,6 +153,21 @@ SURFACES = (
 def git(*args):
     r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
     return r.stdout if r.returncode == 0 else ""
+
+
+def blob(rev, path):
+    """The file at `rev`, or None when it does not exist there. Distinct from empty."""
+    r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT,
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+def worktree(path):
+    try:
+        with open(os.path.join(ROOT, path), encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return None
 
 
 def parse_version(text):
@@ -175,7 +257,8 @@ def main():
             paths.update(git("show", "--name-only", "--format=", c).split())
         date = git("log", "-1", "--format=%ad", "--date=short", bump).strip()
         surf = surfaces_for(paths)
-        heal = any(any(h in p for p in paths) for h in HEAL_PATHS)
+        old_rev = prev or f"{bump}~1"
+        heal = bool(heal_hits(paths, lambda p: blob(old_rev, p), lambda p: blob(bump, p)))
         # THE BUMP COMMIT IS THE WORST SUBJECT IN THE RANGE, AND SINCE `wrap` IT IS
         # ALWAYS THE LAST ONE. `wrap` ends every session with "Roll the session into
         # one release (vX.Y.Z)" followed by a record regeneration, so taking the tip's
@@ -240,7 +323,7 @@ def main():
         ver, paths = pending
         date = git("log", "-1", "--format=%ad", "--date=short").strip()
         surf = surfaces_for(paths)
-        heal = any(any(h in p for p in paths) for h in HEAL_PATHS)
+        heal = bool(heal_hits(paths, lambda p: blob("HEAD", p), worktree))
         subj = "(pending — message lands on the next regeneration)"
         rows.append((ver, date, surf, heal, subj, 0, len(paths)))
         parts = [f"# {ver}", "",

@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.59.1 | 2026-09-14 | chart, principles, audit, verify, changes, hooks, scripts, installer, platform | **yes** | prove: drop nine constants that point at deleted files or duplicate a definition |
+| 1.59.1 | 2026-09-14 | chart, principles, audit, verify, changes, hooks, scripts, installer, platform | no | prove: drop nine constants that point at deleted files or duplicate a definition |
 | 1.59.0 | 2026-09-14 | audit, changes, scripts, installer | no | install.ps1 installs the sibling evaluators and ports the kept-slot and prune rules |
 | 1.58.0 | 2026-09-13 | audit, changes, scripts, installer, platform | **yes** | Fix 16 defects from two TicketTomato audits, plus dead-gate and detector cleanup |
 | 1.57.1 | 2026-09-13 | changes, scripts, installer | no | The generated region carries the standing cold-reader request again |

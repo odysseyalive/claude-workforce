@@ -860,6 +860,19 @@ CASES = [
     # ...and the generator that writes a record's one instruction is scanned in its place.
     ("no shipped file instructs writing or creating CLAUDE.md",
      "bin/gen-changes", "append", "\n# Then write CLAUDE.md at the repo root.\n"),
+    # ── the heal flag reads the copy, not the path (2026-09-14) ──
+    # org.md treated as whole-file again: the 1.59.1 citation fixes must flag and fail.
+    ("change record: 1.59.1's citation fixes outside every copied block flag no org heal",
+     "bin/gen-changes", "append", "\nREGIONED = ()\n"),
+    # A block compared by name alone: an edited CHECKPOINT reads unchanged.
+    ("change record: a change inside the Canonical Dispatch block still flags an org heal",
+     "bin/gen-changes", "del", ', "\\n".join(lines[start[1]:i + 1])'),
+    # Two unreadable sides compared equal: None == None and [] == [] must not skip.
+    ("change record: unpaired markers, no markers or a missing side flag an org heal",
+     "bin/gen-changes", "del", "ra and rb and "),
+    # templates.md dropped from the heal set while wf-companion still copies WF-PRINCIPLES.
+    ("change record: every block a producer copies is a heal region, and nothing reads principles.md",
+     "bin/gen-changes", "del", '    "workforce/references/templates.md",\n'),
     ("wf-census publishes immutable spans per file, with line numbers",
      CEN, "del", "sacred_lines.append(lineno)"),
     ("wf-conform computes T2 coverage for a removal target",

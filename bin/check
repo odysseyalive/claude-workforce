@@ -12407,6 +12407,124 @@ check(
     "bump — so every release reads identically and the index stops distinguishing them",
 )
 
+# THE HEAL FLAG READS THE COPY, NOT THE PATH (2026-09-14).
+# `Reaches an existing org: YES` tells a user that updating is not enough and to run
+# `/workforce audit`. gen-changes set it whenever a heal path appeared in a release at
+# all. MEASURED on 1.59.1: its only heal-path changes were citation fixes in
+# `procedures/org.md` § Mode: `index` and `procedures/principles.md` step 3. An org copies
+# neither, and the record still sent every user to re-audit. The fixture holds org.md at
+# both ends of that range, so the decision runs on real bytes without git history, which
+# a bin/prove copy does not carry.
+_hc_fx = "fixtures/gen-changes/1.59.1"
+_hc_org = "workforce/references/procedures/org.md"
+_hc_mod = _wc_mod = None
+_hc_err = ""
+try:
+    import importlib.util as _hcu, importlib.machinery as _hcm
+    sys.dont_write_bytecode = True
+    for _hc_name, _hc_src in (("_wf_gen_changes", "bin/gen-changes"),
+                              ("_wf_companion", "workforce/bin/wf-companion")):
+        _hc_spec = _hcu.spec_from_loader(_hc_name, _hcm.SourceFileLoader(_hc_name, _hc_src))
+        _hc_m = _hcu.module_from_spec(_hc_spec)
+        _hc_spec.loader.exec_module(_hc_m)
+        if _hc_name == "_wf_gen_changes":
+            _hc_mod = _hc_m
+        else:
+            _wc_mod = _hc_m
+except Exception as _exc:                                # noqa: BLE001
+    _hc_err = f"{_hc_src} will not import ({_exc}); "
+
+
+def _hc_hits(paths, before, after):
+    """gen-changes' heal decision over in-memory texts; None when it cannot answer."""
+    try:
+        return _hc_mod.heal_hits(set(paths), before.get, after.get)
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+_hc_before = read(f"{_hc_fx}/before/{_hc_org}")
+_hc_after = read(f"{_hc_fx}/after/{_hc_org}")
+_hc_paths = read(f"{_hc_fx}/paths.txt").split()
+_hc_1591 = _hc_hits(_hc_paths, {_hc_org: _hc_before}, {_hc_org: _hc_after})
+check(
+    "change record: 1.59.1's citation fixes outside every copied block flag no org heal",
+    bool(_hc_before) and bool(_hc_after) and _hc_before != _hc_after
+    and _hc_org in _hc_paths
+    and "workforce/references/procedures/principles.md" in _hc_paths
+    and _hc_1591 == [],
+    f"{_hc_err}heal_hits returned {_hc_1591!r} on the 1.59.1 range. Its heal-path changes "
+    "sit outside ORG-DISPATCH-CHECKPOINT and ORG-CHAIN and in a file nothing copies, so "
+    "`YES` tells every user to run an audit that has nothing to heal",
+)
+
+# The other half: a change inside the block `wf-companion` copies still flags. The
+# marker comes from the producer, so the test follows the producer if the block is renamed.
+_hc_lines = _hc_after.split("\n")
+_hc_cp = None
+if _wc_mod is not None:
+    _hc_at = next((i for i, l in enumerate(_hc_lines)
+                   if l.startswith(_wc_mod.CHECKPOINT_MARKERS[0])), None)
+    if _hc_at is not None and not _hc_lines[_hc_at + 1].startswith("<!--"):
+        _hc_cp = "\n".join(_hc_lines[:_hc_at + 1] + [_hc_lines[_hc_at + 1] + " (edited)"]
+                           + _hc_lines[_hc_at + 2:])
+check(
+    "change record: a change inside the Canonical Dispatch block still flags an org heal",
+    _hc_cp is not None
+    and _hc_hits([_hc_org], {_hc_org: _hc_after}, {_hc_org: _hc_cp}) == [_hc_org],
+    f"{_hc_err}an edit to the first line inside {_hc_org}'s CHECKPOINT block did not flag. "
+    "Every generated `/org` carries that block, so `no` leaves existing orgs dispatching "
+    "on a stale ladder with nothing telling the user to audit",
+)
+
+# Uncertain markers flag. A false `no` leaves an org stale with nothing to say so; a
+# false `yes` costs one audit.
+_hc_unp = ([l for l in _hc_lines if _wc_mod is None
+            or not l.startswith(_wc_mod.CHECKPOINT_MARKERS[0])])
+_hc_unp_a = "\n".join(_hc_unp)
+_hc_unp_b = _hc_unp_a.replace("\n", "\n(edited)\n", 1)
+check(
+    "change record: unpaired markers, no markers or a missing side flag an org heal",
+    len(_hc_unp) == len(_hc_lines) - 1
+    and _hc_hits([_hc_org], {_hc_org: _hc_unp_a}, {_hc_org: _hc_unp_b}) == [_hc_org]
+    and _hc_hits([_hc_org], {_hc_org: "a\n"}, {_hc_org: "b\n"}) == [_hc_org]
+    and _hc_hits([_hc_org], {}, {_hc_org: _hc_after}) == [_hc_org],
+    f"{_hc_err}a regioned heal path whose blocks cannot be read was classified `no`. "
+    "Unreadable is uncertain, and uncertain must flag",
+)
+
+# The regions are only as right as the producer list. Every CORE companion `wf-companion`
+# copies from shipped doctrine must name a heal path. A regioned path must be copied
+# between a marker pair gen-changes finds in the shipped file. And no shipped script may
+# read `procedures/principles.md`, the premise of its removal from HEAL_PATHS.
+_hc_prod = []
+if _hc_mod is None or _wc_mod is None:
+    _hc_prod.append(_hc_err or "a module did not load")
+else:
+    # A malformed return from the generator fails THIS check; it never takes the run down.
+    try:
+        for _hc_e in _wc_mod.CORE:
+            _hc_s = "workforce/" + "/".join(_hc_e["source"])
+            if _hc_s not in _hc_mod.HEAL_PATHS:
+                _hc_prod.append(f"{_hc_e['name']} copies from {_hc_s}, which is not a heal path")
+            elif _hc_s in _hc_mod.REGIONED:
+                _hc_names = [n for n, _ in (_hc_mod.copied_regions(read(_hc_s)) or [])]
+                _hc_rm = re.match(r"<!-- ([A-Z][A-Z0-9-]*) START",
+                                  (_hc_e["region"] or ("",))[0])
+                if not _hc_rm or _hc_rm.group(1) not in _hc_names:
+                    _hc_prod.append(f"{_hc_e['name']} copies {_hc_s} outside any marker pair "
+                                    f"gen-changes reads ({_hc_names})")
+    except Exception as _exc:                            # noqa: BLE001
+        _hc_prod.append(f"the producer walk raised {_exc!r}")
+    for _hc_p in sorted(glob.glob("workforce/bin/wf-*")):
+        if "procedures/principles.md" in read(_hc_p):
+            _hc_prod.append(f"{_hc_p} names procedures/principles.md")
+check(
+    "change record: every block a producer copies is a heal region, and nothing reads principles.md",
+    not _hc_prod,
+    "; ".join(_hc_prod) + ". A copy the heal set cannot see never flags a release",
+)
+
 check(
     "directives sidecar: wf-stamp implements the producer, not only the contract half",
     "--directives" in _ds_stamp and "def stamp_directives" in _ds_stamp
