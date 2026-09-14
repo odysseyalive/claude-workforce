@@ -21,14 +21,25 @@
 #              fixture, not an employee: it must be REGISTERED as an agent before
 #              `staging.md` Phase C or D can spawn it, and it is shipped so the first
 #              audit finds it already there rather than having to write it
+#   sibling    fetch into <skills-root>/<name>/ (personal or project skills root), BESIDE
+#              skills/workforce/ and never inside it: a whole skill of its own, found only at
+#              <skills-root>/<name>/SKILL.md. Never written over a skill `.installed-external`
+#              does not record, save workforce's own additions slot (see the evaluator section)
+#   exec-sibling  as `sibling`, plus chmod +x
+#   agent      fetch the named AGENT.md into <config-root>/agents/<dir>.md (personal) or
+#              .claude/agents/<dir>.md (project), <dir> being the agent's directory. The
+#              registration the host reads; the definition ships as a `sibling` row
 #
 #   retired    NOT fetched, and not a shipped file. A path this project USED to
 #              install OUTSIDE the skill directory and no longer ships. It exists so
 #              the prune can reach a host whose `.installed-external` record predates
 #              the record itself — see § Retired external paths at the foot of this file
 #
-# THIS LIST IS THE FLAG SET, and it is complete. Both installers branch on all six
-# and every reader that strips a flag must strip all five. `canary` went undocumented
+# THIS LIST IS THE FLAG SET, and it is complete. Both installers branch on every flag in
+# it, every reader that strips a flag must strip them all, and `bin/check` fails when an
+# installer or this header lacks one the bash installer parses. `sibling`, `exec-sibling`
+# and `agent` were missing from both this header and install.ps1 from 2026-09-10 to
+# 2026-09-14, and the port fetched every such row as a 404. `canary` went undocumented
 # here from the day it was added until 2026-09-07 while five rows used it, and
 # release-verifier's own completeness check — which its handbook orders to read the
 # set "off manifest.txt's own header, never from memory" — would have derived four

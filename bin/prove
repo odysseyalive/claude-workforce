@@ -244,10 +244,44 @@ WDN  = "workforce/bin/wf-widen"
 TLDG = "workforce/bin/wf-turn-ledger"
 TTAG = "workforce/bin/wf-task-tag"
 
+# The bin/check assertions that run install.ps1 under PowerShell and are skipped without it.
+PWSH_CHECKS = {
+    "install: install.ps1 keeps, slots and refuses exactly as install does",
+    "install: install.ps1 installs every sibling, registers its agents and prunes by the record",
+}
+
 # (check name, file, mode, payload)
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # INSTALLER FLAG PARITY (2026-09-14). The port dropping one flag from its table must fail by
+    # name, and so must the manifest header dropping one from its documented set.
+    ("install: install.ps1 parses every manifest flag the bash installer parses",
+     PS1, "del", "        'agent'        = 'agentreg'\n"),
+    ("manifest: the header documents every flag the installers parse",
+     MAN, "del", "#   exec-sibling  as `sibling`, plus chmod +x\n"),
+    # THE PORT'S BEHAVIOUR. These run install.ps1 itself, so they need PowerShell (`pwsh` on PATH
+    # or WF_PWSH); on a host without it they report N/A (see PWSH_CHECKS).
+    # Never marking the skill kept overwrites the project's own SKILL.md.
+    ("install: install.ps1 keeps, slots and refuses exactly as install does",
+     PS1, "del", "                        $siblingKept += $sibName\n"),
+    # Without the claim the slot lands unrecorded, so the next run cannot refresh it.
+    ("install: install.ps1 keeps, slots and refuses exactly as install does",
+     PS1, "del", "            if ($slotClaim) { $slotClaimed += $dest }\n"),
+    # Without the skill-directory link test the slot is written into the link's target.
+    ("install: install.ps1 keeps, slots and refuses exactly as install does",
+     PS1, "del", "(Test-ReparsePoint $skill) -or "),
+    # Without the corpus test a retired shell is handed a slot and resolves as a copy again.
+    ("install: install.ps1 keeps, slots and refuses exactly as install does",
+     PS1, "del", "        if ($corpus.Count -eq 0) { return $false }\n"),
+    # Without the SKILL.md test every unrecorded skill counts as kept, so none ever installs.
+    ("install: install.ps1 installs every sibling, registers its agents and prunes by the record",
+     PS1, "del", "(Test-Path -LiteralPath $sibMarker -PathType Leaf) -and"),
+    # Prune rule 1, and rule 2.
+    ("install: install.ps1 installs every sibling, registers its agents and prunes by the record",
+     PS1, "del", "Remove-Item -LiteralPath $f -Force -ErrorAction Stop; "),
+    ("install: install.ps1 installs every sibling, registers its agents and prunes by the record",
+     PS1, "del", "Remove-Item -LiteralPath $pf -Force -ErrorAction Stop; "),
     # SWEEP RESIDUE: without the command in § After the sweep, nothing runs the detector.
     ('sweep: § After the sweep runs the swept-reference detector, and wf-remainder carries it',
      "workforce/references/procedures/audit.md", "del",
@@ -2027,6 +2061,13 @@ def run_shard(shard):
                 else:
                     out.append((name, "STALE-CASE",
                                 f"{relpath} does not ship — remove this case"))
+                continue
+            # A CHECK THAT RUNS install.ps1 IS SKIPPED WHERE NO POWERSHELL EXISTS, so its cases
+            # cannot fire there. Calling that VACUOUS would send a reader after an assertion
+            # that is fine; it is N/A for the same reason an org-state case is.
+            if name in PWSH_CHECKS and not (os.environ.get("WF_PWSH") or shutil.which("pwsh")):
+                out.append((name, "N/A", "needs PowerShell to run install.ps1 — put `pwsh` on "
+                                         "PATH or set WF_PWSH. Do NOT remove."))
                 continue
             original = target.read_bytes()          # restore is byte-exact, not text-round-tripped
             try:

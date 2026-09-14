@@ -252,12 +252,280 @@ function Install-ClaudeWorkforce {
         Write-Host ''
     }
 
+    # ── Fetching, and the manifest grammar ────────────────────────────────────
+    #
+    # `WORKFORCE_REPO_URL=file://...` is the documented test seam, and PowerShell 7's
+    # Invoke-WebRequest refuses that scheme ("The 'file' scheme is not supported", measured
+    # under pwsh 7.6.6), so the seam never ran on this port. A file URI is copied instead.
+    function Get-ShippedText([string]$uri) {
+        if ($uri -like 'file://*') {
+            return (Get-Content -LiteralPath ([System.Uri]$uri).LocalPath -Raw -ErrorAction Stop)
+        }
+        return (Invoke-WebRequest -UseBasicParsing -Uri $uri -ErrorAction Stop).Content
+    }
+    function Save-ShippedFile([string]$uri, [string]$outFile) {
+        if ($uri -like 'file://*') {
+            Copy-Item -LiteralPath ([System.Uri]$uri).LocalPath -Destination $outFile -Force -ErrorAction Stop
+        } else {
+            Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $outFile -ErrorAction Stop
+        }
+    }
+
+    # EVERY FLAG `install` BRANCHES ON, mapped to the destination class it installs as. The
+    # header of manifest.txt says what each one means. MEASURED 2026-09-14 under pwsh 7.6.6:
+    # this port knew six of the nine and took a `sibling`, `exec-sibling` or `agent` row's
+    # whole text as its path, fetching `$RepoUrl/sibling workforce/skills/...`, so every
+    # Windows install failed to fetch all five evaluators and their agents. The fetch, prune
+    # and verify passes all parse through ConvertFrom-ManifestLine, and `bin/check` reads this
+    # table against the case arms in `install`.
+    $script:ManifestFlags = [ordered]@{
+        'keep'         = 'keep'
+        'hook'         = 'hook'
+        'exec'         = 'hook'
+        'canary'       = 'canary'
+        'style'        = 'style'
+        'sibling'      = 'sibling'
+        'exec-sibling' = 'sibling'
+        'agent'        = 'agentreg'
+        'retired'      = 'retired'
+    }
+    function ConvertFrom-ManifestLine([string]$rawLine) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith('#')) { return $null }
+        $parts = $line -split '\s+', 2
+        if ($parts.Count -eq 2 -and $script:ManifestFlags.Contains($parts[0])) {
+            return [pscustomobject]@{
+                Flag = $script:ManifestFlags[$parts[0]]
+                Path = $parts[1].Trim()
+                Exec = $parts[0] -in @('hook', 'exec', 'exec-sibling')
+            }
+        }
+        return [pscustomobject]@{ Flag = ''; Path = $line; Exec = $false }
+    }
+
+    # A full path in the platform's own form. The ownership record is matched line for line
+    # by `wf-catalog` against `os.path.join`, which writes backslashes on Windows; a
+    # `C:\Users\x\.claude/skills/...` Join-Path result would never match it. Resolved against
+    # the PowerShell location first, because .NET's current directory does not follow it.
+    function Resolve-FullPath([string]$p) {
+        return [System.IO.Path]::GetFullPath($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($p))
+    }
+
+    function Get-ManifestDestination([string]$path, [string]$flag, [string]$skillDir,
+                                     [string]$skillsRoot, [string]$agentsDir, [string]$stylesDir) {
+        if ($flag -eq 'canary') {
+            # Agent DEFINITIONS register only from .claude/agents/, so they are shipped there
+            # and are ALREADY REGISTERED by the first audit.
+            $dest = Join-Path $agentsDir (Split-Path $path -Leaf)
+        } elseif ($flag -eq 'style') {
+            # An output style is selectable only from <config-root>/output-styles/ or the
+            # project's .claude/output-styles/.
+            $dest = Join-Path $stylesDir (Split-Path $path -Leaf)
+        } elseif ($flag -eq 'agentreg') {
+            # The host reads `<name>.md`, never a nested AGENT.md:
+            # `agents/character-scanner/AGENT.md` registers as `character-scanner.md`.
+            $dest = Join-Path $agentsDir ((Split-Path ($path -creplace '/AGENT\.md$', '') -Leaf) + '.md')
+        } elseif ($flag -eq 'sibling') {
+            # A whole skill of its own, beside skills/workforce/ and never inside it.
+            $dest = Join-Path $skillsRoot ($path -creplace '^workforce/skills/', '')
+        } else {
+            $dest = Join-Path $skillDir ($path -creplace '^workforce/', '')
+        }
+        return (Resolve-FullPath $dest)
+    }
+
+    # bash's `-L`. Windows calls a symbolic link or a junction a reparse point, and the
+    # attribute is read without following the link, so a dangling one is refused too. A path
+    # that does not exist reads as -1 (every bit set) and is not a link. An attribute that
+    # cannot be read at all answers "link", so every caller refuses rather than writes or walks.
+    function Test-ReparsePoint([string]$p) {
+        try { $a = [int](New-Object System.IO.FileInfo($p)).Attributes } catch { return $true }
+        return ($a -ne -1) -and (($a -band [int][System.IO.FileAttributes]::ReparsePoint) -ne 0)
+    }
+
+    # bash's `chmod +x`. Windows has no executable bit, so this does nothing there; under pwsh
+    # on Linux or macOS the bit is set, because a script without it fails like a missing one.
+    function Set-ExecutableBit([string]$p) {
+        if ($IsLinux -or $IsMacOS) { & chmod +x -- $p }
+    }
+
+    # One path per line, LF, no BOM: `wf-catalog` and `wf-remainder` read the record line by line.
+    function Write-RecordFile([string]$p, $lines) {
+        $body = if (@($lines).Count -gt 0) { (@($lines) -join "`n") + "`n" } else { '' }
+        try {
+            [System.IO.File]::WriteAllText($p, $body, (New-Object System.Text.UTF8Encoding($false)))
+        } catch {
+            Write-Host "  Could not write the install record $($p): $($_.Exception.Message)"
+        }
+    }
+
+    # `find -type f` and `-type d`, never following a link: a symbolic link or junction is
+    # neither listed nor descended. Windows PowerShell 5.1's `Get-ChildItem -Recurse` DOES
+    # descend links, and a prune walking one deletes files in whatever tree the link names.
+    function Get-TreeListing([string]$root) {
+        $files = New-Object 'System.Collections.Generic.List[string]'
+        $dirs = New-Object 'System.Collections.Generic.List[string]'
+        $stack = New-Object 'System.Collections.Generic.Stack[string]'
+        if ((Test-Path -LiteralPath $root -PathType Container) -and -not (Test-ReparsePoint $root)) {
+            $stack.Push($root)
+        }
+        while ($stack.Count -gt 0) {
+            foreach ($child in @(Get-ChildItem -LiteralPath ($stack.Pop()) -Force -ErrorAction SilentlyContinue)) {
+                if ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { continue }
+                if ($child.PSIsContainer) { $dirs.Add($child.FullName); $stack.Push($child.FullName) }
+                else { $files.Add($child.FullName) }
+            }
+        }
+        return @{ Files = $files; Dirs = $dirs }
+    }
+
+    # A KEPT SIBLING STILL RECEIVES WORKFORCE'S OWN SLOT FILE, and nothing else of the shipped
+    # skill. `install` § kept_slot_due carries the measurement (a peer host on 1.58.0 whose four
+    # kept evaluators had no `additions.md` anywhere, so `wf-seed --execute` failed on every
+    # audit). Clause for clause: a slot row only; never through a link at the skill, its
+    # `references/` or the file; only into a skill that still bears corpus, because a retired
+    # shell handed a slot resolves as a copy again; and only where the file is absent or the
+    # pre-run record says this installer wrote it.
+    function Test-KeptSlotDue([string]$path, [string]$skill, [string]$dest, [string[]]$record) {
+        if ($path -cnotlike 'workforce/skills/*/references/additions.md') { return $false }
+        $refs = Join-Path $skill 'references'
+        if ((Test-ReparsePoint $skill) -or (Test-ReparsePoint $refs) -or (Test-ReparsePoint $dest)) { return $false }
+        $corpus = @(Get-ChildItem -LiteralPath $refs -File -Force -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -clike '*.md' -and $_.Name -cne 'additions.md' -and
+            -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) })
+        if ($corpus.Count -eq 0) { return $false }
+        if (-not (Test-Path -LiteralPath $dest)) { return $true }
+        return ($record -ccontains $dest)
+    }
+
+    # REMOVE WHAT THE MANIFEST NO LONGER LISTS. `install` § prune_scope carries the history and
+    # the measurements; the three rules are the same here:
+    #   1. Inside the skill directory the manifest is authoritative. Anything unlisted goes.
+    #   2. Outside it (agents/, output-styles/, sibling skills) nothing is removed unless
+    #      `.installed-external` records that a previous run wrote that exact path. A kept
+    #      skill is not claimed, save the slot files this run placed, and its recorded paths
+    #      are carried forward rather than deleted.
+    #   3. `.claude/workforce/` project state is never walked.
+    # A partial install never prunes: deleting "everything not in the set" would delete working
+    # files whose replacements did not arrive.
+    function Invoke-ScopePrune([string]$skillDir, [string]$agentsDir, [string]$stylesDir,
+                               [string[]]$keptSkills, [string[]]$slotClaimed) {
+        $skillsRoot = Split-Path $skillDir -Parent
+        $slashed = $skillDir -replace '\\', '/'
+        if ($slashed -notlike '*/skills/workforce') {
+            Write-Host "  Prune SKIPPED: '$skillDir' is not a skill directory under skills/workforce."
+            return
+        }
+        if ($slashed -like '*/.claude/workforce' -or $slashed -like '*/.claude/workforce/*') {
+            Write-Host "  Prune REFUSED: '$skillDir' is project state, not a skill directory."
+            return
+        }
+        if ($script:FetchFailed.Count -gt 0) {
+            Write-Host '  Prune SKIPPED: a fetch failed this run, so the shipped set on disk is incomplete.'
+            return
+        }
+
+        # Both deletion whitelists ignore case, and nothing else here does. On Windows two
+        # spellings name one file, so an exact miss would delete a file just installed; a
+        # missed delete only leaves residue.
+        $expect = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        $extNow = New-Object 'System.Collections.Generic.List[string]'
+        $seed = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($rawLine in $manifest) {
+            $e = ConvertFrom-ManifestLine $rawLine
+            if (-not $e) { continue }
+            if ($e.Flag -eq 'retired') {
+                # NOT "what we ship now", so never in $extNow; it seeds a missing record. An
+                # unrecognized prefix is not guessed at.
+                if ($e.Path -clike 'workforce/canary/*') {
+                    $seed.Add((Resolve-FullPath (Join-Path $agentsDir (Split-Path $e.Path -Leaf))))
+                } elseif ($e.Path -clike 'workforce/output-styles/*') {
+                    $seed.Add((Resolve-FullPath (Join-Path $stylesDir (Split-Path $e.Path -Leaf))))
+                } else {
+                    Write-Host "  Prune: retired path '$($e.Path)' has no known destination; skipped."
+                }
+            } elseif ($e.Flag -eq 'sibling') {
+                $sibDest = Get-ManifestDestination $e.Path $e.Flag $skillDir $skillsRoot $agentsDir $stylesDir
+                $sibName = ($e.Path -creplace '^workforce/skills/', '').Split('/')[0]
+                if ($keptSkills -ccontains $sibName) {
+                    if ($slotClaimed -ccontains $sibDest) { $extNow.Add($sibDest) }
+                } else {
+                    $extNow.Add($sibDest)
+                }
+            } elseif ($e.Flag -in @('canary', 'style', 'agentreg')) {
+                $extNow.Add((Get-ManifestDestination $e.Path $e.Flag $skillDir $skillsRoot $agentsDir $stylesDir))
+            } else {
+                [void]$expect.Add(($e.Path -creplace '^workforce/', ''))
+            }
+        }
+
+        $recordPath = Join-Path $skillDir '.installed-external'
+        $pruned = 0
+
+        # Rule 1.
+        $tree = Get-TreeListing $skillDir
+        foreach ($f in $tree.Files) {
+            $rel = $f.Substring($skillDir.Length).TrimStart('\', '/') -replace '\\', '/'
+            if ($rel -eq '.installed-external') { continue }
+            if (-not $expect.Contains($rel)) {
+                # `rm -f ... &&` in `install`: a file that will not go is named, and the run goes on.
+                try {
+                    Remove-Item -LiteralPath $f -Force -ErrorAction Stop; $pruned++
+                    Write-Host "  Pruned $rel"
+                } catch {
+                    Write-Host "  Could not prune $($rel): $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # THE BOOTSTRAP: a host installed before the record existed has none, so rule 2 would
+        # read nothing. Seeded from the manifest's `retired` list, and only when absent.
+        if (-not (Test-Path -LiteralPath $recordPath -PathType Leaf) -and $seed.Count -gt 0) {
+            $present = @($seed | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }).Count
+            Write-RecordFile $recordPath $seed
+            Write-Host "  Prune: no install record here; seeded from the manifest's retired list ($present of $($seed.Count) present on disk)."
+        }
+
+        # Rule 2.
+        if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
+            $keptPrefixes = @($keptSkills | Where-Object { $_ } | ForEach-Object {
+                (Resolve-FullPath (Join-Path $skillsRoot $_)) + [System.IO.Path]::DirectorySeparatorChar })
+            foreach ($pf in @(Get-Content -LiteralPath $recordPath)) {
+                if (-not $pf) { continue }
+                if (@($keptPrefixes | Where-Object { $pf.StartsWith($_, [System.StringComparison]::Ordinal) }).Count -gt 0) {
+                    if (-not $extNow.Contains($pf)) { $extNow.Add($pf) }
+                    continue
+                }
+                if ((Test-Path -LiteralPath $pf -PathType Leaf) -and -not ($extNow -contains $pf)) {
+                    try {
+                        Remove-Item -LiteralPath $pf -Force -ErrorAction Stop; $pruned++
+                        Write-Host "  Pruned $pf"
+                    } catch {
+                        Write-Host "  Could not prune $($pf): $($_.Exception.Message)"
+                    }
+                }
+            }
+        }
+        Write-RecordFile $recordPath $extNow
+
+        # Directories the prune emptied, deepest first. The skill directory itself always
+        # holds the record.
+        foreach ($d in @($tree.Dirs | Sort-Object -Property Length -Descending)) {
+            if (@(Get-ChildItem -LiteralPath $d -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+                Remove-Item -LiteralPath $d -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        if ($pruned -gt 0) {
+            Write-Host "  Pruned $pruned file(s) the manifest no longer lists."
+        } else {
+            Write-Host '  Prune: nothing orphaned.'
+        }
+    }
+
     # Download the shared manifest ONCE, then install it to each target scope.
-    # Manifest format: optional flag ("keep" = fetch only if absent,
-    # "hook" = executable bit on unix; no-op on Windows) followed by the
-    # repo-relative path.
     Write-Host 'Downloading workforce...'
-    $manifest = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/manifest.txt").Content -split "`n"
+    $manifest = (Get-ShippedText "$RepoUrl/manifest.txt") -split "`n"
     $script:FetchFailed = @()
     $script:VerifyFailed = $false
     $script:SettingsFailed = @()
@@ -273,7 +541,7 @@ function Install-ClaudeWorkforce {
     # Kept in step with the bash installer.
     $incomingVersion = 'unknown'
     try {
-        $vBody = (Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/workforce/references/version.md").Content
+        $vBody = Get-ShippedText "$RepoUrl/workforce/references/version.md"
         foreach ($vLine in ($vBody -split "`n")) {
             if ($vLine -match '^\s*WORKFORCE-VERSION:\s*([0-9][0-9.]*)') { $incomingVersion = $Matches[1]; break }
         }
@@ -303,6 +571,7 @@ function Install-ClaudeWorkforce {
         switch ($scope) {
             'user' {
                 $skillDir     = $personalSkillDir
+                $skillsRoot   = Join-Path $configRoot 'skills'
                 $agentsDir    = Join-Path $configRoot 'agents'
                 $stylesDir    = Join-Path $configRoot 'output-styles'
                 $settingsFile = Join-Path $configRoot 'settings.json'
@@ -310,6 +579,7 @@ function Install-ClaudeWorkforce {
             }
             'project' {
                 $skillDir     = $projectSkillDir
+                $skillsRoot   = Join-Path (Get-Location).Path '.claude/skills'
                 $agentsDir    = Join-Path (Get-Location).Path '.claude/agents'
                 $stylesDir    = Join-Path (Get-Location).Path '.claude/output-styles'
                 $settingsFile = '.claude/settings.local.json'
@@ -317,49 +587,58 @@ function Install-ClaudeWorkforce {
             }
         }
 
+        # Reset per scope: a skill kept at project scope is not evidence about the personal tree.
+        $siblingKept = @()
+        $siblingOurs = @()
+        $slotClaimed = @()
+        # SNAPSHOT THE OWNERSHIP RECORD BEFORE THE FIRST WRITE, and read only the snapshot. The
+        # prune rewrites the record after this loop, while the files this run writes exist at
+        # once; a guard reading the live tree installs each evaluator's SKILL.md and then reads
+        # it back as the project's own (`install` § install_to_scope carries the measurement).
+        $siblingRecord = @()
+        $recordPath = Join-Path $skillDir '.installed-external'
+        if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
+            $siblingRecord = @(Get-Content -LiteralPath $recordPath)
+        }
+
         Write-Host ''
         Write-Host "Scope: $scopeLabel"
         Write-Host "Installing to $skillDir"
 
         foreach ($rawLine in $manifest) {
-            $line = $rawLine.Trim()
-            if (-not $line -or $line.StartsWith('#')) { continue }
+            $entry = ConvertFrom-ManifestLine $rawLine
+            # `retired` names a path this project USED to install outside the skill directory.
+            # It is never fetched; the prune below is its only reader.
+            if (-not $entry -or $entry.Flag -eq 'retired') { continue }
+            $flag = $entry.Flag
+            $path = $entry.Path
+            $dest = Get-ManifestDestination $path $flag $skillDir $skillsRoot $agentsDir $stylesDir
 
-            $flag = ''
-            $path = $line
-            # `retired` names a path this project USED to install outside the skill
-            # directory and no longer ships. Not fetched; the bash installer's prune
-            # is its only reader. Skipped here so it is never treated as shipped.
-            if ($line.StartsWith('retired ')) { continue }
-            if ($line.StartsWith('keep ')) { $flag = 'keep'; $path = $line.Substring(5).Trim() }
-            elseif ($line.StartsWith('hook ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
-            # `exec` is `hook`'s mechanical twin — chmod +x on unix, a no-op here.
-            # Separate word because this project ships exactly one hook and several
-            # plain scripts; see references/enforcement.md § Hooks.
-            elseif ($line.StartsWith('exec ')) { $flag = 'hook'; $path = $line.Substring(5).Trim() }
-            # `canary` files are agent DEFINITIONS and must land in .claude/agents/
-            # to register as agent types at all. Shipped so they are ALREADY
-            # REGISTERED by the first audit: fixtures written during a run cannot
-            # resolve in that run, which forced a restart to clear DEGRADED marks.
-            elseif ($line.StartsWith('canary ')) { $flag = 'canary'; $path = $line.Substring(7).Trim() }
-            # `style` files are OUTPUT STYLES and must land in <config-root>/output-styles/
-            # or the project's .claude/output-styles/ to be selectable at all. A style
-            # modifies the system prompt, which is why the plain-speak rule ships here
-            # rather than in a reference the model has to still be paying attention to.
-            elseif ($line.StartsWith('style ')) { $flag = 'style'; $path = $line.Substring(6).Trim() }
-
-            if ($flag -eq 'canary') {
-
-                $dest = Join-Path $agentsDir (Split-Path $path -Leaf)
-
-            } elseif ($flag -eq 'style') {
-
-                $dest = Join-Path $stylesDir (Split-Path $path -Leaf)
-
-            } else {
-
-                $dest = Join-Path $skillDir ($path -replace '^workforce/', '')
-
+            # A SIBLING NEVER OVERWRITES A SKILL THIS INSTALLER DID NOT WRITE. A project's own
+            # `text-eval/SKILL.md` can carry an `origin: user | immutable: true` block, and at
+            # project scope the shipped copy resolves to that exact path. Ownership is decided
+            # once per skill, on its SKILL.md, against the snapshot: a path the record names is
+            # ours to refresh, and anything else stays where it stands.
+            $slotClaim = $false
+            if ($flag -eq 'sibling') {
+                $sibName = ($path -creplace '^workforce/skills/', '').Split('/')[0]
+                $sibDir = Resolve-FullPath (Join-Path $skillsRoot $sibName)
+                if (-not ($siblingKept -ccontains $sibName) -and -not ($siblingOurs -ccontains $sibName)) {
+                    $sibMarker = Resolve-FullPath (Join-Path $sibDir 'SKILL.md')
+                    if ((Test-Path -LiteralPath $sibMarker -PathType Leaf) -and
+                        -not ($siblingRecord -ccontains $sibMarker)) {
+                        Write-Host "  Keeping $sibDir (the project's own -- not written by this installer)"
+                        $siblingKept += $sibName
+                    } else {
+                        $siblingOurs += $sibName
+                    }
+                }
+                # A kept skill is skipped whole EXCEPT for workforce's own slot files.
+                if ($siblingKept -ccontains $sibName) {
+                    if (-not (Test-KeptSlotDue $path $sibDir $dest $siblingRecord)) { continue }
+                    Write-Host "  Placing workforce's own $($path -creplace '^workforce/skills/', '') beside the kept corpus"
+                    $slotClaim = $true
+                }
             }
 
             if ($flag -eq 'keep' -and (Test-Path $dest -PathType Leaf)) {
@@ -377,41 +656,51 @@ function Install-ClaudeWorkforce {
             # on a missing script. Every fetch is checked, and the scope is verified
             # against the manifest once the loop finishes.
             try {
-                Invoke-WebRequest -UseBasicParsing -Uri "$RepoUrl/$path" -OutFile $dest -ErrorAction Stop
+                Save-ShippedFile "$RepoUrl/$path" $dest
             } catch {
                 Write-Host "  FETCH FAILED: $path"
                 $script:FetchFailed += $path
                 if (Test-Path $dest -PathType Leaf) { Remove-Item $dest -Force }
                 continue
             }
+
+            # Exactly the slot paths placed inside a kept skill are recorded, so its SKILL.md
+            # stays unrecorded and the skill stays the project's.
+            if ($slotClaim) { $slotClaimed += $dest }
+            if ($entry.Exec) { Set-ExecutableBit $dest }
         }
+
+        if ($siblingKept.Count -gt 0) {
+            Write-Host ''
+            Write-Host "  NOTE: kept the project's own copy of: $($siblingKept -join ' ')"
+            Write-Host '        Those directories were not written by this installer, so they hold'
+            Write-Host "        the project's words rather than the distribution's. The shipped"
+            Write-Host '        evaluator is not installed over them.'
+        }
+
+        Invoke-ScopePrune (Resolve-FullPath $skillDir) $agentsDir $stylesDir $siblingKept $slotClaimed
 
         # Post-install completeness pass -- the manifest is the authoritative
         # shipped-file list, so "did the install include everything the project
-        # needs" is answerable by re-reading it against disk. There is no
-        # executable bit to repair on Windows; absence is the whole check here.
+        # needs" is answerable by re-reading it against disk. `install` also restores a
+        # lost executable bit here; this port sets it at fetch on Linux and macOS and
+        # has none to restore on Windows, so absence is the whole check.
         $vMissing = @()
         $vTotal = 0
         foreach ($rawLine in $manifest) {
-            $line = $rawLine.Trim()
-            if (-not $line -or $line.StartsWith('#')) { continue }
-            $vPath = $line
-            $vFlag = ''
+            $vEntry = ConvertFrom-ManifestLine $rawLine
             # Not shipped, so not part of completeness. See the fetch loop above.
-            if ($line.StartsWith('retired ')) { continue }
-            foreach ($pre in @('keep ', 'hook ', 'exec ', 'canary ', 'style ')) {
-                if ($line.StartsWith($pre)) { $vPath = $line.Substring($pre.Length).Trim(); $vFlag = $pre.Trim() }
-            }
-            if ($vFlag -eq 'canary') {
-                $vDest = Join-Path $agentsDir (Split-Path $vPath -Leaf)
-            } elseif ($vFlag -eq 'style') {
-                $vDest = Join-Path $stylesDir (Split-Path $vPath -Leaf)
-            } else {
-                $vDest = Join-Path $skillDir ($vPath -replace '^workforce/', '')
-            }
+            if (-not $vEntry -or $vEntry.Flag -eq 'retired') { continue }
+            $vDest = Get-ManifestDestination $vEntry.Path $vEntry.Flag $skillDir $skillsRoot $agentsDir $stylesDir
             $vTotal++
-            if (-not (Test-Path $vDest -PathType Leaf) -or (Get-Item $vDest).Length -eq 0) {
-                $vMissing += $vPath
+            # `-Force`, or Get-Item cannot see a hidden file: under pwsh on Linux or macOS that is
+            # every dotfile, and `.immutable.sha` threw here and ended the run before the summary.
+            if (-not (Test-Path -LiteralPath $vDest -PathType Leaf) -or (Get-Item -LiteralPath $vDest -Force).Length -eq 0) {
+                # A SIBLING THE FETCH LOOP DELIBERATELY KEPT IS NOT A MISSING FILE: an
+                # installer that cries incomplete on a correct tree gets its verification ignored.
+                $vSib = ($vEntry.Path -creplace '^workforce/skills/', '').Split('/')[0]
+                if ($siblingKept -ccontains $vSib) { continue }
+                $vMissing += $vEntry.Path
             }
         }
         if ($vMissing.Count -gt 0) {

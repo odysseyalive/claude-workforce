@@ -3134,7 +3134,9 @@ check(
 # BEHAVIOURAL, against the SHIPPED installer, in a throwaway HOME that is also the project root
 # (scope collapse). The manifest is filtered from the real one — same rows, same order — so the
 # run takes a fraction of a second rather than fetching ~400 files.
-def _kept_slot_probe():
+def _kept_slot_probe(pwsh=None):
+    # `pwsh` runs install.ps1 through the same shapes instead of `install`; see the two
+    # PowerShell checks below.
     import tempfile as _tfm
     res = {}
 
@@ -3157,7 +3159,10 @@ def _kept_slot_probe():
             os.symlink(os.path.join(ROOT, "workforce"), os.path.join(_repo, "workforce"))
             _keep = ("workforce/skills/code-evaluator/", "workforce/skills/text-eval/")
             _rows = [l for l in read("manifest.txt").splitlines()
-                     if l.split(" ")[-1].startswith(_keep) or l == "workforce/references/version.md"]
+                     if l.split(" ")[-1].startswith(_keep) or l == "workforce/references/version.md"
+                     # The dotfile rows too: pwsh outside Windows treats them as hidden, and a
+                     # verify that could not see one threw after the prune (2026-09-14).
+                     or l.split(" ")[-1].startswith("workforce/.")]
             _put(os.path.join(_repo, "manifest.txt"), "\n".join(_rows) + "\n")
             _shipped = _get(os.path.join(ROOT, "workforce/skills/code-evaluator/references/additions.md"))
 
@@ -3167,9 +3172,23 @@ def _kept_slot_probe():
                 for _k in ("CLAUDE_CONFIG_DIR", "CLAUDE_PROJECT_DIR", "WORKFORCE_SCOPE",
                            "WORKFORCE_CONFIG_DIR"):
                     _env.pop(_k, None)
+                if pwsh:
+                    # The port takes no flags through `irm | iex`, so its env twins stand in.
+                    _env.update(WORKFORCE_SCOPE="user", WORKFORCE_NO_AUTOMODE="1", WORKFORCE_FORCE="1")
+                    return subprocess.run([pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
+                                           os.path.join(ROOT, "install.ps1")], cwd=home, env=_env,
+                                          capture_output=True, text=True, timeout=120)
                 return subprocess.run(["bash", os.path.join(ROOT, "install"), "--user",
                                        "--no-automode", "--force"], cwd=home, env=_env,
                                       capture_output=True, text=True, timeout=120)
+
+            # install.ps1 RETURNS rather than exits (it runs in the user's console), so its exit
+            # status is 0 on a failed install and only its output tells the two apart. The
+            # verify line is required as well as the failure line absent: a run that dies after
+            # the prune prints neither.
+            def _ok(r):
+                return (r.returncode == 0 and "INSTALL INCOMPLETE" not in r.stdout
+                        and "Verified: " in r.stdout)
 
             # SHAPE A — a customized code-evaluator with a corpus and no slot: the peer host.
             _a = os.path.join(_t, "a")
@@ -3180,8 +3199,16 @@ def _kept_slot_probe():
             _put(os.path.join(_ce, "references", "mistake-taxonomy.md"), _tax)
             _r = _install(_a)
             _slot = os.path.join(_ce, "references", "additions.md")
-            _rec = _get(os.path.join(_a, ".claude", "skills", "workforce", ".installed-external")) or ""
-            res["placed"] = _r.returncode == 0 and _get(_slot) == _shipped
+            _recp = os.path.join(_a, ".claude", "skills", "workforce", ".installed-external")
+            _rec = _get(_recp) or ""
+            # text-eval is absent in this shape, so it installs as the distribution's own.
+            _agents = os.path.join(_a, ".claude", "agents")
+            _te_a = os.path.join(_a, ".claude", "skills", "text-eval")
+            res["fresh_sibling"] = (_ok(_r) and os.path.isfile(os.path.join(_te_a, "references", "text-tells.md"))
+                                    and os.path.join(_te_a, "SKILL.md") in _rec.splitlines())
+            res["agent_registered"] = (os.path.isfile(os.path.join(_agents, "character-scanner.md"))
+                                       and os.path.join(_agents, "character-scanner.md") in _rec.splitlines())
+            res["placed"] = _ok(_r) and _get(_slot) == _shipped
             res["recorded"] = _rec.splitlines().count(_slot) == 1
             res["not_claimed"] = os.path.join(_ce, "SKILL.md") not in _rec.splitlines()
             res["only_slot"] = sorted(os.path.relpath(os.path.join(dp, f), _ce)
@@ -3202,9 +3229,20 @@ def _kept_slot_probe():
                 res["seeds"] = False
             # THE HEAL IS A REFRESH. A slot this installer recorded writing is ours on the next run.
             _put(_slot, "<!-- code-additions-version: 1 -->\n# stale\n")
+            # THE PRUNE, both rules: an unlisted file inside the skill directory goes, a recorded
+            # external file the manifest no longer ships goes, and an unrecorded one stays.
+            _orphan = os.path.join(_a, ".claude", "skills", "workforce", "retired-by-probe.md")
+            _gone_ext = os.path.join(_agents, "wf-retired-by-probe.md")
+            _users_own = os.path.join(_agents, "the-projects-own.md")
+            for _p in (_orphan, _gone_ext, _users_own):
+                _put(_p, "# probe\n")
+            with open(_recp, "a", encoding="utf-8") as _fh:
+                _fh.write(_gone_ext + "\n")
             _r = _install(_a)
-            _rec = _get(os.path.join(_a, ".claude", "skills", "workforce", ".installed-external")) or ""
-            res["refreshed"] = _r.returncode == 0 and _get(_slot) == _shipped
+            _rec = _get(_recp) or ""
+            res["pruned_by_record"] = (_ok(_r) and not os.path.exists(_orphan)
+                                       and not os.path.exists(_gone_ext) and os.path.exists(_users_own))
+            res["refreshed"] = _ok(_r) and _get(_slot) == _shipped
             res["recorded_once"] = _rec.splitlines().count(_slot) == 1
             res["still_untouched"] = _get(os.path.join(_ce, "SKILL.md")) == _skill_md
 
@@ -3220,7 +3258,7 @@ def _kept_slot_probe():
             _put(os.path.join(_sh, "CATALOG-ANCHOR.md"), "# house rules\n")
             _r = _install(_b)
             _rec = _get(os.path.join(_b, ".claude", "skills", "workforce", ".installed-external")) or ""
-            res["own_slot_kept"] = (_r.returncode == 0
+            res["own_slot_kept"] = (_ok(_r)
                                     and _get(os.path.join(_te, "references", "additions.md")) == _own
                                     and os.path.join(_te, "references", "additions.md") not in _rec.splitlines())
             res["shell_stays_shell"] = not os.path.exists(os.path.join(_sh, "references"))
@@ -3233,7 +3271,7 @@ def _kept_slot_probe():
             os.makedirs(os.path.join(_c, ".claude", "skills"))
             os.symlink(_real, os.path.join(_c, ".claude", "skills", "code-evaluator"))
             _r = _install(_c)
-            res["symlink_not_followed"] = (_r.returncode == 0 and not os.path.exists(
+            res["symlink_not_followed"] = (_ok(_r) and not os.path.exists(
                 os.path.join(_real, "references", "additions.md")))
     except Exception as _e:
         res["probe"] = f"failed: {type(_e).__name__}: {_e}"
@@ -3259,6 +3297,84 @@ check(
     "through into a tree the run never named. Got: "
     + ", ".join(f"{k}={v}" for k, v in _ks.items()),
 )
+
+
+# EVERY MANIFEST FLAG THE BASH INSTALLER PARSES, THE POWERSHELL PORT PARSES TOO (2026-09-14).
+#
+# MEASURED against 1.58.0's install.ps1 under pwsh 7.6.6: `sibling`, `exec-sibling` and `agent`
+# reached `install` with the five evaluators (2026-09-10) and never reached the port. With no
+# branch for them it took each row's whole text as the path and fetched
+# `$RepoUrl/sibling workforce/skills/...`, so every Windows install failed to fetch all five
+# evaluators and their agents. No assertion noticed, because each one on the port pinned a
+# literal the port already had. The flag set is read off both installers rather than listed
+# here, so a flag taught to one installer alone fails this by name.
+_bash_flags = set(re.findall(r'"([a-z][a-z-]*) "\*\)', read("install")))
+_ps1_src = read("install.ps1")
+_ps1_flags = set(re.findall(r"StartsWith\('([a-z][a-z-]*) '\)", _ps1_src))
+_ps1_table = re.search(r"\$script:ManifestFlags = \[ordered\]@\{(.*?)\n\s*\}", _ps1_src, re.S)
+if _ps1_table:
+    _ps1_flags |= set(re.findall(r"^\s*'([a-z][a-z-]*)'\s*=", _ps1_table.group(1), re.M))
+_man_lines = read("manifest.txt").splitlines()
+_used_flags = {l.split()[0] for l in _man_lines
+               if l.strip() and not l.startswith("#") and len(l.split()) > 1}
+check(
+    "install: install.ps1 parses every manifest flag the bash installer parses",
+    # The floor keeps the bash parse honest: a rewrite the regex no longer reads would
+    # otherwise empty both sides and pass.
+    {"sibling", "exec-sibling", "agent", "retired"} <= _bash_flags
+    and not (_bash_flags - _ps1_flags)
+    and not (_used_flags - (_bash_flags & _ps1_flags)),
+    f"bash parses {sorted(_bash_flags)}; install.ps1 parses {sorted(_ps1_flags)}; "
+    f"missing from install.ps1: {sorted(_bash_flags - _ps1_flags)}; used in manifest.txt "
+    f"but not parsed by both: {sorted(_used_flags - (_bash_flags & _ps1_flags))}. A flag the "
+    "port does not parse is fetched as part of the path and 404s on every Windows install",
+)
+# THE HEADER CLAIMS TO BE THE COMPLETE FLAG SET, and release-verifier derives the set from it.
+# It omitted all three sibling-era flags from 2026-09-10 on while saying so.
+_hdr_flags = set()
+for _l in _man_lines:
+    if not _l.startswith("#"):
+        break
+    _m = re.match(r"^# {3}([a-z][a-z-]*) {2,}\S", _l)
+    if _m:
+        _hdr_flags.add(_m.group(1))
+check(
+    "manifest: the header documents every flag the installers parse",
+    _bash_flags and not (_bash_flags - _hdr_flags),
+    f"undocumented in manifest.txt's header: {sorted(_bash_flags - _hdr_flags)}. A reader "
+    "that strips flags read off that header mis-strips every row carrying one it omits",
+)
+
+# PARSING A FLAG IS NOT HONOURING IT, so the port runs the same shapes `install` just ran, when
+# this host has PowerShell (`pwsh` on PATH, or WF_PWSH naming one). Without it both are skipped,
+# never passed: the static check above is all such a host can say about install.ps1.
+import shutil as _shutil
+_pwsh = os.environ.get("WF_PWSH") or _shutil.which("pwsh")
+if _pwsh:
+    _ksp = _kept_slot_probe(_pwsh)
+    check(
+        "install: install.ps1 keeps, slots and refuses exactly as install does",
+        all(_ksp.get(k) is True for k in ("placed", "recorded", "not_claimed", "only_slot",
+                                          "kept_untouched", "seeds", "refreshed", "recorded_once",
+                                          "still_untouched", "own_slot_kept", "shell_stays_shell",
+                                          "symlink_not_followed")),
+        "install.ps1 must decide sibling ownership on the pre-run record, place only workforce's "
+        "own additions slot into a kept corpus-bearing skill, record exactly that path and refresh "
+        "it, and never write over the project's own slot, into a retired shell, or through a "
+        "link. Got: " + ", ".join(f"{k}={v}" for k, v in _ksp.items()),
+    )
+    check(
+        "install: install.ps1 installs every sibling, registers its agents and prunes by the record",
+        all(_ksp.get(k) is True for k in ("fresh_sibling", "agent_registered", "pruned_by_record")),
+        "a sibling the project does not own must land beside skills/workforce and be recorded, an "
+        "`agent` row must register `<dir>.md` in the agents directory, and the prune must remove an "
+        "unlisted skill file and a recorded external one while leaving an unrecorded file alone. "
+        "Got: " + ", ".join(f"{k}={v}" for k, v in _ksp.items()),
+    )
+else:
+    for _n in ("install: install.ps1 keeps, slots and refuses exactly as install does",
+               "install: install.ps1 installs every sibling, registers its agents and prunes by the record"):
+        skip(_n, "no PowerShell on this host; put `pwsh` on PATH or set WF_PWSH to run install.ps1")
 
 
 # SWEEP RESIDUE HAS A DETECTOR, AND THE STEP AFTER THE SWEEP RUNS IT (2026-09-14). `audit.md`
