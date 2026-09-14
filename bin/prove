@@ -260,6 +260,14 @@ CASES = [
      PS1, "del", "        'agent'        = 'agentreg'\n"),
     ("manifest: the header documents every flag the installers parse",
      MAN, "del", "#   exec-sibling  as `sibling`, plus chmod +x\n"),
+    # ARTIFACT PRODUCERS (2026-09-14). An authored reference naming an unmapped artifact must
+    # still fail by name once the change record is out of the scan...
+    ("artifacts: every artifact a shipped file reads has a named producer",
+     ORGP, "append", "\nRead `.claude/workforce/prove-unmapped.json` before dispatch.\n"),
+    # ...and the exclusion is load-bearing: workforce/changes/1.59.0.md quotes 3592d04 naming
+    # `.claude/workforce/commitments.json`, so scanning the archive again must turn it red.
+    ("artifacts: every artifact a shipped file reads has a named producer",
+     CHK, "del", " if _q not in ARCHIVE"),
     # THE PORT'S BEHAVIOUR. These run install.ps1 itself, so they need PowerShell (`pwsh` on PATH
     # or WF_PWSH); on a host without it they report N/A (see PWSH_CHECKS).
     # Never marking the skill kept overwrites the project's own SKILL.md.

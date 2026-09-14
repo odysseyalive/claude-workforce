@@ -9650,7 +9650,13 @@ PRODUCERS = {
 }
 
 _artifacts = set()
-for _p in _shipped_md:
+# The change record is excluded, by the ARCHIVE set and nowhere else (§ The change record
+# is HISTORY). A commit message quoted in it NAMES a path; it never reads one. Measured
+# 2026-09-14: 1.59.0.md quoted 3592d04's note about `.claude/workforce/commitments.json`
+# (org state a session wrote mid-run), and this scan counted the quote as a read. No
+# shipped reader of that file exists, so the failure asked for a PRODUCERS row that
+# answers a question nothing asked, and the only other remedy was to edit history.
+for _p in (_q for _q in _shipped_md if _q not in ARCHIVE):
     for _a in re.findall(r"\.claude/workforce/[A-Za-z0-9._/-]+", read(_p) or ""):
         _a = _a.rstrip(".,)`'\"")
         # directories and run-scoped paths have no single producer
