@@ -92,6 +92,9 @@ dossier** — it is a bar of unknown origin, which is the state this whole mecha
    **within the freshness window** (90 days) → reuse it as-is. Dependable, no network, no restat. This
    is the reuse that makes a non-deterministic source dependable: **cite, cache, restamp** — the same
    pattern the security catalog uses for its pinned upstream corpora (`evaluators.md` § Seeding).
+   **A re-audit does not override this rule.** § In audit's remediation and `procedures/audit.md`
+   § Step 5c force fresh research because the handbook's *bar* is what proved wrong. A `sourced: web`
+   dossier inside the window already *is* fresh research, so it satisfies that forcing and is reused.
 2. **Absent, `sourced: seed`, or past the freshness window → the research below is DUE**, and it is a
    blocking precondition of authoring the bar. A stale dossier is not silently reused, and a seed
    dossier is never treated as equivalent to researched standards.
@@ -195,7 +198,11 @@ one now, so there is no longer any reason to drop.
 
 Re-auditing an existing org **forces fresh research on each role's standard** rather than trusting the
 bar already in the handbook — the existing bars are exactly what proved wrong, so a present bar is never
-read as a satisfied one. The same discover-then-verify pass runs; the same UNAVAILABLE degradation
+read as a satisfied one. **What is never trusted is the handbook's bar, not the dossier.** "Fresh" means
+what § Cache and freshness says: a `sourced: web` dossier stamped inside the freshness window is fresh
+research and satisfies this step as it stands. A seed, stale, or absent dossier triggers new research. A
+re-audit with 8- and 18-day-old web dossiers therefore re-derives both bars from those dossiers and
+researches nothing. The same discover-then-verify pass runs; the same UNAVAILABLE degradation
 applies. `procedures/audit.md` § Step 5c drives it, and the twin use — deriving the expected roster from
 the project's domain (`org-design.md` § Where the greenfield org comes from, concretely) — is what makes
 the one mechanism reachable whether the trigger is a greenfield audit or a re-audit (`SKILL.md` Core

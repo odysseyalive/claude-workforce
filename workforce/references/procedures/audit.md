@@ -1022,7 +1022,10 @@ optional keep-or-resolve. Full mechanism: `references/recruiter.md`.
 **1. Refresh each existing employee's verification bar.** Per existing employee, **force fresh research**
 on its role's standard (`recruiter.md` § In audit's remediation) — do not trust the bar already in the
 handbook, because the existing bars are exactly what proved wrong, and a present-but-unresearched bar is
-never read as satisfied. Diff the handbook's `## Verification` against the dossier's `## Failure modes to
+never read as satisfied. **The forcing targets the bar, not the dossier.** A `sourced: web` dossier
+stamped inside the freshness window *is* fresh research and satisfies this step without a new pass. Only
+a seed, stale, or absent dossier triggers research (`recruiter.md` § Cache and freshness, rule 1, which
+says the same). Diff the handbook's `## Verification` against the dossier's `## Failure modes to
 gate against`. A gap is **DOCUMENT-attributed** (`SKILL.md` § Sacred-Directive Enforcement Gates,
 Failure-Attribution): the handbook did not name a failure mode the standard gates against, so the cure is
 to **amend the handbook in the same run and re-probe** it — not to flag it, not to defer it.
