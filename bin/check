@@ -3259,6 +3259,24 @@ check(
     "through into a tree the run never named. Got: "
     + ", ".join(f"{k}={v}" for k, v in _ks.items()),
 )
+
+
+# SWEEP RESIDUE HAS A DETECTOR, AND THE STEP AFTER THE SWEEP RUNS IT (2026-09-14). `audit.md`
+# § After the sweep required dangling references to be rewritten and nothing counted what
+# survived: a peer host carried seven live instructions naming a skill swept a month earlier,
+# across four audits that each read clean. The detector's behaviour is pinned by
+# `fixtures/scripts/remainder-swept-refs` and its rewritten twin; this pins the wiring, so the
+# count cannot quietly stop being taken on a re-audit.
+_sr_aud = read("workforce/references/procedures/audit.md")
+_sr_rem = read("workforce/bin/wf-remainder")
+check(
+    'sweep: § After the sweep runs the swept-reference detector, and wf-remainder carries it',
+    "wf-remainder --root ${CLAUDE_PROJECT_DIR} --swept-refs" in _sr_aud
+    and "def swept_refs" in _sr_rem and 'argv[1] == "--swept-refs"' in _sr_rem,
+    "§ After the sweep must run `wf-remainder --root ${CLAUDE_PROJECT_DIR} --swept-refs` on every "
+    "audit that reaches Step 6c, and wf-remainder must carry the mode. Without the wiring a "
+    "re-audit never heals residue an earlier sweep left, which is the state it was measured in.",
+)
 check(
     "records: a predecessor's knowledge base converts its ownership, not its record types",
     "converted, never re-typed" in ds

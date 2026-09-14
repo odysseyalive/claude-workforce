@@ -2173,6 +2173,28 @@ prevent — and removing the gateway while keeping the files is the quieter vers
   named a removed command gets that reference stripped. A gate telling a reader to invoke something
   deleted is worse than no gate.
 
+  **Count the survivors with the detector, on every audit that reaches Step 6c, including one that swept
+  nothing this run:**
+
+  ```
+  wf-remainder --root ${CLAUDE_PROJECT_DIR} --swept-refs
+  ```
+
+  The swept set comes from every COMMITTED `T8` sweep row in the conversion journal, not only this run's.
+  That is what lets a re-audit heal residue an earlier sweep left behind. The scan covers `.claude/`
+  skills, agents, hooks and scripts. It looks for the swept skill's command (`/<name>`) and for its
+  directory path (`.claude/skills/<name>/…`) where that path no longer exists. Each row names its
+  disposition. `LIVE` is rewritten by the table below. `USER-SPAN` is reported and never edited.
+  `SHIPPED` is the distribution's own file, which `update` would overwrite, so it is reported for the
+  maintainer and not edited here. Run it before the rewrite and again after. Its `swept refs` line is
+  the before-and-after count this section requires, and **the step is not finished while it exits 1**,
+  which it does on any `LIVE` row.
+
+  *Added 2026-09-14. A peer host swept `skill-builder` on 2026-08-10, and four audits later seven live
+  instructions still named it: two hook messages, three paths into its deleted `references/`, and a
+  `SKILL.md` naming one of its commands. This section already required the rewrite, but nothing counted
+  what survived, and `--dead-scripts` and `wf-conform` read clean on every run.*
+
   **A REDUCED skill points at its own moved sections, and this case is new.** Under the old rule the
   whole `SKILL.md` was deleted, so an intra-skill dangling reference could not exist; reduction creates
   it. Measured on a sandbox reduction of `invest`, 2026-08-01: the reduced skill kept

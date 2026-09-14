@@ -5,6 +5,7 @@
     wf-remainder --diff <before> <after>        exit 1 on ANY surface change
     wf-remainder --diff-manifest <a.txt> <b.txt>  same, for saved manifests
     wf-remainder --root <tree> --dead-scripts   script: tokens that do not resolve
+    wf-remainder --root <tree> --swept-refs     references that outlived a swept skill
     wf-remainder --apply <SKILL.md> --drop "<h>" [—] \
         --interface-invoke <s> --interface-returns <s> --interface-fails <s>
                                                 reduce, and declare the contract
@@ -91,13 +92,19 @@ def _load_census():
     SHIPPED bin/ directory, which `bin/check` correctly reports as an undeclared
     file the installers would never fetch.
     """
+    return _load_sibling("wf-census")
+
+
+def _load_sibling(name):
+    """Import a sibling shipped script by path, without leaving bytecode in `bin/`."""
     import importlib.machinery
     import importlib.util
     _prev = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
-    loader = importlib.machinery.SourceFileLoader("wf_census", path)
-    spec = importlib.util.spec_from_loader("wf_census", loader)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    mod_name = name.replace("-", "_")
+    loader = importlib.machinery.SourceFileLoader(mod_name, path)
+    spec = importlib.util.spec_from_loader(mod_name, loader)
     mod = importlib.util.module_from_spec(spec)
     try:
         loader.exec_module(mod)
@@ -447,6 +454,133 @@ def dead_scripts(root, include_maintainer=False):
     return out
 
 
+# ── SWEPT REFERENCES ─────────────────────────────────────────────────────────
+# A SWEPT SKILL'S NAME OUTLIVES IT, AND NOTHING COUNTED THE SURVIVORS. `audit.md` § After
+# the sweep has said since 2026-08-01 that dangling references are rewritten, and it was
+# prose performed by whoever remembered. MEASURED 2026-09-14 at a peer host on 1.58.0:
+# `skill-builder` was swept on 2026-08-10, and four audits later seven live instructions
+# still named it — two hook messages ("Run /skill-builder code-eval create", "use
+# /skill-builder inline"), three paths into its deleted `references/`, and a `SKILL.md`
+# naming `/skill-builder code-eval enforce`. `--dead-scripts` and `wf-conform` read clean on
+# every run, because neither asks: the first stats script paths, and a slash command is
+# not a script path. A DETECTOR SHIPS WITH ITS FIX (SKILL.md § Directives), and the fix is
+# the rewrite § After the sweep specifies, held to zero by this count on every audit.
+#
+# THE SWEPT SET IS READ FROM THE RECORD THE SWEEP WRITES, never inferred from what is
+# missing. A skill is swept when the conversion journal holds a COMMITTED `T8` sweep row for
+# it — `wf-conform.swept_undo_paths`, loaded rather than re-parsed, because three live
+# journals write three row shapes and that function is the reader tuned to all of them —
+# AND a COMMITTED row names its directory `.claude/skills/<name>`. The second clause drops
+# sweeps of things that were never skills (`verify-clause-current (script)`). A name whose
+# `SKILL.md` is back on disk, at project or personal scope, is not swept: its command resolves.
+#
+# THE SHIPPED TREE IS REPORTED, NEVER COUNTED. `skills/workforce/**` and every path in
+# `.installed-external` belong to the distribution, and `update` overwrites a local edit, so a
+# rewrite there is undone by the next install and would be re-reported forever. The shipped
+# workforce skill names `skill-builder` a dozen times as measured history and worked examples,
+# and the vendored `code-evaluator/references/version.md` names `/skill-builder code-eval
+# enforce` in a dated changelog entry. An `origin: user | immutable: true` span is reported
+# and never edited (§ After the sweep, "an immutable user span — nothing").
+SWEPT_DIRS = ("skills", "agents", "hooks", "scripts")
+SKILL_NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SWEPT_RULE = {
+    "LIVE": "rewrite by audit.md § After the sweep",
+    "USER-SPAN": "report only; the user's words are never edited",
+    "SHIPPED": "the distribution's file; update overwrites a local edit",
+}
+
+
+def _config_root():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def _text(path):
+    """A file's text, or "" when it is unreadable or not UTF-8 — a scan never dies on one file."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def swept_skills(root):
+    """Names of skills the conversion journal records as swept, that are still gone."""
+    body = _text(os.path.join(root, ".claude", "workforce", ".conversion-journal.md"))
+    if not body:
+        return []
+    committed = [l for l in body.splitlines() if "COMMITTED" in l]
+    out = []
+    for name in sorted(_load_sibling("wf-conform").swept_undo_paths(body)):
+        if not SKILL_NAME_RX.match(name):
+            continue
+        dir_rx = re.compile(r"\.claude/skills/" + re.escape(name) + r"(?![A-Za-z0-9._-])")
+        if not any(dir_rx.search(l) for l in committed):
+            continue
+        if any(os.path.isfile(os.path.join(base, "skills", name, "SKILL.md"))
+               for base in (os.path.join(root, ".claude"), _config_root())):
+            continue
+        out.append(name)
+    return out
+
+
+def _installer_paths(root):
+    """Every path a workforce install recorded writing, from both possible records."""
+    paths = set()
+    for base in (os.path.join(root, ".claude"), _config_root()):
+        rec = os.path.join(base, "skills", "workforce", ".installed-external")
+        paths.update(os.path.realpath(l.strip()) for l in _text(rec).splitlines() if l.strip())
+    return paths
+
+
+def swept_refs(root):
+    """(swept names, [(relpath, line, token, bucket)]) — surviving references to a swept skill.
+
+    `bucket` is LIVE, USER-SPAN or SHIPPED (see SWEPT_RULE). A path token that exists on disk
+    — under the project or under the home the personal config sits in — resolves and is not a
+    reference to anything removed: a data skill's directory outlives its `SKILL.md`.
+    """
+    names = swept_skills(root)
+    if not names:
+        return names, []
+    alt = "|".join(re.escape(n) for n in names)
+    ref_rx = re.compile(
+        r"\.claude/skills/(?:" + alt + r")(?![A-Za-z0-9._-])(?:/[A-Za-z0-9._@+-]+)*"
+        r"|(?<![A-Za-z0-9_./-])/(?:" + alt + r")(?![A-Za-z0-9_-])")
+    home = os.path.dirname(os.path.realpath(_config_root()))
+    shipped = _installer_paths(root)
+    census = _load_census().Census(root)
+    census.load_ignore()
+    rows = []
+    for sub in SWEPT_DIRS:
+        for dp, dn, fn in os.walk(os.path.join(root, ".claude", sub)):
+            dn.sort()
+            for f in sorted(fn):
+                path = os.path.join(dp, f)
+                if os.path.islink(path) or census.ignored(path):
+                    continue
+                text = _text(path)
+                if not text or "\0" in text:
+                    continue
+                rel = os.path.relpath(path, root)
+                parts = rel.split(os.sep)
+                is_shipped = (parts[1:3] == ["skills", "workforce"]
+                              or os.path.realpath(path) in shipped)
+                spans = [(m.start(), m.end()) for m in SACRED_RX.finditer(text)]
+                for m in ref_rx.finditer(text):
+                    tok = m.group(0)
+                    if tok.startswith(".claude/") and any(
+                            os.path.exists(os.path.join(b, tok)) for b in (root, home)):
+                        continue
+                    if is_shipped:
+                        bucket = "SHIPPED"
+                    elif any(a <= m.start() < b for a, b in spans):
+                        bucket = "USER-SPAN"
+                    else:
+                        bucket = "LIVE"
+                    rows.append((rel, text.count("\n", 0, m.start()) + 1, tok, bucket))
+    return names, rows
+
+
 def main(argv):
     argv = list(argv)
     root = ""
@@ -476,6 +610,19 @@ def main(argv):
         for s, t, _v in maint:
             print(f"  MAINTAINER {s}  ->  {t}   (bin/ does not ship; maintainer-facing)")
         return 0
+    if len(argv) >= 2 and argv[1] == "--swept-refs":
+        names, rows = swept_refs(root or ".")
+        n = {b: sum(1 for r in rows if r[3] == b) for b in SWEPT_RULE}
+        # Counted line ALWAYS, zeroes included, and the swept set named: a detector that
+        # prints nothing on a clean tree is indistinguishable from one that read no journal.
+        print(f"swept refs     {n['LIVE']} live · {n['USER-SPAN']} in user spans · "
+              f"{n['SHIPPED']} shipped · {len(names)} swept skill(s)"
+              + (": " + ", ".join(names) if names else ""))
+        for rel, line, tok, bucket in rows:
+            print(f"  {bucket:<10} {rel}:{line}  ->  {tok}   ({SWEPT_RULE[bucket]})")
+        # EXIT 1 ON A LIVE ROW. The count is a gate, not a report: § After the sweep is not
+        # finished while one survives, and a caller branches on this rather than on prose.
+        return 1 if n["LIVE"] else 0
     if len(argv) >= 3 and argv[1] == "--manifest":
         for t in manifest(read(rel(argv[2]))):
             print(t)
@@ -657,7 +804,7 @@ def main(argv):
         return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
     print("usage: wf-remainder --manifest <file> | --diff <before> <after> | "
-          "--diff-manifest <a> <b> | --root <tree> --dead-scripts | "
+          "--diff-manifest <a> <b> | --root <tree> --dead-scripts | --root <tree> --swept-refs | "
           "--apply <SKILL.md> --drop <h> --interface-invoke/-returns/-fails <s> | "
           "--interface-only <SKILL.md> --interface-invoke/-returns/-fails <s>",
           file=sys.stderr)
