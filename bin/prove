@@ -268,6 +268,12 @@ CASES = [
     # `.claude/workforce/commitments.json`, so scanning the archive again must turn it red.
     ("artifacts: every artifact a shipped file reads has a named producer",
      CHK, "del", " if _q not in ARCHIVE"),
+    # A STALE PRODUCER ROW (2026-09-14). Joining two PRODUCERS rows re-points
+    # `.conversion-journal.md` at checksums.md, which never names it, so that row must be
+    # named in the failure. The joined-away `.directives.sha` row also trips the unmapped
+    # check above; this case asserts only its own name.
+    ("artifacts: every PRODUCERS row names a file that still names its artifact",
+     CHK, "del", 'hire.md",\n    ".claude/workforce/.directives.sha": "workforce/references/procedures/'),
     # THE PORT'S BEHAVIOUR. These run install.ps1 itself, so they need PowerShell (`pwsh` on PATH
     # or WF_PWSH); on a host without it they report N/A (see PWSH_CHECKS).
     # Never marking the skill kept overwrites the project's own SKILL.md.

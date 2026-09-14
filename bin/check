@@ -9643,10 +9643,13 @@ PRODUCERS = {
     ".claude/workforce/.current-run": "workforce/references/procedures/audit.md",
     ".claude/workforce/census.json": "workforce/references/procedures/audit.md",
     ".claude/workforce/.agents-symlink-manifest.txt": "workforce/references/procedures/audit.md",
-    ".claude/workforce/.spawn-count": "workforce/references/procedure-for-procedures.md",
     ".claude/workforce/pass-baseline.md": "workforce/references/procedures/audit.md",
-    ".claude/workforce/loop-guard.json": "workforce/references/procedures/hooks.md",
-    ".claude/workforce/.handoff-wired.json": "workforce/references/handoff.md",
+    # REMOVED 2026-09-14, the first run of the stale-row check below: `.spawn-count`,
+    # `loop-guard.json` and `.handoff-wired.json`. No shipped file read or wrote any of
+    # them. wf-loop-guard and wf-handoff went in the simplification release (audit.md
+    # § the removed handoff-clause step says so), `references/handoff.md` went with the
+    # latter, and nothing names `.spawn-count` at all. Each row asserted a producer for
+    # an artifact that no longer exists.
 }
 
 _artifacts = set()
@@ -9673,8 +9676,25 @@ check("artifacts: every artifact a shipped file reads has a named producer",
       "that consumes it, which is how .directives.sha and platform-local.md each shipped with "
       "a reader and no writer. Add it to PRODUCERS with the file that creates it.")
 
-_stale = sorted(a for a, prod in PRODUCERS.items()
-                if a in _artifacts and os.path.basename(a) not in (read(prod) or ""))
+# THE MAPPING ITSELF GOES STALE, AND THIS WAS A DETECTOR WITH NO OUTPUT. Until 2026-09-14
+# `_stale` was computed here and no check() read it, so a row whose producer had stopped
+# writing its artifact passed forever. The user's directive, recorded in DOCTRINE.md, is
+# that a detector ships with its fix.
+# Two narrowings rode along and are both gone:
+#   - `a in _artifacts` skipped every row whose artifact no reference still reads by full
+#     path, which is exactly where the three removed rows above were hiding.
+#   - the BASENAME match let `personnel/index.md` pass on any mention of `index.md`. The
+#     path under `.claude/workforce/` is what a producer names when it writes the file.
+# A producer file that no longer exists reads as "" and fails here too, named as such.
+_stale = sorted(
+    f"{a} <- {prod}" + ("" if os.path.isfile(prod) else " (producer file does not exist)")
+    for a, prod in PRODUCERS.items()
+    if a.removeprefix(".claude/workforce/") not in (read(prod) or ""))
+check("artifacts: every PRODUCERS row names a file that still names its artifact",
+      not _stale,
+      f"stale producer rows: {_stale} — a row whose producer never names the artifact "
+      "asserts a writer nothing performs. Repoint each to the file that writes it, or "
+      "delete the row if no shipped file reads or writes that artifact anymore.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # The CLAUDE.md machinery has to travel to the NEXT project
