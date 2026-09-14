@@ -10,7 +10,8 @@ an anecdote, not a test, and `bin/baseline`'s own docstring says why:
 
 Each fixture is a tree under `fixtures/scripts/<case>/` plus a row in
 `expectations.json` naming the script, the required exit code, substrings that MUST
-appear, and substrings that must NOT. A stdin-driven script (the hook) takes
+appear (`want`), and substrings that must NOT (`not`, `must_not` or `reject` — three
+spellings of one assertion, all read). A stdin-driven script (the hook) takes
 `stdin_file` (a path inside the fixture, wrapped as a PostToolUse payload) or
 `stdin_raw`. A script that reads the process environment takes `env`: a map of
 variable name to value, where `null` UNSETS the variable in the child.
@@ -36,6 +37,28 @@ FIX = os.path.join(ROOT, "fixtures", "scripts")
 BIN = os.path.join(ROOT, "workforce", "bin")
 
 
+# THREE SPELLINGS OF ONE ASSERTION, AND TWO OF THEM WERE READ BY NOTHING. The loop
+# below took `spec["not"]` and only that, so the 6 rows written as `must_not` and the
+# 3 written as `reject` carried 9 negative assertions that never ran — three of them
+# in rows this harness was already reporting FAIL, where a half-evaluated row looks
+# exactly like a fully evaluated one. All three spellings are now honoured, and the
+# allow-lists below are the part that keeps this fixed: a row or an `after` block
+# carrying any key nothing here reads FAILS THAT ROW by name. A fourth spelling can
+# be invented, but it can no longer be ignored. Measured 2026-09-13.
+NEGATIVE_KEYS = ("not", "must_not", "reject")
+ROW_KEYS = {"script", "exit", "args", "env", "want", "after",
+            "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
+AFTER_KEYS = {"want", *NEGATIVE_KEYS}
+
+
+def _unknown_keys(spec, allowed, where):
+    """Keys nothing in this file reads — reported per row, never silently dropped."""
+    if not isinstance(spec, dict):
+        return [f"{where}: expected a map, got {type(spec).__name__}"]
+    return [f"{where}: unrecognized key {k!r} — no assertion reads it"
+            for k in sorted(spec) if k not in allowed]
+
+
 def _sub_version(arg):
     """Replace `${VERSION}` with the release version.md declares, or leave it alone."""
     if "${VERSION}" not in str(arg):
@@ -47,6 +70,18 @@ def _sub_version(arg):
         return arg
     _m = _re.search(r"^WORKFORCE-VERSION:\s*(\S+)", _t, _re.M)
     return arg.replace("${VERSION}", _m.group(1)) if _m else arg
+
+
+def _sub_tree(arg, tree):
+    """Replace `${TREE}` with the copied fixture tree's absolute path.
+
+    THE TREE IS COPIED TO A TEMP DIRECTORY, so a case that needs a variable to POINT AT
+    the tree cannot spell that path in advance. `HOME=${TREE}` is the one that matters:
+    a defect class in this project is a project whose root IS `$HOME`, where
+    `config_root()` and `<root>/.claude` are the same directory under two names, and no
+    fixture could reach that state while every env value had to be a literal.
+    """
+    return str(arg).replace("${TREE}", tree)
 
 
 def run_case(name, spec):
@@ -102,7 +137,7 @@ def _run_in(tree, script, spec):
         if _v is None:
             env.pop(_k, None)
         else:
-            env[_k] = str(_v)
+            env[_k] = _sub_tree(_v, tree)
 
     if "stdin_file" in spec or "stdin_raw" in spec:
         payload = spec.get("stdin_raw")
@@ -118,14 +153,14 @@ def _run_in(tree, script, spec):
         # one afternoon broke it, and the fix-the-number repair would break again on the
         # eighth. Constants are stated once (SKILL.md Principle 9a); this is that rule
         # reaching the fixture args.
-        _args = [_sub_version(a) for a in spec.get("args", [])]
+        _args = [_sub_tree(_sub_version(a), tree) for a in spec.get("args", [])]
         p = subprocess.run([sys.executable, script, "--root", tree] + _args,
                            text=True, capture_output=True, env=env)
 
     shutil.rmtree(_home, ignore_errors=True)
 
     out = p.stdout + p.stderr
-    problems = []
+    problems = _unknown_keys(spec, ROW_KEYS, "row")
     # A ROW MISSING A REQUIRED KEY FAILS THAT ROW; it never takes the run down. A bare
     # spec["exit"] raised KeyError out of the loop, so one malformed row made every other
     # case unrunnable -- the same defect bin/check fixed for its expectations parse.
@@ -136,9 +171,10 @@ def _run_in(tree, script, spec):
     for s in spec.get("want", []):
         if s not in out:
             problems.append(f"missing {s!r}")
-    for s in spec.get("not", []):
-        if s in out:
-            problems.append(f"present but forbidden: {s!r}")
+    for _key in NEGATIVE_KEYS:
+        for s in spec.get(_key, []):
+            if s in out:
+                problems.append(f"present but forbidden: {s!r}")
 
     # WHAT IT WROTE, not only what it said. The docstring above argues that "a script
     # that exits correctly while reporting the wrong thing is the failure this project
@@ -155,6 +191,9 @@ def _run_in(tree, script, spec):
     # stdout. An unreadable path is a FAILURE, never a skip — a missing file and a file
     # whose contents are wrong must not report the same.
     for rel, expect in spec.get("after", {}).items():
+        problems += _unknown_keys(expect, AFTER_KEYS, f"after {rel}")
+        if not isinstance(expect, dict):
+            continue
         try:
             body = open(os.path.join(tree, rel), encoding="utf-8").read()
         except OSError as exc:
@@ -163,9 +202,10 @@ def _run_in(tree, script, spec):
         for s in expect.get("want", []):
             if s not in body:
                 problems.append(f"after {rel}: missing {s!r}")
-        for s in expect.get("not", []):
-            if s in body:
-                problems.append(f"after {rel}: present but forbidden: {s!r}")
+        for _key in NEGATIVE_KEYS:
+            for s in expect.get(_key, []):
+                if s in body:
+                    problems.append(f"after {rel}: present but forbidden: {s!r}")
     return (not problems), "; ".join(problems) or "ok"
 
 

@@ -33,9 +33,16 @@ against 13 shipped. That is not staleness, it is five project-specific principle
 project added, and a force-refresh that "won" would delete them. The three-state rule is
 why this script reports rather than writes there.
 
-EXIT CODE. 0 when every Core skill is either current or names its precondition; 1 when a
-refresh was owed, attempted and failed. An UNMANAGED skill is not a failure — it is a
-reported state with a named reason, and `INV-CORE` prints it either way.
+EXIT CODE. 0 when every Core skill is either present-and-current or present-and-naming
+its precondition. 1 when a refresh or a materialization was owed, attempted and failed —
+and 1 in REPORT mode for a Core companion that is simply ABSENT, because the companion is
+owed and not there — `invariants.md` row 23 requires that "every core companion skill
+exists after the run, or names the rule that refused it", and an absence with a producer
+standing ready names no rule.
+That second case is the 2026-09-11 measurement this release closed: an absence printed at
+exit 0 let `/org` go missing through a two-hour audit with nothing in the run's exit codes
+to say so. An UNMANAGED or NO-REGION skill is NOT a failure — it is a reported state with
+a named reason, it exits 0, and `INV-CORE` prints it either way.
 """
 import argparse
 import os
@@ -476,8 +483,6 @@ def main():
                     fh.write(new_body)
                 # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
                 # its own output has not finished (`checksums.md` rule 2).
-                # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot
-                # verify its own output has not finished (`checksums.md` rule 2).
                 #
                 # A MATERIALIZED companion with no machine-owned region reads back
                 # UNMANAGED, not CURRENT, and that is correct rather than a failure:
@@ -533,8 +538,11 @@ def main():
               "refreshed by --execute either: it names the precondition instead, because "
               "a customized Core skill is never overwritten.")
     # AN ABSENT CORE COMPANION IS A NON-ZERO EXIT IN BOTH MODES, and that is the whole
-    # point of this release. `invariants.md` row 23: "Absence of any is a FAIL, not a
-    # report." This script printed an absence and returned 0 for it, so `/org` could go
+    # point of this release. `invariants.md` row 23 requires that every core companion
+    # "exists after the run, or names the rule that refused it" — quoted from the row,
+    # which does NOT contain the "Absence of any is a FAIL, not a report" sentence this
+    # comment attributed to it until 2026-09-13.
+    # This script printed an absence and returned 0 for it, so `/org` could go
     # missing through a two-hour audit on a fresh project with nothing in the run's own
     # exit codes to say so (MEASURED 2026-09-11, a remote host). Report mode exits 1
     # because the companion is OWED and not there; `--execute` exits 1 only if creating

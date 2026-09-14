@@ -332,18 +332,66 @@ HANDOFF = re.compile(
 # paragraphs later is not this defect; the last words are where the stop happens.
 TAIL = 400
 
+# ── A TURN WAITING ON BACKGROUND WORK HAS NOT CONCLUDED ──────────────────────────
+# `background_tasks` settles the case while a task is RUNNING, and it was read in one
+# place only: `unfinished`. REPORTED 2026-09-13 by the session driving four background
+# agent batches: between one batch finishing and the next being dispatched the array is
+# momentarily EMPTY, the main turn says out loud that it is holding for the next batch,
+# and the Stop that lands in that gap is judged as though the work had ended. It had
+# not — the turn's next action is triggered by a completion it has not received.
+#
+# TWO FACTS, NOT ONE PHRASE. The gap is recognised only when BOTH hold: a task
+# notification opened this turn (so a batch really did just finish — `wf-task-tag`
+# records the prompt, and `NOTIFICATION` is its own definition of that shape), and the
+# reply says it is waiting. Either alone is far too wide: notifications open a large
+# share of turns in an agent-driven run, and "waiting on" appears in plenty of replies
+# that then genuinely stop mid-work.
+WAITING = re.compile(
+    r"\b(?:holding|hold)\b[^.\n]{0,40}\b(?:for|until|on)\b"
+    r"|\bwaiting (?:on|for)\b"
+    r"|\bblocked on\b[^.\n]{0,60}"
+    r"\b(?:agents?|batch|background|tasks?|run|runs|gate|gates)\b"
+    r"|\bstill (?:running|in flight|working)\b"
+    r"|\b(?:let|letting) (?:it|them|those|the \w+) finish\b"
+    r"|\bcontinuing to wait\b", re.I)
+
+
+def just_finished(payload):
+    """True when a background task's completion notification OPENED this turn.
+
+    The tag `wf-task-tag` wrote carries the message that started the turn, so this reads
+    the same text the classifier read rather than re-deriving it from the transcript.
+    """
+    return bool(TT.NOTIFICATION.match((task_tag(payload) or {}).get("prompt") or ""))
+
+
+def waiting_on_background(payload, reply):
+    """Why this Stop is a WAIT rather than the end of the work, or None.
+
+    THE WHOLE REPLY, not the tail, and that is safe only because of the precondition
+    above: the sentence that says what the turn is waiting on is usually the first one
+    ("I'm blocked on four background agents"), with the tail two paragraphs later.
+    """
+    if payload.get("background_tasks"):
+        return "a background task is still running"
+    if just_finished(payload) and WAITING.search(reply or ""):
+        return "a background batch finished and the turn says it is waiting on the next"
+    return None
+
 
 def unfinished(reply, payload):
     """True when the turn announced it was continuing and then ended anyway.
 
     Returns the promise it made, so the block can quote the turn its own words back.
-    Silent when the turn asked the user something, and silent when a background task
-    is still running — that was the one false positive in the measurement above
-    ("nothing to do but let it finish"), and the payload carries the array that
-    settles it rather than a guess.
+    Silent when the turn asked the user something.
+
+    THE WAIT IS NOT CHECKED HERE ANY MORE, and the copy that used to be here is gone
+    rather than kept as a second layer. `widen` gates the whole decision on
+    `waiting_on_background` before this is called — a turn holding for a batch is not
+    judged at all — so a second call could never return anything but None, and an
+    unreachable guard is a guard nothing can prove. It also cost a re-read of the tag
+    file on every Stop.
     """
-    if payload.get("background_tasks"):
-        return None
     tail = (reply or "")[-TAIL:]
     if HANDOFF.search(tail) or CONDITIONAL.search(tail):
         return None
@@ -526,7 +574,27 @@ def widen(payload):
     # only knob left is WF_AUDIT_SAMPLE, which sets how often a PASSING turn is audited.
     cwd = payload.get("cwd") or os.getcwd()
 
-    counts = TL.turn_counts(payload)
+    # A SUBAGENT'S STOP IS ITS OWN TURN, AND NOTHING OF THE MAIN TURN'S BELONGS IN IT.
+    # MEASURED 2026-09-13, twice in one run, and reproduced from a payload: on
+    # `SubagentStop` this hook built a case out of three different turns. `transcript_path`
+    # is the PARENT's, so the evidence was the main turn's tool calls; the tag is the
+    # SESSION's, so the ask was the user's message; and the reply was the spawned agent's
+    # own last line. The flag it wrote carried "Locating Directives block markers in
+    # SKILL.md" as the `conclusion` beside a `<task-notification>` as the `ask`, and
+    # `wf-widen-agent` — registered on `Stop` and on nothing else, so a flag raised here can
+    # only ever be read by the MAIN turn — blocked the main Stop on a fragment the user had
+    # never seen. The juror said so: "The conclusion is unrelated to the actual verification
+    # task."
+    #
+    # So a subagent is judged on ITS OWN turn or not at all: the evidence is walked from the
+    # transcript the reply came from, the session's tag is not its ask, and it never raises
+    # the flag, because there is no reader for one but the turn that did not do the work.
+    subagent = payload.get("hook_event_name") == "SubagentStop"
+    # THE EVIDENCE AND THE CONCLUSION COME FROM ONE FILE. `reply_transcript` is the ledger's
+    # own rule for where this stop's reply lives — the agent's transcript on `SubagentStop`,
+    # the session's otherwise — and pointing the walk at it makes the pair inseparable: no
+    # transcript, no counts, nothing judged.
+    counts = TL.turn_counts(dict(payload, transcript_path=TL.reply_transcript(payload)))
     if counts is None:
         return None
     reply = counts[-1]
@@ -548,6 +616,16 @@ def widen(payload):
             except OSError:
                 pass
         return {"systemMessage": note}
+
+    # THE WAIT IS GATED ONCE, FOR THE WHOLE DECISION. The exemption used to live inside
+    # `unfinished` alone, so a turn holding for a background batch was spared the promise
+    # block and still sent to the jury — which found every channel shut, because a turn
+    # that is waiting has run nothing, and blocked it into another turn to do work it was
+    # already waiting on. Nothing below this line runs: no promise check, no claim scan, no
+    # tag sense, no sample, and no flag, so the agent hook spends nothing on it either.
+    waiting = waiting_on_background(payload, reply)
+    if waiting:
+        return {"systemMessage": f"WIDEN  not judged — {waiting}"}
 
     # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
     # applicable to this turn, and a turn that trips neither is scored against nothing
@@ -591,7 +669,10 @@ def widen(payload):
     # THE TAG IS ADDITIVE, never a replacement. A turn can trip a claim trigger AND
     # answer a tagged ask, and both senses are then required — taking one would drop
     # the other silently, which is the narrowing every mechanism here is built against.
-    for h in ((task_tag(payload) or {}).get("hits") or []):
+    # THE TAG IS THE SESSION'S ASK, so it is the main turn's and a subagent never inherits
+    # it: the spawned agent was given a different job by a different message, and scoring
+    # its reply against the user's tagged ask is the cross-turn case above in miniature.
+    for h in ([] if subagent else (task_tag(payload) or {}).get("hits") or []):
         applicable.add(h["sense"])
         why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
 
@@ -638,7 +719,9 @@ def widen(payload):
         # reading, whatever pattern the prompt did or did not trip. Sampled four times as
         # often, so the attention lands where a wrong reading has already been acted on.
         rate = max(1, blind // 4) if counts[5] else blind
-        picked = (blind > 0 and ask and reply
+        # NEVER ON A SUBAGENT. The blind sample exists to raise a flag, and a flag raised
+        # here is read by the main turn's agent hook against the main turn's ask.
+        picked = (not subagent and blind > 0 and ask and reply
                   and hashlib.sha256((reply or "").encode("utf-8")).digest()[1] % rate == 0)
         if not picked:
             # THE MESSAGE IS UNCHANGED for the unsampled case, and two fixtures assert it.
@@ -673,7 +756,7 @@ def widen(payload):
     except ValueError:
         rate = 5
     sampled = False
-    if rate > 0 and not unopened:
+    if rate > 0 and not unopened and not subagent:
         # Deterministic per turn, never random: the same reply always gets the same
         # verdict, so a run is reproducible and a fixture can pin it.
         sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
@@ -692,8 +775,14 @@ def widen(payload):
     if not applicable:
         return {"systemMessage":
                           "WIDEN  no docket — nothing this ask requires to be checked"}
-    raise_flag(payload, why_rows, rows, counts, unopened, applicable,
-               sampled=sampled, reply=reply)
+    # THE BLOCK IS THE SUBAGENT'S; THE FLAG IS NOT. Its `decision` returns to the agent that
+    # just stopped, which is what "the same widen on a spawned employee" means, and it is
+    # built from that agent's own claims and its own evidence. The hand-off is skipped
+    # because `wf-widen-agent` runs on `Stop` only: the flag would be opened by the main
+    # turn, whose ask and whose evidence it does not describe.
+    if not subagent:
+        raise_flag(payload, why_rows, rows, counts, unopened, applicable,
+                   sampled=sampled, reply=reply)
 
     if sampled:
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so

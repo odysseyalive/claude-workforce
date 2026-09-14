@@ -197,6 +197,34 @@ HARNESS_COMMANDS = {
     "logout", "memory", "status", "vim", "agents", "hooks", "mcp", "resume", "review",
     "workforce", "org", "loop", "schedule", "run", "simplify", "security-review",
 }
+# FILESYSTEM ROOTS, which the command grammar cannot tell from a slash-command. A shell
+# example whose LAST argument is a bare absolute path — `php tests/reconcile.php … /tmp`
+# — ends with no trailing `/`, so the path-fragment filter below (which skips a token
+# with a `/` on BOTH sides) never sees it, and `/tmp` was advised as a missing skill.
+# MEASURED 2026-09-13 on a real IC handbook.
+FS_ROOTS = {
+    "tmp", "var", "etc", "usr", "home", "opt", "dev", "proc", "sys", "mnt", "srv",
+    "bin", "lib", "sbin", "boot", "media", "root",
+}
+# TWO CONDITIONS, NEVER THE ROOT NAME ALONE. Membership in FS_ROOTS is not sufficient:
+# on its own it would blind an ADVISORY whose whole job is naming a skill that does not
+# resolve, and a project is free to ship `/dev`. The token must ALSO sit in a shell
+# example rather than a routing position — a sibling argument carrying a `/`, a `.ext`
+# or a `--flag`. `Invoke /dev` keeps being advised; `php tests/x.php --out /tmp` does not.
+SHELL_ARG_RX = re.compile(r"(?:^|\s)(?:--?[A-Za-z][\w-]*|\S*[\w.]/\S+|\S+\.[A-Za-z]{1,5})(?:\s|$)")
+
+
+def _is_path_argument(tok, text):
+    """True when `/tok` reads as an absolute path in a shell example, not a command."""
+    if tok not in FS_ROOTS:
+        return False
+    bare = re.compile(r"(?<![\w/])/" + re.escape(tok) + r"(?![\w-])")
+    for line in text.splitlines():
+        if not bare.search(line):
+            continue
+        if SHELL_ARG_RX.search(bare.sub(" ", line)):
+            return True
+    return False
 
 # CANONICAL SIDECAR GRAMMAR — identical to wf-protect-directives. Two readers of one
 # artifact must share one grammar and one normalization, or they cannot both be right.
@@ -913,8 +941,12 @@ def check_handbook(path, body, res, ceiling):
                 #                           `<run-id>/business-correspondent/OUTPUT.md`
                 #                           both matched the command grammar. A trailing
                 #                           hyphen or a following `/` means it is a path.
+                #   a PATH ARGUMENT       — a bare `/tmp` at the end of a shell example
+                #                           has no following `/` and escaped the line
+                #                           above until 2026-09-13. `_is_path_argument`.
                 if (sk.endswith("-") or sk in HARNESS_COMMANDS
                         or re.search(r"/" + re.escape(sk) + r"/", _acts)
+                        or _is_path_argument(sk, _acts)
                         or os.path.isfile(os.path.expanduser(
                             os.path.join("~", ".claude", "skills", sk, "SKILL.md")))):
                     continue
@@ -1057,6 +1089,120 @@ def check_defects(root, res):
                 "a record nothing points at is one the next reader never finds")
 
 
+# A path a journal row RECORDS, in the repo-relative form every journal writes it:
+# optionally backticked, optionally `./`-prefixed, always under `.claude/`. An absolute
+# host path is deliberately unmatched — a row naming one is naming a tree outside the
+# root this run was asked about, and resolving it would check somebody else's disk.
+JOURNAL_PATH_RX = re.compile(r"(?:\./)?\.claude/[A-Za-z0-9._/@+-]+")
+# A T8 row that reports the DELETION, not merely the commit. `hire.md` § The order ends
+# EVERY transaction at `T8 journal COMMITTED`, and § On a HIRE keeps that row for a hire
+# that retired nothing (`T8 follows T6 directly`), so the row alone cannot mean "swept".
+# The verb is what
+# separates the sweep from the commit, and all three shapes measured on live journals
+# carry one: `SWEPT — directory removed`, `swept at Step 6c`, `sweep (Step 6c): 176
+# unlinked`.
+SWEEP_VERB_RX = re.compile(r"\bswept\b|\bsweep\b|\bunlinked\b|directory removed", re.I)
+
+
+def swept_undo_paths(body):
+    """`name` -> the paths its COMMITTED T8 sweep row records, for every swept target.
+
+    THE UNDO IS RELOCATED BY THE ACT THE ROW RECORDS. Before the sweep the staged tree
+    sits at `.claude/workforce/staging/<name>/tree`; the sweep moves it under the run it
+    belongs to and the T8 row writes down where, e.g. *"SWEPT — directory removed; undo
+    at .claude/workforce/work/<run-id>/staging/<name>/tree (73 files)"*.
+
+    Measured on a live host: a correctly swept `skill-builder` — undo present at the
+    recorded path, absent under `staging/` — failed the whole-directory row below on
+    every verify after the sweep, with no edit that could ever clear it. The sweep was
+    behaving; the reader was looking at one hard-coded path and calling the other
+    absent. `check_journal` already trusts the path a row records, and this is the same
+    principle applied one row later.
+
+    ROW SHAPE IS NOT ASSUMED, because three live journals write three of them (7 cells
+    with a `seq` first, 5 with a `run-id` first, 4 with the name first). The step cell
+    is found by value and the name is the cell in FRONT of it, which holds in all three.
+    `(hire)` and other parenthesized pseudo-names are dropped: a hire retires nothing.
+    """
+    out = {}
+    for line in body.splitlines():
+        if "T8" not in line or "COMMITTED" not in line:
+            continue
+        cells = [c.strip().strip("*").strip("`").strip()
+                 for c in line.strip().strip("|").split("|")]
+        # An exact CELL, never a prose mention of T8 in a note about the journal.
+        if "T8" not in cells or cells.index("T8") == 0:
+            continue
+        if not SWEEP_VERB_RX.search(line):
+            continue
+        name = cells[cells.index("T8") - 1]
+        if not name or name.startswith("("):
+            continue
+        out.setdefault(name, []).extend(JOURNAL_PATH_RX.findall(line))
+    return out
+
+
+def undo_tree(root, staging, name, recorded):
+    """(the staged undo tree on disk or None, every path looked at for it).
+
+    `recorded` is None for a target this journal has not swept — then the mid-run
+    staging path is the only legal home and the search is exactly what it always was.
+    A swept target is looked for in the order that trusts the record first:
+
+      1  the path its T8 row wrote down (truncated to the `tree/` component, so a row
+         naming a file inside the tree still resolves the tree)
+      2  `work/<run-id>/staging/<name>/tree` under the run `.current-run` names
+      3  the same path under every other run directory, newest name last
+      4  `staging/<name>/tree`, the mid-run home it was moved out of
+
+    EXISTENCE IS STILL PROVEN, never assumed from the row. A T8 row is not permitted to
+    stand in for the artifact: a recorded undo that is not on disk fails exactly as an
+    unstaged one does, because the sweep's only whole-directory reversal is the bytes.
+    """
+    tried = []
+
+    def _cand(p):
+        p = os.path.normpath(p)
+        # A recorded path NAMES a location inside this tree; it never escapes it.
+        # `..` in a row is a row to distrust, not a directory to go read.
+        if p != root and not p.startswith(root + os.sep):
+            return
+        if p not in tried:
+            tried.append(p)
+
+    for rec in (recorded or []):
+        rel = os.path.normpath(rec)
+        # AN UNDO LIVES UNDER `.claude/workforce/`, AND A ROW NAMES OTHER PATHS TOO.
+        # Every sweep row also carries the target itself (`.claude/skills/<name>`), and
+        # a `tree/` subdirectory inside a live skill would then answer the undo question
+        # with the very directory the sweep is about to delete.
+        if not rel.startswith(os.path.join(".claude", "workforce") + os.sep):
+            continue
+        parts = rel.split(os.sep)
+        if "tree" in parts:
+            _cand(os.path.join(root, *parts[:parts.index("tree") + 1]))
+        elif parts[-1] == name:
+            _cand(os.path.join(root, rel, "tree"))
+    if recorded is not None:
+        work = os.path.join(root, ".claude", "workforce", "work")
+        cur = os.path.join(root, ".claude", "workforce", ".current-run")
+        try:
+            run = (open(cur, encoding="utf-8", errors="replace").read().strip()
+                   .splitlines() or [""])[0].strip()
+        except OSError:
+            run = ""      # unreadable is not a finding here; the enumeration below covers it
+        if run and "/" not in run and run not in (".", ".."):
+            _cand(os.path.join(work, run, "staging", name, "tree"))
+        if os.path.isdir(work):
+            for run in sorted(os.listdir(work)):
+                _cand(os.path.join(work, run, "staging", name, "tree"))
+    _cand(os.path.join(staging, name, "tree"))
+    for p in tried:
+        if os.path.isdir(p):
+            return p, tried
+    return None, tried
+
+
 def check_removal_set(root, body, staging, res):
     """The removal set has exactly one producer, and every decided removal reaches it.
 
@@ -1091,6 +1237,9 @@ def check_removal_set(root, body, staging, res):
       NO-UNDO    `T7c` row, no `T7` or `T7s` row           -> marked with no undo behind it
       NO-TREE    `T7s` row, no staged `tree/`              -> the surgical undo covers
                                                               SKILL.md and nothing else
+
+    NO-TREE is answered against the path the journal RECORDS once the target has been
+    swept — see `undo_tree`, which reads the relocation the sweep performs.
     """
     marked, staged, undone, declined = set(), set(), set(), set()
     for line in body.splitlines():
@@ -1130,10 +1279,17 @@ def check_removal_set(root, body, staging, res):
                 "target stages too: T7s never appears without its T7c — either the mark "
                 "is missing, or a rule declined the removal and the run owes that rule "
                 "by name.")
+    swept = swept_undo_paths(body)
     for name in sorted(staged):
-        tree = os.path.join(staging, name, "tree")
-        res.add(os.path.isdir(tree), f"removal set: {name} staged its whole directory",
-                f"{tree} is absent. A T7s target is unlinked ENTIRELY — references/, "
+        tree, tried = undo_tree(root, staging, name, swept.get(name))
+        shown = ", ".join(os.path.relpath(t, root) for t in tried[:4])
+        if len(tried) > 4:
+            shown += f" (+{len(tried) - 4} more)"
+        res.add(bool(tree), f"removal set: {name} staged its whole directory",
+                (f"its COMMITTED T8 row records the sweep, and the undo it names is at "
+                 f"none of: {shown}. "
+                 if name in swept else f"absent at {shown}. ")
+                + "A T7s target is unlinked ENTIRELY — references/, "
                 "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
                 "an undo for the least of what the sweep removes.")
 
@@ -1900,17 +2056,27 @@ PROBE_SPAN_RX = re.compile(r"(\d+)\s*(?:[-–]\s*(\d+))?")
 PROBE_EXEMPT_RX = re.compile(r"^(Procedure|Verification|Probe)\b")
 
 
-def _unfenced_headings(body):
-    """Every `## ` heading, skipping fenced blocks — a heading in an example is not a
-    section, and a handbook that quotes the template would otherwise be measured against
-    its own illustration."""
-    out, fenced = [], False
-    for line in body.splitlines():
+def _unfenced_lines(text):
+    """Lines outside fenced code blocks.
+
+    A FENCE IS QUOTED MATERIAL, never something the handbook says in its own voice: a
+    heading in an example is not a section, and a worked example showing a forbidden
+    command is documentation of the ban. Every reader here shares this one rule.
+    """
+    fenced = False
+    for line in (text or "").splitlines():
         if line.lstrip().startswith("```"):
             fenced = not fenced
             continue
-        if fenced:
-            continue
+        if not fenced:
+            yield line
+
+
+def _unfenced_headings(body):
+    """Every `## ` heading outside a fence — a handbook that quotes the template would
+    otherwise be measured against its own illustration."""
+    out = []
+    for line in _unfenced_lines(body):
         m = re.match(r"^## (.+?)[ \t]*$", line)
         if m:
             out.append(m.group(1))
@@ -2026,6 +2192,38 @@ def check_probe_substitution(n, body, res):
         "a handbook already shipped is `audit` Step 5d. ADVISORY: this row blocks nothing")
 
 
+def _bullets(text):
+    """Each markdown list item in `text`, joined across the lines it wraps onto.
+
+    A WRAPPED BULLET IS ONE BULLET. Its operative clause — a deferral phrase, an owner
+    attribution, `you own these` — lands on the continuation line about as often as on
+    the first, and a reader that takes lines independently reports a conforming handbook
+    for where its line breaks happened to fall.
+
+    A BLANK LINE CLOSES AN ITEM AND NOTHING ELSE DOES, including a line at column 0:
+    markdown's lazy continuation is legal and handbooks in the wild use it. Only a marker
+    at column 0 opens the next item, so an indented `-` is read as continuation rather
+    than as a new claim. This is the rule `check_exit_criteria_defers` has shipped with;
+    it is lifted here verbatim rather than re-derived, because two readers of one shape
+    must share one grammar or they cannot both be right.
+    """
+    out, cur = [], None
+    for line in (text or "").splitlines():
+        if re.match(r"^[-*]\s", line):
+            if cur:
+                out.append(cur)
+            cur = line[2:].strip()
+        elif cur is not None:
+            if line.strip():
+                cur += " " + line.strip()
+            else:
+                out.append(cur)
+                cur = None
+    if cur:
+        out.append(cur)
+    return out
+
+
 # THE DEFERRAL FORMS. A bullet under the preamble must POINT AT the section that owns its
 # condition rather than write the condition's value. These are the phrasings the contract
 # itself uses; the message names them so the remedy is a literal, not a category.
@@ -2068,20 +2266,7 @@ def check_exit_criteria_defers(n, body, res):
     # A wrapped bullet is ONE bullet. Its deferral phrase lands on the continuation line
     # about as often as on the first, and reading lines independently reports a conforming
     # handbook for where its line breaks fell.
-    bullets, cur = [], None
-    for line in ec.splitlines():
-        if line.startswith("- "):
-            if cur:
-                bullets.append(cur)
-            cur = line[2:].strip()
-        elif cur is not None:
-            if line.strip():
-                cur += " " + line.strip()
-            else:
-                bullets.append(cur)
-                cur = None
-    if cur:
-        bullets.append(cur)
+    bullets = _bullets(ec)
     # The trailing space is the phrase boundary — `that section ` must not match a bullet
     # that merely contains the word `section`. Appending one lets the phrase close a
     # bullet, which is where a deferral most often sits: "…, exactly as that step states."
@@ -2098,6 +2283,352 @@ def check_exit_criteria_defers(n, body, res):
         "drift, and the measured drift was a NARROWING the reader honored. See "
         "ORG-exit-criteria-restates-001; the fix path is `audit` Step 5d. ADVISORY: this "
         "row blocks nothing")
+
+
+# THE OWNERSHIP GRAMMAR, read from the shape `handbook-templates.md` § Scope writes: an
+# `IN:` bullet CLAIMS a concern, an `OUT:` bullet disclaims one and names who holds it
+# instead. Both markers are matched at the head of the bullet only — a sentence mentioning
+# "in" or "out" mid-line is prose, and this check may not read prose as a claim.
+SCOPE_IN_RX = re.compile(r"^\*{0,2}IN\*{0,2}\s*:", re.I)
+SCOPE_OUT_RX = re.compile(r"^\*{0,2}OUT\*{0,2}\s*:", re.I)
+# `— `content-writer` owns these` and `owned by `content-writer``. The captured name is
+# checked against the handbooks that EXIST before anything is reported, so "the operator
+# owns this" or "`git` owns that" never reads as an attribution to an employee.
+ATTRIBUTION_RX = re.compile(
+    r"`([A-Za-z0-9][\w-]*)`\s+owns\b|\bowned by\s+`([A-Za-z0-9][\w-]*)`")
+# EXCLUSIVITY, STATED. Two handbooks naming one glob is ordinary shared reading and is not
+# a contradiction; a contradiction needs one of them to have claimed it to the exclusion of
+# everyone else. `you own these` is the template's own wording for that.
+EXCLUSIVE_RX = re.compile(
+    r"\byou own (?:these|this|it)\b|\bexclusiv|\bsolely\b|\bsole owner\b|\bonly you\b"
+    r"|\bnobody else\b|\bno one else\b", re.I)
+BACKTICKED_RX = re.compile(r"`([^`\n]+)`")
+# AN ASPECT IS NOT A TREE. Measured on a live 17-handbook org: `orthography-gate` claims
+# "CW appearing anywhere under `src/**` and `content/**`" — the Chinuk Wawa STRINGS inside
+# those trees, deliberately, while `platform-lead` owns the trees. That is a designed
+# overlap of one aspect with one tree, not two owners of one concern, and reporting it as
+# a contradiction would fail a correct org on the thing that makes it correct. A bullet
+# that scopes its claim this way claims no path at all for this check's purposes.
+QUALIFIED_CLAIM_RX = re.compile(
+    r"\bonly\b|\banywhere under\b|\bappearing\b|\bwherever\b|\bstrings\b|\btokens\b"
+    r"|\bpart of\b|\bportion\b|\baspect\b|\binside any\b", re.I)
+# A TOOL A BULLET NAMES IS AN INSTRUMENT, NOT A CLAIM: "the CW text baked into `Figures/**`
+# by `.claude/skills/cw-accuracy/tools/overlay.py`" claims the text, and names the script
+# that bakes it. Measured on the same org, where the instrument was reported as contested.
+INSTRUMENT_RX = re.compile(r"\b(?:by|via|using|through)\s+`[^`\n]+`")
+
+
+def _path_tokens(text):
+    """Backticked tokens that name a file or a tree, normalized for comparison.
+
+    PATH-SHAPED ONLY, and this filter is the whole false-positive guard on both checks
+    below. `Agent`, `tools:`, `## Scope` and `PASS` are backticked tokens too, and
+    comparing those across two handbooks manufactures a contradiction out of two
+    employees using the same vocabulary. A token qualifies only if it carries a `/`, a
+    `*`, or a file extension — and never if it contains a space, which is a phrase.
+
+    Comparison is by EXACT normalized token. `docs/**` and `docs/` are left as two
+    different tokens deliberately: a glob dispute that has to be inferred is a dispute
+    this check declines to report, and silence on an ambiguous case is the cheaper error.
+    """
+    out = set()
+    for tok in BACKTICKED_RX.findall(text or ""):
+        # TRAILING punctuation only. `.strip(",;.")` ate the leading dot of every
+        # `.claude/...` path and reported the contested concern as `claude/skills/…`,
+        # a path that exists nowhere — measured on a live 17-handbook org.
+        t = tok.strip().rstrip(",;.").strip()
+        if not t or " " in t:
+            continue
+        if "/" not in t and "*" not in t and not re.search(r"\.[A-Za-z0-9]{1,5}$", t):
+            continue
+        out.add(t.rstrip("/") or t)
+    return out
+
+
+def ownership_claims(body):
+    """(claimed, attributed, exclusive) — what this handbook says about who owns what.
+
+    `claimed`     token -> the IN bullet claiming it
+    `attributed`  token -> (employee named as its owner, the bullet saying so)
+    `exclusive`   tokens claimed in a bullet that also claims them exclusively
+    """
+    claimed, attributed, exclusive = {}, {}, set()
+    for bullet in _bullets(section(body, "## Scope")):
+        toks = _path_tokens(bullet)
+        if SCOPE_IN_RX.match(bullet):
+            if QUALIFIED_CLAIM_RX.search(bullet):
+                continue
+            toks -= _path_tokens(" ".join(INSTRUMENT_RX.findall(bullet)))
+            for t in toks:
+                claimed.setdefault(t, bullet)
+            if EXCLUSIVE_RX.search(bullet):
+                exclusive |= toks
+        elif SCOPE_OUT_RX.match(bullet):
+            m = ATTRIBUTION_RX.search(bullet)
+            if m:
+                for t in toks:
+                    attributed.setdefault(t, (m.group(1) or m.group(2), bullet))
+    # A guardrail is the other place an owner is named — "NEVER edit `x` — `y` owns it".
+    for bullet in _bullets(section(body, "## Guardrails")):
+        m = ATTRIBUTION_RX.search(bullet)
+        if m:
+            for t in _path_tokens(bullet):
+                attributed.setdefault(t, (m.group(1) or m.group(2), bullet))
+    return claimed, attributed, exclusive
+
+
+def _quote(text, n=110):
+    """One line of evidence, short enough to read in a report."""
+    t = " ".join((text or "").split())
+    return t if len(t) <= n else t[:n - 1] + "…"
+
+
+def check_ownership_conflicts(claims, res):
+    """One concern, two handbooks, two different owners — the org's routing, contradicted.
+
+    THE ORG IS A ROUTING TABLE AND THIS IS THE ONE DEFECT THAT MAKES IT UNREADABLE.
+    `handbook-templates.md` § IC writes the assignment twice over — `IN: <the specific
+    work>` and `OUT: <the adjacent work that belongs to someone else, named>` — so every
+    handbook states both what it holds and who holds the next thing over. Nothing until
+    now compared one handbook's answer against another's. Each file is internally perfect in the failing case —
+    which is why no per-handbook check can see it, and why a cold reader of either one
+    alone reports nothing.
+
+    Both halves of the contradiction are QUOTED, never summarized. A finding that says
+    "ownership conflict" and names no lines is a finding the reader has to re-derive, and
+    this script does not know which of the two sides is stale (`check_org_edges`, same
+    rule). Naming the disagreement is the whole finding.
+
+    TWO FIRING FORMS, and nothing else fires. They are classified differently, and the
+    split was MEASURED across eight live orgs (82 handbooks) rather than chosen:
+
+      EXCLUSIVE   FAILS. A and B both claim `p` IN, and at least one said it owns `p` to
+                  the exclusion of everyone else. Shared reading of one path is normal, so
+                  the stated exclusivity is what makes the pair a contradiction — and it
+                  leaves no reading under which both handbooks are right. One instance in
+                  82: two employees each told one skill directory was theirs alone.
+      DISPUTED    ADVISORY. A's `## Scope` IN claims `p`, and B says `p` belongs to a
+                  THIRD party — B's OUT bullet or guardrail reads "`x` owns these" with
+                  x != A. Where B attributes it to A, the two agree and nothing is
+                  reported; that is the ordinary IN/OUT pairing the template ships.
+
+    DISPUTED IS ADVISORY BECAUSE AN ORG MAY OVERLAP A TREE WITH AN ASPECT OF IT ON
+    PURPOSE. Measured: a site-copy employee owning the WORDS in `content/**` under a
+    platform lead owning the TREE is a correct org, and it is not distinguishable from a
+    stale attribution by any grammar this script can apply. Five of the eight live orgs
+    reported zero either way; the one that reported several is a 17-handbook org built on
+    exactly that aspect split. Failing it would be the nine-false-failures run this file
+    already records as the lesson it must not repeat.
+
+    The attributed owner must itself be a handbook in this tree. "the operator owns this"
+    is a true sentence about a human, not a competing claim by an employee.
+    """
+    # Every pair of handbooks against every claimed token. Bounded by the org: the largest
+    # live org measured is 23 handbooks with ~10 tokens each, which is ~5k comparisons of
+    # dict lookups. code-eval: quadratic by design, index it if an org ever reaches the
+    # hundreds.
+    names = sorted(claims)
+    contested = 0
+    # ONE CONCERN, ONE FINDING. Keyed on (claimant, token) because an org states an
+    # attribution in every handbook that routes around it — measured, the same contested
+    # path produced five identical rows naming five different bystanders, which reads as
+    # five defects and is one.
+    disputed = {}
+    for a in names:
+        claimed_a, _att_a, excl_a = claims[a]
+        for b in names:
+            if b == a:
+                continue
+            claimed_b, att_b, excl_b = claims[b]
+            for tok in sorted(claimed_a):
+                owner, line_b = att_b.get(tok, (None, None))
+                # A CLAIM THAT NAMES THE OTHER PARTY AGREES WITH IT. "`convex/**` — the
+                # self-hosted backend, delegated to `backend-data-steward`" is a lead
+                # holding a tree its report works in, and the handbooks that say the
+                # report owns it are saying the same thing. Measured on a live org, where
+                # this was four of the loudest findings.
+                if owner and owner != a and owner in claims and owner not in claimed_a[tok]:
+                    disputed.setdefault((a, tok, owner), (line_b, []))[1].append(b)
+                if (a < b and tok in claimed_b
+                        and (tok in excl_a or tok in excl_b)):
+                    contested += 1
+                    res.add(False, f"{a} and {b}: both claim `{tok}`, one of them alone",
+                            f"`{a}` — \"{_quote(claimed_a[tok])}\" — and `{b}` — "
+                            f"\"{_quote(claimed_b[tok])}\". One of these bullets claims "
+                            f"`{tok}` to the exclusion of everyone else, and the other "
+                            f"claims it too. Shared READING of a path is fine; a stated "
+                            f"exclusive is a promise the other handbook breaks.")
+    for (a, tok, owner), (line_b, bystanders) in sorted(disputed.items()):
+        contested += 1
+        said_by = ", ".join(sorted(bystanders)[:3])
+        if len(bystanders) > 3:
+            said_by += f" (+{len(bystanders) - 3} more)"
+        res.advise(f"{a}: `{tok}` is claimed here and given to {owner} by {said_by}",
+                   f"`{a}` claims it — \"{_quote(claims[a][0][tok])}\" — while `{said_by}` "
+                   f"sends it elsewhere: \"{_quote(line_b)}\". One concern has two owners "
+                   f"of record, so work on `{tok}` routes to whichever handbook the "
+                   f"dispatcher happened to read. Each file is internally consistent and "
+                   f"only the pair is wrong; fix whichever line is stale. ADVISORY: this "
+                   f"row blocks nothing — an org may also overlap a tree with an ASPECT of "
+                   f"it on purpose, and this check cannot always tell the two apart")
+    if names:
+        res.add(True, f"ownership: {len(names)} handbook(s) · {contested} contested "
+                      f"concern(s) across them")
+
+
+# THE ACTS A HANDBOOK CAN FORBID AND THEN ORDER. Verbs only — the object is decided by the
+# path token beside them, never by the verb.
+WRITE_VERB_RX = re.compile(
+    r"\b(writ|edit|creat|modif|overwrit|append|delet|remov|commit|push|run|ran|invok"
+    r"|stag|sync|bump|touch|regenerat|publish|install)\w*\b", re.I)
+# A LITERAL PROHIBITION, in the project's own grammar: `procedure-for-procedures.md`
+# requires a guardrail to carry NEVER / MUST NOT / STOP, so keying off that vocabulary
+# reads the contract rather than guessing at intent. Case-sensitive on the shouted forms
+# for the same reason — "it is never edited" is description, `NEVER edit` is the rule.
+#
+# `(?![\w-])` is not decoration: `\bNEVER\b` matches inside `the NEVER-auto-send rule`,
+# and a handbook LISTING its own rules by name was reported as banning the skills named
+# beside them. Measured 2026-09-13 on a live org.
+PROHIBITION_STRICT_RX = re.compile(
+    r"(?<![\w-])(?:NEVER|MUST NOT|STOP|do NOT)(?![\w-])")
+# A CARVE-OUT INVERTS THE SENTENCE. "NEVER edit files outside your `## Scope` IN list and
+# your own reporting directory under `.claude/workforce/work/`" names `work/` as the one
+# place writing IS allowed, and reading its tokens as forbidden would fail every handbook
+# that then writes its report there — a false integrity alarm on the correct shape.
+CARVE_OUT_RX = re.compile(
+    r"\boutside\b|\bexcept\b|\bunless\b|\bother than\b|\bbeyond\b|\bapart from\b"
+    r"|\bwithout\b|\brather than\b|\binstead of\b|\bonly\b", re.I)
+# AN INSTRUCTION AGREEING WITH THE BAN IS NOT A CONTRADICTION. A step that says "never run
+# `bin/sync`" restates the guardrail; reading it as an order to run it inverts the file.
+NEGATION_RX = re.compile(
+    r"\bnever\b|\bnot\b|\bno\b|\bnothing\b|\bdon't\b|\bcannot\b|\bcan't\b"
+    r"|\brather than\b|\binstead of\b|\bwithout\b", re.I)
+# THE OBJECT OF THE ACT FOLLOWS THE VERB, and a LOCATION follows a preposition. "NEVER
+# write, edit, or overwrite a `*.png.orig` under `Figures/`" bans one artifact inside a
+# directory it does not ban; without this cut the directory was reported as forbidden and
+# the ordinary step that writes into it as the contradiction. Measured on a live org.
+# `to` and `into` are deliberately NOT cutters — "NEVER write to `~/.claude/`" is the most
+# common shape a ban takes, and cutting there would drop the ban entirely.
+LOCATION_RX = re.compile(r"\b(?:under|inside|within|beneath|below|across)\b", re.I)
+# Markdown closers count as sentence ends. `silently.** \`install.sh\`` did not split on
+# `.` because the period is followed by `**` rather than a space, which glued a NEXT
+# sentence's subject onto a ban about something else — measured, one false finding.
+SENTENCE_SPLIT_RX = re.compile(r"(?<=[.;:!?])[*_`)]*\s+")
+
+
+def _unfenced_sentences(text):
+    """Sentences outside fenced code, each as one line of readable evidence."""
+    out = []
+    for line in _unfenced_lines(text):
+        if not line.strip():
+            continue
+        out += [s.strip() for s in SENTENCE_SPLIT_RX.split(line.strip()) if s.strip()]
+    return out
+
+
+def _banned_objects(sentence):
+    """Path tokens this sentence forbids acting on, or an empty set.
+
+    THE BAN'S OBJECT, never everything the ban mentions. Read left to right: the
+    prohibition keyword, then the act it forbids, then the thing acted on — and stop at
+    the first locational preposition, which introduces where the object lives rather than
+    another object. A token before the keyword is the sentence's subject and a token after
+    a location word is a place; both were measured producing false findings.
+    """
+    m = PROHIBITION_STRICT_RX.search(sentence)
+    if not m or CARVE_OUT_RX.search(sentence):
+        return set()
+    tail = sentence[m.end():]
+    verb = WRITE_VERB_RX.search(tail)
+    if not verb:
+        return set()
+    span = tail[verb.end():]
+    cut = LOCATION_RX.search(span)
+    return _path_tokens(span[:cut.start()] if cut else span)
+
+
+def _ordered_objects(sentence):
+    """Path tokens this sentence orders an act ON, or an empty set."""
+    if NEGATION_RX.search(sentence):
+        return set()
+    verb = WRITE_VERB_RX.search(sentence)
+    if not verb:
+        return set()
+    # Same left-to-right reading as the ban: a token BEFORE the verb is the subject of a
+    # description — "the checks in `bin/check` are run by the operator" orders nothing.
+    return _path_tokens(sentence[verb.end():])
+
+
+def _forbids(banned, target):
+    """True when a banned token covers a target token — exact, or a `/**` prefix."""
+    if banned == target:
+        return True
+    for suffix in ("/**", "/*", "**", "*"):
+        if banned.endswith(suffix):
+            prefix = banned[:-len(suffix)].rstrip("/")
+            if prefix and (target == prefix or target.startswith(prefix + "/")):
+                return True
+    return False
+
+
+def check_self_contradiction(n, body, res, tally):
+    """A handbook that orders a write its own guardrail forbids.
+
+    `DEF-relocation-does-not-reconcile`, 2026-08-06, and it is the defect a passing gate
+    produces: eighteen lines were relocated verbatim into `runtime-lead` during this
+    project's own audit, the ledger went 32 -> 50, and EVERY GATE PASSED — retention is a
+    per-line question and coherence is not. The cold reader that passed that handbook then
+    found a mock-audit write-up path ordered against a guardrail forbidding edits outside
+    the reporting directory, and `bin/baseline <real project>` ordered against a `## Scope`
+    OUT line reading "anything in another repository". `claude-md.md` § Reconcile the
+    receiving component states the rule — "a relocated rule its host forbids has not
+    arrived" — and left it to a human reading the whole file. This is the mechanical half
+    of that reading.
+
+    The employee is the one who pays: told to do a thing and told never to do it, in one
+    document, it stops and returns a QUESTION — or worse, picks one and is wrong either
+    way. Only the file's author can say which side is right, so both are quoted and
+    neither is preferred.
+
+    FIRES ON ONE SHAPE ONLY: a path-or-command token is the OBJECT of a shouted
+    prohibition (`NEVER` / `MUST NOT` / `STOP` / `do NOT`) and the OBJECT of an act
+    ordered in `## Procedure` or `## Reporting`. Five guards keep it off the ambiguous
+    cases, every one of them written from a false finding measured on a live org, because
+    a false integrity alarm costs more than a missed one:
+
+      1  path-shaped tokens only, by `_path_tokens` — a shared word is not a shared object
+      2  object position on BOTH sides, by `_banned_objects` and `_ordered_objects` — a
+         token before the verb is a subject and a token after `under` is a place
+      3  a prohibition sentence carrying a carve-out (`outside`, `except`, `only`) is
+         skipped entirely: its tokens are the PERMITTED region, not the banned one
+      4  an instruction sentence carrying any negation is skipped: it agrees with the ban
+      5  fenced blocks are quoted material on both sides, never instructions
+    """
+    tally["checked"] += 1
+    banned = {}
+    for sentence in _unfenced_sentences(body):
+        for t in _banned_objects(sentence):
+            banned.setdefault(t, sentence)
+    if not banned:
+        return
+    found = []
+    for label in ("## Procedure", "## Reporting"):
+        for sentence in _unfenced_sentences(section(body, label)):
+            for t in sorted(_ordered_objects(sentence)):
+                for b, ban_sentence in sorted(banned.items()):
+                    if _forbids(b, t):
+                        found.append((label, t, b, sentence, ban_sentence))
+    if not found:
+        return
+    tally["flagged"] += 1
+    label, tok, ban, step, ban_sentence = found[0]
+    res.add(False, f"{n}: {label} orders a write this handbook forbids (`{tok}`)",
+            f"{label} says \"{_quote(step)}\" and the same file says "
+            f"\"{_quote(ban_sentence)}\"" + (f" — `{ban}` covers `{tok}`" if ban != tok else "")
+            + (f", plus {len(found) - 1} more pair(s)" if len(found) > 1 else "")
+            + ". One document gives an order and forbids it, so the employee holding it "
+            "either stops and returns a QUESTION or picks a side and is wrong. Only the "
+            "author can say which line is right; amend that one.")
 
 
 def check_companions(root, res, governed_n):
@@ -2210,7 +2741,9 @@ def main():
     # never staffed here, so it must not make the tree look audited.
     governed_n = 0
     _catread = {"flagged": 0, "clean": 0}
+    _selfcon = {"checked": 0, "flagged": 0}
     org_edge_map = {}
+    own_map = {}
     for p in sorted(handbooks):
         body = read(p, res)
         if body is None:
@@ -2229,6 +2762,11 @@ def main():
             # writes. Same placement, same reason, as the two rows above.
             check_probe_substitution(_name, body, res)
             check_exit_criteria_defers(_name, body, res)
+            # A write ordered against this same file's own prohibition, and the ownership
+            # claims that only mean anything next to every OTHER handbook's — collected
+            # here, compared after the loop by `check_ownership_conflicts`.
+            check_self_contradiction(_name, body, res, _selfcon)
+            own_map[_name] = ownership_claims(body)
         elif args.strict_adopted:
             check_handbook(p, body, res, args.ceiling)
         else:
@@ -2318,6 +2856,12 @@ def main():
     check_sidecar(root, res)
     check_canary_record(root, res)
     check_org_edges(org_edge_map, res)
+    check_ownership_conflicts(own_map, res)
+    # Printed with its zero, like every other census here: a detector that reports nothing
+    # and a detector that examined nothing read identically in a report until one says so.
+    if governed_n:
+        res.add(True, f"write instructions: {_selfcon['checked']} handbook(s) · "
+                      f"{_selfcon['flagged']} ordering an act the same file forbids")
     # INV-CATREAD — PRINTED, including the zero. The first draft of this row named an
     # invariant in a docstring and emitted nothing, so `verify.md` and `audit` 2c both
     # instructed printing a count no tool produced. A named invariant that nothing emits is

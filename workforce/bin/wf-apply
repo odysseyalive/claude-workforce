@@ -198,8 +198,20 @@ def apply_dead_hooks(root, rows, execute):
 # THREE CONDITIONS, all required, which is what makes precision a property rather than
 # a sample: the name is a canary/probe name, the file does NOT carry `measures-fact:`
 # (that marks a shipped canary, whose job RECURS per host and per harness version and
-# which is never residue), and platform-local.md actually records the measurement. Any
-# one missing and the file is left alone.
+# which is never residue), and platform-local.md records a measurement TAKEN ON THE
+# RUNNING HARNESS. Any one missing and the file is left alone.
+#
+# THE THIRD CONDITION USED TO BE A SUBSTRING TEST. `"TIER-LIMIT:" in local` asks only
+# whether the file exists and once held a measurement, never whether that measurement
+# still describes the harness in the room. A host that upgraded `claude` therefore had
+# stale platform facts AND a green third condition at the same time, so `--execute`
+# deleted the canary a run had just written to re-measure them — the tier ceiling is
+# re-measured per harness version (`platform.md` § Staleness), so the one moment a
+# fresh canary is indispensable is exactly the moment this pass swept it away.
+# `MEASURED-ON` is now parsed and compared to the running version, which is the same
+# comparison `audit.md` Step 4b already makes before it returns `PASS (on record)`.
+# A running version that cannot be obtained falls to UNMEASURED and KEEPS the file:
+# this pass deletes, and an unanswerable question must not authorize a deletion.
 #
 # ON DELETION. `discharge.md` reserves deleting to `sweep`, and that rule governs a
 # USER's skills — the conversion sweep, with its own preconditions and its `.orig`
@@ -211,23 +223,56 @@ def apply_dead_hooks(root, rows, execute):
 CANARY_RX = re.compile(r"^wf-(canary-[a-z]|ceiling-probe|reload-probe)\.md$")
 
 
-def detect_stale_canaries(root):
+VERSION_RX = re.compile(r"([0-9]+(?:\.[0-9A-Za-z-]+)+)")
+
+
+def recorded_on(local):
+    """The harness version `platform-local.md` says it was measured on, or None.
+
+    The line is written by render_local() as `MEASURED-ON:  Claude Code <version>`,
+    so the prose prefix is stripped by matching the version rather than by slicing at
+    a fixed column — a future field width must not silently change what is compared.
+    """
+    for line in local.splitlines():
+        if line.startswith("MEASURED-ON:"):
+            m = VERSION_RX.search(line)
+            return m.group(1) if m else None
+    return None
+
+
+def detect_stale_canaries(root, supplied=None):
     local = read(os.path.join(root, ".claude", "workforce", "platform-local.md"))
-    measured = "TIER-LIMIT:" in local
-    out = []
+    candidates = []
     for p in sorted(glob.glob(os.path.join(root, ".claude", "agents", "wf-*.md"))):
         if not CANARY_RX.match(os.path.basename(p)):
             continue
         body = read(p)
         if "measures-fact:" in body:
             continue                      # SHIPPED: its job recurs, never residue
-        out.append((p, "REMOVABLE" if measured else "REFUSED"))
-    return out
+        candidates.append(p)
+    if not candidates:
+        return []
+
+    # ONLY NOW is the harness asked its version. measured_on() shells out to
+    # `claude --version` with a 30s timeout, and a run with no candidate canary has
+    # nothing that answer could change — paying for it unconditionally would put a
+    # subprocess on the hot path of every other pass in this script.
+    on_record = recorded_on(local) if "TIER-LIMIT:" in local else None
+    if not on_record:
+        why = "platform-local.md records no measurement"
+        measured = False
+    else:
+        running, _src = measured_on(supplied)
+        measured = running == on_record
+        why = (f"platform-local.md was measured on Claude Code {on_record}, and "
+               + (f"this harness is {running}" if running
+                  else "the running version could not be read"))
+    return [((p, why), "REMOVABLE" if measured else "REFUSED") for p in candidates]
 
 
 def apply_stale_canaries(root, rows, execute):
     edits, removed = [], []
-    for path, verdict in rows:
+    for (path, _why), verdict in rows:
         if verdict != "REMOVABLE":
             continue
         rel = os.path.relpath(path, root)
@@ -324,7 +369,8 @@ PASSES = [
         "token": "PASS-STALE-CANARY",
         "verdict": "AUTO",
         "legality": "MECHANICAL — canary name, no `measures-fact:`, and "
-                    "platform-local.md records the measurement. All three required",
+                    "platform-local.md records a measurement taken on the RUNNING "
+                    "harness. All three required",
         "safe": "workforce's own emission, carrying workforce's own expiry condition; "
                 "no sacred span involved",
         "reversal": ".claude/workforce/.settings-owned.json § files_removed (whole file)",
@@ -332,8 +378,9 @@ PASSES = [
                      "carries measures-fact: and is never touched (4 of 4 on "
                      "apps-odyssey-alive, hand-verified against platform-local.md)",
         "refusal": lambda r: (
-            f"{os.path.basename(r[0])} — platform-local.md records no measurement, so "
-            f"the canary's own expiry condition is not met and it is not yet residue"),
+            f"{os.path.basename(r[0])} — {r[1]}, so the canary's own expiry condition "
+            f"is not met and it is not yet residue"),
+        "reads_harness": True,
         "detect": detect_stale_canaries,
         "apply": apply_stale_canaries,
     },
@@ -597,7 +644,13 @@ def main(argv):
     applied = reported = refused = 0
 
     for p in PASSES:
-        rows = p["detect"](root)
+        # PASS-STALE-CANARY is the one pass whose verdict depends on the RUNNING
+        # harness and not only on the tree, so it takes the same `--measured-on`
+        # escape hatch --record-canary does: `claude` is not on PATH in every context
+        # a procedure runs in, and a caller who knows the version must be able to say
+        # so rather than have the pass fall to a refusal it cannot argue out of.
+        rows = (p["detect"](root, _opt(argv, "--measured-on"))
+                if p.get("reads_harness") else p["detect"](root))
         if p["verdict"] == "AUTO":
             removable = [r for r in rows if r[1] == "REMOVABLE"]
             refusals = [r for r in rows if r[1] == "REFUSED"]

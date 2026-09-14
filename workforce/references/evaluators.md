@@ -205,6 +205,18 @@ answered from the repo, and a personal-scope one from `$CLAUDE_CONFIG_DIR`. The 
 identical in all four. A handbook written before this change keeps working until its project migrates,
 and `audit` § Step 5d rewrites it before that can happen.
 
+**The form carries no `--root`, and that is deliberate rather than an omission.** `$CLAUDE_PROJECT_DIR`
+is unset in the Bash tool — measured 2026-08-04 on 2.1.221, and recorded in `wf-apply` beside the
+empty-`--root` guard it produced — so the default root is the current directory, and
+the current directory is not the project whenever a step has `cd`ed into a subtree. Two of the three
+places an install can live are named relative to the root, so a project-scope install one level up was
+invisible and the command exited 1 reporting the catalog `unresolved` — a false absence delivered to
+the one reader with no way to check it. `wf-catalog` now walks up to the nearest ancestor carrying a
+`.claude/` before it resolves, stopping at the first one so a nested project is still its own project,
+and announces the substitution on stderr so `--path`'s stdout stays a single capturable path. Passing
+`--root` explicitly remains correct and is used where the caller genuinely knows the tree; the bare
+form is what a handbook writes, because a handbook cannot know where its executor is standing.
+
 **This is the second collision of its shape.** The first was `disallowedTools: Agent` versus a
 handbook that instructed delegation — caught by the Tier-Ceiling Gate. This one is the same conflict
 arriving through a *grounding library* rather than through the handbook's own prose, and no gate sees

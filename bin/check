@@ -2704,6 +2704,26 @@ check(
     "'nothing to check' and 'all checks passed' must not produce the same output; "
     "that is the failure mode the harness exists to make impossible",
 )
+# AN ASSERTION THE HARNESS DOES NOT READ IS AN ASSERTION THAT DOES NOT EXIST, and it
+# looks identical to one that passes. MEASURED 2026-09-13: `bin/script-conformance`
+# took `spec["not"]` and only that, while 9 rows spelled the same thing `must_not` (6)
+# and `reject` (3) — 9 negative assertions authored, stored, never evaluated, three of
+# them inside rows the run was already reporting FAIL. This reads the KEYS OUT OF THE
+# DATA rather than listing them here: any spelling a row uses must appear in the
+# harness's source, so a tenth invented tomorrow fails this check on the day it is
+# written instead of being quietly dropped.
+_sc_src = read("bin/script-conformance")
+_spec_keys = {k for _c in _fix_cases.values() if isinstance(_c, dict) for k in _c}
+_spec_keys |= {k for _c in _fix_cases.values() if isinstance(_c, dict)
+               for _e in (_c.get("after") or {}).values() if isinstance(_e, dict) for k in _e}
+_unread_keys = sorted(k for k in _spec_keys if f'"{k}"' not in _sc_src)
+check(
+    "scripts: every key an expectation row spells is one the harness reads",
+    bool(_spec_keys) and not _unread_keys,
+    f"expectations.json spells {_unread_keys}, which bin/script-conformance never "
+    f"names — {len(_spec_keys)} key(s) seen. A row whose assertion nothing evaluates "
+    "passes for the same reason an empty row does",
+)
 check(
     "catalogs: the portable corpora ship, for text AND code",
     len(_vend_text) >= 2 and len(_vend_code) >= 5,
@@ -7019,46 +7039,13 @@ check(
     "restated constant a wording edit drifts from (SKILL.md Principle 9a)",
 )
 
-# THE DRIFT GUARD, RUN RATHER THAN DESCRIBED. Every assertion above is a property of
-# the TEXT. The failure being guarded is a property of the OUTPUT: a project's own
-# org-config.md must change a budget's recorded VALUES and never its STRUCTURE. This
-# runs both emitters twice over a fixture that carries a stale, pre-split config —
-# once with `--config` and once without — and compares the structural markers a
-# caller renders from. Anti-vacuity: the two runs must also DIFFER somewhere, or the
-# config was never read and the comparison proves nothing.
-_STRUCT_PREFIX = ("CALL ", "LANE ", "lanes: ", "pool (cost order", "ladder (cost order")
-
-
-def _emit_structure(script, tree, args):
-    p = subprocess.run([sys.executable, os.path.join(ROOT, "workforce", "bin", script),
-                        "--root", os.path.join(ROOT, "fixtures", "scripts", tree)] + args,
-                       capture_output=True, text=True, timeout=60)
-    out = p.stdout + p.stderr
-    return out, [l for l in out.splitlines() if l.startswith(_STRUCT_PREFIX)]
-
-
-_drift_problems = []
-try:
-    for _script, _tree, _base, _cfg_args in (
-            ("wf-model-budget", "modelbudget-stale-reaudit",
-             ["--template", "template.md"], ["--config", "org-config.md"]),
-            ("wf-effort-budget", "effortbudget-drift-regression",
-             ["--template", "template.md", "--platform", "platform.md"],
-             ["--config", "org-config.md"])):
-        _clean_out, _clean = _emit_structure(_script, _tree, _base)
-        _stale_out, _stale = _emit_structure(_script, _tree, _base + _cfg_args)
-        if not _clean or not _stale:
-            _drift_problems.append(f"{_script}: emitted no structural line at all")
-            continue
-        if _clean_out == _stale_out:
-            _drift_problems.append(
-                f"{_script}: --config changed nothing, so the stale config was never "
-                "read and this comparison proves nothing")
-        if _clean != _stale:
-            _diff = [l for l in _stale if l not in _clean] + [l for l in _clean if l not in _stale]
-            _drift_problems.append(f"{_script}: structure changed: {_diff[:3]}")
-except Exception as _e:      # a diagnostic must not die on the input it diagnoses
-    _drift_problems.append(f"could not run the emitters: {_e}")
+# A budget-emitter drift guard stood here until 2026-09-13. It ran `wf-model-budget`
+# and `wf-effort-budget` over two fixture trees and collected `_drift_problems` — and
+# no check() ever read that list, so its findings went nowhere. Both scripts and both
+# fixtures were removed on the user's marks in the simplification release, so every
+# run landed in the except arm, appended a string, and passed. Deleted rather than
+# rebuilt (Core Principle 9c): the rule it guarded is now text, and the two assertions
+# above hold the two references to the derivation those scripts used to perform.
 
 # The reference SHAPE, measured rather than described: this repository's own
 # instantiated config carries a Budget Receipt and no pool. There is no earlier
@@ -7491,8 +7478,26 @@ for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)):
 
 _drift = []
 for _p in sorted(set(_live) | set(_stamped)):
-    if _live.get(_p, []) != _stamped.get(_p, []):
-        _drift.append(f"{_p}: {len(_live.get(_p, []))} live vs {len(_stamped.get(_p, []))} stamped")
+    _lv, _st = _live.get(_p, []), _stamped.get(_p, [])
+    if _lv != _st:
+        _changed = [_i for _i in range(max(len(_lv), len(_st)))
+                    if _lv[_i:_i + 1] != _st[_i:_i + 1]]
+        _drift.append(
+            f"{_p}: {len(_lv)} live vs {len(_st)} stamped, block index {_changed} differs")
+
+# THE STAMP HAD NO READER. Everything above computed the comparison and nothing
+# asserted it, so every sacred block in this distribution could be rewritten and
+# the run stayed green — the exact failure `workforce/.immutable.sha` was written
+# to catch, unguarded in the file that owns the stamp. checksums.md's rule is flag,
+# never repair, so this reports and stops; refreshing the stamp stays a human act.
+check(
+    "sacred blocks: every shipped immutable block still hashes to its stamp",
+    not _drift,
+    f"drifted: {'; '.join(_drift)} — an `origin: user | immutable: true` block no longer "
+    "matches workforce/.immutable.sha. Read the block before you touch the stamp: if the "
+    "change was NOT intended, restore the block's content. Only after an INTENDED sacred "
+    "change, re-run `bin/check --stamp` to re-certify it",
+)
 
 check(
     "fixtures: a fixture is swept once its fact is measured",
@@ -9141,6 +9146,25 @@ check("wf-conform requires the whole directory staged for a T7s target",
       "a T7s target is unlinked ENTIRELY \u2014 references/, scripts/, hooks/, datasets \u2014 "
       "so SKILL.md.orig is an undo for the least of what the sweep removes")
 
+# DEF-Q-002. The sweep RELOCATES the staged undo to
+# `.claude/workforce/work/<run-id>/staging/<name>/tree` and its COMMITTED T8 row records
+# that path; the reader knew one hard-coded location, so a correctly swept employee was
+# reported as never having staged its directory on every verify after the sweep, with no
+# edit that could clear it. Measured on a live host: tree present at the recorded path,
+# absent under staging/.
+check("wf-conform resolves a swept target's undo from the path its T8 row records",
+      "def swept_undo_paths" in _wfc and "def undo_tree" in _wfc
+      and "SWEEP_VERB_RX" in _wfc,
+      "trusting the path the journal records is what check_journal already does one row "
+      "earlier; a reader that knows only the mid-run staging path fails the sweep it is "
+      "supposed to be verifying")
+
+check("wf-conform still proves a swept target's undo exists on disk",
+      "EXISTENCE IS STILL PROVEN" in _wfc,
+      "skipping T8 rows would clear DEF-Q-002 by suppressing the gate: a row saying the "
+      "undo exists is not the undo, and the sweep's only whole-directory reversal is "
+      "the bytes")
+
 check("wf-conform exempts aggregate journal rows",
       "aggregate row (undo is the backup)" in _wfc,
       "a row marking a class of edits has no single SKILL.md; demanding one is a false positive")
@@ -10451,6 +10475,21 @@ check(
     "two readers of one section with different heading rules cannot both be right — "
     "measured disagreeing on `## Verification (mechanical)`, where one found the "
     "declared check and the other reported no section",
+)
+# ONE TIER GRAMMAR, BYTE-FOR-BYTE — the same shape as the heading grammar above, on a
+# different field. `wf-conform` reads `tier:` to decide which sections a handbook must
+# carry; `wf-stamp` reads it (since 2026-09-13) to classify a delegating tier as `n/a`
+# rather than the alarming NO-SECTIONS. A handbook that is tier 2 to one reader and
+# tierless to the other gets a contract stamp demanded of a charter that correctly has
+# no procedure — which is the false alarm the `n/a` state was added to end.
+_tier_grammar = r'r"tier:\s*(\d)"'
+_stm_tier = read("workforce/bin/wf-stamp")
+check(
+    "wf-conform and wf-stamp share ONE tier grammar",
+    _tier_grammar in _cfm and _tier_grammar in _stm_tier,
+    "two readers of one ORG-RECORD field with different patterns cannot both be right: "
+    "wf-stamp's n/a classification and wf-conform's tier-conditional section list would "
+    "disagree about the same handbook, and nothing else compares them",
 )
 check(
     "both section readers match the heading line-anchored",
@@ -12827,6 +12866,94 @@ check(
     "narration; and a missing field records no commitments, as it never did",
 )
 
+
+# ── ONE TURN PER CASE, 2026-09-13 ────────────────────────────────────────────────────────
+# The reply was confirmed and the case was still built out of three different turns. On
+# `SubagentStop` the reply is the spawned agent's, `transcript_path` is the PARENT's, and the
+# tag is the SESSION's — so `wf-widen` scored an agent's in-flight line against the main
+# turn's tool calls and the user's ask, wrote that mixture to the session's flag, and
+# `wf-widen-agent` (registered on `Stop` and nothing else, so a flag raised on a subagent can
+# only ever be opened by the main turn) blocked the main Stop on it. MEASURED 2026-09-13,
+# twice in one run: "Locating Directives block markers in SKILL.md" and "Reading _set_status
+# in wf-ledger", both quoted back at a user who had seen neither. Reproduced from a payload
+# before the fix; every assertion below RUNS the hook.
+_WD_FRAG = "Locating Directives block markers in SKILL.md"
+
+
+def _wd_sub_evidence():
+    """The PARENT enumerated a set; the agent read one file and claimed an absence. Judged on
+    the parent's evidence the claim looks settled, which is the cross-turn case with the
+    conclusion and the tool calls swapped: (decision, note)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": "fold in what the agents found"})
+        parent = os.path.join(d, "p.jsonl")
+        with open(parent, "w") as fh:
+            fh.write(json.dumps({"type": "user", "message": {"content": "fold it in"}}) + "\n")
+            fh.write(json.dumps({"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Bash",
+                 "input": {"command": "ls workforce/bin"}}]}}) + "\n")
+            fh.write(_rc_row(_RC_OTHER))
+        out = _cl_hook(d, "wf-widen", {
+            "hook_event_name": "SubagentStop", "transcript_path": parent,
+            "agent_transcript_path": _rc_transcript(d, _RC_CLAIM, "agent.jsonl"),
+            "last_assistant_message": _RC_CLAIM}, _CL_NOBLIND)[1]
+        return out.get("decision"), out.get("systemMessage") or ""
+
+
+_wd_cross = _rc_run(_RC_OTHER, _WD_FRAG, event="SubagentStop", agent=_WD_FRAG)
+_wd_own = _rc_run(_RC_OTHER, _RC_CLAIM, event="SubagentStop", agent=_RC_CLAIM)
+_wd_ev = _wd_sub_evidence()
+check(
+    "widen: a subagent's stop is judged on its own turn, and never flags the main turn's jury",
+    _wd_cross[0] is None and _wd_cross[2] is None and "not scored" in _wd_cross[1]
+    and _wd_own[0] == "block" and "taste NOT OPENED" in _wd_own[1] and _wd_own[2] is None
+    and _wd_ev[0] == "block" and "taste NOT OPENED" in _wd_ev[1],
+    f"(agent mid-sentence, agent ungrounded, parent's evidence)={_wd_cross}, {_wd_own}, "
+    f"{_wd_ev}. The hand-off carried the "
+    "agent's line as `conclusion` beside the session's `<task-notification>` as `ask` and the "
+    "parent's tool calls as `evidence`, and the juror's own words were \"the conclusion is "
+    "unrelated to the actual task\". The widen on a spawned employee stays (procedures/hooks.md, "
+    "the SubagentStop row) — on ITS ask, ITS reply and ITS evidence, with no flag, because "
+    "nothing but the main turn can read one",
+)
+
+
+def _wd_wait(said, prompt, **extra):
+    """One Stop on a turn that says it is waiting: (decision, note, flag raised)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": prompt})
+        out = _cl_hook(d, "wf-widen", {"hook_event_name": "Stop", "last_assistant_message": said,
+                                       "transcript_path": _rc_transcript(d, said), **extra},
+                       _CL_NOBLIND)[1]
+        return (out.get("decision"), out.get("systemMessage") or "",
+                os.path.exists(os.path.join(d, "wf-widen-flag.c1.json")))
+
+
+# THE SAME REPLY THREE TIMES. Only the two facts around it differ, so a phrase can never buy
+# silence on its own: a task running, a notification that opened the turn, or neither.
+_WD_GAP = ("Batch one landed and its report is folded in. I am waiting on the next batch "
+           "before anything else moves.\n\nContinuing.")
+_WD_HIST = "why was the widen loop removed, and was that deliberate?"
+_wd_running = _wd_wait("It was removed on purpose. The agents are still running; I am waiting "
+                       "on them.", _WD_HIST, background_tasks=[{"id": "x"}])
+_wd_gap = _wd_wait(_WD_GAP, "<task-notification>\n<status>completed</status>\nAgent finished")
+_wd_words = _wd_wait(_WD_GAP, "fold in what the agents found and give me one report")
+check(
+    "widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
+    _wd_running == (None, "WIDEN  not judged — a background task is still running", False)
+    and _wd_gap[0] is None and "waiting on the next" in _wd_gap[1] and _wd_gap[2] is False
+    and _wd_words[0] == "block" and "stopped mid-work" in _wd_words[1],
+    f"(running, between batches, neither)={_wd_running}, {_wd_gap}, {_wd_words}. "
+    "`background_tasks` was read inside `unfinished` alone, so a turn waiting on a running "
+    "agent was spared the promise block and handed to the jury anyway — where it fails by "
+    "construction, because a turn that is waiting has run nothing. REPORTED 2026-09-13 by the "
+    "session driving four agent batches: in the "
+    "gap between one batch finishing and the next being dispatched the array is momentarily "
+    "EMPTY, and a legitimate wait read as a turn that announced work and stopped",
+)
+
 check(
     "org producer: Step 0.3 CALLS the producer instead of describing materialization",
     '"$WF/bin/wf-companion"' in _asu and "--execute  # materialize it" in _asu,
@@ -13339,6 +13466,42 @@ check("conform: an exit-criteria bullet restating an owned value has a detector,
       "honors the first and the employee honors the second. Advisory because compliance is "
       "recognised by a phrase list, so a bullet deferring in an unlisted wording is a false "
       "positive on a conforming handbook; the fix path is audit Step 5d")
+# THE TWO DEFECTS NO PER-HANDBOOK READER CAN SEE, 2026-09-13. Every file in the failing
+# case is internally perfect: a cold reader of any one of them reports nothing, and the
+# contradiction exists only in the pair (#10a) or only between two sections of one file
+# that no single check reads together (#10b). `claude-md.md` § Reconcile the receiving
+# component states the second rule — "a relocated rule its host forbids has not arrived" —
+# and left it to a human
+# reading the whole file, which is the reading DEF-relocation-does-not-reconcile measured
+# nobody doing: 18 lines relocated, ledger 32 -> 50, every gate green, three duplications
+# and two contradictions found afterwards by a cold reader.
+check("conform: a cross-handbook ownership contradiction has a detector, split by certainty",
+      "def check_ownership_conflicts" in _n6 and "def ownership_claims" in _n6
+      and "check_ownership_conflicts(own_map, res)" in _n6
+      # An EXCLUSIVE double claim leaves no reading under which both handbooks are right,
+      # so it fails. A DISPUTED third-party attribution advises: measured across eight live
+      # orgs, an org may overlap a tree with an ASPECT of it on purpose, and no grammar
+      # here tells that from a stale line. Both halves asserted, or the split is one edit
+      # away from failing every org built on the aspect shape.
+      and "one of them alone" in _n6
+      and "is claimed here and given to" in _n6
+      and "QUALIFIED_CLAIM_RX" in _n6,
+      "one concern with two owners of record routes work to whichever handbook the "
+      "dispatcher happened to read, and each file passes every check it has on its own")
+
+check("conform: a handbook ordering a write it forbids has a detector, and it reads objects",
+      "def check_self_contradiction" in _n6
+      and "check_self_contradiction(_name, body, res, _selfcon)" in _n6
+      # OBJECT POSITION ON BOTH SIDES is the guard that took this from four false findings
+      # on live orgs to zero: a token before the verb is a subject, and a token after
+      # `under` is a place. Named here because a later edit that drops it makes the check
+      # fire on correct handbooks, which is how a detector stops being read.
+      and "def _banned_objects" in _n6 and "def _ordered_objects" in _n6
+      and "LOCATION_RX" in _n6 and "CARVE_OUT_RX" in _n6,
+      "DEF-relocation-does-not-reconcile: a relocated rule its host forbids has not "
+      "arrived, and the ledger that proved retention could not see it. The employee "
+      "holding such a handbook stops and returns a QUESTION, or picks a side and is wrong")
+
 # The catalog-resolution batch, 2026-09-10: the corpus resolves from the install, so the
 # handbooks that read it must resolve too, and the heal must land before the migration.
 _cat_n = read("workforce/bin/wf-conform")

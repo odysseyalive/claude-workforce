@@ -172,6 +172,26 @@ a `stop_hook_summary` row newer than the flag. Deleting it sooner can drop the r
 seconds after its turn ended, while that Stop's agent was still running. A side query that lands in
 that window can still meet the flag, because nothing a command hook sees tells the two agents apart.
 
+**A subagent's Stop is its own case, and it hands the main turn's jury nothing.** `wf-widen` runs
+on `SubagentStop` too, and there the reply is the spawned agent's, `transcript_path` is the
+PARENT's and the tag is the SESSION's — so one Stop scored an agent's in-flight line against the
+main turn's tool calls and the user's ask, and wrote that mixture to the session's flag.
+`wf-widen-agent` is registered on `Stop` and on nothing else, so a flag raised there can only ever
+be opened by the turn that did not do the work. MEASURED 2026-09-13, twice in one run: a main Stop
+was blocked on "Locating Directives block markers in SKILL.md", a fragment the user never saw, and
+the juror's own reason was *"The conclusion is unrelated to the actual verification task."* A
+spawned employee is still judged — on its ask, its reply and its evidence, all walked from its own
+transcript — and it raises no flag.
+
+**A turn waiting on background work is not judged at all.** `background_tasks` was read in one
+place, the unfinished-work trigger, so a turn holding for a running agent was spared that block and
+handed to the jury anyway — where it fails by construction, because a turn that is waiting has run
+nothing. The exemption now gates the whole Stop decision. REPORTED 2026-09-13 by the session driving four agent batches: between one batch
+finishing and the next being dispatched that array is momentarily EMPTY, so the gap is recognised
+from two facts instead — a task notification opened the turn, which the tag records, and the reply
+says what it is waiting on. Neither fact alone is a wait, and the same reply with nothing pending
+is the measured mid-work stop, still blocked.
+
 **Nothing in steps 1 and 2 scores anything, and that is a directive rather than a
 design taste.** *"you have to measure results, not measure what you're doing and it has
 to be aligned with the current request"*, and *"Evaluations are always done by the

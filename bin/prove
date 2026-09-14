@@ -181,8 +181,6 @@ CHK = "bin/check"
 COV = "bin/coverage"
 PRV = "bin/prove"   # this file: safe to mutate mid-run, Python already holds the source
 REM = "workforce/bin/wf-remainder"
-WFMB = "workforce/bin/wf-model-budget"
-WFEB = "workforce/bin/wf-effort-budget"
 PRM = "workforce/bin/wf-permissions"
 CMD = "CLAUDE.md"
 DEV = "DEVELOPMENT.md"
@@ -404,6 +402,27 @@ CASES = [
      WDN, "del", "def describe(why, rows, unopened):"),
     ("wf-widen reports a decision in words, not a score",
      WDN, "del", "Returns (unopened, rows)"),
+    # ── one turn per case (2026-09-13) ───────────────────────────────────────
+    # Each break is one of the three things that let a SubagentStop build a case out of
+    # three different turns, and each one leaves valid Python: the blind sample writing the
+    # session's flag from a spawned agent's line, and the evidence being walked from the
+    # PARENT's transcript while the reply came from the agent's. Deleting a whole `if` here
+    # would orphan its body and fail on syntax, which proves nothing about the named check.
+    ("widen: a subagent's stop is judged on its own turn, and never flags the main turn's jury",
+     WDN, "del", "not subagent and "),
+    ("widen: a subagent's stop is judged on its own turn, and never flags the main turn's jury",
+     WDN, "del", ", transcript_path=TL.reply_transcript(payload)"),
+    # THE GATE MOVED, AND BOTH HALVES ARE BROKEN SEPARATELY. The first puts the exemption
+    # back inside `unfinished` alone, where the senses jury blocked the turn the promise
+    # trigger had just spared; the second drops the between-batches half, where the array
+    # that settles a wait is momentarily empty.
+    ("widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
+     WDN, "del", "    waiting = waiting_on_background(payload, reply)\n    if waiting:\n"
+                 '        return {"systemMessage": f"WIDEN  not judged — {waiting}"}\n'),
+    ("widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
+     WDN, "del", '    if just_finished(payload) and WAITING.search(reply or ""):\n'
+                 '        return "a background batch finished and the turn says it is waiting '
+                 'on the next"\n'),
     # ONE PROVEN CASE, NOT TWO WITH A VACUOUS ONE. A case deleting
     # `def read_targets(name, inp):` orphans its body, so bin/check fails on syntax and
     # the NAMED check never runs — `did NOT fire — 2 other failures`. A case that cannot
@@ -557,6 +576,21 @@ CASES = [
      STMP, "del", "if symlink_drift:"),
     ("symlink census: SKILL.md rule 3 names the producer, not an unperformed prescription",
      SKL, "del", "The mechanical floor is BUILT"),
+    # THE STAMP HAD NO READER UNTIL 2026-09-13: bin/check computed the live-vs-stamped
+    # comparison for every `origin: user | immutable: true` block and no check() consumed
+    # it, so a rewritten sacred block passed. Append a second stamped row for SKILL.md and
+    # the live file cannot match two digests. Appended rather than pinned to a digest — a
+    # payload carrying a real hash would have to be re-typed on every legitimate restamp.
+    ("sacred blocks: every shipped immutable block still hashes to its stamp",
+     "workforce/.immutable.sha", "append",
+     "\n0000000000000000000000000000000000000000000000000000000000000000  "
+     "workforce/SKILL.md  ## Directives\n"),
+    # Strip one negative spelling from the fixture harness's own vocabulary. The 6 rows
+    # that use `must_not` then carry an assertion nothing reads, which is the exact state
+    # measured on 2026-09-13; the key survives in expectations.json, so the check must
+    # name it rather than pass on a shorter vocabulary.
+    ("scripts: every key an expectation row spells is one the harness reads",
+     "bin/script-conformance", "del", '"must_not"'),
     # ── the Core-skill refresh producer (2026-09-08) ─────────────────────────
     # The rule existed as prose for weeks and did not run. Each break removes one of
     # the three things that make it run rather than read: the producer, the caller,
@@ -1030,9 +1064,6 @@ CASES = [
     #    scan must catch it (audit-setup.md restated all four verbatim until 2026-08-26) ──
     ("budget wording: no reference restates the canonical question copy",
      ASU, "append", "\n**Which model should each kind of agent use?**\n"),
-    # The drift guard runs the emitters instead of reading them. Break the INPUT it
-    # depends on: with `--config` no longer read, the with/without runs are identical
-    # and the guard must report that it proved nothing rather than pass.
     ("scopes: no shipped file invokes a script by a bare project-scope path",
      ORG, "append", "\n.claude/skills/workforce/bin/wf-census --root x\n"),
     ("scopes: the canonical script resolver is stated, and personal resolves first",

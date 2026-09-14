@@ -95,6 +95,9 @@ import sys
 # reader with a comment naming its source, exactly as `wf-protect-directives` copies
 # `BLOCK_RX`/`ROW_RX` from `wf-conform`. `bin/check` cross-tests the copies.
 ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
+# THE SAME GRAMMAR `wf-conform` READS, deliberately. Two readers of one field must
+# share one pattern, or a handbook can be tier 2 to one of them and tierless to the other.
+TIER_RX = re.compile(r"tier:\s*(\d)")
 ORG_RECORD_END_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+END\b.*$", re.I | re.M)
 
 # The field, and every spelling of it that is on disk today: a real digest, the
@@ -146,13 +149,26 @@ def contract_digest(body):
 def classify(body):
     """(state, recomputed, recorded) for one handbook body.
 
-    States: NO-RECORD (not governed), NO-SECTIONS, UNSTAMPED (placeholder or no line
-    at all), OK, MISMATCH.
+    States: NO-RECORD (not governed), N/A (a delegating tier, which correctly has no
+    procedure contract), NO-SECTIONS, UNSTAMPED (placeholder or no line at all), OK,
+    MISMATCH.
     """
     if not ORG_RECORD_RX.search(body):
         return "NO-RECORD", None, None
     want = contract_digest(body)
     if want is None:
+        # A DELEGATING TIER HAS NOTHING TO HASH, AND THAT IS THE DESIGN, NOT A DEFECT.
+        # `handbook-templates.md` § Lead: `tier: 2` carries "no `## Procedure` — a
+        # coordinator's job is judgment", and `wf-conform` exempts the section for
+        # tier 1 AND 2 for the same reason. Reporting those as NO-SECTIONS made
+        # INV-STAMP read "no-sections 3" — three alarms for three correct handbooks,
+        # next to a counter whose other values are all failures. They get their own
+        # state so the count means what it says, and NO-SECTIONS keeps meaning what it
+        # was for: an IC handbook that is genuinely missing a section it must carry.
+        # No hash pair is invented for a Lead; a Lead has no procedure contract.
+        m = TIER_RX.search(body)
+        if m and m.group(1) in ("1", "2"):
+            return "N/A", None, None
         return "NO-SECTIONS", None, None
     m = STAMP_LINE_RX.search(body)
     if m is None:
@@ -461,7 +477,8 @@ def main():
 
     print(f"wf-stamp — {root}")
     counts = {k: 0 for k in
-              ("OK", "MISMATCH", "UNSTAMPED", "NO-SECTIONS", "NO-RECORD", "STAMPED", "UNREADABLE")}
+              ("OK", "MISMATCH", "UNSTAMPED", "N/A", "NO-SECTIONS", "NO-RECORD",
+               "STAMPED", "UNREADABLE")}
     refused = []
     # BEFORE THE FIRST WRITE, not before the first write that happens to be reached.
     # Taken unconditionally — a review run writes nothing, and its INV-SYMLINK line is
@@ -482,6 +499,11 @@ def main():
         if state == "NO-RECORD":
             counts[state] += 1
             print(f"  . adopted     {name}  no ORG-RECORD — workforce did not author it, not stamped")
+            continue
+        if state == "N/A":
+            counts[state] += 1
+            print(f"  . n/a         {name}  delegating tier — a coordinator's job is "
+                  f"judgment, so there is no ## Procedure to hash and no contract to stamp")
             continue
         if state == "NO-SECTIONS":
             counts[state] += 1
@@ -548,8 +570,8 @@ def main():
     total = sum(counts.values())
     print(f"\nINV-STAMP  {total} handbook(s) · stamped {counts['STAMPED']} · ok {counts['OK']} · "
           f"unstamped {counts['UNSTAMPED']} · mismatch {counts['MISMATCH']} · "
-          f"no-sections {counts['NO-SECTIONS']} · adopted {counts['NO-RECORD']} · "
-          f"unreadable {counts['UNREADABLE']}")
+          f"n/a {counts['N/A']} · no-sections {counts['NO-SECTIONS']} · "
+          f"adopted {counts['NO-RECORD']} · unreadable {counts['UNREADABLE']}")
 
     # THE HINT NAMES THE FLAG THAT WOULD ACTUALLY DO IT. `--execute` alone never
     # touches a MISMATCH, so printing it under a drift-only run sends the reader to a

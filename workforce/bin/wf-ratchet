@@ -207,7 +207,28 @@ def capture(root, found):
     return path
 
 
+USAGE = """wf-ratchet — monotonic improvement across audit runs, without a count.
+
+    wf-ratchet --root <tree>              compare findings to the baseline
+    wf-ratchet --root <tree> --capture    write the baseline from current findings,
+                                          PRESERVING any hand-set `state` / `why`
+    wf-ratchet --help                     this text
+
+--root defaults to `.`. The baseline lives at <root>/%s.
+Exit 0 on improved, carried or inherited findings; exit 1 on a REGRESSION — a finding
+absent from the baseline whose pass already existed when the baseline was captured.
+""" % BASELINE
+
+
 def main(argv):
+    # BEFORE `findings(root)`, because the parser below recognizes only --root and
+    # --capture: `wf-ratchet --help` used to fall through to a full no-baseline compare
+    # and print a scan of the tree where a reader asked what the flags were. A help
+    # flag that runs the tool is the "remedy with no producer" shape inverted.
+    if any(a in ("--help", "-h") for a in argv[1:]):
+        print(USAGE, end="")
+        return 0
+
     root = "."
     if len(argv) >= 3 and argv[1] == "--root":
         root = argv[2]

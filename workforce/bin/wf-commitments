@@ -79,9 +79,27 @@ MAX_OPEN = 40           # a ledger nobody can read is a ledger nobody reads
 def path(payload):
     """Per-PROJECT, not per-session. A debt stated on Monday is still owed on Tuesday,
     and a session-scoped file would clear the ledger exactly when a new session made it
-    matter most — which is the moment this exists for."""
-    cwd = payload.get("cwd") or os.getcwd()
-    d = os.path.join(cwd, ".claude", "workforce")
+    matter most — which is the moment this exists for.
+
+    `${CLAUDE_PROJECT_DIR}` FIRST, the payload's `cwd` second (`wf-protect-directives`
+    resolves a hook root the same way). The two differ the moment a turn has cd'd
+    somewhere — a subdirectory, a sibling clone, a scratch tree — and only the first
+    names the project whose debt this is.
+
+    NO `os.getcwd()` FALLBACK, AND THAT IS THE WHOLE FIX. Both sources above are
+    supplied BY THE HARNESS and name the project this hook was fired for. `os.getcwd()`
+    names wherever the process happens to be, so falling back to it turned every
+    invocation from an unrelated directory — a hand-run, a test, a `cd` — into a stray
+    `<cwd>/.claude/workforce/commitments.json`, a confident write to a path nobody named
+    (`wf-companion` § materializing creates the directory). An unresolved root is not a
+    root to guess at: `None` is the honest answer, and `main` already treats it as
+    "record nothing". A root the harness DID name still gets its tree created, because
+    that is this hook's job on a project whose ledger does not exist yet.
+    """
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    if not root or not str(root).strip():
+        return None
+    d = os.path.join(root, ".claude", "workforce")
     try:
         os.makedirs(d, exist_ok=True)
         return os.path.join(d, "commitments.json")

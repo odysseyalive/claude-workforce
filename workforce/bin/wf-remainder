@@ -382,8 +382,33 @@ def _emit_diff(before, after, label_a, label_b):
 # detector emit a permanent false regression. The exclusion is a skip, never a
 # suppression: it is applied per SKILL.md before reading, so a genuine dead script in
 # any skill that was not declared out still reports exactly as before.
-def dead_scripts(root):
-    """[(skill_path, token, verdict)] for path-shaped script tokens that do not resolve."""
+#
+# A THIRD FILTER: `bin/…` IS MAINTAINER TOOLING AND DOES NOT SHIP. `workforce/SKILL.md`
+# says so in its own second line — *"maintainer-facing; bin/ does not ship"* — and then
+# cites `bin/check`, `bin/sync` and `bin/dev-sandbox` throughout, because the reader of
+# those sentences is a maintainer standing in the repository. On a HOST, `bin/` is
+# absent by design, so every one of those citations resolved nowhere and the shipped
+# skill was reported as carrying dead scripts on every install. That is a false
+# positive produced by the distribution working correctly, and the rewrite it invites
+# is deleting a correct sentence about a real file — the exact act the REPORT verdict
+# above exists to withhold.
+#
+# The exemption is NARROW and it is a classification, not a suppression. It applies
+# only when the token's first segment is `bin` AND the token resolves nowhere AND its
+# basename resolves nowhere either: a `bin/…` path that exists is still resolved
+# normally, and one whose basename sits elsewhere is still MISROUTED. Maintainer rows
+# are returned only on request and are printed in their own bucket, because a number
+# that shrank without explanation is its own defect (passes.md § PASS-MARKER-GRAMMAR).
+MAINTAINER_ROOTS = ("bin",)
+
+
+def dead_scripts(root, include_maintainer=False):
+    """[(skill_path, token, verdict)] for path-shaped script tokens that do not resolve.
+
+    `include_maintainer` adds the `MAINTAINER` rows, which are never dead. The default
+    is False so that every caller counting `len(rows)` — `wf-apply`'s PASS-DEAD-SCRIPT
+    among them — counts dead scripts and nothing else.
+    """
     skills_dir = os.path.join(root, ".claude", "skills")
     census = _load_census().Census(root)
     census.load_ignore()
@@ -410,8 +435,15 @@ def dead_scripts(root):
                     os.path.join(skills_dir, tok))):
                 continue
             elsewhere = basenames.get(os.path.basename(tok))
-            out.append((os.path.relpath(sk, root), tok,
-                        "MISROUTED  -> " + elsewhere if elsewhere else "UNRESOLVED"))
+            if elsewhere:
+                verdict = "MISROUTED  -> " + elsewhere
+            elif tok.split("/")[0] in MAINTAINER_ROOTS:
+                if not include_maintainer:
+                    continue
+                verdict = "MAINTAINER"
+            else:
+                verdict = "UNRESOLVED"
+            out.append((os.path.relpath(sk, root), tok, verdict))
     return out
 
 
@@ -426,15 +458,23 @@ def main(argv):
         return os.path.join(root, p) if root and not os.path.isabs(p) else p
 
     if len(argv) >= 2 and argv[1] == "--dead-scripts":
-        rows = dead_scripts(root or ".")
+        allrows = dead_scripts(root or ".", include_maintainer=True)
+        rows = [r for r in allrows if r[2] != "MAINTAINER"]
+        maint = [r for r in allrows if r[2] == "MAINTAINER"]
         mis = sum(1 for _s, _t, v in rows if v.startswith("MISROUTED"))
         # Counted line ALWAYS, including the zeroes: a detector that prints nothing
         # on a clean tree is indistinguishable from one that did not run.
         print(f"dead scripts   {len(rows)} unresolved · {mis} misrouted "
-              f"· {len(rows) - mis} not found in this tree")
+              f"· {len(rows) - mis} not found in this tree "
+              f"· {len(maint)} maintainer-only")
         for s, t, v in rows:
             print(f"  {v.split()[0]:<10} {s}  ->  {t}"
                   + ("" if v == "UNRESOLVED" else "   (" + v.split("-> ")[1] + ")"))
+        # PRINTED, NEVER SILENTLY DROPPED. These are exempt from the dead count, not
+        # from the report: a reader has to be able to see which citations were excused
+        # and check that the excuse holds.
+        for s, t, _v in maint:
+            print(f"  MAINTAINER {s}  ->  {t}   (bin/ does not ship; maintainer-facing)")
         return 0
     if len(argv) >= 3 and argv[1] == "--manifest":
         for t in manifest(read(rel(argv[2]))):

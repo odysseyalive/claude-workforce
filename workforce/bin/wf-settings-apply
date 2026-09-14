@@ -292,6 +292,44 @@ def user_settings_path():
     return os.path.join(config_root(), "settings.json")
 
 
+def scopes_collapse(root):
+    """Are `<root>/.claude` and the personal config root the SAME directory?
+
+    They are whenever the project IS `$HOME` — a real configuration, and the one this
+    distribution is most often installed into — and whenever `$CLAUDE_CONFIG_DIR` or a
+    symlink points one at the other. There is then no such thing as wiring "at project
+    scope on top of" user scope: the two files sit side by side in one directory and the
+    harness reads both for the same session, so a hook wired at user scope is already
+    live for this project and adding the project-scope one DOUBLE-FIRES it.
+    """
+    return os.path.realpath(os.path.join(root, ".claude")) == os.path.realpath(config_root())
+
+
+def union_settings_paths(root):
+    """Every settings file in force for `root`, deduped by realpath, project first.
+
+    THE SAME ARGUMENT `union_allow` MAKES FOR GRANTS, MADE FOR HOOKS. Registrations
+    concatenate across scopes exactly as grants do (platform.md fact 17): a hook in
+    `~/.claude/settings.json` fires for every project on the machine, this one included.
+    A presence check that reads only the file its own scope writes therefore asks
+    "is it wired HERE", reports no, and offers a registration that is already live —
+    and at `root == $HOME` the two files are siblings in one directory, so the offer
+    lands a second copy of a hook the user can see in the same `ls`.
+
+    Deduped by realpath because the same file reached through two spellings must not be
+    read twice, and ordered project-first so the path REPORTED is the one whose scope
+    was asked about.
+    """
+    seen, out = set(), []
+    for cand in [os.path.join(root, ".claude", n) for n in PROJECT_SETTINGS] + [user_settings_path()]:
+        key = os.path.realpath(cand)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cand)
+    return out
+
+
 def union_allow(root):
     """Every permissions.allow entry across the two project scopes and the user scope.
     Grants concatenate across scopes (platform.md fact 17), so a grant already in force
@@ -509,6 +547,48 @@ def _same_agent(h, inner):
     mine, theirs = inner.get("prompt") or "", h.get("prompt") or ""
     marker = "wf-widen-flag"
     return marker in mine and marker in theirs
+
+
+def _scan_hook(data, event, agent_cfg, command, root):
+    """Is this hook registered in `data`, and does it carry a stale agent prompt?
+
+    Returns `(present, stale_agent)`, where `stale_agent` is the list of
+    `(entry, inner)` pairs that ARE this hook but hold a prompt that is no longer the
+    shipped one. Lifted out of `do_wire_hook` unchanged when the presence check learned
+    to read more than one settings file: one scan written twice is a restated constant
+    (Core Principle 9a), and the copy that drifts is the one that reads the file nobody
+    is looking at.
+    """
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    existing = hooks.get(event) if isinstance(hooks, dict) else None
+    present, stale_agent = False, []
+    if not isinstance(existing, list):
+        return present, stale_agent
+    for e in existing:
+        for h in (e.get("hooks", []) if isinstance(e, dict) else []):
+            if agent_cfg is not None:
+                if _same_agent(h, agent_cfg):
+                    # OURS — BUT IS IT THE CURRENT PROMPT? An agent hook IS its
+                    # prompt: change the prompt and you have changed what the hook
+                    # does, entirely. Identity is deliberately coarse (a marker, so
+                    # a rename does not orphan a live registration), which means
+                    # equality has to be checked separately or a rewritten prompt
+                    # reports NOOP forever and the machine keeps running the old one.
+                    #
+                    # MEASURED 2026-09-09: the widening agent was rewritten from
+                    # "open the named channel" to "judge whether the evidence
+                    # supports the conclusion" — the entire point of the release —
+                    # and `--wire-defaults --execute` said "already registered,
+                    # NOOP". The old prompt stayed live and the redesign reached
+                    # nothing. Found by reading settings.json instead of trusting
+                    # the word NOOP.
+                    if (h.get("prompt") or "") == (agent_cfg.get("prompt") or ""):
+                        present = True
+                    else:
+                        stale_agent.append((e, h))
+            elif _same_command(h, command, root):
+                present = True
+    return present, stale_agent
 
 
 def hook_defaults(name):
@@ -1009,34 +1089,23 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         return 1
     if not isinstance(data, dict):
         data = {}
-    hooks = data.get("hooks")
-    existing = hooks.get(event) if isinstance(hooks, dict) else None
-    present, stale_agent = False, []
-    if isinstance(existing, list):
-        for e in existing:
-            for h in (e.get("hooks", []) if isinstance(e, dict) else []):
-                if agent_cfg is not None:
-                    if _same_agent(h, agent_cfg):
-                        # OURS — BUT IS IT THE CURRENT PROMPT? An agent hook IS its
-                        # prompt: change the prompt and you have changed what the hook
-                        # does, entirely. Identity is deliberately coarse (a marker, so
-                        # a rename does not orphan a live registration), which means
-                        # equality has to be checked separately or a rewritten prompt
-                        # reports NOOP forever and the machine keeps running the old one.
-                        #
-                        # MEASURED 2026-09-09: the widening agent was rewritten from
-                        # "open the named channel" to "judge whether the evidence
-                        # supports the conclusion" — the entire point of the release —
-                        # and `--wire-defaults --execute` said "already registered,
-                        # NOOP". The old prompt stayed live and the redesign reached
-                        # nothing. Found by reading settings.json instead of trusting
-                        # the word NOOP.
-                        if (h.get("prompt") or "") == (agent_cfg.get("prompt") or ""):
-                            present = True
-                        else:
-                            stale_agent.append((e, h))
-                elif _same_command(h, command, root):
-                    present = True
+    present, stale_agent = _scan_hook(data, event, agent_cfg, command, root)
+
+    # THE OFFER IS MADE AGAINST EVERY FILE IN FORCE, NOT ONLY THE ONE THIS SCOPE WRITES.
+    # See union_settings_paths: a user-scope registration fires for this project too, so
+    # asking only `settings_for_scope` reports "not wired" about a hook that is running.
+    # At `root == $HOME` the two files are siblings in one directory and the second copy
+    # double-fires every hook in the default set. Nothing is REMOVED on this evidence —
+    # `--unwire-defaults` owns removal, and it removes only what the sidecar records.
+    also_in = []
+    for other in union_settings_paths(root):
+        if os.path.realpath(other) == os.path.realpath(spath):
+            continue
+        odata, _oerr = load(other)
+        if not isinstance(odata, dict):
+            continue
+        if _scan_hook(odata, event, agent_cfg, command, root)[0]:
+            also_in.append(other)
 
     # The stamp is a SECOND write with its own precondition, so registration and stamp
     # are reported independently and neither short-circuits the other: a hook already
@@ -1060,8 +1129,19 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
               f"wf-settings-apply: HOOK UNVERIFIED — {name} prompt did not update")
         return 0 if ok else 1
 
-    if present:
-        print(f"  . {name} already registered on {event} — NOOP")
+    if present or also_in:
+        if present:
+            print(f"  . {name} already registered on {event} — NOOP")
+        else:
+            # NAME THE FILE. "Already registered" about a file the caller did not ask
+            # for reads like a refusal to do the work, and the operator's next move is
+            # to go and look — so the output says where, and why that file counts.
+            print(f"  . {name} already registered on {event} in {also_in[0]} — NOOP")
+            print("  note: registrations concatenate across scopes, so this hook "
+                  "already fires for this project"
+                  + (" (the project and personal config roots are the SAME directory "
+                     "here)" if scopes_collapse(root) else "")
+                  + ". A second copy would double-fire it.")
         rc, pending = do_stamp(root, name, execute)
         if not execute and pending:
             print("  apply with: --execute   (run it yourself via `!` if the classifier "

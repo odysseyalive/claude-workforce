@@ -141,6 +141,51 @@ def config_root():
     return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
 
 
+def scopes_collapse(root):
+    """Are `<root>/.claude` and the personal config root the SAME directory?
+
+    They are whenever the project IS `$HOME` — a real configuration, and the one this
+    distribution is most often installed into — and whenever `$CLAUDE_CONFIG_DIR` or a
+    symlink points one at the other. THE PROJECT/PERSONAL DISTINCTION THEN HAS NO
+    REFERENT: `<root>/.claude/skills/text-eval` is the path `install` writes AND the path
+    a project copy would occupy, and no test can tell them apart because there is nothing
+    to tell apart. A migration that reports `no-install` there is refusing to retire a
+    copy in favour of an install that is the same directory, and the remedy it implies —
+    "retire the project copy so the user install is used" — names one directory twice.
+    """
+    return os.path.realpath(os.path.join(root, ".claude")) == os.path.realpath(config_root())
+
+
+def walk_up_to_project(start):
+    """The nearest directory at or above `start` carrying a `.claude/`, or None.
+
+    `--root` DEFAULTS TO THE CURRENT DIRECTORY, AND THE CURRENT DIRECTORY IS NOT THE
+    PROJECT. `$CLAUDE_PROJECT_DIR` is unset in the Bash tool — measured 2026-08-04 on
+    2.1.221, the same fact `wf-apply`'s empty-`--root` guard exists for — so every
+    documented reader form (`evaluators.md` and `procedures/audit.md` Step 5d both
+    cite this script with no `--root`) falls through to `os.getcwd()`. A shell that has
+    `cd`ed into a subdirectory then resolves against a tree with no `.claude/` in it, and
+    two of the three `install_candidates` are root-relative, so a project-scope install
+    one level up is invisible: the script exits 1 saying the catalog is `unresolved`.
+    That is a FALSE ABSENCE, the failure class this project treats as worse than a crash,
+    and the IC that reads it concludes the catalog does not exist.
+
+    The walk is the same one every project tool performs by hand, and it stops at the
+    FIRST `.claude/` rather than the outermost: a nested project is its own project, and
+    answering it from the parent would resolve the wrong corpus. Finding nothing returns
+    None and the caller keeps the root it was given, so a tree with no `.claude/` anywhere
+    behaves exactly as it did before.
+    """
+    cur = os.path.abspath(start)
+    while True:
+        if os.path.isdir(os.path.join(cur, ".claude")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return None
+        cur = parent
+
+
 def install_candidates(root):
     """Ordered places the shipped catalogs can live, in the SAME order and for the same
     reasons as `wf-seed._slot_candidates` — project install, maintainer source tree, then
@@ -195,13 +240,22 @@ def install_dir(root, kind):
     # repository's source distribution: nothing installed it, by construction, and it is
     # what `workforce dev` reads.
     maintainer = os.path.join(root, "workforce", "skills")
+    personal = os.path.realpath(os.path.join(config_root(), "skills"))
+    collapsed_scope = scopes_collapse(root)
     for base in install_candidates(root):
         for name in CATALOGS[kind]["skills"]:
             skill = os.path.join(base, name)
             d = os.path.join(skill, "references")
             if not (os.path.isdir(d) and corpus_bearing(d)):
                 continue
-            if base != maintainer and not installer_owned(root, skill):
+            # THE OWNERSHIP TEST NEEDS TWO DIRECTORIES TO SEPARATE, and under scope
+            # collapse there is one. `<root>/.claude/skills` IS `config_root()/skills`
+            # when the project is `$HOME`, so the path this test would reject as "the
+            # project's own" is the personal install's own address. Rejecting it left
+            # `install_dir` returning None and `classify` refusing with `no-install`
+            # about the only corpus on the machine. See scopes_collapse.
+            collapsed = collapsed_scope and os.path.realpath(base) == personal
+            if base != maintainer and not collapsed and not installer_owned(root, skill):
                 continue
             return d
     return None
@@ -322,6 +376,13 @@ def project_skill_dir(root, kind):
     the old ones of the project ... No exceptions"* — hidden behind a verdict that reads
     like success.
     """
+    # UNDER SCOPE COLLAPSE THERE IS NO PROJECT COPY, because there is no project
+    # directory distinct from the install directory (see scopes_collapse). Retiring
+    # what this returns would delete the personal install, so the answer is None and
+    # `classify` reports `no-copy` — which is true: there is nothing to migrate,
+    # the one copy on the machine is already the one being read.
+    if scopes_collapse(root):
+        return None
     for name in CATALOGS[kind]["skills"]:
         d = os.path.join(root, ".claude", "skills", name)
         if os.path.isdir(d) and not installer_owned(root, d):
@@ -341,6 +402,12 @@ def project_dir(root, kind):
     A migrated copy falls through to the install, which is what makes `--migrate` a
     completed act rather than a severed read.
     """
+    # The same collapse ruling `project_skill_dir` carries, for the same reason: under
+    # collapse this path is the install's own address, and reporting the read as
+    # `source: project copy` would label the install a copy of itself and count it as a
+    # migration still owed on every audit, forever.
+    if scopes_collapse(root):
+        return None
     for name in CATALOGS[kind]["skills"]:
         d = os.path.join(root, ".claude", "skills", name)
         if os.path.isdir(d) and corpus_bearing(d) and not installer_owned(root, d):
@@ -928,12 +995,28 @@ def hook_registrations(root):
     function and turned `--migrate` into a traceback. Every shape is guarded and an
     unreadable file is skipped, because a tool that reports on settings must not die on the
     settings it reports on.
+
+    THE FOUR CANDIDATES ARE NOT FOUR FILES. When the project IS `$HOME`, `config_root()`
+    is `$HOME/.claude` and the personal pair is the project pair spelled a second way, so
+    every registration was read twice and reported as `REGISTERED 2 TIMES` — a duplicate
+    that exists only in this list, against which the honest fix is to delete one of two
+    entries that are the same entry. A symlinked or `$CLAUDE_CONFIG_DIR`-relocated tree
+    produces the same collision under a different spelling, so identity is decided by
+    `os.path.realpath` rather than by string equality. Order is preserved: the project
+    spelling is seen first and is the one reported, which keeps `file:` naming the path
+    the reader would edit.
     """
     out = []
-    paths = [os.path.join(root, ".claude", "settings.local.json"),
-             os.path.join(root, ".claude", "settings.json"),
-             os.path.join(config_root(), "settings.json"),
-             os.path.join(config_root(), "settings.local.json")]
+    seen, paths = set(), []
+    for cand in (os.path.join(root, ".claude", "settings.local.json"),
+                 os.path.join(root, ".claude", "settings.json"),
+                 os.path.join(config_root(), "settings.json"),
+                 os.path.join(config_root(), "settings.local.json")):
+        key = os.path.realpath(cand)
+        if key in seen:
+            continue
+        seen.add(key)
+        paths.append(cand)
     for path in paths:
         try:
             with open(path, encoding="utf-8") as fh:
@@ -1154,6 +1237,31 @@ def main():
     ap.add_argument("--execute", action="store_true")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
+
+    # THE WIDENING IS NEVER SILENT. A root that already carries `.claude/` is used as
+    # given and nothing is printed; only a root that does not is replaced, and then the
+    # substitution is announced on stderr so `--path`'s stdout stays a single path a
+    # caller can capture. See walk_up_to_project for why the default root is wrong.
+    #
+    # AND IT NEVER REACHES `--execute`. The walk is a repair for a READ that reported a
+    # false absence; `--migrate --execute` deletes files, and inferring the tree to
+    # delete from is not the same act as inferring the tree to read from. A run from
+    # `~/lab/foo/bar` whose nearest `.claude/` sits at `~/lab` would otherwise retire
+    # copies under a directory nobody named, on the strength of a guess this script made
+    # after the operator had already consented to deletion. Naming the tree is one
+    # argument and it is the operator's to give.
+    if not os.path.isdir(os.path.join(root, ".claude")):
+        found = walk_up_to_project(root)
+        if found and args.execute:
+            print("wf-catalog: %s carries no .claude/. The nearest project root is %s, "
+                  "but --execute deletes files and will not act on an inferred tree. "
+                  "Re-run with --root %s if that is the one you mean."
+                  % (root, found, found), file=sys.stderr)
+            return 2
+        if found:
+            print("wf-catalog: %s carries no .claude/ — resolving against %s"
+                  % (root, found), file=sys.stderr)
+            root = found
 
     if args.execute and not args.migrate:
         print("--execute is only meaningful with --migrate", file=sys.stderr)

@@ -1211,12 +1211,23 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    with the `$WF` prefix that section shows because nothing here puts `bin/` on `PATH`. **A citation in
    `## Sources` takes a different edit**: that section declares sources by path as a matter of
    contract, so name the resolver as the read mechanism and keep the source named, rather than dropping
-   a bare command into a path list. **Only the three resolvable kinds are healed** — `text-eval`,
-   `code-evaluator`, `security-evaluator`. `image-eval`, `ui-design` and any other catalog are not in
-   the resolver's table, the migration never touches their files, and rewriting those citations would
-   replace a working read with a command that exits 2. *Measured 2026-09-10: an earlier draft flagged
-   all five, and 5 of 13 flagged handbooks on `odyssey-alive` cited only unresolvable catalogs — 38%
-   false positives carrying a breaking remedy.* **This is a relocation, not a rewrite**, and it is authorized here on the same footing as the
+   a bare command into a path list. **Every resolvable kind is healed, and that is now all five** —
+   `text-eval`, `code-evaluator`, `security-evaluator`, `image-eval` and `ui-design`, the last of which
+   the resolver also serves under its `design-eval` spelling. *This item read `only the three
+   resolvable kinds` until 2026-09-13, and the restriction was correct when it was written: an earlier
+   draft flagged all five against a three-kind resolver, and 5 of 13 flagged handbooks on
+   `odyssey-alive` cited only catalogs the resolver did not serve — 38% false positives carrying a
+   remedy that would have replaced a working read with a command that exits 2. The image and ui
+   catalogs shipped on 2026-09-10, `wf-catalog`'s `CATALOGS` table has served all five kinds since, and
+   `wf-conform`'s `CATALOG_KIND` table behind `INV-CATREAD` names the same five (under six spellings,
+   `design-eval` among them); `bin/check` § `conform: a catalog read grounded on a literal path has a
+   detector, and it is advisory` asserts the two tables agree as a set relation, so a sixth catalog
+   added to one and not the other fails there rather than on somebody's org. The
+   restriction outlived its reason by three days and named this item as the fix locus while doing it.*
+   **Confirm the kind resolves before rewriting a citation**, which is one command per kind and is the
+   standing rule rather than a concession to this history: a citation is healed to a form that has been
+   observed to answer, never to one the table says ought to.
+   **This is a relocation, not a rewrite**, and it is authorized here on the same footing as the
    Sources heal above: the check the handbook performs is unchanged, and item 2's bar on rewriting
    `## Procedure` prose does not reach a citation whose target the same run is about to delete.
    **Ordering is not a preference — 2c runs in Step 5d and the migration in Step 6-F**, so the
@@ -1319,14 +1330,25 @@ The run prints **`INV-STAMP`** (`references/invariants.md` row 32), all counts, 
 already emits this line, so the work here is wiring it into the report rather than composing one:
 
 ```
-INV-STAMP  22 handbook(s) · stamped 2 · ok 15 · unstamped 0 · mismatch 0 · no-sections 4 · adopted 3
+INV-STAMP  22 handbook(s) · stamped 2 · ok 15 · unstamped 0 · mismatch 0 · n/a 3 · no-sections 1 · adopted 3
 ```
 
 **`mismatch` above zero at the end of an audit is `NOT UPHELD` and blocks the sweep.** A stamp the run
 could not resolve means a handbook moved for a reason the run cannot account for, and a sweep that
-deletes on that footing is deleting against a tree nobody read. `no-sections` and `adopted` are not
-failures and never block: a Lead carries a charter with no `## Procedure`, so there is nothing to
-hash, and an adopted agent was never placed under this contract.
+deletes on that footing is deleting against a tree nobody read.
+
+**`n/a`, `no-sections` and `adopted` never block, and only the middle one is worth reading twice.**
+`n/a` counts the delegating tiers — a CEO and a Lead carry a charter with no `## Procedure`
+(`handbook-templates.md` § Lead: a coordinator's job is judgment), so there is no procedure contract
+and nothing to hash. That is the design, and no hash pair is invented to give them one. `adopted`
+counts agents workforce never authored, which were never placed under this contract. `no-sections`
+now means one thing only: **an IC handbook missing a section it is required to carry** — read it as a
+handbook to fix, and `wf-conform` owns the verdict.
+
+*Until 2026-09-13 there was no `n/a`, and every Lead landed in `no-sections`. A healthy org read
+`no-sections 3` — three alarms for three correct charters, printed beside counters whose other values
+are all failures — and the one count that should have prompted a repair could not be seen against
+them.*
 
 The run prints **`INV-REFRESH`** (`references/invariants.md` row 27), all counts, always:
 

@@ -138,7 +138,17 @@ stops the census it depends on.
 **Three conditions, all required**, which makes precision a property rather than a sample: the name is
 a canary or probe name; the file does **not** carry `measures-fact:` (that marks a shipped canary,
 whose job recurs per host and per harness version and which is never residue); and `platform-local.md`
-actually records the measurement. Any one missing and the file is left alone.
+records a measurement **taken on the running harness**. Any one missing and the file is left alone.
+
+The third condition compares `platform-local.md`'s `MEASURED-ON` against the version the harness
+reports, which is the comparison `procedures/audit.md` Step 4b already makes before it returns
+`PASS (on record)`. It was once a substring test for `TIER-LIMIT:`, which asks only whether a
+measurement was ever taken. On a host that had upgraded `claude`, the platform facts were stale and
+that condition was satisfied at the same time, so the pass deleted the canary a run had just written
+to re-measure them. A running version that cannot be obtained counts as **unmeasured** and the file is
+kept: this pass deletes, and a question the host will not answer must not authorize a deletion.
+`--measured-on` supplies the version where `claude` is not on PATH, the same escape hatch
+`--record-canary` carries and reconciled the same way.
 
 Measured on `apps-odyssey-alive`: **4 live collisions → 0**, all four self-declared throwaways, with
 `platform-local.md` recording `TIER-LIMIT: 3` and citing those exact fixtures as its evidence.

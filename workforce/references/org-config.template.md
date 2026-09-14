@@ -88,9 +88,10 @@ losing the code lane changes what a code employee costs. What WAS verified again
 reference that day (the `claude-api` skill, cached 2026-06-24) is the arithmetic the rest of this section
 depends on: `claude-opus-5` at $5/$25 with the full five-rung ladder, and `claude-sonnet-5` at $2/$10 —
 the latter correcting a stale `$3/$15` this file had carried, which understated the IC lane's saving as
-~40% when it is ~60%. The analytical lane still splits its recommendation by tier: `claude-opus-5` for
-the **Lead**, whose mistakes are inherited by every IC beneath it, and — **since 2026-09-09** —
-`claude-opus-4-8` for the **IC**, the wide fan-out wave. **The arithmetic above is the record of what
+~40% when it is ~60%. The analytical lane's tier split outlived this revision by four days: **since
+2026-09-09 both tiers run `claude-opus-4-8`** and the split is carried by `effort` alone — `high` for
+the **Lead**, whose mistakes are inherited by every IC beneath it, `medium` for the **IC**, the wide
+fan-out wave. **The arithmetic above is the record of what
 was verified that day and is deliberately left standing; the `$2/$10` IC and the ~60% saving it
 describes are gone.** `claude-opus-4-8` is `$5/$25`, so the two tiers are now price-neutral and effort
 is the only lever between them (§ Tier defaults). A directive is not a measurement of THIS project's work either — treat the picks
@@ -160,10 +161,10 @@ pinned to it renders no effort object at all. **Named with the canonical categor
 this section sets the order the choices are shown in and, apart from marking the recommendation, changes
 none of them.
 
-**Per-model rung availability is read from `references/platform.md` facts 12b and 12c and from nowhere
-else.** The paragraph above is a reader's summary of those two facts, not a second source: `wf-effort-budget`
-parses the facts themselves, so a model that gains or loses a rung is one edit in `platform.md`. Both facts
-are DOCUMENTED and unverified — the ladder they produce is offered, never enforced.
+**Per-model rung availability is read from `references/platform.md` facts 12b, 12c and 12d and from
+nowhere else.** The paragraph above is a reader's summary of those facts, not a second source: the run
+reads the facts themselves, so a model that gains or loses a rung is one edit in `platform.md`. Every one
+of them is DOCUMENTED and unverified — the ladder they produce is offered, never enforced.
 
 ## Budget question wording — the four calls, stated once
 
@@ -252,8 +253,8 @@ Five employee-bearing lanes plus the advisor, each addressed and managed separat
 ### Analytical — the baseline  (EDIT THESE FREELY)
 
 **The Lead and IC defaults are the analytical selection.** There is no separate "tier" question: an
-employee with no lane override resolves to the analytical row for its tier. **The two rows now differ in
-model as well as effort** — a change from the era when one model supplied both.
+employee with no lane override resolves to the analytical row for its tier. **Since 2026-09-09 the two
+rows name one model and differ in effort alone** — the reasoning is under the table.
 
 | Tier | Model | Effort |
 |---|---|---|
@@ -284,15 +285,17 @@ so every value here is a deliberate override of whatever the user is running.
   the deliberate result of spending the model lever and keeping the effort one.* For the *most mechanical* ICs
   (pure classification, routing, lookups), pin `claude-haiku-4-5` per employee (§ Employee overrides) —
   it is cheaper still, though it takes no effort setting.
-- **Lead `claude-opus-5` · `high`.** Leads are 2–4 in the whole org and spawn once per work order, so
+- **Lead `claude-opus-4-8` · `high`.** Leads are 2–4 in the whole org and spawn once per work order, so
   the wide-wave cost argument does not reach them. Their work — planning, dispatch, synthesis — is the
   judgment kind that model strength and effort actually move, and it is the tier whose mistakes are
-  inherited by every IC beneath it. **A cheap Lead is the expensive place to save.** Until 2026-09-05
-  this row read `claude-opus-4-8`, argued for on steerability — that a coordinating seat should stay a
-  thought-partner rather than commit to its own reading. That argument was a preference, never a
-  measurement on this project's work, and the user's directive replaced it; both models are the same
-  `$5/$25` tier, so the swap costs nothing. The steerability preference is still reachable by typing
-  `claude-opus-4-8` into the budget's "Other" field.
+  inherited by every IC beneath it. **A cheap Lead is the expensive place to save**, and the effort rung
+  is where this row spends rather than the model. *This row read `claude-opus-4-8` until 2026-09-05,
+  when a user directive moved it to `claude-opus-5`; the 2026-09-09 directive that set both tiers to
+  `claude-opus-4-8` moved it back, and this bullet went on naming the superseded pick until 2026-09-13.
+  The standing argument for the current value is steerability — a coordinating seat should stay a
+  thought-partner rather than commit to its own reading — which is a preference and was never a
+  measurement on this project's work. Both models are the same `$5/$25` tier, so neither swap changed
+  what a Lead costs.* `claude-opus-5` is reachable by typing it into the budget's "Other" field.
 
 **The Lead default is conditional on the domain the Lead oversees.** The `analytical` seat is the
 Lead default for a pure-orchestration seat: a routing Lead stays analytical because routing is the

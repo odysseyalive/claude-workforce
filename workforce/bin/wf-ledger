@@ -105,7 +105,16 @@ _FIELD_RE = {f: re.compile(r"^\*\*%s:\*\*[ \t]*(.*)$" % f, re.M) for f in FIELDS
 _INDEX_ROW_RE = re.compile(
     r"^- `(?P<id>[A-Za-z]+-[A-Za-z0-9._-]+)` — (?P<type>[A-Z]+)"
     r"(?: — (?P<status>[a-z]+) — subjects: (?P<subjects>.*?))?"
-    r"(?: — anchors: (?P<anchors>.*?))?$", re.M)
+    r"(?: — anchors: (?P<anchors>.*?))?"
+    # THE ORG FAMILY'S SUMMARY TAIL. `index` carries those rows through verbatim
+    # (`carried_org_rows`), and a row it preserves must still PARSE — without this
+    # group a `DEF` row reading "— the router dropped the tag" stops matching and
+    # `check` reports it NOT INDEXED, which is the carry-forward defeating itself.
+    # Captured and unread: the text belongs to the procedure that wrote it.
+    r"(?P<summary> — .*?)?$", re.M)
+# Any row at all, whatever follows the ID. Deliberately looser than the row grammar
+# above, because carrying a row forward must not depend on being able to parse it.
+_ANY_ROW_RE = re.compile(r"^- `(?P<id>[A-Za-z]+-[A-Za-z0-9._-]+)` — .*$", re.M)
 
 
 def _die(msg):
@@ -184,11 +193,42 @@ def index_path(root):
     return os.path.join(store_dir(root), INDEX)
 
 
+def carried_org_rows(root):
+    """The ORG family's existing index rows, verbatim, keyed by ID.
+
+    A SCOPED EXCEPTION to "never trust the old index", and the scope is the whole
+    point. Enumeration still comes from the filesystem — this decides only what an
+    org row SAYS, never which rows exist, so the drift this file's header warns about
+    cannot come back through it: a row here that has no file on disk is never emitted,
+    and a file with no row here still gets the bare fallback.
+
+    WHY THE TEXT MUST BE CARRIED. `index --execute` is the only shipped writer of
+    `index.md`, and the org rows in it are written by the procedures that own those
+    records — `defect.md` step 5c says "Add it to .claude/workforce/personnel/index.md"
+    in so many words. Re-emitting them as bare `- `ID` — TYPE` destroyed every summary
+    a human or a procedure had put there, on a mode whose header says "Never
+    hand-edited". Parsing a `Summary:` field out of the records instead was the
+    alternative and it is not available: `personnel-templates.md` gives EMP, PERF, DEF,
+    AMD, RFI and ORG six different field sets with no common summary line, so option
+    one meant inventing a field in six templates and back-filling every record on every
+    installed tree to stop a data-loss bug.
+    """
+    text = read_text(index_path(root)) or ""
+    out = {}
+    for m in _ANY_ROW_RE.finditer(text):
+        if not is_project(m.group("id")):
+            out[m.group("id")] = m.group(0).rstrip()
+    return out
+
+
 def render_index(root, records):
     today = datetime.date.today().isoformat()
+    carried = carried_org_rows(root)
     out = ["# Personnel index", "",
            "Regenerated from the filesystem by `wf-ledger index`, %s." % today,
-           "Never hand-edited.", "",
+           "Project rows are rebuilt from each record; org-family rows "
+           "(EMP, PERF, DEF, AMD, RFI, ORG) are carried through unchanged, because "
+           "the procedures that own those records write them.", "",
            "**%d records.**" % len(records), ""]
     for rec in records:
         if is_project(rec["id"]):
@@ -198,7 +238,7 @@ def render_index(root, records):
             if rec.get("anchors") and rec["anchors"] != "(none)":
                 row += " — anchors: %s" % rec["anchors"]
         else:
-            row = "- `%s` — %s" % (rec["id"], rec["type"])
+            row = carried.get(rec["id"]) or "- `%s` — %s" % (rec["id"], rec["type"])
         out.append(row)
     return "\n".join(out) + "\n"
 

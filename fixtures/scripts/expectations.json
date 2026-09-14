@@ -121,8 +121,11 @@
     ]
   },
   "apply-emptyroot": {
-    "_why": "wf-apply's plain (non-record-canary) DISPLAY path on a minimal root. The tree carries exactly one throwaway canary, .claude/agents/wf-canary-a.md, so PASS-STALE-CANARY has one named target; DISPLAY is the default, so the target and the --execute consent gate are printed and nothing is applied. Without a row the fixture tree was on disk and unasserted \u2014 a detector with no proof.",
-    "args": [],
+    "_why": "wf-apply's plain (non-record-canary) DISPLAY path on a minimal root. The tree carries exactly one throwaway canary, .claude/agents/wf-canary-a.md, so PASS-STALE-CANARY has one named target; DISPLAY is the default, so the target and the --execute consent gate are printed and nothing is applied. Without a row the fixture tree was on disk and unasserted \u2014 a detector with no proof. platform-local.md carries a MEASURED-ON matching the pinned --measured-on: the third condition became a version comparison rather than a substring test (see apply-stalecanary-drifted), and this tree's record was written before there was anything to compare, so it read as unmeasured and the DISPLAY path this row exists for was never reached.",
+    "args": [
+      "--measured-on",
+      "2.1.223"
+    ],
     "exit": 0,
     "script": "wf-apply",
     "want": [
@@ -132,7 +135,11 @@
     ]
   },
   "apply-stalecanary": {
-    "_why": "THREE populations in one tree and only one is residue: a throwaway canary (no measures-fact:), a SHIPPED canary (carries measures-fact:, its job recurs per host and per harness version, never residue), and a real employee. Precision is a property of the three required conditions rather than a sample, and this asserts all three by naming what must NOT appear.",
+    "_why": "THREE populations in one tree and only one is residue: a throwaway canary (no measures-fact:), a SHIPPED canary (carries measures-fact:, its job recurs per host and per harness version, never residue), and a real employee. Precision is a property of the three required conditions rather than a sample, and this asserts all three by naming what must NOT appear. THE CONTROL HALF of the drift pair: platform-local.md's MEASURED-ON equals the harness version passed in, so the third condition is genuinely met and the canary is genuinely residue. --measured-on pins the comparison so the case is host-independent, exactly as it does for --record-canary.",
+    "args": [
+      "--measured-on",
+      "2.1.223"
+    ],
     "exit": 0,
     "not": [
       "wf-canary-b.md",
@@ -145,6 +152,28 @@
       "would apply 1",
       "wf-canary-a.md",
       "files_removed"
+    ]
+  },
+  "apply-stalecanary-drifted": {
+    "_why": "A CANARY WRITTEN TO RE-MEASURE STALE FACTS WAS SWEPT BY THE PASS THAT READS THEM. The third condition was `\"TIER-LIMIT:\" in platform-local.md`, a bare substring test that asks whether a measurement was ever taken and never whether it still describes the harness in the room. On a host that upgraded `claude`, the facts were stale AND the condition was green at the same time, so `--execute` deleted the fresh canary — the tier ceiling is re-measured per harness version (platform.md § Staleness), so the one moment the canary is indispensable is the moment the pass removed it. Identical tree and identical arguments to apply-stalecanary except MEASURED-ON, which is 2.1.100 here against a 2.1.223 harness: the pair isolates the verdict to that one token. REFUSED is asserted together with the reason, because a refusal whose message does not name the drift is indistinguishable from the never-measured refusal it replaced.",
+    "args": [
+      "--measured-on",
+      "2.1.223"
+    ],
+    "exit": 0,
+    "not": [
+      "would apply 1",
+      "wf-canary-b.md",
+      "real-employee.md"
+    ],
+    "script": "wf-apply",
+    "want": [
+      "PASS-STALE-CANARY",
+      "would apply 0",
+      "1 refused",
+      "REFUSED  wf-canary-a.md",
+      "measured on Claude Code 2.1.100",
+      "this harness is 2.1.223"
     ]
   },
   "census-badjson": {
@@ -650,8 +679,25 @@
     ]
   },
   "companion-drifted": {
-    "_why": "THE DEFECT THE WHOLE SCRIPT EXISTS FOR. audit.md Step 4 said 'force-refresh the Core skills every run' in prose with no producer, so it never ran: measured on claude-workforce itself, .claude/skills/org carried 11 dispatch rungs against the shipped 15 across three audits. The marked region here is deliberately behind shipped source, and the two hand-written lines around it are what a refresh must NOT touch.",
-    "exit": 0,
+    "_why": "THE DEFECT THE WHOLE SCRIPT EXISTS FOR. audit.md Step 4 said 'force-refresh the Core skills every run' in prose with no producer, so it never ran: measured on claude-workforce itself, .claude/skills/org carried 11 dispatch rungs against the shipped 15 across three audits. The marked region here is deliberately behind shipped source, and the two hand-written lines around it are what a refresh must NOT touch. REWRITTEN 2026-09-13, against the behaviour 1b866d1 deliberately shipped and this row was never updated for. Two expectations were stale and one was vacuous. (a) exit is 1, not 0: an ABSENT core companion is non-zero in REPORT mode too, because the companion is owed and not there -- invariants.md row 23, and the measurement that forced it was /org going missing through a two-hour audit at exit 0. (b) operating-principles now reports NO-REGION rather than UNMANAGED, because it gained the WF-PRINCIPLES machine-owned region on 2026-09-11 and this installed copy carries no marker pair. (c) 'UNMANAGED' as a want was VACUOUS from that day on -- no row can produce it in this tree, and the substring was satisfied only by the boilerplate footer sentence that names both states. It is replaced by the counted INV-CORE line, which is exact and cannot be satisfied by prose. The 'after' block is the report-mode-writes-nothing assertion the row never had: stdout claiming 'would refresh' proves nothing about the file.",
+    "after": {
+      ".claude/skills/operating-principles/SKILL.md": {
+        "want": [
+          "1. A project-specific principle with no machine-owned region anywhere in the file."
+        ]
+      },
+      ".claude/skills/org/SKILL.md": {
+        "not": [
+          "15. **Say the state, not the journey.**"
+        ],
+        "want": [
+          "Hand-written preamble this project owns.",
+          "2. **A second stale rung.**",
+          "Hand-written trailer this project also owns."
+        ]
+      }
+    },
+    "exit": 1,
     "must_not": [
       "refreshed region"
     ],
@@ -660,14 +706,37 @@
       "DRIFTED",
       "would refresh",
       "rungs installed vs",
-      "UNMANAGED",
+      "NO-REGION",
       "ABSENT",
       "INV-CORE  3 core skill(s)",
-      "unrefreshed 3"
+      "current 0 · refreshed 0 · materialized 0 · unrefreshed 3 · absent 1"
     ]
   },
   "companion-drifted-execute": {
-    "_why": "The same tree with --execute. Only the machine-owned region is replaced; operating-principles has no region and is REPORTED rather than overwritten, because audit-setup.md Step 0.3 state 3 holds that the customization is the requirement and the shipped copy is the newcomer. A run that 'succeeded' by overwriting it would have deleted this project's own principles.",
+    "_why": "The same tree with --execute. Only the machine-owned region is replaced; operating-principles is REPORTED rather than overwritten, because audit-setup.md Step 0.3 state 3 holds that the customization is the requirement and the shipped copy is the newcomer. A run that 'succeeded' by overwriting it would have deleted this project's own principles. REWRITTEN 2026-09-13 for the behaviour 1b866d1 shipped: personnel-ledger is now MATERIALIZED instead of left absent, so unrefreshed is 1 and not 2; and the refusal is labelled NO-REGION, not UNMANAGED, since operating-principles gained the WF-PRINCIPLES region on 2026-09-11 and this copy has no marker pair. 'refreshed 1' is kept off the want list on purpose -- it is a substring of 'unrefreshed 1' and would pass on the wrong number; the counted line is asserted whole instead. The 'after' block is what the _why above always claimed and never measured: the project's own two principles survive byte-for-byte, the stale rung is gone, both hand-written org lines remain, and the materialized companion is on disk.",
+    "after": {
+      ".claude/skills/operating-principles/SKILL.md": {
+        "want": [
+          "1. A project-specific principle with no machine-owned region anywhere in the file.",
+          "2. A second one. A force-refresh that \"won\" here would delete both."
+        ]
+      },
+      ".claude/skills/org/SKILL.md": {
+        "not": [
+          "2. **A second stale rung.**"
+        ],
+        "want": [
+          "Hand-written preamble this project owns.",
+          "15. **Say the state, not the journey.**",
+          "Hand-written trailer this project also owns."
+        ]
+      },
+      ".claude/skills/personnel-ledger/SKILL.md": {
+        "want": [
+          "name: personnel-ledger"
+        ]
+      }
+    },
     "args": [
       "--execute"
     ],
@@ -679,25 +748,36 @@
     "want": [
       "+ org",
       "refreshed",
-      "refreshed 1",
-      "UNMANAGED",
-      "unrefreshed 2"
+      "NO-REGION",
+      "current 0 · refreshed 1 · materialized 1 · unrefreshed 1 · absent 0"
     ]
   },
   "companion-halfmarker": {
-    "_why": "One marker without its pair. procedures/org.md step 5: REPORT and SKIP, never auto-repair -- guessing where the missing END belongs is how a partial hand-edit gets overwritten. NO-REGION is counted in unrefreshed and names its precondition, so the run cannot skip it silently and still close clean.",
+    "_why": "One marker without its pair. procedures/org.md step 5: REPORT and SKIP, never auto-repair -- guessing where the missing END belongs is how a partial hand-edit gets overwritten. NO-REGION is counted in unrefreshed and names its precondition, so the run cannot skip it silently and still close clean. REWRITTEN 2026-09-13. The count is 1, not 3: the other two companions are absent here and --execute now MATERIALIZES them, which is 1b866d1's producer behaviour. The must_not was also WRONG AS WRITTEN and only looked right because nothing evaluated it -- 'refreshed 1' is a substring of 'unrefreshed 1', so it fired on the very output it was meant to accept. It is pinned to '· refreshed 1' so the separator anchors it to the refreshed counter, and the whole counted line is asserted as well. The 'after' block is the never-auto-repair assertion itself: the half-marked file must still read exactly as the hand-edit left it.",
+    "after": {
+      ".claude/skills/org/SKILL.md": {
+        "not": [
+          "15. **Say the state, not the journey.**",
+          "<!-- ORG-DISPATCH-CHECKPOINT END -->"
+        ],
+        "want": [
+          "CHECKPOINT — a partial hand-edit removed the END marker.",
+          "1. **Only half a region.**"
+        ]
+      }
+    },
     "args": [
       "--execute"
     ],
     "exit": 0,
     "must_not": [
-      "refreshed 1"
+      "· refreshed 1"
     ],
     "script": "wf-companion",
     "want": [
       "NO-REGION",
       "never auto-repair",
-      "unrefreshed 3"
+      "current 0 · refreshed 0 · materialized 2 · unrefreshed 1 · absent 0"
     ]
   },
   "commitments-records-a-list": {
@@ -880,6 +960,26 @@
       "0 failed"
     ]
   },
+  "conform-fsroot-path-arg": {
+    "_why": "A bare `/tmp` as the last argument of a shell example is an absolute path, not a slash-command. The path-fragment filter skipped only a token with a `/` on BOTH sides, so a trailing-less root escaped and the advisory read `/tmp resolves to no skill`. MEASURED 2026-09-13 on a real IC handbook whose step ran `php tests/reconcile-transactions.php ... /tmp`.",
+    "exit": 0,
+    "not": [
+      "/tmp resolves to no skill"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "0 failed"
+    ]
+  },
+  "conform-fsroot-routed": {
+    "_why": "THE NEGATIVE FOR THE EXCLUSION ABOVE. Membership in FS_ROOTS is not on its own enough to skip a token: `Invoke /tmp` sits in a routing position with no sibling path, flag or `.ext` argument, so it is still advised. Without this row the root list could be widened until the advisory reported nothing — a check discounted into silence is the failure verify.md § BLOCKING names.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "/tmp resolves to no skill",
+      "0 failed"
+    ]
+  },
   "conform-mcp-slug-is-skill": {
     "_why": "A bare `<name>-mcp` that resolves to `.claude/skills/<name>-mcp/SKILL.md` is a SKILL, reached through `Skill()`, and a skill grants nothing and needs nothing in `tools:`. MEASURED 2026-09-05 on playwright-mcp: `build-mcp` is a skill and it produced a BLOCKING failure in 4 of 6 handbooks. The `mcp__` invocation form is untouched, so this exclusion cannot hide a dependency an employee actually calls.",
     "exit": 0,
@@ -937,12 +1037,58 @@
       "0 failed"
     ]
   },
+  "conform-ownership-contested": {
+    "_why": "Finding #10a: an owner named in one handbook and denied in another. No per-handbook check can see it — each of these three files is internally perfect, and a cold reader of any one alone reports nothing. Both firing forms are here and they are classified differently on purpose. EXCLUSIVE fails: `docs-writer` is told `docs/**` is its own (`you own these`) and `api-engineer` claims the same tree, which leaves no reading under which both are right. DISPUTED advises: `site-editor` sends `site/**` to `api-engineer` while `docs-writer` claims it, and an org may also overlap a tree with an aspect of it on purpose — measured across eight live orgs before the split was chosen.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "3 governed",
+      "both claim `docs/**`, one of them alone",
+      "`site/**` is claimed here and given to api-engineer by site-editor"
+    ]
+  },
+  "conform-ownership-routed": {
+    "_why": "THE NEGATIVE THAT STOPS #10a BEING WIDENED INTO SILENCE, carrying all three shapes that must NOT fire, each one measured as a false finding on a live org before it was guarded. (1) The ordinary IN/OUT pairing the template ships: `api-engineer` sends `docs/**` to `docs-writer`, who claims it — agreement, not a dispute. (2) An ASPECT of a tree: `docs-writer` claims the strings appearing anywhere under `content/**` while `api-engineer` owns the tree exclusively — a correct org, and the shape a 17-handbook live org is built on. (3) A DELEGATION: `api-engineer` holds `convex/**` and names `data-steward` in the same bullet, so the handbook that attributes it to `data-steward` agrees with it.",
+    "exit": 0,
+    "not": [
+      "claimed here and given to",
+      "one of them alone"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "3 governed",
+      "0 failed"
+    ]
+  },
   "conform-removal-staged": {
     "_why": "The same tree with Step 6-S having run: T7s writes SKILL.md.orig and tree/, T7c writes the mark, and T2's extraction record exists for the one sacred span the target holds. MUST pass. Paired with conform-removal-unstaged (the mark is missing) and conform-removal-unextracted (the extraction is missing) so each half of Step 6-S has a fixture that fails without it. `tree/` is asserted because the sweep unlinks the WHOLE directory \u2014 references/, scripts/, hooks/, datasets \u2014 and SKILL.md.orig is an undo for the least of that.",
     "exit": 0,
     "not": [
       "dispositioned for removal and staged",
       "sacred span"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ]
+  },
+  "conform-removal-swept-missing": {
+    "_why": "The paired negative for conform-removal-swept-relocated, and the reason the fix could not simply skip T8 rows. Identical journal, identical T8 row recording the same undo path — and nothing on disk at it, nor under any other run directory, nor at the mid-run staging path. A recorded undo is not an undo. The sweep's only whole-directory reversal is the bytes, so a row that says they exist while they do not must still fail, and the finding must name every path that was looked at rather than one hard-coded guess.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "oldgen staged its whole directory",
+      "its COMMITTED T8 row records the sweep",
+      "work/audit-20260810T215735Z/staging/oldgen/tree"
+    ]
+  },
+  "conform-removal-swept-relocated": {
+    "_why": "DEF-Q-002: a CORRECTLY swept employee failed forever. The removal-set reader resolved the staged undo only at `.claude/workforce/staging/<name>/tree`, and the sweep RELOCATES it to `.claude/workforce/work/<run-id>/staging/<name>/tree`, recording that exact path in its COMMITTED T8 row. Measured on a live host: undo present at the recorded path, absent under staging/, and every verify after the sweep reported `staged its whole directory: … is absent` with no edit that could clear it. The sweep was behaving. This tree is the after-state — target gone, staging/ gone, undo under work/ — and it MUST pass, because trusting the path a journal records is what `check_journal` already does one row earlier.",
+    "exit": 0,
+    "not": [
+      "staged its whole directory",
+      "dispositioned for removal and staged"
     ],
     "script": "wf-conform",
     "want": [
@@ -997,6 +1143,27 @@
     "want": [
       "1 governed",
       "0 failed"
+    ]
+  },
+  "conform-selfwrite-carveout": {
+    "_why": "THE NEGATIVE THAT STOPS #10b BEING WIDENED INTO SILENCE. Three shapes that read like the defect and are not, each one measured as a false finding on a live org before it was guarded. (1) A CARVE-OUT inverts the sentence: `NEVER edit files outside your ## Scope IN list and your own reporting directory under .claude/workforce/work/` names the one place writing IS allowed, and the Reporting step writes exactly there. (2) A LOCATION is not an object: `NEVER write, edit, or overwrite a *.png.orig under figures/` bans one artifact inside a directory it does not ban, and the step that writes a composite into that directory is correct. (3) An instruction AGREEING with a ban restates it: `this step never runs bin/sync` is not an order to run it. A false integrity alarm costs more than a missed one, so every one of these must stay silent.",
+    "exit": 0,
+    "not": [
+      "orders a write this handbook forbids"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ]
+  },
+  "conform-selfwrite-contradiction": {
+    "_why": "Finding #10b, and the mechanical half of a reading `claude-md.md` § question 2 left to a human: `a relocated rule its host forbids has not arrived`. From DEF-relocation-does-not-reconcile, 2026-08-06 — eighteen lines were relocated verbatim into `runtime-lead`, the ledger went 32 to 50, and EVERY GATE PASSED, because retention is a per-line question and coherence is not. The cold reader that passed that handbook then found a write-up path ordered against a guardrail forbidding it. Here the same file orders `write docs/api.md` at ## Procedure and forbids editing it at ## Guardrails; the employee holding it either stops and returns a QUESTION or picks a side and is wrong. Both sides are quoted because only the author can say which line is right.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "orders a write this handbook forbids (`docs/api.md`)",
+      "NEVER edit `docs/api.md`"
     ]
   },
   "conform-slug-is-project-mcp": {
@@ -1371,6 +1538,30 @@
       "${CLAUDE_PROJECT_DIR} is unset outside a hook; pass an explicit path."
     ]
   },
+  "ledger-index-carries-org-summary": {
+    "_why": "DESTRUCTIVE-ON-EXECUTE DATA LOSS, MEASURED 2026-09-13. `index --execute` is the ONLY shipped writer of index.md, and it re-emitted every org-family row (EMP, PERF, DEF, AMD, RFI, ORG) as a bare `- `ID` — TYPE`, erasing the one-line summary the procedures that own those records had written there (`defect.md` step 5c). It now carries an org row through verbatim. THREE THINGS AT ONCE, and the last two are what keep the exception scoped: the DEF summary survives; the project row is still rebuilt from the record and not from the index; and `EMP-gone` — a row with no file on disk — is NOT resurrected, so enumeration still comes from the filesystem.",
+    "after": {
+      ".claude/workforce/personnel/index.md": {
+        "not": [
+          "EMP-gone"
+        ],
+        "want": [
+          "**2 records.**",
+          "- `DEC-real` — DEC — accepted",
+          "- `DEF-org-family` — DEF — the intent router dropped the task tag on resume"
+        ]
+      }
+    },
+    "args": [
+      "index",
+      "--execute"
+    ],
+    "exit": 0,
+    "script": "wf-ledger",
+    "want": [
+      "wrote .claude/workforce/personnel/index.md — 2 record(s)"
+    ]
+  },
   "ledger-index-rebuild": {
     "_why": "ENUMERATE FROM THE FILESYSTEM, NEVER FROM THE PRIOR INDEX (`ledger.md` \u00a7 Migrating them in - a real predecessor index under-reported its own contents by three records). The fixture's index names a record that does not exist and omits two that do, so an implementation that read its own output forward would keep the phantom and drop the real ones while reporting success. `after` asserts the written file, because the destroyed value never appears on stdout.",
     "after": {
@@ -1704,6 +1895,27 @@
       "REFUSED",
       "LOST    cmd:/demo run",
       "Nothing was written"
+    ]
+  },
+  "remainder-deadscript-maintainer": {
+    "_why": "THE SHIPPED SKILL WAS REPORTED AS CARRYING DEAD SCRIPTS ON EVERY INSTALL, and the distribution was working correctly while it happened. `workforce/SKILL.md` says in its own second line that bin/ is maintainer-facing and does not ship, then cites `bin/check`, `bin/sync` and `bin/dev-sandbox` because the reader of those sentences is a maintainer standing in the repository. On a host none of the three resolves, so all three came back UNRESOLVED -- and the repair a dead-script finding invites is rewriting the sentence, which here would break a correct reference to a real file. Measured against HEAD's wf-remainder on this identical tree: `4 unresolved`, three of them maintainer citations. THE EXEMPTION IS NARROW AND THIS TREE PINS BOTH SIDES: `scripts/vanished.sh` sits in the same file, resolves nowhere, and is not under bin/, so it must still report UNRESOLVED and the count must still be 1. The MAINTAINER rows are asserted PRESENT rather than absent -- they are excused from the dead count, not from the report, because a number that shrank without explanation is its own defect.",
+    "args": [
+      "--dead-scripts"
+    ],
+    "exit": 0,
+    "script": "wf-remainder",
+    "want": [
+      "1 unresolved",
+      "0 misrouted",
+      "3 maintainer-only",
+      "UNRESOLVED .claude/skills/workforce/SKILL.md  ->  scripts/vanished.sh",
+      "MAINTAINER .claude/skills/workforce/SKILL.md  ->  bin/check   (bin/ does not ship; maintainer-facing)",
+      "MAINTAINER .claude/skills/workforce/SKILL.md  ->  bin/sync",
+      "MAINTAINER .claude/skills/workforce/SKILL.md  ->  bin/dev-sandbox"
+    ],
+    "not": [
+      "UNRESOLVED .claude/skills/workforce/SKILL.md  ->  bin/",
+      "4 unresolved"
     ]
   },
   "remainder-deadscript": {
@@ -2601,6 +2813,17 @@
       "stamped 0"
     ]
   },
+  "stamp-lead-judgment-tier": {
+    "_why": "A FALSE ALARM IS A DEFECT IN THE LABEL, NOT IN THE HANDBOOK. `handbook-templates.md` § Lead: a `tier: 2` charter carries no `## Procedure`, because a coordinator's job is judgment — so `contract_digest` correctly finds nothing to hash. Reporting that as NO-SECTIONS made INV-STAMP read `no-sections 3` for three correct handbooks, in a counter whose other values are all failures (MEASURED 2026-09-13). The Lead now reports `n/a`. BOTH HALVES IN ONE TREE, and the second is what keeps the first honest: the tier-3 handbook beside it is genuinely missing `## Procedure` and must still read NO-SECTIONS, or the new state has simply muted the check.",
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      ". n/a         lead",
+      "delegating tier",
+      "~ NO-SECTIONS broken-ic",
+      "n/a 1 · no-sections 1"
+    ]
+  },
   "stamp-drift": {
     "_why": "THE NEGATIVE. A real digest that no longer matches the sections is MISMATCH: reported, exit 1, and NEVER rewritten. checksums.md \u00a7 On mismatch \u2014 a legitimate amendment and an unauthorized edit are indistinguishable from the hash, so re-stamping erases the only evidence that something changed. `not` asserts the file is not silently repaired by holding the stale digest in the output; the --execute half of the same guarantee is stamp-drift-execute.",
     "exit": 1,
@@ -3047,12 +3270,90 @@
     ]
   },
   "widen-background-is-silent": {
-    "_why": "THE ONE FALSE POSITIVE IN THE MEASUREMENT, closed with data rather than a word list. \"Nothing to do but let it finish. Continuing to wait\" is a correct stop, and the Stop payload carries `background_tasks` to say so, so the fixture proves the array is read rather than the phrase guessed.",
+    "_why": "THE ONE FALSE POSITIVE IN THE MEASUREMENT, closed with data rather than a word list. \"Nothing to do but let it finish. Continuing to wait\" is a correct stop, and the Stop payload carries `background_tasks` to say so, so the fixture proves the array is read rather than the phrase guessed. The note it must carry changed on 2026-09-13 with the gate that moved: the turn is not judged BECAUSE it is waiting, which is a different fact from \"no claim this turn that evidence settles\" and was reported with that wording while the jury was still free to block the same turn.",
     "exit": 0,
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Nothing to do but let it finish. Continuing to wait.\", \"background_tasks\": [{\"id\": \"x\"}]}",
     "want": [
+      "not judged",
+      "a background task is still running"
+    ]
+  },
+  "widen-background-jury-is-silent": {
+    "_why": "THE GATE WAS ON ONE TRIGGER, NOT ON THE DECISION. `background_tasks` was read inside `unfinished` alone, so a turn waiting on a running agent was spared the promise block and handed to the senses jury anyway - where it fails by construction, because a turn that is waiting has run nothing. This tree tags the ask `history`, whose juror is hearing, and records zero outside calls: before the fix it blocked with `hearing NOT OPENED` and told a turn to open a channel it was already waiting on.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"It was removed on purpose. The agents are still running; I am waiting on them.\", \"background_tasks\": [{\"id\": \"x\"}]}",
+    "want": [
+      "not judged",
+      "a background task is still running"
+    ],
+    "not": [
+      "NOT OPENED",
+      "stopped mid-work"
+    ]
+  },
+  "widen-between-batches-is-silent": {
+    "_why": "THE GAP BETWEEN BATCHES, REPORTED 2026-09-13 by the session driving four agent batches. `background_tasks` is momentarily EMPTY between one batch finishing and the next being dispatched, and the Stop that lands in that window read a legitimate wait as a turn that announced work and stopped: the tail says \"Continuing.\" and the array that used to settle it says nothing. TWO FACTS make it a wait - a task notification opened the turn, which the tag records, and the reply says what it is waiting on - so the words alone never buy silence (see widen-waiting-words-alone-still-block, the same reply with neither fact).",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}",
+    "want": [
+      "not judged",
+      "waiting on the next"
+    ],
+    "not": [
+      "stopped mid-work"
+    ]
+  },
+  "widen-waiting-words-alone-still-block": {
+    "_why": "THE NEGATIVE THAT KEEPS THE FIX FROM WIDENING INTO SILENCE. Byte for byte the reply of widen-between-batches-is-silent, with no task running and no notification tag on disk: nothing is pending, nobody was asked anything, and the turn ended on \"Continuing.\" That is the measured stop defect - 10 of 106 turns - and it must still be blocked, or a guard is retired by a phrase any turn can write.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}",
+    "want": [
+      "stopped mid-work",
+      "CONTINUING"
+    ],
+    "not": [
+      "not judged"
+    ]
+  },
+  "widen-subagent-fragment-not-the-turn": {
+    "_why": "MEASURED 2026-09-13 and reproduced from a payload: on SubagentStop this hook built a case out of three turns at once. `transcript_path` is the PARENT's, so the evidence was the main turn's; the tag is the SESSION's, so the ask was the user's message; the reply was the spawned agent's own in-flight line. The blind sample then wrote that mixture to the session's flag, and `wf-widen-agent` - registered on Stop and nothing else - blocked the MAIN turn on \"Locating Directives block markers in SKILL.md\", a fragment the user never saw. Here the agent's transcript ends on that fragment while the parent's ends on a clean close, and the sample is forced on: the run must reach `not scored` on the agent's own turn and must NOT blind-sample a flag for the main turn to open.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "1"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"agent.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"Locating Directives block markers in SKILL.md\"}",
+    "want": [
       "not scored"
+    ],
+    "not": [
+      "blind-sampled",
+      "decision"
+    ]
+  },
+  "widen-subagent-claim-still-widens": {
+    "_why": "THE CONTROL ON THE ISOLATION ABOVE. A spawned employee has zero residency and is the node most exposed to authoring from the thin surface in front of it (procedures/hooks.md, the SubagentStop row), so the widen still runs on it - now on ITS ask, ITS reply and ITS evidence. The agent's transcript here makes an absence claim after one point read, which is the 0.5% measured trigger, and the block must still fire. The parent's turn enumerated a set and closed cleanly, so a pass here would mean the parent's evidence was answering for the agent.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"agent.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"There is no hook wired for that event.\"}",
+    "want": [
+      "taste NOT OPENED"
     ]
   },
   "live-finds-phantoms": {
@@ -3133,6 +3434,145 @@
       "DISPLAY ONLY"
     ],
     "must_not": [
+      "REMOVED",
+      "ARCHIVED"
+    ]
+  },
+  "sa-hook-user-scope-already-wired": {
+    "_why": "EVERY DEFAULT HOOK OFFERED A SECOND TIME ON TOP OF ITSELF. The presence check read ONE file -- `settings_for_scope(root, scope)` -- so it asked `is it wired in the file I am about to write` rather than `is it wired`. Registrations concatenate across scopes exactly as grants do (platform.md fact 17, the argument `union_allow` already makes), and at `root == $HOME` the user `settings.json` and the project `settings.local.json` are siblings in ONE directory: the user-scope hook is visibly live and the project-scope offer lands a second copy that double-fires it. Measured against HEAD's wf-settings-apply on this identical tree: 9 of 9 `would register`, 8 of them already running. This tree resolves project scope to settings.local.json by giving it a workforce key and no hooks, so the two scopes are two real files and not one. THE AGENT HOOK IS THE CONTROL: `wf-widen-agent` is genuinely absent here and MUST still be offered, or the fix would be a blanket suppression that reports every tree already wired. `would register` appearing exactly once is what separates the two.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-defaults"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "wf-commitments already registered on Stop in",
+      "wf-protect-directives already registered on PostToolUse in",
+      "wf-task-tag already registered on UserPromptSubmit in",
+      "wf-turn-ledger@subagent already registered on SubagentStop in",
+      "registrations concatenate across scopes",
+      "the project and personal config roots are the SAME directory here",
+      "A second copy would double-fire it.",
+      "~ wf-widen-agent  Stop  would register"
+    ],
+    "not": [
+      "~ wf-commitments  Stop",
+      "~ wf-protect-directives  PostToolUse",
+      "~ wf-widen  Stop",
+      "verified on disk"
+    ]
+  },
+  "catalog-subdir-execute-refused": {
+    "_why": "THE WALK-UP MUST NOT REACH A DELETION. catalog-resolves-from-subdir fixes a READ that reported a false absence by climbing to the nearest ancestor carrying a `.claude/`; inferring the tree to READ from and inferring the tree to DELETE from are not the same act, and the second was never asked for. A `--migrate --execute` run from `~/lab/foo/bar` whose nearest `.claude/` sits at `~/lab` would retire copies under a directory nobody named, after the operator had already consented to deletion of something else. Identical tree to catalog-resolves-from-subdir; the only difference is the flags, which is what isolates the refusal to `--execute`. Exit 2 rather than 1: this is a caller error with a stated remedy, not a resolution that failed. The refusal PRINTS the root it found, because a refusal that withholds the one argument that would satisfy it is a dead end.",
+    "script": "wf-catalog",
+    "args": [
+      "--root",
+      "${TREE}/src/deep",
+      "--migrate",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config",
+      "CLAUDE_PROJECT_DIR": null
+    },
+    "exit": 2,
+    "want": [
+      "--execute deletes files and will not act on an inferred tree",
+      "Re-run with --root"
+    ],
+    "not": [
+      "catalog migration",
+      "REMOVED",
+      "ARCHIVED"
+    ]
+  },
+  "catalog-resolves-from-subdir": {
+    "_why": "A FALSE ABSENCE REPORTED TO THE ONE READER WHO CANNOT CHECK IT. `--root` defaults to `$CLAUDE_PROJECT_DIR or os.getcwd()`, and `$CLAUDE_PROJECT_DIR` is unset in the Bash tool (measured 2026-08-04 on 2.1.221, the fact wf-apply's empty---root guard exists for), so the documented reader forms -- evaluators.md and procedures/audit.md Step 5d both cite this script with no `--root` -- resolve against whatever directory the shell is sitting in. Two of the three install_candidates are root-relative, so from `src/deep` the install one level up is invisible and the script exits 1 saying the catalog is `unresolved`. Measured against HEAD's wf-catalog on this identical tree: `text: unresolved`, exit 1. The IC that reads that concludes the corpus it is graded against does not exist, which is the failure this project rates worse than a crash. `--path` is the form asserted because its exit code carries the whole verdict with no prose to hide behind: 1 before, 0 after. The stderr notice is asserted too -- a resolver that silently answers about a directory nobody named is the `--root \"\"` defect wf-apply already carries a guard for. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so no personal install can answer this and make the walk-up look unnecessary, and CLAUDE_PROJECT_DIR is unset because its being unset IS the scenario.",
+    "script": "wf-catalog",
+    "args": [
+      "--root",
+      "${TREE}/src/deep",
+      "--kind",
+      "text",
+      "--path"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config",
+      "CLAUDE_PROJECT_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "carries no .claude/ — resolving against",
+      "workforce/skills/text-eval/references"
+    ],
+    "not": [
+      "unresolved"
+    ]
+  },
+  "catalog-home-is-root-single-copy": {
+    "_why": "THE COPY IS THE ONLY INSTALL, AND THE MIGRATION REFUSED TO SEE IT. At `root == $HOME` the personal config root and `<root>/.claude` are ONE directory, so `<root>/.claude/skills/text-eval` is both the path `install` writes and the path a project copy would occupy -- and the ownership test that separates those two has nothing to separate. `install_dir` returned None, `classify` refused with `no-install`, and the remedy it implies, retire the project copy so the user install is used, names one directory twice. Measured against HEAD's wf-catalog on this identical tree: `text      no-install`. The verdict is now `no-copy -- nothing to migrate`, which is the true statement: the one corpus on the machine is already the one being read and there is nowhere to move it to. THE REFUSAL WAS CONSERVATIVE AND ITS SAFETY IS KEPT: `0 file(s) removable` is asserted, because a collapse-aware classify that started REMOVING files would be deleting the install.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "text      no-copy        nothing to migrate",
+      "INV-CATMIG   0 file(s) removable"
+    ],
+    "not": [
+      "no-install",
+      "retire",
+      "REMOVED",
+      "ARCHIVED"
+    ]
+  },
+  "catalog-home-is-root-single-copy-reads": {
+    "_why": "THE OTHER HALF OF THE COLLAPSE, and it is the half an IC reads. The same single directory was reported `source: project copy`, so every audit counted a migration still owed against a directory there is nowhere to migrate from -- a debt that can never be paid and is re-reported forever. Measured against HEAD's wf-catalog on this identical tree: `text      project` and `1 from project copy`. It now reports `install`, which is what the directory is. Separated from catalog-home-is-root-single-copy because one case is one invocation and the two verdicts come from two commands; the trees are identical so the pair isolates the difference to the command.",
+    "script": "wf-catalog",
+    "args": [],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 1,
+    "want": [
+      "text      install",
+      "1 from install",
+      "0 from project copy"
+    ],
+    "not": [
+      "text      UNRESOLVED",
+      "1 from project copy"
+    ]
+  },
+  "catalog-home-is-root-collides": {
+    "_why": "THE PROJECT ROOT IS $HOME, WHICH MAKES config_root() THE PROJECT'S OWN .claude. hook_registrations() read four candidate settings files, and two of the four are then the other two spelled a second way, so every registration was read twice and reported `** REGISTERED 2 TIMES **`. The duplicate exists nowhere but in that list, and the repair it invites is deleting one of two entries that are one entry -- a migration that unregisters a live hook on the strength of its own double vision. Measured against HEAD's wf-catalog on this tree: two identical PostToolUse lines, each marked twice. Identity is now decided by os.path.realpath, so a symlinked or CLAUDE_CONFIG_DIR-relocated spelling collapses too. `1 hook registration(s)` and `0 duplicated` are asserted together because either alone would pass on a list that dropped the hook entirely, and a retirement that sees no hook is the make-before-break inversion the refusal exists to prevent. THE KINDS ALL READ no-copy HERE, and that is the sibling ruling rather than a gap: the same collapse that fused the settings paths fuses the skill directories, so this tree's `.claude/skills/text-eval` IS the install and there is nowhere to migrate it to (see catalog-home-is-root-single-copy). The hook-refusal path is held by catalog-residue-but-hooked, whose CLAUDE_CONFIG_DIR is pinned elsewhere and whose scopes therefore do not collapse.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "hook registrations pointing into a project copy",
+      "1 hook registration(s)",
+      "0 duplicated",
+      "0 file(s) removable"
+    ],
+    "not": [
+      "REGISTERED 2 TIMES",
       "REMOVED",
       "ARCHIVED"
     ]
