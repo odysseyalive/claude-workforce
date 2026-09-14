@@ -262,24 +262,32 @@ step; that is the entire reason it survived.*
 ```
 .claude/workforce/.settings-owned.json
 {
-  "settings_file": ".claude/settings.local.json",
-  "permissions.allow": ["Agent"],
-  "permissions.deny":  ["Bash(rm -rf:*)"],
-  "hooks":             [{"event": "PostToolUse", "matcher": "Edit|Write",
-                         "command": "/home/you/.claude/skills/workforce/bin/wf-protect-directives"}],
-  "env_removed":       {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
+  "permissions_allow_added": ["Agent"],
+  "hooks_added":             [{"event": "PostToolUse", "matcher": "Edit|Write",
+                               "command": "/home/you/.claude/skills/workforce/bin/wf-protect-directives"}],
+  "hooks_removed":           [{"event": "Stop", "matcher": null,
+                               "command": "/home/you/.claude/hooks/gone.sh",
+                               "settings": ".claude/settings.json"}],
+  "files_removed":           [{"path": "CLAUDE.md", "content": "<the whole prior file>"}]
 }
 ```
 
-**`env_removed` is the one section `disband` RESTORES rather than removes, and the asymmetry is
-deliberate.** Every other key records something workforce *added*, so reversal means deleting it. That
-one records a key workforce *deleted* — under declared succession only, per `audit-setup.md` § BLOCKING —
-so reversal means writing it back with the exact prior value. **A sidecar that could only express
-additions would have made the removal irreversible**, which is the one thing this project will not do to
-a user's settings file. It stores the prior *value*, never just the name, because restoring a key to `1`
-that was set to `0` is not a restoration.
+These are the keys the writers write, and no others: `wf-settings-apply` writes `permissions_allow_added`
+and `hooks_added`, `wf-permissions` rewrites `permissions_allow_added` when it repairs a rule, and
+`wf-apply` writes `hooks_removed` and `files_removed`. `bin/check` derives this set from those three
+scripts and fails when the example drifts from it.
 
-`disband` removes exactly the entries this file names, from the file it names, and nothing else. That
+**The `_removed` sections are the ones `disband` RESTORES rather than removes, and the asymmetry is
+deliberate.** An `_added` key records something workforce *added*, so reversal means deleting it. A
+`_removed` key records something workforce *deleted*, so reversal means writing it back: the whole prior
+hook entry, the whole prior file. The audit records one more by hand, because no script writes it:
+`"env_removed": {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}`, a key deleted under declared succession
+only, per `audit-setup.md` § BLOCKING. **A sidecar that could only express additions would have made the
+removal irreversible**, which is the one thing this project will not do to a user's settings file. It
+stores the prior *value*, never just the name, because restoring a key to `1` that was set to `0` is not
+a restoration.
+
+`disband` removes exactly the entries this file names, and nothing else. That
 is **stronger** than a marker region, not a workaround: a marker delimits a *span*, so a user rule that
 lands inside it by reformatting gets excised too. A sidecar names *values*, so removal is exact
 regardless of how the settings file has since been reordered by a hand edit or a formatter.

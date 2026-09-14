@@ -359,22 +359,23 @@ declared = manifest_paths()
 # image, ui and security are authored-and-cited by workforce (see `manifest.txt`), so they
 # are NOT vendored and every authoring rule applies to them.
 # IMPORTED, not authored here: every corpus file and every bundled agent definition in the
-# five evaluator skills. They follow their SOURCE project's conventions — single-line
+# two evaluator skills copied from claude-enforcer, `text-eval` and `code-evaluator`, named
+# below by skill. Until 2026-09-14 the set took the whole prefix and excluded only
+# `security-evaluator`, so `image-eval` and `ui-design` sat exempt while the paragraph above
+# called them authored. They follow their SOURCE project's conventions — single-line
 # `origin:` annotations rather than paired blocks, their own heading structure, their own
 # version anchors, a frontmatter `model:` pin — and workforce's authoring rules must not
 # demand an edit to them, because editing one forks a corpus that has a single origin.
 #
-# THREE THINGS ARE AUTHORED HERE AND STAY UNDER EVERY RULE, and the exclusions are named
-# rather than inferred from a prefix: each `SKILL.md`, each `additions.md` — the one
-# sanctioned place to GROW a catalog — and the whole `security-evaluator` corpus, which is
-# distilled and cited by workforce rather than copied. A wide exemption is the dangerous
+# AUTHORED HERE AND UNDER EVERY RULE, named rather than inferred from a prefix: each
+# `SKILL.md`, each `additions.md` — the one sanctioned place to GROW a catalog — and the whole
+# `security-evaluator`, `image-eval` and `ui-design` skills. A wide exemption is the dangerous
 # direction: it excuses authored prose from the checks it exists to pass.
 VENDORED = {p_ for p_ in declared
-            if p_.startswith("workforce/skills/")
+            if p_.startswith(("workforce/skills/text-eval/", "workforce/skills/code-evaluator/"))
             and ("/references/" in p_ or "/agents/" in p_)
             and not p_.endswith("/SKILL.md")
-            and not p_.endswith("/additions.md")
-            and "/security-evaluator/" not in p_}
+            and not p_.endswith("/additions.md")}
 
 missing = [p for p in declared if not os.path.exists(p)]
 check("manifest: every declared file exists", not missing, f"missing: {missing}")
@@ -1853,7 +1854,11 @@ CONST_RX = re.compile(
 # bodies must agree (§ The change record).
 ARCHIVE = {p for p in declared if p.startswith("workforce/changes/")}
 
-_canary_set = set(manifest_canary_paths())
+# A bundled evaluator agent's registration is the same class: its frontmatter `model:` is
+# the value the host reads when it spawns the agent, not prose restating a constant. Its
+# BODY is still scanned. Surfaced 2026-09-14 when image-eval left VENDORED and its
+# `image-validator` definition failed on `model:` alone.
+_canary_set = set(manifest_canary_paths()) | set(manifest_agent_paths())
 def _const_scan_text(_p):
     _t = read(_p)
     if _p in _canary_set and _t.startswith("---\n"):
@@ -2357,9 +2362,15 @@ for p in declared:
     # be broken for anyone who copies just that block. It is stated canonically in
     # scopes.md § Resolving the shipped scripts, and the assertions below compare
     # the copies against it — so this is a mechanical duplicate, not a restatement.
+    # A per-rule citation is the other sanctioned repeat. A catalog whose rules share a
+    # source cites it under each rule, so the rule stays traceable when it is read alone;
+    # two rules citing one page is two citations, not a restated paragraph. Surfaced
+    # 2026-09-14 when the ui-design corpus left VENDORED: every repeat flagged in its two
+    # files was a `**Source:**` line, in a catalog carried forward verbatim with no rule reworded.
     prose = [
         l for l in lines
         if len(l) > 55 and not l.lstrip().startswith(("|", "#", "```", "<!--"))
+        and not l.lstrip("> ").startswith("**Source:**")
         and not l.startswith('WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"')
     ]
     dup_p = sorted({l for l in prose if prose.count(l) > 1})
@@ -10415,6 +10426,25 @@ check("audit-setup scopes the env removal to the file that holds the key",
 check("the settings sidecar can express a removal, not only an addition",
       '"env_removed"' in enf and "RESTORES rather than removes" in enf,
       "a sidecar that only recorded additions would have made the env removal irreversible")
+
+# THE SIDECAR EXAMPLE IS DERIVED FROM ITS WRITERS, not typed beside them. MEASURED 2026-09-14:
+# enforcement.md § The machine-owned region showed `permissions.allow`, `permissions.deny`,
+# `hooks` and `settings_file`, and no script writes any of them. The three writers spell
+# `permissions_allow_added`, `hooks_added`, `hooks_removed` and `files_removed`, and a reader
+# who greps a real sidecar for the documented keys finds nothing. This reads the WRITE sites
+# (`<sidecar>["k"] = …` and `<sidecar>.setdefault("k", …)`) out of the three scripts and
+# requires the example's top-level keys to be exactly that set, in both directions.
+_sc_block = re.search(r"```\n\.claude/workforce/\.settings-owned\.json\n(.*?)```", enf, re.S)
+_sc_example = set(re.findall(r'^  "([A-Za-z_.]+)":', _sc_block.group(1), re.M)) if _sc_block else set()
+_sc_writes = {k for _w in ("workforce/bin/wf-settings-apply", "workforce/bin/wf-permissions",
+                           "workforce/bin/wf-apply")
+              for k in re.findall(r'\b(?:owned|owned_data|sc)(?:\.setdefault\(|\[)"([a-z_]+)"(?:,|\]\s*=(?!=))',
+                                  read(_w))}
+check("the settings sidecar example names exactly the keys its writers write",
+      bool(_sc_writes) and _sc_example == _sc_writes,
+      f"enforcement.md example keys {sorted(_sc_example)}; wf-settings-apply, wf-permissions and "
+      f"wf-apply write {sorted(_sc_writes)}. A documented key no script writes sends `disband` and "
+      "every reader looking for a record that is never there")
 
 check("disband restores env_removed with its prior value",
       "replay `env_removed` in the opposite direction" in _dsb and "exact prior value" in _dsb,

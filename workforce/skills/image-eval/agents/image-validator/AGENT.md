@@ -30,8 +30,7 @@ Prompt: "Evaluate this article's image set for AI tells and palette variation:
 - Hero: [path]
 - Inline 1: [path]
 - Inline 2: [path]
-Read .claude/skills/image-eval/agents/image-validator/AGENT.md for instructions.
-Return findings using the article image set format."
+Follow .claude/skills/image-eval/agents/image-validator/AGENT.md and return its Article Image Set format."
 ```
 
 ---
@@ -189,12 +188,7 @@ For Odyssey Alive's watercolor aesthetic:
 ### Required Checks
 Signature check: [found/none]
 Symmetry check: [symmetric/asymmetric] — [brief note]
-Metadata provenance: [clean / generator-attributed / fully-tracked]
-- Generator: [name or none]
-- C2PA manifest: [present/absent]
-- IPTC AI tag: [present/absent]
-- InstanceID: [present/absent]
-- Recommended action: [none / scrub / regen]
+[the Metadata Provenance Check output block from Step 1, every line of it]
 
 ### Summary
 [One sentence: overall assessment and confidence level]

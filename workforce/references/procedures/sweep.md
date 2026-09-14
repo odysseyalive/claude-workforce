@@ -174,7 +174,7 @@ learning to detect.*
 |---|---|
 | **Count FILES, not hooks** | a hook is commonly a `.sh` **and** a `.ps1` port. `DEF-Q-005` said "the two load-bearing hooks" and meant four files; the Windows variants would have been deleted in silence, and a user directive names them explicitly |
 | **Create the destination** | `.claude/workforce/maintainers/` does not exist until something makes it. Relocating into an absent directory is a failure discovered mid-transaction, after the first move |
-| **Record every rewritten registration in `.settings-owned.json`** | its schema already carries a `hooks` array (`enforcement.md` § The machine-owned region) and a run that rewrites a registration without recording it **strands that entry for `disband`**, which removes exactly what the sidecar names and nothing else. The relocation would then be permanent and unowned |
+| **Record every rewritten registration in `.settings-owned.json`** | its schema already carries `hooks_added` and `hooks_removed` arrays (`enforcement.md` § The machine-owned region) and a run that rewrites a registration without recording it **strands that entry for `disband`**, which removes exactly what the sidecar names and nothing else. The relocation would then be permanent and unowned |
 
 **6. Sweep, once, atomically per target.** Then re-run the hook census and print `INV-HOOKS`: dead
 wiring must be **zero**.

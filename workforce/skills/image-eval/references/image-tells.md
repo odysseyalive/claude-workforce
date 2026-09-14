@@ -217,3 +217,4 @@ Metadata provenance: [clean / generator-attributed / fully-tracked]
 ### Set-level recommendation
 [Which images, if any, need attention]
 ```
+<!-- /origin -->

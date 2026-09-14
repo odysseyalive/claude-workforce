@@ -667,7 +667,7 @@ receives the unconditional append. Nothing above weakens that case.
 
 **And the workforce-authored additions are a SEPARATE append with a SEPARATE gate.** Everything in this
 section governs the vendored corpus and the supersession register that guards it.
-the evaluator skill's own `references/additions.md` is neither vendored nor superseded — it is workforce's own — so its append
+The evaluator skill's own `references/additions.md` is neither vendored nor superseded — it is workforce's own — so its append
 (§ Seeding step 1b) is stopped by **exactly one** thing, the insertion-point blocker above, and by nothing
 else: not an empty supersession register, not a foreign version anchor, not foreign ownership of the skill.
 A run that withholds the additions for any of those reasons has confused the two appends — the error

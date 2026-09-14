@@ -89,7 +89,7 @@ unjournalled employees. Never remove one by inference from its name or location.
 
 **`.settings-owned.json` is not that record.** Its writers record settings and removals, never a created
 file: `wf-settings-apply` the allow rules and hook registrations it added (`permissions_allow_added`,
-`hooks_added`) and the output style it set, `wf-permissions` its repairs to those allow rules, and
+`hooks_added`), `wf-permissions` its repairs to those allow rules, and
 `wf-apply` the whole hook entries and files a pass deleted (`hooks_removed`, `files_removed`). The
 journal records conversions, registrations and marks, and no row in it names a created skill either.
 

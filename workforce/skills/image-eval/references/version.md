@@ -17,3 +17,4 @@ image-eval-ref-version: 1
 *Why this file exists at all: a catalog with no anchor cannot be reported stale, and two of the nine
 text-catalog copies measured on 2026-09-10 carried no anchor — a state that renders as "unknown"
 rather than as a version, which is precisely the drift nobody can act on.*
+<!-- /origin -->
