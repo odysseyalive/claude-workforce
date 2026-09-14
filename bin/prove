@@ -843,6 +843,15 @@ CASES = [
     # heading two files cite by `§` (conversion-taxonomy.md, org-design.md) must now fire it.
     ("references: every `file § Section` anchor resolves to a real heading",
      "workforce/references/personas.md", "del", "Panels"),
+    # The path check was computed and never asserted from 90fb341 to 2026-09-14. A live
+    # reference citing a file that does not ship must fire it, and so must a skill citing a
+    # file only OUR tree holds: a skill's `references/` is its own directory, not ours.
+    ("references: every references/… link resolves, backticked or bare",
+     "workforce/references/procedures/disband.md", "append",
+     "\nShape at `references/never-shipped.md`.\n"),
+    ("references: every references/… link resolves, backticked or bare",
+     "workforce/skills/code-evaluator/SKILL.md", "append",
+     "\nSee `references/platform.md`.\n"),
     ("conversion-taxonomy sends every decided removal to the journal",
      CT, "del", "STAGED INTO THE CONVERSION JOURNAL AT `T7s`, OR IT IS NOT IN THE"),
     ("audit runs the staging step, and before verify",
@@ -1050,8 +1059,8 @@ CASES = [
     # broke a different row and left this check green — VACUOUS, caught by prove itself.
     ("plain guard: the banned-term row states CANNOT, because nothing enforces it",
      ENF, "del", "held this row and was removed on the user's explicit marks"),
-    ("plain output: audit-setup points at the rule instead of restating a narrower copy",
-     ASU, "del", "references/plain-output.md"),
+    ("plain output: audit-setup restates no banned-word list, and records where the old one went",
+     ASU, "del", "lived in `plain-output.md`"),
     # ── the speak guard and the output style (2026-09-07): the report, not the question ──
     ("text-eval: the conversational-register row no longer exempts what the user reads",
      TTL, "del", "and to anything a human reads in the terminal"),

@@ -80,11 +80,21 @@ never re-create the file in order to have somewhere to remove a marker from.
 `.settings-owned.json` § `files_removed` holds its bytes; `disband` reverses the org, and the file's
 deletion was a pass rather than an org change.
 
-**6b. Remove what this project's run CREATED, not only what it demoted.** Steps 2 and 3 reverse
+**6b. Account for what this project's run CREATED, not only what it demoted.** Steps 2 and 3 reverse
 *conversions*; a run also **creates** artifacts that existed nowhere before — data skills authored at
-`hire.md` Step 3b, and companion skills installed at `audit-setup.md` § Step 0.3. Each is removed only
-when the journal or `.settings-owned.json` records workforce as its creator **and** its bytes still hash
-to what workforce wrote. Anything hand-edited is reported and left, exactly as a handbook is.
+`hire.md` Step 3b, and companion skills materialized at `audit-setup.md` § Step 0.3. **No record names
+them as workforce's, so this step removes none of them and says so.** List each by path, state that
+disband will not remove it, and name `restore` and the backup path, as the BLOCKING check below does for
+unjournalled employees. Never remove one by inference from its name or location.
+
+**`.settings-owned.json` is not that record.** Its writers record settings and removals, never a created
+file: `wf-settings-apply` the allow rules and hook registrations it added (`permissions_allow_added`,
+`hooks_added`) and the output style it set, `wf-permissions` its repairs to those allow rules, and
+`wf-apply` the whole hook entries and files a pass deleted (`hooks_removed`, `files_removed`). The
+journal records conversions, registrations and marks, and no row in it names a created skill either.
+
+*Corrected 2026-09-14: this step removed a created artifact when `.settings-owned.json` named workforce
+as its creator. The one writer of that record, `wf-settings-apply`'s config stamp, was removed in 1abb09f.*
 
 *Added 2026-08-04. Step 2 restores demoted skills and nothing enumerated created ones, so a data skill a
 run authored survived every disband — residue by the definition of the standing directive, in the

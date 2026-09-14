@@ -275,7 +275,7 @@ the org needs the rest of the heal too.
 
 *`HANDOFF-UNWIRED` is REMOVED (2026-09-10), and its row above with it.* It read as the `verify`
 leg of the three-paths rule on the grounds that "the installer ships `wf-handoff`". It does not —
-the simplification release deleted that script, `references/handoff.md` went with it, and
+the simplification release deleted that script, `handoff.md` went with it, and
 `audit.md` had already removed its own step saying exactly that. This file did not get the same
 edit, so a live row kept citing a producer, a spec and a reversal that were all gone. **A rule whose
 spec, producer and reversal are absent is not a weakened rule; it is a check that fails on every

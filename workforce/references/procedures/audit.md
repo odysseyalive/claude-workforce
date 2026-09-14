@@ -203,7 +203,7 @@ is a project whose work has not been written down yet.
    is going to be comes from the user; write the answer to `.claude/workforce/charter.md`, which is
    what everything downstream reads. *Corrected 2026-09-10: this step said "Run `charter`
    (`charter.md` § Brand-new project)". **There is no `charter` command and no
-   `references/procedures/charter.md`** — so the first-time path, on the emptiest possible project,
+   `charter.md` procedure** — so the first-time path, on the emptiest possible project,
    opened by telling the reader to run something that has never shipped. The ARTIFACT is real and
    unchanged; only its imaginary producer is gone.*
 3. **Write nothing to `CLAUDE.md`.** The charter from step 2 is where those answers live, and
@@ -1511,7 +1511,7 @@ handed back as an optional refinement.
    `wf-handoff --wire --execute`, and the simplification release deleted that script — so this step
    instructed every run to execute a command that does not exist, recorded state in a
    `.handoff-wired.json` nothing writes, and named a reversal nothing can perform. Its rule's spec
-   file, `references/handoff.md`, went with it. **A rule whose spec, producer and reversal are all gone
+   file, `handoff.md`, went with it. **A rule whose spec, producer and reversal are all gone
    is not a weakened rule; it is a step that fails on every run** — found by the collision sweep, which
    asked which invariants cite a spec that no longer ships.*
 

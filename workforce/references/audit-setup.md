@@ -248,8 +248,8 @@ A reader at question 2 of 6 has installed a skill and typed one command. They ha
 `conversion-taxonomy.md`. They do not know what a sweep is. Say what happens to **their project**, in
 words they already own.
 
-*The banned-word list and the wider rule lived in `references/plain-output.md`, which the
-simplification release deleted along with the two guards that enforced it. What survives is the table
+*The banned-word list and the wider rule lived in `plain-output.md`, which the
+simplification release deleted on 2026-09-09 along with the two guards that enforced it. What survives is the table
 below and the paragraph above it: concrete, local to the six questions this file owns, and checkable
 by reading them. The rule that governed every reply is gone by the user's own instruction — this is
 the part that was never about a word list.*

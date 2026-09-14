@@ -1882,13 +1882,59 @@ check(
 # quoted.
 # ─────────────────────────────────────────────────────────────────────────────
 REF_RX = re.compile(r"(?<![\w/])references/[\w./-]+\.md")
+# A user's immutable block is retained verbatim, citations included: directive one is
+# retention, and a dated attribution is not rewritten to tidy a link. SKILL.md's directive
+# block holds two such citations of files since deleted. Same grammar as `--stamp` above.
+_SACRED_SPAN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
+    r"(.*?)^<!--\s*/origin\s*-->$",
+    re.S | re.M)
+# ATTRIBUTION is wf-live's rule, read from it rather than restated: "the evaluator skill's
+# own `references/additions.md`" is relative to THAT skill, and resolves only if a shipped
+# skill really holds the file (§ THE ATTRIBUTION RULE, RUN RATHER THAN READ).
+_skill_owned_m = re.search(r'^SKILL_OWNED = re\.compile\(r"(.+)"\)$',
+                           read("workforce/bin/wf-live"), re.M)
+_SKILL_OWNED_RX = re.compile(_skill_owned_m.group(1)) if _skill_owned_m else None
 broken = []
-for p in glob.glob("workforce/**/*.md", recursive=True) + [
+for p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + [
     "README.md", "COMMANDS.md", "CLAUDE.md",
 ]:
-    for m in REF_RX.findall(read(p)):
-        if not os.path.exists("workforce/" + m):
-            broken.append((p, m))
+    # The change record is HISTORY: it names files as they stood at that release.
+    if p in ARCHIVE:
+        continue
+    # A path resolves against the root of the tree that cites it. A skill's `references/…`
+    # is its own directory at `<skills-root>/<name>/`, where the host installs it, never
+    # ours. Vendored corpora get exactly this treatment and no skip: their internal links
+    # resolve inside their own skill, so they pass without an exemption.
+    _parts = p.split("/")
+    _root = "/".join(_parts[:3]) + "/" if p.startswith("workforce/skills/") else "workforce/"
+    _body = read(p)
+    _sacred = [(_s.start(), _s.end()) for _s in _SACRED_SPAN_RX.finditer(_body)]
+    for m in REF_RX.finditer(_body):
+        if os.path.exists(_root + m.group(0)):
+            continue
+        if any(_a <= m.start() < _b for _a, _b in _sacred):
+            continue
+        _before = _body[max(0, m.start() - 40):m.start()].rstrip("`")
+        if (_SKILL_OWNED_RX and _SKILL_OWNED_RX.search(_before)
+                and glob.glob("workforce/skills/*/" + m.group(0))):
+            continue
+        broken.append(f"{p}:{_body.count(chr(10), 0, m.start()) + 1} → {m.group(0)}")
+# The assertion. 90fb341 deleted this `check()` in the simplification release together with
+# the § anchor one below, and left the scan computing a list nothing read. MEASURED
+# 2026-09-14 when it came back: 73 reported. 13 were the change record, 49 a skill's own
+# `references/` read against ours, 2 were in SKILL.md's immutable block, 4 were attributed
+# to an evaluator skill that holds the file. The 5 left were real: four removal notes in
+# audit-setup.md, audit.md and verify.md still spelling a deleted file as a live path, and
+# image-eval's version history doing the same. Each now names the file without the path.
+check(
+    "references: every references/… link resolves, backticked or bare",
+    _SKILL_OWNED_RX is not None and not broken,
+    (f"broken: {broken} — repoint each at the file that carries the content now, or name "
+     "the deleted file without the `references/` path in a dated correction note"
+     if _SKILL_OWNED_RX is not None else
+     "wf-live's SKILL_OWNED pattern could not be read, so attribution cannot be resolved"),
+)
 
 # Section anchors. `REF_RX` above resolves the PATH half of a citation and never
 # the `§ Section` half, so every heading in the project could be renamed with the
@@ -1935,14 +1981,9 @@ for _p in glob.glob("workforce/**/*.md", recursive=True):
     _by_path[_p.replace("workforce/", "")] = _p
 
 _anchor_broken = []
-# A user's immutable block is retained verbatim, citations included: directive one is
-# retention, and a dated attribution is not rewritten to tidy a link. SKILL.md's directive
-# block cites `update.md` § Resolution rules and `evaluators.md` § The five skills ship in
-# the install, both since renamed, and those words stay. Same grammar as `--stamp` above.
-_SACRED_SPAN_RX = re.compile(
-    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
-    r"(.*?)^<!--\s*/origin\s*-->$",
-    re.S | re.M)
+# `_SACRED_SPAN_RX` is defined with the path check above and skips the same spans here.
+# SKILL.md's directive block cites `update.md` § Resolution rules and `evaluators.md` § The
+# five skills ship in the install, both since renamed, and those words stay.
 for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
     # A vendored catalog's internal citations resolve in the SOURCE project's
     # tree, not ours — its changelog cites its own siblings by heading. Reading
@@ -10062,12 +10103,16 @@ _hks = read("workforce/references/procedures/hooks.md")
 # single-homed, carried by all three readers, and floored by a hook.
 _tpl_t = read("workforce/references/templates.md")
 _org_p = read("workforce/references/procedures/org.md")
-check("plain output: audit-setup points at the rule instead of restating a narrower copy",
-      "references/plain-output.md" in _asu
+# Retargeted 2026-09-14: this required the live path `references/plain-output.md`, a file
+# deleted 2026-09-09, so it demanded the dangling link the path check above forbids. What
+# still holds is that no narrower copy of the list returns, and the note saying where it went.
+check("plain output: audit-setup restates no banned-word list, and records where the old one went",
+      "lived in `plain-output.md`" in _asu
       and "archive` (as a verb)" not in _asu,
-      "audit-setup.md must POINT at plain-output.md, not carry its own copy of the "
-      "list. Two lists is how the doc's and the check's diverged before 2026-08-03, and "
-      "a copy scoped to 'the six questions' is the narrowing this change undid")
+      "audit-setup.md must not carry its own copy of the deleted list, and must keep the note "
+      "naming `plain-output.md` as where it lived. Two lists is how the doc's and the check's "
+      "diverged before 2026-08-03, and a copy scoped to 'the six questions' is the narrowing "
+      "that change undid")
 # THIS ASSERTION USED TO REQUIRE AN OVERCLAIM. It demanded enforcement.md say
 # "PREVENTS the call once wired" of `wf-plain-guard` — a hook removed on the user's
 # marks — so the one table that forbids describing an unenforced rule as prevented was

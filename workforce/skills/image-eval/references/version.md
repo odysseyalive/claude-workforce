@@ -12,7 +12,7 @@ reference blocks, preserving any `origin: user` seams.
 image-eval-ref-version: 1
 ```
 
-**v1** (2026-09-10) — first built catalog. Promoted from `references/image-eval-seed.md`, which shipped as a single seed spec copied into a project once and never tracked afterwards. The content is unchanged; what changed is that it is now resolvable from the install like every other corpus.
+**v1** (2026-09-10) — first built catalog. Promoted from workforce's former `image-eval-seed.md`, which shipped as a single seed spec copied into a project once and never tracked afterwards. The content is unchanged; what changed is that it is now resolvable from the install like every other corpus.
 
 *Why this file exists at all: a catalog with no anchor cannot be reported stale, and two of the nine
 text-catalog copies measured on 2026-09-10 carried no anchor — a state that renders as "unknown"
