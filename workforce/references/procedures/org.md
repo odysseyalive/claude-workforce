@@ -24,7 +24,7 @@ the `ORG-RECORD` block; recompute the `contract-stamp` over the normalized `## P
 conversion-journal row is charted as ADOPTED: `conversion-taxonomy.md` ADOPT, *censused into the
 chart, zero bytes changed*. On a project that has never been audited, that is every agent it has,
 and this step is what fills the roster. The marker block decides it, never the word in prose
-(`verify.md` § GOVERNED vs ADOPTED). An adopted row carries only what the file states and what the
+(`verify.md` § BLOCKING — a failure is not discounted by naming a class, "GOVERNED vs ADOPTED"). An adopted row carries only what the file states and what the
 gates already fix (`org-chart-format.md` § Adopted rows):
 
 - **`Tier`, `Dept` and `Reports to` are `—`.** A file with no ORG-RECORD declares none of them, and
@@ -33,7 +33,7 @@ gates already fix (`org-chart-format.md` § Adopted rows):
   agent's first amendment. The row sits in `## Roster` and is not drawn into `## Chain of Command`.
   It is never `ORPHAN`, which is for a `reports-to` naming nobody; an adopted file has no
   `reports-to` at all.
-- **`Status: adopted` and `Release Record: not probed (pre-existing)`** (SKILL.md § Off-the-Street
+- **`Status: adopted` and `Release Record: not probed (pre-existing)`** (SKILL.md § Sacred-Directive Enforcement Gates, Off-the-Street
   Release Gate rule 8). `Model / Effort` is read from its frontmatter; absent keys are written `—`.
 - **No stamp is recomputed and no `CONTRACT-DRIFT` is raised**, because there is no stamp to differ
   from. The first amendment gives it an ORG-RECORD, and from then on it is governed.

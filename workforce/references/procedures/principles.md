@@ -26,7 +26,7 @@ procedure — it gets decided here. That is what keeps handbooks followable.
 3. **Write** into `operating-principles/SKILL.md`, **below the `<!-- WF-PRINCIPLES END -->` marker**,
    inside `<!-- origin: user | immutable: true -->`. The region above that marker is workforce's
    shipped doctrine and is refreshed byte-for-byte by `wf-companion` on every audit
-   (`references/templates.md` § Two halves, two owners); an item written inside it is silently
+   (`references/templates.md` § General Operating Principles, "Two halves, two owners"); an item written inside it is silently
    reverted on the next run, and an item written below it is never touched.
 4. **Assert five things on every write:**
    - the skill does **not** set `disable-model-invocation: true` — such skills cannot be preloaded,

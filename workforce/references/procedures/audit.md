@@ -199,7 +199,7 @@ is a project whose work has not been written down yet.
 1. **Say what was found and what was not.** "No `CLAUDE.md`, no source, no build tooling — this looks
    like a brand-new project."
 2. **Ask the charter question, inline, as the one extra setup question a bare project earns**
-   (`audit-setup.md` § charter-first). A bare directory has no evidence to read, so what the project
+   (`audit-setup.md` § The question budget). A bare directory has no evidence to read, so what the project
    is going to be comes from the user; write the answer to `.claude/workforce/charter.md`, which is
    what everything downstream reads. *Corrected 2026-09-10: this step said "Run `charter`
    (`charter.md` § Brand-new project)". **There is no `charter` command and no
@@ -1932,8 +1932,8 @@ still CLEARS a style selected by an older release, which is the half that had to
 **Every write is idempotent and reversible.** A hook already registered is a reported NOOP. Each write records itself in `.claude/workforce/.settings-owned.json`,
 so `disband` and `/workforce hooks --remove` reverse exactly these and nothing else.
 
-**`OPT_IN_HOOKS` is never wired here.** `wf-loop-guard` is PROPOSED and reaches a settings file only
-when a human names it (`procedures/hooks.md` § What is wired). A heal step that quietly widened the set
+**`OPT_IN_HOOKS` is never wired here.** It has been empty since the simplification release removed
+`wf-loop-guard`; a hook named in it reaches a settings file only when a human types `--wire-hook <name>`. A heal step that quietly widened the set
 would be a decision the user never made, arriving through a command they ran for a different reason.
 
 **The classifier may refuse this write, and that is the one legitimate hand-back.** When it does, surface

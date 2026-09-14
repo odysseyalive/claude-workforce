@@ -1935,13 +1935,26 @@ for _p in glob.glob("workforce/**/*.md", recursive=True):
     _by_path[_p.replace("workforce/", "")] = _p
 
 _anchor_broken = []
+# A user's immutable block is retained verbatim, citations included: directive one is
+# retention, and a dated attribution is not rewritten to tidy a link. SKILL.md's directive
+# block cites `update.md` § Resolution rules and `evaluators.md` § The five skills ship in
+# the install, both since renamed, and those words stay. Same grammar as `--stamp` above.
+_SACRED_SPAN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$"
+    r"(.*?)^<!--\s*/origin\s*-->$",
+    re.S | re.M)
 for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
     # A vendored catalog's internal citations resolve in the SOURCE project's
     # tree, not ours — its changelog cites its own siblings by heading. Reading
-    # them here reports a broken anchor that is correct where it lives.
-    if _src in VENDORED:
+    # them here reports a broken anchor that is correct where it lives. The change
+    # record is HISTORY: it cites headings as they stood at that release.
+    if _src in VENDORED or _src in ARCHIVE:
         continue
-    for _m in CITE_RX.finditer(read(_src)):
+    _body = read(_src)
+    _sacred = [(_s.start(), _s.end()) for _s in _SACRED_SPAN_RX.finditer(_body)]
+    for _m in CITE_RX.finditer(_body):
+        if any(_a <= _m.start() < _b for _a, _b in _sacred):
+            continue
         _raw, _sec = _m.group(1), _norm_heading(_m.group(2))
         if not _sec or _raw.startswith(GENERATED_TARGETS):
             continue
@@ -1980,9 +1993,12 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
         # end, or continue with punctuation: "Header — …", "Creative / …",
         # "Resolution". "three checks …" continues with a letter, so it is prose
         # that merely starts the same way, and is not the cited section.
+        # A heading may also continue with punctuation directly: "An IC READS the catalog;
+        # it never INVOKES the skill" is cited as "§ An IC READS the catalog".
         def _boundary(_h, _p):
             _rest = _h[len(_p):]
-            return _rest == "" or (_rest[:1] == " " and not _rest[1:2].isalnum())
+            return (_rest == "" or _rest[:1] in ";:,"
+                    or (_rest[:1] == " " and not _rest[1:2].isalnum()))
 
         # A bare basename can name more than one file — the code and security
         # catalogs deliberately share filenames — so try each candidate and accept
@@ -1993,7 +2009,9 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
         for _tgt in _cands:
             _heads = [_norm_heading(h) for h in re.findall(r"^#{2,4}\s+(.+)$", read(_tgt), re.M)]
             for _n in range(len(_w), 0, -1):
-                _pre = " ".join(_w[:_n])
+                # The shortened prefix's last word sheds sentence punctuation too:
+                # "§ Lead: a coordinator's job is judgment" means the heading "Lead".
+                _pre = " ".join(_w[:_n - 1] + [_w[_n - 1].rstrip(":;,")])
                 _ms = [h for h in _heads if h.startswith(_pre)]
                 # An EXACT heading — the prefix is the whole heading, or ends at its
                 # separator — resolves even when it is also a prefix of siblings.
@@ -2015,6 +2033,21 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
                 break
         if not _hit:
             _anchor_broken.append(f"{_src.replace('workforce/', '')} → {_raw} § {_sec[:48]}")
+# The assertion. ec89ae5 built this gate with it; 90fb341 deleted the `check()` in the
+# simplification release and left the scan above running, computing a list nothing read.
+# MEASURED 2026-09-14 when it came back: 13 reported. Four were this resolver misreading
+# punctuation, fixed above; nine were real, one of them a numbered conversion-taxonomy.md
+# step telling readers to wire `hooks.md` § The loop guard, a section and a hook that had
+# both been gone five days.
+# `workforce/bin/` scripts are not scanned. The same resolver over them returned 40 hits,
+# most of them a Python string split across a concatenation, not a citation.
+check(
+    "references: every `file § Section` anchor resolves to a real heading",
+    not _anchor_broken,
+    f"broken anchors: {_anchor_broken} — a renamed or removed heading dangles every citation "
+    "of it. Repoint the citation at the heading that holds the rule now, or drop it with a "
+    "dated correction note",
+)
 
 img_broken = [
     src for _, src in re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)
@@ -5931,7 +5964,7 @@ for _path in ["bin/check"] + sorted(glob.glob("workforce/bin/wf-*")):
 # is compared by EQUALITY, per file: add or remove a reader anywhere and this fails
 # until its row is updated, which is the whole point.
 _READER_INVENTORY = {
-    "bin/check": 3,
+    "bin/check": 4,   # the fourth is the § anchor check's sacred-span skip (2026-09-14)
     "bin/baseline": 1,
     "workforce/bin/wf-catalog": 2,
     "workforce/bin/wf-census": 1,
@@ -10237,7 +10270,7 @@ check("conversion-taxonomy states the backup is what makes the batch safe",
 # The runaway-context conversion method (2026-08-19). The rule: MEASURE an existing
 # architecture's context-runaway proneness, DECOMPOSE the separable into shorter-lived
 # spawns behind real isolation boundaries, keep the irreducibly-coherent whole intact
-# and wire loop-guard + a different-persona re-evaluation. Its load-bearing half is the
+# and insert a different-persona re-evaluation. Its load-bearing half is the
 # JUDGMENT GATE — not every long context is decomposed. This assertion binds the gate
 # to BOTH the conversion path (ct, canonical) AND the primary creation path (_od, by
 # reference), because Principle 7c's named failure is precisely a rule that lives only
@@ -10250,7 +10283,7 @@ check("conversion-taxonomy states the backup is what makes the batch safe",
 # for wf-loop-guard: provably structural, so no invariants.md row.
 check("runaway-context judgment gate reaches BOTH the conversion and the creation path (Principle 7c)",
       "flag with a chainsaw" in ct and "greenfield twin of decomposition" in _od,
-      "the gate — decompose the separable, keep the coherent whole and wire loop-guard + "
+      "the gate — decompose the separable, keep the coherent whole and insert "
       "re-evaluation — is canonical in conversion-taxonomy.md and carried onto the primary path by "
       "org-design.md; a rule living only in the conversion branch is 7c's named failure. "
       "Removing or inverting it in either file fires this.")

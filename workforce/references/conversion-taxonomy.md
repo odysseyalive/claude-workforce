@@ -351,33 +351,32 @@ peak context is the maximum over a run's assistant turns of `input + cache_read 
 the tool-call count is the number of `tool_use` items; a run whose peak crosses the window, or whose
 tool-calls run into the hundreds, is evidence rather than a worry (`platform.md` Fact 21). The script
 that reads an arbitrary project's transcript store this way is **`wf-runlength`** — the Fact 21 census
-generalised beyond this repo (`procedures/model-map.md` § Run length and peak context). Run it where
+generalised beyond this repo (`platform.md` § Fact 21). Run it where
 transcript history exists; where none does, the static tells stand on their own. State the
 check in the survey report, and never state a count nothing produced (`audit.md` Step 1; `SKILL.md`
 Core Principle 5).
 
-### Convert toward the method — three moves, each with a home already
+### Convert toward the method — two moves, each with a home already
 
 1. **Decompose separable long-context work into shorter-lived spawns with real isolation boundaries.**
    The boundary is the point: a spawn returns its **goal and what failed as constraints**, never the
    thrash transcript — the negative results are the valuable part and the rotted context is the thing
-   being escaped (`procedures/hooks.md` § Where the handoff actually happens).
+   being escaped.
 2. **Insert handoff / re-evaluation points routed to a DIFFERENT persona.** A stuck context re-reading
    its own path is the worst-placed vantage there is; a rounded second read is perspective-diverse by
    construction and arrives with a catalog rather than another opinion. Do not reinvent it —
    `references/personas.md` § Panels and `references/evaluators.md` supply the lenses.
-3. **Wire the loop guard into the converted project** through the existing gesture
-   (`procedures/hooks.md` § The loop guard, `/workforce hooks --execute`). It observes byte-identical
-   repetition inside a subagent the main loop cannot see (`platform.md` Fact 22); it nudges and cannot
-   prevent, and it cannot spawn — the handoff in move 2 is the orchestration layer's, never the hook's.
+
+*Corrected 2026-09-14: a third move said to wire `wf-loop-guard` with `/workforce hooks --execute`.
+The simplification release removed that hook and its `hooks.md` sections, because it shipped unwired
+and never fired. Nothing replaced it.*
 
 ### THE JUDGMENT GATE — not every long context is decomposed
 
 **Length is evidence, not a verdict.** Some work is one coherent long task where a handoff loses more
-than it saves — the **lossy-handoff risk**: a summary is not the context it summarises
-(`procedures/hooks.md` § Where the handoff actually happens). Decompose where the length comes from
-**separable subtasks or thrash-prone loops**; for **irreducibly-coherent** long work keep the shape
-intact and wire loop-guard plus re-evaluation instead of cutting it. **A detector that decomposes on
+than it saves — the **lossy-handoff risk**: a summary is not the context it summarises. Decompose where
+the length comes from **separable subtasks or thrash-prone loops**; for **irreducibly-coherent** long
+work keep the shape intact and insert re-evaluation points (move 2) instead of cutting it. **A detector that decomposes on
 length alone is a flag with a chainsaw** — it shortens the context by severing the coherence that was
 doing the work. Which of the two a given architecture is, is a JUDGMENT the audit makes per target with
 its reason on disk, exactly as the remainder cut is (§ The cut is a JUDGMENT the audit makes per skill).
