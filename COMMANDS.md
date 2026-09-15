@@ -38,7 +38,7 @@ Hands work to the employee who owns it — the lowest node that can do the job.
 | `/org <task>` | — | Dispatch work to the right employee |
 | `/workforce roster` | read-only | Who works here, on which model, owning what |
 | `/workforce org status [employee]` | read-only | Why routing resolves the way it does |
-| `/workforce verify` | read-only | Is what this project reports about itself true? |
+| `/workforce verify` | low-risk | Is what this project reports about itself true? Removes workforce hook rows whose script was retired, first; writes nothing else |
 
 ```
 /workforce roster

@@ -41,7 +41,7 @@ before removing a mechanism and was told it had opened no hearing channel.* A tu
 `git log` for a decision has heard testimony; a turn that reads a source file has used sight, and the
 difference is whether the thing read was WRITTEN to record a decision.
 
-**Not every situation needs all six.** A turn is scored only on the senses its claim
+**Not every situation needs all six.** A turn is checked only on the senses its claim
 needs. Asking for a channel the claim never required is how a guard earns its way into
 being ignored — one was retired from this distribution at a measured 7.0% false-positive
 rate for that (`changes/1.30.1.md`).
@@ -76,7 +76,7 @@ more confidence is the tunnel continuing, and it registers as work.
 **A reply scan is reactive and it reads the turn's own prose** — the same surface a
 tunnel is built out of. `wf-task-tag` runs on `UserPromptSubmit`, classifies the ask
 before any of the answer exists, and names the sense that closes it. `wf-widen` then
-scores against that tag at `Stop` rather than re-guessing.
+checks the turn's channel counts against that tag at `Stop` rather than re-guessing.
 
 | Task kind | The ask looks like | Closed by | Because |
 |---|---|---|---|
@@ -147,7 +147,7 @@ Three parts, cheap to expensive, so the expensive one only runs when it is earne
 
 1. **`wf-task-tag`** (`UserPromptSubmit`, free) classifies the ask and names the sense
    that closes it, before any of the answer exists.
-2. **`wf-widen`** (`Stop`, free) scores the finished turn against that sense. If the
+2. **`wf-widen`** (`Stop`, free) checks whether the finished turn opened that sense's channel. If the
    sense went unopened it blocks the stop, and writes a flag naming what is unopened.
 3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **No flag, it
    returns `ok: true` and spends nothing.** With a flag, it spawns a reader carrying
@@ -218,7 +218,7 @@ deliverable: `file:line`, a commit SHA, what the record actually says.
 
 ## Where this is enforced
 
-`wf-widen` scores the turn at `Stop` and `SubagentStop`, and blocks rather than stopping
+`wf-widen` checks the turn's channel counts at `Stop` and `SubagentStop`, and blocks rather than stopping
 when an applicable sense went unopened — the block's reason names the instruments that
 were on the machine and untouched. It is a hook because the measurement says the operator
 cannot be the one to decide to run it: that decision is made from inside the tunnel, by

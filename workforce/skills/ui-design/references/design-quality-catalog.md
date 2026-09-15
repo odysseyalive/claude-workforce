@@ -483,8 +483,9 @@ that lets the critic hold the line the designer's check draws.]*
 
 > **CRIT-02** — Assess **first impression** explicitly: an aesthetic judgment forms in ~50ms, so
 > evaluate what the first rendered screenful communicates before deeper analysis.
-> **Check (process):** Capture the above-the-fold view first; rate its immediate clarity and
-> polish as a distinct step.
+> **Check (process):** Capture the above-the-fold view first, and judge it as a distinct step: a
+> verdict of pass or fail on what that first screenful communicates, with the reason in one
+> sentence, and any defect it shows filed under its own catalog row and severity.
 > **Severity:** process rule
 > **Basis:** Stated (NNG: "users make an aesthetics-driven first impression… in the 50 milliseconds
 > after landing… ~10x faster than the time it takes to read").

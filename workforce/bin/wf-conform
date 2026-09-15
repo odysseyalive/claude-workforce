@@ -31,9 +31,10 @@ import re
 import sys
 
 
-def _load_census():
-    """Import the sibling `wf-census` for its exclusion loader — one owner, never
-    a second copy.
+def _load_sibling(name):
+    """Import a sibling shipped script — `wf-census` for its exclusion loader and hook
+    resolver, `wf-settings-apply` for the dead-row verdict — one owner, never a second
+    copy, and one loader for both.
 
     `.censusignore` is a DECLARATION the project makes about what its corpus is,
     and it had three readers and one producer: `wf-census` and `wf-apply` both
@@ -54,9 +55,10 @@ def _load_census():
     import importlib.util
     _prev = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
-    loader = importlib.machinery.SourceFileLoader("wf_census", path)
-    spec = importlib.util.spec_from_loader("wf_census", loader)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    mod_name = name.replace("-", "_")
+    loader = importlib.machinery.SourceFileLoader(mod_name, path)
+    spec = importlib.util.spec_from_loader(mod_name, loader)
     mod = importlib.util.module_from_spec(spec)
     try:
         loader.exec_module(mod)
@@ -1517,6 +1519,139 @@ def check_catalogs(root, res):
                 "(evaluators.md § Succession removes the source).")
 
 
+# The remedy for a dead row this distribution did not write. The remedies for workforce's
+# own rows are `wf-settings-apply`'s VERDICT_REMEDY, beside the classifier that decides
+# them, so the text printed is always what the heal will do. A plain constant, so it names
+# the command whose flags it carries (bin/check § flag lies reads string constants).
+FOREIGN_REMEDY = ("not a workforce script, so the heal leaves it alone. `wf-apply --root "
+                  "<tree> --execute` (PASS-DEAD-HOOK) removes it with its reversal recorded, "
+                  "and refuses one under declared succession")
+
+
+def _personal_root(census, cfg, root):
+    """Is `cfg` really somebody's personal config root? The running one and the default
+    `~/.claude` are; an install inside the project, or an ancestor's `.claude` (a
+    monorepo's vendored install), is not; otherwise a root is personal only when it holds
+    Claude Code's own `projects/` store. The advisory once called a monorepo root's
+    vendored install "ONE account's personal install" (second review, N5)."""
+    real = os.path.realpath(cfg)
+    if real in {os.path.realpath(census.config_root()),
+                os.path.realpath(os.path.join(os.path.expanduser("~"), ".claude"))}:
+        return True
+    here = os.path.realpath(root)
+    if real == here or real.startswith(here + os.sep):
+        return False
+    up = here
+    while True:
+        if real == os.path.join(up, ".claude"):
+            return False
+        parent = os.path.dirname(up)
+        if parent == up:
+            break
+        up = parent
+    return os.path.isdir(os.path.join(real, "projects"))
+
+
+def _second_copy(wsa, census, root, event, script, this_path):
+    """Where ELSE this session runs the same hook on the same event, or None: the other
+    project settings file, another row in this one, or the running account's user
+    settings. Without a second copy nothing fires twice, and saying so would be false."""
+    places, seen = [], set()
+    for p in [os.path.join(root, ".claude", n) for n in ("settings.local.json", "settings.json")] \
+            + [os.path.join(census.config_root(), "settings.json")]:
+        if os.path.realpath(p) not in seen:
+            seen.add(os.path.realpath(p))
+            places.append(p)
+    for p in places:
+        data, _t, _e = wsa._load_strict(p)
+        live = 0
+        for ev, _m, h in _hook_rows(data or {}):
+            ident = wsa._wf_identity(h, root) if ev == event else None
+            live += bool(ident is not None and ident[0] == script and ident[1])
+        if live >= (2 if os.path.realpath(p) == os.path.realpath(this_path) else 1):
+            return p
+    return None
+
+
+def check_hook_wiring(root, res):
+    """Every hook registered in this project's settings resolves to a file on disk.
+
+    WHY IT IS IN THE COUNT. `verify` printed `N checks · 0 failed` from this script while
+    the same project's settings held dead registrations, because the dead-wiring finding
+    lived in a separate procedure step and never reached the headline. MEASURED
+    2026-09-14: the census counted 38 dead rows across six projects on one workstation,
+    each failing on every prompt and tool call, and three of those projects read
+    `0 failed`. A headline that can be green over a failure on every event is the
+    overclaim this script exists to refuse.
+
+    PROJECT FILES ONLY. The personal settings file is the same for every project on the
+    machine and belongs to the installer; reading it here would make this result depend
+    on who runs it, which a fixture cannot pin.
+
+    ONE RESOLVER, ONE VERDICT. A workforce row is resolved by `wf-census`'s
+    `workforce_hook` and judged by `wf-settings-apply`'s `dead_row_verdict`, the same two
+    functions the heal runs, so the remedy printed is the thing that happens. A live row
+    into a personal install that ALSO runs from a second place is ADVISORY: it fires
+    twice, and removing it is a judgement.
+    REPORTS; NEVER REPAIRS.
+    """
+    census_mod = _load_sibling("wf-census")
+    census = census_mod.Census(root)
+    wsa = _load_sibling("wf-settings-apply")
+    rows, dead = 0, 0
+    own_install = os.path.realpath(os.path.join(root, ".claude"))
+    for rel in (os.path.join(".claude", "settings.local.json"),
+                os.path.join(".claude", "settings.json")):
+        p = os.path.join(root, rel)
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, ValueError) as exc:
+            res.advise(f"hook wiring: {rel} could not be read as JSON — not examined",
+                       f"{exc.__class__.__name__}: the harness cannot read it either")
+            continue
+        for event, matcher, h in _hook_rows(cfg):
+            rows += 1
+            resolved, exists = census.resolve_hook_command(h["command"])
+            wh = wsa.CENSUS.workforce_hook(h["command"], root)
+            where = f"hook wiring: {rel} · {event} · {matcher or '(no matcher)'}"
+            if exists is False:
+                dead += 1
+                verdict, _wh = wsa.dead_row_verdict(h, root)
+                res.add(False, f"{where} → {resolved} is not on disk",
+                        wsa.VERDICT_REMEDY.get(verdict) if verdict else FOREIGN_REMEDY)
+            elif (wh is not None and wh["form"] in ("absolute", "home")
+                  and os.path.realpath(wh["cfg"]) != own_install
+                  and _personal_root(census_mod, wh["cfg"], root)):
+                other = _second_copy(wsa, census_mod, root, event, wh["script"], p)
+                if other:
+                    res.advise(f"{where} → {wh['path']}",
+                               f"points into the personal config root {wh['cfg']}, and this "
+                               f"session also runs the same hook from {other}, so it fires "
+                               f"twice here; the row also fails on any machine or account "
+                               f"without {wh['cfg']}. Never removed automatically: whether "
+                               f"it is redundant for every account that reads this file "
+                               f"cannot be proven from one machine. Delete it by hand once "
+                               f"every account that opens this project has workforce wired "
+                               f"at user scope")
+    if rows and not dead:
+        res.add(True, f"hook wiring: {rows} registration(s) in this project's settings · "
+                      f"0 dead")
+
+
+def _hook_rows(cfg):
+    """`(event, matcher, hook)` for every command hook in one settings object."""
+    hooks = cfg.get("hooks") if isinstance(cfg, dict) else None
+    for event, entries in (hooks.items() if isinstance(hooks, dict) else ()):
+        for e in (entries if isinstance(entries, list) else ()):
+            inner = e.get("hooks") if isinstance(e, dict) else None
+            for h in (inner if isinstance(inner, list) else ()):
+                if isinstance(h, dict) and isinstance(h.get("command"), str) and h["command"].strip():
+                    yield event, e.get("matcher"), h
+
+
 def check_data_skill(path, body, res):
     n = os.path.relpath(path)
     missing = [s for s in DATA_SKILL_SECTIONS if ("\n" + s) not in body]
@@ -1618,7 +1753,7 @@ def check_sidecar(root, res):
     # THE DENOMINATOR IS THE CENSUS'S, not this file's. `.censusignore` is read
     # through `wf-census` so that what counts as project content is decided in one
     # place; the directory-name prune this loop used to carry is gone, because it
-    # answered a question the project alone is allowed to answer (`_load_census`).
+    # answered a question the project alone is allowed to answer (`_load_sibling`).
     # WORKFORCE DOES NOT SURVEY ITS OWN SCRATCH AS IF IT WERE PROJECT CONTENT.
     #
     # This is NOT the `fixtures/` default the census doctrine bars (procedures/audit.md
@@ -1646,7 +1781,7 @@ def check_sidecar(root, res):
         for _dp, _dn, _fns in os.walk(_sr):
             _scratch_skipped += len([f for f in _fns if f.endswith(".md")])
     unstamped = []
-    census = _load_census().Census(root)
+    census = _load_sibling("wf-census").Census(root)
     census.load_ignore()
     claude_dir = os.path.join(root, ".claude")
     for dirpath, dirnames, filenames in os.walk(claude_dir):
@@ -2884,6 +3019,7 @@ def main():
     check_journal(root, res)
     check_defects(root, res)
     check_catalogs(root, res)
+    check_hook_wiring(root, res)
 
     if args.json_path:
         with open(args.json_path, "w", encoding="utf-8") as fh:

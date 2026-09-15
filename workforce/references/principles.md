@@ -67,9 +67,10 @@ skills, delete your hooks. See what the model does."*
 - **`update` is a clean full replacement.** No user state lives in the skill directory, so there is
   no clobber risk to weigh against staying current. An update path people hesitate to run does not
   mitigate anything.
-- **`ablate` is a first-class command.** Delete handbook lines, re-run the evals, keep what earns its
-  place. Ablation without measurement is vandalism, which is why it refuses to run without an eval
-  set.
+- **Removal is by measurement.** Delete handbook lines, re-run the evals, keep what earns its place.
+  Ablation without measurement is vandalism. *This bullet called `ablate` "a first-class command";
+  it never shipped a procedure (`SKILL.md` § Core Principles, 9(c) "Prefer deleting to accumulating"), so removal is done by hand, in the
+  change that finds the guidance, with the evals re-run.*
 
 ---
 

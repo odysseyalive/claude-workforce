@@ -370,6 +370,7 @@ done
 FETCH_FAILED=""
 VERIFY_FAILED=""
 SETTINGS_FAILED=""
+WIRE_FAILED=""
 
 # Remove what the manifest no longer lists.
 #
@@ -1047,14 +1048,17 @@ if changed:
         echo "  Wire them later with: /workforce hooks --execute"
     else
         echo "Wiring hooks and selecting the output style..."
-        if [ "$scope" = "user" ]; then
-            python3 "$skill_dir/bin/wf-settings-apply" --scope user \
-                --wire-defaults --execute 2>&1 | sed 's/^/  /' || \
-                echo "  Warning: wiring reported a problem. Run \`/workforce verify\` to see what is unwired."
-        else
-            python3 "$skill_dir/bin/wf-settings-apply" --root "$(pwd)" \
-                --wire-defaults --execute 2>&1 | sed 's/^/  /' || \
-                echo "  Warning: wiring reported a problem. Run \`/workforce verify\` to see what is unwired."
+        # THE EXIT STATUS IS THE APPLIER'S, NOT sed's. `cmd | sed … || warn` tested sed,
+        # which always succeeds, so a wiring run that crashed before wiring anything
+        # printed a traceback, skipped the warning, and the install said it was complete
+        # (second review, N3). PIPESTATUS[0] is the applier; the failure is kept for the
+        # summary at the end, where it cannot scroll away. Still never fatal.
+        if [ "$scope" = "user" ]; then wire_args=(--scope user); else wire_args=(--root "$(pwd)"); fi
+        python3 "$skill_dir/bin/wf-settings-apply" "${wire_args[@]}" --wire-defaults --execute 2>&1 | sed 's/^/  /'
+        wire_rc=${PIPESTATUS[0]}
+        if [ "$wire_rc" -ne 0 ]; then
+            WIRE_FAILED="$WIRE_FAILED $scope"
+            echo "  Warning: wiring exited $wire_rc -- the lines above name what failed. Run \`/workforce verify\` to see what is unwired."
         fi
     fi
 }
@@ -1119,6 +1123,11 @@ if [ -z "$NO_AUTOMODE" ]; then
     echo
 fi
 
+if [ -n "$WIRE_FAILED" ]; then
+    echo "HOOK WIRING REPORTED A PROBLEM ($WIRE_FAILED scope). Every file installed; the lines under"
+    echo "  \"Wiring hooks\" above name what failed, and \`/workforce verify\` shows what is unwired."
+    echo
+fi
 if [ "$MODE" = "update" ]; then
     echo "Update complete ($TARGETS)."
 else

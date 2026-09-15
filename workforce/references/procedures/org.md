@@ -653,9 +653,10 @@ malfunction · failure) belong to `diagnose`, which owns the vocabulary findings
 A run directory is large and permanent today because it is the only record that the run happened.
 Once its telemetry rows exist, that stops being true: **a run whose telemetry is recorded, and whose
 captures are not cited by any eval case, is reclaimable** — the row survives, the megabytes do not.
-The exception is exactly the captures an eval case names (`evals.md` § Judgment roles), which are
+The exception is exactly the captures an eval case names (`procedures/audit.md` § Step 5f), which are
 ground truth and are never reaped. This is the standing answer to a `work/` tree that grows without
-bound and to the tension `evals.md` otherwise creates by arguing those directories must be kept.
+bound and to the tension the eval-set rule otherwise creates by arguing those directories must be kept.
+*Both cited `evals.md`, deleted in v1.31.0, until 2026-09-14; the eval-set rules live in audit Step 5f.*
 
 ## Mode: `status`
 

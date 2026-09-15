@@ -1929,6 +1929,18 @@ lists would guarantee within one release. **It selects no output style.** This s
 by the installer — so the step named a write the producer had stopped performing. `--unwire-defaults`
 still CLEARS a style selected by an older release, which is the half that had to survive.
 
+**The same call removes what a retired release left behind, first.** Before it wires anything it runs
+`heal` over the project's settings files: a workforce row whose script the distribution retired, whose
+file is missing and whose install is present and whole, is removed and recorded in
+`.settings-owned.json` § `hooks_removed`. A live row and a user's own row are never touched. Every
+session start runs the same function (`hooks.md` § Healing), so on most trees this finds nothing.
+
+**Project scope never receives a path under a personal config root.** The project file is shared by
+every account and machine that opens the tree, so it gets the project install's
+`${CLAUDE_PROJECT_DIR}` path, or, when the only install is personal and user scope does not already carry
+the hook, the per-session form `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/…`, which each session's shell
+resolves to its own install.
+
 **Every write is idempotent and reversible.** A hook already registered is a reported NOOP. Each write records itself in `.claude/workforce/.settings-owned.json`,
 so `disband` and `/workforce hooks --remove` reverse exactly these and nothing else.
 

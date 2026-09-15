@@ -3685,5 +3685,1184 @@
       "retire     CATALOG-ANCHOR.md",
       "retire     hooks/post.sh"
     ]
+  },
+  "sa-heal-execute": {
+    "_why": "EVERY GUARD, ONE TREE, and each row fails this case if its guard is removed (mutation-tested 2026-09-14). REMOVED: five rows whose script the distribution RETIRED, whose file is missing and whose install is present and whole \u2014 an absolute-form row, the per-session form (resolved against the running CLAUDE_CONFIG_DIR), one sharing an entry with the user's own hook, one in the committed settings.json, and one reached through `cfg-a/../cfg-a`, which the kernel resolves (a `..` is never refused or normalised as text, review 3 L5). KEPT and named: a shipped script missing from the project install (a broken install, never a retirement), a name neither shipped nor retired, a retired name whose install is partial, and one whose install is absent. KEPT silently: a retired name still on disk, an exec-form row (args), a path with `$` in it and an unquoted path with a space (the shell runs something else), and two LIVE wf-protect-directives rows \u2014 the project's own and another install's, which double-fires but is never deleted because redundancy for every account cannot be proven. `${CLAUDE_PROJECT_DIR}` stands in for absolute paths the copied tree cannot know. The file is 4-space indented and carries a non-ASCII label; both must survive the rewrite.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "- PreToolUse  AskUserQuestion  wf-budget-guard  retired",
+      "wf-plain-guard  retired",
+      "wf-ledger-capture  retired",
+      "wf-model-budget  retired",
+      "wf-effort-budget  retired",
+      "kept  Stop  wf-widen  shipped",
+      "kept  PreToolUse  wf-future-hook  unknown",
+      "kept  Stop  wf-speak-guard  install",
+      "kept  Stop  wf-turn-brief  install",
+      "5 removed \u00b7 4 kept \u00b7 0 refused \u00b7 2 settings file(s) read",
+      "verified on disk: 5 registration(s) gone"
+    ],
+    "not": [
+      "wf-standing-request",
+      "wf-ledger-open",
+      "wf-loop-guard",
+      "wf-handoff",
+      "wf-protect-directives",
+      "my-own-stop-hook",
+      "NOT HEALED"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "/usr/local/bin/my-own-stop-hook --label caf\u00e9",
+          ".claude/skills/workforce/bin/wf-widen",
+          "wf-future-hook",
+          "cfg-partial/skills/workforce/bin/wf-speak-guard",
+          "wf-turn-brief",
+          "cfg-old/skills/workforce/bin/wf-standing-request",
+          "wf-ledger-open",
+          "c$x/skills",
+          "cfg a/skills",
+          "\n    \"hooks\": {",
+          "cfg-a/skills/workforce/bin/wf-protect-directives",
+          "{CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives"
+        ],
+        "not": [
+          "wf-budget-guard",
+          "wf-plain-guard",
+          "wf-ledger-capture",
+          "wf-effort-budget",
+          "\\u00e9"
+        ]
+      },
+      ".claude/settings.json": {
+        "not": [
+          "wf-model-budget"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "want": [
+          "\"hooks_removed\"",
+          "\"settings\": \".claude/settings.json\""
+        ],
+        "once": [
+          "\"script\": \"wf-budget-guard\"",
+          "wf-protect-directives"
+        ]
+      }
+    }
+  },
+  "sa-heal-display": {
+    "_why": "The heal in DISPLAY: the same tree as sa-heal-execute, no --execute. It names the same five removals and four kept rows and writes nothing, so a regression that makes display write, or execute only report, fails one of the pair.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "~ PreToolUse  AskUserQuestion  wf-budget-guard",
+      "5 to remove \u00b7 4 kept",
+      "apply with: --execute"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard",
+          "wf-plain-guard"
+        ]
+      },
+      ".claude/settings.json": {
+        "want": [
+          "wf-model-budget"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "not": [
+          "hooks_removed"
+        ]
+      }
+    }
+  },
+  "sa-heal-home-is-user-scope": {
+    "_why": "The project is $HOME, so its .claude IS the default account's config root and its settings.json is user scope, while this session runs another account (CLAUDE_CONFIG_DIR=cfg-b). The heal must write nothing: it never writes a user-scope file, and here that file belongs to an account that is not even running.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "personal config root"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-project-is-running-root": {
+    "_why": "The project's .claude IS the running account's config root (CLAUDE_CONFIG_DIR points at it) while HOME is elsewhere, so its settings.json is that account's user scope. Never written. Paired with sa-heal-home-is-user-scope, where the project is $HOME and a different account runs, so each half of the refusal has a case that fails without it.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/.claude"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "personal config root"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-bad-sidecar": {
+    "_why": "A reversal record that does not parse. It is the only thing disband can replay, so the heal writes NOTHING \u2014 not the record, and not the settings file whose removals it could not record. The first version replaced it with a fresh object at every session start.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "is not a JSON object"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "want": [
+          "{ not json, the only record disband has"
+        ]
+      }
+    }
+  },
+  "sa-heal-symlinked-sidecar": {
+    "_why": "CWE-59. The repository ships .settings-owned.json as a symlink to a file outside it (here `bashrc`, standing in for ~/.bashrc). The first version wrote JSON through the link at SessionStart. The record is never written through a link, and so nothing is written at all.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "is a symlink"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      "bashrc": {
+        "want": [
+          "export FIXTURE_UNTOUCHED=1"
+        ],
+        "not": [
+          "hooks_removed"
+        ]
+      },
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-symlinked-record-dir": {
+    "_why": "The same attack one level up: .claude/workforce itself is a link out of the project, so the record would land wherever it points. Refused, nothing written.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "resolves outside the project"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-readonly-settings": {
+    "_why": "A settings file the user made read-only. The heal must fail loudly with the real cause and leave the reversal record untouched. The first version wrote the record FIRST, so hooks_removed grew by the same row at every session start while the settings never changed.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "chmod": {
+      ".claude/settings.local.json": "0444"
+    },
+    "exit": 1,
+    "want": [
+      "NOT HEALED",
+      "retired row(s) still in",
+      "PermissionError",
+      "not writable"
+    ],
+    "not": [
+      "left for another session",
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "not": [
+          "hooks_removed"
+        ]
+      }
+    }
+  },
+  "sa-heal-symlinked-settings": {
+    "_why": "The settings file is a symlink (a dotfiles setup). The rewrite goes into the REAL file by temp-file-and-rename in the real file's directory, so the link survives and the target is what changes. Writing to the link path would replace the link with a copy and leave the real file holding the dead row.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "1 removed",
+      "verified on disk"
+    ],
+    "after": {
+      "real-settings.json": {
+        "want": [
+          "my-own-stop-hook"
+        ],
+        "not": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-duplicate-keys": {
+    "_why": "A settings file with two `hooks` keys. The harness keeps one, and a parse-then-rewrite would silently drop the other, so a file with duplicate keys is never written.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "duplicate key"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard",
+          "second-hooks-key"
+        ]
+      }
+    }
+  },
+  "commitments-heals-at-sessionstart": {
+    "_why": "THE CARRIER. The SessionStart registration every default install already has removes a retired row with no audit and no typed command \u2014 the 2026-09-07 directive: the next use of workforce heals it. The hook still exits 0 and speaks JSON, and the user's own row beside it stays.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "{\"systemMessage\": \"HEALED  removed 1 workforce hook registration(s)",
+      "wf-budget-guard"
+    ],
+    "not": [
+      "Traceback",
+      "FAILED",
+      "INTERRUPTED"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "/usr/local/bin/my-own-stop-hook"
+        ],
+        "not": [
+          "wf-budget-guard"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "\"script\": \"wf-budget-guard\""
+        ]
+      }
+    }
+  },
+  "commitments-heal-concurrent": {
+    "_why": "Eight sessions starting at once in one project. MEASURED before the lock: 19 of 40 such starts appended the same removal twice, and disband would then write the row back twice. Under the directory lock the first heals and the rest find nothing, so the record holds it exactly once.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "concurrent": 8,
+    "exit": 0,
+    "want": [],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "/usr/local/bin/my-own-stop-hook"
+        ],
+        "not": [
+          "wf-budget-guard"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "\"script\": \"wf-budget-guard\""
+        ]
+      }
+    }
+  },
+  "conform-hook-wiring-dead": {
+    "_why": "THE HEADLINE HAS TO SEE IT, AND SAY WHAT IS TRUE. Four dead rows, each with the remedy its verdict earns: a retired script in a whole install (the heal removes it), a retired script in an absent install (the file proves nothing), a shipped script missing from the project install (reinstall; nothing removes it), and a foreign script (PASS-DEAD-HOOK). The `jq` row resolves through PATH and is undecidable, never dead. A LIVE row into an install inside the project is not a personal root and draws no advisory.",
+    "script": "wf-conform",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "exit": 1,
+    "want": [
+      "4 failed",
+      "hook wiring: .claude/settings.local.json",
+      "--heal --execute",
+      "absent or incomplete",
+      "still SHIPS",
+      "PASS-DEAD-HOOK"
+    ],
+    "not": [
+      "personal config root",
+      "jq -r",
+      "0 failed"
+    ]
+  },
+  "commitments-sessionstart-clean": {
+    "_why": "The clean half of the pair. Settings that name workforce, so the gate opens and the classifier runs, holding only a live project-install row and the user's own hook: nothing is removed, nothing is said, the file is untouched. A heal that spoke or wrote here would do it in every healthy project on every session.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [],
+    "not": [
+      "HEALED",
+      "systemMessage",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "/usr/local/bin/my-own-stop-hook",
+          "wf-protect-directives"
+        ]
+      }
+    }
+  },
+  "sa-hook-project-never-personal": {
+    "_why": "FIX 2. The only install is personal (CLAUDE_CONFIG_DIR=cfg) and its user settings do not carry the hook, so project scope writes it. It must write the per-session form, never cfg's absolute path: a project file is shared by every account and machine, and absolute personal paths from two config roots are how one project fired both installs' hooks and failed for every account when either retired a script. Against HEAD the file received `<tree>/cfg/skills/workforce/bin/wf-protect-directives`.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-hook",
+      "wf-protect-directives",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "per-session form",
+      "verified on disk: wf-protect-directives registered once"
+    ],
+    "not": [
+      "HOOK UNVERIFIED"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce/bin/wf-protect-directives"
+        ],
+        "not": [
+          "/cfg/skills"
+        ]
+      }
+    }
+  },
+  "apply-deadhook-workforce-verdict": {
+    "_why": "PASS-DEAD-HOOK DECIDES A WORKFORCE ROW THROUGH THE HEAL'S VERDICT, or not at all. Second review, N1, reproduced: once the census resolved the per-session form against the running account, this pass deleted a LIVE shipped hook on every audit for any account without a personal install. Five dead rows as the census sees them; exactly three go \u2014 two foreign scripts, and a retired workforce script whose install is present and whole. The shipped per-session row stays, the retired row whose install is absent stays, and the foreign `..` row is decided by the kernel like any other and removed (review 3, L5: refusing `..` outright had lost HEAD's handling of it). HEAD's pass applied four here, the shipped per-session row among them.",
+    "script": "wf-apply",
+    "args": [
+      "--execute"
+    ],
+    "subst": [
+      ".claude/settings.local.json"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [
+      "PASS-DEAD-HOOK",
+      "applied 3",
+      "gone/hook.sh",
+      "gone2/hook.sh",
+      "wf-speak-guard"
+    ],
+    "not": [
+      "applied 2",
+      "applied 4"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-protect-directives",
+          "wf-plain-guard"
+        ],
+        "not": [
+          "gone/hook.sh",
+          "gone2/hook.sh",
+          "wf-speak-guard"
+        ]
+      }
+    }
+  },
+  "sa-wire-user-readonly": {
+    "_why": "A PRUNE FAILURE NEVER STOPS THE WIRING. Second review, N3, reproduced: a read-only user settings file holding a retired row made the user-scope prune raise before the wiring loop, so nothing was wired and \u2014 the installer piping the status into sed \u2014 the install reported success. Now the prune reports NOT HEALED, every default hook is still attempted and reported NOT WRITTEN, there is no traceback, and the exit is 1 so the installer's summary says wiring failed.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--wire-defaults",
+      "--execute"
+    ],
+    "subst": [
+      "cfg/settings.json"
+    ],
+    "chmod": {
+      "cfg/settings.json": "0444"
+    },
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 1,
+    "want": [
+      "NOT HEALED",
+      "PermissionError",
+      "wf-protect-directives  PostToolUse  NOT WRITTEN",
+      "wf-task-tag  UserPromptSubmit  NOT WRITTEN"
+    ],
+    "not": [
+      "Traceback",
+      "registered"
+    ],
+    "after": {
+      "cfg/workforce/.settings-owned.json": {
+        "not": [
+          "wf-protect-directives"
+        ]
+      }
+    }
+  },
+  "sa-heal-session-row-skew": {
+    "_why": "VERSION SKEW ON A SHARED FILE (second review, N4). A per-session row resolves to each account's own install; here the running account (cfg-b) no longer ships wf-plain-guard, but the project's own rows name another install on this machine (cfg-old) that still does, so for that account the row is live. Kept and named `skew`; nothing removed.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "subst": [
+      ".claude/settings.local.json"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "kept  Stop  wf-plain-guard  skew",
+      "0 removed \u00b7 1 kept"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "conform-cross-root-monorepo": {
+    "_why": "NOT A PERSONAL ROOT (second review, N5, reproduced). A monorepo subproject whose rows point into the repository root's own vendored install, registered twice so a second copy DOES exist: the advisory must still not call it one account's personal install. --root is the subproject; the harness's own --root is overridden by the later one.",
+    "script": "wf-conform",
+    "args": [
+      "--root",
+      "${TREE}/sub"
+    ],
+    "subst": [
+      "sub/.claude/settings.local.json"
+    ],
+    "env": {
+      "HOME": "${TREE}/home"
+    },
+    "exit": 0,
+    "want": [
+      "0 failed"
+    ],
+    "not": [
+      "personal config root",
+      "fires"
+    ]
+  },
+  "conform-cross-root-personal": {
+    "_why": "The advisory when it is TRUE: the row points into a real personal config root (the running CLAUDE_CONFIG_DIR) and that account's user settings run the same hook, so this session fires it twice. It is advisory, never a failure.",
+    "script": "wf-conform",
+    "subst": [
+      ".claude/settings.local.json",
+      "acct/settings.json"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/acct"
+    },
+    "exit": 0,
+    "want": [
+      "~ hook wiring: .claude/settings.local.json \u00b7 PostToolUse \u00b7 Edit|Write",
+      "points into the personal config root",
+      "fires twice here",
+      "0 failed"
+    ]
+  },
+  "conform-cross-root-single": {
+    "_why": "The same personal root with NO second registration: nothing fires twice, so saying so would be false and the advisory stays silent.",
+    "script": "wf-conform",
+    "subst": [
+      ".claude/settings.local.json"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/acct"
+    },
+    "exit": 0,
+    "want": [
+      "0 failed"
+    ],
+    "not": [
+      "personal config root",
+      "fires twice"
+    ]
+  },
+  "sa-heal-hardlinked-settings": {
+    "_why": "A settings file with a second hard link (last review, 2; replaces N6's in-place write). The other name may live outside the project, and the heal cannot know where, so the file is refused and counted exactly like a symlink out. Editing it in place made a copy outside the project lose its row too.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "hardlink": {
+      "other-name.json": ".claude/settings.local.json"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "hard links",
+      "0 removed \u00b7 0 kept \u00b7 1 refused"
+    ],
+    "after": {
+      "other-name.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      },
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    },
+    "not": [
+      "verified on disk",
+      "written in place"
+    ]
+  },
+  "sa-heal-settings-link-to-user": {
+    "_why": "The project's settings.json is a symlink to the running account's user settings (second review, N7): a project-scope write would land in user scope. Every file the heal would write is compared by real path against both user settings files, and this is refused.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "resolves to the user-scope file"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-settings-link-to-default": {
+    "_why": "The same link, to the DEFAULT account's ~/.claude/settings.json while another account runs, so each half of the file comparison has a case that fails without it.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "resolves to the user-scope file"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      "home/.claude/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-readonly-sidecar": {
+    "_why": "A reversal record that cannot be written (second review, N8, reproduced): the row used to be removed, the record fail, and the message claim the row was still there. Writability is checked BEFORE anything is removed, so no removal is ever unrecorded.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "chmod": {
+      ".claude/workforce/.settings-owned.json": "0444"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "is not writable, so a removal could not be recorded"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-no-claude-dir": {
+    "_why": "No .claude means nothing to heal (second review, N9): quiet, exit 0. It printed `NOT HEALED \u2014 FileNotFoundError` and exited 1.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "absent \u2014 nothing to heal"
+    ],
+    "not": [
+      "NOT HEALED",
+      "Traceback"
+    ]
+  },
+  "sa-wire-no-claude-dir": {
+    "_why": "The same tree under --wire-defaults, which runs the heal first: no NOT HEALED, exit 0.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-defaults"
+    ],
+    "exit": 0,
+    "not": [
+      "REFUSED",
+      "NOT HEALED",
+      "Traceback"
+    ],
+    "want": [
+      "default hook(s)"
+    ]
+  },
+  "commitments-heal-failure-first": {
+    "_why": "A read-only settings file holding a retired row, at the first session start that sees it: HEAL FAILED names the real cause, and the notice records the file's state so the next session does not say it again.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "chmod": {
+      ".claude/settings.local.json": "0444"
+    },
+    "exit": 0,
+    "want": [
+      "HEAL FAILED",
+      "not writable",
+      "Said once for this state"
+    ],
+    "after": {
+      ".claude/workforce/.heal-notice": {
+        "want": [
+          "6c676d35a94b272269e01aaf0e08c1917664f3482d8c340ccf8def58a40c76c9"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "not": [
+          "hooks_removed"
+        ]
+      }
+    }
+  },
+  "commitments-heal-failure-once": {
+    "_why": "The next session start over the SAME file state (round-one partial #4): silent. It used to print HEAL FAILED at every session start forever, with nothing the user could do but make the file writable.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "chmod": {
+      ".claude/settings.local.json": "0444"
+    },
+    "exit": 0,
+    "not": [
+      "HEAL FAILED",
+      "Traceback"
+    ],
+    "want": []
+  },
+  "sa-heal-compact": {
+    "_why": "A MINIMAL TEXTUAL EDIT (round-one partial #10). Two retired rows go; every other byte stays \u2014 the compact inline objects, the odd spacing, the key order, the last line. A re-serialise expanded `{\"allow\": [...]}` across lines. The result is checked against the intended object before it is written.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "2 removed"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "{\"permissions\": {\"allow\": [\"Bash(ls:*)\"], \"deny\": []},\n \"hooks\": {\"Stop\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"/usr/local/bin/my-own-stop-hook\"}]}]},\n \"model\":\"opus\"}\n"
+        ]
+      }
+    }
+  },
+  "commitments-heal-bad-notice": {
+    "_why": "A non-UTF-8 .heal-notice (review 3, L1, reproduced): it raised UnicodeDecodeError out of the SessionStart hook, exit 1, and the commitment ledger's read-back never printed. An unreadable notice is an absent one, the heal path cannot fail the hook, and the ledger still reads back.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "chmod": {
+      ".claude/settings.local.json": "0444"
+    },
+    "exit": 0,
+    "want": [
+      "HEAL FAILED",
+      "thing(s) a previous turn in this project said it would do",
+      "wire the heal into the release notes"
+    ],
+    "not": [
+      "Traceback",
+      "UnicodeDecodeError"
+    ]
+  },
+  "sa-heal-crlf": {
+    "_why": "CRLF line endings survive the edit byte for byte (review 3, L2). Text-mode read and write turned them into LF; on Windows the reverse. The file is read and written with newline='', so only the removed row's characters change.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "1 removed"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "{\r\n  \"hooks\": {\r\n",
+          "/usr/local/bin/my-own-stop-hook\"\r\n"
+        ],
+        "not": [
+          "wf-budget-guard",
+          "}\n"
+        ]
+      }
+    }
+  },
+  "sa-heal-readonly-record-dir": {
+    "_why": "A read-only record DIRECTORY (review 3, L3: the directory half of the writability check was unpinned \u2014 replacing it with `if False:` passed everything). The record could not be created, so nothing is removed.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "chmod": {
+      ".claude/workforce": "0555"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "is not writable, so a removal could not be recorded"
+    ],
+    "not": [
+      "verified on disk",
+      "REMOVED"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-skew-weak-evidence": {
+    "_why": "Skew needs a COMPLETE install as evidence (review 3, L4, reproduced). Here an abandoned ~/.claude holds nothing but a stale wf-speak-guard, and an incomplete directory a project row names holds another; neither is an install anyone runs, so neither keeps the retired per-session row alive, and it is removed.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "subst": [
+      ".claude/settings.local.json"
+    ],
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "wf-speak-guard  retired",
+      "1 removed"
+    ],
+    "not": [
+      "  skew \u2014"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-speak-guard"
+        ],
+        "want": [
+          "junk/skills/workforce/bin/wf-protect-directives"
+        ]
+      }
+    }
+  },
+  "apply-deadhook-dotdot-kernel": {
+    "_why": "`..` resolved by the KERNEL, never as text (review 3, L5; review 1, #9). `link` points at real/inner, so link/../hooks/live.sh is real/hooks/live.sh, which exists: lexical normalisation said tree/hooks/live.sh and called a live row dead. The two foreign rows that really are gone \u2014 one with the quote before the `..`, one relative \u2014 are removed, as HEAD removed them, which the outright `..` refusal had stopped.",
+    "script": "wf-apply",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "applied 2",
+      "../gone/hook.sh",
+      "../gone/rel.sh"
+    ],
+    "not": [
+      "live.sh",
+      "applied 3"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "link/../hooks/live.sh"
+        ],
+        "not": [
+          "gone/hook.sh",
+          "gone/rel.sh"
+        ]
+      }
+    }
+  },
+  "sa-heal-dotdot-kernel": {
+    "_why": "The same kernel resolution for a workforce row: link/../cfg is real/cfg, a complete install, so the retired wf-plain-guard row is judged against the install the shell would really run. Lexically it pointed at an absent tree/cfg and was kept as `install`.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "wf-plain-guard  retired",
+      "1 removed"
+    ],
+    "not": [
+      ". kept"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-plain-guard"
+        ],
+        "want": [
+          "my-own-stop-hook"
+        ]
+      }
+    }
+  },
+  "commitments-heal-notice-cleared": {
+    "_why": "The notice is not residue (review 3, L6): once nothing is failing \u2014 here the heal succeeds \u2014 it is removed.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "HEALED  removed 1"
+    ],
+    "not": [
+      "HEAL FAILED"
+    ],
+    "after": {
+      ".claude/workforce/.heal-notice": {
+        "absent": true
+      },
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-settings-link-outside": {
+    "_why": "THE GENERAL RULE (review 3, L7): a project heals only files inside its own tree. The project's settings.json is a link to ANOTHER account's settings (work/, a third config root the two named user files would never match). Refused, and that account's file keeps its row. --root is the project inside the fixture tree.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute",
+      "--root",
+      "${TREE}/proj"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "resolves outside the project"
+    ],
+    "not": [
+      "verified on disk"
+    ],
+    "after": {
+      "work/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      }
+    }
+  },
+  "commitments-heal-bom-skipped": {
+    "_why": "A settings file with a byte-order mark is not strict JSON, so the heal cannot read it (review 3, L8). It was skipped in silence at every session start, and the retired row in it stayed forever. Now it is said, once for this state of the file.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "HEAL SKIPPED",
+      "is not strict JSON",
+      "Said once for this state"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "commitments-heal-backslash-gate": {
+    "_why": "WINDOWS ROWS OPEN THE GATE (final review, F1). hook_command joins with os.path.join, so on Windows a row reads `\u2026\\\\skills\\\\workforce\\\\bin\\\\wf-x` in the JSON text; the session-start gate looked for `/wf-` only and never opened there, so the automatic heal never ran on Windows. Linux cannot run a backslash row, so the observable here is the unparseable-file notice this file's byte-order mark triggers \u2014 which fires only once the gate has opened.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "HEAL SKIPPED",
+      "is not strict JSON"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
+  "sa-heal-refuse-per-file": {
+    "_why": "REFUSED PER FILE, NOT PER PROJECT (final review, F2, reproduced). The project's settings.json is a link into a dotfiles checkout outside the project and is refused; the in-tree settings.local.json beside it is still healed, where one outside link used to block both. The summary counts the refused row instead of reporting 0 to remove.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute",
+      "--root",
+      "${TREE}/proj"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED  .claude/settings.json: it resolves outside the project",
+      "1 retired row(s) left in it",
+      "1 removed \u00b7 0 kept \u00b7 1 refused"
+    ],
+    "after": {
+      "dotfiles/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      },
+      "proj/.claude/settings.local.json": {
+        "not": [
+          "wf-budget-guard"
+        ],
+        "want": [
+          "my-own-stop-hook"
+        ]
+      }
+    }
+  },
+  "commitments-heal-refused-notice": {
+    "_why": "A refusal that leaves retired rows is SAID at session start, once per state (final review, F2). settings.json links to the running account's user settings, which the heal never writes; settings.local.json beside it is healed in the same session. Both used to be silent.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "HEALED  removed 1",
+      "HEAL REFUSED",
+      "user-scope file",
+      "1 retired row(s) left in it"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "want": [
+          "wf-plain-guard"
+        ]
+      },
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "sa-heal-symlinked-claude-dir": {
+    "_why": "The project's whole .claude is a link out of the tree (a dotfiles-managed setup). Every settings file then resolves outside the project and is refused, with the rows it leaves counted \u2014 never written, never silent. Since the last review the whole project is refused (the record and notice would land outside too), so nothing is written at all.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute",
+      "--root",
+      "${TREE}/proj"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg-b"
+    },
+    "exit": 0,
+    "want": [
+      "REFUSED",
+      "resolves outside the project",
+      "0 to remove \u00b7 0 kept \u00b7 1 refused"
+    ],
+    "after": {
+      "dotclaude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
+  },
+  "commitments-heal-claude-dir-outside": {
+    "_why": "`.claude` is a link OUT of the project (last review, 1, reproduced): the HEAL REFUSED notice was written into the link's target. Every heal write now passes the inside-the-project test, so the notice file is never created; the refusal is said at every session start while it lasts, which writes nothing. CLAUDE_PROJECT_DIR is the subdirectory, so the link's target is outside it.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}/proj"
+    },
+    "exit": 0,
+    "want": [
+      "HEAL REFUSED",
+      "resolves outside the project",
+      "1 retired row(s) left in it"
+    ],
+    "not": [
+      "Traceback",
+      "HEALED"
+    ],
+    "after": {
+      "dotclaude/workforce/.heal-notice": {
+        "absent": true
+      },
+      "dotclaude/workforce/.settings-owned.json": {
+        "absent": true
+      },
+      "dotclaude/settings.local.json": {
+        "want": [
+          "wf-budget-guard"
+        ]
+      }
+    }
   }
 }

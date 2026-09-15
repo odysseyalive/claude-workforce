@@ -191,7 +191,7 @@ Symmetry check: [symmetric/asymmetric] — [brief note]
 [the Metadata Provenance Check output block from Step 1, every line of it]
 
 ### Summary
-[One sentence: overall assessment and confidence level]
+Verdict: [pass / fail] — [one sentence naming the check or flag that decided it]
 
 ### Flags
 [List specific concerns — maximum 3-5 flags]

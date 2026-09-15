@@ -43,6 +43,65 @@ def config_root():
     return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 
 
+# ── the ONE workforce-row resolver ────────────────────────────────────────────
+# "Is this hook row a workforce hook, which script does it name, and where does that
+# script resolve?" had three answers on 2026-09-14 — a strict path test in the settings
+# heal, a lenient expander for the wiring, and this census — and they disagreed: the
+# per-session form the wiring wrote was a row the heal could not see and the census
+# called undecidable. One function now answers it, and all three read it.
+PER_SESSION_ROOT = "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+WF_BIN_RX = re.compile(r"^(?P<prefix>.*?)/skills/workforce/bin/(?P<script>wf-[a-z0-9-]+)$")
+_WF_PREFIXES = (("${CLAUDE_PROJECT_DIR}", "project"), ("$CLAUDE_PROJECT_DIR", "project"),
+                (PER_SESSION_ROOT, "session"), ("${HOME}", "home"), ("$HOME", "home"))
+_WF_META = set("$`\"';&|<>(){}*?[]!#~\n\t")
+
+
+def workforce_hook(command, root):
+    """A workforce hook row, resolved, or None. Never raises.
+
+    Accepts exactly the forms workforce writes, each optionally inside ONE pair of
+    quotes: an absolute path, `${CLAUDE_PROJECT_DIR}/…` (resolved to `root`), the
+    per-session `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/…` (resolved to THIS process's
+    config root, which is the running session's), and `$HOME/…`. The rest of the
+    path must end in `/skills/workforce/bin/wf-<name>` and carry no shell syntax, no
+    other variable and no unquoted space. Anything else is not a workforce row here, dead
+    or alive. A `..` component is allowed and NEVER normalised: every decision downstream
+    is a kernel stat or a realpath of the joined path, both physically correct across a
+    symlinked directory, so there is no removal decision a `..` could mislead.
+
+    Returns {"script", "cfg", "bin", "path", "exists", "form"}; `form` is one of
+    absolute, project, session, home.
+    """
+    if not isinstance(command, str):
+        return None
+    c = command.strip()
+    quoted = len(c) >= 2 and c[0] == c[-1] and c[0] in "\"'"
+    if quoted:
+        c = c[1:-1]
+    if os.sep == "\\":
+        c = c.replace("\\", "/")
+    m = WF_BIN_RX.match(c)
+    if not m:
+        return None
+    prefix, form, base = m.group("prefix"), "absolute", ""
+    for token, kind in _WF_PREFIXES:
+        if prefix.startswith(token):
+            prefix, form = prefix[len(token):], kind
+            base = {"project": root or "", "session": config_root(),
+                    "home": os.path.expanduser("~")}[kind]
+            break
+    if (any(ch in _WF_META for ch in prefix) or (" " in prefix and not quoted)
+            or (form == "project" and not root)):
+        return None
+    cfg = base + prefix
+    if not os.path.isabs(cfg):
+        return None
+    bin_dir = os.path.join(cfg, "skills", "workforce", "bin")
+    path = os.path.join(bin_dir, m.group("script"))
+    return {"script": m.group("script"), "cfg": cfg, "bin": bin_dir, "path": path,
+            "exists": os.path.exists(path), "form": form}
+
+
 # Anchored for the same reason MARKER_RX is: a file DOCUMENTING the marker
 # convention mentions it in prose and inside backticks. Unanchored, this reported
 # 10 of 21 immutable blocks "unpaired" on a real project — and an unpaired sacred
@@ -548,6 +607,11 @@ class Census:
         raw = (cmd or "").strip()
         if not raw:
             return None, None
+        # A WORKFORCE ROW IS RESOLVED BY THE ONE RESOLVER, in every form workforce writes,
+        # so this census, `wf-conform` and the settings heal cannot disagree about it.
+        wh = workforce_hook(raw, self.root)
+        if wh is not None:
+            return wh["path"], wh["exists"]
 
         # THE FIRST DECIDABLE SEGMENT WINS, and the loop is the point. A line's
         # leading segment is very often a `cd`, a `test -f`, or a `mkdir -p` — bare
@@ -598,7 +662,13 @@ class Census:
             return None                    # an env var this process cannot know
         if not os.path.isabs(path):
             path = os.path.join(self.root, path)
-        return os.path.normpath(path)
+        # NEVER NORMALISED LEXICALLY. `os.path.normpath` resolves `..` against the TEXT, so
+        # across a symlinked directory it names a different file than the shell runs and
+        # called a live row dead (review 1, #9). The kernel's own resolution, which
+        # `os.path.exists` uses on the joined path, is physically correct across links, and
+        # a `..` row is decided like any other — HEAD's behaviour for foreign rows, which
+        # refusing `..` outright had lost (review 3, L5).
+        return path
 
     def owning_skill(self, resolved):
         """Which skill directory this hook's script lives in, exactly.
@@ -662,6 +732,9 @@ class Census:
                                 "skill": owner,
                                 "resolved": resolved,
                                 "exists": exists,
+                                # The registration itself, so a remover can judge the
+                                # row it would delete (type, args) and not a summary.
+                                "hook": h,
                             }
                         )
 

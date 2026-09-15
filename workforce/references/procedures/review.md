@@ -78,11 +78,12 @@ disclosure risk, and it does not wait for the next amendment cycle.
 **7. Calibration age.** Compare the `ORG-RECORD`'s `calibrated-for` against the frontmatter `model:`
 (`references/org-chart-format.md`). Equal → the wording has been measured against the model executing
 it. Different, or `calibrated-for` absent → it has not, and the handbook is a candidate for
-`ablate --classify` (the ablation classifier, removed in the simplification release).
+re-measurement by hand (`ablate --classify`, the classifier that once did this, was removed in the
+simplification release).
 
 This is a **finding, never a `PERF`**. Nothing has gone wrong: a model release moves every handbook
 into this state at once, and treating that as a regression would attribute a platform event to a
-document. Report it and let `ablate` decide.
+document. Report it; cutting guidance is a hand edit in the change that measures it.
 
 **Print the count, always, including zero**, in the form
 `CALIBRATION  <n> of <m> handbooks calibrated against the model they run on`. A zero is a

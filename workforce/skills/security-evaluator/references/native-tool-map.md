@@ -2,7 +2,7 @@
 <!-- origin: workforce | modifiable: true -->
 # Native-Tool Map — prefer a real security analyzer when present
 
-The security twin of the code catalog's [native-tool-map](../code/native-tool-map.md), and it works the
+The security twin of the code catalog's [native-tool-map](../../code-evaluator/references/native-tool-map.md), and it works the
 same way: a real analyzer uses ASTs, type info, and **dataflow/taint** — so it establishes reachability
 that grep only guesses at, and it is what makes the whole pass selective, because it fires **only the
 rules whose sinks are present in the code under review**. Detect the ecosystem by its marker file, prefer

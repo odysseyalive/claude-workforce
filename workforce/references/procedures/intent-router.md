@@ -29,7 +29,7 @@ Classifies a freeform ask into a command. Runs when the first token is not a kno
    | "X did the wrong thing" | `defect` or `review` — **never** `retire` |
    | "change how X works" | `amend` |
    | "is any of this actually working?" | `verify` |
-   | "this is costing too much" | `budget`, then `ablate` |
+   | "this is costing too much" | `roster` (it leads with the budget receipt), then `model-map`; guidance is cut by hand — no `budget` or `ablate` command exists |
    | "start over" / "get rid of this" | `disband` — display first, always |
 
 3. **Ambiguous → ask.** Two plausible commands, or a destructive one among the candidates, means

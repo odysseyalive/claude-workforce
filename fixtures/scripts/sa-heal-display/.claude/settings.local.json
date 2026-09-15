@@ -1,0 +1,139 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(ls:*)"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "AskUserQuestion",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-a/skills/workforce/bin/wf-budget-guard\""
+                    }
+                ]
+            },
+            {
+                "matcher": "AskUserQuestion",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce/bin/wf-plain-guard\""
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-a/skills/workforce/bin/wf-future-hook\""
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "/usr/local/bin/my-own-stop-hook --label café"
+                    },
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-a/skills/workforce/bin/wf-ledger-capture\""
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-widen\""
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-partial/skills/workforce/bin/wf-speak-guard\""
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"/nonexistent-wf-fixture/.claude/skills/workforce/bin/wf-turn-brief\""
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-old/skills/workforce/bin/wf-standing-request\""
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "${CLAUDE_PROJECT_DIR}/cfg-a/skills/workforce/bin/wf-ledger-open",
+                        "args": []
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/c$x/skills/workforce/bin/wf-loop-guard\""
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "${CLAUDE_PROJECT_DIR}/cfg a/skills/workforce/bin/wf-handoff"
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-a/../cfg-a/skills/workforce/bin/wf-effort-budget\""
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/wf-protect-directives\""
+                    }
+                ]
+            },
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}/cfg-a/skills/workforce/bin/wf-protect-directives\""
+                    }
+                ]
+            }
+        ]
+    }
+}

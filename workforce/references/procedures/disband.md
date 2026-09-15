@@ -101,6 +101,9 @@ run authored survived every disband — residue by the definition of the standin
 command whose whole job is leaving none.*
 
 **7. Preserve `.claude/workforce/`.** Move it to `.claude/workforce.disbanded-<date>/` and say so.
+The move carries workforce's own state files with it: `.settings-owned.json` (already replayed in
+the steps above) and `.heal-notice`, the settings heal's record of failures it has already reported,
+which holds only hashes and nothing to restore (`hooks.md` § Healing).
 
 **Disbanding a company does not burn its filing cabinet.** Personnel records, amendment history, and
 performance incidents are institutional memory: they explain why the handbooks said what they said,

@@ -156,6 +156,12 @@ per host by the canary**, never inferred per handbook from the presence of a str
 **Measured 2026-08-03 on Claude Code 2.1.221**, during `/workforce verify` on a real org. Same fixture
 (`wf-ceiling-probe`), same session, two spawns:
 
+**No evidence file exists for this fact.** The raw canary output was never copied into the repository's
+`measurements/` directory (§ Adding a fact, step 2), so everything below rests on this section's own
+account and a clone cannot check it; `measurements/README.md` carries a 2d row saying so. *Recorded
+2026-09-14, and deliberately not reconstructed: evidence written after the fact would be a claim. The
+next canary run re-measures it and files the result.*
+
 | Spawn form | Tools it actually saw | `Agent`? |
 |---|---|---|
 | **named teammate** | `Read, Write, Agent, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate` | **present** |

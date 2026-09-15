@@ -64,7 +64,7 @@ The gesture was the whole outcome.*
 
 **The gates are the safety here, not the flag, and this is not the usual case for `--execute`.** The
 commands that default to display are the ones that *decide* something as they run — `hire` authors,
-`ablate` chooses what to strip, `discharge` classifies. Previewing them shows the user a judgment they
+`discharge` classifies. Previewing them shows the user a judgment they
 have not seen yet. **This command decides nothing** (§ What it does NOT do): the removal set came from
 COMMITTED `T7c` rows a prior run wrote, and step 4 re-asserts every precondition against the tree as it
 stands now. There is no new judgment for a preview to disclose — only the same set, re-verified.

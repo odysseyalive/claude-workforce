@@ -2,7 +2,7 @@
 <!-- origin: workforce | modifiable: true -->
 # Cross-File Detection — taint and policy defects invisible in one file
 
-The security twin of the code catalog's [cross-file-detection](../code/cross-file-detection.md). Its
+The security twin of the code catalog's [cross-file-detection](../../code-evaluator/references/cross-file-detection.md). Its
 premise carries straight over: the worst defects do not fit in a single diff hunk. A source in one file
 and a sink in another is invisible to a reviewer reading either alone, and it is the shape most web
 vulnerabilities actually take. This file is the method for the two-file cases; the single-function cases

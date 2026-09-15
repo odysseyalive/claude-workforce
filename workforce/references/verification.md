@@ -80,8 +80,10 @@ Three requirements, and a handbook missing any one of them is not released:
    the **principal's recorded verdict** on those same cases; the check exits non-zero when agreement
    falls below the set's stated threshold. This is mechanical — a string comparison of two verdict
    lines — and it is the only check in this file whose ground truth is the person the work is for.
-   The set lives at `${CLAUDE_PROJECT_DIR}/.claude/workforce/evals/<employee>.md` (`evals.md`
-   § Judgment roles), and `INV-EVALS` (`invariants.md` row 30) counts whether it exists.
+   The set lives at `${CLAUDE_PROJECT_DIR}/.claude/workforce/evals/<employee>.md`
+   (`procedures/audit.md` § Step 5f), and `INV-EVALS` (`invariants.md` row 30) counts whether it
+   exists. *This cited the Judgment roles section of `evals.md` until 2026-09-14; that file was deleted in the
+   simplification release (v1.31.0) and the eval-set rules now live in audit Step 5f.*
 2. **An uncatalogued finding may block.** Where a rule exists, cite it — naming the criterion is what
    makes a critique actionable, and it stays required. Where **no** rule covers what the employee
    found, the finding stands **on its evidence** and is graded at the severity that evidence warrants,

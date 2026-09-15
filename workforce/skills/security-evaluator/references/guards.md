@@ -5,7 +5,7 @@
 A signal grep finds *sinks*. A vulnerability is a sink **reachable by untrusted data and not
 neutralized**. The gap between those two is where security tools earn their false-positive reputation, so
 every candidate from [security-taxonomy.md](security-taxonomy.md) clears the relevant guard below before
-it is reported. This is the security twin of the code catalog's [guards.md](../code/guards.md); the
+it is reported. This is the security twin of the code catalog's [guards.md](../../code-evaluator/references/guards.md); the
 numbering is stable so the taxonomy and cross-file files can cite a guard by number.
 
 **#1 — Constant-fed sink.** The sink's argument is a string literal, an enum, or a value provably not

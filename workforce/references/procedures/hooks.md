@@ -36,12 +36,12 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-protect-directives` | `PostToolUse` | `Edit\|Write` | byte-level drift in `<!-- origin: user \| immutable: true -->` blocks across `.claude/agents/**`, `.claude/workforce/directives/**`, and any `SKILL.md` |
 | `wf-turn-ledger` | `Stop` | *(none)* | **reports, never checks.** Counts the reads this turn made and prints `GROUNDING <n> reads · <n> distinct`. It does not read the reply and judges nothing, so it has no false-positive rate to tune. It also names any of this distribution's own coined terms used bare in the reply. Distinct-source count is the signal: one document read three times is one piece of evidence. § The turn ledger below |
 | `wf-turn-ledger` | `SubagentStop` | *(none)* | the same ledger on a spawned employee. A subagent has **zero residency** — fresh context, no history, one shot — so it is the node most exposed to authoring from the thin surface in front of it. `SubagentStop` carries `agent_type`, `agent_transcript_path` and `last_assistant_message` for that agent. § The turn ledger below |
-| `wf-widen` | `Stop` | *(none)* | **acts where the ledger reports.** Scores the turn on the senses its claim needs and returns `decision: "block"` when one went unopened — the reason names the instruments on this machine that were untouched. Also blocks a turn that announced it was continuing and then ended. Each block happens once per turn. The asks checklist never blocks: once per list, the Stop that ends the turn hands the list and the reply to the widening agent when the tag counted two or more asks or the list holds two or more items, an empty list included, and the tag records that the list's turn has ended. § The widen below |
+| `wf-widen` | `Stop` | *(none)* | **acts where the ledger reports.** Checks, for each sense its claim needs, whether the turn opened that channel (a count of the tool calls that did), and returns `decision: "block"` when one went unopened — the reason names the instruments on this machine that were untouched. Also blocks a turn that announced it was continuing and then ended. Each block happens once per turn. The asks checklist never blocks: once per list, the Stop that ends the turn hands the list and the reply to the widening agent when the tag counted two or more asks or the list holds two or more items, an empty list included, and the tag records that the list's turn has ended. § The widen below |
 | `wf-widen` | `SubagentStop` | *(none)* | the same widen on a spawned employee, for the reason the ledger has both rows: a subagent has zero residency and is the node most exposed to authoring from the thin surface in front of it. |
 | `wf-task-tag` | `UserPromptSubmit` | *(none)* | classifies the ASK before the turn runs and injects the sense that closes it — `history`/`world` need hearing, `behaviour` needs touch, `existence` needs taste. On a message of a dozen words or more it also starts an empty asks checklist, `wf-asks.<session>.json`, which the session fills with each separate ask and updates as it works. A `<task-notification>` arriving mid-turn keeps a checklist whose turn no Stop has ended yet; every other message replaces it. Names, never blocks: `decision: "block"` on this event erases the user's prompt. § The widen below |
 | `wf-widen-agent` | `Stop` | *(none)* | **the only hook here that ACTS.** A `type: "agent"` hook, not a command — it spawns a reader with Read and Bash and none of the finishing turn's context, opens the sense `wf-widen` flagged as unopened, and returns what it found as the next instruction. Returns `ok: true` and spends nothing when there is no flag. § The widen below |
 | `wf-commitments` | `Stop` | *(none)* | records what the turn said it would do NEXT — a stated intention is a debt, and this is the one queue nobody was keeping. Records and reports; never blocks, never judges whether an item is done. § The commitment ledger below |
-| `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. |
+| `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. It also runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project. |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -90,8 +90,23 @@ to wire and nothing to orphan.
    `~/.claude`: a user running more than one environment directory installed the skill under the config
    dir the session resolves from (`scopes.md` § Installing into a specific `CLAUDE_CONFIG_DIR`), so a
    registration hardcoded to `~/.claude` would point at nothing there. `wf-settings-apply --wire-hook`
-   resolves this for you. Write the resolved path **absolute** — expand `~` and `${CLAUDE_CONFIG_DIR}`
-   yourself; a hook command is not run through a shell that will do it for you.
+   resolves this for you. **At user scope, write the resolved path absolute.** Expand `~` yourself:
+   the command does run through a shell, but `~` inside double quotes is not expanded by one.
+
+   **At project scope, never write a path under a personal config root.** The project file is read by
+   every account and machine that opens the tree, so an absolute `~/.claude-work/…` is right for one of
+   them and double-fires or fails for the rest. Project scope takes
+   `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce/bin/<hook>` when the project has its own install, and
+   otherwise `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce/bin/<hook>`, which the session's shell
+   expands to its own config root. Neither is written when any settings file in force already registers
+   the same hook script. `wf-settings-apply` does all of this.
+
+   *Corrected 2026-09-14. This step said "a hook command is not run through a shell", and that was never
+   measured. Read out of the Claude Code 2.1.268 binary: a command with no `args` is spawned with
+   `shell: true` and the session's environment, which is why the `"$CLAUDE_PROJECT_DIR/…"` rows beside
+   ours work at all. Believing the opposite is how each config root came to write its own absolute path
+   into shared project files: 48 such rows across seven projects on one workstation, 38 of them
+   dead by the census, in six of the projects.*
 
    *Corrected 2026-08-03: this table read project-first while citing `scopes.md` as its authority, and
    `scopes.md` says skills resolve **personal > project**. Project-first can return a copy that is
@@ -118,6 +133,8 @@ to wire and nothing to orphan.
    `matcher`, and `command` workforce added, so `disband` removes those and nothing else.
 5. **Never duplicate a registration.** Present and matching → NOOP. Present and differing → REFRESH in
    place. A registration the sidecar does not name is **the user's** — leave it, and report it.
+   **Present means the same hook script on the same event, reached through ANY install, and not provably
+   dead.** A row naming another config root's copy fires this hook in this project exactly as ours would.
 6. **Read back and confirm** the settings file still parses as JSON and the registration is present
    exactly once. On failure, restore the pre-edit content and report. **Never report a write that was
    not confirmed by re-reading.**
@@ -194,6 +211,120 @@ HOOKS  .claude/settings.local.json                    ← resolved, not assumed
 
 **`--execute` is required to write.** Display mode prints exactly the registration it would add, by
 path, so the user reads the change before it happens.
+
+---
+
+## Healing — rows whose script was retired
+
+**A registration outlives its script, and the remover has to reach every file the registration can be
+in.** `--wire-defaults` pruned only the one file its scope resolves, so `update` at personal scope never
+touched a project's `.claude/settings*.json`, and `verify` only reported the rows. MEASURED 2026-09-14:
+the census counted 38 dead rows across six projects on one workstation, from two config roots, each
+failing on every prompt and tool call.
+
+`heal` in `wf-settings-apply` is the one classifier, and it has three callers:
+
+| Caller | Reaches |
+|---|---|
+| `wf-commitments` at `SessionStart` | every project, the first time anyone opens it after the files land. No audit, no typed command, no new wiring |
+| `wf-settings-apply --root <tree> --heal --execute` | what `verify` § Hook wiring runs before it counts |
+| `--wire-defaults` | the installer and `audit` Step 6-H, before they wire |
+
+**Dead is decided by the distribution, never by a missing file.** A row is removed only when ALL of:
+
+| Condition | Why |
+|---|---|
+| the shared resolver (`wf-census` `workforce_hook`) reads the command as a workforce row: one absolute, `${CLAUDE_PROJECT_DIR}`, per-session `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` or `$HOME` path ending `/skills/workforce/bin/wf-*`, in at most one pair of quotes, with no other variable, no shell syntax and no unquoted space | anything else runs something this cannot stat. The same resolver feeds the census and `wf-conform`, so the three never disagree. A `..` is allowed and never normalised as text: every decision is a kernel stat or a realpath of the joined path, which is physically correct across a symlinked directory, so no removal can hang on how `..` is spelled |
+| it is a plain `command` row, not exec-form (`args`) | an exec-form row runs a different argv than the path read here |
+| its script is in `RETIRED_HOOKS` | every script git has deleted from `workforce/bin/` that the manifest does not ship now; `bin/check` derives the set and fails when it drifts. A shipped name is never removed, even with its file missing |
+| the file is missing, and the install's `bin/` holds every currently shipped hook script | "not there right now" is also true without a vendored install, inside `bin/sync`'s window, on a slow mount and under EACCES |
+
+**The same verdict decides every removal of a workforce row.** `wf-apply`'s `PASS-DEAD-HOOK` removes a
+workforce row only when `dead_row_verdict` says `retired`, exactly as the heal and the installer's
+user-scope prune do, and `wf-conform` prints that verdict's remedy. The census resolves every path,
+`..` included, by the kernel (`os.path.exists` on the joined path) and never lexically, so a foreign
+dead row with `..` in it is reported and removed as HEAD did, and a live one reached through a
+symlinked directory is not called dead.
+
+**A per-session row is judged against every install this machine can name.** It sits in a shared file
+and resolves to each account's own install, so a retired name is kept (`skew`) while a COMPLETE
+workforce install — the running account's, the default `~/.claude`, or one the project's own workforce
+rows point into — still holds the script. Complete means it holds every currently shipped hook script,
+the same test the heal applies to the install a row points into; an abandoned directory with one stale
+script is not evidence. At user scope there is no project, and nothing reads the current directory. **The limit, stated:** an account or machine this one cannot name — another user,
+another workstation reading a committed file — may run an older install that still ships the name. For
+that account the row keeps working until the heal on THIS machine removes it; the next update of that
+install retires the script there too, and the name can never come back (`bin/check` fails if a retired
+name ships again, renames included). Nothing on one machine can see the others, and waiting for proof
+that cannot arrive would keep a row failing here forever.
+
+**It refuses the whole project, writing nothing, when** the project's `.claude` is a personal config
+root (the project is `$HOME`, or `CLAUDE_CONFIG_DIR` points at it), when `.settings-owned.json` or its
+directory is a symlink out of the project, when the record exists and is not a JSON object, or when the
+record could not be written — checked BEFORE anything is removed, so no removal goes unrecorded — or
+when `.claude` itself resolves outside the project.
+**It refuses one FILE, and still heals the other,** when that settings file resolves outside the
+project (a link to any account's settings, a dotfiles checkout, another project) or to either user
+settings file, or has a second hard link — the other name may live anywhere, so it is treated exactly
+like a link out. That is the general rule, and it needs no list of
+config roots to be complete. Every refusal that leaves retired rows is counted (`N refused` in the
+summary) and said once per file state at session start, naming the file and the reason. It never writes
+a settings file that does not parse as a JSON object or carries a duplicate key. A project with no
+`.claude` has nothing to heal: silent, exit 0.
+
+**How it writes.** It classifies without a lock and takes one only when something is retired: an
+exclusive flock on the project's `.claude`, waited on for at most `LOCK_WAIT_S`, one second. A heal holds
+it for 9 to 29 ms (measured), so eight simultaneous session starts finish in about a quarter of a
+second, and a stuck holder costs the user one second once. Where the filesystem cannot lock (NFS answers
+EBADF or ENOLCK) it runs lock-free. Under the lock each file is read fresh and only the retired rows'
+characters are cut out — every other byte stays, compact objects and spacing included — and the result
+must parse to exactly the intended object. It is written by temp file and rename in the real file's
+directory (a symlinked settings file keeps its link), or in place when the file has another owner,
+which is reported; a write whose file changed since it was read is abandoned. It
+re-reads, and only then records the removal in `hooks_removed`. A failure is reported with its real
+cause, and at session start once per state of the file, not every session. Files are read and written
+with `newline=''`, so CRLF survives byte for byte.
+
+**The notice, `.claude/workforce/.heal-notice`.** One line per settings-file state a session start has
+already reported — a SHA-256 of the file's relative path, bytes and mode, nothing else. It exists so
+a read-only file, or one with a byte-order mark or comments that the heal cannot parse, is reported
+once rather than at every session. It is deleted as soon as a session start finds nothing failing, an
+unreadable notice counts as absent, and it is written only where every heal write may go: inside the
+project. When `.claude` resolves outside it there is no notice file, and the message is said at every
+session start while the state lasts. `disband` moves it with
+the rest of `.claude/workforce/`; it holds nothing to restore.
+
+**What session start costs.** The hook reads the settings text and imports the classifier only when
+that text names a RETIRED script after a `/` or a `\` (a Windows row is written with backslashes) (the list is read from `wf-settings-apply`'s source, not executed) or
+a notice is waiting to be cleared, and then imports it once.
+
+**A live row is never removed, and that includes a double-firing one.** `wf-conform` names a project row
+into a real personal config root as advisory only when this session also runs the same hook from a
+second place; a monorepo's vendored install at an ancestor, or an install inside the project, is not
+a personal root.
+
+**A clean project costs one directory listing.** The session-start caller reads the settings text and
+imports the classifier only when it names `workforce` at all. The session that heals has already loaded
+its hooks, so removed rows stop firing from the next session, and the message says so.
+`PASS-DEAD-HOOK` still owns every foreign dead row, and the succession disposition in § Procedure step 6b
+with it; the heal touches only workforce's own retired scripts.
+
+**Fixtures,** each failing when the guard it names is removed (the mutation run is recorded in this
+change's commit): `sa-heal-execute` and `sa-heal-display` (every row rule in one tree),
+`sa-heal-session-row-skew`, `sa-heal-home-is-user-scope`, `sa-heal-project-is-running-root`,
+`sa-heal-settings-link-to-user`, `sa-heal-settings-link-to-default`, `sa-heal-bad-sidecar`,
+`sa-heal-readonly-sidecar`, `sa-heal-symlinked-sidecar`, `sa-heal-symlinked-record-dir`,
+`sa-heal-readonly-settings`, `sa-heal-symlinked-settings`, `sa-heal-hardlinked-settings`,
+`sa-heal-duplicate-keys`, `sa-heal-compact`, `sa-heal-crlf`, `sa-heal-readonly-record-dir`,
+`sa-heal-skew-weak-evidence`, `sa-heal-dotdot-kernel`, `sa-heal-settings-link-outside`,
+`apply-deadhook-dotdot-kernel`, `commitments-heal-bad-notice`, `commitments-heal-notice-cleared`,
+`commitments-heal-bom-skipped`, `commitments-heal-backslash-gate`,
+`commitments-heal-refused-notice`, `sa-heal-refuse-per-file`, `sa-heal-symlinked-claude-dir`, `sa-heal-no-claude-dir`, `sa-wire-no-claude-dir`,
+`sa-wire-user-readonly`, `commitments-heals-at-sessionstart`, `commitments-heal-concurrent`,
+`commitments-heal-failure-first`, `commitments-heal-failure-once`, `commitments-sessionstart-clean`,
+`sa-hook-project-never-personal`, `apply-deadhook-workforce-verdict`, `conform-hook-wiring-dead`,
+`conform-cross-root-personal`, `conform-cross-root-single` and `conform-cross-root-monorepo`. The lock,
+its fallback and timeout, and the stale-write check are also run directly by `bin/check`.
 
 ---
 
@@ -282,8 +413,8 @@ something that is not the operator.
 
 **The tag comes from the ask, the claim scan from the reply, and the tag is the stronger of the two** — it was set before any of the answer existed, so the answer cannot have bent it. The measured miss it closes: a turn asked to decide the fate of four removed scripts read the live requirements, never read the record that removed them, and concluded they should return. No absence or universal claim was made, so the reply scan was silent and right to be — while the ask was plainly a `history` question.
 
-**The denominator moves, and that is the design.** A turn is scored only on the senses its claim
-needs (`references/senses.md`). Marking a turn down for not spawning a reader when spawning one was
+**Only the senses the claim needs are checked, and that is the design.** A turn is judged only on the
+senses its claim needs (`references/senses.md`). Marking a turn down for not spawning a reader when spawning one was
 pointless is how a guard earns its way into being ignored, and this distribution retired one at a
 measured 7.0% for exactly that.
 

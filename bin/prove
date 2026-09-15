@@ -588,6 +588,45 @@ CASES = [
      WSA, "del", "def _norm_command"),
     ("settings-apply: a hook wired in both scopes is REPORTED, never silently unwired",
      WSA, "del", "def report_duplicate_firing"),
+    # The final review's exact mutant: a second definition the source parse cannot see.
+    ("heal: the session-start gate's retired names equal the loaded RETIRED_HOOKS",
+     WSA, "add", '\nRETIRED_HOOKS = RETIRED_HOOKS | frozenset({"wf-zz-retired-later"})\n'),
+    # F1 and F2 are pinned by fixtures (commitments-heal-backslash-gate,
+    # sa-heal-refuse-per-file, commitments-heal-refused-notice), mutation-tested directly.
+    # ── dead references (scoring audit, 2026-09-14) ─────────────────────────────
+    # Each appends a citation of a file that exists nowhere, to a shipped reference.
+    ("references: every relative markdown link resolves",
+     "workforce/references/principles.md", "add", "\nSee [the spec](no-such-spec-zz.md).\n"),
+    ("references: every `file § Section` citation names a file that exists",
+     "workforce/references/principles.md", "add", "\nSee `no-such-spec-zz.md` § Anything.\n"),
+    # ── the heal reaches every project (2026-09-14) ─────────────────────────────
+    ("heal: retired workforce rows are removed at session start, in every project",
+     "workforce/bin/wf-commitments", "del",
+     "wsa.heal(root, True, quiet=True, progress=progress)"),
+    ("heal: every remover of a workforce row decides through dead_row_verdict",
+     "workforce/bin/wf-apply", "del", "            if wsa.dead_row_verdict(h.get(\"hook\") or {}, root)[0] != \"retired\":\n                continue\n"),
+    ("installers: a wiring failure reaches the summary instead of being piped away",
+     "install", "del", "wire_rc=${PIPESTATUS[0]}"),
+    ("heal: the lock is taken only when needed, falls back where it cannot exist, and a timeout says what it left",
+     WSA, "del", "    if not pending:\n        return\n"),
+    ("heal: the lock is taken only when needed, falls back where it cannot exist, and a timeout says what it left",
+     WSA, "del", "                self.unlocked = f\"this filesystem cannot lock ({errno.errorcode.get(exc.errno)})\"\n"),
+    # The git-derived half ("the retired set is exactly what git history deleted or renamed
+    # away") has no case: prove's workers are copies without .git, where it is not
+    # evaluated by design, so no mutation there can fire it.
+    ("heal: a retired name is reserved forever and a shipped name is never retired",
+     "fixtures/scripts/expectations.json", "del", '"kept  Stop  wf-widen  shipped",'),
+    ("heal: the lock excludes a second session and a stale write is abandoned",
+     WSA, "del", "                fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"),
+    ("heal: the lock excludes a second session and a stale write is abandoned",
+     WSA, "del", " != before"),
+    ("heal: verify removes dead wiring and its headline counts what is left",
+     "fixtures/scripts/expectations.json", "del", "conform-hook-wiring-dead"),
+    ("heal: verify removes dead wiring and its headline counts what is left",
+     "workforce/references/procedures/verify.md", "del",
+     '"$WF/bin/wf-settings-apply" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --heal --execute'),
+    ("heal: project scope never receives a path under a personal config root",
+     WSA, "del", 'resolved = f"{PER_SESSION_ROOT}/skills/workforce/bin/{script}"'),
     ("conform: the org chart's edges are diffed in both directions",
      CNFM, "del", "def check_org_edges"),
     ("conform: the anti-gaslighting clause has a detector, and it is advisory",

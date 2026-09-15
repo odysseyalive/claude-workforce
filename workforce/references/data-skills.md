@@ -273,7 +273,7 @@ This binds every command that can remove a skill, in perpetuity:
 | Command | The constraint |
 |---|---|
 | `audit` / conversion | a SPLIT reduces the skill; it never deletes it (`conversion-taxonomy.md` § SPLIT) |
-| `ablate` | may cut guidance **inside** a data skill; may never cut the skill itself while its dataset exists |
+| removing guidance by hand (no `ablate` command ever shipped) | may cut guidance **inside** a data skill; may never cut the skill itself while its dataset exists |
 | `retire` | retiring the owning employee re-homes the dataset to another; it does not remove the gateway |
 | a later `audit` | a reduced skill is not residue. Re-reading it as "leftover from the old system" is the failure this section exists to prevent |
 

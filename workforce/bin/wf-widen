@@ -43,8 +43,9 @@ the input-side methods scored 100/100 and 77/100 while the reasoning-side method
 this turn?" is the 34. A hook asking "what did this turn look at, and what was sitting
 right there unused?" is the 100.
 
-WHAT KEEPS IT FROM CRYING WOLF. The score is computed on every turn and always shown —
-it is the user's dial and it has to be legible to be tuned. **The block is far
+WHAT KEEPS IT FROM CRYING WOLF. A `WIDEN` line is printed on every turn and always
+shown: the channel counts for each sense the claim needs, and whether each was opened.
+It has to be legible, because it is what the decision rested on. **The block is far
 narrower.** It fires only when the reply makes a claim that evidence could settle and
 the evidence is not there. Those two triggers were measured over 1,495 real turns of
 this operator's traffic before either shipped: zero reads plus a project-scoped absence
@@ -57,7 +58,8 @@ THE REASON STRING IS THE WHOLE DELIVERABLE. "Insufficient, try harder" hands the
 back to itself and is worth nothing. What blocks instead is a REGISTRY: the instruments
 that were on this machine, for this project, during this turn, and went untouched — the
 agents by name, the skills by name, whether web search was ever run. Naming the unused
-instrument is the widening; the score is only what decides to print it.
+instrument is the widening; the per-sense opened / not-opened verdict is only what
+decides to print it.
 
 EXIT CODES: 0 always, and `stop_hook_active` returns immediately. A widen that can widen
 forever is a wedged session, and a hook that wedges a session is worse than the defect
@@ -246,9 +248,9 @@ def instruments(cwd):
     return found
 
 
-# WHICH SENSE SETTLES WHICH CLAIM. The denominator moves, and that is the design, not
-# a shortcut: **not every situation needs all six.** A turn scored out of a fixed six
-# is marked down for failing to spawn a reader when spawning one was pointless, and a
+# WHICH SENSE SETTLES WHICH CLAIM. Only the senses a claim needs are checked, and that is
+# the design, not a shortcut: **not every situation needs all six.** A turn held to a
+# fixed six is marked down for failing to spawn a reader when spawning one was pointless, and a
 # guard that marks down correct work is the guard that gets ignored — this
 # distribution retired one at a measured 7.0% for exactly that (changes/1.30.1.md).
 #

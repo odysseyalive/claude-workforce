@@ -46,9 +46,10 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 # carrying any key nothing here reads FAILS THAT ROW by name. A fourth spelling can
 # be invented, but it can no longer be ignored. Measured 2026-09-13.
 NEGATIVE_KEYS = ("not", "must_not", "reject")
-ROW_KEYS = {"script", "exit", "args", "env", "want", "after",
+ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent",
+            "subst", "hardlink",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
-AFTER_KEYS = {"want", *NEGATIVE_KEYS}
+AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -100,10 +101,21 @@ def run_case(name, spec):
     # test, it is a single observation. Found 2026-08-04, by running it twice.
     tmp = tempfile.mkdtemp(prefix=f"wfsc-{name}-")
     tree = os.path.join(tmp, name)
-    shutil.copytree(src, tree)
+    # LINKS ARE COPIED AS LINKS. A case about writing through a symlink is meaningless on
+    # a copy that dereferenced it, which the default does; no fixture held a link before
+    # the settings-heal cases (2026-09-14), so no earlier case changes meaning.
+    shutil.copytree(src, tree, symlinks=True)
     try:
         return _run_in(tree, script, spec)
     finally:
+        # A case may make a directory read-only (`chmod`); give every directory its write
+        # bit back first, or the cleanup leaves the tree behind in /tmp.
+        for _d, _ds, _fs in os.walk(tmp):
+            for _x in _ds:
+                try:
+                    os.chmod(os.path.join(_d, _x), 0o755)
+                except OSError:
+                    pass
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -122,6 +134,9 @@ def _run_in(tree, script, spec):
     _home = tempfile.mkdtemp(prefix="wf-conformance-home-")
     env["HOME"] = _home
     env.pop("XDG_CONFIG_HOME", None)
+    # CLAUDE_CONFIG_DIR relocates the whole personal tree, so an empty HOME hides nothing
+    # while it is inherited: `sa-hook-display` passed or failed by which account ran it.
+    env.pop("CLAUDE_CONFIG_DIR", None)
 
     # THE CHILD ENV IS PART OF THE FIXTURE when the script reads it. wf-preflight's
     # runtime-override receipt reads CLAUDE_CODE_SUBAGENT_MODEL and CLAUDE_EFFORT out
@@ -139,7 +154,37 @@ def _run_in(tree, script, spec):
         else:
             env[_k] = _sub_tree(_v, tree)
 
-    if "stdin_file" in spec or "stdin_raw" in spec:
+    # `subst` writes the copy's own path into the named files wherever they say `${TREE}`,
+    # so a case can hold a real ABSOLUTE path — the shape a personal install's row takes,
+    # and one a fixture could only fake before. `hardlink` makes `new` a second name for
+    # `existing` (git stores neither). Both added 2026-09-14 for the settings heal.
+    for _rel in spec.get("subst") or []:
+        _fp = os.path.join(tree, _rel)
+        with open(_fp, encoding="utf-8") as _fh:
+            _body = _fh.read()
+        with open(_fp, "w", encoding="utf-8") as _fh:
+            _fh.write(_body.replace("${TREE}", tree))
+    for _new, _old in (spec.get("hardlink") or {}).items():
+        os.link(os.path.join(tree, _old), os.path.join(tree, _new))
+
+    # `chmod` sets modes on paths inside the copy (git stores no read-only bit), so a case
+    # can make a file the script must NOT be able to write. Octal strings, e.g. "0444".
+    for _rel, _mode in (spec.get("chmod") or {}).items():
+        os.chmod(os.path.join(tree, _rel), int(_mode, 8))
+
+    # `concurrent: N` starts N copies at once against the same tree and asserts on the
+    # FIRST one's output; `after` then sees what all N left behind. It exists for a
+    # writer every session start runs, where two sessions opening at once is ordinary.
+    if spec.get("concurrent"):
+        _cargs = [sys.executable, script] + (
+            [] if "stdin_file" in spec or "stdin_raw" in spec
+            else ["--root", tree] + [_sub_tree(_sub_version(a), tree) for a in spec.get("args", [])])
+        _procs = [subprocess.Popen(_cargs, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT, text=True, env=env, cwd=tree)
+                  for _ in range(int(spec["concurrent"]))]
+        _outs = [pr.communicate(spec.get("stdin_raw") or "") for pr in _procs]
+        p = subprocess.CompletedProcess(_cargs, _procs[0].returncode, _outs[0][0], "")
+    elif "stdin_file" in spec or "stdin_raw" in spec:
         payload = spec.get("stdin_raw")
         if payload is None:
             payload = json.dumps({"tool_input": {"file_path": os.path.join(tree, spec["stdin_file"])}})
@@ -194,14 +239,24 @@ def _run_in(tree, script, spec):
         problems += _unknown_keys(expect, AFTER_KEYS, f"after {rel}")
         if not isinstance(expect, dict):
             continue
+        # `absent: true` — the file must NOT exist, the only way to see residue removed.
+        if expect.get("absent"):
+            if os.path.lexists(os.path.join(tree, rel)):
+                problems.append(f"after {rel}: present, expected absent")
+            continue
+        # newline="": the bytes as written, so a case can see CRLF survive.
         try:
-            body = open(os.path.join(tree, rel), encoding="utf-8").read()
+            body = open(os.path.join(tree, rel), encoding="utf-8", newline="").read()
         except OSError as exc:
             problems.append(f"after {rel}: unreadable ({exc.strerror})")
             continue
         for s in expect.get("want", []):
             if s not in body:
                 problems.append(f"after {rel}: missing {s!r}")
+        # `once`: present EXACTLY one time — the only way to see a duplicated record.
+        for s in expect.get("once", []):
+            if body.count(s) != 1:
+                problems.append(f"after {rel}: {s!r} appears {body.count(s)} times, expected 1")
         for _key in NEGATIVE_KEYS:
             for s in expect.get(_key, []):
                 if s in body:

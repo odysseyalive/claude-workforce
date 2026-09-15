@@ -4,6 +4,7 @@
     wf-settings-apply --root <tree>                    DISPLAY: print the exact edit, write nothing
     wf-settings-apply --root <tree> --execute --grants <file|->
     wf-settings-apply --root <tree> --execute --wire-hook <name>
+    wf-settings-apply --root <tree> --execute --heal   (remove rows whose script was retired)
     wf-settings-apply           --execute --automode   (writes ~/.claude/settings.json, user scope)
 
 WHY THIS EXISTS. Every settings-file mutation a workforce audit needs — the Step 0.8
@@ -26,6 +27,12 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
     --wire-hook <name>  register a shipped workforce hook at its event, idempotently.
                         A PROPOSED hook (`OPT_IN_HOOKS`) is wireable only by NAME and is
                         never in the default set.
+    --heal              remove, from this project's two settings files only, the
+                        workforce hook rows whose script the distribution RETIRED
+                        (`RETIRED_HOOKS`) and whose install is present and whole. Never a
+                        live row, never a user-scope file (see `heal`). The same function
+                        runs at SessionStart from `wf-commitments`, so a project heals on
+                        first use without anybody typing this.
     --automode          write autoMode.environment/allow into ~/.claude/settings.json
                         so the classifier stops refusing routine workforce maintenance.
                         User scope is deliberate: the classifier reads autoMode ONLY
@@ -37,6 +44,8 @@ CONSENT MODEL, identical to wf-apply. DISPLAY is the default: the exact bytes ar
 printed and nothing is written. `--execute` is the consent. The reversal (pre-edit
 content) is written to `.settings-owned.json` BEFORE the edit, and the edit is
 confirmed by RE-READING the file — never by echoing the string passed to write().
+The heal is the one exception to the order, and `_record` says why: it removes, so
+it writes the settings file, re-reads it, and records only what it verified.
 
 OWNERSHIP. Every key this script adds is recorded in
 `.claude/workforce/.settings-owned.json` so `disband` removes exactly those and
@@ -44,14 +53,46 @@ nothing the user wrote. A registration the sidecar does not name is the user's.
 """
 
 import argparse
+import errno
 import json
 import os
+import re
 import sys
 
 OWNED_REL = os.path.join(".claude", "workforce", ".settings-owned.json")
 
 # The two project-scope settings files, precedence order (references/scopes.md).
 PROJECT_SETTINGS = ("settings.local.json", "settings.json")
+
+def _sibling(name):
+    """A sibling shipped script, imported by path. The ONE loader in this file, and it
+    leaves no bytecode behind in the shipped bin/ (bin/check reports a __pycache__
+    there as an undeclared file)."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+# THE ONE WORKFORCE-ROW RESOLVER lives in wf-census (`workforce_hook`), and the wiring,
+# the heal and wf-conform all read it, so no two of them can disagree about which rows
+# are workforce's or where they resolve. PER_SESSION_ROOT is the canonical resolver's
+# personal root (scopes.md § Resolving the shipped scripts). Claude Code runs a hook
+# command that has no `args` through a shell (`spawn(command, [], {shell: true})`, read
+# out of the 2.1.268 binary on 2026-09-14) with the session's environment, so this form
+# expands to the config root of whichever account is running.
+CENSUS = _sibling("wf-census")
+PER_SESSION_ROOT = CENSUS.PER_SESSION_ROOT
+
 
 # Shipped hooks, by name -> (event, matcher-or-None). references/procedures/hooks.md
 # § What is wired. A matcher of None omits the key, which is correct for
@@ -191,6 +232,29 @@ AGENT_HOOKS = {
 # to go; an empty frozenset is the honest expression of "none right now".
 OPT_IN_HOOKS = frozenset()
 DEFAULT_HOOKS = tuple(n for n in sorted(SHIPPED_HOOKS) if n not in OPT_IN_HOOKS)
+
+# RETIRED BY THE DISTRIBUTION, NEVER BY A MISSING FILE. A row is removable as dead only
+# when its script is named here: every script this repository has deleted from
+# workforce/bin/ and does not ship now. bin/check derives the same set from `git log`
+# and the manifest and fails when the two disagree, so a name cannot be retired here by
+# accident, and a currently shipped name can never be.
+#
+# WHY A LIST AND NOT `os.path.exists`. "The file is not there right now" is also true on
+# a branch checked out without its vendored install, inside `bin/sync`'s delete-then-copy
+# window, on a slow network mount, under EACCES, and whenever the install is simply gone.
+# The first version of the heal read absence as retirement and would have unwired a live
+# shipped hook in every one of those cases, with nothing to put it back (independent
+# review, 2026-09-14).
+RETIRED_HOOKS = frozenset({
+    "wf-budget-guard", "wf-effort-budget", "wf-handoff", "wf-ledger-capture",
+    "wf-ledger-open", "wf-loop-guard", "wf-model-budget", "wf-pin-check",
+    "wf-plain-guard", "wf-speak-guard", "wf-standing-request", "wf-turn-brief",
+    "wf-unique-persona",
+})
+# The scripts a complete, current install holds. A missing retired script proves
+# retirement only when the install it would live in is present and whole.
+CURRENT_HOOK_SCRIPTS = frozenset(n.split("@", 1)[0] for n in SHIPPED_HOOKS
+                                 if n not in AGENT_HOOKS)
 
 # The autoMode entries recommended into ~/.claude/settings.json. Prose, not patterns —
 # the classifier reads them as natural-language rules (auto-mode-config docs). Each is
@@ -478,15 +542,39 @@ def hook_script(name):
     return name.split("@", 1)[0]
 
 
-def hook_command(name):
-    """The absolute, shell-quoted command string for a shipped hook. Personal scope
-    first, then project (scopes.md § Resolving the shipped scripts). Expand ~ here — a
-    hook command is not run through a shell that will do it."""
-    name = hook_script(name)
-    personal = os.path.join(config_root(), "skills", "workforce", "bin", name)
-    project = os.path.join("${CLAUDE_PROJECT_DIR}", ".claude", "skills", "workforce",
-                           "bin", name)
-    resolved = personal if os.path.exists(personal) else project
+def hook_command(name, scope="user", root=None):
+    """The shell-quoted command string for a shipped hook, and the path it names.
+
+    USER SCOPE gets the absolute personal path: that file belongs to one config root, so
+    naming that root's install is exact.
+
+    PROJECT SCOPE NEVER GETS A PATH UNDER A PERSONAL CONFIG ROOT. A project settings file
+    is read by every account and every machine that opens the tree, and an absolute
+    `~/.claude-work/...` in it is right for one of them. MEASURED 2026-09-14: seven
+    projects on one workstation carried 48 rows written this way, from two config roots,
+    38 of them dead by the census (six projects). Every
+    session in them fired both installs' hooks, and when either install retired a script
+    its rows failed on every prompt for every account. So project scope takes the
+    project install when there is one (`${CLAUDE_PROJECT_DIR}`, which travels with the
+    repo), and otherwise `PER_SESSION_ROOT`, which each session's shell resolves to its
+    own install.
+
+    Expanding `~` here is still right. A hook command DOES run through a shell (see
+    PER_SESSION_ROOT), but `~` inside double quotes is not expanded by one.
+    """
+    script = hook_script(name)
+    personal = os.path.join(config_root(), "skills", "workforce", "bin", script)
+    project_rel = os.path.join(".claude", "skills", "workforce", "bin", script)
+    project = os.path.join("${CLAUDE_PROJECT_DIR}", project_rel)
+    if scope == "project":
+        if root and os.path.exists(os.path.join(root, project_rel)):
+            resolved = project
+        elif os.path.exists(personal):
+            resolved = f"{PER_SESSION_ROOT}/skills/workforce/bin/{script}"
+        else:
+            resolved = project
+    else:
+        resolved = personal if os.path.exists(personal) else project
     return f'"{resolved}"', resolved
 
 
@@ -512,6 +600,9 @@ def _norm_command(cmd, root=None):
     if root:
         for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
             out = out.replace(var, root)
+    # `os.path.expandvars` does not know the `:-` default, so the per-session form would
+    # survive it unexpanded and never match the row this script itself wrote.
+    out = out.replace(PER_SESSION_ROOT, config_root())
     out = os.path.expandvars(os.path.expanduser(out))
     return os.path.normpath(out) if os.path.isabs(out) else out
 
@@ -520,6 +611,18 @@ def _same_command(h, command, root=None):
     """Does this registered hook entry name the same command as `command`?"""
     return (isinstance(h, dict)
             and _norm_command(h.get("command"), root) == _norm_command(command, root))
+
+
+def _wf_identity(h, root=None):
+    """`(script, live)` when this entry names a workforce hook in any form workforce
+    writes, else None — read from the shared resolver (`CENSUS.workforce_hook`).
+
+    Identity is the SCRIPT, not the path: the same hook reached through two installs is
+    one hook firing twice, and a presence check keyed on the path offered a second copy
+    of every hook already live from another install.
+    """
+    wh = CENSUS.workforce_hook(h.get("command"), root) if isinstance(h, dict) else None
+    return None if wh is None else (wh["script"], wh["exists"])
 
 
 def _same_agent(h, inner):
@@ -553,6 +656,11 @@ def _scan_hook(data, event, agent_cfg, command, root):
     present, stale_agent = False, []
     if not isinstance(existing, list):
         return present, stale_agent
+    # THE SAME SCRIPT FROM ANOTHER INSTALL IS THE SAME HOOK — unless it is provably dead.
+    # A row naming `~/.claude-work/.../wf-protect-directives` fires that hook in this
+    # project exactly as the path this run resolved would, so writing ours beside it
+    # double-fires every edit. A dead one fires nothing and must not suppress the write.
+    want = _wf_identity({"command": command}, root) if agent_cfg is None else None
     for e in existing:
         for h in (e.get("hooks", []) if isinstance(e, dict) else []):
             if agent_cfg is not None:
@@ -577,6 +685,10 @@ def _scan_hook(data, event, agent_cfg, command, root):
                         stale_agent.append((e, h))
             elif _same_command(h, command, root):
                 present = True
+            elif want is not None:
+                have = _wf_identity(h, root)
+                if have is not None and have[0] == want[0] and have[1] is not False:
+                    present = True
     return present, stale_agent
 
 
@@ -593,11 +705,12 @@ def settings_for_scope(root, scope):
 def count_registrations(root, name):
     """How many times `name` is registered on its event, per scope.
 
-    Returns {scope: count}. Counting is `_same_command`'s job, so a registration
-    written in any spelling of the same path is seen.
+    Returns {scope: count}. Counted by `_wf_identity`, so the same script reached through
+    any install and any spelling is one hook, and a row that is provably dead is not
+    counted as firing.
     """
     event, _matcher = SHIPPED_HOOKS[name]
-    _q, command = hook_command(name)
+    script = hook_script(name)
     out = {}
     for scope in ("user", "project"):
         spath = settings_for_scope(root, scope)
@@ -606,9 +719,10 @@ def count_registrations(root, name):
         if isinstance(data, dict):
             hooks = data.get("hooks")
             entries = hooks.get(event) if isinstance(hooks, dict) else None
-            for e in (entries or []):
+            for e in (entries if isinstance(entries, list) else []):
                 for h in (e.get("hooks", []) if isinstance(e, dict) else []):
-                    if _same_command(h, command, root):
+                    ident = _wf_identity(h, root)
+                    if ident is not None and ident[0] == script and ident[1] is not False:
                         n += 1
         out[scope] = n
     return out
@@ -629,6 +743,12 @@ def report_duplicate_firing(root):
     `--unwire`'s conservatism exists to refuse. Duplication is harmless for a guard
     that is idempotent and wasteful for every hook, and the defect was that nothing
     said so.
+
+    A LIVE ROW INTO A PERSONAL INSTALL IS REPORTED HERE TOO, NEVER HEALED. It double-
+    fires, but whether it is redundant for every account and machine that reads the
+    project file cannot be proven from this one, so removing it would be the same
+    decision this function refuses. `heal` removes only rows whose script is retired;
+    wf-conform names the live ones as advisory.
     """
     both, twice = [], []
     for hook in DEFAULT_HOOKS:
@@ -679,10 +799,11 @@ def do_wire_defaults(root, scope, execute):
     print(f"WIRE   {spath}          <- resolved, not assumed")
     print(f"  {len(DEFAULT_HOOKS)} default hook(s)"
           f"{'' if execute else '  (nothing written — add --execute)'}")
-    rc = 0
+    # PRUNE FIRST. A dead row is not a registration, and a presence check that ran over
+    # it before it was gone would read the file in a state this run is about to change.
+    rc = prune_dead_hooks(root, scope, execute)
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
-    rc = max(rc, prune_dead_hooks(root, scope, execute))
     report_duplicate_firing(root)
     if not execute:
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
@@ -691,106 +812,806 @@ def do_wire_defaults(root, scope, execute):
 
 
 def prune_dead_hooks(root, scope, execute):
-    """Remove workforce-owned hook registrations whose command is no longer on disk.
+    """Remove the retired workforce rows from the file `--wire-defaults` is about to wire.
 
-    WHY THIS EXISTS — the missing half of "three paths, or it does not propagate"
-    (SKILL.md § Directives, 2026-09-07). That directive built three paths for WIRING a
-    new mechanism and none for UNWIRING a retired one, so a release that deletes a hook
-    script leaves its registration behind on every machine that already had it. The
-    installer prunes the FILES; nothing pruned the REGISTRATIONS.
+    WHY THIS EXISTS: the missing half of "three paths, or it does not propagate"
+    (SKILL.md § Directives, 2026-09-07). A release that deletes a hook script leaves its
+    registration behind on every machine that had it. MEASURED 2026-09-09: updating to
+    1.31.0 removed eight scripts and left all eight rows in `~/.claude/settings.json`.
 
-    MEASURED 2026-09-09 on this machine. The 1.30.2 strip took the shipped hook set
-    from nine to one. Updating to 1.31.0 removed the eight scripts as designed and left
-    all eight `hooks` entries in `~/.claude/settings.json` pointing at paths that no
-    longer exist — `wf-plain-guard`, `wf-speak-guard`, `wf-ledger-open`,
-    `wf-standing-request`, `wf-turn-brief`, `wf-ledger-capture`, `wf-unique-persona`,
-    `wf-budget-guard`. A dead registration is worse than an absent one: the host runs it
-    every turn, it fails every turn, and the failure is invisible.
+    PROJECT SCOPE is `heal`, the same function every session start runs. USER SCOPE is
+    the installer's own file — the one writer that already owns it — pruned by the same
+    classifier over that one file. `heal` itself never writes a user-scope file.
 
-    IT IS NOT `--unwire-defaults`. That reverses everything workforce owns, on purpose,
-    as a teardown. This removes ONLY rows the record calls workforce-owned whose command
-    path does not resolve — a row the user wired themselves is never touched, and a row
-    whose script is present is never touched, so a release that merely renames nothing
-    removes nothing. Absence of the record means workforce owns nothing here and this
-    removes nothing, exactly as the unwire path treats it.
+    A FAILURE HERE NEVER STOPS THE WIRING. The prune runs first, and it used to raise out
+    of this function on a read-only user settings file, so the installer wired nothing and
+    — its pipe swallowing the exit status — reported success (second review, N3).
 
-    IT RIDES `--wire-defaults`, which is deliberate: that is the single producer the
-    installer, `audit`, and `verify` all call, so the prune reaches every path the wiring
-    reaches and cannot drift from it. A separate flag would be a fourth path somebody has
-    to type, which is the shape the directive forbids."""
-    spath = settings_for_scope(root, scope)
-    owned_path, owned = load_owned(root, scope)
-    recorded = owned.get("hooks_added") or []
-    if not recorded:
+    This docstring once claimed `verify` called this function. It never did: `verify`
+    only reported `DEAD WIRING`, and a personal `update` never looked at a project, so
+    the census counted 38 dead rows across six projects on the author's machine.
+    """
+    if scope != "user":
+        return heal(root, execute, quiet=True)["rc"]
+    cfg = config_root()
+    if not os.path.isdir(cfg):
         return 0
+    out = _new_result()
+    owned_path = os.path.join(cfg, "workforce", ".settings-owned.json")
+    out["refused"] = _record_refusal(owned_path, os.path.join(os.path.realpath(cfg), "workforce"))
+    _run_heal(out, [user_settings_path()], "", owned_path, cfg,
+              execute and not out["refused"], None)
+    _print_result(out, execute and not out["refused"], quiet=True)
+    return out["rc"]
 
-    data, err = load(spath)
-    if err or not isinstance(data, dict):
-        return 0
-    hooks = data.get("hooks")
-    if not isinstance(hooks, dict):
-        return 0
 
-    def _dead(command):
-        """True only when the command resolves to a path that is not there.
+def known_roots(root):
+    """Every personal config root this machine can name for the project: the running one,
+    the default `~/.claude`, and every install the project's own rows point into.
 
-        EXPANSION FIRST, ALWAYS. `_norm_command` is the one place a registration's two
-        spellings are reduced to the form they share — a raw string test would read
-        `"$HOME/.claude/skills/workforce/bin/wf-protect-directives"` as a nonexistent
-        path and prune a live hook. Same helper the wire and unwire paths use, for the
-        same reason.
+    A per-session row sits in a SHARED file and resolves to a different install for each
+    account, so "retired" is only true for it when no install anyone here can name still
+    ships the script (second review, N4). Accounts this machine cannot name are the stated
+    limit, in `hooks.md` § Healing."""
+    roots = {config_root(), os.path.join(os.path.expanduser("~"), ".claude")}
+    # AT USER SCOPE THERE IS NO PROJECT, and `""` joined to `.claude` is the CURRENT
+    # directory's, a tree nobody named (review 3, L4).
+    for n in (PROJECT_SETTINGS if root else ()):
+        data, _text, _err = _load_strict(os.path.join(root, ".claude", n))
+        for _ev, _mt, h in _command_rows(data):
+            wh = CENSUS.workforce_hook(h.get("command"), root)
+            if wh is not None and wh["form"] != "session":
+                roots.add(wh["cfg"])
+    # ONLY A COMPLETE INSTALL IS EVIDENCE. An abandoned `~/.claude` holding one stale
+    # script, or a directory some row happens to name, kept a dead row forever and made
+    # "update that install" a remedy with nothing to update (review 3, L4).
+    return {r for r in roots if _complete_install(r)}
 
-        A command that is not a plain absolute path — a shell pipeline, an interpreter
-        call — is NEVER called dead: this cannot tell whether it runs, and guessing
-        would remove a working hook. Absence is proven, never inferred.
-        """
-        c = _norm_command(command, root)
-        if not isinstance(c, str) or not os.path.isabs(c) or " " in c:
-            return False
-        return not os.path.exists(c)
 
-    removed = []
-    for row in recorded:
-        if not isinstance(row, dict):
-            continue
-        event, matcher, command = row.get("event"), row.get("matcher"), row.get("command")
-        if not _dead(command):
-            continue
-        entries = hooks.get(event)
+def _complete_install(cfg):
+    """Does `cfg` hold every currently shipped hook script? The one completeness test,
+    for the install a row points into and for every root that could keep a row live."""
+    return all(os.path.isfile(os.path.join(cfg, "skills", "workforce", "bin", s))
+               for s in CURRENT_HOOK_SCRIPTS)
+
+
+def dead_row_verdict(h, root):
+    """What a missing workforce row IS, decided by the distribution. `(verdict, wh)`.
+
+    THE ONE RULE FOR REMOVING A WORKFORCE ROW. The heal, the user-scope prune and
+    `wf-apply`'s PASS-DEAD-HOOK all remove a workforce row only on "retired", and
+    wf-conform prints VERDICT_REMEDY for the verdict, so the remedy printed is always
+    what happens. PASS-DEAD-HOOK once removed whatever the census called missing and
+    deleted a live shipped hook on every audit (second review, N1).
+
+      None       not a command row the shared resolver recognises, or its script is on
+                 disk (live rows are never this function's business)
+      retired    REMOVABLE: the name is in RETIRED_HOOKS, the file is missing, the
+                 install it points into holds every CURRENT_HOOK_SCRIPTS file, and — for
+                 a per-session row — no install this machine can name still ships it
+      shipped    a name this release ships, file missing: a broken or half-synced
+                 install. Never removed — the hook is live, the install is not
+      unknown    a name this release neither ships nor retired
+      skew       a retired name in a per-session row that another known install still
+                 ships, so the row is live for that account
+      install    a retired name, but the install is absent or incomplete, so the
+                 missing file proves nothing
+
+    The type/args guard: an exec-form row (`args`) or any non-command type runs
+    something other than the path this reads, so it is not decidable here.
+    """
+    if not isinstance(h, dict) or h.get("type", "command") != "command" or "args" in h:
+        return None, None
+    wh = CENSUS.workforce_hook(h.get("command"), root)
+    if wh is None or wh["exists"]:
+        return None, wh
+    here = os.path.dirname(os.path.abspath(__file__))
+    if wh["script"] in CURRENT_HOOK_SCRIPTS or os.path.exists(os.path.join(here, wh["script"])):
+        return "shipped", wh
+    if wh["script"] not in RETIRED_HOOKS:
+        return "unknown", wh
+    if wh["form"] == "session" and any(
+            os.path.exists(os.path.join(r, "skills", "workforce", "bin", wh["script"]))
+            for r in known_roots(root)):
+        return "skew", wh
+    if not _complete_install(wh["cfg"]):
+        return "install", wh
+    return "retired", wh
+
+
+# What each verdict means for the person reading `verify`. Stated beside the classifier
+# so the remedy is true by construction; wf-conform prints these and composes none.
+VERDICT_REMEDY = {
+    "retired": ("a hook this distribution retired. `wf-settings-apply --root <tree> --heal "
+                "--execute` removes it and records it in .settings-owned.json § "
+                "hooks_removed. Every session start runs the same heal, so a row still here "
+                "means the heal refused this project; run that command to see the reason"),
+    "shipped": ("a hook this release still SHIPS, and its script is missing from the "
+                "install the row points into: that install is broken, absent or mid-update. "
+                "Re-run the installer for that config root. Nothing in workforce removes "
+                "this row — the heal and PASS-DEAD-HOOK both leave a shipped hook alone"),
+    "install": ("a retired hook, but the install the row points into is absent or "
+                "incomplete, so the missing file proves nothing about it. If that install "
+                "is gone for good, delete the row by hand"),
+    "unknown": ("a script this release neither ships nor retired, most likely from a "
+                "newer release. Update the install that runs here; nothing removes it"),
+    "skew": ("a retired hook in a per-session row, and another COMPLETE workforce install "
+             "on this machine still holds the script, so the row is live for that account. "
+             "Updating that install removes the script (the installer prunes what the "
+             "manifest no longer ships); the next heal then removes the row"),
+}
+
+
+def _load_strict(path):
+    """`(data, text, err)`. A DUPLICATE KEY IS AN ERROR: the harness keeps one of the
+    two, and a rewrite would silently drop the other, so such a file is never written."""
+    # newline="": the text is the file's exact characters, CRLF included, so a file is
+    # never rewritten with different line endings (review 3, L2).
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, None, f"{exc.__class__.__name__}: {getattr(exc, 'strerror', None) or exc}"
+
+    def pairs(kv):
+        d = {}
+        for k, v in kv:
+            if k in d:
+                raise ValueError(f"duplicate key {k!r}")
+            d[k] = v
+        return d
+    try:
+        return json.loads(text, object_pairs_hook=pairs), text, None
+    except ValueError as exc:
+        return None, text, str(exc)
+
+
+def _command_rows(data):
+    """`(event, matcher, hook)` for every inner hook of a settings object."""
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    for event, entries in (hooks.items() if isinstance(hooks, dict) else ()):
+        for e in (entries if isinstance(entries, list) else ()):
+            inner = e.get("hooks") if isinstance(e, dict) else None
+            for h in (inner if isinstance(inner, list) else ()):
+                yield event, e.get("matcher"), h
+
+
+def _render(data, original):
+    """Serialise the reversal RECORD in its own style. Settings files never come through
+    here: they are edited by `_strip_rows`, character by character."""
+    m = re.search(r"^([ \t]+)\S", original or "", re.M)
+    text = json.dumps(data, indent=m.group(1) if m else 2, ensure_ascii=False)
+    return text + ("\n" if (original or "\n").endswith("\n") else "")
+
+
+def _spans(text):
+    """Parse JSON text into nodes that carry their character offsets, so a row can be cut
+    out without re-serialising anything around it. Raises ValueError on anything that
+    is not strict JSON. Node: {"k": "{" | "[" | "v", "s": start, "e": end, "c": kids},
+    each kid `(key or None, start of the key or value, node)`."""
+    n = len(text)
+
+    def ws(i):
+        while i < n and text[i] in " \t\r\n":
+            i += 1
+        return i
+
+    def string(i):
+        if i >= n or text[i] != '"':
+            raise ValueError(f"string expected at {i}")
+        j = i + 1
+        while j < n and text[j] != '"':
+            j += 2 if text[j] == "\\" else 1
+        if j >= n:
+            raise ValueError("unterminated string")
+        return json.loads(text[i:j + 1]), j + 1
+
+    def value(i):
+        i = ws(i)
+        if i >= n:
+            raise ValueError("unexpected end")
+        if text[i] in "{[":
+            return container(i)
+        if text[i] == '"':
+            end = string(i)[1]
+            return {"k": "v", "s": i, "e": end}, end
+        j = i
+        while j < n and text[j] not in ",]} \t\r\n":
+            j += 1
+        json.loads(text[i:j])
+        return {"k": "v", "s": i, "e": j}, j
+
+    def container(i):
+        kind, close, kids = text[i], "}" if text[i] == "{" else "]", []
+        j = ws(i + 1)
+        if j < n and text[j] == close:
+            return {"k": kind, "s": i, "e": j + 1, "c": kids}, j + 1
+        while True:
+            if kind == "{":
+                ks = ws(j)
+                key, j = string(ks)
+                j = ws(j)
+                if j >= n or text[j] != ":":
+                    raise ValueError(f"':' expected at {j}")
+                v, j = value(j + 1)
+                kids.append((key, ks, v))
+            else:
+                v, j = value(j)
+                kids.append((None, v["s"], v))
+            j = ws(j)
+            if j < n and text[j] == ",":
+                j += 1
+                continue
+            if j < n and text[j] == close:
+                return {"k": kind, "s": i, "e": j + 1, "c": kids}, j + 1
+            raise ValueError(f"',' or '{close}' expected at {j}")
+
+    node, end = value(0)
+    if ws(end) != n:
+        raise ValueError("trailing data")
+    return node
+
+
+def _cut(kids, k):
+    """The characters to delete to remove kid `k`: it and the separator on one side."""
+    if k + 1 < len(kids):
+        return kids[k][1], kids[k + 1][1]
+    if k > 0:
+        return kids[k - 1][2]["e"], kids[k][2]["e"]
+    return kids[k][1], kids[k][2]["e"]
+
+
+def _member(node, key):
+    for idx, (k, _s, v) in enumerate(node.get("c", ()) if node["k"] == "{" else ()):
+        if k == key:
+            return idx, v
+    return None, None
+
+
+def _next_cut(text, root):
+    """The span to delete for the first retired row in `text`, or None. Removing a row
+    that empties its entry removes the entry; an emptied event goes, and an emptied
+    `hooks` object goes — the same shape `_without` produces, and verified against it."""
+    top = _spans(text)
+    hi, hooks = _member(top, "hooks")
+    if hooks is None or hooks["k"] != "{":
+        return None
+    for ei, (_ev, _s, arr) in enumerate(hooks["c"]):
+        for ni, (_n, _s2, entry) in enumerate(arr["c"] if arr["k"] == "[" else ()):
+            _ii, inner = _member(entry, "hooks") if entry["k"] == "{" else (None, None)
+            for hj, (_h, _s3, hn) in enumerate(inner["c"] if inner and inner["k"] == "[" else ()):
+                if dead_row_verdict(json.loads(text[hn["s"]:hn["e"]]), root)[0] != "retired":
+                    continue
+                if len(inner["c"]) > 1:
+                    return _cut(inner["c"], hj)
+                if len(arr["c"]) > 1:
+                    return _cut(arr["c"], ni)
+                if len(hooks["c"]) > 1:
+                    return _cut(hooks["c"], ei)
+                return _cut(top["c"], hi)
+    return None
+
+
+def _strip_rows(text, root):
+    """`text` minus the retired rows' characters and NOTHING else — every other byte of a
+    file the user owns stays as it was (second review, #10: a re-serialise expanded the
+    user's compact `{"allow": [...]}`). The result must parse to exactly what `_without`
+    computes from the same file, or nothing is written."""
+    out = text
+    for _ in range(10000):
+        span = _next_cut(out, root)
+        if span is None:
+            break
+        out = out[:span[0]] + out[span[1]:]
+    data = json.loads(text)
+    want = _without(data, {id(h) for _e, _m, h in _command_rows(data)
+                           if dead_row_verdict(h, root)[0] == "retired"})
+    if json.loads(out) != want:
+        raise RuntimeError("the character-level edit did not reproduce the intended "
+                           "settings; nothing was written")
+    return out
+
+
+def _atomic_write(real, text, before=None):
+    """Replace `real`'s content. Returns a note when the write had to be made in place.
+
+    Temp file plus rename in `real`'s own directory, never a truncate in place — EXCEPT
+    when the file has other hard links or another owner: a rename would split the links
+    (the other name keeping the old row) or hand the file to this user. Those are written
+    in place, under the caller's lock and after the re-check below, and said so.
+    `before` is the text this run read: when the file no longer holds it, another writer
+    got there first and the write is abandoned.
+    """
+    import stat
+    import tempfile
+    if before is not None:
+        with open(real, encoding="utf-8", newline="") as fh:
+            stale = fh.read() != before
+        if stale:
+            raise RuntimeError(f"{real} changed while it was being healed; left alone")
+        if not os.access(real, os.W_OK):
+            raise PermissionError(13, "the file is not writable", real)
+    st = os.stat(real) if os.path.exists(real) else None
+    if st is not None and (st.st_nlink > 1 or (hasattr(os, "getuid") and st.st_uid != os.getuid())):
+        # BYTES, not text: no newline translation exists to go wrong on any OS (review 3,
+        # L2 — text mode turned CRLF into LF here, and would do the reverse on Windows).
+        with open(real, "r+b") as fh:
+            fh.write(text.encode("utf-8"))
+            fh.truncate()
+        return (f"{real} written in place: it has {st.st_nlink} hard link(s) and owner "
+                f"uid {st.st_uid}, which a rename would break")
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(real), prefix=".wf-heal.")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(text.encode("utf-8"))
+        os.chmod(tmp, stat.S_IMODE(st.st_mode) if st else 0o644)
+        os.replace(tmp, real)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    return None
+
+
+# THE LONGEST A SESSION START WAITS FOR ANOTHER HEAL, in seconds. MEASURED 2026-09-14: one
+# heal holds the lock for 9 to 29 ms (ten runs of the sa-heal-execute tree: fresh read,
+# edit, write, re-read, record) on a local disk, so eight session starts opening at once in one project finish inside a
+# quarter of a second. One second covers that with room, and it is short enough that a
+# stuck holder costs the user one second once — after which the rows are left for the
+# holder or the next session, and the count left is reported.
+LOCK_WAIT_S = 1.0
+# flock(2) errors that mean "this filesystem cannot lock here" rather than "somebody holds
+# it" — NFS refuses LOCK_EX on a read-only descriptor, and a directory cannot be opened
+# for writing. The heal then runs unlocked; `_atomic_write`'s content re-check still
+# abandons a write whose file changed underneath it.
+LOCK_UNSUPPORTED = {errno.EBADF, errno.ENOLCK, errno.EOPNOTSUPP, errno.EINVAL}
+
+
+class _Lock:
+    """An exclusive flock on a DIRECTORY, so concurrent session starts in one project heal
+    one at a time and the second finds nothing left to remove. MEASURED before it: 19 of
+    40 concurrent starts appended duplicate `hooks_removed` records. Taken only when there
+    is something to remove. Falls back to no lock where the filesystem cannot give one
+    (LOCK_UNSUPPORTED) or flock does not exist (Windows)."""
+
+    def __init__(self, dirpath):
+        self.dirpath, self.fd, self.unlocked = dirpath, None, None
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:
+            self.unlocked = "no flock on this platform"
+            return self
+        import time
+        self.fd = os.open(self.dirpath, os.O_RDONLY)
+        deadline = time.monotonic() + LOCK_WAIT_S
+        while True:
+            try:
+                fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return self
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
+            except OSError as exc:
+                if exc.errno not in LOCK_UNSUPPORTED:
+                    raise
+                self.unlocked = f"this filesystem cannot lock ({errno.errorcode.get(exc.errno)})"
+                os.close(self.fd)
+                self.fd = None
+                return self
+        os.close(self.fd)
+        self.fd = None
+        raise TimeoutError(f"another heal held {self.dirpath} for {LOCK_WAIT_S:g} s")
+
+    def __exit__(self, *exc):
+        if self.fd is not None:
+            os.close(self.fd)
+        return False
+
+
+def _record_refusal(owned_path, expect_dir):
+    """Why the reversal record must not be written, or None. Checked BEFORE anything is
+    removed, so no removal can ever go unrecorded (second review, N8).
+
+    A SYMLINK IS NEVER WRITTEN THROUGH (CWE-59): a repository shipping
+    `.settings-owned.json -> ~/.bashrc` would otherwise have that target replaced with
+    JSON at the next session start. A record that is not a JSON object is never
+    replaced — it is the only thing `disband` can replay. And a record that cannot be
+    written means the removal could not be recorded, so nothing is removed.
+    """
+    side_dir = os.path.dirname(owned_path)
+    # `expect_dir` is the resolved parent plus the literal name, so a link AT that name
+    # shows up here as a difference instead of being resolved on both sides.
+    if os.path.lexists(side_dir) and os.path.realpath(side_dir) != expect_dir:
+        return f"{side_dir} resolves outside the project; the record is never written through a link"
+    if os.path.islink(owned_path):
+        return f"{owned_path} is a symlink; the record is never written through one"
+    if os.path.lexists(owned_path):
+        data, _text, err = _load_strict(owned_path)
+        if err or not isinstance(data, dict):
+            return (f"{owned_path} is not a JSON object ({err or 'wrong type'}); rewriting "
+                    f"it would destroy the record disband replays, so nothing is written")
+        if not os.access(owned_path, os.W_OK):
+            return f"{owned_path} is not writable, so a removal could not be recorded"
+    probe = side_dir if os.path.isdir(side_dir) else os.path.dirname(side_dir)
+    if not os.access(probe, os.W_OK):
+        return f"{probe} is not writable, so a removal could not be recorded"
+    return None
+
+
+def _inside_project(root, path):
+    """Does `path` resolve INSIDE the project? The one test every write the heal makes
+    passes — settings files, the reversal record, the notice. A link anywhere on the way
+    (`.claude` itself included) is followed to where the write would really land."""
+    here, real = os.path.realpath(root), os.path.realpath(path)
+    return real == here or real.startswith(here + os.sep)
+
+
+def _project_refusal(root, owned_path):
+    """Why NOTHING in this project may be written, or None: its `.claude` is a personal
+    config root (the project is $HOME, or CLAUDE_CONFIG_DIR points at it) or resolves
+    outside the project, or the one reversal record every removal needs cannot be written
+    safely."""
+    claude = os.path.realpath(os.path.join(root, ".claude"))
+    # A `.claude` THAT IS A LINK OUT OF THE PROJECT: the record, the notice and every
+    # settings file would land outside it (last review, 1: the notice was written into
+    # the link's target).
+    if not _inside_project(root, os.path.join(root, ".claude")):
+        return (f"{os.path.join(root, '.claude')} resolves outside the project ({claude}); a "
+                f"project heal only writes inside its tree")
+    home_root = os.path.join(os.path.expanduser("~"), ".claude")
+    if claude in {os.path.realpath(config_root()), os.path.realpath(home_root)}:
+        return (f"{claude} is a personal config root (the project is $HOME), so its "
+                f"settings.json is user scope, which the heal never writes")
+    return _record_refusal(owned_path, os.path.join(claude, "workforce"))
+
+
+def _file_refusal(root, p):
+    """Why THIS settings file may not be written, or None. Per file, so one link out of the
+    tree no longer blocks the file beside it (final review, F2: a settings.json linked
+    into a dotfiles repo left the in-tree settings.local.json's retired row in place)."""
+    if not os.path.lexists(p):
+        return None
+    real = os.path.realpath(p)
+    # A SECOND HARD LINK IS A NAME SOMEWHERE ELSE. The heal cannot know where, so it treats
+    # the file as it treats a symlink out: refused and counted. It used to edit in place,
+    # and a copy outside the project lost its row too (last review, 2).
+    try:
+        links = os.stat(real).st_nlink
+    except OSError:
+        links = 1
+    if links > 1:
+        return (f"it has {links} hard links, and the other names may live outside the "
+                f"project, where the heal never writes")
+    home_root = os.path.join(os.path.expanduser("~"), ".claude")
+    users = {os.path.realpath(os.path.join(config_root(), "settings.json")),
+             os.path.realpath(os.path.join(home_root, "settings.json"))}
+    if real in users:
+        return f"it resolves to the user-scope file {real}, which the heal never writes"
+    # THE GENERAL RULE (review 3, L7): a project heals only files that live inside the
+    # project. A link out of the tree points at another account's settings, a dotfiles
+    # checkout or another project, none of which this heal was asked about — naming every
+    # user settings file on the machine is a list that is never complete, and "inside the
+    # project" needs no list.
+    here = os.path.realpath(root)
+    if real != here and not real.startswith(here + os.sep):
+        return f"it resolves outside the project ({real}); a project heal only writes inside its tree"
+    return None
+
+
+def _retired_rows(data, root):
+    """`[(event, matcher, h, wh, verdict)]` for every missing workforce row, retired or not."""
+    out = []
+    for event, matcher, h in _command_rows(data):
+        verdict, wh = dead_row_verdict(h, root)
+        if verdict:
+            out.append((event, matcher, h, wh, verdict))
+    return out
+
+
+def _without(data, doomed):
+    """`data` minus the inner hooks whose id() is in `doomed`. An entry that held the
+    user's hooks beside ours keeps them; only an entry this removal emptied goes."""
+    hooks = data["hooks"]
+    for event in list(hooks):
+        entries = hooks[event]
         if not isinstance(entries, list):
             continue
         keep = []
         for e in entries:
-            if (isinstance(e, dict) and e.get("matcher") == matcher
-                    and any(_same_command(h, command, root)
-                            for h in (e.get("hooks") or []))):
-                removed.append((event, command))
-                continue
+            inner = e.get("hooks") if isinstance(e, dict) else None
+            if isinstance(inner, list) and any(id(h) in doomed for h in inner):
+                left = [h for h in inner if id(h) not in doomed]
+                if not left:
+                    continue
+                e = dict(e, hooks=left)
             keep.append(e)
         if keep:
             hooks[event] = keep
         else:
-            hooks.pop(event, None)
-
-    if not removed:
-        return 0
-    print(f"  PRUNE  {len(removed)} dead registration(s) — the script no longer ships:")
-    for event, command in removed:
-        print(f"    - {event}  {os.path.basename(command.strip(chr(34)))}")
-    if not execute:
-        print("    (nothing written — add --execute)")
-        return 0
-
-    owned["hooks_added"] = [
-        r for r in recorded
-        if not (isinstance(r, dict) and (r.get("event"), r.get("command")) in
-                {(e, c) for e, c in removed})
-    ]
+            hooks.pop(event)
     if not hooks:
-        data.pop("hooks", None)
-    dump(spath, data)
-    dump(owned_path, owned)
-    return 0
+        data.pop("hooks")
+    return data
+
+
+def _record(owned_path, recs, root):
+    """Append the removals to the reversal record, AFTER the settings file is verified.
+
+    The order is the fix for a measured defect: the record was written first, so a
+    settings file that could not be written (read-only) left `hooks_removed` growing by
+    the same rows at every session start. The record's writability is checked before
+    anything is removed (`_record_refusal`), so what is left is a crash or a full disk
+    between the two, which the caller reports as an unrecorded removal.
+    """
+    data, text, err = _load_strict(owned_path) if os.path.lexists(owned_path) else ({}, "", None)
+    if err or not isinstance(data, dict):
+        raise ValueError(f"{owned_path} stopped parsing as a JSON object: {err}")
+    added = data.get("hooks_added") if isinstance(data.get("hooks_added"), list) else []
+    data["hooks_added"] = [
+        r for r in added
+        if not (isinstance(r, dict) and any(
+            r.get("event") == x["event"] and r.get("matcher") == x["matcher"]
+            and _same_command({"command": r.get("command")}, x["command"], root) for x in recs))]
+    if not isinstance(data.get("hooks_removed"), list):
+        data["hooks_removed"] = []
+    data["hooks_removed"].extend(recs)
+    os.makedirs(os.path.dirname(owned_path), exist_ok=True)
+    _atomic_write(owned_path, _render(data, text or "{\n  }\n"))
+
+
+def _scan(spath, root, out):
+    """Read one settings file and classify it. Returns `(text, recs)` or None."""
+    if not os.path.lexists(spath):
+        return None
+    data, text, err = _load_strict(spath)
+    rel = os.path.relpath(spath, root) if root else spath
+    if err or not isinstance(data, dict):
+        out["skipped"].append(f"{spath}: {err or 'not a JSON object'} — not written")
+        # Kept apart so a session start can SAY it once per file state: a BOM or a comment
+        # makes the file unreadable here, and silence meant a retired row in it stayed
+        # forever with nothing ever mentioning why (review 3, L8).
+        out["unparsed"].append({"settings": rel, "cause": f"{rel} is not strict JSON "
+                                f"({err or 'not a JSON object'}), so the heal cannot read it"})
+        return None
+    rows = _retired_rows(data, root)
+    recs = [{"event": ev, "matcher": mt, "command": h.get("command"), "settings": rel,
+             "hook": dict(h), "script": wh["script"],
+             "reason": f"retired — {wh['path']} is not on disk"}
+            for ev, mt, h, wh, v in rows if v == "retired"]
+    return text, recs, [(spath, r) for r in rows if r[4] != "retired"]
+
+
+def _heal_one(spath, root, owned_path, out, progress):
+    """Under the lock: re-read, cut the retired rows out, write, verify, then record."""
+    scanned = _scan(spath, root, {"skipped": []})
+    if not scanned or not scanned[1]:
+        return
+    text, recs, _kept = scanned
+    note = _atomic_write(os.path.realpath(spath), _strip_rows(text, root), text)
+    if progress is not None:
+        progress["wrote"].append(spath)
+    if note:
+        out["notes"].append(note)
+    back, _t, _e = _load_strict(spath)
+    if any(r[4] == "retired" for r in _retired_rows(back or {}, root)):
+        raise RuntimeError(f"re-read of {spath} still holds a retired row")
+    out["removed"] += recs
+    try:
+        _record(owned_path, recs, root)
+    except (OSError, ValueError) as exc:
+        out["rc"] = 1
+        out["failures"].append({"settings": recs[0]["settings"], "unrecorded": True,
+                                "cause": f"{len(recs)} row(s) REMOVED from {spath} but the "
+                                         f"record could not be written — {exc}"})
+        return
+    if progress is not None:
+        progress["wrote"].append(owned_path)
+
+
+def _run_heal(out, files, root, owned_path, lock_dir, execute, progress):
+    """Classify without a lock; lock and apply only when something is retired. Every
+    failure is reported per file into `out`, never raised: a caller at session start or
+    ahead of the installer's wiring must go on."""
+    pending = []
+    for spath in files:
+        scanned = _scan(spath, root, out)
+        if scanned is None:
+            continue
+        out["files"] += 1
+        out["kept"] += scanned[2]
+        if scanned[1]:
+            pending.append((spath, scanned[1]))
+    if not execute:
+        out["removed"] = [r for _p, recs in pending for r in recs]
+        return
+    if not pending:
+        return
+    try:
+        with _Lock(lock_dir) as lk:
+            if lk.unlocked:
+                out["notes"].append(f"healed without a lock: {lk.unlocked}")
+            for spath, recs in pending:
+                try:
+                    _heal_one(spath, root, owned_path, out, progress)
+                except (OSError, ValueError, RuntimeError) as exc:
+                    out["rc"] = 1
+                    out["failures"].append({
+                        "settings": recs[0]["settings"],
+                        "cause": f"{len(recs)} retired row(s) still in {spath} — "
+                                 f"{exc.__class__.__name__}: {exc}"})
+    except (OSError, TimeoutError) as exc:
+        out["rc"] = 1
+        n = sum(len(recs) for _p, recs in pending)
+        out["failures"].append({"settings": pending[0][1][0]["settings"], "lock": True,
+                                "cause": f"{n} retired row(s) left for another session — "
+                                         f"{exc.__class__.__name__}: {exc}"})
+
+
+def _new_result():
+    return {"rc": 0, "removed": [], "kept": [], "skipped": [], "files": 0, "refused": None,
+            "failures": [], "notes": [], "unparsed": [], "refused_rows": [], "refusals": []}
+
+
+def _print_result(out, execute, quiet):
+    """Every count, including the zeroes, unless `quiet` and there is nothing to say."""
+    for r in out["removed"]:
+        print(f"  {'-' if execute else '~'} {r['event']}  {r['matcher'] or '(no matcher)'}  "
+              f"{r['script']}  {r['reason']}")
+    for _spath, (ev, _mt, _h, wh, verdict) in out["kept"]:
+        print(f"  . kept  {ev}  {wh['script']}  {verdict} — {VERDICT_REMEDY[verdict]}")
+    for s in out["skipped"] + out["notes"]:
+        print(f"  . {s}")
+    for f in out["failures"]:
+        print(f"  NOT HEALED — {f['cause']}")
+    if out["refused"]:
+        print(f"  REFUSED  {out['refused']}")
+    for f in out["refusals"]:
+        print(f"  REFUSED  {f['cause']}")
+    if (not quiet or out["removed"] or out["kept"] or out["refused"] or out["failures"]
+            or out["refusals"]):
+        print(f"  {len(out['removed'])} {'removed' if execute else 'to remove'} · "
+              f"{len(out['kept'])} kept · {len(out['refused_rows'])} refused · "
+              f"{out['files']} settings file(s) read")
+    if execute and out["removed"]:
+        print(f"  verified on disk: {len(out['removed'])} registration(s) gone"
+              + ("" if any(f.get("unrecorded") for f in out["failures"])
+                 else ", then recorded in .settings-owned.json § hooks_removed"))
+
+
+def heal(root, execute, quiet=False, progress=None):
+    """Remove the project's workforce hook rows whose script the distribution RETIRED.
+
+    WHY IT EXISTS. A registration outlives its script, and the only remover was
+    `--wire-defaults`, which cleans the ONE file its scope resolves: `update` at personal
+    scope never touched a project, and `verify` only reported. MEASURED 2026-09-14: the
+    census counted 38 dead rows across six projects on one workstation, from two config
+    roots, each failing on every prompt and tool call.
+
+    THREE CALLERS, ONE RULE: `wf-commitments` at SessionStart (every project, first
+    use), `--heal` (`verify` § Hook wiring), and `--wire-defaults` (installer, `audit`).
+    `wf-apply`'s PASS-DEAD-HOOK decides workforce rows through the same verdict.
+
+    WHAT IT NEVER DOES, each enforced below and each pinned by a fixture:
+      - remove a row the verdict does not call "retired" (`dead_row_verdict`);
+      - delete a LIVE row, even a double-firing one: redundancy for every account and
+        machine that reads a shared file cannot be proven from one of them;
+      - write a user-scope settings file, write through a symlinked record, replace a
+        malformed or unwritable record, or write a settings file that does not parse as
+        a JSON object or carries duplicate keys (`_project_refusal`, `_file_refusal` —
+        a file-level refusal skips that file only, and every refusal that leaves retired
+        rows is counted and announced);
+      - take the lock when nothing is retired, or block longer than LOCK_WAIT_S;
+      - change any byte of a settings file but the removed rows' (`_strip_rows`);
+      - record a removal before the settings file is written and re-read.
+    A project with no `.claude` has nothing to heal: silent, rc 0.
+    """
+    out = _new_result()
+    if not os.path.isdir(os.path.join(root, ".claude")):
+        return out
+    owned_path = os.path.join(root, OWNED_REL)
+    out["refused"] = _project_refusal(root, owned_path)
+    files, blocked = [], []
+    for n in PROJECT_SETTINGS:
+        p = os.path.join(root, ".claude", n)
+        why = _file_refusal(root, p)
+        (blocked if why else files).append((p, why))
+    # A REFUSAL STILL COUNTS WHAT IT LEAVES. The rows a refused file (or a refused
+    # project) holds are read, never written, so the summary and the session-start notice
+    # can say how many retired rows stay and why (final review, F2).
+    probe = _new_result()
+    _run_heal(probe, [p for p, _w in blocked] + ([p for p, _w in files] if out["refused"] else []),
+              root, owned_path, "", False, None)
+    for k in ("kept", "skipped", "unparsed"):
+        out[k] += probe[k]
+    out["files"] += probe["files"]
+    for r in probe["removed"]:
+        why = next((w for p, w in blocked if os.path.relpath(p, root) == r["settings"]), None)
+        out["refused_rows"].append(dict(r, why=why or out["refused"]))
+    for rel in sorted({r["settings"] for r in out["refused_rows"]}):
+        rows = [r for r in out["refused_rows"] if r["settings"] == rel]
+        out["refusals"].append({"settings": rel, "cause": f"{rel}: {rows[0]['why']}; "
+                                f"{len(rows)} retired row(s) left in it"})
+    if not out["refused"]:
+        _run_heal(out, [p for p, _w in files], root, owned_path,
+                  os.path.realpath(os.path.join(root, ".claude")), execute, progress)
+    _print_result(out, execute and not out["refused"], quiet)
+    return out
+
+
+def failure_state(root, rel):
+    """A key for one settings file's CURRENT state — path, bytes and mode — so a failure
+    that nothing has changed is announced once, not at every session start (second
+    review, #4). Relative path, so the key survives the tree being copied or moved."""
+    import hashlib
+    p = os.path.join(root, rel)
+    try:
+        with open(p, "rb") as fh:
+            body = fh.read()
+        mode = oct(os.stat(p).st_mode & 0o7777)
+    except OSError:
+        body, mode = b"", "absent"
+    return hashlib.sha256(rel.encode() + b"\0" + body + b"\0" + mode.encode()).hexdigest()
+
+
+NOTICE_REL = os.path.join(".claude", "workforce", ".heal-notice")
+
+
+def announce_once(root, failures):
+    """True when at least one failure is in a state not announced before, and remember
+    it. The notice lives beside the reversal record and is written by the same rules:
+    never through a link, and its absence only means the message repeats."""
+    keys = {failure_state(root, f["settings"]) for f in failures}
+    path = os.path.join(root, NOTICE_REL)
+    # OUTSIDE THE PROJECT, NOTHING IS WRITTEN (last review, 1). A `.claude` linked out would
+    # carry the notice into the link's target, so there is no notice file: the message is
+    # said at every session start while the state lasts, which writes nothing anywhere.
+    if not _inside_project(root, os.path.dirname(path)):
+        return True
+    # AN UNREADABLE NOTICE IS AN ABSENT ONE. A non-UTF-8 file here raised out of the
+    # SessionStart hook and took the commitment ledger's read-back with it (review 3, L1).
+    try:
+        with open(path, encoding="utf-8") as fh:
+            seen = set(fh.read().split())
+    except (OSError, UnicodeDecodeError, ValueError):
+        seen = set()
+    if keys <= seen:
+        return False
+    try:
+        if not (os.path.islink(path) or os.path.islink(os.path.dirname(path))):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            _atomic_write(path, "\n".join(sorted(keys)) + "\n")
+    except OSError:
+        pass
+    return True
+
+
+def clear_notice(root):
+    """Remove the notice once nothing is failing, so it is never residue (review 3, L6).
+    Never through a link, like every other write here."""
+    path = os.path.join(root, NOTICE_REL)
+    if not _inside_project(root, os.path.dirname(path)):
+        return
+    if os.path.isfile(path) and not os.path.islink(path) \
+            and not os.path.islink(os.path.dirname(path)):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def do_heal(root, execute):
+    """`--heal`: the CLI face of `heal`, printing every count including the zeroes."""
+    if not os.path.isdir(os.path.join(root, ".claude")):
+        print(f"HEAL   {os.path.join(root, '.claude')} is absent — nothing to heal")
+        return 0
+    print(f"HEAL   {os.path.join(root, '.claude')}          <- resolved, not assumed")
+    rc = heal(root, execute)["rc"]
+    if not execute:
+        print("  apply with: --execute")
+    return rc
 
 
 def do_unwire_defaults(root, scope, execute):
@@ -937,14 +1758,15 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if agent_cfg is not None:
         command, resolved = "", ""
     else:
-        command, resolved = hook_command(name)
+        command, resolved = hook_command(name, scope=scope, root=root)
 
     spath = settings_for_scope(root, scope)
     if not quiet:
         print(f"HOOKS  {spath}          <- resolved, not assumed")
-    if resolved.startswith("${CLAUDE_PROJECT_DIR}"):
-        print(f"  note: no personal install found; registering the project-scope path "
-              f"for {name}.")
+    if resolved.startswith(PER_SESSION_ROOT):
+        print(f"  note: {name} resolves only to a personal install, so the project file "
+              f"gets the per-session form — each session's shell expands it to its own "
+              f"config root. This file is shared by every account that opens the tree.")
     if name in OPT_IN_HOOKS:
         print(f"  note: {name} is PROPOSED and opt-in — wired only when you name it; "
               f"the default set is {', '.join(DEFAULT_HOOKS)} and never includes it.")
@@ -995,7 +1817,11 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         if not execute:
             print(f"  ~ {name}  {event}  prompt CHANGED — would update in place")
             return 0
-        dump(spath, data)
+        try:
+            dump(spath, data)
+        except OSError as exc:
+            print(f"  ! {name}  {event}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
+            return 1
         back, _ = load(spath)
         ok = any(_same_agent(h, agent_cfg)
                  and (h.get("prompt") or "") == (agent_cfg.get("prompt") or "")
@@ -1020,10 +1846,22 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
                      "here)" if scopes_collapse(root) else "")
                   + ". A second copy would double-fire it.")
         return 0
-    print(f"  {'+' if execute else '~'} {name}  {event}"
-          f"{('  matcher ' + matcher) if matcher else ''}  "
-          f"{'registered' if execute else 'would register'}")
+    # NEVER REGISTER A SCRIPT THAT IS NOT THERE. `hooks.md` § Procedure step 2 has always
+    # said so and nothing enforced it: with no install found this wrote a
+    # `${CLAUDE_PROJECT_DIR}` row for a missing file, and the prune in the same call took
+    # it straight back out. Once the prune moved ahead of the wiring, that became a dead
+    # row written by one run and removed by the next, forever.
+    target = _norm_command(resolved, root) if agent_cfg is None else None
+    if agent_cfg is None and not (isinstance(target, str) and os.path.exists(target)):
+        print(f"  ! {name}  {event}  NOT registered — {target} is not on disk, and a "
+              f"registration pointing at nothing is dead wiring (hooks.md § Procedure "
+              f"step 2). Install workforce, then wire again.")
+        return 0
+    # ONE ACCURATE LINE. `+ registered` used to print before the write, so a write that
+    # then failed printed `+ registered` and `! NOT WRITTEN` for one hook (review 3, L8).
     if not execute:
+        print(f"  ~ {name}  {event}"
+              f"{('  matcher ' + matcher) if matcher else ''}  would register")
         if not quiet:
             print("  apply with: --execute   (run it yourself via `!` if the classifier "
                   "refused the agent's write)")
@@ -1031,12 +1869,22 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
 
     # Sidecar reversal FIRST — the exact event/matcher/command, so `disband`/`hooks
     # --remove` removes those and nothing else.
-    owned_path, owned = load_owned(root, scope)
-    added = owned.setdefault("hooks_added", [])
-    if not isinstance(added, list):
-        added = owned["hooks_added"] = []
-    added.append({"event": event, "matcher": matcher, "command": command})
-    dump(owned_path, owned)
+    if os.path.exists(spath) and not os.access(spath, os.W_OK):
+        print(f"  ! {name}  {event}  NOT WRITTEN — {spath} is not writable")
+        return 1
+    # A WRITE THAT FAILS IS REPORTED PER HOOK, NEVER RAISED. The installer runs this for
+    # every default hook in turn, and one traceback used to end the loop with nothing
+    # after it wired (second review, N3).
+    try:
+        owned_path, owned = load_owned(root, scope)
+        added = owned.setdefault("hooks_added", [])
+        if not isinstance(added, list):
+            added = owned["hooks_added"] = []
+        added.append({"event": event, "matcher": matcher, "command": command})
+        dump(owned_path, owned)
+    except OSError as exc:
+        print(f"  ! {name}  {event}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
+        return 1
 
     hooks = data.setdefault("hooks", {})
     if not isinstance(hooks, dict):
@@ -1049,7 +1897,11 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
               file=sys.stderr)
         return 1
     hooks[event].append(entry)
-    dump(spath, data)
+    try:
+        dump(spath, data)
+    except OSError as exc:
+        print(f"  ! {name}  {event}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
+        return 1
 
     # THE RE-READ MUST USE THE SAME IDENTITY TEST THE WRITE DID. It did not: presence
     # detection learned about agent hooks and this verifier did not, so a correct write
@@ -1072,6 +1924,7 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         print(f"wf-settings-apply: HOOK UNVERIFIED — re-read found {count} registrations "
               f"of {name} on {event}, expected 1.", file=sys.stderr)
         return 1
+    print(f"  + {name}  {event}{('  matcher ' + matcher) if matcher else ''}  registered")
     print(f"  verified on disk: {name} registered once on {event} in {spath}")
     return 0
 
@@ -1168,21 +2021,24 @@ def main(argv=None):
                     help="wire every default hook, in one call")
     ap.add_argument("--unwire-defaults", action="store_true",
                     help="reverse exactly what --wire-defaults wrote, per the record")
+    ap.add_argument("--heal", action="store_true",
+                    help="remove project rows whose workforce script was retired (see heal())")
     ap.add_argument("--scope", choices=("project", "user"), default="project",
                     help="which settings file to write (user scope needs no --root)")
     args = ap.parse_args(argv)
 
     modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
              bool(args.wire_defaults),
-             bool(args.unwire_defaults)]
+             bool(args.unwire_defaults), bool(args.heal)]
     if sum(modes) != 1:
         print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
-              "--automode, --wire-defaults, --unwire-defaults.",
+              "--automode, --wire-defaults, --unwire-defaults, --heal.",
               file=sys.stderr)
         return 2
-    if args.scope == "user" and (args.grants or args.wire_hook):
+    if args.scope == "user" and (args.grants or args.wire_hook or args.heal):
         print("wf-settings-apply: --scope user applies to --wire-defaults and "
-              "--wire-defaults only.", file=sys.stderr)
+              "--unwire-defaults only. The heal never writes a user-scope file.",
+              file=sys.stderr)
         return 2
 
     # --automode writes only the user file and needs no --root, and neither does any
@@ -1209,6 +2065,8 @@ def main(argv=None):
         return do_wire_defaults(root, args.scope, args.execute)
     if args.unwire_defaults:
         return do_unwire_defaults(root, args.scope, args.execute)
+    if args.heal:
+        return do_heal(root, args.execute)
     return do_automode(args.execute)
 
 

@@ -126,6 +126,17 @@ WRITERS = {
                  "fixtures/scripts/apply-deadhook-execute", "--execute"],
         "watch": "fixtures/scripts/apply-deadhook-execute",
     },
+    # wf-settings-apply --heal runs at EVERY session start, so a second pass that wrote
+    # anything would write on every session in every project. Same hazard as the row
+    # above: `hooks_removed` APPENDS, and a re-detected row would be recorded twice and
+    # written back twice by `disband`. The tree holds every row rule the heal has; the
+    # per-session row resolves against whichever account runs this, and the property —
+    # the second pass writes nothing — holds whether that row is removed or kept.
+    "settings-heal": {
+        "argv": ["workforce/bin/wf-settings-apply", "--root",
+                 "fixtures/scripts/sa-heal-execute", "--heal", "--execute"],
+        "watch": "fixtures/scripts/sa-heal-execute",
+    },
 }
 
 

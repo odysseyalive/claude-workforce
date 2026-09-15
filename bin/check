@@ -1941,6 +1941,42 @@ check(
      "wf-live's SKILL_OWNED pattern could not be read, so attribution cannot be resolved"),
 )
 
+# RELATIVE MARKDOWN LINKS, the form `REF_RX` cannot see. It matches `references/…md` and
+# nothing else, so `[creative-integrity.md](../creative-integrity.md)` in text-eval's corpus
+# pointed at a file that never existed in this tree and nothing noticed (scoring audit,
+# 2026-09-14). A link resolves against the directory of the file that holds it.
+MDLINK_RX = re.compile(r"\]\(([^)\s#]+\.md)(?:#[^)\s]*)?\)")
+# A VENDORED corpus is read-only and byte-identical to its source project, so a link in it
+# that resolves only THERE stays, named here with the file that says so to a reader. Each
+# entry is (citing file, link target, the authored file that records it).
+VENDORED_SOURCE_LINKS = {
+    ("workforce/skills/text-eval/references/text-tells.md", "../creative-integrity.md"):
+        "workforce/skills/text-eval/SKILL.md",
+}
+_mdlink_broken = []
+for p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + ["README.md", "COMMANDS.md"]:
+    if p in ARCHIVE:
+        continue
+    _body = read(p)
+    _sacred = [(_s.start(), _s.end()) for _s in _SACRED_SPAN_RX.finditer(_body)]
+    for m in MDLINK_RX.finditer(_body):
+        _tgt = m.group(1)
+        if _tgt.startswith(("http://", "https://")) or any(_a <= m.start() < _b for _a, _b in _sacred):
+            continue
+        if os.path.exists(os.path.normpath(os.path.join(os.path.dirname(p), _tgt))):
+            continue
+        _rec = VENDORED_SOURCE_LINKS.get((p, _tgt))
+        if _rec and "creative-integrity.md" in read(_rec):
+            continue
+        _mdlink_broken.append(f"{p}:{_body.count(chr(10), 0, m.start()) + 1} → {_tgt}")
+check(
+    "references: every relative markdown link resolves",
+    not _mdlink_broken,
+    f"broken: {_mdlink_broken} — repoint the link at the file that holds the content now, or "
+    "remove it with a dated note. A vendored corpus's link into its source project is "
+    "listed in VENDORED_SOURCE_LINKS with the authored file that tells the reader",
+)
+
 # Section anchors. `REF_RX` above resolves the PATH half of a citation and never
 # the `§ Section` half, so every heading in the project could be renamed with the
 # check green. Four separate doctrine audits flagged this independently as the
@@ -1986,6 +2022,7 @@ for _p in glob.glob("workforce/**/*.md", recursive=True):
     _by_path[_p.replace("workforce/", "")] = _p
 
 _anchor_broken = []
+_cite_nofile = []
 # `_SACRED_SPAN_RX` is defined with the path check above and skips the same spans here.
 # SKILL.md's directive block cites `update.md` § Resolution rules and `evaluators.md` § The
 # five skills ship in the install, both since renamed, and those words stay.
@@ -2009,7 +2046,12 @@ for _src in sorted(glob.glob("workforce/**/*.md", recursive=True)):
         else:
             _cands = _by_name.get(os.path.basename(_raw), [])
         if not _cands:
-            continue  # the PATH half is check 3's job, not this one
+            # NOT SILENTLY. This `continue` said "the PATH half is check 3's job", and
+            # check 3 matches only `references/…md` — so a bare `evals.md` § Judgment
+            # roles, citing a file deleted in v1.31.0, passed both. Recorded here and
+            # asserted after PRODUCERS, which names the files a PROJECT holds.
+            _cite_nofile.append((_src, _raw, _m.start(), _body))
+            continue
         _w = _sec.split()
         # Sentence punctuation is not part of the heading. A citation ending a
         # sentence — "resolve to one of the four outcomes in staging.md § The
@@ -8737,11 +8779,13 @@ check(
 _fx = os.path.join(ROOT, "fixtures")
 if os.path.isdir(_fx):
     try:
-        _r = subprocess.run(["git", "ls-files", "fixtures/"], cwd=ROOT,
+        # NUL-separated: a whitespace split broke a tracked path with a space in it into
+        # two untracked halves (the settings-heal fixtures carry one on purpose).
+        _r = subprocess.run(["git", "ls-files", "-z", "fixtures/"], cwd=ROOT,
                             capture_output=True, text=True, timeout=30)
         if _r.returncode != 0:
             raise RuntimeError(_r.stderr.strip()[:120] or "git ls-files failed")
-        _tracked = set(_r.stdout.split())
+        _tracked = {_x for _x in _r.stdout.split("\0") if _x}
         _ondisk = set()
         for _d, _s, _f in os.walk(_fx):
             if ".git" in _d.split(os.sep):
@@ -9723,6 +9767,9 @@ PRODUCERS = {
     ".claude/workforce/.conversion-journal.md": "workforce/references/procedures/hire.md",
     ".claude/workforce/.directives.sha": "workforce/references/procedures/checksums.md",
     ".claude/workforce/.settings-owned.json": "workforce/references/audit-setup.md",
+    # The settings heal's once-per-state failure record (hooks.md § Healing), written by
+    # `announce_once` and removed by `clear_notice`, both in the script named here.
+    ".claude/workforce/.heal-notice": "workforce/bin/wf-settings-apply",
     ".claude/workforce/platform-local.md": "workforce/references/procedures/audit.md",
     ".claude/workforce/personnel/index.md": "workforce/references/procedures/audit.md",
     ".claude/workforce/.current-run": "workforce/references/procedures/audit.md",
@@ -9755,6 +9802,19 @@ for _p in (_q for _q in _shipped_md if _q not in ARCHIVE):
         _artifacts.add(_a)
 
 _unmapped = sorted(_artifacts - set(PRODUCERS))
+# A `file.md § Section` CITATION NAMES A FILE THAT EXISTS. What a project holds, not this
+# tree — the artifacts PRODUCERS names — is exempt, like the generated targets.
+# `OUTPUT.md` is an employee's run deliverable under `.claude/workforce/work/<run>/`, cited
+# by a project's own dated notes; it never exists in this tree.
+_project_names = {os.path.basename(_k) for _k in PRODUCERS} | {"CLAUDE.md", "MEMORY.md", "OUTPUT.md"}
+_cite_missing = sorted({f"{_s.replace('workforce/', '')}:{_b.count(chr(10), 0, _o) + 1} → {_r}"
+                        for _s, _r, _o, _b in _cite_nofile
+                        if os.path.basename(_r) not in _project_names})
+check("references: every `file § Section` citation names a file that exists",
+      not _cite_missing,
+      f"cited file exists nowhere in the tree: {_cite_missing} — repoint the citation at the "
+      "file that holds the rule now, or drop it with a dated correction note")
+
 check("artifacts: every artifact a shipped file reads has a named producer",
       not _unmapped,
       f"no producer mapped for {_unmapped} — an absent producer leaves no trace in the file "
@@ -10244,6 +10304,299 @@ check("a retired hook is UNWIRED by the same pass that wires the live ones",
       "no longer exist — run every turn, failing every turn, invisibly. The prune rides "
       "--wire-defaults so it reaches the installer, audit and verify without a fourth "
       "gesture anyone has to type")
+# ── the heal reaches every project, 2026-09-14 ──────────────────────────────────────
+# MEASURED on the author's workstation: the census counted 38 dead rows across six
+# projects, pointing at scripts retired in 1.31.0 and failing on every prompt and tool
+# call. The prune above cleaned only the ONE file its scope resolves, so a personal
+# `update` never touched a project, and `verify` reported the rows while its headline read
+# `0 failed`. An independent review of the first fix then found it read "file missing" as
+# "retired" and deleted live rows. These pin the carrier, the verify write, the headline
+# row, the project-scope form and the retirement rule, each against a fixture that fails
+# without it (the mutation run that proved that is in this change's commit message).
+_cmt_src = read("workforce/bin/wf-commitments")
+_cfm_hw = read("workforce/bin/wf-conform")
+_heal_fx = (_fix_json.get("sa-heal-execute", {}).get("after") or {})
+check("heal: retired workforce rows are removed at session start, in every project",
+      "def heal(root, execute, quiet=False, progress=None)" in _wsa
+      and "wsa.heal(root, True, quiet=True, progress=progress)" in _cmt_src
+      and "def _wsa():" in _cmt_src
+      and "commitments-heals-at-sessionstart" in _fix_json
+      and "/usr/local/bin/my-own-stop-hook --label café" in
+          ((_heal_fx.get(".claude/settings.local.json") or {}).get("want") or [])
+      and "commitments-sessionstart-clean" in _fix_json,
+      "the only remover rode --wire-defaults, which cleans the one file its scope "
+      "resolves, so update at personal scope never reached a project. SessionStart "
+      "already fires in every project from a wiring every default install has, so the "
+      "next session heals it with nothing typed. The fixture keeps the user's own row "
+      "beside a removed one, or a heal that removed by entry would pass")
+check("heal: verify removes dead wiring and its headline counts what is left",
+      '"$WF/bin/wf-settings-apply" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --heal --execute'
+      in _vfy_h
+      and "def check_hook_wiring" in _cfm_hw and "check_hook_wiring(root, res)" in _cfm_hw
+      and "wsa.VERDICT_REMEDY" in _cfm_hw
+      and "conform-hook-wiring-dead" in _fix_json
+      and "installer, `audit`, and `verify` all call" not in _wsa,
+      "verify only REPORTED dead wiring and named a command to type, and wf-conform had "
+      "no hook check, so `N checks · 0 failed` printed over rows failing on every event. "
+      "The remedy wf-conform prints comes from the classifier the heal runs, so it is "
+      "true in every case it prints")
+check("heal: project scope never receives a path under a personal config root",
+      'resolved = f"{PER_SESSION_ROOT}/skills/workforce/bin/{script}"' in _wsa
+      and "/cfg/skills" in (((_fix_json.get("sa-hook-project-never-personal", {})
+                              .get("after") or {}).get(".claude/settings.local.json") or {})
+                            .get("not") or [])
+      and "a hook command is not run through a shell that will do it for you" not in _hks,
+      "a project settings file is shared by every account and machine that opens the "
+      "tree. Each config root wrote its own absolute path into it, so one project fired "
+      "both installs' hooks and failed for every account when either retired a script. "
+      "The rule rested on `a hook command is not run through a shell`, which the 2.1.268 "
+      "binary contradicts: a command with no `args` is spawned with shell: true")
+# RETIREMENT IS THE DISTRIBUTION'S, DERIVED HERE FROM THE RECORD. Every script git has
+# deleted from workforce/bin/ that the manifest does not ship now, and nothing else.
+# RENAMES COUNT (second review, N4): `--diff-filter=D` alone missed a script renamed away,
+# whose old name is exactly as retired. `--name-status -M` gives `D\tpath` and
+# `R<score>\told\tnew`; the old side of each is the name that stopped shipping.
+try:
+    _gl = subprocess.run(["git", "log", "--diff-filter=DR", "-M", "--name-status", "--format=",
+                          "--", "workforce/bin"], capture_output=True, text=True, check=True).stdout
+    _git_deleted = {os.path.basename(_f[1]) for _f in (_ln.split("\t") for _ln in _gl.splitlines())
+                    if len(_f) >= 2 and _f[0][:1] in "DR"}
+except (OSError, subprocess.CalledProcessError):
+    _git_deleted = None
+_shipped_bin = {os.path.basename(_p) for _p in manifest_exec_paths() + manifest_hook_paths()}
+_retired_m = re.search(r"RETIRED_HOOKS = frozenset\(\{(.*?)\}\)", _wsa, re.S)
+_retired_set = set(re.findall(r'"(wf-[a-z0-9-]+)"', _retired_m.group(1))) if _retired_m else set()
+# RESERVED FOREVER, and it needs no history to check: a retired name never ships again, on
+# disk or in the manifest, or the heal would judge a newer release's hook by the old one's
+# retirement — and the fixture pins that a SHIPPED name with its file missing is kept.
+check("heal: a retired name is reserved forever and a shipped name is never retired",
+      bool(_retired_set) and not (_retired_set & _shipped_bin)
+      and not any(os.path.exists(f"workforce/bin/{_n}") for _n in _retired_set)
+      and "kept  Stop  wf-widen  shipped" in (_fix_json.get("sa-heal-execute", {}).get("want") or []),
+      f"retired and shipped: {sorted(_retired_set & _shipped_bin)}. The first heal read "
+      "`not on disk` as `retired`, which is also true on a branch without its vendored "
+      "install, inside bin/sync's delete-then-copy window, on a slow mount and under EACCES "
+      "— each would have unwired a live shipped hook for good")
+if _git_deleted is None:
+    # A COPY WITH NO .git (a prove worker, a tarball) has no history to derive the set
+    # from. That is an absent input, not a failed rule: the same not-evaluated row every
+    # other check here uses for one. The half above still runs.
+    skip("heal: the retired set is exactly what git history deleted or renamed away",
+         "no git history in this tree — the retired set is derived from "
+         "`git log`, so it cannot be compared here")
+else:
+    check("heal: the retired set is exactly what git history deleted or renamed away",
+          bool(_git_deleted) and _retired_set == (_git_deleted - _shipped_bin),
+          f"RETIRED_HOOKS {sorted(_retired_set)}; deleted-or-renamed-and-not-shipped per git "
+          f"{sorted(_git_deleted - _shipped_bin)}. Derived, so a name cannot be retired by "
+          "accident and a script renamed away is retired like a deleted one")
+# THE TWO CONCURRENCY GUARDS, RUN, because each backs the other up and a fixture that only
+# sees their sum cannot tell when one is gone. The lock must really exclude a second
+# flock on the same directory, and a write whose file changed since it was read must be
+# abandoned with the file untouched.
+_heal_rt = []
+try:
+    import importlib.machinery as _hm, importlib.util as _hu, tempfile as _ht, fcntl as _hf
+    _hl = _hm.SourceFileLoader("_wsa_rt", "workforce/bin/wf-settings-apply")
+    _hmod = _hu.module_from_spec(_hu.spec_from_loader("_wsa_rt", _hl))
+    sys.dont_write_bytecode = True
+    _hl.exec_module(_hmod)
+    with _ht.TemporaryDirectory() as _hd:
+        with _hmod._Lock(_hd):
+            _hfd = os.open(_hd, os.O_RDONLY)
+            try:
+                _hf.flock(_hfd, _hf.LOCK_EX | _hf.LOCK_NB)
+                _heal_rt.append("a second flock on the locked directory SUCCEEDED")
+            except BlockingIOError:
+                pass
+            finally:
+                os.close(_hfd)
+        _hp = os.path.join(_hd, "s.json")
+        with open(_hp, "w") as _fh:
+            _fh.write('{"a": 1}\n')
+        try:
+            _hmod._atomic_write(_hp, "{}\n", before='{"a": 0}\n')
+            _heal_rt.append("a stale write was NOT abandoned")
+        except RuntimeError:
+            pass
+        if open(_hp).read() != '{"a": 1}\n':
+            _heal_rt.append("the file changed after an abandoned write")
+        try:
+            _hmod._atomic_write(_hp, '{"b": 2}\n', before='{"a": 1}\n')
+        except RuntimeError:
+            _heal_rt.append("a write whose file had NOT changed was refused")
+        if open(_hp).read() != '{"b": 2}\n':
+            _heal_rt.append("a fresh write did not land")
+except Exception as _exc:                                # noqa: BLE001
+    _heal_rt.append(f"could not run: {_exc.__class__.__name__}: {_exc}")
+check("heal: the lock excludes a second session and a stale write is abandoned",
+      not _heal_rt,
+      "; ".join(_heal_rt) + ". MEASURED before the lock: 19 of 40 concurrent session "
+      "starts appended the same removal twice. `dump` truncated in place, so a write "
+      "from Claude Code between the heal's read and its write was lost")
+# ROUND THREE, 2026-09-14. PASS-DEAD-HOOK once removed whatever the census called missing
+# and deleted a live shipped per-session hook on every audit (N1); the installer's pipe
+# hid a wiring run that crashed (N3); the lock was taken on healthy projects, failed
+# outright on NFS, and misreported a timeout (N2).
+_apply_src = read("workforce/bin/wf-apply")
+check("heal: every remover of a workforce row decides through dead_row_verdict",
+      'wsa.dead_row_verdict(h.get("hook") or {}, root)[0] != "retired"' in _apply_src
+      and "apply-deadhook-workforce-verdict" in _fix_json
+      and '"hook": h,' in read("workforce/bin/wf-census"),
+      "PASS-DEAD-HOOK removed whatever the census called missing. Once the census resolved "
+      "the per-session form against the running account, that was a LIVE shipped hook for "
+      "any account without a personal install, on every audit. One rule decides removal")
+check("installers: a wiring failure reaches the summary instead of being piped away",
+      "wire_rc=${PIPESTATUS[0]}" in _ins and 'WIRE_FAILED="$WIRE_FAILED $scope"' in _ins
+      and "HOOK WIRING REPORTED A PROBLEM" in _ins
+      and "$script:WireFailed += $scope" in _insp and "HOOK WIRING REPORTED A PROBLEM" in _insp,
+      "`python3 … | sed … || warn` tested sed's status, so a wiring run that crashed before "
+      "wiring anything printed a traceback and the install said it was complete")
+_heal_rt3 = []
+try:
+    import errno as _he
+    with _ht.TemporaryDirectory() as _hd:
+        os.makedirs(os.path.join(_hd, ".claude"))
+        with open(os.path.join(_hd, ".claude", "settings.local.json"), "w") as _fh:
+            _fh.write('{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "/usr/bin/true"}]}]}}\n')
+        _real_lock = _hmod._Lock
+
+        class _NoLock:
+            def __init__(self, *_a):
+                _heal_rt3.append("the lock was taken on a project with nothing retired")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+        _hmod._Lock = _NoLock
+        try:
+            _hmod.heal(_hd, True, quiet=True)
+        finally:
+            _hmod._Lock = _real_lock
+        _real_flock = _hf.flock
+
+        def _nolck(_fd, _op):
+            raise OSError(_he.ENOLCK, "No locks available")
+        _hf.flock = _nolck
+        try:
+            with _hmod._Lock(os.path.join(_hd, ".claude")) as _lk:
+                if not _lk.unlocked:
+                    _heal_rt3.append("an ENOLCK filesystem did not fall back to lock-free")
+        except OSError as _exc:
+            _heal_rt3.append(f"an ENOLCK filesystem raised instead of falling back ({_exc})")
+        finally:
+            _hf.flock = _real_flock
+        _out = _hmod._new_result()
+        _hmod.LOCK_WAIT_S, _saved_wait = 0.2, _hmod.LOCK_WAIT_S
+        _hold = os.open(os.path.join(_hd, ".claude"), os.O_RDONLY)
+        try:
+            _hf.flock(_hold, _hf.LOCK_EX)
+            _hmod._run_heal(_out, ["x"], _hd, "y", os.path.join(_hd, ".claude"), True, None)
+            _scan = _hmod._scan
+            _hmod._scan = lambda _p, _r, _o: ("", [{"settings": "s.json"}], [])
+            try:
+                _hmod._run_heal(_out, ["x"], _hd, "y", os.path.join(_hd, ".claude"), True, None)
+            finally:
+                _hmod._scan = _scan
+        finally:
+            os.close(_hold)
+            _hmod.LOCK_WAIT_S = _saved_wait
+        if not any("1 retired row(s) left for another session" in _f["cause"]
+                   for _f in _out["failures"]):
+            _heal_rt3.append(f"a lock timeout did not report the rows it left: {_out['failures']}")
+        # At user scope there is no project: known_roots("") must not read the CURRENT
+        # directory's .claude (review 3, L4).
+        _cwd = os.getcwd()
+        _kr = os.path.join(_hd, "kr")
+        os.makedirs(os.path.join(_kr, ".claude"))
+        for _s in list(_hmod.CURRENT_HOOK_SCRIPTS) + ["wf-plain-guard"]:
+            _pp = os.path.join(_kr, "stray", "skills", "workforce", "bin", _s)
+            os.makedirs(os.path.dirname(_pp), exist_ok=True)
+            open(_pp, "w").close()
+        with open(os.path.join(_kr, ".claude", "settings.local.json"), "w") as _fh:
+            _fh.write('{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "'
+                      + os.path.join(_kr, "stray", "skills", "workforce", "bin", "wf-task-tag")
+                      + '"}]}]}}\n')
+        try:
+            os.chdir(_kr)
+            if any(os.path.realpath(_r) == os.path.realpath(os.path.join(_kr, "stray"))
+                   for _r in _hmod.known_roots("")):
+                _heal_rt3.append("known_roots('') read the current directory's settings")
+        finally:
+            os.chdir(_cwd)
+        # NOTHING IN THE HEAL PATH MAY FAIL THE SESSIONSTART HOOK (review 3, L1): an error
+        # anywhere inside it returns "" before any write, so the ledger read-back follows.
+        _cl = _hm.SourceFileLoader("_cmt_rt", "workforce/bin/wf-commitments")
+        _cmod = _hu.module_from_spec(_hu.spec_from_loader("_cmt_rt", _cl))
+        _cl.exec_module(_cmod)
+        _cmod._heal_settings = lambda _r, _p: (_ for _ in ()).throw(UnicodeDecodeError("utf-8", b"", 0, 1, "x"))
+        try:
+            if _cmod.heal_settings(_hd) != "":
+                _heal_rt3.append("an error in the session-start heal produced output with nothing written")
+        except Exception as _exc:                        # noqa: BLE001
+            _heal_rt3.append(f"an error in the session-start heal RAISED ({_exc.__class__.__name__})")
+        # A cut that went wrong must be caught by the self-check, never written.
+        _nc = _hmod._next_cut
+        _hmod._next_cut = lambda _t, _r, _c=[0]: (_c.__setitem__(0, _c[0] + 1) or (1, 3)) if _c[0] == 0 else None
+        try:
+            _hmod._strip_rows('{"hooks": {"Stop": []}, "x": 1}', _hd)
+            _heal_rt3.append("a wrong character-level cut was not caught before writing")
+        except (RuntimeError, ValueError):
+            pass
+        finally:
+            _hmod._next_cut = _nc
+        # A wiring write that fails is reported per hook, never raised.
+        _dump = _hmod.dump
+        # Fails on the SETTINGS write only, so the record write before it succeeds and the
+        # guard under test is the one around the settings file.
+        _hmod.dump = lambda _p, _d: ((_ for _ in ()).throw(OSError(5, "I/O error"))
+                                     if _p.endswith("settings.local.json") else _dump(_p, _d))
+        # The machine running this must not decide it: its own user settings may already
+        # carry the hook, which reads as "already registered" and writes nothing.
+        _ccd = os.environ.get("CLAUDE_CONFIG_DIR")
+        os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(_hd, "nocfg")
+        try:
+            os.makedirs(os.path.join(_hd, ".claude", "skills", "workforce", "bin"), exist_ok=True)
+            open(os.path.join(_hd, ".claude", "skills", "workforce", "bin", "wf-task-tag"), "w").close()
+            import contextlib as _hc, io as _hio
+            with _hc.redirect_stdout(_hio.StringIO()) as _buf:
+                _rc = _hmod.do_wire_hook(_hd, "wf-task-tag", True, scope="project", quiet=True)
+            if _rc != 1 or "NOT WRITTEN" not in _buf.getvalue():
+                _heal_rt3.append(f"a failed wiring write returned {_rc} without saying NOT WRITTEN")
+        except OSError:
+            _heal_rt3.append("a failed wiring write RAISED, ending the installer's wiring loop")
+        finally:
+            _hmod.dump = _dump
+            if _ccd is None:
+                os.environ.pop("CLAUDE_CONFIG_DIR", None)
+            else:
+                os.environ["CLAUDE_CONFIG_DIR"] = _ccd
+except Exception as _exc:                                # noqa: BLE001
+    _heal_rt3.append(f"could not run: {_exc.__class__.__name__}: {_exc}")
+# THE SESSION-START GATE READS RETIRED_HOOKS FROM SOURCE TEXT (the L8 latency win: no
+# import on a project with nothing retired), so the parse must equal the value Python
+# loads. Appending `| frozenset({"wf-zz-retired-later"})` made them differ with every gate
+# green (final review, F3) — a retired name the gate would never see.
+_rn_problem = ""
+try:
+    _parsed = _cmod._retired_names()
+    if _parsed != set(_hmod.RETIRED_HOOKS):
+        _rn_problem = (f"parsed {sorted(_parsed or [])} but loaded "
+                       f"{sorted(_hmod.RETIRED_HOOKS)}")
+except Exception as _exc:                                # noqa: BLE001
+    _rn_problem = f"could not compare: {_exc.__class__.__name__}: {_exc}"
+check("heal: the session-start gate's retired names equal the loaded RETIRED_HOOKS",
+      not _rn_problem,
+      _rn_problem + ". The gate parses the source to avoid importing the classifier on "
+      "every session start; a definition the parse cannot see is a retired row that "
+      "never heals")
+check("heal: the lock is taken only when needed, falls back where it cannot exist, and a timeout says what it left",
+      not _heal_rt3 and _hmod.LOCK_WAIT_S <= 2.0,
+      "; ".join(_heal_rt3) + ". NFS refuses LOCK_EX on a read-only descriptor and a directory "
+      "cannot be opened for writing, so every session start in every project there would have "
+      "failed; a timeout blocked 5.2 s and then reported 0 rows left when 1 was")
 check("restoring a style that was absent DELETES the key",
       "outputStyle removed (it was absent before)" in _wsa
       and 'data.pop("outputStyle", None)' in _wsa,
@@ -11000,6 +11353,12 @@ for _c in _ro_single:
         continue
     for _m in re.finditer(r"```bash\n(.*?)```", _body, re.S):
         for _ln in _m.group(1).splitlines():
+            # ONE NAMED EXCEPTION, 2026-09-14: `verify` § Hook wiring runs the settings heal
+            # on purpose — a dead workforce row fails on every event, and the operator's
+            # 2026-09-07 directive is that the next use of workforce heals it. Exempted by
+            # the exact producer and flag pair, so any OTHER executing line still fails.
+            if _c == "verify" and "/bin/wf-settings-apply\"" in _ln and "--heal --execute" in _ln:
+                continue
             if any(_flag in _ln for _flag in _EXECUTING):
                 _ro_violations.append(f"{_c}.md: {_ln.strip()[:90]}")
 check(
@@ -13922,7 +14281,9 @@ check("settings-apply: a hook wired in both scopes is REPORTED, never silently u
       "per turn — seen then as the since-removed standing-request context injected "
       "twice. Measured 2026-09-08: all six defaults doubled on a live machine and "
       "nothing said so. Reported and not repaired, because which scope keeps the "
-      "registration is the user's call and a tool that picked one would be deciding it")
+      "registration is the user's call and a tool that picked one would be deciding it. "
+      "A project row into a PERSONAL install is not that choice: heal() removes it only "
+      "when user scope already carries the hook for that install and the running one")
 check("checkrun: only the row with a certain fix blocks; naming a command is not running it",
       'cannot tell that from an instruction. This row blocks nothing' in _c6
       and "may name a command in order to FORBID it" in _c6,

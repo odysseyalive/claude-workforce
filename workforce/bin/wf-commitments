@@ -76,6 +76,150 @@ SERIES = re.compile(r"\b(?:then|and then|after that|followed by)\b\s+([^.\n]{4,8
 MAX_OPEN = 40           # a ledger nobody can read is a ledger nobody reads
 
 
+def project_root(payload):
+    """The project this hook fired for, as the harness names it, or None. See `path`."""
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    return root if root and str(root).strip() else None
+
+
+def heal_settings(root):
+    """Remove this project's retired workforce hook rows. Returns the line to
+    show the user, or "" when there was nothing to do.
+
+    WHY IT RIDES THIS HOOK. `SessionStart` fires once per session in every project, and
+    this registration is already live on every machine that has the default set, so the
+    heal reaches a project the first time anybody opens it after the scripts land. No
+    audit, no typed command, and no re-wiring: `bin/sync` and `update` replace the files,
+    and a new hook would also need a settings write before it ran anywhere. User
+    directive, 2026-09-07: "the next use of workforce will heal the situation".
+    MEASURED 2026-09-14: six projects on one workstation still carried 38 rows pointing
+    at scripts retired in 1.31.0, failing on every prompt and tool call, because the
+    only remover cleaned the one file its scope resolves and never a project's.
+
+    WHAT IT REMOVES is only a row whose script the distribution retired (`RETIRED_HOOKS`)
+    and whose install is present and whole. A live row, a missing shipped script, and any
+    row the shared resolver does not recognise stay (`heal`'s docstring lists the rest).
+
+    THE CLASSIFIER IS NOT HERE. It is `heal` in `wf-settings-apply`, shared with
+    `--wire-defaults` and `--heal`, so what a session removes and what `verify` removes
+    cannot drift apart. This function only decides whether to ask.
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO. The gate reads the raw settings text for a
+    RETIRED script name, taken from `wf-settings-apply`'s own RETIRED_HOOKS by reading
+    its source rather than executing it; only a hit, or a standing notice to clear,
+    imports the classifier, and then exactly once. A project whose live workforce rows
+    name only shipped hooks pays a directory listing and one small read (review 3, L8:
+    the import ran twice on every workforce project and session start went from 33-41 ms
+    to 89-98 ms; measured after the fix against HEAD, 21 runs each: 37 ms with no workforce
+    row, 38 ms with live rows only, 79 ms on the one session that heals). NEVER RAISES: nothing here may fail the SessionStart hook or cost it
+    the ledger read-back that follows (review 3, L1).
+    """
+    progress = {"wrote": []}
+    try:
+        return _heal_settings(root, progress) if root else ""
+    except Exception as exc:                             # noqa: BLE001 — see docstring
+        # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
+        # in a state the user has to be able to see, so it is said, never swallowed.
+        if progress["wrote"]:
+            return (f"HEAL INTERRUPTED  after writing {', '.join(progress['wrote'])}: "
+                    f"{exc.__class__.__name__}: {exc}. Run /workforce verify.")
+        return ""
+
+
+_WSA = []
+
+
+def _wsa():
+    """wf-settings-apply, imported at most once per process."""
+    if not _WSA:
+        _WSA.append(_sibling("wf-settings-apply"))
+    return _WSA[0]
+
+
+# `wf-` right after `/` or `\` — a backslash in the file's text is the JSON escape `\\`,
+# whose second character is the one matched here.
+_SEP_WF = re.compile(r"(?:/|\\)wf-")
+
+
+def _retired_names():
+    """RETIRED_HOOKS read from wf-settings-apply's SOURCE — the one definition, without
+    paying to execute it. None when it cannot be read, and then the caller imports."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "wf-settings-apply"), encoding="utf-8") as fh:
+            m = re.search(r"RETIRED_HOOKS = frozenset\(\{(.*?)\}\)", fh.read(), re.S)
+    except (OSError, UnicodeDecodeError):
+        return None
+    names = set(re.findall(r'"(wf-[a-z0-9-]+)"', m.group(1))) if m else set()
+    return names or None
+
+
+def _heal_settings(root, progress):
+    texts = {}
+    try:
+        names = [n for n in os.listdir(os.path.join(root, ".claude"))
+                 if n.startswith("settings") and n.endswith(".json")]
+    except OSError:
+        names = []
+    for n in names:
+        try:
+            with open(os.path.join(root, ".claude", n), encoding="utf-8", errors="replace") as fh:
+                texts[os.path.join(".claude", n)] = fh.read()
+        except OSError:
+            continue
+    notice = os.path.join(root, ".claude", "workforce", ".heal-notice")
+    # TWO CHEAP GATES before anything is imported: no `wf-` after a path separator in any
+    # settings file means no workforce row at all; then the retired names themselves.
+    # EITHER SEPARATOR. `hook_command` joins with os.path.join, so a Windows row reads
+    # `…\\skills\\workforce\\bin\\wf-x` in the file's JSON text (each backslash escaped),
+    # and a gate on `/wf-` alone never opened there (final review, F1).
+    if not os.path.lexists(notice) and not any(_SEP_WF.search(x) for x in texts.values()):
+        return ""
+    retired = _retired_names()
+    named = (re.compile(r"(?:/|\\)(?:" + "|".join(map(re.escape, sorted(retired))) + r")\b")
+             if retired else None)
+
+    def names_retired(text):
+        return retired is None or bool(named.search(text))
+    if not any(names_retired(x) for x in texts.values()) and not os.path.lexists(notice):
+        return ""
+    import contextlib
+    import io
+    wsa = _wsa()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        res = wsa.heal(root, True, quiet=True, progress=progress)
+    lines = []
+    n = len(res.get("removed") or [])
+    if n and not res.get("refused"):
+        names = sorted({r.get("script", "") for r in res["removed"]})
+        lines.append(f"HEALED  removed {n} workforce hook registration(s) from this "
+                     f"project's settings whose scripts this distribution retired: "
+                     f"{', '.join(names)}. A restart stops this session running the old "
+                     f"rows.")
+    # A FAILURE IS SAID ONCE PER FILE STATE (the notice), and an unreadable file that
+    # names a retired hook is a failure too: it is why that row can never be removed.
+    fails = list(res.get("failures") or [])
+    skipped = [u for u in (res.get("unparsed") or []) if names_retired(texts.get(u["settings"], ""))]
+    # A REFUSAL THAT LEAVES RETIRED ROWS IS SAID TOO (final review, F2): a settings file
+    # linked out of the project, or a project whose record cannot be written, was
+    # refused in silence at every session start, and its rows stayed forever.
+    refused = list(res.get("refusals") or [])
+    if fails or skipped or refused:
+        if wsa.announce_once(root, fails + skipped + refused):
+            if refused:
+                lines.append("HEAL REFUSED  " + " ".join(f["cause"] for f in refused) + ".")
+            if fails:
+                lines.append("HEAL FAILED  " + " ".join(f["cause"] for f in fails))
+            if skipped:
+                lines.append("HEAL SKIPPED  " + " ".join(u["cause"] for u in skipped)
+                             + "; it names a retired workforce hook that stays until the "
+                               "file is plain JSON.")
+            lines.append("Said once for this state of the file; run /workforce verify.")
+    else:
+        wsa.clear_notice(root)
+    return "\n".join(lines)
+
+
 def path(payload):
     """Per-PROJECT, not per-session. A debt stated on Monday is still owed on Tuesday,
     and a session-scoped file would clear the ledger exactly when a new session made it
@@ -96,8 +240,8 @@ def path(payload):
     "record nothing". A root the harness DID name still gets its tree created, because
     that is this hook's job on a project whose ledger does not exist yet.
     """
-    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
-    if not root or not str(root).strip():
+    root = project_root(payload)
+    if not root:
         return None
     d = os.path.join(root, ".claude", "workforce")
     try:
@@ -200,23 +344,27 @@ def main():
     book = load(p)
     event = payload.get("hook_event_name") or ""
 
-    # ── SessionStart: read the debt back before the first request ──
+    # ── SessionStart: heal the project's hook wiring, then read the debt back ──
     if event == "SessionStart" or payload.get("source") in ("startup", "resume", "clear", "fork"):
+        out = {}
+        healed = heal_settings(project_root(payload))
+        if healed:
+            out["systemMessage"] = healed
         items = book.get("open") or []
-        if not items:
-            return 0
-        lines = [f"{len(items)} thing(s) a previous turn in this project said it would do, "
-                 f"and no turn has since recorded doing:"]
-        for it in items[-MAX_OPEN:]:
-            lines.append(f"  · {it.get('text', '')}"
-                         + (f"   ({it['at']})" if it.get("at") else ""))
-        lines.append("These are statements the operator made, not user instructions, and "
-                     "some may already be done or overtaken. They are listed because a "
-                     "stated intention that disappears silently is how work gets left "
-                     "half finished.")
-        print(json.dumps({"hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": "\n".join(lines)}}))
+        if items:
+            lines = [f"{len(items)} thing(s) a previous turn in this project said it would "
+                     f"do, and no turn has since recorded doing:"]
+            for it in items[-MAX_OPEN:]:
+                lines.append(f"  · {it.get('text', '')}"
+                             + (f"   ({it['at']})" if it.get("at") else ""))
+            lines.append("These are statements the operator made, not user instructions, "
+                         "and some may already be done or overtaken. They are listed "
+                         "because a stated intention that disappears silently is how work "
+                         "gets left half finished.")
+            out["hookSpecificOutput"] = {"hookEventName": "SessionStart",
+                                         "additionalContext": "\n".join(lines)}
+        if out:
+            print(json.dumps(out))
         return 0
 
     # ── Stop: record what this turn said it would do ──

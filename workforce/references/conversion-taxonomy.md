@@ -153,7 +153,7 @@ them.) The employees sat beside 45 skills they could only read as documents. **T
 have been. The schema, the invariants, the maintaining scripts and the degradation contract are reached
 *through* it (`data-skills.md`), and the data never moves — so the gateway must not move either.
 
-This binds every future optimisation, not just the conversion: **an `ablate`, a `retire`, or a later
+This binds every future optimisation, not just the conversion: **a hand ablation, a `retire`, or a later
 audit may not remove the last invocable path to a live dataset.** Deleting the gateway does not delete
 the data; it strands it, which is worse, because the files remain and nothing can legitimately reach
 them.

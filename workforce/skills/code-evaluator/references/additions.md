@@ -7,7 +7,7 @@
 that must stay byte-identical to its origin so a reconcile can still compute a difference
 (`evaluators.md` § Seeding). This file is where **workforce's own** code-review entries live, tracked
 and shipped, with no obligation to match anything upstream. The text-side twin is
-[text-tells.md](text-tells.md), and the reasoning for the split is stated there once rather than
+text-eval's [additions.md](../../text-eval/references/additions.md), and the reasoning for the split is stated there once rather than
 twice.
 
 **Seeding order is vendored first, then this file appended**, and the anchor written at seeding

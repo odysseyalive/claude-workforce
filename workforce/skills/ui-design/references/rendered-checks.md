@@ -110,6 +110,6 @@ Responsive check:     [pass / flags]
 - Horizontal overflow:  [none / at which widths]
 ```
 
-**A view with any declared-vs-rendered FAIL or a DEFAULT theme is not shippable regardless of the
-other scores.** Those two are the failures that read as success — the page renders, the tests pass,
+**A view with any declared-vs-rendered FAIL or a DEFAULT theme is not shippable, whatever the other
+checks found.** Those two are the failures that read as success — the page renders, the tests pass,
 and it is still wrong.

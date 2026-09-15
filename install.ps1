@@ -527,6 +527,7 @@ function Install-ClaudeWorkforce {
     Write-Host 'Downloading workforce...'
     $manifest = (Get-ShippedText "$RepoUrl/manifest.txt") -split "`n"
     $script:FetchFailed = @()
+    $script:WireFailed = @()
     $script:VerifyFailed = $false
     $script:SettingsFailed = @()
 
@@ -876,7 +877,9 @@ function Install-ClaudeWorkforce {
             }
             & $py @wireArgs 2>&1 | ForEach-Object { Write-Host "  $_" }
             if ($LASTEXITCODE -ne 0) {
-                Write-Host '  Warning: wiring reported a problem. Run `/workforce verify` to see what is unwired.'
+                # Kept for the summary, where it cannot scroll away (second review, N3).
+                $script:WireFailed += $scope
+                Write-Host "  Warning: wiring exited $LASTEXITCODE -- the lines above name what failed. Run ``/workforce verify`` to see what is unwired."
             }
         }
     }
@@ -949,6 +952,11 @@ function Install-ClaudeWorkforce {
         Write-Host ''
     }
 
+    if ($script:WireFailed.Count -gt 0) {
+        Write-Host "HOOK WIRING REPORTED A PROBLEM ($($script:WireFailed -join ' ') scope). Every file installed; the lines under"
+        Write-Host '  "Wiring hooks" above name what failed, and `/workforce verify` shows what is unwired.'
+        Write-Host ''
+    }
     if ($mode -eq 'update') {
         Write-Host "Update complete ($($targets -join ' '))."
     } else {

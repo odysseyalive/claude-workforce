@@ -34,7 +34,11 @@ its own work, which is the one configuration the measurement says returns a pass
 2. **Read the catalog.** [references/text-tells.md](references/text-tells.md) is the corpus:
    pattern → tell → falsifiable test. [references/additions.md](references/additions.md)
    carries the rows authored by this distribution, including citation integrity and
-   conversational register.
+   conversational register. `text-tells.md` is imported byte-for-byte from claude-enforcer,
+   and its header points to a `creative-integrity.md` that exists only in that source project
+   (skill-builder) and never shipped here. The severity and cluster rules it points to are the
+   ones step 4 states; read those, not the dead link. *Recorded 2026-09-14 instead of editing
+   the corpus, which would fork a file with a single origin.*
 3. **Score the positive signals too**, from
    [references/human-markers.md](references/human-markers.md), BEFORE requiring any change.
    A passage with strong human markers and a few rhetorical devices is human writing. An

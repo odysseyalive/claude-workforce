@@ -1,8 +1,10 @@
 # verify — health check
 
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
-**Answers one question: is what this project reports about itself true?** Read-only, headless-safe,
-executes immediately.
+**Answers one question: is what this project reports about itself true?** Headless-safe, executes
+immediately, and read-only with ONE exception: § Hook wiring removes this project's workforce hook rows
+whose script the distribution retired, before it counts, because a row that fails on every event is not a finding anybody
+should have to act on (§ Output says why this is the only write).
 
 `/workforce verify`
 
@@ -16,7 +18,7 @@ instead. The division of labour, stated so it stops blurring:
 
 | | Owns |
 |---|---|
-| `verify` | **detecting** every silent-failure class below, across the whole org, changing nothing |
+| `verify` | **detecting** every silent-failure class below, across the whole org, changing nothing except the one heal in § Hook wiring |
 | `reconcile` | resolving cross-employee conflicts it detects — collisions, races, orphans |
 | `checksums` | the integrity-stamp mechanism whose states it reports |
 | `review` | per-employee performance, where the subject is the document |
@@ -162,10 +164,37 @@ it is that `/workforce hooks` wires it and this row says whether it is wired.
 | `DEAD WIRING` | a registration whose `command` resolves to nothing — **worse than absent**, because it reads as protection (`discovery.md` § Dead wiring) |
 | `NOT EXECUTABLE` | registered, on disk, and the host cannot run it |
 
-**Report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
---execute`. `DEAD WIRING` → `wf-apply --root <tree> --execute` (`references/passes.md`
-§ `PASS-DEAD-HOOK`), which removes registrations that do not resolve, records each whole prior entry in
-`.settings-owned.json` § `hooks_removed`, and refuses any hook under declared succession.
+**Heal first, then count.** A dead workforce row is removed here, not reported for someone to remove:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-settings-apply" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --heal --execute
+```
+
+It removes one kind of row from the project's two settings files, and nothing else: a workforce row
+whose script the distribution RETIRED, whose file is missing, and whose install is present and whole
+(`hooks.md` § Healing has the rule and every refusal). A live row, a shipped script that is missing, a
+user's row and a user-scope file are never touched. It writes the settings file, re-reads it, and only
+then records the removal in `.settings-owned.json` § `hooks_removed`. It is `heal` in
+`wf-settings-apply`, the same function `--wire-defaults` and every session start (`wf-commitments` at
+`SessionStart`) run, so this step usually finds nothing: the session it runs in already healed the
+project when it opened.
+
+**Then report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
+--execute`. `DEAD WIRING` left after the heal is one it does not own: a foreign script → `wf-apply
+--root <tree> --execute` (`references/passes.md` § `PASS-DEAD-HOOK`), which removes foreign
+registrations that do not resolve, judges workforce rows by the heal's own verdict, records each whole
+prior entry in `.settings-owned.json` § `hooks_removed`, and refuses any hook under declared
+succession. A workforce row still dead after the heal carries its own remedy in
+the `wf-conform` row: a shipped script missing from its install means reinstall, an absent or partial
+install means the missing file proves nothing, and an unknown name means update.
+
+**The headline counts it.** `wf-conform` carries a `hook wiring:` row per dead registration in the
+project's settings, so a project with dead rows cannot read `0 failed`. *Added 2026-09-14. This section
+only REPORTED `DEAD WIRING` and named a command to type, and `wf-conform` had no hook check, so the
+headline read `N checks · 0 failed` over dead wiring. Measured on the author's machine: six projects
+carried 38 dead rows between them, all pointing at scripts retired in 1.31.0, and three of the six read
+`0 failed`.*
 
 **`ORPHANED` also has a producer now, and it is not only that command.** `install` and `install.ps1`
 wire the default set after the files land, and `audit` Step 6-H wires it again — so an `ORPHANED` row on
@@ -306,8 +335,9 @@ Exit `0` all clear · `1` at least one check failed, each named · `2` the tree 
 **and never `0` on an unreadable target**, because a validator exiting 0 on a file it could not open
 reports health it did not measure.
 
-It covers: sections present and ordered; every IC carries the literal `disallowedTools: Agent`; no
-`Agent(` allowlist anywhere; `## Directives` resolves or declares `(none bound)`; `## Verification` is
+It covers: every hook registered in the project's settings resolves to a file (§ Hook wiring);
+sections present and ordered; every IC carries the literal `disallowedTools: Agent`; no `Agent(`
+allowlist anywhere; `## Directives` resolves or declares `(none bound)`; `## Verification` is
 non-empty and names at least one literal invocation; the length ceiling; the immutable-block sidecar
 digests; `tools:` is a real allowlist rather than the display string; and the staged draft still
 matches the registered bytes.
@@ -775,8 +805,13 @@ restart notice — **whose wording is `platform.md` fact 3's, quoted from there 
 | the field or rule at fault, by name | not "invalid frontmatter" — *which key* |
 | **the literal text that would fix it** | `/doctor` shows an exec-form example when a hook is missing its `command` field. The gates in SKILL.md already do this well; reports do not |
 
-**`verify` never fixes anything.** It reports; `audit` and `amend` change things. A health check that
-mutates cannot be run safely when you are unsure of the state — which is exactly when it is needed.
+**`verify` fixes one thing, and only that one: § Hook wiring's heal.** Everything else it reports;
+`audit` and `amend` change things. A health check that mutates cannot be run safely when you are unsure
+of the state — which is exactly when it is needed. The heal is safe to run in that state because what it
+removes cannot be anybody's intent: its script was retired by the distribution, so it fails on every
+event for every account with a current install. Nothing live is ever removed, and each removal is
+recorded for `disband` to write back. *User directive 2026-09-07: a fix must be made "in such a way that the next use of workforce
+will heal the situation"; `verify` is a use.*
 
 **But reporting a fix is not applying one.** Print the exact edit for every mechanically-fixable
 finding, and close with the single command that would apply them — `/doctor` pairs its report with

@@ -129,6 +129,16 @@ and it shipped that way for two hours on 2026-09-07 because the record looked ri
 rather than a fresh-install-only improvement; `verify` § Hook wiring and § Output style report the state
 of both. All three write through **one producer**, so the wired set cannot drift between them.
 
+**Retiring a hook needs the same three paths, and the first two were not enough.** `--wire-defaults`
+prunes only the ONE settings file its scope resolves, so a personal `update` cleaned
+`~/.claude/settings.json` and never a project's file, and `verify` only reported `DEAD WIRING`. MEASURED
+2026-09-14: the census counted 38 dead rows across six projects on one workstation, pointing at
+scripts retired in 1.31.0 and failing on every prompt and tool call. The remover is now `heal` in `wf-settings-apply`, and it has three
+callers: `--wire-defaults` (installer, `audit`), `--heal` (`verify` § Hook wiring runs it before it
+counts), and `wf-commitments` at `SessionStart`, which runs in every project on first use, so a project
+heals the next time anyone opens it. It removes only a row whose script the distribution RETIRED —
+never a row whose file merely is not there right now — and records each in `hooks_removed`. `wf-conform` counts what is left, so the headline cannot read `0 failed` over it.
+
 ## Nothing ships dormant — the rule the hook findings actually support
 
 **The default hook set is whatever `manifest.txt` § Hooks declares, and `procedures/hooks.md`

@@ -109,13 +109,28 @@ sentence is not recoverable by re-running it.
 `wf-apply --root <tree>` displays the exact edit; `--execute` applies it. Removes a registration whose
 `command` resolves to no file on disk.
 
-**Precision 1.00**, and it is a property of the detector rather than a sample: `wf-census` separates
-`DEAD` from `UNDECIDABLE`, and only `exists is False` is taken. A bare `jq` found on `PATH` is
-undecidable, is left alone, and calling it dead would invite deleting a working registration.
+**Precision 1.00, measured — not a property of the detector.** 38 of 38 rows flagged on six real
+projects were dead (2026-09-14, display mode: each path absent on disk, and each workforce row a script
+the distribution retired); the earlier figure was 3 of 3 on odyssey-alive. `wf-census` separates `DEAD`
+from `UNDECIDABLE` and only `exists is False` is taken — a bare `jq` found on `PATH` is undecidable and
+left alone. *Corrected 2026-09-14. This paragraph called 1.00 "a property of the detector rather than a
+sample", and that was false: review 2 (N1) reproduced a false positive — this pass deleted a live
+SHIPPED per-session row for an account with no personal install, because the census had resolved the
+row against the running account and the pass took `exists is False` as the whole rule. The AUTO
+verdict now rests on the measurement above, with workforce rows gated by `dead_row_verdict`.*
 
 **Safe on a file workforce does not own, because the transform is BEHAVIOUR-NEUTRAL.** The hook is
 already not running — the removal deletes an error message, not a guard. That is the second clause of
 precondition 2, and it is the whole reason this is legal on a user's settings file.
+
+**A workforce row is judged by the heal's rule, not by `exists`.** A row the shared resolver reads as a
+workforce hook is removed only when `wf-settings-apply`'s `dead_row_verdict` calls it `retired`; a
+shipped script missing from its install, an absent install, an unknown name and a per-session row
+another install still ships are left, each with the remedy `wf-conform` prints. A path with `..` in it
+is resolved by the kernel, never normalised as text, so a live row reached through a symlink is not
+called dead. *Added 2026-09-14 (second review, N1): once the census resolved the
+per-session form against the running account, this pass deleted a live shipped hook on every audit for
+any account without a personal install. Fixture: `apply-deadhook-workforce-verdict`.*
 
 **Refuses under declared succession.** A dead hook belonging to a predecessor workforce is replacing is
 a capability **workforce owes** (`hooks.md` § Procedure step 6b). Removing the registration there would close the
@@ -281,4 +296,5 @@ Four artifacts, in one change. `bin/check` refuses a row missing any of them.
    re-runnable rather than an anecdote.
 
 **And retire one when it stops paying.** A catalog that only grows is the failure a ratchet invites:
-nobody wants to be the one proposing fewer rules. `ablate` exists for this and applies here.
+nobody wants to be the one proposing fewer rules. Retiring an entry is a hand edit in the change that
+shows it stopped paying; no `ablate` command exists for it.

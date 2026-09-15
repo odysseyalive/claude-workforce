@@ -356,6 +356,8 @@ The two questions that make the number actionable, both from the same accounting
 
 ### Total instruction volume
 
-Sum of handbook bytes, per department, reported by `budget`. It is the denominator `ablate --org`'s
-`LOAD-BEARING` share is a fraction of — and unlike that share, it costs nothing to compute, so it is
-available every run rather than only after a full measured ablation.
+Sum of handbook bytes, per department. It is the denominator a measured ablation's `LOAD-BEARING`
+share is a fraction of — and unlike that share, it costs nothing to compute, so it is available every
+run rather than only after a full measured ablation. *This read "reported by `budget`" and "`ablate
+--org`'s share". `ablate` never shipped a procedure, and `budget` was retired; `wf-context`, which
+`verify` runs, now measures what one spawn receives by layer instead of this single total.*

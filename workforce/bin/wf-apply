@@ -118,9 +118,21 @@ def detect_dead_hooks(root):
     c.census_skills()
     c.census_hooks()
     out, owed = [], succeeded_owners(root)
+    wsa = None
     for h in c.summary()["hooks"]:
         if h.get("exists") is not False:
             continue
+        # A WORKFORCE ROW IS DECIDED BY THE ONE RULE, `dead_row_verdict`, or not at all.
+        # This pass used to remove whatever the census called missing, and once the
+        # census learned to resolve the per-session form against the running account, it
+        # deleted a live SHIPPED hook on every audit for any account without a personal
+        # install (second review, N1). Only "retired" is removable here, exactly as in
+        # the heal; every other verdict leaves the row for the remedy wf-conform prints.
+        if wsa is None:
+            wsa = _load("wf-settings-apply")
+        if wsa.CENSUS.workforce_hook(h.get("command"), root) is not None:
+            if wsa.dead_row_verdict(h.get("hook") or {}, root)[0] != "retired":
+                continue
         if h.get("skill") in owed:
             out.append((h, "REFUSED"))     # workforce owes this capability
         else:
@@ -356,8 +368,14 @@ PASSES = [
         "safe": "no sacred span involved; ownership is not a precondition during audit "
                 "and the backup is the authorization (SKILL.md 2026-08-05)",
         "reversal": ".claude/workforce/.settings-owned.json § hooks_removed",
-        "precision": "1.00 — wf-census separates DEAD from UNDECIDABLE, and only "
-                     "exists is False is taken (3 of 3 on odyssey-alive, hand-verified)",
+        # MEASURED, NOT A PROPERTY. This said the figure was a property of the detector;
+        # review 2 (N1) reproduced a false positive — a live SHIPPED per-session row deleted
+        # for an account with no personal install — so it was a sample, and a wrong one.
+        # Re-measured on the current detector (workforce rows through dead_row_verdict).
+        "precision": "1.00 — 38 of 38 flagged rows dead on six real projects, 2026-09-14, "
+                     "display mode: each path absent on disk, each workforce row a retired "
+                     "script. Earlier 3 of 3 on odyssey-alive; one false positive before "
+                     "the dead_row_verdict gate (review 2, N1, on a scratch tree)",
         "refusal": lambda h: (
             f"{h['skill']} is under declared succession — workforce OWES this "
             f"capability, so removing the registration would close the finding by "
