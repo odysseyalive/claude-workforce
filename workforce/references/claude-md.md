@@ -64,9 +64,11 @@ verification, never a deletion with a rationale.
 single line is `UNPLACED` or a single sacred block is still inline, and it stores the whole file in
 `.settings-owned.json` § `files_removed` before removing it.
 
-**Both real trees refuse today** — 70 unplaced and 191 unplaced. That is the honest current state of
-those projects, not a defect in the pass: their `CLAUDE.md` files still hold direction that has reached
-no component. An evacuation is finished when the audit has relocated them, not when the file is gone.
+**Both real trees refused when the pass shipped** (2026-08-05): `odyssey-alive` with 70 unplaced lines
+and `apps-odyssey-alive` with 191. That was the honest state of those projects then, not a defect in the
+pass: their `CLAUDE.md` files still held direction that had reached no component. Both have since been
+evacuated — neither carries a `CLAUDE.md`, at the root or in `.claude/`, checked 2026-09-15. An
+evacuation is finished when the audit has relocated the lines, not when the file is gone.
 
 **A line that arrived nowhere was not moved — it was lost.** Directive one is retention, and that is
 why the gate refuses rather than warns.
