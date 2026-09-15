@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.60.1 | 2026-09-15 | changes, scripts, installer | no | Date the evacuation refusal and drop an unmeasured ~10% trigger rate |
 | 1.60.0 | 2026-09-15 | chart, audit, verify, changes, hooks, scripts, installer, platform | no | Heal dead and cross-root workforce hook rows on first use, in every project |
 | 1.59.1 | 2026-09-14 | chart, principles, audit, verify, changes, hooks, scripts, installer, platform | no | prove: drop nine constants that point at deleted files or duplicate a definition |
 | 1.59.0 | 2026-09-14 | audit, changes, scripts, installer | no | install.ps1 installs the sibling evaluators and ports the kept-slot and prune rules |
