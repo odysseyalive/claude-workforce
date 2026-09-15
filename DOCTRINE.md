@@ -51,7 +51,7 @@ Claude Workforce turns that insight into a structure. Instead of one assistant d
 
 This project grew out of [claude-enforcer](https://github.com/odysseyalive/claude-enforcer), which solved a real problem.
 
-Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Nelson Liu's group at Stanford [measured that and named it "lost in the middle"](https://aclanthology.org/2024.tacl-1.9/). A model retrieves worst from the middle of a long input and best from its edges.
+Instructions you write at the start of a conversation fade as the conversation grows. Like breadcrumbs in a fairy tale, they get consumed by everything that comes after. Nelson Liu and colleagues [measured that and named it "lost in the middle"](https://aclanthology.org/2024.tacl-1.9/) (TACL, 2024). A model retrieves worst from the middle of a long input and best from its edges.
 
 The enforcer built layers to resist that: instructions that were harder to ignore, automatic rules that fired on their own, and checkers that ran in a clean, separate conversation where the clutter of the main chat couldn't reach them. And it worked. The instructions stopped drifting. But the longer the system ran, the clearer a different problem became.
 
@@ -127,13 +127,15 @@ If your shell already runs under the target environment (`CLAUDE_CONFIG_DIR` set
 install command above lands there on its own. Each **project's** company still lives in that project's
 own `.claude/` regardless. The config directory only relocates the personal, cross-project install.
 
-Then restart Claude Code and run your first audit:
+Then restart Claude Code. You're already running. The install ships skills you can use right away, and you can hire individual agents or build new skills before anything else happens.
+
+When you want a full company designed for your project, run the audit:
 
 ```
 /workforce audit
 ```
 
-The audit reads your project (its layout, its tooling, its purpose, its history) and designs the smallest company that can do its work. It asks one question (which models at which tiers) and works out everything else on its own.
+The audit reads your project (its layout, its tooling, its purpose, its history) and designs the smallest company that can do its work. It asks whether to proceed, whether to back up first, and which model and effort level each lane runs at. Everything else it works out on its own.
 
 It works on empty projects too. Thin evidence means a small roster, which is the right answer for a project that hasn't been built yet. A role whose verification can't be named is reported unstaffed, never hired. **A role with a runnable check is an employee. A role without one is a job title.**
 
@@ -150,10 +152,10 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
-**Update is the whole path.** Installing puts six skills on your machine, not one. You get
+**Update is the whole path.** Installing puts seven skills on your machine, not one. You get
 `workforce` itself plus five evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
-`image-eval`, `ui-design`), each one complete, with the catalog it grades against and the agents it
-runs. They sit side by side in your skills directory and every project on the machine reaches them.
+`image-eval`, `ui-design`), each one complete with the catalog it grades against and the agents it
+runs. The seventh is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. They sit side by side in your skills directory and every project on the machine reaches them.
 When an evaluator's catalog changes, `/workforce update` is all you run. You never re-audit a project
 to collect a change. Earlier versions copied them into each project instead, which meant an update
 reached none of them.
@@ -448,7 +450,7 @@ If the skill is gone and you can't run the command, the restore kit inside `.cla
 
 ## The Tools That Check the Work
 
-Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Three evaluators do that, and each has its own catalog.
+Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Five evaluators do that, and each has its own catalog.
 
 **text-eval reads prose the way an editor hunting for a robot would.** It looks for the tells that give away machine writing: the em-dash leaned on as a crutch, the "it's not X, it's Y" reasoning models reach for, a sentence built like a paragraph when a person would just say it. One tell is only a word choice. It flags a passage when several cluster together. The whole catalog is here, and every rule comes with a test you can hold it to: [text-tells.md](workforce/skills/text-eval/references/text-tells.md).
 
@@ -456,7 +458,11 @@ Agents write most of what's in this project: the handbooks, the references, the 
 
 **security-evaluator reads the same code for a different kind of danger.** code-evaluator asks whether the code is clean; this one asks whether it's safe to put on the web: a query built by pasting a request straight into it, a password hard-coded where every reader of the repo can see it, a redirect that trusts whatever address it's handed. Its catalog is the OWASP Top 10 written out as signals you can grep for, one per flaw and tagged by language, so a change only pulls in the checks its own code could trip. The catalog can be exhaustive that way without every review carrying all of it. Where a real scanner like semgrep is installed, that's the verdict; where it isn't, the catalog flags candidates and says plainly what a static read can't prove. It's [security-taxonomy.md](workforce/skills/security-evaluator/references/security-taxonomy.md), an [analyzer map](workforce/skills/security-evaluator/references/native-tool-map.md), and [guards](workforce/skills/security-evaluator/references/guards.md).
 
-You never turn these on. The audit wires them in on its own, one evaluator for each department whose work a catalog covers, so prose goes to the writers and code to the script authors. The catalog installs as a skill anyone can check their own work against, and the review is a step the lead runs before the work is called done. How that gets decided is written up in [evaluators.md](workforce/references/evaluators.md).
+**image-eval checks whether a picture was made by a person or by a generator.** It looks for the tells a generator leaves behind: signature and watermark artefacts, unnatural symmetry, and the metadata a generator writes into the file, including C2PA manifests and IPTC source-type tags. Then it grades visual clarity, whether a claimed technique (watercolor, oil, ink) actually holds, and whether a set of images reads as one body of work or a batch of unrelated outputs. The catalog is [image-tells.md](workforce/skills/image-eval/references/image-tells.md).
+
+**ui-design reviews what the interface actually looks like when it renders, not what the code says it should look like.** A page can build, pass its tests, and still ship with a blank hero image, a default framework palette nobody replaced, or text below the contrast threshold. It checks declared slots against rendered ones, applied theme against framework default, visual hierarchy, typography, color roles, reflow at 320 pixels, WCAG 2.2 AA contrast and focus, and the templated-default tells that say nobody actually designed this. The catalog is split across [design-quality-catalog.md](workforce/skills/ui-design/references/design-quality-catalog.md) and [rendered-checks.md](workforce/skills/ui-design/references/rendered-checks.md).
+
+You never turn these on. The install places them as skills anyone can check their own work against, and when you run an audit it hires an evaluator for each department whose work a catalog covers, so prose goes to the writers and code to the script authors. The review is a step the lead runs before the work is called done. How that gets decided is written up in [evaluators.md](workforce/references/evaluators.md).
 
 One last thing, because it's the point. A rule only counts here if something makes it true. Every entry in these catalogs carries a test, and the structural ones sit behind a check that goes red the moment the rule is broken. A rule can't fall out of force without somebody's build failing.
 

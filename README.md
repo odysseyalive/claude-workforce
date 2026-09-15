@@ -232,7 +232,7 @@ You already knew this. You switch models by feel. That instinct is right. But ma
 
 ### Instructions fade, structure doesn't
 
-There is a second problem, and it compounds the first. Instructions you give at the start of a conversation lose their grip as the conversation grows. Nelson Liu's group at Stanford [measured this](https://aclanthology.org/2024.tacl-1.9/) and named it "lost in the middle." A model retrieves worst from the middle of a long input and best from its edges. So the rules you wrote at the top are loudest before any work has happened, and faintest by the time the session is making the decisions that actually matter.
+There is a second problem, and it compounds the first. Instructions you give at the start of a conversation lose their grip as the conversation grows. Nelson Liu and colleagues [measured this](https://aclanthology.org/2024.tacl-1.9/) (TACL, 2024) and named it "lost in the middle." A model retrieves worst from the middle of a long input and best from its edges. So the rules you wrote at the top are loudest before any work has happened, and faintest by the time the session is making the decisions that actually matter.
 
 Managing by hand works until it doesn't, and the failure is invisible. The assistant stops following a rule it was given an hour ago, and you don't notice because it doesn't announce that it forgot.
 
@@ -252,7 +252,7 @@ A set of instructions with those three things is an employee. A set of employees
 ![A craftsperson hunched over a workbench peering through a magnifying loupe at a tiny mechanism, completely absorbed, while the wall behind them has a large obvious crack. Through an open window, a second figure outside points directly at the crack the focused worker cannot see](assets/images/tunnel-and-outside-eye.png)
 *You look through the loupe long enough, you stop seeing the crack in the wall. Someone who just walked up sees it right away.*
 
-A model deep in a task locks onto its first reading and stops questioning it. The more powerful the model, the worse this gets. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) in *Nature Machine Intelligence* (2026): seeing its own prior answer drops a model's willingness to change by 71%. Sharma et al. at Anthropic [documented sycophancy](https://arxiv.org/abs/2310.13548), models telling users what they want to hear. Jhaveri et al. [showed confirmation bias](https://arxiv.org/abs/2604.02485) in hypothesis exploration. Put those together and you get a model that walks confidently in the wrong direction.
+A model deep in a task locks onto its first reading and stops questioning it. Kumaran et al. [measured it](https://www.nature.com/articles/s42256-026-01217-9) in *Nature Machine Intelligence* (2026): when a model can see its own first answer, the odds that it changes its mind drop by 71%. Sharma et al. at Anthropic [documented sycophancy](https://arxiv.org/abs/2310.13548), models telling users what they want to hear, and Perez et al. [found it gets worse](https://arxiv.org/abs/2212.09251) as models get bigger. Jhaveri et al. [showed confirmation bias](https://arxiv.org/abs/2604.02485) in hypothesis exploration. Put those together and you get a model that walks confidently in the wrong direction.
 
 We measured it on this project. Ten tunnels, ten wrong readings. Nine of the ten escapes came from outside the turn that formed the reading. Zero came from the model noticing on its own.
 
