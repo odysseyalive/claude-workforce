@@ -483,9 +483,18 @@ def dead_scripts(root, include_maintainer=False):
 # and never edited (§ After the sweep, "an immutable user span — nothing").
 SWEPT_DIRS = ("skills", "agents", "hooks", "scripts")
 SKILL_NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+#
+# A DATA SKILL'S RECORDS ARE HISTORY, AND HISTORY IS NEVER REWRITTEN (customer DEF-Q-003,
+# 2026-09-15). `data-skills.md` § A predecessor's record system keeps record bodies
+# "untouched, byte-for-byte, at their existing paths". On a real host this scan called 11
+# lines in 3 awareness-ledger records and 1 line of its `index.md` LIVE, because they named
+# the removed `/skill-builder`. It exited 1 on a count that could never reach 0. RECORD is
+# decided by `wf-conform.is_record`, the one definition of a data skill and its declared
+# record paths that `wf-conform` also checks against. Never by a directory name.
 SWEPT_RULE = {
     "LIVE": "rewrite by audit.md § After the sweep",
     "USER-SPAN": "report only; the user's words are never edited",
+    "RECORD": "history in a data skill; record bodies are never edited — data-skills.md",
     "SHIPPED": "the distribution's file; update overwrites a local edit",
 }
 
@@ -535,7 +544,7 @@ def _installer_paths(root):
 def swept_refs(root):
     """(swept names, [(relpath, line, token, bucket)]) — surviving references to a swept skill.
 
-    `bucket` is LIVE, USER-SPAN or SHIPPED (see SWEPT_RULE). A path token that exists on disk
+    `bucket` is LIVE, USER-SPAN, RECORD or SHIPPED (see SWEPT_RULE). A path token that exists on disk
     — under the project or under the home the personal config sits in — resolves and is not a
     reference to anything removed: a data skill's directory outlives its `SKILL.md`.
     """
@@ -550,6 +559,8 @@ def swept_refs(root):
     shipped = _installer_paths(root)
     census = _load_census().Census(root)
     census.load_ignore()
+    conform = _load_sibling("wf-conform")
+    records = conform.record_patterns(root)
     rows = []
     for sub in SWEPT_DIRS:
         for dp, dn, fn in os.walk(os.path.join(root, ".claude", sub)):
@@ -575,6 +586,8 @@ def swept_refs(root):
                         bucket = "SHIPPED"
                     elif any(a <= m.start() < b for a, b in spans):
                         bucket = "USER-SPAN"
+                    elif conform.is_record(root, path, records):
+                        bucket = "RECORD"
                     else:
                         bucket = "LIVE"
                     rows.append((rel, text.count("\n", 0, m.start()) + 1, tok, bucket))
@@ -616,6 +629,7 @@ def main(argv):
         # Counted line ALWAYS, zeroes included, and the swept set named: a detector that
         # prints nothing on a clean tree is indistinguishable from one that read no journal.
         print(f"swept refs     {n['LIVE']} live · {n['USER-SPAN']} in user spans · "
+              f"{n['RECORD']} in data-skill records · "
               f"{n['SHIPPED']} shipped · {len(names)} swept skill(s)"
               + (": " + ", ".join(names) if names else ""))
         for rel, line, tok, bucket in rows:

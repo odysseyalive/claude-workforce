@@ -30,7 +30,7 @@ consent and the backup (questions 1 and 2), the
 discovering the `deny`/`ask` rules, the auto-mode self-modification classifier exposure, and the missing
 grants that would refuse the run's own writes, and handing the human the single `! wf-settings-apply …`
 command that clears each so the block is gone before Step 6 could hit it — the model and effort budgets
-(questions 3 and 4), VCS preflight, the canary fixtures, and the
+(questions 3–6), VCS preflight, the canary readiness check (Step 0.6, which writes nothing), and the
 **ownership and collision preflight (Step 0.7)** — which reads the `succession:` marker and censuses
 name collisions — the **settings review (Step 0.8)**, which resolves the permissions file, adds only
 what the designed org is missing, removes nothing the user wrote, and **runs
@@ -47,8 +47,9 @@ run. **Doctrine could not fix it**: rules concatenate, so writing a correct gran
 one, and the warning recurs on every session start until something removes the line. Its outcome is
 `INV-PERMS` — `dead · repaired · left · suspect` — reported last with the other permission findings.
 
-**Step 0.9 is the producer for a measurement three later steps consume.** Step 2's design panel, every
-Phase B cold probe, and Step 4b's tier canary are all spawns; until 2026-08-04 each of them read an
+**Step 0.9 is the producer for a measurement two later steps consume.** Step 2's design panel and every
+Phase B cold probe are spawns from this session (Step 4b's tier canary is not: it runs in headless child
+sessions, `staging.md` § Phase C); until 2026-08-04 each of them read an
 outcome that no gate produced, and a run that inferred `UNAVAILABLE` from its own ambient instructions
 degraded everything downstream without ever attempting one. Its outcome is `INV-SPAWN`.
 
@@ -64,7 +65,7 @@ entry point is the only thing that sequences them.
 
 Run them in order and carry their outcomes forward, because three of them change what the rest of this
 file may do: the backup state gates conversion's destructive step, the budget answers are what Step 6's
-receipt asserts against, and Step 0.6's fixtures decide what Step 4b can return.
+receipt asserts against, and Step 0.6's record check decides whether Step 4b spawns at all.
 
 **Nothing below writes anything until those gates have run.**
 
@@ -420,6 +421,65 @@ Two things survive and are not reservations: a `<!-- origin: user | immutable: t
 reworded — the file around it may still be edited or deleted once the block is extracted — and every
 write reports what it changed, by path.
 
+## Step 1c — Draft the Strategic Objective while it is still the template's placeholder
+
+**Fires on every audit whose `operating-principles` § Strategic Objective is still the placeholder** —
+after the survey has the evidence and before any design panel, probe, or handbook reads it. Every
+Lead's handbook conforms upward to that section (`handbook-templates.md`), so a probe run against the
+placeholder fails for a reason that is not the handbook's.
+
+```bash
+"$WF/bin/wf-companion" --root <absolute path to project> --objective     # PLACEHOLDER exits 1
+```
+
+- `FILLED` or `DRAFTED` → **never overwritten.** Print the state and move on.
+- `PLACEHOLDER` → **draft it and write it; never ask.** One page, present tense, concrete: what this
+  project is, what it does, what success depends on, and what it will not do (`templates.md`
+  § `operating-principles`). The evidence is the survey — the README and docs first (`org-design.md`,
+  evidence item 5), then the manifests, the repository shape and the history; on a charter-first run it is the
+  charter. Then write it:
+
+  ```bash
+  "$WF/bin/wf-companion" --root <absolute path to project> --draft-objective - \
+    --by 'audit <run-id>, from <the files it read>' --execute <<'OBJECTIVE'
+  <the draft>
+  OBJECTIVE
+  ```
+
+  and paste its `read back DRAFTED` line into the Execution Summary.
+- `ABSENT` → Step 0.3 owed the companion; it runs first, then this step.
+
+**Declared and reported, never asked** — the same shape as a succession declaration. Step 7 prints the
+draft whole under `Strategic Objective — drafted this run`, with the one line that overturns it: *edit
+the text in `.claude/skills/operating-principles/SKILL.md`; to make it yours and frozen, change its
+opening marker to `origin: user | immutable: true`.* The run never holds on the question.
+
+**Why the draft is NOT written inside the `origin: user | immutable: true` span the template puts
+around the placeholder.** That marker asserts the user wrote the words. SKILL.md's T2 extraction lifts
+such a span verbatim as a user directive, and `wf-protect-directives` and `checksums` guard it as one —
+so a model's draft inside it would later be quoted back to the user as their own directive, and could
+never be corrected without registering as a directive violation. The script therefore replaces the
+placeholder span (shipped template text, not the user's) with an `origin: workforce | modifiable: true`
+span carrying `drafted-by:`. **Its sidecar consequence is deliberate and bounded:** the placeholder's own
+`.directives.sha` row is orphaned, and the scaffold's later sacred block (the project-principles span)
+keeps every byte — the script verifies it — but shifts its `:directive:<N>` index by one
+(`checksums.md` § The row grammar). Step 5-STAMP's `--directives --execute --restamp`, which re-stamps
+what this run moved, runs after this step and settles both. `principles.md` step 2's rule — ratified
+text is captured verbatim in a user span — is what the user does with the draft, not what the run does.
+
+**This is also the heal.** It keys on the state, never on a version stamp, so an org materialized before
+2026-09-15 with the placeholder still in place is drafted on its next audit, exactly as Step 5d heals
+handbooks on theirs.
+
+**Under `--review`: the same two commands without `--execute`** — it prints the draft and the span it
+would replace, and writes nothing.
+
+*Added 2026-09-15. `wf-companion` materialized the placeholder at Step 0.3 and its own docstring called
+it "the audit's own instruction to fill it"; the phrase "Strategic Objective" did not occur anywhere in
+this file. On a customer host (1.59.1) a Lead's first probe FAILED against the placeholder and the
+failure-attribution gate charged it to the handbook; the customer drafted the objective by hand and the
+re-probe passed.*
+
 ## Step 2 — Design the org (panel) — both modes
 
 Full method: `references/org-design.md`.
@@ -754,6 +814,17 @@ no existing maintainer is a **candidate**: report it with the script that would 
 it only under `--execute`. Report the candidate count **before** executing — a converted project can
 present dozens, and each is new executable code in a tree the user owns.
 
+**A data skill missing a required contract section is completed here, in this run.** `wf-conform` fails
+every data skill that lacks one of `data-skills.md` § Required sections, and that row stays blocking. So
+for each data skill it names (`data skill carries every required section`), draft each missing section
+**from the skill's own data**, never from a template. Write `## Seed` as the literal bytes of an empty
+instance, in the shape the existing records take. Write `## Schema` from the files as they are, field by
+field. Then **append** the section to the skill's `SKILL.md` under `--execute` (under `--review`, print
+it and write nothing), and leave every existing byte where it was. Step 6 writes it in its `data skills`
+slot. `personnel-ledger` is workforce's own companion and is completed from shipped source by `wf-companion`
+at Step 4 (`audit-setup.md` § Three states), not here. *Added 2026-09-15: pythom-space's `email` and `quo`
+each lack `## Seed`, and before this nothing in the audit said whose work that was.*
+
 ### Connections
 
 Enumerate the MCP servers and connectors the host **actually has configured**, and write the list into
@@ -911,28 +982,33 @@ Run `staging.md` § Phase C now — after the org is designed, before a single h
 registered. **This is the step that produces the `canary:` value every registration precondition
 requires** (`hire.md` § Preconditions, and SKILL.md's Tier-Ceiling and Atomic-or-Absent gates).
 
+```bash
+"$WF/bin/wf-apply" --root <absolute path to project> --run-canary --by 'audit, run <run-id>' --execute
+```
+
+Under `--review`, the same command **without** `--execute`: it measures and writes nothing. On `PASS`
+the `--execute` form records `platform-local.md` through `--record-canary` in the same call, so the
+PASS-on-record step at Step 7 has already run. It makes two attempts itself on `UNAVAILABLE` and prints
+`INV-CANARY`; paste that line into the org chart header as this step's reading.
+
 Resolve to exactly one of the four outcomes in `staging.md` § The three outcomes:
 
 | Result | What Step 5 does |
 |---|---|
 | `PASS` / `PASS (on record)` | author and register normally |
-| `UNAVAILABLE` | **proceed, DEGRADED — and carry the state into Step 6a, which RE-ATTEMPTS it in this run.** Register, mark every handbook `Tier ceiling: unverified this run`. That mark is provisional until 6a resolves it |
+| `UNAVAILABLE` | **proceed, DEGRADED — and carry the state into Step 6a, which reads it again later in this run.** Register, mark every handbook `Tier ceiling: unverified this run`. That mark is provisional until 6a resolves it |
 | `FAIL` | **abort before any registration.** Confirm the expectation first — on the one occasion this has fired, the spec was at fault |
 
-**`UNAVAILABLE` is the expected result HERE on a first audit** and is not a defect: the fixtures written
-at `references/audit-setup.md` § Step 0.6 have not registered yet. It is also the expected result
-headless. Never report it as FAIL, and never abort on it — a gate that refuses a fresh install because
-it cannot measure a host it has a shipped baseline for is a gate that fails for a reason that is not true.
+**`PASS` is the expected result on a first audit.** `UNAVAILABLE` now means the runner said why — `claude`
+absent or signed out, a flag the harness rejects, a timeout, an unparseable answer — and it is also the
+result on a headless host with no `claude` to call. Never report it as FAIL, and never abort on it — a
+gate that refuses a fresh install because it cannot measure a host it has a shipped baseline for is a
+gate that fails for a reason that is not true.
 
-**But it is NOT the run's final answer, and this step is no longer where the question is settled.**
-Fact 3 measures the registration delay as *shorter than a session* — so a first audit that stops asking
-here is guaranteed to end DEGRADED on a fact it could have measured before the run was over. Step 6a
-re-attempts it. Record this result, and cite it in the org chart header as the **first** attempt.
-
-*Amended 2026-08-04. Step 4b ran the canary immediately after Step 0.6 wrote its fixtures, which made
-`UNAVAILABLE` structurally certain on every first audit — and the run then queued three deferred rows
-(`verify`, fixture sweep, `amend`) asking the user to finish in another session what the delay would
-have released minutes later in this one.*
+*Amended 2026-09-15. Until then this step ran against fixtures Step 0.6 wrote into `.claude/agents/`, so
+`UNAVAILABLE` was structurally certain on every first audit (`platform.md` fact 3); and from 1.31.0,
+which removed the fixtures on the user's marks, it was certain on every audit. The runner defines its
+agents per headless session and writes no agent file (`platform.md` fact 24).*
 
 ## Step 5 — Ratify, then author
 
@@ -1763,7 +1839,7 @@ back on every run. The three rules it carried were already `operating-principles
 preloaded into every employee. **Nothing replaces it in this order.**
 
 **The backup is not in this list** — it already ran at `references/audit-setup.md` § Step 0.2, before the
-first writing gate. Re-taking it here would archive a tree this run has been modifying since Step 0.6.
+first writing gate. Re-taking it here would archive a tree this run has been modifying since then.
 Assert it succeeded (or that its state is `declined` / `no-content`) before the first conversion; never
 run it again.
 
@@ -1975,31 +2051,30 @@ that does not exist.*
 **Runs only when Step 4b returned `UNAVAILABLE`.** On `PASS`, `PASS (on record)`, or `FAIL`, the
 question is already settled and this step is a no-op that prints why.
 
-Re-run `staging.md` § Phase C against the same fixtures. Nothing is rewritten and no fixture is
-re-authored: this is the *identical* measurement, attempted later, because the only thing that was
-missing at Step 4b was elapsed time and turn boundaries (`platform.md` fact 3 — the registration delay
-is shorter than a session, and a turn boundary is the leading trigger).
+Run Step 4b's command again. Nothing is rewritten: this is the *identical* measurement, taken later,
+because the causes that clear with time — a rate limit, a slow network, a busy host — are the ones the
+authoring wave has given room to clear.
 
-| Second result | What this step does |
+| Result | What this step does |
 |---|---|
-| `PASS` | **record `platform-local.md` via `wf-apply … --record-canary --execute` (the PASS-on-record step below, which names the full command), restamp every handbook's `Tier ceiling:` line in place, sweep the `wf-canary-*` and `wf-ceiling-probe` fixtures, and queue NOTHING.** The run is no longer degraded |
-| `UNAVAILABLE` again | stay DEGRADED, keep the marks, and queue the three rows at Step 7 — **now with two recorded attempts, not zero** |
-| `FAIL` | the ceiling is measurably broken. Do NOT sweep. Report it against every registered handbook and queue the remediation |
+| `PASS` | **the `--execute` form has recorded `platform-local.md` already; restamp every handbook's `Tier ceiling:` line in place, and queue NOTHING.** The run is no longer degraded |
+| `UNAVAILABLE` again | stay DEGRADED, keep the marks, and queue the rows at Step 7 — **now with every attempt recorded, not one** |
+| `FAIL` | the ceiling is measurably broken. Report it against every registered handbook and queue the remediation |
 
 **The restamp IS `/workforce amend`, executed here rather than asked for.** `amend`'s own procedure is
 the authority on how the line is rewritten; this step calls it, and the closing report counts the
 handbooks it touched. **A run that can clear its own marks and instead asks the user to clear them has
 deferred a run** (`conversion-taxonomy.md` § What succession does not do).
 
-**Print both attempts, always** — a single-attempt line and a two-attempt line must never read the same:
+**Print every attempt, always** — a single-attempt line and a multi-attempt line must never read the same:
 
 ```
-INV-CANARY   attempt 1 UNAVAILABLE (Step 4b, fixtures unregistered) · attempt 2 PASS (Step 6a)
-             platform-local.md written · 13 handbooks restamped · 4 fixtures swept
+INV-CANARY   Step 4b: attempt 1 UNAVAILABLE (timed out after 180s) · attempt 2 UNAVAILABLE (timed out after 180s)
+             Step 6a: attempt 1 PASS · platform-local.md written · 13 handbooks restamped
 ```
 
-**Under `--review`: attempt the measurement, print the outcome, write nothing** — no `platform-local.md`,
-no restamp, no fixture sweep. The measurement is read-only; only its consequences write.
+**Under `--review`: attempt the measurement without `--execute`, print the outcome, write nothing** — no
+`platform-local.md`, no restamp. The measurement is read-only; only its consequences write.
 
 *Added 2026-08-04. Step 4b ran the canary at the one moment it could not succeed, and Step 7 queued
 three rows — `verify`, the fixture sweep, and `amend` — asking the user to finish in another session
@@ -2198,7 +2273,8 @@ prevent — and removing the gateway while keeping the files is the quieter vers
   directory path (`.claude/skills/<name>/…`) where that path no longer exists. Each row names its
   disposition. `LIVE` is rewritten by the table below. `USER-SPAN` is reported and never edited.
   `SHIPPED` is the distribution's own file, which `update` would overwrite, so it is reported for the
-  maintainer and not edited here. Run it before the rewrite and again after. Its `swept refs` line is
+  maintainer and not edited here. `RECORD` is history inside a data skill's record, and a record body
+  is never edited, so it is reported and left. Run it before the rewrite and again after. Its `swept refs` line is
   the before-and-after count this section requires, and **the step is not finished while it exits 1**,
   which it does on any `LIVE` row.
 
@@ -2277,7 +2353,9 @@ is the EXPECTED consequence of teardown, not evidence that a mid-flight teammate
 
 **WRITE THE REPORT, then print it.** Everything below goes to
 `${CLAUDE_PROJECT_DIR}/.claude/workforce/work/<run-id>/report.md` **and** to the terminal — the file
-first, so a run that dies mid-report still leaves what it had.
+first, so a run that dies mid-report still leaves what it had. **The orchestrating session writes this
+file itself and never delegates it:** its name matches the pattern the harness refuses a subagent's
+`Write` for (`platform.md` fact 25).
 
 *Measured 2026-08-03, second real audit. `dispositions.md` and `deferred.md` were written because they
 had been fixed that morning; **every counted line in the report was printed and lost** —
@@ -2399,11 +2477,16 @@ Then the org, the fan-out budget, and the canary result **by state, with its con
 |---|---|
 | `PASS` | `tier ceiling: verified this run (canary PASS)` — **and RECORD `platform-local.md`** via `wf-apply … --record-canary --execute` (the PASS-on-record step below) |
 | `PASS (on record)` | `tier ceiling: verified — platform-local.md matches the running harness` |
-| `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — fixtures written this run and not yet registered. Re-run /workforce verify once they load.` |
+| `UNAVAILABLE` | `tier ceiling: UNVERIFIED this run — <the cause INV-CANARY names>. /workforce verify re-runs the canary.` |
 
 A run that verified the host and a run that verified nothing must never print the same line.
 
-**On `PASS`, the measurement is RECORDED by the producer, not composed by hand.** Run:
+**Then the Strategic Objective, when Step 1c drafted it this run:** the draft whole, under
+`Strategic Objective — drafted this run`, and the one line that overturns it. Never a question.
+
+**On `PASS`, the measurement is RECORDED by the producer, not composed by hand.** Step 4b's
+`--run-canary --execute` already made this call with the values it measured; the producer it calls, for
+a PASS measured some other way, is:
 
 ```bash
 wf-apply --root <absolute path to project> --record-canary \
@@ -2443,16 +2526,17 @@ attempt count. Two categories, and `deferred.md` owns the list — it is not res
 **Print `INV-CLOSE`** with the rest of the invariant block; a queue with no classification line is
 indistinguishable from a queue nobody classified.
 
-**The three canary rows are conditional on Step 6a, and on a passing re-attempt there are none:**
+**The two canary rows are conditional on Step 6a, and on a passing re-attempt there are none:**
 
 | Row | Queued when | Discharged by |
 |---|---|---|
-| tier ceiling unverified — re-run the canary | **only if Step 6a's second attempt also returned `UNAVAILABLE`** | `/workforce verify` once the fixtures register |
-| `wf-canary-*` and `wf-ceiling-probe` fixtures live in the user's `.claude/agents/` | same condition — 6a sweeps them itself on `PASS` | the same `verify` (`staging.md` § Fixture lifecycle) |
+| tier ceiling unverified — re-run the canary | **only if Step 6a's reading also returned `UNAVAILABLE`** | `/workforce verify` once the cause `INV-CANARY` names has changed (`claude` installed or signed in, the harness upgraded past a rejected flag) |
 | every handbook carries `Tier ceiling: unverified this run` | same condition — 6a restamps them itself on `PASS` | `/workforce amend` |
 
-**Print the attempt count beside them.** Three rows after one attempt is a run that gave up; three rows
-after two is a host that will not register fixtures inside a run, which is a real finding about the host.
+**Print the attempt count beside them.** Rows after one attempt are a run that gave up; rows after
+three readings are a host that cannot run the instrument, which is a real finding about the host.
+*A third row — the `wf-canary-*` fixtures left in the user's `.claude/agents/` — was dropped 2026-09-15:
+the canary writes no agent file, so there is nothing to sweep.*
 
 *Rewritten 2026-08-04. These three were queued unconditionally, and the note that stood here read:
 "Found 2026-08-03 by being asked whether one audit run does all of this in one session." **The question

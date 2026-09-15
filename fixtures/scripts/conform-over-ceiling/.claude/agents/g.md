@@ -16,19 +16,6 @@ Owns fixture prose.
 Terminal tier.
 ## Procedure
 1. Read a file and report.
-## Verification
-`true` exits 0.
-## Guardrails
-- NEVER report PASS on an unrun check.
-## Exit criteria
-Green.
-## Escalation
-Return ESCALATE.
-## Probe
-Run the fixture.
-## Reporting
-Write OUTPUT.md.
-
 padding line 0
 padding line 1
 padding line 2
@@ -229,3 +216,15 @@ padding line 196
 padding line 197
 padding line 198
 padding line 199
+## Verification
+`true` exits 0.
+## Guardrails
+- NEVER report PASS on an unrun check.
+## Exit criteria
+Green.
+## Escalation
+Return ESCALATE.
+## Probe
+Run the fixture.
+## Reporting
+Write OUTPUT.md.

@@ -271,14 +271,84 @@ DEFAULT_LENGTH_CEILING = 172
 MEASURED_BYTES_PER_LINE = 113
 
 
+# The sections `procedure-for-procedures.md` § How the split is performed relocates from:
+# the heavy material lives in these, and every other section is either required by the
+# contract or the role's own binding rules. The customer measurement that shaped the IC
+# length row removed exactly these four (2026-09-15).
+RELOCATABLE_SECTIONS = ("Scope", "Sources", "Procedure", "Verification")
+_ORG_OPEN_RX = re.compile(r"^[ \t]*<!--\s*(ORG-[A-Z-]+)\s+START\b")
+_ORG_LINE_RX = re.compile(r"^[ \t]*<!--\s*(?:ORG-[A-Z-]+\b|Tier ceiling:|tier-ceiling)", re.I)
+
+
+def _ic_floor(body):
+    """(floor, mandated, breakdown) for an IC handbook's length.
+
+    `mandated` counts the lines this script itself requires and no author can relocate or
+    condense: the frontmatter, every line of an `ORG-*` block (the `embed` step writes
+    them), the tier-ceiling line, and each `## Probe` substitution-table row that cites a
+    section in backticks (the rows the probe-table check demands). `floor` is the line
+    count with every RELOCATABLE_SECTIONS section removed, heading included, which is the
+    shortest the handbook can get by relocation. `breakdown` is every block's line count,
+    heading through the line before the next heading, in file order, so an author can see
+    what drives the size.
+    """
+    lines = body.splitlines()
+    mandated = 0
+    fm = FM_RX.match(body)
+    fm_n = fm.group(0).count("\n") if fm else 0
+    mandated += fm_n
+    in_org = None
+    for line in lines[fm_n:]:
+        if in_org:
+            mandated += 1
+            if re.search(r"<!--\s*" + re.escape(in_org) + r"\s+END\b", line) or \
+                    re.search(re.escape(in_org) + r"\s+END\s*-->", line):
+                in_org = None
+            continue
+        m = _ORG_OPEN_RX.match(line)
+        if m:
+            mandated += 1
+            if not re.search(r"END\s*-->", line):
+                in_org = m.group(1)
+        elif _ORG_LINE_RX.match(line):
+            mandated += 1
+    probe = section(body, "## Probe") or ""
+    for l in probe.splitlines():
+        cells = l.strip().split("|")
+        if l.lstrip().startswith("|") and len(cells) > 2 and PROBE_CITE_RX.search(cells[1]):
+            mandated += 1
+    blocks, name, count = [], "preamble", 0
+    for line in lines:
+        mh = re.match(r"^## (.+?)[ \t]*$", line)
+        if mh:
+            blocks.append((name, count))
+            name, count = mh.group(1), 0
+        count += 1
+    blocks.append((name, count))
+    relocatable = sum(c for h, c in blocks
+                      if any(h == s or h.startswith(s + " ") for s in RELOCATABLE_SECTIONS))
+    breakdown = " · ".join(f"{h} {c}" for h, c in blocks if c)
+    return len(lines) - relocatable, mandated, breakdown
+
+
 class Result:
     def __init__(self):
         self.rows = []
         self.unreadable = []
         self.scratch_skipped = 0
+        self.counts = []
 
     def add(self, ok, name, detail=""):
         self.rows.append({"ok": bool(ok), "check": name, "detail": detail})
+
+    def count(self, line):
+        """A population count, printed under the summary on EVERY run, zero included.
+
+        A passing row is not printed, so a check that examined nothing and a check that
+        found nothing wrong look identical in the human output. That is how the DEF check
+        stayed invisible while reading an empty folder (DEF-Q-004). A count line says how
+        many things a check actually saw."""
+        self.counts.append(line)
 
     def advise(self, name, detail=""):
         """A finding that is reported and does NOT set the exit code.
@@ -695,6 +765,27 @@ def check_handbook(path, body, res, ceiling):
             f"this row blocks nothing")
     elif body_lines <= ceiling and not _over_bytes:
         res.add(True, f"{n}: within the {ceiling}-line ceiling")
+    elif body_lines > ceiling and _ic_floor(body)[0] > ceiling:
+        # THE IC BRANCH OF THE SAME REASONING AS THE LEAD BRANCH ABOVE. MEASURED 2026-09-15
+        # on a customer host (nc-audit, Nevada Classics): three IC handbooks at 297, 231
+        # and 296 lines, still over after verbatim relocation. The 297 carries no user
+        # span at all and is 181 lines with Scope, Sources, Procedure and Verification
+        # removed entirely. Its size is the mandated section set plus its own Guardrails,
+        # Probe and Reporting for a report-only reviewer. An order to relocate to 172 could
+        # not be followed. So the row states what it measured, section by section, and
+        # orders nothing it cannot reach.
+        _floor, _mand, _brk = _ic_floor(body)
+        res.advise(
+            f"{n}: IC handbook length OBSERVED — the required content alone exceeds the "
+            f"ceiling",
+            f"{body_lines} lines, {_density}: {_mand} are lines this check itself requires "
+            f"(frontmatter, ORG-* blocks, the tier-ceiling line, the Probe rows citing a "
+            f"section), and {body_lines - _mand} are authored. With every line of the "
+            f"relocatable sections moved out, it would still be {_floor} lines, over "
+            f"{ceiling}, so no relocation is ordered: it cannot reach the target. By section: "
+            f"{_brk}. The {ceiling}-line figure was measured on one IC; why that does not "
+            f"bind this one: procedure-for-procedures.md § The handbook length ceiling. "
+            f"ADVISORY: this row blocks nothing")
     else:
         # WHICH BUDGET WAS BLOWN CHANGES NOTHING ABOUT THE REMEDY — relocation is the
         # same act either way — but it changes what the author goes looking for, so the
@@ -720,6 +811,10 @@ def check_handbook(path, body, res, ceiling):
             _why = (f"{_density} — WITHIN the {ceiling}-line count and over the "
                     f"{byte_budget:,} B the same ceiling buys at the density it was "
                     f"measured at ({MEASURED_BYTES_PER_LINE} B/line); {_shape}")
+        if body_lines > ceiling:
+            _f, _m, _b = _ic_floor(body)
+            _why += (f" ({_m} of them required by this check, {body_lines - _m} authored; "
+                     f"{_f} with the relocatable sections moved out. By section: {_b})")
         res.advise(f"{n}: within the {ceiling}-line ceiling",
                    f"{_why} — the split is PERFORMED this run: relocate the "
                    f"heavy material (worked examples, mapping tables, reference data) into "
@@ -1045,50 +1140,122 @@ def check_defects(root, res):
     AND EVERY RECORD IS INDEXED. Four DEF records sat unindexed while the project's own
     `check-personnel-index.sh` was ready to catch it and nobody ran it. A record nothing
     points at is a record the next reader does not know exists.
+
+    WHERE THE RECORDS ARE IS `wf-ledger`'s TO SAY, never this function's. This read
+    `personnel/defects/DEF-*.md` while `personnel-templates.md` § Schema has filed every
+    record flat at `personnel/<TYPE>-<subject>.md`, so on a host that followed the schema it
+    checked NOTHING and passed. Customer DEF-Q-004, 2026-09-15. MEASURED the same day on six
+    staffed projects on the maintainer's machine: 120 DEF records, every one flat, and none
+    of them ever checked. A record in the older per-type `defects/` folder is still checked,
+    not dropped, and is reported as legacy layout so it can be seen. The count prints on
+    every run, zero included, because "checked nothing" and "all clean" read the same
+    otherwise.
     """
     pdir = os.path.join(root, ".claude", "workforce", "personnel")
-    ddir = os.path.join(pdir, "defects")
-    if not os.path.isdir(ddir):
+    ledger = _load_sibling("wf-ledger")
+    flat = [(i, ledger.record_path(root, i)) for i in ledger.record_ids(root)
+            if i.startswith("DEF-")]
+    legacy = [(i, p) for i, p in ledger.legacy_records(root) if i.startswith("DEF-")]
+    res.count(f"DEF records: {len(flat) + len(legacy)} checked · {len(flat)} flat · "
+              f"{len(legacy)} in a legacy subfolder")
+    for i, p in legacy:
+        res.advise(f"{os.path.relpath(p, root)}: legacy layout — § Schema files records flat",
+                   f"checked here, but `wf-ledger index` and `consult` cannot see it until it "
+                   f"sits at {os.path.relpath(ledger.record_path(root, i), root)} "
+                   f"(personnel-templates.md § Schema). ADVISORY: this row blocks nothing")
+    names = [(i, p) for i, p in sorted(flat + legacy)]
+    if not names:
         return                      # no defects yet is legal
 
-    names = sorted(f for f in os.listdir(ddir)
-                   if f.startswith("DEF-") and f.endswith(".md"))
-    if not names:
-        return                      # an empty defects/ is also legal
-
-    # Read the index only once a record exists to check against it. Reading it
-    # unconditionally made a project with an empty `defects/` and no index.md report
-    # `unreadable` -> exit 2 -> "the tree could not be read", which is a false alarm
-    # about the whole run. Found by the fixture written for this very check.
+    # ADVISORY AT VERIFY, BLOCKING WHERE A DEF IS WRITTEN (decided 2026-09-15). The field
+    # exists to force the class question at the moment a DEF is AUTHORED, and that
+    # moment has its own gate: `procedures/defect.md` step 5d runs `wf-conform --def
+    # <path>`, which exits 1 on the rows below. At verify these records are history. This
+    # check read an empty folder until DEF-Q-004, so its blocking status had never been
+    # exercised, and switching it on across every staffed host would be a flag with no
+    # fix: no mechanism can supply a Class fix. MEASURED 2026-09-15 on six staffed hosts:
+    # 110 of 126 DEF records carry no `**Class fix:**` line. The index half is advisory
+    # for the same reason. `wf-ledger index --execute` can rebuild the index, but no
+    # audit step runs it, so a blocking row would have no producer.
     ipath = os.path.join(pdir, "index.md")
-    index = (read(ipath, res) or "") if os.path.exists(ipath) else ""
-    res.add(os.path.exists(ipath), "personnel index exists to record defects in",
-            f"{len(names)} DEF record(s) on disk and no {ipath}")
-
-    for fn in names:
-        body = read(os.path.join(ddir, fn), res)
+    index = (read(ipath, res) or "") if os.path.exists(ipath) else None
+    no_fix, bad_fix, unindexed = [], [], []
+    for stem, path in names:
+        body = read(path, res)
         if body is None:
             continue
-        stem = fn[:-3]
-
-        m = re.search(r"^\*\*Class fix:\*\*\s*(.+)$", body, re.M)
-        val = (m.group(1).strip() if m else "")
-        res.add(bool(m), f"{stem}: names a Class fix",
-                "a defect in a generated org is evidence about the generator; without this "
-                "field the shape recurs in the next project (personnel-templates.md § DEF)")
-        if m:
-            # INSTANCE-ONLY must carry a reason; anything else must name a file.
-            if val.upper().startswith("INSTANCE-ONLY"):
-                ok = len(val) > len("INSTANCE-ONLY") + 4
-                detail = "`INSTANCE-ONLY` with no reason is not a disposition"
+        for ok, name, _detail in def_record_findings(stem, body, index):
+            if ok:
+                continue
+            if name.endswith("names a Class fix"):
+                no_fix.append(stem)
+            elif name.endswith("reasoned INSTANCE-ONLY"):
+                bad_fix.append(stem)
             else:
-                ok = bool(re.search(r"[\w./-]+\.(md|py|sh)\b|`[^`]+`", val))
-                detail = ("names an intention rather than a file — a class fix is a change to a "
-                          "named workforce file, or it is INSTANCE-ONLY with a reason")
-            res.add(ok, f"{stem}: Class fix is a file or a reasoned INSTANCE-ONLY", detail)
+                unindexed.append(stem)
+    m = len(names)
+    if no_fix or bad_fix:
+        res.advise(f"{len(no_fix)} of {m} DEF records carry no Class fix — historical; the field "
+                   f"is enforced where a DEF is authored"
+                   + (f" · {len(bad_fix)} carry one naming no file" if bad_fix else ""),
+                   f"{(no_fix + bad_fix)[:5]}{' …' if len(no_fix + bad_fix) > 5 else ''} — "
+                   f"procedures/defect.md step 5d runs `wf-conform --def <path>` on every new "
+                   f"record and fails it there. ADVISORY: this row blocks nothing")
+    if index is None:
+        res.advise(f"no personnel index — {m} DEF record(s) on disk and none indexed",
+                   "rebuild it from the filesystem with `wf-ledger index --execute`. "
+                   "ADVISORY: this row blocks nothing")
+    elif unindexed:
+        res.advise(f"{len(unindexed)} of {m} DEF records are not in the personnel index",
+                   f"{unindexed[:5]}{' …' if len(unindexed) > 5 else ''} — rebuild it from the "
+                   f"filesystem with `wf-ledger index --execute`. ADVISORY: this row blocks "
+                   f"nothing")
 
-        res.add(stem in index, f"{stem}: appears in the personnel index",
-                "a record nothing points at is one the next reader never finds")
+
+_CLASS_FIX_LINE_RX = re.compile(r"^\*\*Class fix:\*\*[ \t]*(.*)$", re.M)
+
+
+def class_fix_value(body):
+    """The `Class fix` field's value, or None when the record carries none.
+
+    Two spellings, one field: the template's `**Class fix:** <value>` line, and a
+    `## Class fix` section whose first non-empty line is the value. The heading form was
+    MEASURED on real records (4 of 126 across six hosts, 2026-09-15), and a reader that
+    refused it would call an answered question unanswered."""
+    m = _CLASS_FIX_LINE_RX.search(body)
+    if m:
+        return m.group(1).strip()
+    seg = section(body, "## Class fix")
+    if seg is not None:
+        for line in seg.splitlines():
+            if line.strip():
+                return line.strip()
+        return ""
+    return None
+
+
+def def_record_findings(stem, body, index):
+    """[(ok, name, detail)] for one DEF record: the ONE grammar verify reads (advisory)
+    and `--def` reads (blocking, at write time). `index` is the personnel index text, or
+    None when there is no index."""
+    out = []
+    val = class_fix_value(body)
+    out.append((bool(val), f"{stem}: names a Class fix",
+                "a defect in a generated org is evidence about the generator; without this "
+                "field the shape recurs in the next project (personnel-templates.md § DEF)"))
+    if val:
+        # INSTANCE-ONLY must carry a reason; anything else must name a file.
+        if val.upper().startswith("INSTANCE-ONLY"):
+            ok = len(val) > len("INSTANCE-ONLY") + 4
+            detail = "`INSTANCE-ONLY` with no reason is not a disposition"
+        else:
+            ok = bool(re.search(r"[\w./-]+\.(md|py|sh)\b|`[^`]+`", val))
+            detail = ("names an intention rather than a file — a class fix is a change to a "
+                      "named workforce file, or it is INSTANCE-ONLY with a reason")
+        out.append((ok, f"{stem}: Class fix is a file or a reasoned INSTANCE-ONLY", detail))
+    out.append((index is not None and stem in index, f"{stem}: appears in the personnel index",
+                "a record nothing points at is one the next reader never finds"))
+    return out
 
 
 # A path a journal row RECORDS, in the repo-relative form every journal writes it:
@@ -1652,11 +1819,116 @@ def _hook_rows(cfg):
                     yield event, e.get("matcher"), h
 
 
+# ── what a data skill IS, and which files are its records — ONE definition ──────
+# `wf-conform` (which data skills to hold to the contract) and `wf-remainder --swept-refs`
+# (which mentions are history in a record, never to be rewritten) both read this. A skill
+# is a data skill when it DECLARES the contract, never when its directory has a
+# suggestive name. The census bars that inference (`procedures/audit.md` § .censusignore).
+# There are two declarations:
+#   1. its name follows workforce's own scheme, `records-<dataset>` (`data-skills.md`
+#      § Naming). Workforce gave it that name, so the name is itself a declaration;
+#   2. its `## Invariants` carries the universal invariant, the one clause `data-skills.md`
+#      says is "always present, in every data skill, generated or hand-written". This is
+#      how a converted predecessor knowledge base like `awareness-ledger` is recognized:
+#      conversion writes the contract into its gateway and leaves the records in place.
+# Its RECORDS are the paths its own `## Schema` declares. Real schemas measured
+# 2026-09-15 on six staffed hosts name them as backticked templates:
+# `ledger/<bucket>/<TYPE>-<YYYY-MM-DD>-<slug>.md`, `ledger/index.md`, `data/<slug>.json`,
+# `.claude/workforce/personnel/<TYPE>-<subject>.md`. A template with an interior `/` is a
+# path. A single segment (`decisions/`, `README.md`) is not taken, because schemas also
+# name folders and files that are NOT records ("a bucket `README.md` is not a record").
+# A schema that declares nothing recognizes nothing, so the error goes toward reporting
+# a mention, never toward hiding one.
+UNIVERSAL_INVARIANT = "may never authorize a write"
+_SCHEMA_TOKEN_RX = re.compile(r"`([^`\s]+)`")
+
+
+def is_data_skill(name, body):
+    inv = section(body, "## Invariants") or ""
+    return name.startswith("records-") or UNIVERSAL_INVARIANT in inv
+
+
+def data_skills(root):
+    """[(skill_dir, body)] for every data skill under `<root>/.claude/skills`, sorted."""
+    base = os.path.join(root, ".claude", "skills")
+    out = []
+    try:
+        entries = sorted(os.listdir(base))
+    except OSError:
+        return out
+    for entry in entries:
+        p = os.path.join(base, entry, "SKILL.md")
+        try:
+            with open(p, encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if is_data_skill(entry, body):
+            out.append((os.path.join(base, entry), body))
+    return out
+
+
+def _template_rx(tpl):
+    """A schema path template as a regex. `<…>` and `*` match within one path segment,
+    and `**` matches across segments."""
+    out, i = [], 0
+    while i < len(tpl):
+        if tpl.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif tpl[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif tpl[i] == "<" and tpl.find(">", i) > i:
+            out.append("[^/]*")
+            i = tpl.find(">", i) + 1
+        else:
+            out.append(re.escape(tpl[i]))
+            i += 1
+    return "".join(out)
+
+
+def record_patterns(root):
+    """[(regex over a root-relative `/`-path, skill_dir)] for every record path a data
+    skill's `## Schema` declares. A template starting `.claude/` is relative to the project
+    root, and any other is relative to the skill's directory."""
+    out = []
+    for skill_dir, body in data_skills(root):
+        rel_skill = os.path.relpath(skill_dir, root).replace(os.sep, "/")
+        for tok in _SCHEMA_TOKEN_RX.findall(section(body, "## Schema") or ""):
+            t = tok[2:] if tok.startswith("./") else tok
+            core = t.rstrip("/")
+            if ("/" not in core or t.startswith(("/", "~", "$", "#"))
+                    or ".." in core.split("/")):
+                continue
+            prefix = "" if t.startswith(".claude/") else rel_skill + "/"
+            tail = "(?:/.*)?" if t.endswith("/") else ""
+            out.append((re.compile("^" + re.escape(prefix) + _template_rx(core) + tail + "$"),
+                        skill_dir))
+    return out
+
+
+def is_record(root, path, patterns=None):
+    """True when `path` is a file some data skill's `## Schema` declares. A data skill's own
+    `SKILL.md` never is: it is the gateway, and it stays live."""
+    if os.path.basename(path) == "SKILL.md":
+        return False
+    rel = os.path.relpath(path, root).replace(os.sep, "/")
+    return any(rx.match(rel) for rx, _d in
+               (record_patterns(root) if patterns is None else patterns))
+
+
 def check_data_skill(path, body, res):
     n = os.path.relpath(path)
     missing = [s for s in DATA_SKILL_SECTIONS if ("\n" + s) not in body]
+    # NOT A DEAD END. Each missing section has an owner that writes it: audit Step 3b drafts
+    # it from the skill's own data, and `wf-companion` appends it to workforce's own
+    # `personnel-ledger` from shipped source.
     res.add(not missing, f"{n}: data skill carries every required section",
-            f"missing: {missing}")
+            f"missing: {missing} — the next `/workforce audit` completes it: Step 3b § Datasets "
+            f"drafts each missing section from this skill's own data and appends it, every existing "
+            f"byte kept (procedures/audit.md). `personnel-ledger` is completed from shipped source "
+            f"by `wf-companion --execute`")
     if "## Invariants" in body:
         seg = section(body, "## Invariants") or ""
         res.add("may never authorize a write" in seg,
@@ -1771,40 +2043,26 @@ def check_sidecar(root, res):
     # verify, producing the org's ONLY hard failure: 8 unstamped blocks, 5 of them
     # inside an August run report and a staged tree already dispositioned for removal.
     # A check whose only failure is its own leftovers is the check that stops being read.
-    _SCRATCH = (os.path.join(root, ".claude", "workforce", "work"),
-                os.path.join(root, ".claude", "workforce", "staging"))
-    # Counted over the whole subtree, not at its head. The prune below clears
-    # `dirnames` so the walk never descends, which means the loop itself can only ever
-    # see the files directly inside `work/` — it reported 1 where the tree held 846.
-    _scratch_skipped = 0
-    for _sr in _SCRATCH:
-        for _dp, _dn, _fns in os.walk(_sr):
-            _scratch_skipped += len([f for f in _fns if f.endswith(".md")])
+    #
+    # THE SET IS `wf-census.sacred_scope`, the same function `wf-stamp` writes rows over.
+    # The walk, the scratch exclusion and the `.censusignore` read all live there. Two copies
+    # of this walk are what let stamp and conform disagree (customer DEF-Q-006, 2026-09-15:
+    # a block under `.claude/workforce/migrated/` conform required and stamp could not
+    # write). The scratch count is over the whole subtree, not at its head. A pruned walk
+    # only sees the files directly inside `work/`, and it once reported 1 where the tree
+    # held 846.
     unstamped = []
-    census = _load_sibling("wf-census").Census(root)
-    census.load_ignore()
-    claude_dir = os.path.join(root, ".claude")
-    for dirpath, dirnames, filenames in os.walk(claude_dir):
-        if any(dirpath == d or dirpath.startswith(d + os.sep) for d in _SCRATCH):
-            dirnames[:] = []
+    _files, _scratch_skipped = _load_sibling("wf-census").sacred_scope(root)
+    for p in _files:
+        rel = os.path.relpath(p, root)
+        try:
+            with open(p, encoding="utf-8") as fh:
+                n = len(BLOCK_RX.findall(fh.read()))
+        except OSError:
             continue
-        dirnames[:] = [d for d in dirnames
-                       if not census.ignored(os.path.join(dirpath, d))]
-        for fn in sorted(filenames):
-            if not fn.endswith(".md"):
-                continue
-            p = os.path.join(dirpath, fn)
-            if census.ignored(p):
-                continue
-            rel = os.path.relpath(p, root)
-            try:
-                with open(p, encoding="utf-8") as fh:
-                    n = len(BLOCK_RX.findall(fh.read()))
-            except OSError:
-                continue
-            for i in range(1, n + 1):
-                if i not in rows.get(rel, {}):
-                    unstamped.append(f"{rel}:directive:{i}")
+        for i in range(1, n + 1):
+            if i not in rows.get(rel, {}):
+                unstamped.append(f"{rel}:directive:{i}")
     # NEVER SILENT. An exclusion that does not print is indistinguishable from a scan
     # that found nothing, and under-reporting is the direction that hurts (audit.md
     # § The dangerous direction).
@@ -2838,6 +3096,10 @@ def main():
                     help="hold adopted agents to the full handbook contract too "
                          "(they are exempt by default: workforce did not author them)")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--def", dest="def_path",
+                    help="check ONE DEF record strictly, at the moment it is written "
+                         "(procedures/defect.md step 5d): exit 1 on a missing or ill-formed "
+                         "Class fix, or a record not in the personnel index")
     args = ap.parse_args()
 
     # AN EMPTY --root IS A CALLER ERROR, NEVER A SILENT RETARGET TO CWD.
@@ -2858,6 +3120,36 @@ def main():
     if not os.path.isdir(root):
         print(f"wf-conform: not a directory: {root}", file=sys.stderr)
         return 2
+
+    # WRITE-TIME ENFORCEMENT OF THE DEF FIELDS. This is where the Class fix blocks: on
+    # the record just written, while its author still holds the defect. At verify the
+    # same grammar only advises (check_defects), because history cannot be re-asked.
+    if args.def_path:
+        dpath = args.def_path if os.path.isabs(args.def_path) else os.path.join(root, args.def_path)
+        stem = os.path.basename(dpath)[:-3] if dpath.endswith(".md") else ""
+        if not stem.startswith("DEF-"):
+            print(f"wf-conform --def: {args.def_path} is not a DEF-<slug>.md record",
+                  file=sys.stderr)
+            return 2
+        try:
+            with open(dpath, encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"wf-conform --def: cannot read {dpath} ({type(exc).__name__})",
+                  file=sys.stderr)
+            return 2
+        ipath = os.path.join(root, ".claude", "workforce", "personnel", "index.md")
+        try:
+            with open(ipath, encoding="utf-8") as fh:
+                index = fh.read()
+        except (OSError, UnicodeDecodeError):
+            index = None
+        rows = def_record_findings(stem, body, index)
+        bad = [r for r in rows if not r[0]]
+        print(f"wf-conform --def {stem}: {len(rows)} check(s) · {len(bad)} failed")
+        for _ok, name, detail in bad:
+            print(f"  ✗ {name}\n      {detail}")
+        return 1 if bad else 0
 
     res = Result()
     agents_dir = os.path.join(root, ".claude", "agents")
@@ -2977,16 +3269,11 @@ def main():
                    "staging layout or the drafts were cleaned; either way the "
                    "divergence question went unanswered rather than answered clean")
 
-    skills = os.path.join(root, ".claude", "skills")
-    if os.path.isdir(skills):
-        for entry in sorted(os.listdir(skills)):
-            if not entry.startswith("records-"):
-                continue
-            p = os.path.join(skills, entry, "SKILL.md")
-            if os.path.exists(p):
-                body = read(p, res)
-                if body is not None:
-                    check_data_skill(p, body, res)
+    # Which skills are data skills is `data_skills`'s to say, the same definition
+    # `wf-remainder --swept-refs` reads (DEF-Q-003). It is no longer the `records-` prefix
+    # alone, which never saw a converted predecessor knowledge base.
+    for skill_dir, body in data_skills(root):
+        check_data_skill(os.path.join(skill_dir, "SKILL.md"), body, res)
 
     check_sidecar(root, res)
     check_canary_record(root, res)
@@ -3034,6 +3321,8 @@ def main():
               f"{len(res.adopted_findings)} adopted-agent note(s) · "
               f"{len(res.advisory_findings)} advisory · "
               f"{len(res.unreadable)} unreadable")
+        for c in res.counts:
+            print(f"  {c}")
         if res.scratch_skipped:
             print(f"  {res.scratch_skipped} file(s) under .claude/workforce/"
                   f"{{work,staging}}/ not scanned for sacred blocks — run scratch "

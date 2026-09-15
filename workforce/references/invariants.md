@@ -103,7 +103,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 4 | marker pairing verified; unpaired files excluded | `INV-MARKERS` | references/legacy-markers.md |
 | 5 | registration verified before a skill is retired | `INV-REGISTER` | references/procedures/hire.md |
 | 6 | the org verifies before the sweep | `INV-VERIFY` | references/procedures/audit.md |
-| 7 | every budget question rendered **and no question beyond the four** | `INV-BUDGET` | references/audit-setup.md |
+| 7 | every budget question rendered, **no question beyond the six**, and each call asked alone in its message in the table's order (the order half is the run's own report — advisory) | `INV-BUDGET` | references/audit-setup.md |
 | 8 | the file census leaves no residual | `INV-CENSUS` | references/procedures/audit.md |
 | 9 | no dead wiring after hook relocation | `INV-HOOKS` | references/procedures/audit.md |
 | 10 | ledger migration matches the filesystem | `INV-LEDGER` | references/procedures/ledger.md |
@@ -288,7 +288,7 @@ Run Invariants
   INV-MAINTAINERS 4 mechanical · 4 maintainers · 4 negative tests passed · 6 contextual
   INV-BATCH       cap 200 · spent 20 · headroom 180 · batch 37 · RUNS THIS RUN
   INV-SUCCESSION  declared from skill-builder · 37 eligible · 37 converted · 0 unexplained
-  INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped · 4 fixtures swept
+  INV-CANARY      attempt 1 UNAVAILABLE · attempt 2 PASS · 13 restamped
   INV-CLOSE       6 candidates · 4 discharged · 2 decided · 0 queued · 0 uncited refusals
   INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
   INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined

@@ -5,6 +5,12 @@
     wf-apply --root <tree> --execute    apply every AUTO pass, reversal written first
     wf-apply --root <tree> --record-canary …    write `platform-local.md` from the
                                         measured canary results (display by default)
+    wf-apply --root <tree> --run-canary [--execute] [--attempts N] [--timeout S]
+             [--canary-model M] [--pin-model P] [--by TEXT] [--measured-on V]
+                                        MEASURE the tier canary (C1, C2) and Phase D
+                                        through `claude -p --agents`, writing no agent
+                                        file; on PASS, hand the result to --record-canary.
+                                        Exit 0 PASS · 1 FAIL · 3 UNAVAILABLE · 2 caller error
 
 WHY THIS EXISTS, and it is a user directive (references/passes.md § Directives):
 
@@ -59,8 +65,12 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import time
+import uuid
 
 sys.dont_write_bytecode = True
 
@@ -495,8 +505,8 @@ def measured_on(supplied):
     if supplied:
         return supplied.strip(), "supplied by the caller"
     try:
-        out = subprocess.run(["claude", "--version"], capture_output=True, text=True,
-                             timeout=30)
+        out = subprocess.run(["claude", "--version"], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, universal_newlines=True, timeout=30)
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"`claude --version` could not be run ({exc.__class__.__name__})"
     if out.returncode != 0:
@@ -634,6 +644,461 @@ def record_canary(root, argv, execute):
     return 0
 
 
+# ── the canary runner ────────────────────────────────────────────────────────
+# THE INSTRUMENT PHASE C HAD NOT HAD SINCE 1.31.0. That release removed the five
+# shipped canary fixtures on the user's explicit marks, because a REGISTERED agent
+# sits in every session's agent menu on the machine. The constraint binds every
+# replacement: NOTHING is written into any `agents/` directory. `staging.md` Phase D
+# already named what a replacement had to be — "spawnable by type without being
+# menu-visible" — and nothing met it, so every audit since returned UNAVAILABLE and
+# marked every handbook `Tier ceiling: unverified`.
+#
+# `claude -p --agents <json>` meets it. The definitions exist for ONE headless
+# session, no file is written, and nothing appears in any other session. They exist
+# at the child's startup, so fact 3's registration delay does not apply — a first
+# audit measures the host on its first attempt. MEASURED 2026-09-15 on Claude Code
+# 2.1.268: `disallowedTools` is honored for these definitions, the control proves
+# the probe can see `Agent`, and the `model` field is honored
+# (`measurements/2026-09-15-agents-flag-canary.md`).
+#
+# EVERY RUN IS READ FROM THE HARNESS'S OWN EVENT STREAM, not from a relay. The first
+# chain trial asked each link to quote its child's reply upward; haiku dropped links'
+# own lines in one of three runs and let the spawns go asynchronous in two. The stream
+# carries each agent's text under the spawn that produced it, the spawn depth the
+# harness assigned, and the model it called — so no agent has to carry another's words.
+#
+# VERDICTS. PASS and FAIL are observations. UNAVAILABLE is everything else — `claude`
+# absent, unauthenticated, too old for a flag, timed out, or an answer that does not
+# parse — and it is NEVER FAIL: a canary that fails for a reason that is not true is
+# worse than no canary (`staging.md` § Phase C).
+CANARY_NS = "wfcanary-"
+DELEGATION_TOOLS = ("Agent", "Task")      # `Task` is the name older harnesses used
+_OBSERVE = ("Report only what you actually observe; never infer from documentation, from "
+            "your own definition, or from what you expect.")
+_SYNC = "Wait for its reply; do not run it in the background."
+
+
+def shipped_tier_limit():
+    """TIER-LIMIT from the shipped `platform.md` header, or None. Never restated here."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    m = re.search(r"^TIER-LIMIT:\s*([0-9]+)",
+                  read(os.path.join(here, "..", "references", "platform.md")), re.M)
+    return int(m.group(1)) if m else None
+
+
+def canary_definitions(links, pin):
+    """The four sessions of one attempt: name -> (main agent, --agents object).
+
+    `ic` carries `Agent` in BOTH `tools` and `disallowedTools`, so a missing `Agent`
+    proves the harness withheld it; `ic-control` is identical without the revocation,
+    so it proves the probe can see `Agent` at all. The chain spawns `links` agents from
+    the main thread so its deepest link sits at the measured limit, never at a
+    two-link false FAIL.
+    """
+    ic_prompt = ("Report the exact names of every tool available to you, "
+                 "comma-separated, and nothing else. " + _OBSERVE)
+
+    def lead(ic):
+        return {"description": "canary lead", "tools": ["Agent", "Read"],
+                "prompt": (f"You are a canary. Use the Agent tool exactly once to spawn "
+                           f"subagent_type {ic} with the prompt: list your tools. {_SYNC} "
+                           f"Then output exactly: LEAD_TOOLS=<your own tool names "
+                           f"comma-separated> IC_SAID=<its reply verbatim>")}
+
+    def root(child):
+        return {"description": "canary root", "tools": ["Agent"],
+                "prompt": (f"You are a canary. Use the Agent tool exactly once to spawn "
+                           f"subagent_type {child} with the prompt: report. {_SYNC} "
+                           f"Then output its reply verbatim and nothing else.")}
+
+    ic = CANARY_NS + "ic"
+    treat = {CANARY_NS + "lead": lead(ic),
+             ic: {"description": "canary IC", "prompt": ic_prompt,
+                  "tools": ["Read", "Agent"], "disallowedTools": ["Agent"]}}
+    ctrl = {CANARY_NS + "lead": lead(ic),
+            ic: {"description": "canary IC", "prompt": ic_prompt,
+                 "tools": ["Read", "Agent"]}}
+    chain = {CANARY_NS + "root": root(CANARY_NS + "d1")}
+    for k in range(1, links + 1):
+        nxt = (f" Then, only if a tool named Agent is among them, use the Agent tool exactly "
+               f"once to spawn subagent_type {CANARY_NS}d{k + 1} with the prompt: report. "
+               f"{_SYNC}" if k < links else "")
+        chain[f"{CANARY_NS}d{k}"] = {
+            "description": f"canary chain link {k}", "tools": ["Read", "Agent"],
+            "prompt": (f"You are canary link {k}. {_OBSERVE} First write exactly one line: "
+                       f"D{k}_TOOLS=<the exact names of every tool available to you, "
+                       f"comma-separated>.{nxt} Write nothing else.")}
+    model = {CANARY_NS + "root": root(CANARY_NS + "model"),
+             CANARY_NS + "model": {
+                 "description": "canary model probe", "tools": ["Read"], "model": pin,
+                 "prompt": ("Your final reply is exactly one line: MODEL=<the exact model ID "
+                            "you are running as>. " + _OBSERVE)}}
+    return {"c2-treatment": (CANARY_NS + "lead", treat),
+            "c2-control": (CANARY_NS + "lead", ctrl),
+            "c1-chain": (CANARY_NS + "root", chain),
+            "phase-d": (CANARY_NS + "root", model)}
+
+
+def parse_stream(raw):
+    """One `--output-format stream-json` run -> what the harness recorded.
+
+    Returns {"error", "result", "session_model", "spawns"}; `spawns` maps each
+    delegation tool_use id to {"type", "depth", "parent", "texts", "reply", "models",
+    "calls"}. Unknown event shapes are skipped, never raised on: a parse that dies on
+    the input it exists to read reports nothing.
+    """
+    st = {"error": None, "result": None, "session_model": None, "spawns": {}}
+    events = []
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(ev, dict):
+                events.append(ev)
+    if not events:
+        st["error"] = "no stream-json event in the output"
+        return st
+
+    def spawn(sid):
+        return st["spawns"].setdefault(sid, {
+            "type": None, "depth": None, "parent": None, "texts": [], "reply": None,
+            "models": [], "calls": 0})
+
+    results = []
+    for ev in events:
+        kind, sub = ev.get("type"), ev.get("subtype")
+        if kind == "system" and sub == "init" and st["session_model"] is None:
+            st["session_model"] = ev.get("model")
+        elif kind == "system" and sub == "task_started" and ev.get("tool_use_id"):
+            sp = spawn(ev["tool_use_id"])
+            sp["type"] = sp["type"] or ev.get("subagent_type")
+            if isinstance(ev.get("spawn_depth"), int):
+                sp["depth"] = ev["spawn_depth"]
+        elif kind == "system" and sub == "task_notification" and ev.get("tool_use_id"):
+            if ev.get("summary") and spawn(ev["tool_use_id"])["reply"] is None:
+                spawn(ev["tool_use_id"])["reply"] = ev["summary"]
+        elif kind in ("assistant", "user"):
+            msg = ev.get("message") if isinstance(ev.get("message"), dict) else {}
+            ptu = ev.get("parent_tool_use_id")
+            if kind == "assistant" and ptu and msg.get("model"):
+                if msg["model"] not in spawn(ptu)["models"]:
+                    spawn(ptu)["models"].append(msg["model"])
+            blocks = msg.get("content") if isinstance(msg.get("content"), list) else []
+            for b in blocks:
+                if not isinstance(b, dict):
+                    continue
+                if kind == "assistant" and b.get("type") == "text" and ptu:
+                    spawn(ptu)["texts"].append(b.get("text") or "")
+                elif (kind == "assistant" and b.get("type") == "tool_use"
+                      and b.get("name") in DELEGATION_TOOLS and b.get("id")):
+                    sp = spawn(b["id"])
+                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                    sp["type"] = sp["type"] or inp.get("subagent_type")
+                    sp["parent"] = ptu
+                    if ptu:
+                        spawn(ptu)["calls"] += 1
+                elif kind == "user" and b.get("type") == "tool_result" and b.get("tool_use_id"):
+                    first = b.get("content")
+                    if isinstance(first, list):
+                        first = next((x.get("text") for x in first if isinstance(x, dict)
+                                      and x.get("type") == "text"), None)
+                    # A backgrounded spawn answers with a launch notice, not its reply.
+                    if (isinstance(first, str) and first.strip()
+                            and not first.startswith("Async agent launched")):
+                        spawn(b["tool_use_id"])["reply"] = first
+        elif kind == "result":
+            results.append(ev)
+    if not results:
+        st["error"] = "the run produced no result event"
+        return st
+    last = results[-1]
+    st["result"] = last.get("result") if isinstance(last.get("result"), str) else None
+    if last.get("is_error") or last.get("subtype") not in (None, "success"):
+        st["error"] = ("claude reported an error: "
+                       + str(last.get("result") or last.get("subtype"))[:160])
+    return st
+
+
+def tool_names(text):
+    """A self-reported tool list -> the set of names, or None when it is not a list.
+
+    An item counts only if the WHOLE item is one identifier, so prose such as "I do not
+    have Agent" contributes nothing rather than a false `Agent`. Every canary agent is
+    granted `Read`, so a report that does not name it is not a tool list at all.
+    """
+    names = set()
+    for item in re.split(r"[,\n;]", text or ""):
+        item = item.strip().strip("`*'\".[]()").strip()
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_-]*$", item):
+            names.add(item)
+    return names if "Read" in names else None
+
+
+def _by_type(st, name):
+    return [sp for _sid, sp in sorted(st["spawns"].items()) if sp["type"] == name]
+
+
+def _own_words(sp):
+    """An agent's final words: its reply to the spawner, else its last forwarded text."""
+    if sp.get("reply"):
+        return sp["reply"]
+    return sp["texts"][-1] if sp["texts"] else ""
+
+
+def c2_verdict(treatment, control):
+    """(verdict, evidence) from two parsed runs. FAIL only when the probe is proven able
+    to see `Agent` (the control reports it) AND the revoked IC still reports it."""
+    said = {}
+    for label, st in (("treatment", treatment), ("control", control)):
+        if st.get("error"):
+            return "UNAVAILABLE", f"{label} run: {st['error']}"
+        ics = _by_type(st, CANARY_NS + "ic")
+        words = _own_words(ics[0]) if ics else ""
+        if not tool_names(words):
+            relay = re.search(r"IC_SAID=(.*)", st.get("result") or "", re.S)
+            words = relay.group(1).strip() if relay else words
+        names = tool_names(words)
+        if not ics and not names:
+            return "UNAVAILABLE", f"{label} run: the lead never spawned the IC"
+        if names is None:
+            return "UNAVAILABLE", f"{label} IC's reply is not a tool list: {words[:80]!r}"
+        said[label] = (bool(names & set(DELEGATION_TOOLS)), ", ".join(sorted(names)))
+    if not said["control"][0]:
+        return "UNAVAILABLE", (f"control IC reported `{said['control'][1]}` without Agent, so "
+                               "the probe cannot see the tool and an absence proves nothing")
+    evidence = f"treatment={said['treatment'][1]} | control={said['control'][1]}"
+    return ("FAIL", evidence) if said["treatment"][0] else ("PASS", evidence)
+
+
+def c1_verdict(chain, links):
+    """(verdict, evidence, measured limit) from the parsed chain run.
+
+    PASS when every link above the deepest holds `Agent` and the deepest does not;
+    FAIL when a SHALLOWER link already lacks it (the host's limit is below the org's
+    shape). A deepest link that still holds `Agent` cannot state a limit with this
+    many links, and a broken chain states nothing — both UNAVAILABLE, never FAIL.
+    """
+    if chain.get("error"):
+        return "UNAVAILABLE", f"chain run: {chain['error']}", None
+    marks = []
+    for k in range(1, links + 1):
+        found = _by_type(chain, f"{CANARY_NS}d{k}")
+        if not found:
+            return ("UNAVAILABLE", f"link {k} was never spawned — the chain broke above it"
+                    + (f" ({' | '.join(marks)})" if marks else ""), None)
+        sp = found[0]
+        line = None
+        for txt in sp["texts"] + [sp.get("reply") or "", chain.get("result") or ""]:
+            m = re.search(rf"D{k}_TOOLS=([^\n]*)", txt or "")
+            if m:
+                line = m.group(1)
+                break
+        names = tool_names(line) if line is not None else None
+        if names is None and not sp["calls"]:
+            return "UNAVAILABLE", f"link {k} reported no parseable tool list", None
+        has = bool(sp["calls"]) or bool(names & set(DELEGATION_TOOLS))
+        depth = sp["depth"] if sp["depth"] is not None else k
+        marks.append(f"D{depth}={'has-agent' if has else 'no-agent'}")
+        if not has:
+            evidence = " | ".join(marks)
+            if k == links:
+                return "PASS", evidence, depth
+            return "FAIL", evidence + f" — limit {depth}, below the shipped {links}", depth
+    return ("UNAVAILABLE", " | ".join(marks) + f" — the deepest link still holds Agent, so "
+            f"this host's limit is above the shipped {links} and {links} links cannot state it",
+            None)
+
+
+def _same_model(a, b):
+    a, b = (a or "").lower(), (b or "").lower()
+    return bool(a and b) and (a in b or b in a)
+
+
+def phase_d_verdict(run, pin):
+    """(outcome, evidence) — ADVISORY. The model is the one the HARNESS called for the
+    pinned spawn, read from the stream; the self-report rides along for a human."""
+    if run.get("error"):
+        return "UNAVAILABLE", f"model run: {run['error']}"
+    found = _by_type(run, CANARY_NS + "model")
+    if not found or not found[0]["models"]:
+        return "UNAVAILABLE", "the harness recorded no model for the pinned spawn"
+    seen, session = found[0]["models"], run.get("session_model")
+    said = re.search(r"MODEL=(\S+)", " ".join(found[0]["texts"] + [found[0].get("reply") or ""]))
+    evidence = (f"pinned {pin} · harness called {', '.join(seen)} · session {session} · "
+                f"self-report {said.group(1) if said else '(none)'}")
+    if _same_model(pin, session):
+        return "INDETERMINATE", evidence
+    return ("MATCH" if any(_same_model(pin, m) for m in seen) else "MISMATCH"), evidence
+
+
+def _kill(proc):
+    try:
+        if os.name == "posix":
+            import signal
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
+    except OSError:
+        pass
+
+
+_RESIDUE_RX = re.compile(r"^(agent-[0-9a-f]+\.(meta\.json|jsonl)|[^/\\]+\.output)$")
+_UUID_RX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _session_roots():
+    """The two places a headless child keeps per-session state, as glob stems."""
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    return [os.path.join(cfg, "projects"), os.path.join(tempfile.gettempdir(), "claude-*")]
+
+
+def _listing(stem):
+    return set(glob.glob(os.path.join(stem, "*")))
+
+
+def sweep_child_sessions(sids, before):
+    """Remove what the canary's OWN children left, and nothing else. Returns (removed, left).
+
+    MEASURED 2026-09-15 on 2.1.268: `--no-session-persistence` stops the transcript but
+    the harness still writes `<config>/projects/<cwd>/<session>/subagents/agent-*.meta.json`
+    per spawn and an empty `<tmp>/claude-<uid>/<cwd>/<session>/tasks/`. A directory is
+    removed only when it is named by a session id THIS attempt generated and holds
+    nothing but those shapes; a parent is removed only if it did not exist before the
+    attempt and is now empty. Anything else is left and reported.
+    """
+    removed, left = 0, []
+    for sid in sids:
+        if not _UUID_RX.match(sid):
+            continue
+        for stem in _session_roots():
+            for d in glob.glob(os.path.join(stem, "*", sid)):
+                files = [os.path.join(p, f) for p, _ds, fs in os.walk(d) for f in fs]
+                if all(_RESIDUE_RX.match(os.path.basename(f)) for f in files):
+                    shutil.rmtree(d, ignore_errors=True)
+                    removed += len(files)
+                    parent = os.path.dirname(d)
+                    if parent not in before and os.path.isdir(parent) and not os.listdir(parent):
+                        os.rmdir(parent)
+                else:
+                    left.append(d)
+    return removed, left
+
+
+def canary_attempt(claude, model, pin, links, timeout, cwd):
+    """Launch the four sessions together and read them. This function writes nothing;
+    what the harness itself leaves per child session is swept by id afterwards."""
+    procs, raw, sids = {}, {}, []
+    before = set()
+    for stem in _session_roots():
+        before |= {p for s in glob.glob(stem) for p in _listing(s)}
+    try:
+        for name, (main_agent, agents) in canary_definitions(links, pin).items():
+            sids.append(str(uuid.uuid4()))
+            cmd = [claude, "-p", "--session-id", sids[-1], "--setting-sources", "",
+                   "--strict-mcp-config", "--no-session-persistence", "--model", model,
+                   "--output-format", "stream-json", "--verbose", "--forward-subagent-text",
+                   "--agents", json.dumps(agents), "--agent", main_agent, "run the canary"]
+            kw = {"stdin": subprocess.DEVNULL, "stdout": subprocess.PIPE,
+                  "stderr": subprocess.PIPE, "cwd": cwd}
+            if os.name == "posix":
+                kw["start_new_session"] = True    # so a timeout can end the whole tree
+            try:
+                procs[name] = subprocess.Popen(cmd, **kw)
+            except OSError as exc:
+                raw[name] = {"error": f"could not start claude ({exc.__class__.__name__})"}
+        deadline = time.time() + timeout
+        for name, proc in procs.items():
+            try:
+                out, err = proc.communicate(timeout=max(1, deadline - time.time()))
+            except subprocess.TimeoutExpired:
+                _kill(proc)
+                proc.communicate()
+                raw[name] = {"error": f"timed out after {timeout}s"}
+                continue
+            st = parse_stream(out.decode("utf-8", "replace"))
+            err = err.decode("utf-8", "replace").strip()
+            if proc.returncode and "unknown option" in err:
+                st["error"] = "this harness rejects a flag the canary needs: " + err[:160]
+            elif proc.returncode and not st["error"]:
+                st["error"] = f"claude exited {proc.returncode}: {err[:160] or '(no stderr)'}"
+            raw[name] = st
+    finally:
+        for proc in procs.values():
+            if proc.poll() is None:
+                _kill(proc)
+        swept = sweep_child_sessions(sids, before)
+    c2 = c2_verdict(raw["c2-treatment"], raw["c2-control"])
+    c1 = c1_verdict(raw["c1-chain"], links)
+    d = phase_d_verdict(raw["phase-d"], pin)
+    if "FAIL" in (c1[0], c2[0]):
+        verdict = "FAIL"
+    elif c1[0] == c2[0] == "PASS":
+        verdict = "PASS"
+    else:
+        verdict = "UNAVAILABLE"
+    return {"verdict": verdict, "c1": c1, "c2": c2, "d": d, "swept": swept}
+
+
+def run_canary(root, argv, execute):
+    """Measure C1, C2 and Phase D on this host; on PASS, record through --record-canary.
+
+    Exit 0 PASS · 1 FAIL · 3 UNAVAILABLE · 2 a caller error or a record that refused.
+    """
+    try:
+        attempts = int(_opt(argv, "--attempts") or 2)
+        timeout = int(_opt(argv, "--timeout") or 180)
+    except ValueError:
+        print("wf-apply --run-canary: --attempts and --timeout take integers", file=sys.stderr)
+        return 2
+    model = _opt(argv, "--canary-model") or "haiku"
+    pin = _opt(argv, "--pin-model") or "sonnet"
+    links = shipped_tier_limit()
+    version, vsrc = measured_on(_opt(argv, "--measured-on"))
+    claude = shutil.which("claude")
+    lines = []
+    for n in range(1, max(1, attempts) + 1):
+        if claude is None:
+            res = {"verdict": "UNAVAILABLE", "c1": ("UNAVAILABLE", "claude is not on PATH", None),
+                   "c2": ("UNAVAILABLE", "claude is not on PATH"),
+                   "d": ("UNAVAILABLE", "claude is not on PATH")}
+        elif links is None:
+            res = {"verdict": "UNAVAILABLE",
+                   "c1": ("UNAVAILABLE", "the shipped platform.md states no TIER-LIMIT", None),
+                   "c2": ("UNAVAILABLE", "not attempted without a chain length"),
+                   "d": ("UNAVAILABLE", "not attempted")}
+        else:
+            res = canary_attempt(claude, model, pin, links, timeout, tempfile.gettempdir())
+        cause = res["c2"] if res["c2"][0] == "UNAVAILABLE" else res["c1"]
+        why = f" ({cause[1]})" if res["verdict"] == "UNAVAILABLE" else ""
+        lines.append(f"attempt {n} {res['verdict']}{why}")
+        print(f"canary-run         attempt {n} · {res['verdict']} · session model {model} · "
+              f"timeout {timeout}s")
+        print(f"  C1 {res['c1'][0]:<12} {res['c1'][1]}")
+        print(f"  C2 {res['c2'][0]:<12} {res['c2'][1]}")
+        print(f"  D  {res['d'][0]:<12} {res['d'][1]}  (advisory — never gates)")
+        removed, left = res.get("swept") or (0, [])
+        print(f"  child-session residue swept: {removed} file(s)"
+              + (f" · LEFT (unexpected contents): {', '.join(left)}" if left else ""))
+        if res["verdict"] != "UNAVAILABLE":
+            break
+    print(f"INV-CANARY   {' · '.join(lines)} · instrument wf-apply --run-canary "
+          f"(--agents, no agent file written) · Claude Code {version or 'unread'} ({vsrc})")
+    if res["verdict"] == "FAIL":
+        return 1
+    if res["verdict"] != "PASS":
+        return 3
+    rec = ["--tier-limit", str(res["c1"][2]), "--c1", "PASS: " + res["c1"][1],
+           "--c2", "PASS: " + res["c2"][1],
+           "--by", _opt(argv, "--by") or "wf-apply --run-canary"]
+    if _opt(argv, "--measured-on"):
+        rec += ["--measured-on", _opt(argv, "--measured-on")]
+    code = record_canary(root, rec, execute)
+    return 0 if code == 0 else 2
+
+
 def main(argv):
     execute = "--execute" in argv
     root = _opt(argv, "--root")
@@ -658,6 +1123,8 @@ def main(argv):
 
     if "--record-canary" in argv:
         return record_canary(root, argv, execute)
+    if "--run-canary" in argv:
+        return run_canary(root, argv, execute)
 
     applied = reported = refused = 0
 

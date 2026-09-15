@@ -6,11 +6,11 @@
      `model-map.md` re-runs Step 0.4 standalone and `evaluators.md` reads Step 0.3. -->
 
 Everything `audit` does before Step 1: backup, companion skills, model and effort setup, VCS, the
-canary fixtures, and the ownership preflight. **These are gates, not steps** — each one's outcome
+canary readiness check, and the ownership preflight. **These are gates, not steps** — each one's outcome
 changes what the rest of the run is allowed to do.
 
-**Two of them write, and the backup precedes both.** Step 0.6 writes canary fixtures and Step 0.2 takes the
-backup; the ordering rule is stated in Step 0.2 and is not a matter of convenience.
+**The backup precedes every gate that writes.** Step 0.2 takes it, and the ordering rule stated there is
+not a matter of convenience.
 
 ---
 
@@ -72,6 +72,50 @@ slot.
 **Adding a question is a design change, not a convenience.** The failure it prevents is real: a run that
 stops forty times is a run nobody finishes, and the work it was stopping for gets skipped by hand
 instead.
+
+### Rendering the calls — one per message, in the table's order
+
+**BLOCKING — when more than one `AskUserQuestion` call is owed, each call is the ONLY tool call in its
+message, and the next is issued only after the previous one is answered.** The table above is the
+order: consent, then the backup and advisor, then model A, model B, effort A, effort B. This deliberately
+overrides the general habit of batching independent tool calls into one message, because these calls are
+**not** independent:
+
+- **the backup (Step 0.2) is answered before any writing gate runs** — its answer decides whether the
+  run is undoable, and every later gate reads that state;
+- **the effort calls (0.4c, 0.4d) come after both model calls (0.4a, 0.4b)** — the rungs an effort
+  object may offer depend on the model that lane was just given (`platform.md` fact 12c), so an effort
+  call rendered before its model call is answered offers a ladder for a model nobody chose.
+
+*Written 2026-09-15 from a customer audit (`audit-20260915T180847Z`, workforce 1.59.1, a cPanel host):
+the run issued the calls in spec order but put backup, model A and model B in one message and the two
+effort calls in another, and the answers came back last-first — model B, model A, backup, then effort
+B, effort A. So the user walked the setup backwards. That the host presents one message's calls
+newest-first is INFERRED from those answer timestamps, not seen on screen (`platform.md` fact 26).*
+
+`references/procedures/model-map.md` renders the same budget calls standalone and follows this rule as
+stated here.
+
+### What "pre-selected" means on screen — a label, never a position
+
+**`AskUserQuestion` has no default and no pre-select field.** Every place this file says an object's
+value is *pre-selected*, it means the rendering below — nothing else — and it keeps two properties:
+keeping the current value costs **one click**, and an in-pool current value **never moves**.
+
+| The object's resolved default is… | Rendered as |
+|---|---|
+| a recorded value that is in the offered set (a re-audit) | that option, labelled `(current)`, **where the cost order already puts it** |
+| the lane's recommendation, with nothing recorded (a first run) | that option, labelled `(recommended)`, where the cost order puts it |
+| both at once | one option, labelled `(current · recommended)` |
+| a recorded value **outside** the pool (e.g. an advisor still on a model the pool has since replaced) | an extra option **placed LAST**, after the cost-ranked pool, labelled `(current — not in the pool)`; to fit the four-option cap, drop the cheapest pool row that is not the recommendation |
+
+**The out-of-pool current goes last, not first.** Leading with it breaks the cost ranking every object
+shares, which is exactly what `org-config.template.md` § Model statics forbids a recommendation to do;
+last is where a hand-typed value would have arrived, and it is still one click. An out-of-pool
+*recommendation* keeps its own sanctioned first position (§ Step 0.4a); a lane with both shows the
+recommendation first and the current value last. *The case was left undecided until 2026-09-15, and the
+customer run above improvised it: the advisor's recorded model, one the pool had since replaced, rendered FIRST
+as `(current)` and the cheapest pool model was dropped.*
 
 ---
 
@@ -182,8 +226,8 @@ interactive run — refuse without it, because the budget questions cannot rende
 `--review` writes nothing **anywhere** (`procedures/audit.md` § `--review`). Steps 1b and 3b carry that
 carve-out explicitly, and a pass that found them fixed both — **in `audit.md`, while the writing gates
 live here**, so Step 0.2 and Step 0.6 kept writing under a mode whose whole promise is that it does not.
-Step 0.6 writes agent fixtures into the user's `.claude/agents/`, which is the worst version of it: a
-preview that registers files.
+Step 0.6 wrote agent fixtures into the user's `.claude/agents/` until 2026-09-15, which was the worst
+version of it: a preview that registers files.
 
 **So the rule is stated once, here, and every gate below carries it:** a gate that writes states what
 it does under `--review`, in its own section. This is the same coupling the setup-gate list in
@@ -193,8 +237,7 @@ not added.
 
 ## Step 0.05 — Settings preflight (runs before every writing gate)
 
-**Runs right after the backup and before anything that writes** — before the canary fixtures (0.6),
-the ownership preflight (0.7), the permissions review (0.8), agent registration, and the model rewrite.
+**Runs right after the backup and before anything that writes** — before the ownership preflight (0.7), the permissions review (0.8), agent registration, and the model rewrite.
 Its job is to find the settings that would refuse those writes *before* the run reaches them, so a
 refusal is cleared in one gesture at setup rather than met at Step 6 and handed back as homework.
 
@@ -298,7 +341,8 @@ defect above:
 >    where they are instead of being cleaned up, so a few jobs will have two copies until you delete
 >    the old ones yourself.
 
-**Second object on this call — the session advisor**, pre-selected from `advisorModel` (Step 0.3):
+**Second object on this call — the session advisor**, its current `advisorModel` (Step 0.3) rendered as the
+one-click `(current)` option (§ What "pre-selected" means on screen):
 
 > **An advisor for you?**
 > It runs alongside you, not inside any agent — a second opinion on what you are doing. Pick the blank
@@ -307,7 +351,8 @@ defect above:
 It offers the same model pool as the model budget, in the same cost order, and **takes as its
 recommendation the pool row whose Notes cell names the session advisor** (`org-config.template.md`
 § Model statics, row 1 as shipped, the same pick as creative-visual), marked `(recommended)` in
-place and pre-selected on a first run; a recorded `advisorModel` pre-selects instead (Step 0.3). Typing
+place on a first run; a recorded `advisorModel` is the `(current)` option instead (Step 0.3), placed last
+if the pool no longer carries it. Typing
 **none** in the blank field removes the `advisorModel` key from settings
 entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is never written as an empty or
 sentinel value. It sits here rather than with the lanes because it is not a lane: it reaches no
@@ -334,9 +379,9 @@ The run prints **`INV-BACKUP`** — taken, and the number of writes that precede
 (`references/invariants.md`).
 
 **The rule is "before the first write of the run", not "first in the execution phase".** An earlier
-revision said the latter, and it was wrong: Step 0.6 writes canary fixtures into `.claude/agents/`, and
-the execution phase is Step 6. A backup taken there captures a tree workforce has already modified, so
-`restore` would put this run's fixtures back as though the user had written them — the archive claims to
+revision said the latter, and it was wrong: Step 0.6 then wrote canary fixtures into `.claude/agents/`,
+and the execution phase is Step 6. A backup taken there captured a tree workforce had already modified,
+so `restore` would have put that run's fixtures back as though the user had written them — the archive claims to
 be pre-audit state and is not. Whatever the first writing gate becomes, the backup precedes it.
 
 **Failed and empty are two different states.** Conflating them is how a run either blocks for no reason
@@ -461,6 +506,14 @@ the immutable case (Step 0.7); this covers the larger one.
 **Report every customization found, by path and kind.** A companion converted without saying what was
 preserved is indistinguishable from one that was overwritten.
 
+**A customized data-skill companion gains the contract sections it lacks, and nothing else.**
+`personnel-ledger` is a data skill, and `verify` fails any data skill missing a required section
+(`data-skills.md` § Required sections). A customized copy is never overwritten, so `wf-companion
+--execute` (Step 4) APPENDS each missing section from shipped source, below a note saying so, and
+leaves every existing byte where it was. It prints `appended <section>` and counts it in `INV-CORE`. A
+differently named section is not taken as the missing one. Measured 2026-09-15 on pythom-space:
+`## Layout` stays as written, and `## Schema` is appended stating the flat layout.
+
 **Evaluator catalogs install on ABSENCE ALONE — never gated on a declared department.** This is
 claude-enforcer's `DEC-2026-06-12-install-on-absence`: an all-coding project got no text evaluator because
 nothing declared a creative lane, and the audit *defended* the non-build. That defense was rejected.
@@ -476,7 +529,7 @@ installed, not a new install, so they run whether or not anything was checked. A
 not reach installed copies only ever helps new projects.
 
 **Read the current `advisorModel` from the project's settings** (both `.claude/settings.json` and
-`.claude/settings.local.json`). Its value pre-selects the advisor object on the backup call (Step 0.2). The budget
+`.claude/settings.local.json`). Its value is the advisor object's `(current)` option on the backup call (Step 0.2). The budget
 decides what happens — not this gate.
 
 ## Step 0.4 — Model budget, effort budget
@@ -550,7 +603,7 @@ lower-cost static the template had since added.
 **This option set is DERIVED FROM ONE SOURCE, and the source is the shipped template.** Read the pool
 from `org-config.template.md` § Model statics and from nowhere else; offer the lanes in the template's
 cost order; mark each lane's recommended model `(recommended)` **in place** from the Notes column; and
-pre-select the recorded value on a re-audit, else the recommendation. Where the project's own
+label the recorded value `(current)` on a re-audit ({R}). Where the project's own
 `org-config.md` carries a `## Model statics` section, report it as a stale legacy artifact and read
 past it — never clobber it, and never read the pool from it.
 
@@ -587,7 +640,7 @@ choice at a glance. The out-of-pool exception is the case noted just above. The 
 the recommendation § Model statics names for it (§ Step 0.2). Never move a row to express one, and never re-annotate the Notes column to shift which
 model reads as recommended — that is a change to the question the user sees, and it is theirs to make.
 
-**On a first run there is no recorded value, and the pre-selected default is still deterministic.**
+**On a first run there is no recorded value, and the default is still deterministic.**
 Resolve each object's default in priority order: (1) the value in this project's `org-config.md` when one
 is present — a re-audit; ELSE (2) the lane's recommended model (§ Model statics, Notes column). There is
 no third fallback —
@@ -597,8 +650,8 @@ selection unless the user overrides it, identically on every project. This is a 
 orthogonal to list POSITION: it does not reorder the options and does not promote the recommended
 static to the first position; the ordering rule above — position never moves to surface a pick — STANDS.
 
-**The advisor object lives on the backup call** (§ Step 0.2), pre-selected from the current
-`advisorModel` in project settings (read in Step 0.3). Choosing a model writes `advisorModel`;
+**The advisor object lives on the backup call** (§ Step 0.2), its `(current)` option read from
+`advisorModel` in project settings (Step 0.3). Choosing a model writes `advisorModel`;
 typing **none** in the blank field removes the key entirely. It runs only in the main session and does not compound with spawned
 employees, **which is why it has no effort object** — nothing spawns at an effort level it controls, and
 that permanent asymmetry is exactly why it may not sit among the lanes.
@@ -630,7 +683,7 @@ promotes it to the first position. The model and effort calls render back to bac
 by opposite conventions. Offer only the rungs the lane's selected model supports, and never invent one —
 the ladder is the complete set, so there is no "Other" here.
 
-**The pre-selected default resolves exactly as the model budget's does** (§ Step 0.4a): (1) the rung in
+**The default resolves exactly as the model budget's does, and renders as its label** (§ Step 0.4a): (1) the rung in
 this project's `org-config.md` when present — a re-audit; ELSE (2) the lane's recommended rung (§ Effort
 statics recommendation table). There is no third fallback —
 **a first run defaults to the recommended rung** —
@@ -638,7 +691,7 @@ never the most-expensive rung and never unset, so the recommendation is the forc
 unless the user overrides it. It is a VALUE default, orthogonal to list POSITION: it neither reorders
 the ladder nor promotes the recommended rung to the first position, and the position rule above STANDS.
 The lane's *current value* is a separate seed used only for ladder windowing and is simply empty on a
-first run (below); the pre-selected default is never empty.
+first run (below); the default is never empty.
 
 **`AskUserQuestion` caps options at four, and the full ladder is five** (`max`/`xhigh`/`high`/`medium`/
 `low`). Where the selected model supports five rungs, offer the **four nearest the recommended rung** —
@@ -686,10 +739,21 @@ reported; a role budgeted by a default nobody chose must never look like one bud
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose;
 anything else arrives via "Other."
 
-**Every object renders every run**, current values pre-selected — one click when nothing changed. A
+**Every object renders every run**, its current value the one-click `(current)` option
+({R}) — one click when nothing changed. A
 marker may change a default; it may never drop a question.
 
-The run prints **`INV-BUDGET`** — questions rendered against questions owed (`references/invariants.md`).
+The run prints **`INV-BUDGET`** — questions rendered against questions owed, **and the order they were
+asked in** (`references/invariants.md`):
+
+```
+INV-BUDGET   rendered 6 of 6 owed · 6 messages · in order
+INV-BUDGET   rendered 6 of 6 owed · 2 messages · NOT in order — calls 2-4 shared one message   UPHELD=false
+```
+
+**The order half is the run's own report, and it is advisory.** No hook can see sibling calls in one
+message, so nothing enforces it (`SKILL.md` Core Principle 6): the run counts the messages that carried a
+call and says whether each call was answered before the next was issued (§ Rendering the calls).
 
 **`INV-BUDGET` fails in BOTH directions, and it used to fail in only one.** It read "every budget
 question rendered," which catches a *missing* question and is blind to an *extra* one — so the budget was
@@ -716,26 +780,28 @@ backup → conversion refuses** (§ Step 0.2).
 covers. The rule is `procedures/verify.md` § The user's own files, which also states why nothing is
 edited; this gate only runs it early enough to matter.
 
-## Step 0.6 — Write the canary fixtures (earliest possible gate)
+## Step 0.6 — Tier-canary readiness (writes nothing)
 
-Registration requires a tier-canary result (`procedures/hire.md` § Preconditions), and a fixture
-**cannot be spawned in the turn that creates it** (`platform.md` fact 3). So the fixtures are written
-here, before the survey — the survey and the Step 2 panels are what buys the registration delay.
+Registration requires a tier-canary result (`procedures/hire.md` § Preconditions). **The canary needs no
+fixture and no head start:** `wf-apply --run-canary` defines its agents for one headless session
+(`staging.md` § Phase C, `platform.md` fact 24), so they exist the moment the child starts and Step 4b
+measures on its first attempt. This gate only settles what Step 4b will do:
 
-- Skip if `platform-local.md` exists and its `MEASURED-ON` matches the running harness: the host is
-  already measured, Step 4b returns `PASS (on record)`, and nothing needs spawning.
-- Skip if fixtures from a previous run are already registered and discoverable. Reuse them.
-- Otherwise write them per `staging.md` § Fixture lifecycle, and **report that they were written this
-  run** — that single fact is what makes an UNAVAILABLE at Step 4b legible rather than mysterious.
+- IF `platform-local.md` exists and its `MEASURED-ON` matches the running harness → the host is already
+  measured, Step 4b returns `PASS (on record)`, and nothing is spawned.
+- ELSE IF `command -v claude` finds nothing → report now that Step 4b will return `UNAVAILABLE`
+  (`claude is not on PATH`), so the DEGRADED marks later in the run are legible rather than mysterious.
+- ELSE → Step 4b runs the instrument.
 
-**This gate writes files and spawns nothing.** It is not a question and consumes no question slot.
+**This gate writes nothing and spawns nothing** — and never writes an agent definition into any
+`agents/` directory. *Until 2026-09-15 it was named "Write the canary fixtures" and put five agent files
+into the user's `.claude/agents/`, where they sat in every session's agent menu; 1.31.0 removed the
+fixtures on the user's marks and left this gate describing them for three releases.* It is not a
+question and consumes no question slot.
 
-**Under `--review`: writes NOTHING.** No fixtures, ever — this gate registers agent definitions in the
-user's `.claude/agents/`, and doing that during a run advertised as zero-write is the sharpest form of
-the contradiction. Report which of the three applies: fixtures already present and reusable, a matching
-`platform-local.md` on record, or **neither — in which case say that Step 4b would return `UNAVAILABLE`
-on a real run and the tier ceiling would be reported unverified.** A review that quietly implies a
-canary it never wrote would be describing a run nobody could have.
+**Under `--review`: the same three checks, and it writes nothing** — which is now true in both modes.
+Report which branch applies; on the third, say that Step 4b would spawn four headless sessions and
+write nothing unless the run records a PASS.
 
 ## Step 0.7 — Ownership and collision preflight (detect, then degrade — stated)
 

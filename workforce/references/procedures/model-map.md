@@ -17,7 +17,8 @@ changeable without a full audit and without either gate question** (there is not
 nothing to archive, because it writes only the config and the frontmatter it names). It renders **five
 `AskUserQuestion` calls** — model budget as two, effort budget as two, and the advisor — fixed regardless
 of headcount. `AskUserQuestion` caps options at four objects per call, and the five lanes overflow it, so
-each budget renders as two calls, grouped identically to `audit-setup.md` § Step 0.4:
+each budget renders as two calls, grouped identically to `audit-setup.md` § Step 0.4, **each call alone
+in its message and asked in that order, advisor last** (`audit-setup.md` § Rendering the calls):
 
 - **Model budget — two calls, six objects:** Call A (3 objects) = `analytical · Lead`, `analytical · IC`,
   `code`; Call B (2 objects) = `creative-text`, `creative-visual`
@@ -35,8 +36,8 @@ each budget renders as two calls, grouped identically to `audit-setup.md` § Ste
 - **Effort budget — two calls, six objects:** the same lanes grouped identically to the model budget,
   each marking its recommended rung `(recommended)` (`audit-setup.md` § Step 0.4b) and offering only rungs
   the lane's selected model supports — at most four, because `AskUserQuestion` caps options at four.
-- **Advisor — 1 object:** pre-selected from `advisorModel` in settings on a re-audit; same model pool,
-  and on a first run pre-selected from its recommendation — the pool row whose Notes cell names the
+- **Advisor — 1 object:** `advisorModel` from settings is its `(current)` option on a re-audit (`audit-setup.md` § What "pre-selected" means on screen); same model pool,
+  and on a first run its default is the recommendation — the pool row whose Notes cell names the
   session advisor (`org-config.template.md` § Model statics), marked `(recommended)` in place in the cost
   order like any lane's. Its **blank field is where the user types `none` to remove the `advisorModel` key
   entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
@@ -49,7 +50,8 @@ a prior run recorded. Generative work is always creative: writing prose or copy 
 graphics and frontend design route to `creative-visual`, and a support role inside a creative department
 is analytical (`org-config.template.md` § Creative).
 
-**Every object renders on every interactive run**, current values pre-selected. Answering costs one click
+**Every object renders on every interactive run**, each current value the one-click `(current)` option
+(`audit-setup.md` § What "pre-selected" means on screen). Answering costs one click
 when nothing changed. **A marker may change a default; it may never drop a question.**
 
 **Never fabricate a model ID.** The shipped statics are the only IDs this project may propose; anything
@@ -61,7 +63,7 @@ project config is reported as a stale artifact and read past, never clobbered
 **The model budget's option set is derived from `org-config.template.md` § Model statics, and from
 nowhere else** (`references/audit-setup.md` § Step 0.4a states the derivation in full: the template's
 cost order, the `(recommended)` mark taken in place from the Notes column, the recorded value
-pre-selected on a re-audit). Do not rebuild the pool from a project's own `org-config.md`, even where a
+labelled `(current)` on a re-audit). Do not rebuild the pool from a project's own `org-config.md`, even where a
 legacy instantiation left a `## Model statics` section inside it.
 
 **The effort budget's option set is derived the same way** (`references/audit-setup.md` § Step 0.4c):

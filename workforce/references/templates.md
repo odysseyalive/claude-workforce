@@ -83,6 +83,12 @@ when_to_use: "When a decision is not covered by a handbook, or when checking tha
 **Must NOT set `disable-model-invocation: true`** — such skills cannot be preloaded, and preloading is
 the entire mechanism. Asserted on every write.
 
+**The Strategic Objective arrives as a placeholder and does not stay one.** `audit` Step 1c drafts it
+from the survey and writes it through `wf-companion --draft-objective`, replacing the placeholder span
+with an `origin: workforce | modifiable: true | drafted-by: …` span — never a user span, because the
+user has not written it yet. The user overturns the draft by editing it and freezes it by changing
+that opener to `origin: user | immutable: true` (`procedures/audit.md` § Step 1c).
+
 **Keep the whole file under ~120 lines.** Its cost is paid on every spawn of every employee, so
 length multiplies by headcount and fan-out. A constitution too long to preload is a constitution
 nobody reads.

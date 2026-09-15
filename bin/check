@@ -2704,6 +2704,237 @@ check("platform: MEASURED-ON stamp present", "MEASURED-ON:" in plat)
 check("platform: TIER-LIMIT constant present", "TIER-LIMIT:" in plat)
 check("platform: MEASURED and DOCUMENTED are separated", "## DOCUMENTED" in plat and "## MEASURED" in plat)
 
+# ── THE PYTHON FLOOR (customer DEF-Q-001, 2026-09-15) ─────────────────────────
+# A cPanel jailshell on RHEL 8, whose python3 is 3.6, ran three 3.7+ calls from shipped
+# scripts: `subprocess.run(capture_output=, text=)` in wf-preflight and wf-apply (a
+# TypeError, so the script crashed) and `datetime.fromisoformat` in wf-widen (an
+# AttributeError that the caller caught, so a check quietly stopped working). Nothing in the
+# repo stated a minimum, so nothing could fail on one. The floor is `PYTHON-FLOOR:` in
+# platform.md's header, read here and never restated (Core Principle 9a). Each row below
+# names the version that introduced the API. A row whose version is newer than the floor
+# is a finding in any shipped script. An AST scan needs no network or container.
+# `bin/` itself does not ship, so it may use anything.
+def _py_floor():
+    _m = re.search(r"^PYTHON-FLOOR:\s*(\d+)\.(\d+)", plat, re.M)
+    return (int(_m.group(1)), int(_m.group(2))) if _m else None
+
+
+def _is_ann_bitor(_n):
+    return isinstance(_n, ast.BinOp) and isinstance(_n.op, ast.BitOr)
+
+
+def _is_builtin_generic(_n):
+    return (isinstance(_n, ast.Subscript) and isinstance(_n.value, ast.Name)
+            and _n.value.id in ("list", "dict", "tuple", "set", "frozenset", "type"))
+
+
+def _evaluated_annotations(_tree):
+    """Annotations Python EVALUATES at runtime: every parameter and return annotation, and
+    a variable annotation at module or class level. A local variable's annotation inside a
+    function body is never evaluated (PEP 526), so it is not reported."""
+    _out = []
+
+    def _visit(_node, _in_func):
+        for _c in ast.iter_child_nodes(_node):
+            if isinstance(_c, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                _a = _c.args
+                for _arg in (_a.args + _a.kwonlyargs + getattr(_a, "posonlyargs", [])
+                             + [x for x in (_a.vararg, _a.kwarg) if x]):
+                    if _arg.annotation is not None:
+                        _out.append(_arg.annotation)
+                if _c.returns is not None:
+                    _out.append(_c.returns)
+                _visit(_c, True)
+            elif isinstance(_c, ast.AnnAssign):
+                if not _in_func:
+                    _out.append(_c.annotation)
+            elif isinstance(_c, ast.ClassDef):
+                _visit(_c, False)
+            else:
+                _visit(_c, _in_func)
+    _visit(_tree, False)
+    return _out
+
+
+def _subprocess_names(_tree):
+    """Names a module binds to `subprocess` or to one of its call APIs."""
+    _mods, _funcs = set(), set()
+    for _n in ast.walk(_tree):
+        if isinstance(_n, ast.Import):
+            for _al in _n.names:
+                if _al.name == "subprocess":
+                    _mods.add(_al.asname or "subprocess")
+        elif isinstance(_n, ast.ImportFrom) and _n.module == "subprocess":
+            for _al in _n.names:
+                _funcs.add(_al.asname or _al.name)
+    return _mods, _funcs
+
+
+_SP_CALLS = {"run", "Popen", "call", "check_call", "check_output"}
+
+
+def _sp_kw(_n, _mods, _funcs, _kw):
+    if not isinstance(_n, ast.Call) or not any(k.arg == _kw for k in _n.keywords):
+        return False
+    _f = _n.func
+    return ((isinstance(_f, ast.Attribute) and _f.attr in _SP_CALLS
+             and isinstance(_f.value, ast.Name) and _f.value.id in _mods)
+            or (isinstance(_f, ast.Name) and _f.id in _funcs and _f.id in _SP_CALLS))
+
+
+def _call_kw(_n, _name, _kw):
+    if not isinstance(_n, ast.Call) or not any(k.arg == _kw for k in _n.keywords):
+        return False
+    _f = _n.func
+    return ((isinstance(_f, ast.Attribute) and _f.attr == _name)
+            or (isinstance(_f, ast.Name) and _f.id == _name))
+
+
+def _attr_or_import(_n, _name, _module=None):
+    if isinstance(_n, ast.Attribute) and _n.attr == _name:
+        return True
+    return (isinstance(_n, ast.ImportFrom) and (_module is None or _n.module == _module)
+            and any(_al.name == _name for _al in _n.names))
+
+
+def _imports_module(_n, _mod):
+    if isinstance(_n, ast.Import):
+        return any(_al.name == _mod or _al.name.startswith(_mod + ".") for _al in _n.names)
+    return isinstance(_n, ast.ImportFrom) and bool(_n.module) and (
+        _n.module == _mod or _n.module.startswith(_mod + "."))
+
+
+# (label, introduced-in, predicate(node, ctx), sample that MUST be detected)
+# The sample column is the self-test below: a row that cannot see its own example is a
+# denylist entry that tests nothing.
+PY_FLOOR_DENYLIST = [
+    ("subprocess `capture_output=`", (3, 7),
+     lambda n, c: _sp_kw(n, c["mods"], c["funcs"], "capture_output"),
+     "import subprocess\nsubprocess.run(['x'], capture_output=True)\n"),
+    ("subprocess `text=`", (3, 7),
+     lambda n, c: _sp_kw(n, c["mods"], c["funcs"], "text"),
+     "from subprocess import Popen\nPopen(['x'], text=True)\n"),
+    ("`datetime.fromisoformat`", (3, 7),
+     lambda n, c: _attr_or_import(n, "fromisoformat"),
+     "import datetime\ndatetime.datetime.fromisoformat('2026-01-01')\n"),
+    ("`from __future__ import annotations`", (3, 7),
+     lambda n, c: _attr_or_import(n, "annotations", "__future__"),
+     "from __future__ import annotations\n"),
+    ("`contextlib.nullcontext`", (3, 7),
+     lambda n, c: _attr_or_import(n, "nullcontext"),
+     "import contextlib\ncontextlib.nullcontext()\n"),
+    ("`sys.stdout.reconfigure`", (3, 7),
+     lambda n, c: _attr_or_import(n, "reconfigure"),
+     "import sys\nsys.stdout.reconfigure(encoding='utf-8')\n"),
+    ("the `dataclasses` module", (3, 7),
+     lambda n, c: _imports_module(n, "dataclasses"),
+     "from dataclasses import dataclass\n"),
+    ("the `breakpoint()` builtin", (3, 7),
+     lambda n, c: isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+     and n.func.id == "breakpoint",
+     "breakpoint()\n"),
+    ("walrus `:=`", (3, 8),
+     lambda n, c: type(n).__name__ == "NamedExpr",
+     "if (n := 1):\n    pass\n"),
+    ("positional-only parameters `/`", (3, 8),
+     lambda n, c: isinstance(n, ast.arguments) and bool(getattr(n, "posonlyargs", [])),
+     "def f(a, /):\n    pass\n"),
+    ("`functools.cached_property`", (3, 8),
+     lambda n, c: _attr_or_import(n, "cached_property"),
+     "from functools import cached_property\n"),
+    ("`Path.unlink(missing_ok=)`", (3, 8),
+     lambda n, c: _call_kw(n, "unlink", "missing_ok"),
+     "import pathlib\npathlib.Path('x').unlink(missing_ok=True)\n"),
+    ("`shutil.copytree(dirs_exist_ok=)`", (3, 8),
+     lambda n, c: _call_kw(n, "copytree", "dirs_exist_ok"),
+     "import shutil\nshutil.copytree('a', 'b', dirs_exist_ok=True)\n"),
+    ("`shlex.join`", (3, 8),
+     lambda n, c: isinstance(n, ast.Attribute) and n.attr == "join"
+     and isinstance(n.value, ast.Name) and n.value.id == "shlex",
+     "import shlex\nshlex.join(['a'])\n"),
+    ("`str.removeprefix` / `removesuffix`", (3, 9),
+     lambda n, c: _attr_or_import(n, "removeprefix") or _attr_or_import(n, "removesuffix"),
+     "'ab'.removeprefix('a')\n"),
+    ("`Path.is_relative_to`", (3, 9),
+     lambda n, c: _attr_or_import(n, "is_relative_to"),
+     "import pathlib\npathlib.Path('a').is_relative_to('b')\n"),
+    ("builtin generic `list[...]` in an evaluated annotation", (3, 9),
+     lambda n, c: id(n) in c["ann_generic"],
+     "def f(x: list[str]):\n    pass\n"),
+    ("`X | Y` in an evaluated annotation", (3, 10),
+     lambda n, c: id(n) in c["ann_bitor"],
+     "def f(x: int | None):\n    pass\n"),
+    ("`zip(strict=)`", (3, 10),
+     lambda n, c: _call_kw(n, "zip", "strict"),
+     "zip([1], [2], strict=True)\n"),
+    ("`match` statement", (3, 10),
+     lambda n, c: type(n).__name__ == "Match",
+     "match 1:\n    case 1:\n        pass\n"),
+    ("`except*`", (3, 11),
+     lambda n, c: type(n).__name__ == "TryStar",
+     "try:\n    pass\nexcept* ValueError:\n    pass\n"),
+]
+
+
+def py_floor_findings(src, floor, rows=None):
+    """[(lineno, label, version)] for every denylisted API newer than `floor` in `src`."""
+    try:
+        _tree = ast.parse(src)
+    except SyntaxError as _e:
+        return [(_e.lineno or 0, f"does not parse on this interpreter ({_e.msg})", (0, 0))]
+    _mods, _funcs = _subprocess_names(_tree)
+    _ann = _evaluated_annotations(_tree)
+    _ctx = {"mods": _mods, "funcs": _funcs,
+            "ann_bitor": {id(x) for a in _ann for x in ast.walk(a) if _is_ann_bitor(x)},
+            "ann_generic": {id(x) for a in _ann for x in ast.walk(a) if _is_builtin_generic(x)}}
+    _live = [r for r in (rows or PY_FLOOR_DENYLIST) if r[1] > floor]
+    _out = []
+    for _n in ast.walk(_tree):
+        for _label, _ver, _pred, _sample in _live:
+            if _pred(_n, _ctx):
+                _out.append((getattr(_n, "lineno", 0), _label, _ver))
+    return sorted(set(_out))
+
+
+def shipped_python_scripts():
+    """Every shipped file whose first line is a python shebang, or that ends in `.py`."""
+    _out = []
+    for _p in manifest_paths():
+        try:
+            with open(_p, "rb") as _fh:
+                _first = _fh.readline()
+        except OSError:
+            continue
+        if (_first.startswith(b"#!") and b"python" in _first) or _p.endswith(".py"):
+            _out.append(_p)
+    return _out
+
+
+_pyfloor = _py_floor()
+check("platform: PYTHON-FLOOR constant present", _pyfloor is not None,
+      "platform.md's header block must state `PYTHON-FLOOR: <major>.<minor>`, the oldest python3 "
+      "a shipped script is allowed to need")
+# THE SELF-TEST. Each denylist row must detect its own sample when the floor is below the
+# row's version. Without this, a predicate that matches nothing would read green forever.
+_pf_blind = [r[0] for r in PY_FLOOR_DENYLIST
+             if not any(f[1] == r[0] for f in py_floor_findings(r[3], (3, 0), [r]))]
+check("python floor: every denylist row detects its own sample", not _pf_blind,
+      f"rows that cannot see their own example: {_pf_blind}")
+_pf_scripts = shipped_python_scripts()
+_pf_hits = []
+for _p in _pf_scripts:
+    for _ln, _label, _ver in py_floor_findings(read(_p), _pyfloor or (3, 6)):
+        _pf_hits.append(f"{_p}:{_ln} {_label} (needs {_ver[0]}.{_ver[1]})")
+check(
+    "python floor: no shipped script uses an API newer than PYTHON-FLOOR",
+    len(_pf_scripts) >= 20 and not _pf_hits,
+    (f"{_pf_hits} — " if _pf_hits else f"only {len(_pf_scripts)} shipped python script(s) found "
+     "(expected the full set; a shrunken scan set is a vacuous pass) — ")
+    + "RHEL 8's python3 is 3.6; a 3.7+ call crashes there or silently disables a check "
+    "(customer DEF-Q-001). Use stdout=subprocess.PIPE, stderr=subprocess.PIPE, "
+    "universal_newlines=True; parse timestamps with strptime",
+)
+
 # Every MEASURED fact must cite evidence a clone can actually open. platform.md
 # promises "MEASURED facts carry their evidence path" — and cited `.claude/`,
 # which is gitignored, so no reader could check one.
@@ -4274,6 +4505,23 @@ check(
     "the layout block and § Schema disagreed on whether records live in per-type "
     "subdirectories; the live tree and the ledger enumeration are flat",
 )
+# ...AND EVERY READER FOLLOWS IT. `wf-conform.check_defects` read `personnel/defects/` after
+# the layout went flat, so on every host that followed § Schema it checked nothing and passed
+# (customer DEF-Q-004, 2026-09-15; 120 flat DEFs, none checked, on six local hosts). The
+# record set is `wf-ledger`'s to enumerate, flat plus any legacy subfolder, and the DEF check
+# reads it from there and prints its count. Fixtures def-no-class-fix, def-not-indexed (flat)
+# and def-legacy-layout (subfolder) hold the behaviour.
+_cfm_def = read("workforce/bin/wf-conform")
+_cfm_def = _cfm_def[_cfm_def.find("def check_defects"):_cfm_def.find("\ndef ", _cfm_def.find("def check_defects") + 10)]
+check(
+    "personnel: the DEF check reads wf-ledger's record set, flat and legacy, and counts it",
+    'ledger.record_ids(root)' in _cfm_def and 'ledger.legacy_records(root)' in _cfm_def
+    and 'res.count(f"DEF records:' in _cfm_def and '"defects")' not in _cfm_def
+    and "def legacy_records(root)" in read("workforce/bin/wf-ledger")
+    and "LEGACY LAYOUT:" in read("workforce/bin/wf-ledger"),
+    "a reader with its own idea of where records live checks nothing when the layout moves, "
+    "and prints nothing that says so",
+)
 # EMP is subject-keyed and never dated (a stable, findable standing record); the event
 # records are <TYPE>-<slug> with a date prepended only to disambiguate a recurrence.
 # The template headings once mandated a date the flat § Schema and the live DEF-<slug>
@@ -4835,7 +5083,9 @@ check(
 #
 # The same shape audit.md already records about Step 0.7: a sweep scoped to one
 # file, over a procedure sequenced across two.
-_WRITING_GATES = ["## Step 0.2 — Backup", "## Step 0.6 — Write the canary fixtures"]
+# Step 0.6 left this list 2026-09-15: it writes nothing now (the canary defines its agents per
+# headless session), and the no-agent-file assertion below is what keeps it that way.
+_WRITING_GATES = ["## Step 0.2 — Backup"]
 _silent_gates = []
 for _g in _WRITING_GATES:
     _i = _asu.find(_g)
@@ -6061,6 +6311,7 @@ _READER_INVENTORY = {
     "bin/check": 4,   # the fourth is the § anchor check's sacred-span skip (2026-09-14)
     "bin/baseline": 1,
     "workforce/bin/wf-catalog": 2,
+    "workforce/bin/wf-companion": 1,  # the Strategic Objective placeholder span (2026-09-15)
     "workforce/bin/wf-census": 1,
     "workforce/bin/wf-claude-md": 1,
     "workforce/bin/wf-conform": 2,
@@ -10031,6 +10282,20 @@ check("wf-conform enforces the Class fix field",
       "names a Class fix" in _wfc,
       "doctrine restated four times did not hold; this is the check behind it")
 
+# WHERE THE FIELD BINDS (decided 2026-09-15). The Class fix blocks at the moment a DEF is
+# written: defect.md step 5d runs `wf-conform --def`, and that mode exits 1. At verify it
+# advises with a count, because 110 of 126 real records carry none and nothing can supply
+# one. Fixtures: def-write-time-no-class-fix (blocks), def-no-class-fix (advises),
+# def-class-fix-heading (the `## Class fix` spelling is the same field).
+check("the Class fix blocks where a DEF is written, and advises at verify",
+      '"--def", dest="def_path"' in _wfc and "return 1 if bad else 0" in _wfc
+      and "carry no Class fix — historical; the field" in _wfc
+      and 'section(body, "## Class fix")' in _wfc
+      and "--def .claude/workforce/personnel/DEF-<slug>.md" in read("workforce/references/procedures/defect.md")
+      and "The step is not finished while this exits 1" in read("workforce/references/procedures/defect.md"),
+      "a field checked only on history, where nothing can supply it, is a flag with no fix; a "
+      "field checked nowhere at write time is the rule restated a fifth time")
+
 check("wf-conform checks DEF records reach the index",
       "appears in the personnel index" in _wfc,
       "a record nothing points at is one the next reader never finds")
@@ -11272,7 +11537,10 @@ check(
 check(
     "sidecar: coverage is measured against the TREE, not the sidecar's own rows",
     "every sacred block on disk is stamped" in _cfm
-    and "os.walk(claude_dir)" in _cfm
+    # The tree-walk moved into wf-census.sacred_scope on 2026-09-15 (DEF-Q-006), so that
+    # wf-stamp writes over the same set this demands. It is pinned where it now lives.
+    and ".sacred_scope(root)" in _cfm
+    and "os.walk(claude)" in read("workforce/bin/wf-census")
     and "guarded by nothing" in _cfm,
     "wf-conform verifies only rows the sidecar already names, so an unstamped "
     "protected span is invisible to it and the gate that authorizes deletion reads "
@@ -11739,7 +12007,9 @@ _cfm2 = read("workforce/bin/wf-conform")
 # heuristic BY NAME, so this file was enforcing the declared rule's opposite.
 check(
     "conform: `.censusignore` is read through wf-census, not guessed from directory names",
-    "census.load_ignore()" in _cfm2 and 'd != "fixtures"' not in _cfm2,
+    # The sidecar walk reads the declaration inside wf-census.sacred_scope since 2026-09-15.
+    ".sacred_scope(root)" in _cfm2 and "census.load_ignore()" in read("workforce/bin/wf-census")
+    and 'd != "fixtures"' not in _cfm2,
     "two shipped checkers measuring one tree against two different denominators. A "
     "declared exclusion bound wf-census and wf-apply and was invisible here, so a "
     "project's own test corpus reported as unstamped sacred blocks and held the "
@@ -12743,7 +13013,9 @@ check(
 # only in the row name is invisible in exactly the clean case it qualifies.
 check(
     "sidecar scan: workforce's own run scratch is excluded, and the exclusion prints",
-    "_SCRATCH" in _lc_cnf and "scratch_skipped" in _lc_cnf
+    # The exclusion itself lives in wf-census.sacred_scope (SACRED_SCRATCH) since 2026-09-15;
+    # the print stays here.
+    "SACRED_SCRATCH" in read("workforce/bin/wf-census") and "scratch_skipped" in _lc_cnf
     and "not scanned for sacred blocks" in _lc_cnf,
     "the scan walks all of .claude/, so every run report and staged tree is read as "
     "live doctrine — the check's only failures become its own leftovers, which is how "
@@ -14014,11 +14286,163 @@ check(
 
 check(
     "directives sidecar: scope is declared, so a vendored tree is never stamped",
-    "def load_ignore" in _ds_stamp and ".censusignore" in _ds_stamp
-    and "SACRED_ROOTS = (" in _ds_stamp,
+    '.sacred_scope(root)' in _ds_stamp and ".censusignore" in _ds_stamp
+    and "def ignored(" not in _ds_stamp and "SACRED_ROOTS" not in _ds_stamp,
     "wf-census answers 'what counts as project content' once, through .censusignore. A "
-    "producer with its own directory guess freezes somebody else's text as this "
-    "project's directive — the failure wf-census § load_ignore was written against",
+    "producer with its own directory guess or its own matcher freezes somebody else's text "
+    "as this project's directive, or misses a block conform demands (DEF-Q-006)",
+)
+
+# THE IC LENGTH ROW ORDERS ONLY WHAT RELOCATION CAN REACH (customer measurement, 2026-09-15).
+# Three ICs on the customer host were at 297, 231 and 296 lines after verbatim relocation.
+# The 297 is 181 lines with Scope, Sources, Procedure and Verification removed entirely, so
+# "the split is PERFORMED this run" was an order no run could satisfy. The Lead branch
+# already refused to order an unreachable relocation; the IC branch now does the same. It
+# reports the lines this check requires as their own component and prints the per-section
+# breakdown. Fixtures: conform-ic-over-ceiling-unreachable (observed, no order) and
+# conform-over-ceiling (reachable, ordered).
+_cfm_len = read("workforce/bin/wf-conform")
+check(
+    "length ceiling: an IC over the ceiling is ordered to relocate only when relocation can reach it",
+    "elif body_lines > ceiling and _ic_floor(body)[0] > ceiling:" in _cfm_len
+    and "IC handbook length OBSERVED" in _cfm_len
+    and "def _ic_floor(body)" in _cfm_len and "RELOCATABLE_SECTIONS = (" in _cfm_len
+    and "2026-09-15" in read("workforce/references/procedure-for-procedures.md"),
+    "an advisory that orders a relocation which provably cannot reach its target is worse than "
+    "silence: every audit spends effort on it and reports the same row again",
+)
+
+# ONE DEFINITION OF A DATA SKILL AND ITS RECORDS (customer DEF-Q-003, 2026-09-15). The
+# swept-reference scan called a converted knowledge base's record bodies LIVE, and
+# `data-skills.md` forbids editing them, so the count could never reach 0. RECORD is decided
+# by `wf-conform.is_record` over `data_skills`, which is the same set conform holds to the
+# data-skill contract. A skill is recognized by the contract it declares, never by a
+# directory name. Fixtures: remainder-swept-refs-records (declared: RECORD, exit 0) and
+# remainder-swept-refs-records-undeclared (no contract: LIVE, exit 1).
+_rem_ds = read("workforce/bin/wf-remainder")
+_cfm_ds = read("workforce/bin/wf-conform")
+check(
+    "data skills: the swept-reference scan and conform share one data-skill definition",
+    'conform.is_record(root, path, records)' in _rem_ds and '"RECORD":' in _rem_ds
+    and "for skill_dir, body in data_skills(root):" in _cfm_ds
+    and 'entry.startswith("records-")' not in _cfm_ds
+    and "def record_patterns(root)" in _cfm_ds,
+    "two readers of 'what is a data skill' that disagree is how a record body gets ordered "
+    "rewritten, or a data skill escapes its contract check",
+)
+
+# A HOST THE SHARED DEFINITION TURNS RED MUST HAVE A WAY BACK (2026-09-15). The data-skill
+# definition caught pythom-space's customized `personnel-ledger`, which has `## Layout` and no
+# `## Schema`. wf-companion called it UNMANAGED and did nothing more, so verify stayed red with
+# no heal. This runs the heal on the fixture tree and then wf-conform. It requires that no
+# data-skill row fails, that the original bytes survive as an exact prefix, and that a second
+# run appends nothing.
+def _ledger_heal():
+    import tempfile as _tf
+    import shutil as _sh
+    with _tf.TemporaryDirectory(prefix="wf-ledger-heal-") as _t:
+        _tree = os.path.join(_t, "tree")
+        _sh.copytree("fixtures/scripts/companion-ledger-missing-schema", _tree)
+        _f = os.path.join(_tree, ".claude/skills/personnel-ledger/SKILL.md")
+        _orig = read(_f)
+        _env = dict(os.environ, HOME=_t)
+        _env.pop("CLAUDE_CONFIG_DIR", None)
+        _run = lambda *a: subprocess.run([sys.executable] + list(a), stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, universal_newlines=True,
+                                         timeout=120, env=_env).stdout
+        _run("workforce/bin/wf-companion", "--root", _tree, "--execute")
+        _after = read(_f)
+        _second = _run("workforce/bin/wf-companion", "--root", _tree, "--execute")
+        _j = os.path.join(_t, "c.json")
+        _run("workforce/bin/wf-conform", "--root", _tree, "--json", _j)
+        try:
+            _rows = json.load(open(_j, encoding="utf-8"))["rows"]
+        except (OSError, ValueError, KeyError):
+            return False, "wf-conform wrote no --json report"
+        _ds = [r for r in _rows if "data skill carries every required section" in r["check"]]
+        _ok = (bool(_orig) and _after.startswith(_orig.rstrip("\n")) and len(_after) > len(_orig)
+               and _ds and all(r["ok"] for r in _ds) and "appended 0" in _second
+               and read(_f) == _after)
+        return _ok, (f"data-skill rows {[(r['ok'], r.get('detail')) for r in _ds]}; prefix kept "
+                     f"{_after.startswith(_orig.rstrip(chr(10)))}; second run appended 0 "
+                     f"{'appended 0' in _second}")
+
+
+# A project data skill's missing section (`## Seed` in pythom-space's `email` and `quo`) is
+# project-specific, so no script can write it. The blocking row must name the step that does.
+# Otherwise verify is a dead end.
+check(
+    "data skills: a missing contract section names the audit step that completes it",
+    "A data skill missing a required contract section is completed here, in this run."
+    in read("workforce/references/procedures/audit.md")
+    and "Step 3b § Datasets" in read("workforce/bin/wf-conform"),
+    "a blocking row whose remedy nothing performs is a flag, not a fix",
+)
+
+_lh_ok, _lh_why = _ledger_heal()
+check(
+    "core refresh: a customized personnel-ledger gains its missing contract sections, every byte kept",
+    bool(_lh_ok) and '"contract": "data-skill"' in read("workforce/bin/wf-companion"),
+    f"{_lh_why} — a host the data-skill definition turns red must have a way back on the next "
+    "audit; the heal appends from shipped source and never touches the customized text",
+)
+
+# ONE SCAN SET FOR THE WRITER AND THE CHECKER (customer DEF-Q-006, 2026-09-15). wf-stamp read
+# four roots and wf-conform walked all of `.claude/`, so a sacred block in a project-made
+# `.claude/workforce/migrated/` was required by one and unstampable by the other. The row
+# was BLOCKING, and clearing it took a hand edit to `.censusignore`. This runs both tools on
+# one tree that has a block in a place outside the old four roots, one in a dot-directory,
+# one in scratch and one declared out. It asserts that after `wf-stamp --directives --execute`
+# conform finds nothing unstamped and the sidecar holds exactly the blocks in scope. Either
+# tool drifting from the shared set fails this by name.
+def _sacred_agreement():
+    import tempfile as _tf
+    _blk = "<!-- origin: user | immutable: true -->\n{}\n<!-- /origin -->\n"
+    with _tf.TemporaryDirectory(prefix="wf-sacred-") as _t:
+        _put = {
+            ".claude/workforce/migrated/archive.md": "keep the archive",
+            ".claude/skills/s/SKILL.md": "a skill directive",
+            ".claude/.hidden/note.md": "a dot-directory block",
+            ".claude/workforce/work/run1/OUTPUT.md": "a run-scratch copy",
+            ".claude/vendored/x.md": "declared out",
+        }
+        for _rel, _txt in _put.items():
+            os.makedirs(os.path.join(_t, os.path.dirname(_rel)), exist_ok=True)
+            with open(os.path.join(_t, _rel), "w", encoding="utf-8") as _fh:
+                _fh.write("# x\n\n" + _blk.format(_txt))
+        with open(os.path.join(_t, ".censusignore"), "w", encoding="utf-8") as _fh:
+            _fh.write(".claude/vendored\n")
+        _env = dict(os.environ, HOME=_t)
+        _env.pop("CLAUDE_CONFIG_DIR", None)
+        subprocess.run([sys.executable, "workforce/bin/wf-stamp", "--root", _t, "--directives",
+                        "--execute"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       universal_newlines=True, timeout=60, env=_env)
+        _j = os.path.join(_t, "conform.json")
+        subprocess.run([sys.executable, "workforce/bin/wf-conform", "--root", _t, "--json", _j],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       universal_newlines=True, timeout=120, env=_env)
+        try:
+            _rows = json.load(open(_j, encoding="utf-8"))["rows"]
+        except (OSError, ValueError, KeyError):
+            return None, "wf-conform wrote no --json report"
+        _cov = [r for r in _rows if r["check"].startswith("sidecar: every sacred block on disk is stamped")]
+        _side = open(os.path.join(_t, ".claude/workforce/.directives.sha"), encoding="utf-8").read() \
+            if os.path.exists(os.path.join(_t, ".claude/workforce/.directives.sha")) else ""
+        _keys = sorted(re.findall(r"\s(\S+):directive:\d+", _side))
+        _want = sorted([".claude/.hidden/note.md", ".claude/skills/s/SKILL.md",
+                        ".claude/workforce/migrated/archive.md"])
+        return (bool(_cov) and _cov[0]["ok"] and _keys == _want), \
+            f"conform coverage row: {_cov[:1]}; sidecar rows: {_keys}; expected {_want}"
+
+
+_sa_ok, _sa_why = _sacred_agreement()
+check(
+    "sacred scope: wf-stamp stamps exactly the set wf-conform demands",
+    bool(_sa_ok)
+    and ".sacred_scope(root)" in read("workforce/bin/wf-conform")
+    and "def sacred_scope(root)" in read("workforce/bin/wf-census"),
+    f"{_sa_why} — the writer and the checker of `.directives.sha` must share one scan set "
+    "(wf-census.sacred_scope), or a block one demands the other cannot write (DEF-Q-006)",
 )
 
 check(
@@ -14688,6 +15112,321 @@ check(
     "`Evidence` in the template) and every other assertion here stayed green. This is "
     "the class fix: the headings in BODIES must equal the `## ` headings in the "
     "matching template, in order",
+)
+
+# ── the tier canary's instrument: `wf-apply --run-canary` (2026-09-15) ─────
+# 1.31.0 removed the five canary fixtures on the user's marks — a registered agent sits
+# in every session's agent menu — and left audit-setup Step 0.6, audit Step 4b/6a and
+# staging Phase C describing them. C2 returned UNAVAILABLE on every run for three
+# releases and every handbook shipped `Tier ceiling: unverified` (customer DEF-Q-005,
+# reported against 1.59.1). The instrument is `claude -p --agents`, which writes no file.
+# These assertions run its parser on RECORDED streams (fixtures/canary/, no network)
+# and the whole runner against a stub `claude`, and hold the doctrine to it.
+_ck_mod, _ck_err = None, ""
+try:
+    import importlib.util as _cku, importlib.machinery as _ckm
+    sys.dont_write_bytecode = True
+    _cks = _cku.spec_from_loader("_wfa_canary", _ckm.SourceFileLoader(
+        "_wfa_canary", "workforce/bin/wf-apply"))
+    _ck_mod = _cku.module_from_spec(_cks)
+    _cks.loader.exec_module(_ck_mod)
+except Exception as _exc:                                # noqa: BLE001
+    _ck_err = f"wf-apply will not import ({_exc})"
+_CK = {n: read(f"fixtures/canary/{n}.jsonl")
+       for n in ("c2-treatment", "c2-control", "c1-chain", "phase-d")}
+_CK_GARBAGE = "Invalid API key · Please run /login\n"
+_CK_SIGNED_OUT = ('{"type":"result","subtype":"success","is_error":true,'
+                  '"result":"Not logged in · Please run /login"}\n')
+
+
+def _ck_table():
+    """(case, got, want) for every recorded or derived stream. Raises nothing."""
+    m, rows = _ck_mod, []
+    try:
+        P = {n: m.parse_stream(v) for n, v in _CK.items()}
+        prose = m.parse_stream(
+            _CK["c2-treatment"].replace('"text": "Read"', '"text": "I cannot tell which tools I have."')
+            .replace("IC_SAID=Read", "IC_SAID=I cannot tell which tools I have."))
+        bad, out = m.parse_stream(_CK_GARBAGE), m.parse_stream(_CK_SIGNED_OUT)
+        rows += [("C2 treatment + control", m.c2_verdict(P["c2-treatment"], P["c2-control"])[0], "PASS"),
+                 ("C2 a leaked revocation (control bytes as treatment)",
+                  m.c2_verdict(P["c2-control"], P["c2-control"])[0], "FAIL"),
+                 ("C2 a control that cannot see Agent", m.c2_verdict(P["c2-treatment"], P["c2-treatment"])[0], "UNAVAILABLE"),
+                 ("C2 not JSON at all", m.c2_verdict(bad, P["c2-control"])[0], "UNAVAILABLE"),
+                 ("C2 signed out", m.c2_verdict(out, P["c2-control"])[0], "UNAVAILABLE"),
+                 ("C2 a prose reply", m.c2_verdict(prose, P["c2-control"])[0], "UNAVAILABLE"),
+                 ("C1 three links", m.c1_verdict(P["c1-chain"], 3)[:3:2], ("PASS", 3)),
+                 ("C1 a shipped limit above the host's", m.c1_verdict(P["c1-chain"], 4)[0], "FAIL"),
+                 ("C1 a deepest link still holding Agent", m.c1_verdict(P["c1-chain"], 2)[0], "UNAVAILABLE"),
+                 ("C1 not JSON at all", m.c1_verdict(bad, 3)[0], "UNAVAILABLE"),
+                 ("D pinned sonnet", m.phase_d_verdict(P["phase-d"], "sonnet")[0], "MATCH"),
+                 ("D pin equal to the session", m.phase_d_verdict(P["phase-d"], "haiku")[0], "INDETERMINATE"),
+                 ("D a pin the harness did not call", m.phase_d_verdict(P["phase-d"], "opus")[0], "MISMATCH"),
+                 ("D not JSON at all", m.phase_d_verdict(bad, "sonnet")[0], "UNAVAILABLE")]
+    except Exception as exc:                             # noqa: BLE001
+        rows.append(("parser raised", repr(exc)[:120], "a verdict"))
+    return rows
+
+
+_ck_rows = _ck_table() if _ck_mod else [("import", _ck_err, "wf-apply imports")]
+_ck_wrong = [f"{c}: got {g!r}, want {w!r}" for c, g, w in _ck_rows if g != w]
+check(
+    "canary: the runner's parser returns the right verdict on recorded streams",
+    all(_CK.values()) and not _ck_wrong,
+    f"{_ck_wrong or 'fixtures/canary/*.jsonl missing'} — a parser that calls a prose reply "
+    "PASS, or a blind control FAIL, turns the one gate allowed to abort an audit into a "
+    "gate that aborts for a reason that is not true",
+)
+
+
+def _ck_run(stub_body, extra, timeout_s=60):
+    """Run `wf-apply --run-canary` against a stub `claude`; (exit, stdout, leftovers)."""
+    import tempfile as _ckt
+    with _ckt.TemporaryDirectory() as d:
+        for sub in ("bin", "cfg", "tmp", "root"):
+            os.makedirs(os.path.join(d, sub))
+        stub = os.path.join(d, "bin", "claude")
+        with open(stub, "w", encoding="utf-8") as fh:
+            fh.write(f"#!{sys.executable}\n" + stub_body)
+        os.chmod(stub, 0o755)
+        env = dict(os.environ, PATH=os.path.join(d, "bin") + os.pathsep + "/usr/bin:/bin",
+                   CLAUDE_CONFIG_DIR=os.path.join(d, "cfg"), TMPDIR=os.path.join(d, "tmp"),
+                   CK_FIX=os.path.abspath("fixtures/canary"))
+        r = subprocess.run([sys.executable, "workforce/bin/wf-apply", "--root",
+                            os.path.join(d, "root"), "--run-canary", "--measured-on", "2.1.268"]
+                           + extra, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           universal_newlines=True, env=env, timeout=timeout_s)
+        left = [os.path.relpath(os.path.join(p, f), d) for p, _ds, fs in os.walk(d)
+                for f in fs if not p.startswith(os.path.join(d, "bin"))]
+        return r.returncode, r.stdout, left
+
+
+_CK_STUB = r'''import os, sys, json
+a = sys.argv[sys.argv.index("--agents") + 1] if "--agents" in sys.argv else "{}"
+name = ("c2-treatment" if "disallowedTools" in a else "c1-chain" if "wfcanary-d1" in a
+        else "phase-d" if "wfcanary-model" in a else "c2-control")
+sys.stdout.write(open(os.path.join(os.environ["CK_FIX"], name + ".jsonl")).read())
+sid = sys.argv[sys.argv.index("--session-id") + 1]
+d = os.path.join(os.environ["CLAUDE_CONFIG_DIR"], "projects", "-tmp", sid, "subagents")
+os.makedirs(d); open(os.path.join(d, "agent-a1.meta.json"), "w").write("{}")
+'''
+if os.name == "posix" and _ck_mod:
+    _ck_pass = _ck_run(_CK_STUB, ["--attempts", "1"])
+    _ck_slow = _ck_run("import time\ntime.sleep(30)\n", ["--timeout", "1", "--attempts", "2"])
+    check(
+        "canary: the runner measures end to end against a stub claude and writes nothing",
+        _ck_pass[0] == 0 and "INV-CANARY   attempt 1 PASS" in _ck_pass[1]
+        and "canary-record      would write" in _ck_pass[1] and not _ck_pass[2]
+        and _ck_slow[0] == 3 and "attempt 2 UNAVAILABLE (" in _ck_slow[1]
+        and "timed out after 1s" in _ck_slow[1],
+        f"PASS run: exit {_ck_pass[0]}, left {_ck_pass[2]} · timeout run: exit {_ck_slow[0]} — "
+        f"{(_ck_pass[1] + _ck_slow[1])[-300:]!r}. The runner must pass on a recorded PASS, leave "
+        "no file (not even the harness's per-session residue), and turn a hang into "
+        "UNAVAILABLE after two attempts — never a FAIL and never an unbounded wait",
+    )
+else:
+    skip("canary: the runner measures end to end against a stub claude and writes nothing",
+         "not a POSIX host, or wf-apply did not import — the stub is a shebang script")
+
+# NO PROCEDURE MAY TELL A RUN TO WRITE A CANARY INTO AN AGENTS DIRECTORY. Classified by
+# grammar, as staging.md § Phase A rule 2 classifies tool mentions: a present-tense or
+# imperative write verb is an instruction; a sentence carrying a negation or a past tense
+# is history or a prohibition. Every shipped Markdown file is read, change records aside.
+_CK_WRITE = re.compile(r"\b(write|writes|register|registers|install|installs|place|"
+                       r"places|copy|copies|create|creates|put|puts)\b", re.I)
+_CK_NEG = re.compile(r"\b(never|not|no|nothing|none|retired|removed|wrote|was|were|until|"
+                     r"used to|once|earlier|left|refuses?)\b", re.I)
+_ck_hits = []
+for _p in manifest_paths():
+    if not _p.endswith(".md") or _p.startswith("workforce/changes/"):
+        continue
+    for _s in re.split(r"(?<=[.!?])\s+|\n\s*\n", read(_p)):
+        if (re.search(r"\b(canary|canaries|fixtures?)\b", _s, re.I)
+                and re.search(r"agents/|agents director", _s, re.I)
+                and _CK_WRITE.search(_s) and not _CK_NEG.search(_s)):
+            _ck_hits.append(f"{_p}: {' '.join(_s.split())[:110]}")
+check(
+    "canary: no shipped procedure instructs writing a canary fixture into an agents directory",
+    not _ck_hits,
+    f"{_ck_hits} — a canary written to an agents directory registers in every session's "
+    "agent menu on the machine; 1.31.0 removed them on the user's marks, and the "
+    "instrument that replaced them (`wf-apply --run-canary`) needs none",
+)
+
+
+def _ck_section(text, heading):
+    i = text.find(heading)
+    j = text.find("\n## ", i + 1) if i >= 0 else -1
+    return text[i:j if j > 0 else len(text)] if i >= 0 else ""
+
+
+_ck_named = {
+    "audit.md § Step 4b": _ck_section(aud, "## Step 4b — Tier canary"),
+    "staging.md § Phase C": _ck_section(read("workforce/references/staging.md"), "## Phase C — tier canary"),
+    "verify.md § Deferred tier canary": _ck_section(
+        read("workforce/references/procedures/verify.md"), "### Deferred tier canary"),
+    "audit-setup.md § Step 0.6": _ck_section(_asu, "## Step 0.6 — "),
+}
+check(
+    "canary: the procedures that run the tier canary name its instrument",
+    all("--run-canary" in v for v in _ck_named.values()),
+    f"not naming `--run-canary`: {[k for k, v in _ck_named.items() if '--run-canary' not in v]} — "
+    "a step that says 'run the canary' without the command is how Phase C described an "
+    "instrument that did not exist for three releases",
+)
+
+# ── the setup questions arrive in order, one call per message (2026-09-15) ──
+# A customer audit (1.59.1) issued the six setup calls in spec order but batched them
+# three and two to a message, and the user answered them last-first: the host presents
+# one message's calls newest-first (inferred from answer timestamps, platform.md fact 26).
+# The effort calls DEPEND on the model answers, so batching is not a cosmetic defect.
+_q_msd = read("workforce/references/procedures/model-map.md")
+check(
+    "budget: each setup call is asked alone in its message, in the table's order",
+    "each call is the ONLY tool call in its\nmessage" in _asu
+    and "### Rendering the calls — one per message, in the table's order" in _asu
+    and "§ Rendering the calls" in _q_msd
+    and "6 messages · in order" in _asu
+    and "(current — not in the pool)" in _asu,
+    "the rule, its INV-BUDGET order report, the out-of-pool `(current)` placement, or "
+    "model-map's pointer to it is gone — a model batching independent tool calls will put "
+    "several AskUserQuestion calls in one message, and the user walks the setup backwards",
+)
+# The table in § The question budget owns the numbering; every "question N of M" and
+# every "questions A–B" range elsewhere must agree with it. audit.md said the two
+# budgets were "questions 3 and 4" for months after they became 3–6.
+_q_tab = {}
+for _m in re.finditer(r"^\| (\d+) \| ([0-9.a-d]+) \| ([^|]+)\|", _asu, re.M):
+    _q_tab[int(_m.group(1))] = (_m.group(2), _m.group(3).lower())
+_q_total = max(_q_tab) if _q_tab else 0
+_q_nouns = {"consent": "consent", "backup": "backup", "back up": "backup",
+            "model": "model budget", "effort": "effort budget", "budget": "budget"}
+_q_bad = []
+for _p in manifest_paths():
+    if not _p.endswith(".md") or _p.startswith("workforce/changes/"):
+        continue
+    _txt = read(_p)
+    for _m in re.finditer(r"\bquestions? (\d+)(?:\s*(and|–|-|to|through)\s*(\d+))?"
+                          r"(?:\s*of\s*(\d+))?", _txt, re.I):
+        _a, _b, _of = int(_m.group(1)), _m.group(3), _m.group(4)
+        if _of and int(_of) != _q_total:
+            _q_bad.append(f"{_p}: {_m.group(0)!r} — the table has {_q_total}")
+        if _b:
+            _before = _txt[max(0, _m.start() - 100):_m.start()].lower()
+            _want = {n for n, (_s, what) in _q_tab.items()
+                     if any(k in _before and v in what for k, v in _q_nouns.items())}
+            if _want and set(range(_a, int(_b) + 1)) != _want:
+                _q_bad.append(f"{_p}: {_m.group(0)!r} — the table numbers them {sorted(_want)}")
+check(
+    "budget: no procedure numbers the setup questions differently from the question-budget table",
+    _q_total == 6 and not _q_bad,
+    f"{_q_bad or f'the table parsed to {_q_total} rows'} — a stale ordinal is how the "
+    "question ceiling quietly gains a slot (audit-setup.md § The question budget)",
+)
+
+# ── the Strategic Objective is drafted, and its placeholder is a precondition (2026-09-15) ──
+# wf-companion materialized `operating-principles` with § Strategic Objective as the
+# template's placeholder, inside an `origin: user | immutable: true` span, and nothing in
+# audit.md filled it — "Strategic Objective" did not occur in the file. A customer's first
+# Lead probe (1.59.1) FAILED against it and was charged to the handbook (DEF-Q-002).
+def _obj_run(d, *args, stdin=None):
+    r = subprocess.run([sys.executable, "workforce/bin/wf-companion", "--root", d] + list(args),
+                       input=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       universal_newlines=True, timeout=60)
+    return r.returncode, r.stdout
+
+
+def _obj_probe():
+    """Detect, draft, refuse to overwrite, and keep every other sacred block's bytes."""
+    import tempfile as _obt
+    bad = []
+    with _obt.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, ".claude"))
+        _obj_run(d, "--execute")                          # materialize the scaffold
+        op = os.path.join(d, ".claude", "skills", "operating-principles", "SKILL.md")
+        before = read(op)
+        spans = re.findall(r"^<!-- origin: user \| immutable: true -->\n(.*?)^<!-- /origin -->",
+                           before, re.S | re.M)
+        c, o = _obj_run(d, "--objective")
+        if c != 1 or "PLACEHOLDER" not in o:
+            bad.append(f"a fresh scaffold read {c} {o.strip()!r}, want exit 1 PLACEHOLDER")
+        c, o = _obj_run(d, "--draft-objective", "-", "--by", "audit t", "--execute",
+                        stdin="This project ships agents.\n")
+        after = read(op)
+        if c != 0 or "drafted-by: audit t" not in after or "This project ships agents." not in after:
+            bad.append(f"the draft did not land: {c} {o.strip()!r}")
+        if "## Strategic Objective" in after and re.search(
+                r"origin: user \| immutable: true -->\n## Strategic Objective\nThis project", after):
+            bad.append("the draft was written inside an origin: user span")
+        if not all(s in after for s in spans[1:]):
+            bad.append("a later sacred block lost bytes")
+        c, o = _obj_run(d, "--objective")
+        if c != 0 or "DRAFTED" not in o:
+            bad.append(f"after drafting it read {c} {o.strip()!r}, want exit 0 DRAFTED")
+        _obj_run(d, "--draft-objective", "-", "--execute", stdin="Something else.\n")
+        if read(op) != after:
+            bad.append("a second draft overwrote the first")
+        filled = after.replace("<!-- origin: workforce | modifiable: true | drafted-by: audit t -->",
+                               "<!-- origin: user | immutable: true -->")
+        with open(op, "w", encoding="utf-8") as fh:
+            fh.write(filled)
+        c, o = _obj_run(d, "--draft-objective", "-", "--execute", stdin="Something else.\n")
+        if read(op) != filled or "FILLED" not in o:
+            bad.append(f"a ratified objective was not left alone: {o.strip()!r}")
+    return bad
+
+
+try:
+    _obj_bad = _obj_probe()
+except Exception as _exc:                                # noqa: BLE001
+    _obj_bad = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "objective: an unfilled Strategic Objective is detected, drafted outside a user span, and never overwritten",
+    not _obj_bad,
+    f"{_obj_bad} — a Lead probed against the template's placeholder fails for a reason that "
+    "is not its handbook's, and a draft written inside `origin: user` would be quoted back "
+    "to the user as their own directive",
+)
+_obj_1c = aud.find("## Step 1c — Draft the Strategic Objective")
+_obj_pb = read("workforce/references/staging.md")
+check(
+    "objective: audit drafts it after the survey, before design and probes, and a probe treats the placeholder as a run precondition",
+    aud.find("## Step 1b") < _obj_1c < aud.find("## Step 2 — Design the org")
+    and "--draft-objective -" in aud and "wf-companion --root <absolute path> --objective" in _obj_pb
+    and "failed precondition of the RUN, never the handbook's `FAIL`" in _obj_pb
+    and "A FAILED RUN PRECONDITION IS NOT A DOCUMENT FAILURE" in read("workforce/SKILL.md"),
+    "Step 1c, the Phase B precondition, or the failure-attribution carve-out is gone — the "
+    "placeholder then reaches a probe and its FAIL becomes a DEF against a correct handbook",
+)
+
+# ── no shipped text directs a subagent to write a report-named Markdown file (2026-09-15) ──
+# The harness refuses a subagent's Write when the basename matches this pattern — read
+# from the 2.1.268 binary, platform.md fact 25 — and a customer's spawn lost its
+# `FINDINGS.md` to it. The scan is the HARNESS'S OWN PATTERN over every basename in
+# every shipped file, not a list of names. A match is allowed only where it is listed
+# below with the reason no subagent writes it; any new one fails until someone decides.
+_RPT_RX = re.compile(r"^(REPORT|SUMMARY|FINDINGS|ANALYSIS).*\.md$", re.I)
+_RPT_TOKEN = re.compile(r"(?<![\w<>{}.-])([\w<>{}.-]+\.md)\b")
+_RPT_ALLOWED = {
+    # the audit's closing report — the orchestrating session writes it (audit.md Step 7)
+    ("workforce/references/procedures/audit.md", "report.md"),
+    # the fact that states the refusal, citing the customer's refused name
+    ("workforce/references/platform.md", "FINDINGS.md"),
+}
+_rpt_hits = sorted({
+    (_p, _m.group(1)) for _p in manifest_paths()
+    if not _p.startswith("workforce/changes/")
+    for _m in _RPT_TOKEN.finditer(read(_p)) if _RPT_RX.match(_m.group(1))
+} - _RPT_ALLOWED)
+check(
+    "report names: no shipped file directs a subagent to write a basename the harness refuses",
+    not _rpt_hits
+    and "The orchestrating session writes this\nfile itself and never delegates it" in aud
+    and "begins with REPORT, SUMMARY, FINDINGS or ANALYSIS" in read(
+        "workforce/references/handbook-templates.md"),
+    f"{_rpt_hits or 'the main-loop note on report.md, or the handbook-template warning, is gone'}"
+    " — a subagent's Write to such a name is refused with 'Subagents should return findings "
+    "as text', so the deliverable never lands and the probe fails for the harness's reason",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -240,6 +240,39 @@ PWSH_CHECKS = {
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # THE PYTHON FLOOR (customer DEF-Q-001, 2026-09-15). Each case puts one of the three
+    # reverted 3.7+ calls back into a shipped script, so the scan must name it. The last one
+    # lowers nothing and raises the floor instead: without `PYTHON-FLOOR:` the constant check
+    # fires by name.
+    ("python floor: no shipped script uses an API newer than PYTHON-FLOOR",
+     "workforce/bin/wf-preflight", "append",
+     "\n\ndef _floor_probe():\n    import subprocess\n"
+     "    return subprocess.run(['x'], capture_output=True, text=True)\n"),
+    ("python floor: no shipped script uses an API newer than PYTHON-FLOOR",
+     WDN, "append",
+     "\n\ndef _floor_probe(stamp):\n    from datetime import datetime\n"
+     "    return datetime.fromisoformat(stamp)\n"),
+    ("platform: PYTHON-FLOOR constant present",
+     PL, "del", "PYTHON-FLOOR: 3.6"),
+    # The IC length row: without the reachability branch every IC is ordered to relocate.
+    ("length ceiling: an IC over the ceiling is ordered to relocate only when relocation can reach it",
+     CFM, "del", "elif body_lines > ceiling and _ic_floor(body)[0] > ceiling:"),
+    # Without the pointer the blocking data-skill row names no remedy.
+    ("data skills: a missing contract section names the audit step that completes it",
+     CFM, "del", "Step 3b § Datasets"),
+    # Without the contract flag the customized ledger is UNMANAGED again and stays red.
+    ("core refresh: a customized personnel-ledger gains its missing contract sections, every byte kept",
+     "workforce/bin/wf-companion", "del", '        "contract": "data-skill",\n'),
+    # DEF-Q-003: without the RECORD branch a data skill's history is LIVE again.
+    ("data skills: the swept-reference scan and conform share one data-skill definition",
+     REM, "del", "elif conform.is_record(root, path, records):"),
+    # Without step 5d the write-time gate is a mode nothing calls.
+    ("the Class fix blocks where a DEF is written, and advises at verify",
+     "workforce/references/procedures/defect.md", "del",
+     "The step is not finished while this exits 1"),
+    # DEF-Q-004: dropping the legacy half of the enumeration must fail by name.
+    ("personnel: the DEF check reads wf-ledger's record set, flat and legacy, and counts it",
+     CFM, "del", "ledger.legacy_records(root)"),
     # INSTALLER FLAG PARITY (2026-09-14). The port dropping one flag from its table must fail by
     # name, and so must the manifest header dropping one from its documented set.
     ("install: install.ps1 parses every manifest flag the bash installer parses",
@@ -657,7 +690,13 @@ CASES = [
     ("directives sidecar: the mismatch rule is the contract half's, not a silent repair",
      STMP, "del", "REFUSES every differing row"),
     ("directives sidecar: scope is declared, so a vendored tree is never stamped",
-     STMP, "del", "SACRED_ROOTS = ("),
+     STMP, "del", 'files, _skipped = _load_sibling("wf-census").sacred_scope(root)'),
+    # DEF-Q-006: stamp and conform share one scan set. Emptying it in the census means
+    # nothing gets stamped, so the agreement test, which also pins the expected set, must fail.
+    ("sacred scope: wf-stamp stamps exactly the set wf-conform demands",
+     CEN, "del", "        for fn in sorted(filenames):\n            p = os.path.join(dirpath, fn)\n"
+                 "            if fn.endswith(\".md\") and not census.ignored(p):\n"
+                 "                files.append(p)\n"),
     # ── the symlink census (2026-09-08) ──────────────────────────────────────
     # Rule 3 prescribed a before/after census the same day it landed, and nothing
     # performed one. Each break removes a different half, because the halves fail
@@ -825,6 +864,29 @@ CASES = [
     ("wf-checkrun states WHY the executing path is absent",
      CKR, "del", "does not execute anything"),
     # ── the canary fixture lifecycle (2026-08-04) ────────────────────────────
+    # ── the tier canary's instrument, `wf-apply --run-canary` (2026-09-15) ───
+    ("canary: the runner's parser returns the right verdict on recorded streams",
+     APL, "del", 'return ("FAIL", evidence) if said["treatment"][0] else ("PASS", evidence)'),
+    ("canary: the runner measures end to end against a stub claude and writes nothing",
+     APL, "del", '"--agents", json.dumps(agents), '),
+    ("canary: no shipped procedure instructs writing a canary fixture into an agents directory",
+     STG, "append", "\nWrite the canary fixture into `.claude/agents/` before the survey.\n"),
+    ("canary: the procedures that run the tier canary name its instrument",
+     AUD2, "del", "--run-canary --by 'audit, run <run-id>'"),
+    # ── report-named files a subagent cannot write (2026-09-15) ──
+    ("report names: no shipped file directs a subagent to write a basename the harness refuses",
+     TPL, "append", "\nWrite your findings to `.claude/workforce/work/<run-id>/<name>/FINDINGS.md`.\n"),
+    # ── the Strategic Objective is drafted, and its placeholder is a precondition (2026-09-15) ──
+    ("objective: an unfilled Strategic Objective is detected, drafted outside a user span, and never overwritten",
+     "workforce/bin/wf-companion", "del",
+     '    if DRAFTED_RX.search(text):\n        return "DRAFTED", "a workforce-drafted objective is in place, not yet ratified", path, text, None\n'),
+    ("objective: audit drafts it after the survey, before design and probes, and a probe treats the placeholder as a run precondition",
+     AUD2, "del", "## Step 1c — Draft the Strategic Objective"),
+    # ── the setup questions, one call per message and numbered by the table (2026-09-15) ──
+    ("budget: each setup call is asked alone in its message, in the table's order",
+     ASU, "del", "each call is the ONLY tool call in its\nmessage"),
+    ("budget: no procedure numbers the setup questions differently from the question-budget table",
+     AUD2, "append", "\nThe two budgets are questions 3 and 4.\n"),
     # ── Phase D — the applied-model canary (2026-08-27) ──────────────────────
     ("staging: Phase D — the applied-model canary — is specified",
      STG, "del", "## Phase D — applied-model canary"),
@@ -1705,7 +1767,7 @@ CASES = [
     ("wf-census strips an environment prefix before deciding what a command runs",
      CEN2, "del", "ENV_ASSIGN_RX.match(tokens[0])"),
     ("conform: `.censusignore` is read through wf-census, not guessed from directory names",
-     CFM, "del", "census.load_ignore()"),
+     CEN2, "del", "census.load_ignore()"),
     # THE SECOND CLAUSE, proved separately. Deleting the loader breaks the reading
     # half; only re-introducing the directory-name guess breaks the refusing half,
     # and that half is the one `load_ignore` names as forbidden. An assertion whose

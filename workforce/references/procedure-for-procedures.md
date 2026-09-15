@@ -317,6 +317,28 @@ of it text the contract requires. When a new section is made mandatory, it grows
 ceiling that counts required text against an author's budget is measuring the contract and blaming
 the writer.
 
+**172 IS NOT REACHABLE FOR EVERY IC EITHER, AND THE ADVISORY NO LONGER PRETENDS IT IS.** MEASURED
+2026-09-15 by `nc-audit` on the Nevada Classics host: three IC handbooks sat at **297, 231 and 296
+lines after verbatim relocation**. The 297 (`platform-security-evaluator`) carries no `origin:` markers
+and binds no directives, so none of it is user text. Heading through the line before the next heading:
+preamble 30 (frontmatter 11, `ORG-RECORD` 9, tier-ceiling line 1, H1 and persona 9) · Role 13 · Scope 20 ·
+Directives 3 · Sources 28 · Procedure 41 · Verification 27 · Guardrails 42 · Exit criteria 11 · Escalation
+12 (6 of them `ORG-CHAIN`) · Probe 36 (a table carrying the rows `wf-conform` demands) · Reporting 34.
+With Scope, Sources, Procedure and Verification relocated entirely it is still **181**. The size comes
+from the mandated section set plus the role's own binding Guardrails, Probe and Reporting.
+
+**What this does to "a MEASURED floor".** 172 is still a measurement, but a measurement of one IC,
+`engineering-site`. Four ICs have now been measured above it after relocation, so it is not a floor for
+ICs in general. It is the length one single-job IC reached, and it stays binding only where relocation
+can reach it. No universal replacement number is asserted, because none has been measured. So
+`wf-conform` applies the Lead branch's reasoning to an IC: it reports the length with a per-section
+breakdown and counts the lines it itself requires (frontmatter, `ORG-*` blocks, the tier-ceiling line,
+the Probe rows citing a section) as their own component, apart from the authored lines. It orders the
+split only when removing every line of `## Scope`, `## Sources`, `## Procedure` and `## Verification`
+would bring the handbook to the ceiling. When even that cannot, the row says the required content
+alone exceeds the ceiling and orders nothing. Immutable user spans were not the cause here; the
+customer's count found none.
+
 **Over the ceiling still never blocks a sweep — but not-blocking is not not-acting.** Under the
 no-standing-queue directive (§ Directives, 2026-08-10) a split is a refinement the run can perform,
 so **the run performs it: DISCHARGED this run, never proposed back, never raised as a question,

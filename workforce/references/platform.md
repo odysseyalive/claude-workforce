@@ -13,7 +13,14 @@ project-wide until the check below was written; this was the largest cluster it 
 MEASURED-ON:  Claude Code 2.1.220
 MEASURED-AT:  2026-07-29
 TIER-LIMIT:   3          <- the derived constant; see § Derived constants
+PYTHON-FLOOR: 3.6        <- oldest python3 every shipped script must run on
 ```
+
+**`PYTHON-FLOOR` is a host fact, not a harness fact, and it is stated here because this block is where
+constants live.** RHEL 8's system `python3` is 3.6 and RHEL 8 is supported to 2029. A real audit on a
+cPanel jailshell on RHEL 8 (2026-09-15) found three 3.7+ calls in shipped scripts: two crashed with a
+TypeError and one check quietly stopped working. `bin/check` reads this line and fails on any API newer
+than it in a shipped script, so raising the floor is a one-line edit here.
 
 Everything in claude-workforce rests on how Claude Code actually delegates. This file records what
 is **MEASURED** and what is merely **DOCUMENTED**, and never lets the two blur.
@@ -280,7 +287,8 @@ an earlier revision of this file carried a second, contradictory one that surviv
   claiming either outcome.
 - **A fixture written for measurement must be written well before it is needed**, and it runs against
   agents registered by a *previous* session, or against built-in agent types driven through the Agent
-  tool's own parameters. Fact 2c is the worked example: `wf-ceiling-probe` was written in one session
+  tool's own parameters — or, the form that needs neither, against `--agents` definitions in a headless
+  child session, which exist at its startup (fact 24; the tier canary's instrument since 2026-09-15). Fact 2c is the worked example: `wf-ceiling-probe` was written in one session
   and could only be spawned in a later one, which is exactly why it sat unmeasured while the gate that
   depended on it shipped.
 
@@ -485,6 +493,65 @@ because nothing could observe the applied value; this variable observes it.
 pin caused it — that needs the forced-spawn pair fact 12 used for `model:`. **Fact 12b stays
 DOCUMENTED and non-blocking** until that runs.
 
+### Fact 24 — `claude -p --agents <json>` definitions are spawnable by type, honor `disallowedTools` and `model`, and write no agent file ✅ MEASURED
+
+Evidence: `measurements/2026-09-15-agents-flag-canary.md` (2026-09-15, Claude Code 2.1.268).
+
+**Conditions:** a headless child session started with `claude -p --setting-sources "" --agents <json>
+--agent <main>`, from a scratch working directory; the main thread is the named agent, so its spawns
+sit at depth 1 and the chain below it at 2 and 3. Session model haiku.
+
+| Run | Result |
+|---|---|
+| lead → IC listing `Agent` in `tools` AND `disallowedTools` (the operator's run, then five on haiku) | the IC reported `Read` — withheld, 6 of 6 |
+| the same IC with no `disallowedTools` (the control) | the IC reported `Read, Agent` — granted, 6 of 6 |
+| root → d1 → d2 → d3, each requesting `Agent` | `D1=has-agent \| D2=has-agent \| D3=no-agent`, spawn depths 1, 2, 3 from the harness's own `task_started` events |
+| root on haiku → an agent whose definition sets `"model": "sonnet"` | the harness called `claude-sonnet-5` for that spawn (its stream's per-message `model`), not the session's haiku |
+
+**So fact 2c holds for this definition path, fact 1 holds on this harness, and the `model` field is
+honored.** The definitions exist at the child's startup, so fact 3's registration delay does not apply:
+a first audit measures on its first attempt. **No agent file is written and nothing appears in any other
+session's agent menu** — which is the constraint the 1.31.0 fixture removal set for any replacement.
+
+**What the child does write, measured the same day:** `--no-session-persistence` stops the transcript,
+but the harness still writes one `subagents/agent-*.meta.json` per spawn under
+`<config>/projects/<cwd>/<session>/` and a `tasks/` directory under `<tmp>/claude-<uid>/<cwd>/<session>/`,
+and it updates its own `.claude.json` (with a backup copy) and a model-catalog cache — harness bookkeeping every `claude` start performs. `wf-apply --run-canary` passes each child a session id it
+generated and removes exactly those two session directories afterwards.
+
+**The self-report was reliable on haiku** (10 of 10 haiku IC reports above matched the grant), and every
+verdict is paired with its control, so a model that misreported would read UNAVAILABLE, never PASS or
+FAIL. The measured path is `--agents`; that a FILE-registered definition resolves identically is what
+fact 2c measured separately on 2.1.220, and this fact does not re-measure it.
+
+### Fact 25 — a subagent's `Write` to a report-named Markdown file is refused ✅ MEASURED (read from the binary)
+
+**Measured 2026-09-15 on Claude Code 2.1.268, by reading the shipped CLI**
+(`~/.local/share/mise/installs/claude/2.1.268/claude`). The `Write` tool's `validateInput` carries:
+
+```
+if(o.agentId&&/^(REPORT|SUMMARY|FINDINGS|ANALYSIS).*\.md$/i.test(zCo(_)))
+  return i("tengu_subagent_md_report_blocked",…),{result:!1,message:"Subagents should return
+  findings as text, not write report files. Include this content in your final response
+  instead.",errorCode:5}
+```
+
+where `zCo` is `path.basename` (imported `{basename as zCo}` in the same bundle). So: **in a subagent
+(an `agentId` is set), a `Write` whose basename STARTS with `REPORT`, `SUMMARY`, `FINDINGS` or
+`ANALYSIS`, in any case, and ends in `.md` is refused.** The main session is not affected. The check
+occurs once in the bundle, inside `Write`; `Edit` and `Bash` do not carry it, and a file written by a
+shipped script is not a tool call at all.
+
+**Observed first by a customer** (Nevada Classics, RHEL 8, reported against workforce 1.59.1): one spawn
+wrote identical content under three names, and `FINDINGS.md` was refused with that message while
+`review-record.md` and `security-findings.txt` were written — both outside the pattern, which is a
+prefix match on the basename.
+
+**Consequence:** no handbook template, probe work product or agent definition may direct a subagent to
+write such a name (`handbook-templates.md` § Reporting, `staging.md` § Phase B); `bin/check` scans every
+shipped file against the harness's own pattern. The one shipped name that matches, the audit's
+closing report file, is written by the orchestrating session and never delegated (`procedures/audit.md` § Step 7).
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
@@ -506,10 +573,11 @@ DOCUMENTED and non-blocking** until that runs.
 | 15 | Subagents **inherit the parent session's permission context**; an absent or empty `permissions.allow` is **not** "deny all" | A grant the main session lacks is a grant no employee has, so the settings review at `audit-setup.md` § Permissions is an org-wide precondition rather than a per-agent one | unverified — same source and date |
 | 16 | **There is no per-agent `permissions:` frontmatter field.** The agent-side fields are `tools:`, `disallowedTools:`, `permissionMode:`, `mcpServers:`, `hooks:` — and `tools:`/`disallowedTools:` govern tool **presence** while `permissions.*` governs tool **use** | Load-bearing, and it is the fact that says a requested design is not expressible: per-agent permission *rules* cannot be written into a handbook. The capability boundary is per-agent; the usage rule is not | unverified — same source and date |
 | 17 | Permission rules from different settings scopes are **concatenated and deduplicated, not replaced** | **The guarantee behind `0 removed`** (`audit-setup.md` § Permissions): adding a grant cannot delete a rule the user wrote. If this measures false, that section's central promise fails and the conflict row must be revisited | unverified — same source and date, and the one here most worth canarying first |
-| 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. `wf-canary-ic` is the fixture |
+| 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. No instrument ships for it: `wf-canary-ic` was retired with the other fixtures in 1.31.0, and fact 24's `--agents` form does not name a teammate |
 | 20 | **`All tools` is a DISPLAY string the harness generates when `tools:` is empty — it is not a value.** Written literally into frontmatter it parses as a one-entry allowlist naming a tool that does not exist | **The failure presents as the opposite of what it is:** the frontmatter reads maximally permissive and the agent can call **nothing**. Fact 14 is the correct expression of "everything" — *omit* `tools:` — and `wf-conform` now refuses the literal on every tier. It is the delegating tiers, which carry no `tools:` line, whose display output says `All tools`, so a round-trip through a human or an agent reading that output is exactly how the phrase gets written back | reported 2026-08-05 by an authoring agent that **declined the instruction** and checked the harness rather than executing it; not canaried here. Treated as DOCUMENTED, and the guard is defensive either way — refusing the literal costs nothing if the fact is wrong |
 | 19 | **A dispatched author works in its OWN context window: N handbooks cost N spawns and accumulate NOTHING in the caller.** Only the returned result reaches the dispatcher | **The fact the conversion batch rests on.** A run that authors INLINE makes its own context the bottleneck and will correctly conclude a large roster is impossible — which is what happened on 2026-08-04, 0 of 40 converted with 192 of 200 spawns unspent. `procedures/audit.md` § Step 5 dispatches for this reason, and `conversion-taxonomy.md` bars context capacity from ever deferring a run | ✅ **MEASURED 2026-08-04** — 4 handbooks authored in one parallel wave: **411,014 subagent tokens and 104 tool calls outside the caller**, 4 of 4 returned complete, wall-clock the slowest author rather than the sum. Evidence `measurements/2026-08-04-dispatched-authoring.md` |
 | 22 | **Hook observability for runtime monitoring.** **`PostToolUse` fires for tool calls made *inside* subagents when the hook is registered at `settings.json` scope** — not only in the main loop. It receives `tool_name` + `tool_input`, so identical-call repetition is detectable; it may emit `additionalContext` or `{"continue": false}` but **cannot block a call — it runs *after* the tool executes.** And **no hook exposes live per-step context size or %-of-window**; the only "context is now large" signal is `PreCompact` with `trigger="auto"` | This is what makes a **loop-guard hook** buildable — a guard watching for repeated identical calls inside an employee can fire, because PostToolUse reaches subagents and sees `tool_input`. That line is the load-bearing one. But such a guard can only observe-and-inject, never prevent (it is post-execution), and it cannot gate on context size — a "context is getting large" guard has only `PreCompact(auto)` to key on, not a live percentage. Bears on fact 21's context-rot risk and on any runtime monitor. **The no-live-context-size half is correct and is NOT contradicted by fact 23**: that fact reads the transcript on disk, which no hook does and which something must call. The two answer different questions and both stand | documented, not measured — read from the Claude Code hooks documentation and verified 2026-08-19 (running harness 2.1.233); not canaried. Three documented claims in this file have already lost to measurement (facts 2, 3, 4), so the load-bearing "PostToolUse fires in subagents" line earns a canary before any gate rests on it |
+| 26 | **Several `AskUserQuestion` calls in ONE assistant message are presented newest-first**, so the user answers them in reverse. Questions inside one call, and options inside one question, keep their order | The audit's six setup questions are ordered by dependency — the backup before any writing gate, the effort calls after the model calls whose answers decide their rungs — so `audit-setup.md` § Rendering the calls requires each call alone in its message and `INV-BUDGET` reports the order. A hook cannot see sibling calls, so that report is advisory | **reported, INFERRED FROM ANSWER TIMESTAMPS — not seen on screen and not measured here.** Source: a customer audit transcript (`audit-20260915T180847Z`, workforce 1.59.1, harness version not recorded): backup+advisor, model A and model B shared one message and were answered model B 18:10:06Z, model A 18:10:16Z, backup 18:10:24Z; effort A and B shared another and were answered B 18:12:23Z, A 18:12:28Z. Not measurable by an agent: answering requires the user |
 
 **Facts 14–17 were researched together on 2026-08-03** for the settings review, and they are the reason
 that review **reports rather than blocks**. Three documented claims in this file have already lost to
@@ -584,7 +652,7 @@ their own answer:
 | shipped baseline | `references/platform.md` (this file) | yes, replaced on every update | no local measurement exists |
 | local measurement | `${CLAUDE_PROJECT_DIR}/.claude/workforce/platform-local.md` | **never** | it exists and its `MEASURED-ON` matches the running harness |
 
-A local measurement is written by re-running the canaries and is **project state**, so an update can
+A local measurement is written by `wf-apply --run-canary --execute` (`staging.md` § Phase C) and is **project state**, so an update can
 never clobber it (`scopes.md`). `verify` reports which level is in force, by path.
 
 **Re-measuring** is the tier canary (`staging.md` § Phase C) plus the background and tool-grant

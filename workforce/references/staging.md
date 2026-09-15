@@ -135,9 +135,19 @@ throwaway agent confirmed it: `SKILL.md` present, and the name absent from the e
 available-skills list. **The handbook was correct and the harness was wrong**, which is the shape
 § Phase C already warns about for the canary and this section did not carry for the probe.*
 
-**This is the second scope trap of the same family.** The tier canary needs the target project's
-registered `wf-canary-*` agent types; the probe needs its skills. Neither travels, and a run that
-assumes either does reports confidently about a tree it could not fully reach.
+**This is the second scope trap of the same family.** The tier canary once needed the target project's
+registered `wf-canary-*` agent types; the probe needs its skills. Neither travelled, and a run that
+assumed either reported confidently about a tree it could not fully reach. The canary has shed its half
+since 2026-09-15 — its agents are defined per headless session (§ Phase C) — and the probe keeps its.
+
+**PRECONDITION — the Strategic Objective is not the template's placeholder.** Before the first probe of a
+run, run `wf-companion --root <absolute path> --objective`. **Exit 1 (`PLACEHOLDER` or `ABSENT`) is a
+failed precondition of the RUN, never the handbook's `FAIL`:** every handbook conforms upward to that
+section, so a probe run against the placeholder measures the placeholder. Inside `audit`, run Step 1c
+(`procedures/audit.md`) now — it drafts the objective — and then probe. Any other caller reports each
+handbook it would have probed as `UNAVAILABLE — precondition failed: Strategic Objective is the template
+placeholder`, opens no `DEF`, and names `/workforce audit` as the heal. *Added 2026-09-15, after a
+customer's first Lead probe failed against the placeholder and was filed against the handbook.*
 
 **Record the edge before spawning**, exactly as a dispatch does: write
 `.claude/workforce/work/<run-id>/audit-to-probe-<name>.spawn` first. A probe is a spawn, and the
@@ -183,6 +193,11 @@ that most needs them.
 Write your work product to .claude/workforce/work/<run-id>/probe-<name>/OUTPUT.md
 Then return ONLY: PASS | FAIL:<one line> | AMBIGUOUS:<the question you would have had to ask a human>
 ```
+
+**The work-product name is `OUTPUT.md` and stays outside one pattern:** a probe is a subagent, and the
+harness refuses a subagent's `Write` to a basename beginning REPORT, SUMMARY, FINDINGS or ANALYSIS and
+ending in `.md`, in any case (`platform.md` fact 25) — a probe told to write one returns a failure that
+is the harness's, not the handbook's.
 
 *The `Constraints:` lines were added 2026-09-11, after a user reported that an audit ran their
 project's e2e suite and wrote junk rows into a live database. **They carry the user's words and
@@ -345,26 +360,56 @@ reach depend on *tier*, not on the individual handbook — so test them once.
 > canary reported failure against a healthy host. The expectation was wrong, not the platform. A canary
 > that fails for a reason that is not true is worse than no canary, because it blocks real work.
 
+### The instrument — `wf-apply --run-canary`, and it writes no agent file
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-apply" --root <absolute path to project> --run-canary --by '<command>, run <run-id>'            # measure, write nothing
+"$WF/bin/wf-apply" --root <absolute path to project> --run-canary --by '<command>, run <run-id>' --execute  # and record a PASS
+```
+
+**It starts four headless `claude -p` sessions whose agents are defined by `--agents <json>` for that
+session only** (`platform.md` fact 24): nothing is written into any `agents/` directory, nothing appears
+in any other session's agent menu, and the definitions exist when the child starts, so fact 3's
+registration delay does not apply and a first audit measures on its first attempt. Each child runs with
+`--setting-sources ""` (the user's hooks stay out), `--strict-mcp-config`, `--no-session-persistence`, a
+cheap session model (`--canary-model`, default `haiku`) and a bounded `--timeout` (default 180 s). It
+reads each child's `stream-json` events rather than any agent's relay of another's words, and removes the
+per-session files the harness leaves under ids it generated. It makes **two attempts** when the first is
+`UNAVAILABLE` and prints `INV-CANARY` with both. On `PASS` it hands C1 and C2 to `--record-canary`, which
+prints the exact `platform-local.md` bytes, or writes them under `--execute`.
+
+*There was no instrument from 1.31.0 to 2026-09-15.* That release removed the five shipped fixtures on
+the user's explicit marks, because a registered agent sits in every session's agent menu on the
+machine, and every audit after it returned `UNAVAILABLE` and marked every handbook `Tier ceiling:
+unverified`. The removal's constraint binds this instrument: **no step anywhere writes a canary
+definition into an `agents/` directory** (`bin/check` asserts it over every shipped file).
+
 **Two independent assertions, because they measure different things:**
 
 ### C1 — the depth limit
 
-Register three throwaway agents chained A → B → C, and spawn A **from the main conversation** so the
-chain reaches true depth. Each reports whether it has `Agent`, and A returns the collected result.
+A main-thread root spawns `d1`, which spawns `d2`, and so on for the shipped `TIER-LIMIT` links
+(`platform.md` § header, read by the runner and never restated). Each link requests `Agent` and reports
+its tools; the harness stamps each spawn's depth.
 
-Assert: the deepest link **lacks** `Agent`, and every link above it has it. That measures
-`TIER-LIMIT` (`platform.md` § header) on this host.
+Assert: the deepest link **lacks** `Agent`, and every link above it has it. That measures `TIER-LIMIT`
+on this host. A shallower link already lacking it is `FAIL` (the host's limit is below the org's shape);
+a deepest link still holding it, or a chain that broke, is `UNAVAILABLE` — that many links cannot state
+the limit.
 
 **Do not test depth with a two-agent chain.** That is the mistake above: two links from main reach depth
 2, which is not the ceiling on a host whose limit is 3.
 
 ### C2 — the tier ceiling mechanism (the one that matters)
 
-Register one throwaway agent listing `Agent` in **both** `tools:` and `disallowedTools:`. Spawn it at any
-depth. Assert it **lacks** `Agent`.
+A lead spawns an IC listing `Agent` in **both** `tools` and `disallowedTools`. Assert it **lacks**
+`Agent`. A second session runs the identical IC with no `disallowedTools` — the **control**.
 
 Listing it in both is the whole design: a missing `Agent` then proves the harness **withheld** it, rather
-than it never having been requested. Without that, absence is uninformative.
+than it never having been requested. The control proves the probe can see `Agent` at all, so the verdict
+is `FAIL` **only** when the control reports `Agent` and the revoked IC reports it too; a control that
+cannot see it makes C2 `UNAVAILABLE`, never `PASS`.
 
 **C2 is the load-bearing assertion.** Every IC handbook's tier ceiling rests on `disallowedTools`, not on
 depth — because entry depth is not controllable (`platform.md` fact 2b). C1 tells you the org's maximum
@@ -375,67 +420,58 @@ shape; C2 tells you whether the shape holds when someone invokes a Lead directly
 - Record both results and cite them in the org chart header.
 - **Confirm the expectation before believing a FAIL.** On the one occasion this has fired, the spec was
   at fault, not the host.
+- **What it measures is the `--agents` definition path.** The file-registered path an employee runs on
+  is the same registry, and fact 2c measured it separately; the canary does not re-measure that.
 
 ---
 
 ## Phase D — applied-model canary
 
-**Does a frontmatter `model:` pin actually apply at runtime?** Every employee is model-pinned and the
-whole budget rests on those pins being honored (`platform.md` fact 12: `model:` resolves
+**Does a `model:` pin actually apply at runtime?** Every employee is model-pinned and the whole budget
+rests on those pins being honored (`platform.md` fact 12: `model:` resolves
 `CLAUDE_CODE_SUBAGENT_MODEL` → per-invocation → frontmatter → session). Phase C canaries a tool grant.
-Phase D canaries the model — and it is a **weaker instrument by construction**, so it is fenced
-differently.
+Phase D canaries the model — and it is fenced differently.
 
 **The measurement that fixed its shape.** On 2026-08-27 (harness 2.1.245) two throwaway spawns were
 run on this host, one pinned haiku and one pinned opus. Each self-reported the model it was *forced*
 to, exactly and correctly. Neither could read its model from the environment: there is **no
 model-identifying env channel a subagent can observe** — `CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_MODEL`,
 and `ANTHROPIC_MODEL` were all empty even in the spawn whose model had been overridden
-(`measurements/2026-08-27-applied-model.md`; recorded into fact 12). So the only channel is the
-model's **self-report**, and self-report is a model introspecting its own ID — real, but softer than
-Phase C's tool-grant observation (fact 4b), because a future model could misreport it.
+(`measurements/2026-08-27-applied-model.md`; recorded into fact 12). The 2026-09-15 instrument adds
+a harder channel: a headless child's event stream carries the **model the harness called** for each
+spawn (`platform.md` fact 24).
 
-**The procedure.**
+**The procedure — the fourth session of every `wf-apply --run-canary` run.**
 
-1. **The fixture no longer ships, so this phase reports `UNAVAILABLE` and stops.**
-   `wf-model-canary` was one of five canary fixtures removed on the user's explicit marks in the
-   simplification release (`changes/1.31.0.md`), and the reason is a constraint on any replacement:
-   a fixture measurable this way has to be REGISTERED as an agent, and a registered agent appears in
-   every session's agent menu, in every project, forever — a permanent cost paid by every user for a
-   measurement run a handful of times. The manifest carries it as `retired`, so `install` removes it
-   from hosts that still have one.
+1. A root on the session model spawns an agent whose `--agents` definition pins a distinctive model
+   (`--pin-model`, default `sonnet`), deliberately unlike the session's, so a match is discriminating
+   rather than accidental. No fixture is registered; the definition lives for that one session.
+2. Read the model the harness called for that spawn from the stream, and the agent's own `MODEL=<id>`
+   line beside it.
+3. Compare the called model against **both** the pin **and** the session model. The comparison needs
+   both because a match against the pin means nothing when the session model *is* the pin.
 
-   *The procedure below is kept whole rather than deleted, because it is the specification any
-   replacement has to satisfy and it was correct when it ran. What it needs is a fixture that is
-   spawnable by type without being menu-visible; until one exists this phase has no instrument.*
-   The steps as they stood: spawn `wf-model-canary` **by its registered `subagent_type`** — not
-   through a generic agent with an overriding `model` parameter, since registering it and spawning it
-   by type is the only way the frontmatter `model:` sits on the honored path this canary exists to
-   measure. The fixture carried a distinctive model pin in its own frontmatter, deliberately unlike
-   the model a session or a CEO is likely running, so a match was discriminating rather than
-   accidental.
-2. Parse the fixture's one line, `MODEL=<id>`.
-3. Compare that self-report against **both** the fixture's pin **and** the resolved session
-   model. The comparison needs both because a match against the pin means nothing when the session
-   model *is* the pin.
+*From 1.31.0 to 2026-09-15 this phase had no instrument and reported `UNAVAILABLE`: `wf-model-canary`
+was removed with the other fixtures (`changes/1.31.0.md`), and the replacement had to be spawnable by
+type without being menu-visible. `--agents` is.*
 
 **The four outcomes.** The extra outcome over Phase C is `INDETERMINATE`, and it exists for the reason
 the comparison needs the session model:
 
 | Outcome | Condition | Consequence |
 |---|---|---|
-| `MATCH` | self-report == pin, and pin != session model | the pin was applied. **Best-effort PASS** — evidence, not proof |
-| `MISMATCH` | self-report == session model != pin, or any third value | the pin was **not** applied; the resolution chain overrode it. Report observed-vs-pinned **and the raw self-report string** |
+| `MATCH` | called model == pin, and pin != session model | the pin was applied. **Best-effort PASS** — evidence, not proof |
+| `MISMATCH` | called model == session model != pin, or any third value | the pin was **not** applied; the resolution chain overrode it. Report called-vs-pinned **and the raw self-report string** |
 | `INDETERMINATE` | pin == session model | a match proves nothing — the session fallback equals the pin, so a MATCH cannot distinguish an applied pin from an ignored one. Say so; do not record PASS |
-| `UNAVAILABLE` | spawning suppressed at the Step 0.9 spawn preflight (`audit-setup.md` § Step 0.9, `INV-SPAWN`), or no parseable `MODEL=` line returned | degrade and state it; never block |
+| `UNAVAILABLE` | the child did not run or recorded no model for the spawn | degrade and state it; never block |
 
 **The honesty fence — Phase D is ADVISORY and NEVER gates a run.** This is the one line that separates
 it from Phase C. Phase C's C2 assertion IS allowed to abort, because a tool grant is a deterministic
-observation the harness makes. A self-report is not, so a `MISMATCH` is **reported, never enforced**:
-it does not refuse an audit, does not fail a handbook, and does not stop a registration. A
-`MISMATCH` must carry the **raw self-report string** into its report so a human can weigh whether the
-pin was genuinely overridden or the model misreported its own ID. **Never refuse a user's work on a
-self-report alone.**
+observation the harness makes. Phase D observes the `--agents` definition path, which is not the
+file-registered path an employee's frontmatter `model:` takes, so a `MISMATCH` is **reported, never
+enforced**: it does not refuse an audit, does not fail a handbook, and does not stop a registration. A
+`MISMATCH` must carry the **raw self-report string** into its report so a human can weigh it. **Never
+refuse a user's work on this phase alone.**
 
 **Phase D and the preflight env receipt answer different questions — run both, and do not fold one
 into the other.** The `preflight` env receipt (`procedures/preflight.md` § Procedure, the runtime-override
@@ -453,15 +489,15 @@ alone, and neither promotes to the other's confidence.
 ## The three outcomes — and UNAVAILABLE is not FAIL
 
 **This distinction is the whole reason the canary is runnable at all.** Written with two outcomes, the
-gate deadlocked: registration required `canary: PASS`, a first run has no registered fixtures, and
+gate deadlocked: registration required `canary: PASS`, a first run had no registered fixtures, and
 "could not run" collapsed into FAIL — so no handbook could ever land on a fresh install.
 
 | Outcome | Meaning | Consequence |
 |---|---|---|
 | `PASS` | ran this run; assertions held | proceed normally |
 | `PASS (on record)` | `platform-local.md` exists and its `MEASURED-ON` matches the running harness | proceed normally, **no spawn** — the host was already measured |
-| `UNAVAILABLE` | could not run: fixtures were written this run and have not registered yet (`platform.md` fact 3), or the run is headless | **proceed, DEGRADED and stated.** Never abort |
-| `FAIL` | ran; an assertion did not hold | **abort before any registration** — no handbooks land against a host whose delegation semantics differ from the design's |
+| `UNAVAILABLE` | could not run: `claude` is not on PATH or not signed in, the harness rejects a flag the instrument needs, a child timed out, the run is headless with no `claude` to call, or an answer did not parse | **proceed, DEGRADED and stated.** Never abort |
+| `FAIL` | ran; an assertion did not hold against a working control | **abort before any registration** — no handbooks land against a host whose delegation semantics differ from the design's |
 
 **Why UNAVAILABLE proceeds.** The tier ceiling is a property of the *host*, and the shipped
 `platform.md` already carries the maintainer's measurement of it. When the canary cannot run, that
@@ -474,20 +510,19 @@ gate that refuses a user's work."*
 not obey it.
 
 **BLOCKING — `UNAVAILABLE` obliges a SECOND attempt inside the same run, and the run prints
-`INV-CANARY` with both outcomes** (`invariants.md` row 16). The stated cause is that the
-fixtures "register later in this session," and `platform.md` fact 3 measures that delay as *shorter than
-a session*. A run that accepts the first `UNAVAILABLE` as final has therefore declined to measure
-something it had every reason to expect would resolve before it finished. `audit` does this at
-**Step 6a**; any other caller re-attempts before it reports. **One attempt is a reading, not a
-measurement** — the same rule `INV-SPAWN` already applies to the spawn capability.
+`INV-CANARY` with both outcomes** (`invariants.md` row 16). The runner makes it itself, immediately, and
+`audit` Step 6a makes a third reading later in the run, after the authoring wave, because the causes
+that clear with time — a rate limit, a slow host, a network drop — are exactly the ones a run has every
+reason to expect to resolve before it finishes. **One attempt is a reading, not a measurement** — the
+same rule `INV-SPAWN` already applies to the spawn capability.
 
-**What DEGRADED costs — and it is only paid when the SECOND attempt also returns `UNAVAILABLE`:**
+**What DEGRADED costs — and it is only paid when every attempt returned `UNAVAILABLE`:**
 
 - Every handbook registered this run is marked `Tier ceiling: unverified this run (canary UNAVAILABLE)`.
   **On a passing re-attempt the mark is restamped in-run, never left for the user to clear.**
-- The closing report names the state, why, and **how many attempts were made**. A one-attempt DEGRADED
-  and a two-attempt DEGRADED are different findings: the first is a run that gave up, the second is a
-  real fact about the host.
+- The closing report names the state, the runner's stated cause, and **how many attempts were made**.
+  A one-attempt DEGRADED and a two-attempt DEGRADED are different findings: the first is a run that gave
+  up, the second is a real fact about the host.
 - `UNAVAILABLE` and `PASS` must never look the same in a report. A run that verified nothing and a run
   that verified the host are different runs.
 
@@ -497,67 +532,32 @@ substitutes for the canary — and the canary never substitutes for the grep.
 
 ## Fixture lifecycle
 
-**A fixture whose fact is MEASURED is residue, and is swept.** The evidence lives in `measurements/`;
-that is what makes the fixture disposable. Keeping it after the measurement closes leaves a registered
-agent in the user's roster doing nothing, which is precisely what this project refuses to leave behind
-in someone else's project.
+**The canary has no fixtures.** Its agents exist for one headless session and are never written to disk
+(§ Phase C). This section now governs only what an earlier release left behind.
 
-The rule this project applied to itself on 2026-07-30, having failed it: eight probe fixtures were
-registered, five of them for facts closed the previous day (2c and 13, both with evidence on file).
-They were swept; `wf-canary-ic`, `wf-canary-lead`, and `wf-reload-probe` were retained because their
-facts are still open.
+**A fixture whose fact is MEASURED is residue, and is swept.** The evidence lives in `measurements/`;
+that is what makes a fixture disposable. Keeping one after the measurement closes leaves a registered
+agent in the user's roster doing nothing, which is precisely what this project refuses to leave behind
+in someone else's project. The rule this project applied to itself on 2026-07-30, having failed it:
+eight probe fixtures were registered, five of them for facts closed the previous day, and they were
+swept.
 
 **The tell that a fixture has outlived its purpose is in `platform.md`, not in the fixture.** A fixture
 is retained by an *open* fact, never by having once been useful.
 
+**Three paths remove what earlier releases shipped, and none of them is a manual command:**
 
-Fixtures persist **across** runs; that is what makes the canary reachable at all.
-
-1. **Write them as early in the run as possible** — before the survey, which is the long part. The
-   registration delay is **shorter** than 4.5 minutes of wall-clock and gated on at least one turn
-   boundary (`platform.md` § Fact 3 — an earlier form of this sentence stated 4.5 minutes as a *lower*
-   bound, the figure that fact explicitly falsifies, and cited it as the authority), so
-   the survey and the org-design panels are what buys the time.
-2. **Run the canary late** — immediately before the first registration, not immediately after writing
-   the fixtures.
-3. **Do not delete them at the end of a run in which they never registered.** Deleting an
-   unregistered fixture guarantees the next run is UNAVAILABLE too, forever. Retain them; the next run
-   finds them registered and returns a real PASS or FAIL.
-
-0. **THE INSTALLER SHIPS THEM, WHICH IS WHY A FIRST RUN NO LONGER COSTS A RESTART.** The four fixtures
-   carry the `canary` manifest flag and install to `.claude/agents/` — not into the skill tree, because
-   an agent type registers from nowhere else. Between installing and running `/workforce` there is
-   always at least one turn boundary, so **the first audit finds them already registered** and Step 4b
-   can return a real verdict on the very first run.
-
-   Step 0.6 therefore **writes only what is missing**, and reports `fixtures: shipped (n present)` rather
-   than claiming to have authored them. Rules 1–4 below still govern, because a hand-installed tree, a
-   `--project` install into a repo that later moves, or a deleted fixture all put a run back in the
-   write-this-run case.
-
-   **MEASURED 2026-08-04 on 2.1.221, both directions** (`measurements/2026-08-04-canary-from-shipped-fixtures.md`).
-   A spawn attempted ~40 minutes after writing the fixtures **in the same session** returned
-   `Agent type not found` — fact 3 holding, the expected negative. Fixtures present *before* a session
-   resolved on the **first** attempt and both assertions passed: `A=has-agent | B=has-agent | C=no-agent`
-   (TIER-LIMIT 3) and `CEILING=agent-withheld` (fact 2c). So the shipping fix is confirmed, and the
-   `UNAVAILABLE` branch below stops being the common case without ceasing to be correct.
-
-   *Added 2026-08-04. This list previously opened at rule 1 and accepted the first-run loss outright:
-   "the next run finds them registered." The next run is a **new session**, and a user who has just run
-   an audit is told to run another one to clear DEGRADED marks the first could not clear. That is a
-   restart charged to the user for a fact the installer can settle before the first run exists.*
-4. **Delete them only after a run that actually used them**, and only once the result is recorded in
-   `platform-local.md`. A recorded measurement outlives its fixture; an unrecorded one does not.
+1. `manifest.txt` carries the five retired fixtures as `retired`, so `install` and `update` prune them
+   from a host that still has them.
+2. `audit` Step 5h unregisters shipped fixtures that no longer ship, on the next audit of an org built
+   before the removal.
+3. `wf-apply`'s `PASS-STALE-CANARY` removes a throwaway canary a run wrote once `platform-local.md`
+   records a measurement taken on the running harness (`passes.md`).
 
 **Instruct every canary to report only what it observes.** The phrasing matters:
 *"report only what you actually observe; never infer from documentation, from your own frontmatter, or
-from what you expect."* A canary that reasons from the docs measures the docs.
-
-**A canary written this session cannot run this session** (`platform.md` fact 3 — registration is
-delayed by at least a turn boundary). It runs against fixtures registered by a
-*previous* session, or against built-in agent types driven through the Agent tool's own parameters —
-which is how the 2026-07-29 depth and background measurements were taken. **Write the fixtures early**
-so a later step in the same run can reach them; see § Fixture lifecycle.
+from what you expect."* A canary that reasons from the docs measures the docs. The runner's prompts
+carry that sentence.
 
 ---
 

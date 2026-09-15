@@ -808,7 +808,6 @@ def audited(payload):
     2026-09-13 over 241 recorded Stops: the agent hook took 2.3 s at its fastest, and one side
     query reached its Stop about 3 s after the real one, while that Stop's agent still ran.
     """
-    from datetime import datetime
     try:
         raised = os.path.getmtime(widen_flag(payload))
     except OSError:
@@ -816,11 +815,37 @@ def audited(payload):
     for line in reversed(TL._read_lines(TL.reply_transcript(payload)) or []):
         if '"stop_hook_summary"' in line:
             try:
-                stamp = json.loads(line)["timestamp"].replace("Z", "+00:00")
-                return datetime.fromisoformat(stamp).timestamp() > raised
+                return _host_stamp(json.loads(line)["timestamp"]) > raised
             except (ValueError, KeyError, TypeError, AttributeError):
                 return False
     return False
+
+
+def _host_stamp(stamp):
+    """Epoch seconds from a transcript `timestamp`, parsed on the Python 3.6 floor.
+
+    `datetime.fromisoformat` is 3.7+, and on RHEL 8's python3 (3.6) it raised the
+    AttributeError the caller catches, so `audited()` answered False forever and this
+    check stopped working without a word (customer DEF-Q-001, 2026-09-15). The host
+    writes `YYYY-MM-DDTHH:MM:SS.fffZ` — MEASURED 2026-09-15 over 350,800 transcript
+    timestamps on one host, every one that shape. Fractional seconds and the zone are
+    optional here, and `Z` or `+HH:MM` are both read, so a host that drops either
+    still parses rather than failing closed.
+    """
+    import calendar
+    from datetime import datetime
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$",
+                 stamp.strip())
+    if not m:
+        raise ValueError("unrecognized timestamp %r" % stamp)
+    secs = calendar.timegm(datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").timetuple())
+    secs += float(m.group(2) or 0)
+    zone = m.group(3) or "Z"
+    if zone != "Z":
+        sign = -1 if zone[0] == "+" else 1
+        hh, mm = int(zone[1:3]), int(zone[-2:])
+        secs += sign * (hh * 3600 + mm * 60)
+    return secs
 
 
 def checklist(payload):

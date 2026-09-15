@@ -511,6 +511,11 @@ there.** Writing into another command's run dir commingles your evidence into it
 dispatcher that hands you a foreign dir has mis-minted the run-id, and this refusal is the catch.
 ```
 
+**Never name a work product whose file name begins with REPORT, SUMMARY, FINDINGS or ANALYSIS and
+ends in `.md`, in any case.** The harness refuses a subagent's `Write` to such a basename
+(`platform.md` fact 25), so the employee's deliverable never lands. `OUTPUT.md` is outside the pattern;
+keep every path a handbook or a probe hands a subagent that way.
+
 **`<run-id>` arrives in the work order**, never derived by the employee — the dispatch payload carries
 the artifact path (`procedures/org.md` § Canonical Dispatch CHECKPOINT clause 6). Say so in the
 handbook: a cold executor given only the text has no way to form one, and the alternative to saying it

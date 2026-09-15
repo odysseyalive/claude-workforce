@@ -149,6 +149,35 @@ def record_ids(root):
     return out
 
 
+def legacy_records(root):
+    """[(rec_id, path)] for every record filed in a SUBFOLDER of the store.
+
+    `personnel-templates.md` § Schema puts every record flat at `personnel/<TYPE>-<subject>.md`.
+    An older layout filed them per type (`defects/DEF-…`, `amendments/AMD-…`, `incidents/PERF-…`),
+    and a host installed then still carries those files. `record_ids` reads the schema's flat
+    layout, so a legacy record is invisible to `index`, `consult` and `check`. This function is
+    how every reader finds them anyway: `check` names each one, and `wf-conform` checks a
+    legacy DEF exactly as it checks a flat one. Customer DEF-Q-004 (2026-09-15) is the other
+    direction of the same split: the reader looked in `defects/`, the records were flat, and
+    the class-fix check read nothing and passed.
+    """
+    d = store_dir(root)
+    out = []
+    try:
+        subs = sorted(e for e in os.listdir(d) if os.path.isdir(os.path.join(d, e)))
+    except OSError:
+        return out
+    for sub in subs:
+        try:
+            names = sorted(os.listdir(os.path.join(d, sub)))
+        except OSError:
+            continue
+        for name in names:
+            if name.endswith(".md") and _ID_RE.match(name[:-3]):
+                out.append((name[:-3], os.path.join(d, sub, name)))
+    return out
+
+
 def read_text(path):
     try:
         with open(path, encoding="utf-8") as fh:
@@ -532,6 +561,11 @@ def do_check(root, args):
         for rec_id in extra:
             findings.append("INDEXED AND ABSENT: %s is in the index and not on disk"
                             % rec_id)
+    for rec_id, path in legacy_records(root):
+        findings.append("LEGACY LAYOUT: %s is filed in a subfolder; § Schema is flat, so "
+                        "`index` and `consult` cannot see it until it sits at %s"
+                        % (os.path.relpath(path, root),
+                           os.path.relpath(record_path(root, rec_id), root)))
     for rec_id in on_disk:
         if not is_project(rec_id):
             continue          # the org family carries its own fields, checked elsewhere

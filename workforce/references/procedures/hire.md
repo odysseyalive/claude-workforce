@@ -207,8 +207,9 @@ name a value that **proceeds degraded**, and a blanket "any failure stops" silen
 those paths.
 
 **Precondition 3 read "returned PASS this run" and deadlocked the first run of every fresh install:**
-a first run has no registered fixtures, so the canary cannot run, and "cannot run" was indistinguishable
-from FAIL. `UNAVAILABLE` is the canary's version of STALE — proceed on the shipped baseline with the
+a first run then had no registered fixtures, so the canary could not run, and "cannot run" was
+indistinguishable from FAIL. The canary no longer needs fixtures (`staging.md` § Phase C), but a host
+with no `claude` to call still cannot run it. `UNAVAILABLE` is the canary's version of STALE — proceed on the shipped baseline with the
 caveat stated, never refuse a user's work over a measurement that was unobtainable.
 
 ### The order

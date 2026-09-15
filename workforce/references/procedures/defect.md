@@ -65,7 +65,8 @@ the whole doctrine: *you may only blame the reader if you can point at the sente
    a generated org is evidence about the generator.** Name the workforce file changed and what it now
    asserts, or write `INSTANCE-ONLY — <why this cannot arise in another project>`. There is no third
    value, `INSTANCE-ONLY` without a reason is not a disposition, and an intention is not a file.
-   `wf-conform` fails a DEF record missing it.
+   The field is written either as the template's `**Class fix:**` line or as a `## Class fix`
+   section; both are the same field. Step 5d is where a missing one fails.
 
 5c. **Index the record.** Add it to `.claude/workforce/personnel/index.md` and correct the counts in
    § Statistics. A record nothing points at is one the next reader never finds — and where the project
@@ -75,6 +76,25 @@ the whole doctrine: *you may only blame the reader if you can point at the sente
    `check-personnel-index.sh` sat ready to catch it and exited 2 the moment anyone ran it. The script
    worked. Nobody ran it. `wf-conform` now checks index membership so the omission cannot wait for
    someone to remember.*
+
+5d. **Check the record you just wrote. The step is not finished while this exits 1.**
+
+   ```bash
+   WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+   "$WF/bin/wf-conform" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --def .claude/workforce/personnel/DEF-<slug>.md
+   ```
+
+   It fails a record with no `Class fix`, one naming an intention rather than a file, an
+   `INSTANCE-ONLY` with no reason, and a record missing from the personnel index. **This is where the
+   field is enforced.** At `verify` the same checks run on every DEF on disk and only ADVISE, with a
+   count: an existing record is history, and no mechanism can supply its missing answer. The index
+   half advises there too, and `wf-ledger index --execute` is its mechanical rebuild.
+
+   *Added 2026-09-15. Until then the only check was `wf-conform` at `verify`, and it read
+   `personnel/defects/` while every record was filed flat, so it examined nothing on any host (customer
+   DEF-Q-004). Once it read the right folder, 110 of 126 DEF records on six staffed hosts carried no
+   Class fix. Blocking on those at `verify` would have been a flag with no fix, so the block moved to
+   the moment of writing, which is where the field was always meant to bind.*
 
 6. **Amend and re-dispatch** the same work order. The employee then executes strictly — the handbook
    now covers the case.

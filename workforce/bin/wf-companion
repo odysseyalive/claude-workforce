@@ -3,6 +3,10 @@
 
     wf-companion --root <dir>              report every Core skill's refresh state, write nothing
     wf-companion --root <dir> --execute    refresh the machine-owned regions that can be refreshed
+    wf-companion --root <dir> --objective  the Strategic Objective's state: PLACEHOLDER |
+                                           DRAFTED | FILLED | ABSENT — exit 1 while unfilled
+    wf-companion --root <dir> --draft-objective <file|-> [--by TEXT] [--execute]
+                                           draft over the placeholder; never overwrites
 
 THE DEFECT THIS CLOSES. `procedures/audit.md` Step 4 says, in prose: "Force-refresh
 the Core skills to current shipped source, every run — never skipped, never offered,
@@ -94,6 +98,9 @@ CORE = [
         "region": None,
         "source": ("references", "personnel-templates.md"),
         "unit": "record type",
+        # A data skill (personnel-templates.md § personnel-ledger). A customized copy is
+        # never overwritten, but a required contract section it lacks is appended.
+        "contract": "data-skill",
     },
 ]
 
@@ -330,6 +337,54 @@ canonical text.
 """
 
 
+APPEND_NOTE = ("<!-- Appended by `wf-companion` from `references/personnel-templates.md`: "
+               "required data-skill contract section(s) this copy lacked (data-skills.md "
+               "§ Required sections). Everything above is unchanged. -->")
+
+
+def _conform():
+    """`wf-conform`, loaded by path without bytecode. It owns `DATA_SKILL_SECTIONS`, and a
+    second copy of that list here is how the heal and the check would drift apart."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-conform")
+        loader = importlib.machinery.SourceFileLoader("wf_conform", path)
+        spec = importlib.util.spec_from_loader("wf_conform", loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+def contract_gaps(body):
+    """The required data-skill sections `body` lacks, by the same test `wf-conform` uses."""
+    return [s for s in _conform().DATA_SKILL_SECTIONS if ("\n" + s) not in "\n" + body]
+
+
+def shipped_section(shipped, heading):
+    """`heading` and its text from the materialized shipped body, or None."""
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*\n(.*?)(?=^## |^<!-- Generated|\Z)",
+                  shipped, re.S | re.M)
+    return (heading + "\n" + m.group(1).rstrip("\n")) if m else None
+
+
+def append_hazard(body):
+    """Why appending at end-of-file is unsafe, or None. Text appended after an unclosed
+    fence or an unclosed `origin:` span would land inside it, which would edit the user's
+    words (directive one)."""
+    if sum(1 for l in body.splitlines() if l.lstrip().startswith("```")) % 2:
+        return "the file ends inside an unclosed code fence"
+    opens = len(re.findall(r"^<!--\s*origin:[^\n]*-->\s*$", body, re.M))
+    closes = len(re.findall(r"^<!--\s*/origin\s*-->\s*$", body, re.M))
+    if opens > closes:
+        return "the file ends inside an unclosed `origin:` span"
+    return None
+
+
 def frontmatter_ok(text):
     """A generated companion opens with exactly one closed frontmatter block.
 
@@ -393,6 +448,33 @@ def evaluate(root, wf, entry):
                 inst_path, None)
 
     if entry["region"] is None:
+        # A DATA-SKILL COMPANION GAINS WHAT ITS CONTRACT LACKS, AND NOTHING ELSE. The file
+        # is customized and is never overwritten, but a required contract section it is
+        # missing can be APPENDED from shipped source without touching one byte that is
+        # already there. Without this, a copy authored before a section became required
+        # fails `wf-conform`'s data-skill contract on every verify, and nothing could clear
+        # it. MEASURED 2026-09-15 on pythom-space: `personnel-ledger` carries `## Layout`
+        # and no `## Schema`. `## Layout` is left exactly as written and is not taken as the
+        # Schema: the appended `## Schema` states the flat layout the shipped contract names.
+        if entry.get("contract") == "data-skill":
+            gaps = contract_gaps(inst)
+            if gaps:
+                builder = globals().get(entry.get("materialize") or "")
+                shipped = builder(wf) if builder else None
+                blocks = [shipped_section(shipped or "", h) for h in gaps]
+                why_not = append_hazard(inst)
+                if any(b is None for b in blocks) or why_not:
+                    return ("UNMANAGED",
+                            f"customized, and missing contract section(s) {gaps} that cannot "
+                            f"be appended: "
+                            + (why_not or "the shipped template carries no text for them"),
+                            inst_path, None)
+                new_body = (inst.rstrip("\n") + "\n\n" + APPEND_NOTE + "\n\n"
+                            + "\n\n".join(blocks) + "\n")
+                return ("INCOMPLETE",
+                        f"customized; missing {', '.join(gaps)} — append from shipped "
+                        f"source, every existing byte kept",
+                        inst_path, new_body)
         # No marker convention defined for this skill yet, so there is no span to replace
         # and no way to tell generated prose from the project's own. Report the drift
         # signal and refuse — Step 4's sanctioned `unrefreshed` outcome.
@@ -428,11 +510,131 @@ def evaluate(root, wf, entry):
     return ("DRIFTED", detail, inst_path, new_body)
 
 
+# ── the Strategic Objective: detect the placeholder, and draft over it ─────────
+# `materialize_operating_principles` leaves the template's placeholder in place and
+# its docstring called that "the audit's own instruction to fill it" — and no audit
+# step filled it. On a customer host (1.59.1) a Lead's first cold-read probe FAILED
+# against the placeholder, which the failure-attribution gate then charged to the
+# handbook. `--objective` is the detector (a run PRECONDITION, `staging.md` § Phase B);
+# `--draft-objective` is the heal `audit` Step 1c runs.
+#
+# THE DRAFT IS NEVER WRITTEN INSIDE AN `origin: user | immutable: true` SPAN. That marker
+# says the user wrote the words: T2 extraction lifts such a span verbatim as a user
+# directive and `wf-protect-directives` guards it as one, so a model's draft inside it
+# would be frozen and later quoted back as the user's. It goes into an
+# `origin: workforce | modifiable: true` span carrying `drafted-by:`, which the user
+# overturns by editing and ratifies by changing that opener to the user marker.
+USER_SPAN_RX = re.compile(
+    r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$(.*?)^<!--\s*/origin\s*-->$",
+    re.S | re.M)
+DRAFTED_RX = re.compile(r"^<!--\s*origin:\s*workforce\b[^>]*\bdrafted-by:", re.M)
+OBJ_HEADING = "## Strategic Objective"
+OP_REL = os.path.join(".claude", "skills", "operating-principles", "SKILL.md")
+
+
+def objective_placeholder(wf):
+    """The template's placeholder text, read from shipped `templates.md` — never restated."""
+    body = materialize_operating_principles(wf) or ""
+    i = body.find(OBJ_HEADING + "\n")
+    j = body.find("\n<!-- /origin -->", i)
+    return body[i + len(OBJ_HEADING) + 1:j].strip() if i >= 0 and j > i else None
+
+
+def _flat(text):
+    return " ".join((text or "").split())
+
+
+def objective_state(root, wf):
+    """(state, detail, path, text, placeholder-span-match-or-None)."""
+    path = os.path.join(root, OP_REL)
+    text = read(path)
+    ph = objective_placeholder(wf)
+    if text is None:
+        return "ABSENT", "no operating-principles/SKILL.md", path, None, None
+    if ph is None:
+        return "UNREADABLE", "the shipped templates.md placeholder cannot be read", path, text, None
+    if DRAFTED_RX.search(text):
+        return "DRAFTED", "a workforce-drafted objective is in place, not yet ratified", path, text, None
+    if OBJ_HEADING not in text:
+        return "ABSENT", f"no `{OBJ_HEADING}` section", path, text, None
+    for m in USER_SPAN_RX.finditer(text):
+        if _flat(ph) in _flat(m.group(1)):
+            return "PLACEHOLDER", "the section still holds the template's placeholder", path, text, m
+    if _flat(ph) in _flat(text):
+        return "PLACEHOLDER", "the template's placeholder sits outside any span", path, text, None
+    return "FILLED", "the section holds an objective", path, text, None
+
+
+def draft_objective(root, wf, draft, by, execute):
+    """Write `draft` over the placeholder. Exit code; never overwrites a filled objective."""
+    state, detail, path, text, m = objective_state(root, wf)
+    rel = os.path.relpath(path, root)
+    if state in ("DRAFTED", "FILLED"):
+        print(f"objective          {state} · {rel} · not overwritten — {detail}")
+        return 0
+    if state != "PLACEHOLDER" or m is None:
+        print(f"objective          {state} · {rel} · cannot draft: {detail}", file=sys.stderr)
+        return 1
+    draft = (draft or "").strip()
+    if (not draft or re.search(r"^<!--", draft, re.M)
+            or _flat(objective_placeholder(wf)) in _flat(draft)):
+        print("wf-companion --draft-objective: the draft is empty, carries a comment marker, "
+              "or is the placeholder itself", file=sys.stderr)
+        return 2
+    # `>` in the provenance would close the comment early and leave the span unopened.
+    opener = ("<!-- origin: workforce | modifiable: true | drafted-by: "
+              f"{' '.join(re.sub(r'[<>]', '', by).split())} -->")
+    later = len(USER_SPAN_RX.findall(text[m.end():]))
+    # The placeholder is shipped template text, not the user's words, so the whole span is
+    # replaced. That orphans its own `.directives.sha` row and, when sacred blocks follow
+    # it (the scaffold carries one for project principles), shifts their `:directive:<N>`
+    # index by one (`checksums.md` § The row grammar). Their CONTENT is untouched — the
+    # read-back below proves it byte-for-byte — and audit Step 5-STAMP's
+    # `wf-stamp --directives --execute --restamp` re-stamps what this run moved.
+    heading = OBJ_HEADING + "\n" if OBJ_HEADING in m.group(1) else ""   # template shape
+    new = text[:m.start()] + f"{opener}\n{heading}{draft}\n<!-- /origin -->" + text[m.end():]
+    how = (f"placeholder span replaced; {later} later sacred block(s) keep their bytes and "
+           f"shift index by one (Step 5-STAMP re-stamps)" if later else
+           "placeholder span replaced; no later sacred block moved")
+    if not execute:
+        print(f"objective          PLACEHOLDER · {rel} · would draft — {how}")
+        for line in (opener + "\n" + draft).splitlines():
+            print(f"  | {line}")
+        print("  write with: --execute")
+        return 0
+    with open(path, "w", encoding="utf-8") as fh:     # through a symlink, never over it
+        fh.write(new)
+    back = objective_state(root, wf)
+    kept = [s for s in USER_SPAN_RX.findall(text) if _flat(objective_placeholder(wf)) not in _flat(s)]
+    ok = back[0] == "DRAFTED" and all(s in USER_SPAN_RX.findall(back[3] or "") for s in kept)
+    print(f"objective          {'drafted' if ok else 'FAILED'} · {rel} · {how} · read back "
+          f"{back[0]}, {len(kept)} other sacred block(s) byte-identical")
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
     ap.add_argument("--execute", action="store_true")
+    ap.add_argument("--objective", action="store_true",
+                    help="report the Strategic Objective's state; exit 1 while unfilled")
+    ap.add_argument("--draft-objective", metavar="FILE",
+                    help="draft the objective from FILE ('-' = stdin) over the placeholder")
+    ap.add_argument("--by", default="/workforce audit",
+                    help="provenance written into the drafted span's opener")
     args = ap.parse_args()
+    if args.objective or args.draft_objective:
+        root = os.path.abspath(args.root)
+        if args.draft_objective:
+            src = (sys.stdin.read() if args.draft_objective == "-"
+                   else read(args.draft_objective))
+            if src is None:
+                print(f"wf-companion: cannot read {args.draft_objective}", file=sys.stderr)
+                return 2
+            return draft_objective(root, wf_source_root(), src, args.by, args.execute)
+        state, detail, path, _t, _m = objective_state(root, wf_source_root())
+        print(f"objective          {state} · {os.path.relpath(path, root)} · {detail}")
+        return 1 if state in ("PLACEHOLDER", "ABSENT", "UNREADABLE") else 0
 
     root = os.path.abspath(args.root)
     wf = wf_source_root()
@@ -447,7 +649,7 @@ def main():
     print(f"  shipped source: {wf}  ·  WORKFORCE-VERSION "
           f"{ver if ver else '<unreadable — no staleness claim made>'}\n")
 
-    refreshed = unrefreshed = current = 0
+    refreshed = unrefreshed = current = appended = 0
     materialized = absent = 0
     failed = False
     print("CORE SKILLS")
@@ -458,6 +660,35 @@ def main():
         if state == "CURRENT":
             current += 1
             print(f"  = {name:22s} current   {detail}")
+            continue
+
+        if state == "INCOMPLETE":
+            # APPEND-ONLY, and proven so: the read-back requires the file to START with
+            # every byte it had before, and to carry no contract gap afterwards.
+            if not args.execute:
+                unrefreshed += 1
+                print(f"  ~ {name:22s} {state:10s} {detail} — would append")
+                continue
+            try:
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(new_body)
+            except OSError as exc:
+                failed = True
+                unrefreshed += 1
+                print(f"  ! {name:22s} FAILED    {exc.strerror}", file=sys.stderr)
+                continue
+            before = read(path) or ""
+            inst_before = new_body[:new_body.index(APPEND_NOTE)].rstrip("\n")
+            if not before.startswith(inst_before) or contract_gaps(before):
+                failed = True
+                unrefreshed += 1
+                print(f"  ! {name:22s} FAILED    appended and read back with a contract gap "
+                      f"or changed bytes — not counted", file=sys.stderr)
+                continue
+            appended += 1
+            print(f"  + {name:22s} appended  "
+                  f"{detail.split('; missing ', 1)[-1].split(' — ')[0]} "
+                  f"(from shipped source; the customized text above is unchanged)")
             continue
 
         if state in ("DRIFTED", "ABSENT"):
@@ -530,7 +761,8 @@ def main():
     # that created three companions and a run that refreshed three regions are different
     # events, and one number cannot tell a reader which happened.
     print(f"\nINV-CORE  {total} core skill(s) · current {current} · refreshed {refreshed} "
-          f"· materialized {materialized} · unrefreshed {unrefreshed} · absent {absent} "
+          f"· materialized {materialized} · appended {appended} · unrefreshed {unrefreshed} "
+          f"· absent {absent} "
           f"· each unrefreshed names its precondition")
     if not args.execute and unrefreshed:
         print("Re-run with --execute to materialize the absent companions and refresh the "

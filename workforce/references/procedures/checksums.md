@@ -139,12 +139,18 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute  # write MISSING rows
 ```
 
-It collects every `<!-- origin: user | immutable: true -->` block under `.claude/agents`,
-`.claude/skills`, `.claude/workforce/directives` and `.claude/workforce/personnel` — a **superset** of
-the paths `wf-protect-directives` guards, so the hook can never fire on a block the sidecar has no row
-for — minus whatever `.censusignore` declares out, read through the same declaration `wf-census` and
-`wf-conform` read. It writes the canonical row, re-parses its own output before counting the write, and
-prints `INV-DIRECTIVES` with every count including the zeroes.
+It collects every `<!-- origin: user | immutable: true -->` block in **every `.md` file under
+`.claude/`**, except the run scratch (`.claude/workforce/work/`, `.claude/workforce/staging/`) and
+whatever `.censusignore` declares out. That set is one function, `wf-census.sacred_scope`. `wf-stamp`
+writes rows over it and `wf-conform` demands rows over it, so the two cannot disagree about which
+blocks need a row. It is a **superset** of the paths `wf-protect-directives` guards, so the hook can
+never fire on a block the sidecar has no row for. It writes the canonical row, re-parses its own output
+before counting the write, and prints `INV-DIRECTIVES` with every count including the zeroes.
+
+*Until 2026-09-15 the stamp read four roots (`agents`, `skills`, `workforce/directives`,
+`workforce/personnel`) while `verify` walked all of `.claude/`. A customer host had an unchanged archive
+copy under `.claude/workforce/migrated/` holding one sacred block: `verify` required a row for it, no
+command could write one, and the row stayed BLOCKING until someone hand-edited `.censusignore`.*
 
 **`--execute` writes a MISSING row only, and `--restamp` is the separate gesture**, exactly as the
 contract half works and for the reason § On mismatch gives: a block with no row has no prior claim to

@@ -213,14 +213,13 @@ because the harness moved is worse than proceeding with a stated caveat.
 ### Deferred tier canary — the follow-up `audit` promises
 
 An audit whose canary came back `UNAVAILABLE` registered its employees with the tier ceiling unverified
-and told the user to re-run `verify` once the fixtures load (`audit.md` Step 7). **This is where that
-promise is kept.**
+and told the user `verify` re-runs it (`audit.md` Step 7). **This is where that promise is kept.**
 
-- IF fixtures from a previous run exist and are now discoverable → **run `staging.md` § Phase C** and
-  report the result.
-- IF they exist and are still not discoverable → report `canary: UNAVAILABLE` with the fixture paths, and
-  say plainly that the ceiling is still unverified. Never report a clean org.
 - IF `platform-local.md` already matches the running harness → `PASS (on record)`; nothing to spawn.
+- ELSE → **run `staging.md` § Phase C** — `wf-apply --root <absolute path> --run-canary`, without
+  `--execute` — and report the result with the `INV-CANARY` line it prints.
+- IF it returns `UNAVAILABLE` → report `canary: UNAVAILABLE` with the cause the runner named, and say
+  plainly that the ceiling is still unverified. Never report a clean org.
 - On `FAIL` → a finding of the first rank: employees are live on a host whose delegation semantics differ
   from the design's. Report it against the org, not against any one handbook.
 
@@ -238,17 +237,15 @@ frontmatter `model:` pin actually applied. It is the non-audit surface for that 
 it the applied-model check can only run at audit time, so on an existing project a drifted pin goes
 unseen between audits. **Run `staging.md` § Phase D** and report its verdict.
 
-- **Reports `UNAVAILABLE`.** The `wf-model-canary` fixture was removed on the user's explicit marks in
-  the simplification release (`changes/1.31.0.md`) — a fixture measurable this way must be registered
-  as an agent, and a registered agent sits in every session's agent menu in every project. There is no
-  instrument for this measurement until a fixture exists that is spawnable by type without being
-  menu-visible. `staging.md` § Phase D keeps the full procedure as the specification a replacement has
-  to satisfy.
-- Report one of the four Phase D outcomes: **MATCH** (self-report == pin != session model — the pin
-  applied), **MISMATCH** (self-report == session model, or any third value — the pin was
+- **It is the `D` line of the same `wf-apply --run-canary` call** the tier canary above makes — the
+  fourth headless session, whose `--agents` definition pins a model unlike the session's. No fixture is
+  registered (`platform.md` fact 24). From 1.31.0 to 2026-09-15 this subsection reported `UNAVAILABLE`,
+  because `wf-model-canary` had been removed and nothing spawnable by type without being menu-visible
+  existed.
+- Report one of the four Phase D outcomes: **MATCH** (the model the harness called == pin != session
+  model — the pin applied), **MISMATCH** (called == session model, or any third value — the pin was
   overridden), **INDETERMINATE** (pin == session model, so a match proves nothing), or
-  **UNAVAILABLE** (spawn suppressed at the Step 0.9 preflight, or no parseable `MODEL=` line —
-  degrade quietly).
+  **UNAVAILABLE** (the child did not run or recorded no model for the spawn — degrade quietly).
 
 **ADVISORY, and NEVER BLOCKING — this is the line that separates it from the tier canary.** A tier
 canary `FAIL` is a finding of the first rank and may gate the run, because a tool grant is a

@@ -56,6 +56,52 @@ _WF_PREFIXES = (("${CLAUDE_PROJECT_DIR}", "project"), ("$CLAUDE_PROJECT_DIR", "p
 _WF_META = set("$`\"';&|<>(){}*?[]!#~\n\t")
 
 
+# ── the ONE sacred-block scope ────────────────────────────────────────────────
+# Which files `.directives.sha` must hold a row for. `wf-stamp` WRITES rows over this set
+# and `wf-conform` DEMANDS rows over it, so it is answered here, once, and both call it.
+# Until 2026-09-15 each had its own answer: stamp read four roots (`agents`, `skills`,
+# `workforce/directives`, `workforce/personnel`) with its own `.censusignore` matcher, and
+# conform walked all of `.claude/`. Customer DEF-Q-006 on a real host: an unchanged archive
+# copy under `.claude/workforce/migrated/` held one sacred block, which conform required and
+# stamp could not write. The BLOCKING row cleared only when someone hand-edited
+# `.censusignore`. The denominator comes from the tree (conform's doctrine), so stamp now
+# covers what conform demands. Conform does not check less.
+SACRED_SCRATCH = (os.path.join(".claude", "workforce", "work"),
+                  os.path.join(".claude", "workforce", "staging"))
+
+
+def sacred_scope(root):
+    """(files, scratch_skipped): every `.md` under `<root>/.claude` whose sacred blocks the
+    sidecar must stamp, sorted, plus the number of `.md` files in run scratch left out.
+
+    Excluded, and nothing else: the run scratch (`workforce/work`, `workforce/staging`),
+    which holds COPIES whose originals are guarded at source (`wf-conform` § check_sidecar
+    records the 846-file measurement), and whatever `.censusignore` declares. It is
+    DECLARED, never inferred, and read through `Census.ignored`, the one matcher. A
+    project-created folder like `.claude/workforce/migrated/` is in scope, because nothing
+    declared it out.
+    """
+    claude = os.path.join(root, ".claude")
+    scratch = tuple(os.path.join(root, s) for s in SACRED_SCRATCH)
+    skipped = 0
+    for s in scratch:
+        for _dp, _dn, fns in os.walk(s):
+            skipped += len([f for f in fns if f.endswith(".md")])
+    census = Census(root)
+    census.load_ignore()
+    files = []
+    for dirpath, dirnames, filenames in os.walk(claude):
+        if any(dirpath == d or dirpath.startswith(d + os.sep) for d in scratch):
+            dirnames[:] = []
+            continue
+        dirnames[:] = sorted(d for d in dirnames if not census.ignored(os.path.join(dirpath, d)))
+        for fn in sorted(filenames):
+            p = os.path.join(dirpath, fn)
+            if fn.endswith(".md") and not census.ignored(p):
+                files.append(p)
+    return sorted(files), skipped
+
+
 def workforce_hook(command, root):
     """A workforce hook row, resolved, or None. Never raises.
 

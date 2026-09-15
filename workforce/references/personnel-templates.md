@@ -54,7 +54,7 @@ are below; this is the artifact that holds them.
 | Section | For the personnel dataset |
 |---|---|
 | `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat (no subdirectories); types `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG` (org family) and `DEC`, `INC`, `PAT`, `FLW` (project family), each shaped by its template below |
-| `## Invariants` | the universal one, **plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`); every project-family record carries a `Status:` of exactly `proposed`\|`accepted`\|`superseded` (`mechanical`); a `proposed` record is never returned by a `consult` (`mechanical`); every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value and a reported finding, never an absence (`mechanical`) |
+| `## Invariants` | the universal one, stated verbatim because it is how every reader recognizes a data skill (`wf-conform.is_data_skill`): **Degraded state may cause more work. It may never authorize a write.** **Plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`); every project-family record carries a `Status:` of exactly `proposed`\|`accepted`\|`superseded` (`mechanical`); a `proposed` record is never returned by a `consult` (`mechanical`); every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value and a reported finding, never an absence (`mechanical`) |
 | `## Degradation` | absent → the org has no history and `review` says so rather than reporting a clean record; empty → same; stale → the index is rebuilt from the filesystem; corrupt → **stop, never rewrite** |
 | `## Owner` | HR. Exactly one Records Owner; its Lead is the second key |
 | `## Git policy` | tracked by default — an org's history is not disposable — and the rule's file is named by path |
@@ -247,8 +247,19 @@ So the field takes one of two values and **there is no third**:
 | `INSTANCE-ONLY — <reason>` | this could not arise in another project, **and the reason says why** |
 
 `INSTANCE-ONLY` with no reason, or a `Class fix:` naming an intention rather than a file, is not a
-disposition. **`wf-conform` fails a DEF record missing this field**, so a run that closes a defect
-without answering the question does not pass.
+disposition. **The field is enforced where the record is written:** `procedures/defect.md` step 5d
+runs `wf-conform --def <path>` on the new record and does not finish while it exits 1, so a run that
+files a defect without answering the question does not pass. The `**Class fix:**` line and a
+`## Class fix` section are the same field. At `verify` the same check covers every DEF on disk and
+**advises**, with a count, because an existing record is history and nothing can supply its answer
+(2026-09-15: 110 of 126 records on six staffed hosts carried none, unseen while the check read the
+wrong folder).
+
+**Legacy layout is read and reported, never moved.** A record in an older per-type subfolder
+(`personnel/defects/DEF-…`) is found by `wf-ledger.legacy_records`, checked exactly like a flat
+one, and named as `legacy layout` by `wf-conform` and `LEGACY LAYOUT` by `wf-ledger check`. No heal
+is owed: no staffed host measured on 2026-09-15 carries the layout, and reading plus reporting keeps
+every record visible.
 
 *Added 2026-08-03, after three defects in one session were fixed in a target project and left standing
 in the skill that generates it. The rule already existed and was restated in `SKILL.md`, `CLAUDE.md`,

@@ -709,7 +709,7 @@
       "NO-REGION",
       "ABSENT",
       "INV-CORE  3 core skill(s)",
-      "current 0 · refreshed 0 · materialized 0 · unrefreshed 3 · absent 1"
+      "current 0 · refreshed 0 · materialized 0 · appended 0 · unrefreshed 3 · absent 1"
     ]
   },
   "companion-drifted-execute": {
@@ -749,7 +749,7 @@
       "+ org",
       "refreshed",
       "NO-REGION",
-      "current 0 · refreshed 1 · materialized 1 · unrefreshed 1 · absent 0"
+      "current 0 · refreshed 1 · materialized 1 · appended 0 · unrefreshed 1 · absent 0"
     ]
   },
   "companion-halfmarker": {
@@ -777,7 +777,7 @@
     "want": [
       "NO-REGION",
       "never auto-repair",
-      "current 0 · refreshed 0 · materialized 2 · unrefreshed 1 · absent 0"
+      "current 0 · refreshed 0 · materialized 2 · appended 0 · unrefreshed 1 · absent 0"
     ]
   },
   "commitments-records-a-list": {
@@ -1017,6 +1017,22 @@
       "2 advisory",
       "declares no negative case",
       "0 failed"
+    ]
+  },
+  "conform-ic-over-ceiling-unreachable": {
+    "_why": "MEASURED 2026-09-15 on the customer host (nc-audit, Nevada Classics): `platform-security-evaluator`, an IC with no `origin:` markers and no bound directives, at 297 lines. It is laid out here with the customer's exact per-section counts: preamble 30 (frontmatter 11, ORG-RECORD 9, tier-ceiling line 1, H1 and persona 9), Role 13, Scope 20, Directives 3, Sources 28, Procedure 41, Verification 27, Guardrails 42, Exit criteria 11, Escalation 12 including a 6-line ORG-CHAIN, Probe 36 (a table citing the sections), Reporting 34. Without Scope, Sources, Procedure and Verification it is still 181, over 172. HEAD's wf-conform ordered 'the split is PERFORMED this run' anyway, an order no relocation could satisfy. The row now says what it measured, section by section, reports the lines this check itself requires as their own component, and orders nothing. conform-over-ceiling is the reachable half and still gets the order.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "platform-security-evaluator.md: IC handbook length OBSERVED — the required content alone exceeds the ceiling",
+      "37 are lines this check itself requires",
+      "it would still be 181 lines, over 172, so no relocation is ordered",
+      "By section: preamble 30 · Role 13 · Scope 20 · Directives 3 · Sources 28 · Procedure 41 · Verification 27 · Guardrails 42 · Exit criteria 11 · Escalation 12 · Probe 36 · Reporting 34",
+      "ADVISORY: this row blocks nothing"
+    ],
+    "not": [
+      "the split is PERFORMED this run",
+      "✗ "
     ]
   },
   "conform-over-ceiling": {
@@ -1334,18 +1350,116 @@
       "unclassified    2 section(s) counted as reference"
     ]
   },
-  "def-no-class-fix": {
+  "remainder-swept-refs-records": {
+    "_why": "Customer DEF-Q-003 (2026-09-15). `skill-builder` was swept, and a converted `awareness-ledger` still names it in three records and one line of its index. `data-skills.md` keeps record bodies untouched, byte-for-byte, so HEAD's wf-remainder called every one LIVE and exited 1 on a count that could never reach 0. The ledger's gateway carries the data-skill contract: the universal invariant under `## Invariants`, and a `## Schema` declaring `ledger/<bucket>/<TYPE>-<YYYY-MM-DD>-<slug>.md` and `ledger/index.md`. So the mentions are RECORD, counted apart, and the scan reaches 0. The gateway's own SKILL.md is never a record.",
+    "script": "wf-remainder",
+    "args": ["--swept-refs"],
+    "exit": 0,
+    "want": [
+      "swept refs     0 live · 0 in user spans · 5 in data-skill records · 0 shipped · 2 swept skill(s): datakeeper, skill-builder",
+      "RECORD     .claude/skills/awareness-ledger/ledger/index.md:3  ->  /skill-builder",
+      "RECORD     .claude/skills/awareness-ledger/ledger/incidents/INC-2026-08-01-builder-drift.md:6  ->  /skill-builder"
+    ],
+    "not": ["LIVE       "]
+  },
+  "remainder-swept-refs-records-undeclared": {
+    "_why": "The same records, but the knowledge base carries NO data-skill contract, and one bucket README (which no schema declares) names the swept skill too. Nothing declares these files to be records, and a folder called `ledger` is not a declaration (`procedures/audit.md` § .censusignore: declared, never inferred). So every mention stays LIVE and the scan still exits 1, which is the direction that reports rather than hides. Recognition comes only from the contract.",
+    "script": "wf-remainder",
+    "args": ["--swept-refs"],
     "exit": 1,
+    "want": [
+      "swept refs     6 live · 0 in user spans · 0 in data-skill records · 0 shipped · 2 swept skill(s): datakeeper, skill-builder",
+      "LIVE       .claude/skills/awareness-ledger/ledger/incidents/README.md:3  ->  /skill-builder"
+    ],
+    "not": ["RECORD     "]
+  },
+  "stampdir-migrated": {
+    "_why": "Customer DEF-Q-006 (2026-09-15). An unchanged archive copy under a project-made `.claude/workforce/migrated/` holds one sacred block. wf-conform demands a row for every block under `.claude/` and HEAD's wf-stamp read only four roots, so it printed `1 block(s) in scope` and never wrote the row. The BLOCKING row cleared only after a hand edit to `.censusignore`. Both tools now share `wf-census.sacred_scope`, so the stamp writes the row conform will ask for.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "2 block(s) in scope"
+    ],
+    "not": [
+      "1 block(s) in scope"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          ".claude/workforce/migrated/SKILL.md.orig.md:directive:1",
+          ".claude/agents/a.md:directive:1"
+        ]
+      }
+    }
+  },
+  "def-write-time-no-class-fix": {
+    "_why": "WHERE THE CLASS FIX BLOCKS. `procedures/defect.md` step 5d runs `wf-conform --def <path>` on the record it just wrote, while its author still holds the defect. The same tree that only advises at verify (def-no-class-fix) fails here with exit 1, naming the field.",
+    "script": "wf-conform",
+    "args": ["--def", ".claude/workforce/personnel/DEF-2026-01-01-x.md"],
+    "exit": 1,
+    "want": ["✗ DEF-2026-01-01-x: names a Class fix", "1 failed"]
+  },
+  "def-class-fix-heading": {
+    "_why": "TWO SPELLINGS, ONE FIELD. 4 of 126 real DEF records (2026-09-15, six hosts) answer the question under a `## Class fix` heading instead of the template's `**Class fix:**` line. The first non-empty line of that section is the value, and a named file makes it well-formed. A reader that refused the heading would call an answered question unanswered.",
+    "script": "wf-conform",
+    "args": ["--def", ".claude/workforce/personnel/DEF-2026-01-02-heading.md"],
+    "exit": 0,
+    "want": ["wf-conform --def DEF-2026-01-02-heading: 3 check(s) · 0 failed"]
+  },
+  "companion-ledger-missing-schema": {
+    "_why": "MEASURED 2026-09-15 on pythom-space: a customized `personnel-ledger` carries `## Layout` and no `## Schema`, so the data-skill contract fails it on every verify. HEAD's wf-companion reported it UNMANAGED and nothing else, because a customized Core skill is never overwritten, so the host could not get back to green. The heal is ADDITIVE. It appends the missing `## Schema` from shipped source, below a note, and leaves every existing byte (the custom preamble, `## Layout`, the project's own invariant) exactly where it was. `## Layout` is not taken as the Schema. bin/check's `core refresh: a customized personnel-ledger gains its missing contract sections, every byte kept` runs this tree through wf-conform afterwards and asserts it passes with the original bytes as an exact prefix.",
+    "script": "wf-companion",
+    "args": ["--execute"],
+    "exit": 0,
+    "want": [
+      "+ personnel-ledger       appended  ## Schema (from shipped source; the customized text above is unchanged)",
+      "appended 1"
+    ],
+    "after": {
+      ".claude/skills/personnel-ledger/SKILL.md": {
+        "want": [
+          "Customized by this project: we keep a narrower record set.\n\n## Layout\n\nRecords live flat under `.claude/workforce/personnel/`, one file each.",
+          "Our own rule: an EMP is never deleted.",
+          "## Schema\n\none file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat"
+        ],
+        "once": ["## Schema", "## Layout"]
+      }
+    }
+  },
+  "def-legacy-layout": {
+    "_why": "The OLDER layout, kept so it cannot regress into being dropped. The record sits in `personnel/defects/`, where hosts installed before the flat schema still carry it. It is checked exactly as a flat one is (its missing Class fix is counted in the advisory row) and it is reported as legacy layout, because `wf-ledger index` and `consult` cannot see it there. The count line says one record was checked and that it was a legacy one.",
+    "exit": 0,
     "script": "wf-conform",
     "want": [
-      "names a Class fix"
+      "1 of 1 DEF records carry no Class fix — historical",
+      "DEF records: 1 checked · 0 flat · 1 in a legacy subfolder",
+      ".claude/workforce/personnel/defects/DEF-2026-01-01-x.md: legacy layout"
+    ]
+  },
+  "def-no-class-fix": {
+    "_why": "Customer DEF-Q-004 (2026-09-15). The record is filed where `personnel-templates.md` § Schema puts it, flat at `personnel/DEF-<slug>.md`. The reader used to look only in `personnel/defects/`, so against HEAD's wf-conform this tree exits 0 having checked nothing. The count line is asserted so a reader that finds nothing is visible as `0 checked`, not as a pass. At VERIFY a missing Class fix is history and is counted on the advisory channel, exit 0 (decided 2026-09-15: 110 of 126 real DEF records carry none and nothing can supply one). The field BLOCKS where a DEF is written: def-write-time-no-class-fix.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "~ 1 of 1 DEF records carry no Class fix — historical; the field is enforced where a DEF is authored",
+      "DEF records: 1 checked · 1 flat · 0 in a legacy subfolder"
+    ],
+    "not": [
+      "legacy layout"
     ]
   },
   "def-not-indexed": {
-    "exit": 1,
+    "_why": "Customer DEF-Q-004, the index half. Flat, per § Schema. Against HEAD's wf-conform the record was never read and nothing was said. Advisory at verify, because no audit step runs `wf-ledger index --execute`, the one mechanical rebuild.",
+    "exit": 0,
     "script": "wf-conform",
     "want": [
-      "appears in the personnel index"
+      "~ 1 of 1 DEF records are not in the personnel index",
+      "wf-ledger index --execute",
+      "DEF records: 1 checked · 1 flat · 0 in a legacy subfolder"
     ]
   },
   "hook-badstdin": {
@@ -1905,7 +2019,7 @@
     ],
     "exit": 1,
     "want": [
-      "swept refs     5 live · 1 in user spans · 1 shipped · 2 swept skill(s): datakeeper, skill-builder",
+      "swept refs     5 live · 1 in user spans · 0 in data-skill records · 1 shipped · 2 swept skill(s): datakeeper, skill-builder",
       "LIVE       .claude/skills/code-evaluator/SKILL.md:7  ->  /skill-builder",
       "LIVE       .claude/skills/code-evaluator/hooks/code-eval-prewrite.sh:4  ->  /skill-builder",
       "LIVE       .claude/skills/self-heal/hooks/no-directive-modification.sh:2  ->  /skill-builder",
@@ -1929,7 +2043,7 @@
     ],
     "exit": 0,
     "want": [
-      "swept refs     0 live · 1 in user spans · 1 shipped · 2 swept skill(s): datakeeper, skill-builder",
+      "swept refs     0 live · 1 in user spans · 0 in data-skill records · 1 shipped · 2 swept skill(s): datakeeper, skill-builder",
       "USER-SPAN  .claude/skills/voice/SKILL.md:5  ->  /skill-builder"
     ],
     "not": [
