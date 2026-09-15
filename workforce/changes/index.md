@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.61.0 | 2026-09-15 | handbook, principles, audit, verify, changes, scripts, installer, platform | **yes** | Fix nine defects a customer audit found on a RHEL 8 host |
 | 1.60.1 | 2026-09-15 | changes, scripts, installer | no | Date the evacuation refusal and drop an unmeasured ~10% trigger rate |
 | 1.60.0 | 2026-09-15 | chart, audit, verify, changes, hooks, scripts, installer, platform | no | Heal dead and cross-root workforce hook rows on first use, in every project |
 | 1.59.1 | 2026-09-14 | chart, principles, audit, verify, changes, hooks, scripts, installer, platform | no | prove: drop nine constants that point at deleted files or duplicate a definition |
