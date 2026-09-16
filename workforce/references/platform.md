@@ -161,7 +161,7 @@ per host by the canary**, never inferred per handbook from the presence of a str
 **This is the condition on fact 2c, and it was not known when 2c was promoted.**
 
 **Measured 2026-08-03 on Claude Code 2.1.221**, during `/workforce verify` on a real org. Same fixture
-(`wf-ceiling-probe`), same session, two spawns:
+(`wf-ceiling-probe`, retired with the other shipped fixtures in 1.31.0), same session, two spawns:
 
 **No evidence file exists for this fact.** The raw canary output was never copied into the repository's
 `measurements/` directory (§ Adding a fact, step 2), so everything below rests on this section's own
@@ -180,8 +180,8 @@ form returned `HAS_AGENT: yes` on two separate occasions from the fixture whose 
 `Read, Write`.
 
 *Corrected 2026-08-03.* This paragraph previously read "instead of honoring the definition's `tools:` /
-`disallowedTools:`" — **which the same measurement contradicts.** `wf-canary-ic` grants
-`tools: Read, Write, Agent` and revokes with `disallowedTools: Agent`; the teammate saw exactly that
+`disallowedTools:`" — **which the same measurement contradicts.** The project-local fixture `.claude/agents/wf-canary-ic.md` was the one that granted
+`tools: Read, Write, Agent` and revoked with `disallowedTools: Agent`; the teammate saw exactly that
 allowlist plus coordination tools. `tools:` was honored precisely. Only the revocation vanished. The
 [agent-teams reference](https://code.claude.com/docs/en/agent-teams) (read 2026-08-03, page stamped
 v2.1.178) states the honored half — *"The teammate honors that definition's `tools` allowlist and
@@ -224,7 +224,7 @@ What is established, harness 2.1.220:
 |---|---|
 | A just-written agent is **not immediately** discoverable | `wf-reload-probe` written 22:41:32Z; spawn attempted at **22:42, 22:44, and 22:46** → `not found` all three times |
 | A just-installed skill is **not immediately** invocable | 58 files installed, invoked three times → `Unknown skill: workforce` |
-| **Both register later in the same session, with no restart** | at 22:42 the available-agents list included `wf-canary-ic` and `wf-canary-lead`, both written at **18:34** — and the skill listing included `workforce` |
+| **Both register later in the same session, with no restart** | at 22:42 the available-agents list included the fixtures `.claude/agents/wf-canary-ic.md` and `.claude/agents/wf-canary-lead.md`, both written at **18:34** — and the skill listing included `workforce` |
 
 **So a restart is not required. The earlier claim that it was is retracted.**
 
@@ -251,7 +251,7 @@ boundaries moved together across the two attempts, the same ambiguity the add ca
 **13m07s is not a latency**, only when the second attempt happened to be made. **The measurement is a
 body-text edit ONLY:** a changed `model:`, `tools:`, or `disallowedTools:` is not covered and remains
 unmeasured, which matters because the tier ceiling rests on `disallowedTools:` — so whether an *amended*
-ceiling takes effect in-session is a separate open branch, and one `wf-reload-probe` cannot settle,
+ceiling takes effect in-session is a separate open branch, and the body-edit probe cannot settle it,
 since settling it means editing frontmatter rather than body text.
 
 **So the trigger is still undetermined — but one candidate is now ahead.** What the two runs differ in
@@ -268,8 +268,9 @@ a session.** Treat "restart is the reliable path" as unchanged — the trigger b
 is not something a procedure can wait on.
 
 **Next measurement, if it is worth narrowing:** write a fixture and attempt it on a fixed schedule, so the
-first success is timed rather than noticed. `wf-reload-probe` is left in `.claude/agents/` for exactly
-that.
+first success is timed rather than noticed. `wf-reload-probe` was left in the measuring project's `.claude/agents/` for exactly
+that. It is not there to reuse now: `wf-apply`'s PASS-STALE-CANARY sweeps a fixture of that name once
+`platform-local.md` records a measurement, and fact 24's `--agents` form needs no fixture file at all.
 
 **Design consequences — restart is the RELIABLE path, not the only one.** This list is the whole set;
 an earlier revision of this file carried a second, contradictory one that survived the retraction of
@@ -361,11 +362,13 @@ door — this is a *prevents*, and `enforcement.md` carries it as one.
 server that exists. That gap is the one that matters for anyone else running this project
 (`verification.md` § When the server is absent).
 
-*Attempted 2026-08-03. The fixture is written and shipped — `.claude/agents/wf-mcp-absent-probe.md`,
-granting `mcp__this-server-does-not-exist` and reporting its own resolved tool list. **It did not
+*Attempted 2026-08-03. The fixture was written into the measuring project, never shipped —
+`.claude/agents/wf-mcp-absent-probe.md`, granting `mcp__this-server-does-not-exist` and reporting its
+own resolved tool list. **It did not
 register within the session that wrote it** (fact 3), so the spawn returned `Agent type not found`
-twice and the measurement is `UNAVAILABLE`, not `FAIL`. The fixture is retained precisely so the next
-session can spawn it in one call; deleting it would spend the setup again. **Do not record a result
+twice and the measurement is `UNAVAILABLE`, not `FAIL`. It was kept then so the next session
+could spawn it in one call. **No copy is on disk to reuse now:** a next attempt can use fact 24's
+`--agents` form, which defines the probe for one headless session and needs no fixture file. **Do not record a result
 for this fact from the agent listing** — § Do not mistake the agent listing for a measurement applies
 here exactly.*
 
@@ -573,7 +576,7 @@ closing report file, is written by the orchestrating session and never delegated
 | 15 | Subagents **inherit the parent session's permission context**; an absent or empty `permissions.allow` is **not** "deny all" | A grant the main session lacks is a grant no employee has, so the settings review at `audit-setup.md` § Permissions is an org-wide precondition rather than a per-agent one | unverified — same source and date |
 | 16 | **There is no per-agent `permissions:` frontmatter field.** The agent-side fields are `tools:`, `disallowedTools:`, `permissionMode:`, `mcpServers:`, `hooks:` — and `tools:`/`disallowedTools:` govern tool **presence** while `permissions.*` governs tool **use** | Load-bearing, and it is the fact that says a requested design is not expressible: per-agent permission *rules* cannot be written into a handbook. The capability boundary is per-agent; the usage rule is not | unverified — same source and date |
 | 17 | Permission rules from different settings scopes are **concatenated and deduplicated, not replaced** | **The guarantee behind `0 removed`** (`audit-setup.md` § Permissions): adding a grant cannot delete a rule the user wrote. If this measures false, that section's central promise fails and the conflict row must be revisited | unverified — same source and date, and the one here most worth canarying first |
-| 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. No instrument ships for it: `wf-canary-ic` was retired with the other fixtures in 1.31.0, and fact 24's `--agents` form does not name a teammate |
+| 18 | **A handbook run as a named agent-teams teammate loses two frontmatter fields outright: `skills:` and `mcpServers:` are "not applied", and the teammate loads skills and MCP servers from project/user settings like a regular session.** `tools:` and `model:` *are* honored; coordination tools are forced on top regardless | **The largest conditioning in this file.** Fact 10 is the only deterministic doctrine channel an employee has, and this is a spawn form in which it silently does not exist — a teammate gets the handbook body appended to its prompt, but none of the preloaded skill content the body assumes it has read. Not a bug to report: it is documented intent | documented, not measured — read verbatim from [the agent-teams reference](https://code.claude.com/docs/en/agent-teams) on 2026-08-03, page self-stamped **v2.1.178**. No instrument ships for it: the fixture fact 2d was measured with, `.claude/agents/wf-canary-ic.md`, was project-local and never shipped, the shipped fixtures were removed in 1.31.0, and fact 24's `--agents` form does not name a teammate |
 | 20 | **`All tools` is a DISPLAY string the harness generates when `tools:` is empty — it is not a value.** Written literally into frontmatter it parses as a one-entry allowlist naming a tool that does not exist | **The failure presents as the opposite of what it is:** the frontmatter reads maximally permissive and the agent can call **nothing**. Fact 14 is the correct expression of "everything" — *omit* `tools:` — and `wf-conform` now refuses the literal on every tier. It is the delegating tiers, which carry no `tools:` line, whose display output says `All tools`, so a round-trip through a human or an agent reading that output is exactly how the phrase gets written back | reported 2026-08-05 by an authoring agent that **declined the instruction** and checked the harness rather than executing it; not canaried here. Treated as DOCUMENTED, and the guard is defensive either way — refusing the literal costs nothing if the fact is wrong |
 | 19 | **A dispatched author works in its OWN context window: N handbooks cost N spawns and accumulate NOTHING in the caller.** Only the returned result reaches the dispatcher | **The fact the conversion batch rests on.** A run that authors INLINE makes its own context the bottleneck and will correctly conclude a large roster is impossible — which is what happened on 2026-08-04, 0 of 40 converted with 192 of 200 spawns unspent. `procedures/audit.md` § Step 5 dispatches for this reason, and `conversion-taxonomy.md` bars context capacity from ever deferring a run | ✅ **MEASURED 2026-08-04** — 4 handbooks authored in one parallel wave: **411,014 subagent tokens and 104 tool calls outside the caller**, 4 of 4 returned complete, wall-clock the slowest author rather than the sum. Evidence `measurements/2026-08-04-dispatched-authoring.md` |
 | 22 | **Hook observability for runtime monitoring.** **`PostToolUse` fires for tool calls made *inside* subagents when the hook is registered at `settings.json` scope** — not only in the main loop. It receives `tool_name` + `tool_input`, so identical-call repetition is detectable; it may emit `additionalContext` or `{"continue": false}` but **cannot block a call — it runs *after* the tool executes.** And **no hook exposes live per-step context size or %-of-window**; the only "context is now large" signal is `PreCompact` with `trigger="auto"` | This is what makes a **loop-guard hook** buildable — a guard watching for repeated identical calls inside an employee can fire, because PostToolUse reaches subagents and sees `tool_input`. That line is the load-bearing one. But such a guard can only observe-and-inject, never prevent (it is post-execution), and it cannot gate on context size — a "context is getting large" guard has only `PreCompact(auto)` to key on, not a live percentage. Bears on fact 21's context-rot risk and on any runtime monitor. **The no-live-context-size half is correct and is NOT contradicted by fact 23**: that fact reads the transcript on disk, which no hook does and which something must call. The two answer different questions and both stand | documented, not measured — read from the Claude Code hooks documentation and verified 2026-08-19 (running harness 2.1.233); not canaried. Three documented claims in this file have already lost to measurement (facts 2, 3, 4), so the load-bearing "PostToolUse fires in subagents" line earns a canary before any gate rests on it |

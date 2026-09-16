@@ -73,69 +73,31 @@ def _src(path):
         return ""
 
 
-# ── Per-function hand-off roles. `bin/check`'s actor check uses these; one copy. ──────────
-def artifact_names(src):
-    """The per-session hand-off files a source composes: `f"wf-x.{sid}…"` or a `-flag`."""
-    return set(re.findall(r'f"(wf-[a-z-]+)\.\{', src)) | set(re.findall(r'"(wf-[a-z-]+-flag)', src))
-
-
-# CODE ONLY, NEVER PROSE. Splitting the raw source on `\n(?=def )` hung the comment block above
-# a def on the function before it, and a name in a comment or docstring counted as a mention,
-# so a function that opened any file became a "reader" of an artifact only its prose named.
-# Found 2026-09-13 by review. Each function is re-rendered from its syntax tree with every
-# docstring and bare string statement dropped, and a tree carries no comments.
-def code_chunks(src):
+# ── Per-function hand-off roles, LOADED FROM THE SHIPPED `wf-live`. One copy. ──────────────
+# These four lived here until 2026-09-16, and the shipped registry kept the file-level rule they
+# replaced, so every host's `wf-live` reported `wf-asks` "acted on by NOTHING" while `bin/check`
+# (reading this file) passed. The rule is enforcement of a shipped directive, so the copy that
+# ships is the one copy; this file and `bin/check`'s actor check read it from there.
+def _load_live():
+    from importlib.machinery import SourceFileLoader
+    import importlib.util
+    loader = SourceFileLoader("_wf_live_roles", os.path.join(ROOT, BIN, "wf-live"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    # NEVER LEAVE A __pycache__ BESIDE A SHIPPED SCRIPT: `bin/check` fails on the residue.
+    prior, sys.dont_write_bytecode = sys.dont_write_bytecode, True
     try:
-        tree = ast.parse(src)
-    except SyntaxError:
-        # Not Python: fall back to the split, with whole-line and trailing comments removed.
-        return re.split(r"\n(?=def )", re.sub(r"(?m)(^|\s)#.*$", r"\1", src))
-
-    class _NoProse(ast.NodeTransformer):
-        def visit_Expr(self, node):
-            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                return None
-            return node
-
-    tree = _NoProse().visit(tree)
-    defs = (ast.FunctionDef, ast.AsyncFunctionDef)
-    chunks = [ast.unparse(n) for n in tree.body if isinstance(n, defs)]
-    rest = [n for n in tree.body if not isinstance(n, defs)]
-    return chunks + [ast.unparse(ast.Module(body=rest, type_ignores=[]))]
+        loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = prior
+    return mod
 
 
-def function_roles(src, art):
-    """{function name, or "" for module code: {"writer", "reader", "clearer"}} for one file.
-
-    A path helper (names the artifact, joins a path, opens nothing) is transparent: a call to
-    it is a mention of the artifact in the calling function. Deleting is not acting, so a
-    clearer is never a reader.
-    """
-    funcs = code_chunks(src)
-    helpers = [m.group(1) for f in funcs
-               if art in f and "os.path.join" in f and "open(" not in f
-               for m in [re.match(r"def (\w+)\(", f)] if m]
-    out = {}
-    for f in funcs:
-        m = re.match(r"def (\w+)\(", f)
-        if m and m.group(1) in helpers:
-            continue
-        if not (art in f or any(f"{h}(" in f for h in helpers)):
-            continue
-        roles = set()
-        if "json.dump(" in f:
-            roles.add("writer")
-        if "os.remove(" in f:
-            roles.add("clearer")
-        if "json.dump(" not in f and "os.remove(" not in f and "open(" in f:
-            roles.add("reader")
-        if roles:
-            out[m.group(1) if m else ""] = roles
-    return out
-
-
-def artifact_roles(src, art):
-    return set().union(*function_roles(src, art).values())
+_LIVE = _load_live()
+artifact_names = _LIVE.artifact_names
+code_chunks = _LIVE.code_chunks
+function_roles = _LIVE.function_roles
+artifact_roles = _LIVE.artifact_roles
 
 
 def prove_cases(src):

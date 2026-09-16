@@ -40,6 +40,7 @@ thing works. `bin/check` (maintainer) and `/workforce verify` (host) judge confo
 This answers the narrower question nothing answered before: *is this thing there?*
 """
 
+import ast
 import json
 import os
 import re
@@ -114,6 +115,32 @@ NOT_A_NAME = re.compile(r"^wf-\d")
 # lowercase mid-sentence after an article or adjective. Requiring the capital and
 # allowing at most a backtick or two of gap separates them without a word list.
 RUNNABLE = re.compile(r"\b(?:Run|Spawn|Invoke|Execute|Call)s?\b[\s`*_]{0,4}$")
+
+# A PROJECT'S AGENT FILE IS NEVER OURS TO RESOLVE, for the reason a project skill's
+# `references/` path is not (REFCITE above). `.claude/agents/wf-mcp-absent-probe.md` names a
+# fixture a measurement run wrote into ONE project; the distribution never shipped it, so
+# "backed by nothing in bin/ or agents/" is true and says nothing.
+PROJECT_AGENT = re.compile(r"(?:\.claude/)?agents/$")
+
+# THE HISTORY TIER, AND WHY IT NEEDS TWO THINGS. MEASURED 2026-09-16 against the 1.63.0 tree:
+# 19 `stale` names, and every run reported the same ones — `wf-pin-check` in "That script was
+# removed", `wf-plain-guard` in "the guard was itself retired in 1.30.2". A report that says
+# the same true thing about correct prose every run is the report a reader learns to skim.
+#
+# A mention is HISTORY, and is counted rather than listed, only when BOTH hold:
+#   1. the name is one the distribution RETIRED, read from the tree's own records and never
+#      from a list kept here — `RETIRED_HOOKS` in wf-settings-apply (bin/check pins it to git
+#      history), the `retired` rows of `manifest.txt` where the repository is beside the tree,
+#      and `CANARY_RX` in wf-apply, the throwaway fixture names workforce itself wrote;
+#   2. the sentence it sits in speaks of the past.
+# A name nobody retired still reports, whatever tense its sentence is in, so a cue word cannot
+# hide a phantom. And a retired name in a present-tense sentence ("`wf-reload-probe` is left in
+# `.claude/agents/`") still reports, because that sentence tells a reader the thing is there.
+HISTORY_CUE = re.compile(
+    r"\b(?:removed|retired|deleted|swept|deprecated|went|gone|no longer|used to|until|"
+    r"had been|was|were|shipped|held|written|reported|returned|measured|attempted|"
+    r"history|previously|earlier|once|said|saying|did|fired|wired|ran|read as)\b", re.I)
+SENTENCE_END = re.compile(r"(?<=[.!?])[*_`)\]]*\s+|\s\|\s|^\s*\|\s*|\s*\|\s*$")
 
 
 def slurp(path):
@@ -198,6 +225,163 @@ def registry():
             "procedures": procedures, "agents": agents, "commands": commands}
 
 
+def skill_dirs():
+    """Every shipped skill directory other than workforce's own, in either layout.
+
+    TWO LAYOUTS, AND THE FIRST VERSION KNEW ONE. In this repository the evaluators sit under
+    `workforce/skills/<name>/`. On a host the installer puts them BESIDE the workforce skill,
+    at `<skills-root>/<name>/`, because a skill is only discoverable there (manifest.txt §
+    sibling). Reading only the first, every "the evaluator skill's own `references/…`"
+    citation resolved here and reported stale on every installed host. MEASURED 2026-09-16 in
+    a bin/dev-sandbox install of 1.63.0: four `references/additions.md` rows, all four files
+    present on disk.
+    """
+    out = []
+    for base in (os.path.join(WF, "skills"), os.path.dirname(WF)):
+        for s in names_in(base, want_dirs=True):
+            full = os.path.join(base, s)
+            if os.path.abspath(full) != os.path.abspath(WF) and os.path.isfile(
+                    os.path.join(full, "SKILL.md")):
+                out.append(full)
+    return out
+
+
+def retired_names():
+    """{name: source} for every name the tree's own records say the distribution retired."""
+    out = {}
+    sa = slurp(os.path.join(WF, "bin/wf-settings-apply"))
+    block = re.search(r"RETIRED_HOOKS = frozenset\(\{(.*?)\}\)", sa, re.S)
+    for n in re.findall(r'"(wf-[a-z0-9-]+)"', block.group(1) if block else ""):
+        out.setdefault(n, "RETIRED_HOOKS")
+    for line in slurp(os.path.join(REPO, "manifest.txt")).splitlines():
+        if line.startswith("retired "):
+            base = os.path.basename(line.split(None, 1)[1].strip())
+            out.setdefault(base[:-3] if base.endswith(".md") else base, "manifest.txt retired")
+    return out
+
+
+def canary_pattern():
+    """wf-apply's own pattern for the throwaway fixtures workforce wrote, or None."""
+    m = re.search(r'^CANARY_RX = re\.compile\(r"(.+)"\)$',
+                  slurp(os.path.join(WF, "bin/wf-apply")), re.M)
+    try:
+        return re.compile(m.group(1)) if m else None
+    except re.error:
+        return None
+
+
+def paragraph_spans(lines):
+    """[(first, last)] per line index: the wrapped paragraph that line belongs to.
+
+    A SENTENCE IS NOT A LINE. Markdown here wraps near column 100, so "the user's explicit
+    instruction that `wf-plain-guard` and `wf-speak-guard`" ends a line and "are deprecated"
+    opens the next. Reading one line at a time reported that sentence as present tense. A
+    blank line, a table row, a heading, a list item and a fence each start a new paragraph.
+    """
+    spans = [(i, i) for i in range(len(lines))]
+    start = None
+
+    def close(last):
+        for j in range(start, last + 1):
+            spans[j] = (start, last)
+
+    for i, raw in enumerate(lines):
+        s = raw.strip()
+        solo = not s or s.startswith(("|", "#", "```"))
+        opens = re.match(r"(?:[-*>]|\d+\.)\s", s) is not None
+        if start is not None and (solo or opens):
+            close(i - 1)
+            start = None
+        if not solo and start is None:
+            start = i
+    if start is not None:
+        close(len(lines) - 1)
+    return spans
+
+
+def sentence_at(text, start, end):
+    """The sentence (or table cell) of `text` holding [start, end)."""
+    left = 0
+    for m in SENTENCE_END.finditer(text[:start]):
+        left = m.end()
+    right = len(text)
+    m = SENTENCE_END.search(text, end)
+    if m:
+        right = m.start()
+    return text[left:right]
+
+
+# ── Per-function hand-off roles. ONE COPY: `bin/components` loads these from here. ────────
+# THE SHIPPED REGISTRY HAD THE FILE-LEVEL RULE THE MAINTAINER SUITE HAD ALREADY RETIRED.
+# `bin/check` moved to per-function roles on 2026-09-12, when the asks checklist landed and the
+# file-level rule reported `wf-asks` "acted on by NOTHING" while `wf-widen` read it at Stop. The
+# fix went into `bin/components`, which does not ship, so every host's `wf-live` kept printing
+# the false DETECTOR row. MEASURED 2026-09-16 on 1.63.0: `wf-widen.checklist()` opens
+# `wf-asks.<sid>.json` and loads it, and `with_checklist` hands it to the juror.
+def artifact_names(src):
+    """The per-session hand-off files a source composes: `f"wf-x.{sid}…"` or a `-flag`."""
+    return set(re.findall(r'f"(wf-[a-z-]+)\.\{', src)) | set(re.findall(r'"(wf-[a-z-]+-flag)', src))
+
+
+# CODE ONLY, NEVER PROSE. Splitting the raw source on `\n(?=def )` hung the comment block above
+# a def on the function before it, and a name in a comment or docstring counted as a mention,
+# so a function that opened any file became a "reader" of an artifact only its prose named.
+# Found 2026-09-13 by review. Each function is re-rendered from its syntax tree with every
+# docstring and bare string statement dropped, and a tree carries no comments.
+def code_chunks(src):
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        # Not Python: fall back to the split, with whole-line and trailing comments removed.
+        return re.split(r"\n(?=def )", re.sub(r"(?m)(^|\s)#.*$", r"\1", src))
+
+    class _NoProse(ast.NodeTransformer):
+        def visit_Expr(self, node):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return None
+            return node
+
+    tree = _NoProse().visit(tree)
+    defs = (ast.FunctionDef, ast.AsyncFunctionDef)
+    chunks = [ast.unparse(n) for n in tree.body if isinstance(n, defs)]
+    rest = [n for n in tree.body if not isinstance(n, defs)]
+    return chunks + [ast.unparse(ast.Module(body=rest, type_ignores=[]))]
+
+
+def function_roles(src, art):
+    """{function name, or "" for module code: {"writer", "reader", "clearer"}} for one file.
+
+    A path helper (names the artifact, joins a path, opens nothing) is transparent: a call to
+    it is a mention of the artifact in the calling function. Deleting is not acting, so a
+    clearer is never a reader.
+    """
+    funcs = code_chunks(src)
+    helpers = [m.group(1) for f in funcs
+               if art in f and "os.path.join" in f and "open(" not in f
+               for m in [re.match(r"def (\w+)\(", f)] if m]
+    out = {}
+    for f in funcs:
+        m = re.match(r"def (\w+)\(", f)
+        if m and m.group(1) in helpers:
+            continue
+        if not (art in f or any(f"{h}(" in f for h in helpers)):
+            continue
+        roles = set()
+        if "json.dump(" in f:
+            roles.add("writer")
+        if "os.remove(" in f:
+            roles.add("clearer")
+        if "json.dump(" not in f and "os.remove(" not in f and "open(" in f:
+            roles.add("reader")
+        if roles:
+            out[m.group(1) if m else ""] = roles
+    return out
+
+
+def artifact_roles(src, art):
+    return set().union(*function_roles(src, art).values())
+
+
 def orphan_handoffs(reg):
     """Hooks that write a hand-off file nothing reads — a detector with no actor.
 
@@ -220,17 +404,24 @@ def orphan_handoffs(reg):
     """
     scripts = {n: slurp(os.path.join(WF, "bin", n)) for n in reg["scripts"]}
     apply_src = scripts.get("wf-settings-apply", "")
+    # A `type: "agent"` reader has no file: its consumption is visible in the PROMPT region of
+    # AGENT_HOOKS only. The whole file names every hook in its wiring tables, so a whole-file
+    # match passed for any artifact named after a hook.
+    agent_region = apply_src[apply_src.find("AGENT_HOOKS = {"):] if "AGENT_HOOKS = {" in apply_src else ""
+    agent_region = agent_region[:agent_region.find("\n}\n")] if agent_region else ""
     artifacts = set()
     for src in scripts.values():
-        artifacts |= set(re.findall(r'f"(wf-[a-z-]+)\.\{', src))
-        artifacts |= set(re.findall(r'"(wf-[a-z-]+-flag)', src))
+        artifacts |= artifact_names(src)
     out = []
     for a in sorted(artifacts):
-        writers = [n for n, src in scripts.items() if a in src and "json.dump" in src]
-        clearers = [n for n, src in scripts.items() if a in src and "os.remove" in src]
-        actors = [n for n, src in scripts.items()
-                  if a in src and n not in writers and n not in clearers]
-        if a in apply_src:                       # a type:"agent" reader has no file
+        # ROLES ARE DECIDED PER FUNCTION, NOT PER FILE. The file-level rule called any script
+        # that saved ANY file a writer of EVERY artifact it named, so a script that saves a
+        # file of its own could never be a reader of anything.
+        roles = {n: artifact_roles(src, a) for n, src in scripts.items() if a in src}
+        writers = [n for n, r in roles.items() if "writer" in r]
+        clearers = [n for n, r in roles.items() if "clearer" in r]
+        actors = [n for n, r in roles.items() if "reader" in r]
+        if a in agent_region:
             actors.append("wf-settings-apply:AGENT_HOOKS")
         if writers and not actors:
             out.append(("DETECTOR", a,
@@ -276,8 +467,8 @@ def disagreements(reg):
                 if os.path.isfile(os.path.join(WF, "references", target)):
                     continue
                 if SKILL_OWNED.search(line[:m.start()]) and any(
-                        os.path.isfile(os.path.join(WF, "skills", s, "references", target))
-                        for s in names_in(os.path.join(WF, "skills"), want_dirs=True)):
+                        os.path.isfile(os.path.join(s, "references", target))
+                        for s in skill_dirs()):
                     continue
                 imperative = fenced or RUNNABLE.search(line[:m.start()])
                 kind = "BROKEN" if imperative else "stale"
@@ -290,20 +481,44 @@ def disagreements(reg):
         if h not in live_script:
             out.append(("hook", h, "registered by wf-settings-apply, not in bin/"))
 
-    broken, stale = {}, {}
+    # A hand-off file a shipped script composes (`wf-asks.<session>.json`) is backed by that
+    # script. Naming it is naming a live artifact, not a phantom mechanism.
+    live_artifact = set()
+    for n in reg["scripts"]:
+        live_artifact |= artifact_names(slurp(os.path.join(WF, "bin", n)))
+    retired = retired_names()
+    canary_rx = canary_pattern()
+
+    broken, stale, history = {}, {}, reg.setdefault("history", {})
     for doc in shipped_docs():
         rel = os.path.relpath(doc, WF)
         fenced = False
-        for lineno, line in enumerate(slurp(doc).splitlines(), 1):
+        lines = slurp(doc).splitlines()
+        spans = paragraph_spans(lines)
+        for lineno, line in enumerate(lines, 1):
             if line.lstrip().startswith("```"):
                 fenced = not fenced
                 continue
+            first, last = spans[lineno - 1]
+            para = " ".join(lines[first:last + 1])
+            shift = len(" ".join(lines[first:lineno - 1])) + (1 if lineno - 1 > first else 0)
             for m in NAME.finditer(line):
                 tok = m.group(0)
-                if NOT_A_NAME.search(tok) or tok in live_script or tok in live_agent:
+                if (NOT_A_NAME.search(tok) or tok in live_script or tok in live_agent
+                        or tok in live_artifact or PROJECT_AGENT.search(line[:m.start()])):
                     continue
+                where = f"{rel}:{lineno}"
                 imperative = fenced or RUNNABLE.search(line[:m.start()])
-                (broken if imperative else stale).setdefault(tok, []).append(f"{rel}:{lineno}")
+                if imperative:
+                    broken.setdefault(tok, []).append(where)
+                    continue
+                known = retired.get(tok) or (
+                    "wf-apply CANARY_RX" if canary_rx and canary_rx.match(tok + ".md") else None)
+                if known and HISTORY_CUE.search(
+                        sentence_at(para, shift + m.start(), shift + m.end())):
+                    history.setdefault(tok, []).append(where)
+                    continue
+                stale.setdefault(tok, []).append(where)
 
     out += orphan_handoffs(reg)
 
@@ -325,7 +540,8 @@ def main():
     bad = disagreements(reg)
 
     if as_json:
-        print(json.dumps({"live": reg,
+        hist = reg.pop("history", {})
+        print(json.dumps({"live": reg, "history": hist,
                           "disagreements": [{"kind": k, "name": n, "why": w} for k, n, w in bad]},
                          indent=2))
         return 1 if bad else 0
@@ -339,6 +555,13 @@ def main():
         print(f"  {label:12} {len(v):3}   {head}")
 
     print()
+    hist = reg.get("history") or {}
+    if hist:
+        # COUNTED, NEVER SILENT. A tier that hides mentions must say how many it hid, or a
+        # rule that swallowed a real defect would be indistinguishable from a clean tree.
+        print(f"  history      {sum(len(v) for v in hist.values()):3}   past-tense mention(s) of "
+              f"{len(hist)} retired name(s) — the record doing its job, not a disagreement "
+              f"(--json lists each)\n")
     if not bad:
         print("  nothing the docs call live is missing from the tree.")
         return 0

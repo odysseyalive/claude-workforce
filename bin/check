@@ -1092,6 +1092,131 @@ check(
     "; ".join(_attr),
 )
 
+
+# ── wf-live ON THE TREE A HOST ACTUALLY HAS, AND THE HISTORY TIER (2026-09-16) ──────────────
+# A peer project ran the installed 1.63.0 `wf-live` and got 0 BROKEN over 19 `stale` names, 4
+# missing `references/additions.md` citations, and a DETECTOR row for `wf-asks`. Reproduced in a
+# bin/dev-sandbox install. Three separate defects, each proven here by RUNNING the shipped CLI:
+#   1. the evaluators sit BESIDE `skills/workforce/` on a host, and wf-live looked only under
+#      `workforce/skills/`, so every skill-owned citation resolved in this repo and on no host;
+#   2. roles were decided per FILE in the shipped copy after bin/components had moved to per
+#      function, so `wf-widen` (which saves a file of its own) could never read `wf-asks`;
+#   3. correct past-tense prose about a retired hook reported every run, so the one tier that
+#      could show a real stale name was a list nobody reads.
+def _wf_live_run(root):
+    return subprocess.run([sys.executable, os.path.join(root, "bin", "wf-live"), "--root", root],
+                          capture_output=True, text=True, timeout=120).stdout
+
+
+def _host_layout(td):
+    """A copy of the tree laid out as the installer lays it out: skills/workforce + siblings."""
+    import shutil as _sh
+    skills = os.path.join(td, "skills")
+    _ign = _sh.ignore_patterns("__pycache__")
+    _sh.copytree("workforce", os.path.join(skills, "workforce"),
+                 ignore=_sh.ignore_patterns("__pycache__", "skills"))
+    for _s in sorted(os.listdir("workforce/skills")):
+        _sh.copytree(os.path.join("workforce/skills", _s), os.path.join(skills, _s), ignore=_ign)
+    return os.path.join(skills, "workforce")
+
+
+_live_host = []
+try:
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _hw = _host_layout(_td)
+        with open(os.path.join(_hw, "references", "evaluators.md"), "a", encoding="utf-8") as _fh:
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/additions.md`.\n")
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/never-existed.md`.\n")
+        _ho = _wf_live_run(_hw)
+    if "references/additions.md" in _ho:
+        _live_host.append("an attributed citation of a file the sibling skill holds reports missing "
+                          "in the HOST layout — skill_dirs() no longer reads <skills-root>/<name>/")
+    if "references/never-existed.md" not in _ho:
+        _live_host.append("the host-layout resolution hid a file no skill has")
+    _hbad = [l.strip() for l in _ho.splitlines()
+             if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", l)
+             and "never-existed" not in l]
+    _hwhy = [l.strip() for l in _ho.splitlines()[1:] if l.startswith("             ")]
+    if _hbad:
+        _live_host.append(f"the installed layout reports {len(_hbad)} disagreement(s): "
+                          f"{list(zip(_hbad, _hwhy))[:4]}")
+except Exception as _exc:                                # noqa: BLE001
+    _live_host.append(f"the host-layout probe would not run ({_exc})")
+check(
+    "wf-live: the tree as a host installs it resolves its skill-owned citations and reports no disagreement",
+    not _live_host,
+    "; ".join(_live_host),
+)
+
+_live_repo_out = _wf_live_run("workforce")
+_live_repo_bad = [l.strip() for l in _live_repo_out.splitlines()
+                  if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", l)]
+check(
+    "wf-live: the shipped tree has no disagreement — every retired name it still mentions is history",
+    not _live_repo_bad and "history" in _live_repo_out,
+    f"{_live_repo_bad[:6]} — a `stale` row now means prose that names a retired thing in the "
+    "present tense, or names something no record retired. Reword it as history or correct it. "
+    "Never add the name to a registry to quiet it: RETIRED_HOOKS is pinned to git",
+)
+
+# THE HISTORY TIER CANNOT HIDE A PHANTOM OR A PRESENT-TENSE CLAIM. Three sentences, one tree.
+_live_hist = []
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf, ignore=_sh.ignore_patterns("__pycache__"))
+        with open(os.path.join(_wf, "references", "passes.md"), "a", encoding="utf-8") as _fh:
+            _fh.write("\n`wf-pin-check` was removed in the simplification release.\n")
+            _fh.write("\n`wf-budget-guard` blocks every mis-rendered picker.\n")
+            _fh.write("\n`wf-never-shipped-guard` was removed long ago.\n")
+        _o = _wf_live_run(_wf)
+    if not re.search(r"stale\s+wf-budget-guard", _o):
+        _live_hist.append("a retired name in a PRESENT-TENSE sentence was counted as history — "
+                          "that sentence tells a reader the hook is there")
+    if not re.search(r"stale\s+wf-never-shipped-guard", _o):
+        _live_hist.append("a name no record retired was hidden by a past-tense cue — the cue "
+                          "alone became a way to silence a phantom")
+    if re.search(r"stale\s+wf-pin-check", _o):
+        _live_hist.append("a retired hook in a past-tense sentence still reports stale")
+    if not re.search(r"history\s+\d+\s+past-tense", _o):
+        _live_hist.append("the history tier is not counted on the report, so a rule that "
+                          "swallowed a real defect would look like a clean tree")
+except Exception as _exc:                                # noqa: BLE001
+    _live_hist.append(f"the history probe would not run ({_exc})")
+check(
+    "wf-live: history needs a retired name AND a past-tense sentence; either alone still reports",
+    not _live_hist,
+    "; ".join(_live_hist),
+)
+
+# THE ACTOR RULE IN THE SHIPPED COPY: a script that saves a file of its own can still READ a
+# hand-off, and a hand-off nobody reads still fires.
+_live_det = []
+if re.search(r"DETECTOR\s+wf-asks|stale\s+wf-asks", _live_repo_out):
+    _live_det.append("wf-asks reads as orphaned or phantom, while wf-widen.checklist() reads it "
+                     "and with_checklist hands it to the juror at Stop")
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf, ignore=_sh.ignore_patterns("__pycache__"))
+        with open(os.path.join(_wf, "bin", "wf-orphan-demo"), "w", encoding="utf-8") as _fh:
+            _fh.write("import json, os\n\n\ndef save(d, sid):\n"
+                      "    with open(os.path.join(d, f\"wf-orphan-note.{sid}.json\"), \"w\") as fh:\n"
+                      "        json.dump({}, fh)\n")
+        _o = _wf_live_run(_wf)
+    if not re.search(r"DETECTOR\s+wf-orphan-note", _o):
+        _live_det.append("a hand-off written and read by nothing no longer fires DETECTOR")
+except Exception as _exc:                                # noqa: BLE001
+    _live_det.append(f"the orphan probe would not run ({_exc})")
+check(
+    "wf-live: a hand-off a shipped script reads is not orphaned; one nothing reads still fires",
+    not _live_det,
+    "; ".join(_live_det),
+)
+
 # THE CORPUS RESOLVES FROM THE INSTALL; THE HOUSE RULES STAY LOCAL. `wf-catalog` is the
 # resolver, and the properties below are the ones whose absence would make it dangerous
 # rather than merely wrong. MEASURED 2026-09-10 across thirteen projects: one corpus in

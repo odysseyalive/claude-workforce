@@ -249,7 +249,7 @@ The one row that legitimately survives is one whose resolution lies in **another
 **measured host limit**, and it is reported with that citation, never as "you chose to keep the stable
 state." Mechanics at `references/procedures/audit.md` § Step 7, `references/deferred.md`, and
 and `references/procedures/discharge.md`. *Corrected 2026-09-10: this also cited
-`references/procedures/diagnose.md` "which drains to the same fixpoint against workforce's own three
+a `diagnose.md` procedure "which drains to the same fixpoint against workforce's own three
 deliverables" — there is no `diagnose` command and no such file, so the sentence sent a reader to a
 mechanism that has never existed.*
 
@@ -582,7 +582,7 @@ grade and counts tool calls is that table's own defect one level up.*
 are deprecated and every vestige removed. **No quoted user text was touched** — directive one is that
 the user's verbiage is absolutely retained, and every `>` line in this block is byte-for-byte what it
 was. What changed is the model-authored mechanics prose around them, which named those two hooks as
-live carriers and cited `references/plain-output.md`. All three were removed in 1.30.2, on the user's
+live carriers and cited the `plain-output.md` reference. All three were removed in 1.30.2, on the user's
 marks, after the speech guard was measured firing on 7.0% of GOOD replies across 2,149 real replies —
 so the prose was describing enforcement that had not existed for two days, which is the overclaim Core
 Principle 6 forbids. The one surviving mention of a guard is the 2026-09-07 three-paths measurement,

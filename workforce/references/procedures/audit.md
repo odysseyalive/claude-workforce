@@ -1906,7 +1906,7 @@ T-step tells the user something broke; it does not tell them what to type.
 ### Step 6-E — Seed evaluator additions and refresh the house rules
 
 The evaluator wiring in Step 4 is a DESIGN decision; **this is where the writes happen**, and until this
-step existed they did not — the append that carries the evaluator skill's own `references/additions.md` into an installed
+step existed they did not — the append that carries the evaluator skill's own `skills/<evaluator>/references/additions.md` into an installed
 catalog was prose-only, performed by whoever ran the audit and remembered. `code-evaluator` is the proof:
 its own additions sat unseeded from 2026-08-06 to 2026-08-25 while its anchor reported the gap every run.
 A detector without its fix is a flag (SKILL.md § Directives), and the fix is a step that always runs.
