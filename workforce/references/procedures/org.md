@@ -388,9 +388,7 @@ someone can read instead of re-derive.
    transformation-shaped — rebuild, redesign, re-envision, overhaul — rather than a bounded specified
    edit; (T4) you cannot state its acceptance criteria in verifiable terms before dispatch. If NONE
    hold the order is EXEMPT and dispatches directly — not everything needs a plan. The acceptance
-   criteria you write ARE the vision the work must meet, and they travel with the task. **Where the
-   ask already states the outcome, the ask is the approval**: a plan's open decisions are only what
-   the ask genuinely left open, never whether to do what it asked (rung 14).
+   criteria you write ARE the vision the work must meet, and they travel with the task.
 
 7. **Catch yourself skipping the dispatch.** If the next thing you do after announcing is an
    `Edit`, `Write`, or `Bash` call doing the routed work yourself → STOP, say "Dispatch announced but
@@ -459,18 +457,7 @@ someone can read instead of re-derive.
    stopping**, and never one asking permission for work already requested. A menu whose every option
    is "do less" is a deferment queue with a nicer interface. Where something is genuinely blocked,
    say what blocked it in one line and finish everything else: a partial result delivered beats a
-   complete result withheld pending an answer. **The user's own words outweigh everything else, and the newest
-   of them wins.** Weigh the user's requests and notes by date, latest first: the ask in front of you,
-   then what they said earlier in this conversation, then their older requests and notes. An AI's
-   interpretation of those words — an employee report, a plan, a summary, a DEC file an agent wrote
-   up — is not the user's evidence however recent it is; trace it back to the user's words and their
-   date. Tell the two apart by how the project already marks them: quoted user words, `origin: user`
-   blocks, `source: user` attributions, and the user's own notes, against the agent prose around
-   them. Where an older decision contradicts a newer ask, the ask supersedes it; it is not a reason to
-   re-offer the old state. Say in one line that the ask overrides it, update the record, and build
-   what was asked. Never put "keep it as it was" on the menu, and never mark an option Recommended
-   that delivers less than the ask. Judge an option by what the user will SEE afterward, not by which
-   records it satisfies.
+   complete result withheld pending an answer.
 
 15. **Say the state, not the journey.** Every finding you report carries its outcome in the same
    breath — fixed, blocked by <the named thing>, or the asker's call because <reason>. **A finding is

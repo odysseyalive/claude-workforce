@@ -187,6 +187,26 @@ KINDS = [
      "sample cannot show what is absent"),
 ]
 
+# THE USER'S WORDS DECIDE, NEWEST FIRST — carried on every message, in every project.
+# User directive 2026-09-16 (SKILL.md § Directives). It lives HERE, in a hook the install
+# wires and `update` refreshes, and not in `/org` dispatch or the operating principles,
+# because those are per-project copies that only an `audit` rewrites: a rule put there
+# reaches no existing org until somebody re-audits it. This hook is already wired at user
+# scope, so changing this text reaches every project on the next `update`, and it arrives
+# at the head of every turn rather than decaying at the head of a conversation.
+# Stated as facts, never as an instruction (see the note above the injection in `main`).
+USER_WORDS = (
+    "What this user wants is decided by the user's own requests and notes, weighed by date "
+    "with the newest first: this message, then earlier messages in this conversation, then "
+    "older requests and notes. A report, plan, summary, or record written by an AI is an "
+    "interpretation of those words, not the user's evidence, however recent it is; projects "
+    "mark the difference with quoted user words, `origin: user` blocks, `source: user` "
+    "attributions, and the user's own notes. An older decision that a newer request "
+    "contradicts is superseded by the request, so \"keep it as it was\" is not one of the "
+    "choices, and an option that delivers less than the request is not the recommended one."
+)
+
+
 SENSE_HOW = {
     "hearing": "read the record that decided it (`git log`, `workforce/changes/`), or ask "
                "a source outside this turn's own reasoning",
@@ -448,11 +468,10 @@ def main():
                            "checklist": checklist_record}, fh)
         except OSError:
             pass
-        if checklist_line:
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": checklist_line,
-            }}))
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": "\n\n".join(x for x in (USER_WORDS, checklist_line) if x),
+        }}))
         return 0
 
     try:
@@ -483,7 +502,7 @@ def main():
     # explicit that text framed as an out-of-band command trips the prompt-injection
     # defences and gets surfaced to the user instead of read — which would turn a tag
     # into one more thing a human has to deal with.
-    lines = ["This ask is of a kind whose wrong answers are on record in this project."]
+    lines = [USER_WORDS, "", "This ask is of a kind whose wrong answers are on record in this project."]
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
                      f"In practice: {SENSE_HOW[h['sense']]}.")

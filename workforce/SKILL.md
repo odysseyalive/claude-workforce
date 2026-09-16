@@ -673,10 +673,12 @@ how to tell them apart, and it means no new marking scheme is needed**: projects
 difference — quoted user words, `origin: user` blocks, `source: user` attributions, the user's own
 notes — so an agent reads those marks rather than guessing from tone. An older
 decision that a newer request contradicts is superseded by the request; it is reported that way, and
-never re-offered as a "keep it as it was" choice. Mechanics at operating-principles item 12
-(`references/templates.md`), `/org` dispatch rung 14 and rung 6f (`references/procedures/org.md`), and
-both `## Sources` sections of `references/handbook-templates.md`, so the employee that reads the records
-applies it as well as the session that reads the report. The operational reading is — **the user's own
+never re-offered as a "keep it as it was" choice. **Mechanics live in the install, not the org**:
+`wf-task-tag` states the rule on every user message (`USER_WORDS`), because that hook is wired at user
+scope and refreshed by `update`. The first cut put it in `/org` dispatch, the operating principles, and
+the handbook template, and the user corrected it the same day — *"this shouldn't live in org"* — because
+those are per-project copies only an `audit` rewrites, so the rule would have reached no existing
+project until someone re-audited it. The operational reading is — **the user's own
 words decide, newest first; an AI's interpretation is never the user's evidence, and an old decision
 never outvotes a new ask.***
 

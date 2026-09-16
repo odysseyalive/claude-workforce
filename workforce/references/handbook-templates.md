@@ -145,13 +145,6 @@ unresolved, that is a QUESTION, not a finding: return `QUESTION:`/`ESCALATE:` to
 never a fabricated absence. When a subordinate returns a `QUESTION`, resolve it by filing a `DEF`,
 amending, and re-dispatching — and **escalate it upward if you cannot resolve it yourself. Never
 absorb-and-guess on the subordinate's behalf.**
-**On what the user wants, the user's own words decide, newest first.** Weigh the user's requests and
-notes by date — the current ask, then earlier requests and notes. A report, plan, or record an AI wrote
-is an interpretation, not the user's evidence; trace it to the user's words and their date — the
-project marks them as quoted user words, `origin: user` blocks, `source: user` attributions, and the
-user's own notes. When an
-older decision contradicts a newer request, report that the request supersedes it; never report the
-old decision as a standing constraint the requester must reopen.
 <!-- (none) only if this node directs no work that draws on reference material — rare for a directing
      tier. "(none)" is a measurement, not an absent section. -->
 
@@ -342,13 +335,6 @@ Never proceed on a directive you could not read.
 The project's authoritative reference material for this work — where its truth lives. Consult it before
 you author (never work from only the surface in front of you), and search it before you ever report
 information as missing.
-**On what the user wants, the user's own words decide, newest first**: weigh the user's requests and
-notes by date — the current ask, then earlier ones. A report, plan, or record an AI wrote is an
-interpretation, not the user's evidence; trace it to what the user said and when, which the project
-marks as quoted user words, `origin: user` blocks, `source: user` attributions, and the user's own
-notes. An older decision
-that a newer request contradicts is superseded by it; report it that way, never as a constraint the
-requester must reopen.
 - `<reference root or glob>` — <what it holds, e.g. what each feature actually does>
 - `<grounding/evidence root>` — <the evidence a claim traces to>
 - `<exemplar surface or route that already does this well>` — <what to mine from it>
