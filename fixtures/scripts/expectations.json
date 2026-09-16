@@ -1041,21 +1041,22 @@
       "ADVISORY: this row blocks nothing"
     ],
     "not": [
-      "the split is PERFORMED this run",
+      "`/workforce audit` performs it",
       "✗ "
     ]
   },
   "conform-over-ceiling": {
-    "_why": "TWO defects in one row, both measured. (1) CHANNEL: delegation-budget.md has always said over the ceiling is never a refusal, but the row was wired to the blocking channel, so 14 of them set a non-zero exit on odyssey-alive (2026-08-05) and INV-VERIFY read that exit as the org failing to verify. The advisory marker plus exit 0 plus no '\u2717 ' anywhere is what pins it to res.advise(). (2) WORDING: the message read 'a structural finding proposing a split', and 'proposing' is a hand-back \u2014 it was being cashed out as an optional 'want me to split these?' offer and an AskUserQuestion picker offering 'leave as-is' or 'trim', which the no-standing-queue directive (2026-08-10) forbids and which risks dropping the user's verbiage (directive one is retention). The run PERFORMS the split by relocation this run, so 'proposing' must NOT appear and the performed/relocated wording must. Paired with conform-under-ceiling: drop the advisory and this half fails; fire it unconditionally and that half fails. (3) THE NUMBER: this row read 150 until 2026-09-07, four days after delegation-budget.md measured the floor at 172 and retired 150 outright \u2014 the fixture was asserting a number its own doctrine had dropped. bin/check now compares wf-conform's constant against the sentence in delegation-budget.md that retires 150, so the two cannot drift again; the fixture handbook is 230 lines so it clears the higher ceiling and the case still fires.",
+    "_why": "TWO defects in one row, both measured. (1) CHANNEL: delegation-budget.md has always said over the ceiling is never a refusal, but the row was wired to the blocking channel, so 14 of them set a non-zero exit on odyssey-alive (2026-08-05) and INV-VERIFY read that exit as the org failing to verify. The advisory marker plus exit 0 plus no '\u2717 ' anywhere is what pins it to res.advise(). (2) WORDING: the message read 'a structural finding proposing a split', and 'proposing' is a hand-back \u2014 it was being cashed out as an optional 'want me to split these?' offer and an AskUserQuestion picker offering 'leave as-is' or 'trim', which the no-standing-queue directive (2026-08-10) forbids and which risks dropping the user's verbiage (directive one is retention). The run PERFORMS the split by relocation this run, so 'proposing' must NOT appear and the performed/relocated wording must. (4) WHO PERFORMS IT (DEF-Q-23, 2026-09-16): the row said 'the split is PERFORMED this run' inside read-only verify. It now names `/workforce audit` as the command that performs the split, and the old sentence must not appear. Paired with conform-under-ceiling: drop the advisory and this half fails; fire it unconditionally and that half fails. (3) THE NUMBER: this row read 150 until 2026-09-07, four days after delegation-budget.md measured the floor at 172 and retired 150 outright \u2014 the fixture was asserting a number its own doctrine had dropped. bin/check now compares wf-conform's constant against the sentence in delegation-budget.md that retires 150, so the two cannot drift again; the fixture handbook is 230 lines so it clears the higher ceiling and the case still fires.",
     "exit": 0,
     "not": [
       "proposing",
+      "PERFORMED this run",
       "\u2717 "
     ],
     "script": "wf-conform",
     "want": [
       "~ g.md: within the 172-line ceiling",
-      "the split is PERFORMED this run",
+      "the split is owed, and `/workforce audit` performs it",
       "relocate the heavy material",
       "grounding library",
       "Never trimmed, never condensed, never handed back as a question",
@@ -1299,7 +1300,7 @@
     "exit": 0,
     "not": [
       "within the 150-line ceiling",
-      "the split is PERFORMED this run",
+      "`/workforce audit` performs it",
       "\u2717 "
     ],
     "script": "wf-conform",
@@ -4988,5 +4989,20 @@
         ]
       }
     }
+  },
+  "conform-byte-floor": {
+    "_why": "DEF-Q-23 (apps-odyssey-alive, 2026-09-16), the unrecorded half. An IC handbook within 172 lines and over the 19,436 B budget, with no length-floors.md, is ordered to split, and the order names `/workforce audit` as the command that performs it rather than claiming this run does. bin/check § a recorded IC byte floor runs the same tree through `wf-stamp --floor` and growth past the floor.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": ["~ g.md: within the 172-line ceiling", "the split is owed, and `/workforce audit` performs it", "wf-stamp --floor <handbook> --evidence <path> --execute", "ADVISORY: this row blocks nothing"],
+    "not": ["PERFORMED this run", "MEASURED FLOOR", "\u2717 "]
+  },
+  "stamp-script-body": {
+    "_why": "DEF-Q-22 (apps-odyssey-alive, 2026-09-16). The handbook's Check and Negative bodies live in scripts under .claude/workforce/checks/g/. The first stamp is written with the script bytes folded in; bin/check § a script a declared check runs edits one script byte and requires MISMATCH, and plants a pre-fold text-only stamp and requires it to upgrade without one.",
+    "args": ["--execute"],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": ["stamped", "stamped 1"],
+    "after": {".claude/agents/g.md": {"want": ["contract-stamp: sha256:"], "not": ["(set at registration)"]}}
   }
 }

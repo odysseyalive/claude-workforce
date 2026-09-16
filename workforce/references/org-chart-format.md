@@ -46,7 +46,8 @@ and greppable.
 <!-- ORG-RECORD END -->
 ```
 
-`contract-stamp` hashes the normalized `## Procedure` + `## Verification` sections. When the recomputed
+`contract-stamp` hashes the normalized `## Procedure` + `## Verification` sections, plus the bytes of any
+project script a declared `Check:` or `Negative:` runs (`procedures/checksums.md`); recompute it with `wf-stamp`. When the recomputed
 hash differs, the handbook changed since its last review and its eval baseline is stale.
 
 `calibrated-for` records the model the handbook's **wording** was last measured against — the model

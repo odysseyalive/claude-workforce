@@ -270,6 +270,63 @@ DEFAULT_LENGTH_CEILING = 172
 # length ceiling, and `bin/check` asserts the two agree (Core Principle 9a).
 MEASURED_BYTES_PER_LINE = 113
 
+# A MEASURED FLOOR, RECORDED ONCE, READ ON EVERY RUN (apps-odyssey-alive DEF-Q-23, 2026-09-16).
+# A relocation pass that stops at a floor it measured writes the floor down with
+# `wf-stamp --floor`, and the length row reports it instead of ordering the same split
+# again. MEASURED on that host: five IC handbooks at 24,132 to 34,658 B, each relocated in
+# `audit-20260914T065649Z` until every remaining byte had a per-section reason, and the row
+# still ordered all five on the next run. The numbers in a row are the ones the writer
+# measured, never typed, and the row stops counting when the handbook grows past either
+# number or its evidence is gone. `wf-stamp` imports this grammar; it keeps no copy.
+LENGTH_FLOORS_REL = os.path.join(".claude", "workforce", "length-floors.md")
+LENGTH_FLOORS_HEADER = (
+    "# Measured handbook length floors\n\n"
+    "Written by `wf-stamp --floor <handbook> --evidence <path> --execute`, which measures the\n"
+    "handbook itself. Read by `wf-conform`: while a handbook is at or under its row, the length\n"
+    "row reports the floor instead of ordering the split. A handbook that grows past either\n"
+    "number, or whose evidence file is gone, is ordered again.\n\n"
+    "| handbook | lines | bytes | evidence | measured |\n"
+    "|---|---|---|---|---|\n"
+)
+FLOOR_ROW_RX = re.compile(
+    r"^\|\s*`?([\w.-]+\.md)`?\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*`?([^|`]+?)`?\s*\|"
+    r"\s*(\d{4}-\d{2}-\d{2})\s*\|\s*$")
+
+
+def read_length_floors(root):
+    """({handbook basename: floor}, [malformed line]) from `LENGTH_FLOORS_REL`.
+
+    A floor is {"lines", "bytes", "evidence", "measured", "evidence_ok"}. `evidence_ok` is
+    whether the cited file is on disk INSIDE the project: a floor whose evidence cannot be
+    read is an assertion, and it does not count. The table header, its separator, prose and
+    blank lines are skipped. Any other line that starts with `|` is returned as malformed,
+    so a hand-edited row that stopped parsing is reported, never silently dropped.
+    """
+    path = os.path.join(root, LENGTH_FLOORS_REL)
+    floors, malformed = {}, []
+    try:
+        body = open(path, encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError):
+        return floors, malformed
+    real_root = os.path.realpath(root)
+    for line in body.splitlines():
+        t = line.strip()
+        if not t.startswith("|") or re.match(r"^\|\s*handbook\s*\|", t) or re.match(r"^\|[-|\s:]+\|$", t):
+            continue
+        m = FLOOR_ROW_RX.match(t)
+        if not m:
+            malformed.append(t[:90])
+            continue
+        ev = m.group(4).strip()
+        ev_abs = os.path.realpath(os.path.join(root, ev))
+        floors[m.group(1)] = {
+            "lines": int(m.group(2)), "bytes": int(m.group(3)), "evidence": ev,
+            "measured": m.group(5),
+            "evidence_ok": (not os.path.isabs(ev) and ev_abs.startswith(real_root + os.sep)
+                            and os.path.isfile(ev_abs)),
+        }
+    return floors, malformed
+
 
 # The sections `procedure-for-procedures.md` § How the split is performed relocates from:
 # the heavy material lives in these, and every other section is either required by the
@@ -491,7 +548,7 @@ def check_adopted(path, body, res):
                      "detail": "; ".join(hazards), "adopted": True})
 
 
-def check_handbook(path, body, res, ceiling):
+def check_handbook(path, body, res, ceiling, floors=None):
     n = os.path.basename(path)
     fm = frontmatter(body)
     res.add(fm is not None, f"{n}: frontmatter parses")
@@ -815,12 +872,42 @@ def check_handbook(path, body, res, ceiling):
             _f, _m, _b = _ic_floor(body)
             _why += (f" ({_m} of them required by this check, {body_lines - _m} authored; "
                      f"{_f} with the relocatable sections moved out. By section: {_b})")
-        res.advise(f"{n}: within the {ceiling}-line ceiling",
-                   f"{_why} — the split is PERFORMED this run: relocate the "
-                   f"heavy material (worked examples, mapping tables, reference data) into "
-                   f"the grounding library or a data skill, leaving a lean core that reads "
-                   f"it on demand. Never trimmed, never condensed, never handed back as a "
-                   f"question. ADVISORY: this row blocks nothing")
+        # A RECORDED FLOOR REPLACES THE ORDER WHILE IT HOLDS (DEF-Q-23, see LENGTH_FLOORS_REL).
+        _fl = (floors or {}).get(n)
+        if (_fl and _fl["evidence_ok"] and body_lines <= _fl["lines"]
+                and body_bytes <= _fl["bytes"]):
+            res.advise(
+                f"{n}: IC handbook length at its MEASURED FLOOR — no split ordered",
+                f"{_why}. A relocation pass stopped at a measured floor of {_fl['lines']} "
+                f"lines / {_fl['bytes']:,} B on {_fl['measured']}; evidence "
+                f"{_fl['evidence']} ({LENGTH_FLOORS_REL}). This row reports that floor instead "
+                f"of ordering the same split again. It stops counting the moment the handbook "
+                f"grows past either number. ADVISORY: this row blocks nothing")
+        else:
+            _floor_note = ""
+            if _fl and not _fl["evidence_ok"]:
+                _floor_note = (f"The floor recorded for it cites {_fl['evidence']}, which is not "
+                               f"a file inside this project, so it does not count. ")
+            elif _fl:
+                _floor_note = (f"A floor of {_fl['lines']} lines / {_fl['bytes']:,} B was "
+                               f"recorded on {_fl['measured']}, and this handbook is now past "
+                               f"it ({body_lines - _fl['lines']:+d} lines, "
+                               f"{body_bytes - _fl['bytes']:+,} B), so the floor no longer "
+                               f"counts. ")
+            # WHO PERFORMS THE SPLIT IS NAMED, because this script runs inside read-only
+            # commands too. The row said "the split is PERFORMED this run" inside `verify`,
+            # which performs nothing (DEF-Q-23). `audit` Step 5d performs it.
+            res.advise(f"{n}: within the {ceiling}-line ceiling",
+                       f"{_why} — {_floor_note}the split is owed, and `/workforce audit` "
+                       f"performs it (procedures/audit.md Step 5d): relocate the "
+                       f"heavy material (worked examples, mapping tables, reference data) into "
+                       f"the grounding library or a data skill, leaving a lean core that reads "
+                       f"it on demand. Never trimmed, never condensed, never handed back as a "
+                       f"question. This check changes nothing, so a read-only command such as "
+                       f"`/workforce verify` only reports it. When a relocation pass has already "
+                       f"stopped at a measured floor, record it with `wf-stamp --floor "
+                       f"<handbook> --evidence <path> --execute` and this row reports the floor "
+                       f"instead. ADVISORY: this row blocks nothing")
 
     # A handbook that cannot say how to verify itself is not releasable.
     #
@@ -1454,13 +1541,21 @@ def check_removal_set(root, body, staging, res):
         shown = ", ".join(os.path.relpath(t, root) for t in tried[:4])
         if len(tried) > 4:
             shown += f" (+{len(tried) - 4} more)"
-        res.add(bool(tree), f"removal set: {name} staged its whole directory",
-                (f"its COMMITTED T8 row records the sweep, and the undo it names is at "
-                 f"none of: {shown}. "
-                 if name in swept else f"absent at {shown}. ")
-                + "A T7s target is unlinked ENTIRELY — references/, "
-                "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
-                "an undo for the least of what the sweep removes.")
+        # THE DETAIL DESCRIBES THE RESULT, and `--json` writes it for passing rows too.
+        # It used to say "the undo it names is at none of: <paths>" whether or not the
+        # search found it. MEASURED 2026-09-16 on apps-odyssey-alive: the row for
+        # `work-reap-audit-20260911T152332Z` read `"ok": true` with that sentence, the undo
+        # tree on disk at the first path listed, and an audit filed the reap as having
+        # lost its undo. The reap was right; this sentence was not.
+        detail = ((f"its COMMITTED T8 row records the sweep, and the undo it names is at "
+                   f"none of: {shown}. "
+                   if name in swept else f"absent at {shown}. ")
+                  + "A T7s target is unlinked ENTIRELY — references/, "
+                  "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
+                  "an undo for the least of what the sweep removes.")
+        if tree:
+            detail = f"undo found at {os.path.relpath(tree, root)}"
+        res.add(bool(tree), f"removal set: {name} staged its whole directory", detail)
 
     # THE DECIDED-BUT-UNSTAGED CASE. Keyed on the taxonomy's own category token so a
     # renamed generator is still caught: `conversion-taxonomy.md` § ORCHESTRATOR names
@@ -3167,6 +3262,12 @@ def main():
     # Under `--strict-adopted` an adopted agent is held to the contract but was still
     # never staffed here, so it must not make the tree look audited.
     governed_n = 0
+    floors, _floor_bad = read_length_floors(root)
+    for _bad in _floor_bad:
+        res.advise(f"length floors: malformed row {_bad!r}",
+                   f"{LENGTH_FLOORS_REL} grammar: | `<handbook>.md` | <lines> | <bytes> | "
+                   f"`<evidence path>` | <YYYY-MM-DD> |. A row that does not parse records no "
+                   f"floor. `wf-stamp --floor` writes it. ADVISORY: this row blocks nothing")
     _catread = {"flagged": 0, "clean": 0}
     _selfcon = {"checked": 0, "flagged": 0}
     org_edge_map = {}
@@ -3177,7 +3278,7 @@ def main():
             continue
         if ORG_RECORD_RX.search(body):
             governed_n += 1
-            check_handbook(p, body, res, args.ceiling)
+            check_handbook(p, body, res, args.ceiling, floors)
             _name = os.path.basename(p)[:-3]
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
@@ -3195,7 +3296,7 @@ def main():
             check_self_contradiction(_name, body, res, _selfcon)
             own_map[_name] = ownership_claims(body)
         elif args.strict_adopted:
-            check_handbook(p, body, res, args.ceiling)
+            check_handbook(p, body, res, args.ceiling, floors)
         else:
             check_adopted(p, body, res)
 
@@ -3324,8 +3425,12 @@ def main():
         for c in res.counts:
             print(f"  {c}")
         if res.scratch_skipped:
+            # NAMED FROM THE LIST ITSELF, so the line cannot say `{work,staging}` while
+            # the scope skips a third directory (`retired/` joined it 2026-09-16).
+            _dirs = ",".join(os.path.basename(d) for d in
+                             _load_sibling("wf-census").SACRED_SCRATCH)
             print(f"  {res.scratch_skipped} file(s) under .claude/workforce/"
-                  f"{{work,staging}}/ not scanned for sacred blocks — run scratch "
+                  f"{{{_dirs}}}/ not scanned for sacred blocks — run scratch "
                   f"holds copies whose originals are guarded at source")
         for r in res.failed:
             print(f"  ✗ {r['check']}" + (f"\n      {r['detail']}" if r["detail"] else ""))

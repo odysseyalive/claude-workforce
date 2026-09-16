@@ -140,11 +140,13 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
 ```
 
 It collects every `<!-- origin: user | immutable: true -->` block in **every `.md` file under
-`.claude/`**, except the run scratch (`.claude/workforce/work/`, `.claude/workforce/staging/`) and
-whatever `.censusignore` declares out. That set is one function, `wf-census.sacred_scope`. `wf-stamp`
+`.claude/`**, except the run scratch (`wf-census.SACRED_SCRATCH`: `.claude/workforce/work/`,
+`.claude/workforce/staging/`, `.claude/workforce/retired/`) and whatever `.censusignore` declares out. That set is one function, `wf-census.sacred_scope`. `wf-stamp`
 writes rows over it and `wf-conform` demands rows over it, so the two cannot disagree about which
-blocks need a row. It is a **superset** of the paths `wf-protect-directives` guards, so the hook can
-never fire on a block the sidecar has no row for. It writes the canonical row, re-parses its own output
+blocks need a row. `wf-protect-directives` reads the same scratch list and stays quiet there, so the
+hook never fires on a block the sidecar has no row for. `retired/` joined the list 2026-09-16: audit
+Step 6-F lifts every span into `CATALOG-ANCHOR.md` before it archives a catalog there, so the archive
+is a copy guarded at source (apps-odyssey-alive DEF-Q-19, 8 unstamped archive blocks). It writes the canonical row, re-parses its own output
 before counting the write, and prints `INV-DIRECTIVES` with every count including the zeroes.
 
 *Until 2026-09-15 the stamp read four roots (`agents`, `skills`, `workforce/directives`,
@@ -177,7 +179,11 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute  # write a FIRST stamp
 ```
 
-It hashes the normalized `## Procedure` + `## Verification` of every **governed** handbook — an
+It hashes the normalized `## Procedure` + `## Verification` of every **governed** handbook, plus the
+bytes of every project script a declared `Check:` or `Negative:` runs (`bash <path>` and its
+relatives, resolved by the resolver `wf-checkrun` uses), so an edit inside a check script is
+`CONTRACT-DRIFT` too. A handbook whose checks run no script hashes exactly as before. A stamp an older
+release wrote over the text alone is `PRE-FOLD`, not a mismatch, and plain `--execute` upgrades it — an
 adopted agent has no `ORG-RECORD` and is skipped by name — writes
 `<!-- contract-stamp: sha256:… -->` where the template puts it, re-reads its own output before
 counting a write, and stamps the staged copy with the same digest so `hire.md` T6 and `wf-conform`'s

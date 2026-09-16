@@ -10017,6 +10017,8 @@ PRODUCERS = {
     ".claude/workforce/dispositions.md": "workforce/references/procedures/audit.md",
     ".claude/workforce/.conversion-journal.md": "workforce/references/procedures/hire.md",
     ".claude/workforce/.directives.sha": "workforce/references/procedures/checksums.md",
+    # a measured handbook length floor, written by `wf-stamp --floor` (DEF-Q-23, 2026-09-16)
+    ".claude/workforce/length-floors.md": "workforce/references/procedure-for-procedures.md",
     ".claude/workforce/.settings-owned.json": "workforce/references/audit-setup.md",
     # The settings heal's once-per-state failure record (hooks.md § Healing), written by
     # `announce_once` and removed by `clear_notice`, both in the script named here.
@@ -14514,6 +14516,214 @@ check(
     and "def sacred_scope(root)" in read("workforce/bin/wf-census"),
     f"{_sa_why} — the writer and the checker of `.directives.sha` must share one scan set "
     "(wf-census.sacred_scope), or a block one demands the other cannot write (DEF-Q-006)",
+)
+
+# ── apps-patch report against 1.63.0 (2026-09-16): four behavioural assertions ──────────
+# Each one runs the shipped tool on a tree it builds, so it observes what the tool DOES.
+# A string pin alone would pass on a tool that still carries the defect.
+
+
+def _wf_run(args, env_home, timeout=120):
+    _env = dict(os.environ, HOME=env_home)
+    _env.pop("CLAUDE_CONFIG_DIR", None)
+    return subprocess.run([sys.executable] + args, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True,
+                          timeout=timeout, env=_env)
+
+
+def _wf_put(root, rel, text):
+    p = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return p
+
+
+# A1 — RETIRED ARCHIVES ARE RUN SCRATCH, AND BOTH TOOLS READ ONE LIST THAT SAYS SO (DEF-Q-19).
+# audit Step 6-F archives a migrated catalog under `.claude/workforce/retired/<kind>-<ts>/`
+# after lifting every `origin: user` span into CATALOG-ANCHOR.md and reading it back. The
+# archive is an undo copy whose spans are guarded at source. Measured on apps-odyssey-alive:
+# `wf-conform` failed "every sacred block on disk is stamped" on 8 blocks in two archives,
+# the org's only hard failure. This builds a tree with a live block and a retired one, stamps
+# it, and requires the sidecar to hold only the live block and conform to pass coverage. It
+# also requires the scratch line conform prints to name the directory it skipped.
+def _retired_scope():
+    import tempfile as _tf
+    _blk = "# x\n\n<!-- origin: user | immutable: true -->\n{}\n<!-- /origin -->\n"
+    with _tf.TemporaryDirectory(prefix="wf-retired-") as _t:
+        _wf_put(_t, ".claude/skills/s/SKILL.md", _blk.format("a live directive"))
+        _wf_put(_t, ".claude/workforce/retired/image-eval-20260911T204356Z/SKILL.md",
+                _blk.format("an archived copy of a lifted directive"))
+        _st = _wf_run(["workforce/bin/wf-stamp", "--root", _t, "--directives", "--execute"], _t)
+        _j = os.path.join(_t, "conform.json")
+        _cf = _wf_run(["workforce/bin/wf-conform", "--root", _t, "--json", _j], _t)
+        try:
+            _rows = json.load(open(_j, encoding="utf-8"))["rows"]
+        except (OSError, ValueError, KeyError):
+            return False, "wf-conform wrote no --json report"
+        _cov = [r for r in _rows
+                if r["check"].startswith("sidecar: every sacred block on disk is stamped")]
+        _sp = os.path.join(_t, ".claude/workforce/.directives.sha")
+        _side = open(_sp, encoding="utf-8").read() if os.path.exists(_sp) else ""
+        _keys = sorted(re.findall(r"\s(\S+):directive:\d+", _side))
+        _ok = (_keys == [".claude/skills/s/SKILL.md"] and bool(_cov) and _cov[0]["ok"]
+               and "retired" in _cf.stdout and "1 block(s) in scope" in _st.stdout)
+        return _ok, (f"sidecar rows {_keys}; coverage row {_cov[:1]}; "
+                     f"conform scratch line present: {'retired' in _cf.stdout}")
+
+
+_ret_ok, _ret_why = _retired_scope()
+check(
+    "sacred scope: a retired archive is run scratch to the stamp and to conform alike",
+    bool(_ret_ok)
+    and 'os.path.join(".claude", "workforce", "retired")' in read("workforce/bin/wf-census"),
+    f"{_ret_why} — `.claude/workforce/retired/` holds undo copies whose spans the migration "
+    "already lifted into CATALOG-ANCHOR.md. One list (wf-census.SACRED_SCRATCH) decides it "
+    "for both tools, or conform demands rows the checksums step is right not to write",
+)
+
+
+# A2 — A PASSING ROW NEVER CARRIES A FAILURE'S DETAIL (report item 5). The removal-set row
+# computed "the undo it names is at none of: <paths>" whether or not the undo was found, and
+# `--json` writes the detail of passing rows too. Measured on apps-odyssey-alive: the row for
+# `work-reap-audit-20260911T152332Z` was `"ok": true` with that detail, the undo tree on disk
+# at the path the T8 row records, and an audit read the detail as a missing undo. The reap
+# kept its undo; the checker's sentence was wrong. This runs conform on the relocated-sweep
+# fixture and requires the passing row to name where the undo IS, and no passing row in the
+# report to claim a location search came up empty.
+def _removal_detail():
+    import tempfile as _tf
+    import shutil as _sh
+    with _tf.TemporaryDirectory(prefix="wf-undo-detail-") as _t:
+        _tree = os.path.join(_t, "tree")
+        _sh.copytree("fixtures/scripts/conform-removal-swept-relocated", _tree)
+        _j = os.path.join(_t, "conform.json")
+        _wf_run(["workforce/bin/wf-conform", "--root", _tree, "--json", _j], _t)
+        try:
+            _rows = json.load(open(_j, encoding="utf-8"))["rows"]
+        except (OSError, ValueError, KeyError):
+            return False, "wf-conform wrote no --json report"
+        _row = [r for r in _rows if r["check"] == "removal set: oldgen staged its whole directory"]
+        _lies = [r["check"] for r in _rows if r["ok"]
+                 and re.search(r"at none of|absent at", r.get("detail") or "")]
+        _ok = (bool(_row) and _row[0]["ok"] and not _lies
+               and ".claude/workforce/work/audit-20260810T215735Z/staging/oldgen/tree"
+               in _row[0]["detail"])
+        return _ok, f"row {_row[:1]}; passing rows claiming an empty search: {_lies}"
+
+
+_rd_ok, _rd_why = _removal_detail()
+check(
+    "removal set: a found undo is reported where it was found, never as absent",
+    bool(_rd_ok),
+    f"{_rd_why} — a row that passes while its detail says the undo is at none of the paths "
+    "sends the next audit to repair a reap that kept its undo",
+)
+
+
+# A3 — THE BYTE ROW SAYS WHO PERFORMS THE SPLIT, AND A MEASURED FLOOR STOPS THE RE-ORDER
+# (DEF-Q-23). The row said "the split is PERFORMED this run" inside read-only `verify`, and
+# nothing could record that a relocation pass had already stopped at a measured floor, so
+# five handbooks at 24-35 KB were re-ordered every audit. This builds an IC handbook under
+# the line ceiling and over the byte budget, records its floor with the one writer, and then
+# grows it past the floor. The floor must silence the order while it holds and stop counting
+# the moment the handbook grows past it.
+def _byte_floor():
+    import tempfile as _tf
+    import shutil as _sh
+    with _tf.TemporaryDirectory(prefix="wf-floor-") as _t:
+        _tree = os.path.join(_t, "tree")
+        _sh.copytree("fixtures/scripts/conform-byte-floor", _tree)
+        _hb = os.path.join(_tree, ".claude/agents/g.md")
+
+        def _row():
+            _j = os.path.join(_t, "c.json")
+            _wf_run(["workforce/bin/wf-conform", "--root", _tree, "--json", _j], _t)
+            try:
+                _rows = json.load(open(_j, encoding="utf-8"))["rows"]
+            except (OSError, ValueError, KeyError):
+                return ""
+            return " ".join(r["check"] + " " + (r.get("detail") or "")
+                            for r in _rows if r["check"].startswith("g.md:")
+                            and ("-line ceiling" in r["check"] or "FLOOR" in r["check"]))
+
+        _before = _row()
+        _rec = _wf_run(["workforce/bin/wf-stamp", "--root", _tree, "--floor", "g",
+                        "--evidence", ".claude/workforce/run-reports/floor-evidence.md",
+                        "--execute"], _t)
+        _at = _row()
+        with open(_hb, "a", encoding="utf-8") as _fh:
+            _fh.write("Grown after the floor was measured. " * 40 + "\n")
+        _grown = _row()
+        _fails = []
+        if "PERFORMED this run" in _before or "`/workforce audit` performs it" not in _before:
+            _fails.append(f"before: the order does not say who performs it: {_before[:200]}")
+        if _rec.returncode != 0:
+            _fails.append(f"wf-stamp --floor exit {_rec.returncode}: {_rec.stdout[-200:]}{_rec.stderr[-200:]}")
+        if "MEASURED FLOOR" not in _at or "relocate the heavy material" in _at:
+            _fails.append(f"at floor: still ordered or floor not reported: {_at[:200]}")
+        if "relocate the heavy material" not in _grown or "no longer counts" not in _grown:
+            _fails.append(f"grown: the floor still silences the order: {_grown[:200]}")
+        return not _fails, "; ".join(_fails)
+
+
+_bf_ok, _bf_why = _byte_floor()
+check(
+    "length ceiling: a recorded IC byte floor replaces the split order until the handbook grows past it",
+    bool(_bf_ok),
+    f"{_bf_why} — an order to relocate a handbook already measured at its floor spends a pass "
+    "every audit on an unreachable target, and a floor that outlives growth is a silencer",
+)
+
+
+# A4 — THE CONTRACT STAMP COVERS THE SCRIPT A DECLARED CHECK RUNS (DEF-Q-22). A byte-density
+# split moves a long check into `.claude/workforce/checks/<employee>/<x>.sh` and leaves the
+# bullet reading `bash <script>`. The stamp hashed only the bullet text, so an edit inside the
+# script changed what the check does with no CONTRACT-DRIFT. This stamps a handbook whose
+# check body is a script, edits one byte of the script, and requires MISMATCH. It also plants
+# the text-only digest every pre-fold release wrote and requires that to upgrade on --execute
+# without a MISMATCH, so an update does not raise contract drift across a whole org.
+def _script_stamp():
+    import tempfile as _tf
+    import shutil as _sh
+    with _tf.TemporaryDirectory(prefix="wf-stamp-script-") as _t:
+        _tree = os.path.join(_t, "tree")
+        _sh.copytree("fixtures/scripts/stamp-script-body", _tree)
+        _hb = os.path.join(_tree, ".claude/agents/g.md")
+        _sc = os.path.join(_tree, ".claude/workforce/checks/g/check.sh")
+        _fails = []
+        _a = _wf_run(["workforce/bin/wf-stamp", "--root", _tree, "--execute"], _t)
+        if _a.returncode != 0 or "stamped 1" not in _a.stdout:
+            _fails.append(f"first stamp: exit {_a.returncode} {_a.stdout[-160:]}")
+        with open(_sc, "a", encoding="utf-8") as _fh:
+            _fh.write("exit 0\n")
+        _b = _wf_run(["workforce/bin/wf-stamp", "--root", _tree], _t)
+        if _b.returncode != 1 or "mismatch 1" not in _b.stdout:
+            _fails.append(f"script edited: exit {_b.returncode}, no MISMATCH: {_b.stdout[-160:]}")
+        # The pre-fold digest: normalized Procedure + "\n" + normalized Verification, nothing else.
+        _body = open(_hb, encoding="utf-8").read()
+
+        def _sec(h):
+            _m = re.search(r"^" + re.escape(h) + r"[ \t]*[^\n]*$(.*?)(?=^## |\Z)", _body, re.S | re.M)
+            return "\n".join(l.rstrip() for l in _m.group(1).strip().splitlines())
+        _legacy = hashlib.sha256((_sec("## Procedure") + "\n" + _sec("## Verification"))
+                                 .encode("utf-8")).hexdigest()
+        _body = re.sub(r"contract-stamp: sha256:[0-9a-f]{64}", "contract-stamp: sha256:" + _legacy, _body)
+        with open(_hb, "w", encoding="utf-8") as _fh:
+            _fh.write(_body)
+        _c = _wf_run(["workforce/bin/wf-stamp", "--root", _tree, "--execute"], _t)
+        _d = _wf_run(["workforce/bin/wf-stamp", "--root", _tree], _t)
+        if _c.returncode != 0 or "MISMATCH" in _c.stdout or "ok 1" not in _d.stdout:
+            _fails.append(f"pre-fold stamp: exit {_c.returncode}, then {_d.stdout[-160:]}")
+        return not _fails, "; ".join(_fails)
+
+
+_ss_ok, _ss_why = _script_stamp()
+check(
+    "contract-stamp: a script a declared check runs is part of the contract, and a pre-fold stamp upgrades without drift",
+    bool(_ss_ok),
+    f"{_ss_why} — a check whose body moved into a script is still the contract; an edit there "
+    "is CONTRACT-DRIFT, and a stamp written before scripts were folded is not",
 )
 
 check(

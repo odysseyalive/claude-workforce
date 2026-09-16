@@ -98,6 +98,26 @@ def main():
         return 0
 
     root = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    # RUN SCRATCH HAS NO ROWS BY DESIGN, so a block there is not UNPROTECTED. The sidecar is
+    # written over `wf-census.sacred_scope`, which skips `SACRED_SCRATCH` (`work/`, `staging/`,
+    # `retired/`), and a `SKILL.md` copied into an archive still matched the path test above.
+    # Read from the one list, never restated here. If the sibling cannot load, the check runs
+    # as it always did, because a hook bug must never go quiet about a real directive.
+    try:
+        import importlib.machinery
+        import importlib.util
+        sys.dont_write_bytecode = True
+        _cp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")
+        _ld = importlib.machinery.SourceFileLoader("wf_census", _cp)
+        _mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("wf_census", _ld))
+        _ld.exec_module(_mod)
+        _abs = os.path.abspath(path)
+        for _s in _mod.SACRED_SCRATCH:
+            _d = os.path.join(os.path.abspath(root), _s)
+            if _abs.startswith(_d + os.sep):
+                return 0
+    except Exception:  # noqa: BLE001 — degrade to checking, never to silence
+        pass
     sidecar = os.path.join(root, ".claude", "workforce", ".directives.sha")
 
     try:
