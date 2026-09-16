@@ -514,7 +514,9 @@ def record_floor(root, name, evidence, execute):
 
     Refused, exit 2: no such handbook; not governed (no ORG-RECORD); a Lead or CEO, whose
     length `wf-conform` already observes without ordering anything; evidence that is not a
-    file inside the project, because a floor with nothing behind it is an assertion. Not
+    file inside the project, because a floor with nothing behind it is an assertion; a floors
+    file `wf-settings-apply.write_refusal` refuses (a symlink, or a path resolving outside the
+    project), because a row appended there lands in a file this project does not own. Not
     recorded, exit 0: a handbook within both budgets has no split to stop ordering.
     The grammar, the path and the budget are `wf-conform`'s, imported.
     """
@@ -558,6 +560,10 @@ def record_floor(root, name, evidence, execute):
     if not execute:
         print(f"  ~ would record  {row}\n  Re-run with --execute to write {rel_file}.")
         return 0
+    refusal = _load_sibling("wf-settings-apply").write_refusal(root, path)
+    if refusal:
+        print(f"  ! REFUSED  {base}: {refusal} — nothing written", file=sys.stderr)
+        return 2
     try:
         old = open(path, encoding="utf-8").read()
     except FileNotFoundError:

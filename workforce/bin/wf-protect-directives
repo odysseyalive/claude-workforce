@@ -111,10 +111,14 @@ def main():
         _ld = importlib.machinery.SourceFileLoader("wf_census", _cp)
         _mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("wf_census", _ld))
         _ld.exec_module(_mod)
-        _abs = os.path.abspath(path)
+        # RESOLVED ON BOTH SIDES. Compared as abspaths, `.claude/workforce/work/sk -> ../../skills`
+        # let an edit to a stamped block through the link go unreported while the same edit by
+        # its real path reported DRIFT (review of the 1.63.0 fix batch, finding 2). What the
+        # edit changed is the file the link lands on, so that file decides.
+        _real = os.path.realpath(path)
         for _s in _mod.SACRED_SCRATCH:
-            _d = os.path.join(os.path.abspath(root), _s)
-            if _abs.startswith(_d + os.sep):
+            _d = os.path.realpath(os.path.join(root, _s))
+            if _real.startswith(_d + os.sep):
                 return 0
     except Exception:  # noqa: BLE001 — degrade to checking, never to silence
         pass
@@ -160,7 +164,9 @@ def main():
              f"examined — treat as no coverage. Regenerate with `/workforce checksums --execute`.")
         return 0
 
-    rel = os.path.relpath(os.path.abspath(path), root).replace("\\", "/")
+    # The row is keyed by the file's real project path, so an edit made through a link inside
+    # the project still finds it rather than falling back to an unrelated basename.
+    rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root)).replace("\\", "/")
     mine = rows.get(rel) or rows.get(os.path.basename(path)) or {}
 
     findings = []

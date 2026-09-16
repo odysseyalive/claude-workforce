@@ -864,6 +864,7 @@ def prune_dead_hooks(root, scope, execute):
 # in 1.31.0 (manifest.txt § Retired external paths). Only these names are ever cleared: a
 # selection of any other style, however broken, is the user's and is left alone.
 RETIRED_OUTPUT_STYLES = {"Plain Speak": "plain-speak.md"}
+STYLE_HEAD_CHARS = 64 * 1024
 
 
 def _style_file_present(name, dirs):
@@ -878,8 +879,18 @@ def _style_file_present(name, dirs):
         except OSError:
             return True     # unreadable: the style may be there, and a clear must not guess
         for f in names:
-            if f.endswith(".md"):
-                m = re.search(r"^name:\s*(.+?)\s*$", read(os.path.join(d, f)) or "", re.M)
+            # A REGULAR FILE, READ TO A CAP. The project's own `output-styles/` is read at every
+            # install, and a `.md` linked to `/dev/zero` was read without end until the installer
+            # ran out of memory (review of the 1.63.0 fix batch, finding 7). A style's `name:`
+            # sits in its frontmatter, so the head is the whole question.
+            p = os.path.realpath(os.path.join(d, f))
+            if f.endswith(".md") and os.path.isfile(p):
+                try:
+                    with open(p, encoding="utf-8", errors="replace") as fh:
+                        head = fh.read(STYLE_HEAD_CHARS)
+                except OSError:
+                    head = ""
+                m = re.search(r"^name:\s*(.+?)\s*$", head, re.M)
                 if m and m.group(1).strip("'\"") == name:
                     return True
     return False
@@ -934,6 +945,14 @@ def clear_retired_style(root, execute):
         back, _t, _e = _load_strict(spath)
         if not isinstance(back, dict) or "outputStyle" in back:
             raise RuntimeError(f"re-read of {spath} still selects an output style")
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"  ! outputStyle {value!r} NOT cleared from {spath}: {exc.__class__.__name__}: {exc}")
+        return 1
+    # THE KEY IS GONE FROM HERE ON, so a failure below is a removal nobody recorded, never "NOT
+    # cleared". One except branch used to cover both halves, and a full disk on the record
+    # printed "NOT cleared" for a key the re-read had just proven removed (review of the 1.63.0
+    # fix batch, finding 3). Said the way `_heal_one` says it.
+    try:
         rec, rtext, rerr = (_load_strict(owned_path) if os.path.lexists(owned_path)
                             else ({}, "", None))
         if rerr or not isinstance(rec, dict):
@@ -947,7 +966,8 @@ def clear_retired_style(root, execute):
         os.makedirs(os.path.dirname(owned_path), exist_ok=True)
         _atomic_write(owned_path, _render(rec, rtext or "{\n  }\n"))
     except (OSError, ValueError, RuntimeError) as exc:
-        print(f"  ! outputStyle {value!r} NOT cleared from {spath}: {exc.__class__.__name__}: {exc}")
+        print(f"  ! outputStyle {value!r} REMOVED from {spath} but the record could not be written "
+              f"to {owned_path} — {exc.__class__.__name__}: {exc}. The previous value was {value!r}")
         return 1
     print(f"  - outputStyle {value!r} cleared from {spath} (a style workforce retired; no file "
           f"for it remains) — recorded in {owned_path} § output_style_cleared")
@@ -1356,6 +1376,33 @@ def _inside_project(root, path):
     (`.claude` itself included) is followed to where the write would really land."""
     here, real = os.path.realpath(root), os.path.realpath(path)
     return real == here or real.startswith(here + os.sep)
+
+
+def write_refusal(root, path):
+    """Why a shipped script must not write `path` for the project at `root`, or None.
+
+    THE ONE CWE-59 TEST FOR A PROJECT FILE ANY SHIPPED SCRIPT WRITES. `wf-stamp --floor` and
+    `wf-code-eval --active on` / `--stamp` import it, so the refusal below cannot drift
+    between writers. Before this they wrote through whatever the name resolved to: a
+    `length-floors.md` linked out of the project got a row appended to the outside file, and
+    a linked `.code-eval-active` truncated its target to 0 B (review of the 1.63.0 fix batch,
+    finding 1). Three refusals, none of them a list:
+      - the name is a symlink, which is never written through, even to a target inside;
+      - the path resolves outside the project, through a link anywhere on the way;
+      - the file has a second hard link, a name that may live anywhere (`_file_refusal`).
+    """
+    if os.path.islink(path):
+        return f"{path} is a symlink; a write is never made through one"
+    if not _inside_project(root, path):
+        return (f"{path} resolves outside the project ({os.path.realpath(path)}); a shipped "
+                f"script only writes inside its tree")
+    try:
+        links = os.stat(path).st_nlink if os.path.exists(path) else 1
+    except OSError:
+        links = 1
+    if links > 1:
+        return f"{path} has {links} hard links, and the other names may live outside the project"
+    return None
 
 
 def _project_refusal(root, owned_path):
