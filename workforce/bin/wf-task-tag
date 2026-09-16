@@ -425,6 +425,16 @@ def main():
     except json.JSONDecodeError:
         return 0
 
+    # A SPAWNED AGENT GETS THE USER-WORDS RULE AND NOTHING ELSE. Returned before the widen
+    # flag is cleared: a subagent starting mid-turn is not the head of a turn, and clearing
+    # there would drop a flag the main session's `Stop` still needs.
+    if payload.get("hook_event_name") == "SubagentStart":
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "SubagentStart",
+            "additionalContext": USER_WORDS,
+        }}))
+        return 0
+
     # CLEAR LAST TURN'S WIDEN FLAG FIRST, and do it before anything can return early.
     # The flag tells the widening agent to go open a sense; one left behind would send
     # a reader after a question the user has already moved past, and would do it on a

@@ -132,6 +132,12 @@ SHIPPED_HOOKS = {
     # blocks: `decision: "block"` on this event ERASES the user's prompt, and nothing
     # about a regex classification justifies destroying an ask.
     "wf-task-tag": ("UserPromptSubmit", None),
+    # THE SAME RULE FOR EMPLOYEES. A spawned agent never sees UserPromptSubmit context,
+    # so `wf-task-tag` is registered again on `SubagentStart` and there emits only
+    # USER_WORDS — the user-words-newest-first rule (SKILL.md § Directives, 2026-09-16) —
+    # into every spawned agent, org or no org. Checked in the 2.1.268 binary: the
+    # SubagentStart branch reads `hookSpecificOutput.additionalContext`.
+    "wf-task-tag@subagent": ("SubagentStart", None),
     # THE ONLY HOOK HERE THAT ACTS. Everything else in this table reports or decides;
     # this one spawns a reader and opens the channel the turn left shut. Config shape is
     # in AGENT_HOOKS below — it is registered as `type: "agent"`, not `command`.
