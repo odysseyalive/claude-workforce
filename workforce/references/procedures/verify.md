@@ -605,6 +605,9 @@ and the per-skill rows exactly as the script prints them.
 | `DRIFTED` | it does not — **name the remedy**: `/workforce audit`, or `wf-companion --execute` |
 | `UNMANAGED` | the skill has no machine-owned region, so no refresh is possible without overwriting the project's own copy. **Report it; never call it a failure** |
 | `NO-REGION` | one marker without its pair — report and skip, never auto-repair |
+| `MIGRATE` | a Core skill older than its region: shipped items still sit inside the user's span, or `personnel-ledger` has no region. **Name the remedy: `/workforce audit`**, whose `wf-companion --execute` migrates it (`audit.md` § A Core skill older than its region). Not a failure |
+| `SUPPLEMENT` | the same, but the split cannot be proved, so `--execute` will add the missing shipped items in a `WF-PRINCIPLES-SUPPLEMENT` block and move nothing. The row carries the reason; reproduce it |
+| `SUPPLEMENTED` | already healed that way: every current shipped item is present, in the supplement block or the user span. A settled state, reported with its reason on every run, never a failure |
 | `ABSENT` | **`--execute` materializes it** from shipped doctrine and reads it back; report mode names it and exits non-zero, because `invariants.md` row 23 makes absence a FAIL. *Until 2026-09-11 this row read "Step 0.3 materializes companions and `INV-COMPANIONS` counts them; this row defers to that gate rather than giving absence two owners" — Step 0.3 was prose and counting is not creating, so absence had zero owners and `/org` went missing through a whole audit at exit 0* |
 
 **A `DRIFTED` row is a finding with a remedy, not a defect in the project.** The org did nothing wrong;
