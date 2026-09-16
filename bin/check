@@ -3804,6 +3804,361 @@ check(
     "; ".join(_style_bad),
 )
 
+# ── REVIEW OF THE 1.63.0 FIX BATCH (2026-09-16) ────────────────────────────────────────────────
+# An independent review reproduced ten defects in the batch merged after b5dfae4. Each assertion
+# below RUNS the shipped script against the shape that reproduced its finding, in a throwaway
+# tree. A probe that cannot run is a failure, never a pass.
+def _rv_run(argv, env=None, cwd=None, timeout=60, fsize=None, stdin_text=None):
+    """Run a shipped script under a memory cap (and an optional file-size cap)."""
+    def _limits():
+        try:
+            import resource as _res
+            _res.setrlimit(_res.RLIMIT_AS, (2 << 30, 2 << 30))
+            if fsize:
+                _res.setrlimit(_res.RLIMIT_FSIZE, (fsize, fsize))
+        except (ImportError, ValueError, OSError):
+            pass
+    return subprocess.run(argv, env=dict(os.environ, **(env or {})), cwd=cwd, capture_output=True,
+                          text=True, timeout=timeout, input=stdin_text or "",
+                          preexec_fn=_limits if os.name == "posix" else None)
+
+
+def _rv_put(path, text, mode=None):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as _fh:
+        _fh.write(text)
+    if mode is not None:
+        os.chmod(path, mode)
+
+
+def _rv_load(name):
+    import importlib.machinery as _im, importlib.util as _iu
+    _prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        _ld = _im.SourceFileLoader("_rv_" + name.replace("-", "_"),
+                                   os.path.join(ROOT, "workforce", "bin", name))
+        _mod = _iu.module_from_spec(_iu.spec_from_loader(_ld.name, _ld))
+        _ld.exec_module(_mod)
+        return _mod
+    finally:
+        sys.dont_write_bytecode = _prev
+
+
+_RV_BIN = os.path.join(ROOT, "workforce", "bin")
+_RV_NOCFG = {"CLAUDE_CONFIG_DIR": "/nonexistent-config"}
+
+# 1. A WRITE NEVER FOLLOWS A LINK OUT OF THE PROJECT. `wf-stamp --floor` appended its row to the
+# file a linked `length-floors.md` pointed at, `wf-code-eval --active on` truncated the target of a
+# linked `.code-eval-active` to 0 B, and `--stamp` overwrote a linked `.code-eval-reviewed`.
+_rv1 = []
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory(prefix="wf-check-rv1-") as _t:
+        _p = os.path.join(_t, "p")
+        _sh.copytree("fixtures/scripts/conform-byte-floor", _p)
+        _out = os.path.join(_t, "outside.md")
+        _rv_put(_out, "outside\n")
+        os.symlink(_out, os.path.join(_p, ".claude", "workforce", "length-floors.md"))
+        _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-stamp"), "--root", _p, "--floor", "g",
+                      "--evidence", ".claude/workforce/run-reports/floor-evidence.md", "--execute"])
+        if read(_out) != "outside\n" or _r.returncode == 0:
+            _rv1.append(f"wf-stamp --floor wrote through a linked length-floors.md (exit "
+                        f"{_r.returncode}, the outside file now reads {read(_out)!r})")
+        _c = os.path.join(_t, "ce")
+        _sh.copytree("fixtures/scripts/code-eval-delegates-stamp", _c)
+        _v = os.path.join(_t, "victim")
+        _rv_put(_v, "keep me\n")
+        os.symlink(_v, os.path.join(_c, ".claude", ".code-eval-active"))
+        _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-code-eval"), "--root", _c, "--active", "on"],
+                env=_RV_NOCFG)
+        if read(_v) != "keep me\n":
+            _rv1.append("wf-code-eval --active on truncated the target of a linked .code-eval-active")
+        _g = os.path.join(_t, "g")
+        _rv_put(os.path.join(_g, ".claude", "hooks", "code-eval-commit-gate.sh"),
+                "#!/bin/bash\ncat .claude/.code-eval-reviewed\n")
+        _rv_put(os.path.join(_g, ".claude", "settings.json"),
+                '{"hooks": {"PreToolUse": [{"hooks": [{"type": "command", '
+                '"command": "bash .claude/hooks/code-eval-commit-gate.sh"}]}]}}')
+        subprocess.run(["git", "init", "-q", _g], capture_output=True, timeout=60)
+        _v2 = os.path.join(_t, "victim2")
+        _rv_put(_v2, "keep me too\n")
+        os.symlink(_v2, os.path.join(_g, ".claude", ".code-eval-reviewed"))
+        _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-code-eval"), "--root", _g, "--stamp"],
+                     env=_RV_NOCFG)
+        if read(_v2) != "keep me too\n" or _r.returncode == 0:
+            _rv1.append(f"wf-code-eval --stamp wrote through a linked .code-eval-reviewed (exit "
+                        f"{_r.returncode})")
+except Exception as _exc:                                # noqa: BLE001
+    _rv1.append(f"the link probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-stamp --floor and wf-code-eval --active/--stamp refuse a path linked out of the project",
+    not _rv1,
+    "; ".join(_rv1) + " — CWE-59: a shipped script writes only inside its project, through "
+    "wf-settings-apply.write_refusal",
+)
+
+# 2. THE SCRATCH SKIP RESOLVES LINKS. `.claude/workforce/work/sk -> ../../skills` hid DRIFT in a
+# stamped block edited through the link. A file really in run scratch is still skipped.
+_rv2 = []
+try:
+    import hashlib as _hl, tempfile as _tf
+    with _tf.TemporaryDirectory(prefix="wf-check-rv2-") as _t:
+        _block = "<!-- origin: user | immutable: true -->\n{}\n<!-- /origin -->\n"
+        _rv_put(os.path.join(_t, ".claude", "skills", "x", "SKILL.md"), _block.format("reworded"))
+        _rv_put(os.path.join(_t, ".claude", "workforce", ".directives.sha"),
+                _hl.sha256(b"keep this wording").hexdigest() + "  .claude/skills/x/SKILL.md:directive:1\n")
+        _rv_put(os.path.join(_t, ".claude", "workforce", "work", "run-1", "SKILL.md"), _block.format("copy"))
+        os.symlink("../../skills", os.path.join(_t, ".claude", "workforce", "work", "sk"))
+        _work = os.path.join(_t, ".claude", "workforce", "work")
+        _via_link, _in_scratch = (
+            _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-protect-directives")],
+                    env={"CLAUDE_PROJECT_DIR": _t}, cwd=_t,
+                    stdin_text=json.dumps({"tool_input": {"file_path": os.path.join(_work, _rel)}})).stdout
+            for _rel in (os.path.join("sk", "x", "SKILL.md"), os.path.join("run-1", "SKILL.md")))
+        if "DRIFT" not in _via_link:
+            _rv2.append("an edit to a stamped block made through a link inside run scratch reported nothing")
+        if _in_scratch.strip():
+            _rv2.append(f"a file really in run scratch was checked: {_in_scratch.strip()[:120]}")
+except Exception as _exc:                                # noqa: BLE001
+    _rv2.append(f"the scratch-link probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-protect-directives skips run scratch by resolved path, so a link into it hides no drift",
+    not _rv2,
+    "; ".join(_rv2),
+)
+
+# 3. A REMOVAL THAT COULD NOT BE RECORDED IS STILL A REMOVAL. With the settings write done and the
+# record's write failing (a file-size cap below the 20 KB record), the run said "NOT cleared" for a
+# key it had removed. The other half keeps "NOT cleared" for a settings file that cannot be written.
+_rv3 = []
+try:
+    import tempfile as _tf
+    if os.name != "posix" or os.geteuid() == 0:
+        raise RuntimeError("needs a non-root POSIX host for the file-size cap and a read-only file")
+    for _half in ("record", "settings"):
+        with _tf.TemporaryDirectory(prefix="wf-check-rv3-") as _t:
+            _cfg, _proj = os.path.join(_t, "cfg"), os.path.join(_t, "proj")
+            os.makedirs(_proj)
+            _rv_put(os.path.join(_cfg, "settings.json"), '{\n  "model": "opus",\n  "outputStyle": "Plain Speak"\n}\n',
+                    mode=0o444 if _half == "settings" else None)
+            _rv_put(os.path.join(_cfg, "workforce", ".settings-owned.json"),
+                    json.dumps({"pad": "x" * 20000}) if _half == "record" else "{}\n")
+            _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-settings-apply"), "--scope", "user",
+                          "--wire-defaults", "--execute"], cwd=_proj,
+                         env={"CLAUDE_CONFIG_DIR": _cfg, "HOME": _t},
+                         fsize=8 * 1024 if _half == "record" else None)
+            _line = next((l for l in _r.stdout.splitlines() if "outputStyle" in l), "")
+            _kept = "outputStyle" in read(os.path.join(_cfg, "settings.json"))
+            if _half == "record" and (_kept or "REMOVED" not in _line
+                                      or "record could not be written" not in _line):
+                _rv3.append(f"record write failed after the key was removed; reported {_line.strip()!r}")
+            if _half == "settings" and (not _kept or "NOT cleared" not in _line):
+                _rv3.append(f"settings write failed; reported {_line.strip()!r}")
+except Exception as _exc:                                # noqa: BLE001
+    _rv3.append(f"the record-failure probe would not run ({_exc})")
+check(
+    "review 1.63.0: a retired outputStyle removed but not recorded is reported REMOVED, never NOT cleared",
+    not _rv3,
+    "; ".join(_rv3),
+)
+
+# 4 and 5. THE GATE IS THE SCRIPT THE ONE RESOLVER NAMES, RUN BY ITS SHEBANG. An extensionless,
+# non-executable Python gate ran under bash and wrote no stamp. An argument FILE of a gate command
+# that mentioned the marker and handled `--stamp` was run as the gate, and an undecidable command
+# beside it must be no gate at all.
+_rv4, _rv5 = [], []
+try:
+    import tempfile as _tf
+    with _tf.TemporaryDirectory(prefix="wf-check-rv4-") as _t:
+        _rv_put(os.path.join(_t, ".claude", "hooks", "code-eval-commit-gate"),
+                "#!/usr/bin/env python3\n# compares the tree with .code-eval-reviewed\n"
+                "if __import__('sys').argv[1:] == ['--stamp']:\n"
+                "    open('.claude/.code-eval-reviewed', 'w').write('python-gate\\n')\n", mode=0o644)
+        _rv_put(os.path.join(_t, ".claude", "settings.json"),
+                '{"hooks": {"PreToolUse": [{"hooks": [{"type": "command", '
+                '"command": ".claude/hooks/code-eval-commit-gate"}]}]}}')
+        _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-code-eval"), "--root", _t, "--stamp"],
+                     env=_RV_NOCFG)
+        if _r.returncode != 0 or read(os.path.join(_t, ".claude", ".code-eval-reviewed")) != "python-gate\n":
+            _rv4.append(f"an extensionless Python gate did not stamp (exit {_r.returncode}): "
+                        f"{(_r.stdout + _r.stderr).strip()[-160:]}")
+    with _tf.TemporaryDirectory(prefix="wf-check-rv5-") as _t:
+        _rv_put(os.path.join(_t, ".claude", "hooks", "code-eval-commit-gate.sh"),
+                '#!/bin/bash\ntest "$(cat .claude/.code-eval-reviewed)" = x\n')
+        _rv_put(os.path.join(_t, ".claude", "hooks", "notes.txt"),
+                '# notes about .code-eval-reviewed\ncase "$1" in\n  --stamp) echo ran > .claude/ran ;;\nesac\n')
+        _rv_put(os.path.join(_t, ".claude", "settings.json"), json.dumps({"hooks": {"PreToolUse": [{"hooks": [
+            {"type": "command", "command": "bash .claude/hooks/code-eval-commit-gate.sh .claude/hooks/notes.txt"},
+            {"type": "command", "command": "bash -c 'true'"}]}]}}))
+        _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-code-eval"), "--root", _t, "--json"],
+                     env=_RV_NOCFG)
+        try:
+            _scripts = [os.path.basename(g["script"]) for g in json.loads(_r.stdout)["gates"]]
+        except (ValueError, KeyError, TypeError):
+            _scripts = None
+        if _scripts != ["code-eval-commit-gate.sh"]:
+            _rv5.append(f"gates found {_scripts!r}, expected only the command's script "
+                        f"(exit {_r.returncode}: {_r.stderr.strip()[-120:]})")
+        _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-code-eval"), "--root", _t, "--stamp"],
+                env=_RV_NOCFG)
+        if os.path.exists(os.path.join(_t, ".claude", "ran")):
+            _rv5.append("--stamp ran an argument file of the gate command as the gate")
+except Exception as _exc:                                # noqa: BLE001
+    _rv4.append(f"the gate probe would not run ({_exc})")
+    _rv5.append(f"the gate probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-code-eval runs a gate by its shebang, not by its file extension",
+    not _rv4,
+    "; ".join(_rv4),
+)
+check(
+    "review 1.63.0: wf-code-eval takes the gate from wf-census's one hook resolver, never from an argument",
+    not _rv5,
+    "; ".join(_rv5),
+)
+
+# 6. A PATH IS COMPARED NORMALISED, AND ONE THAT CANNOT BE FAILS CLOSED. `hooks/../references/x.md`
+# returned False while `references/x.md` was being removed, so the retirement left a dead hook.
+_rv6 = []
+try:
+    _cat = _rv_load("wf-catalog")
+    _verdict = {"verdict": "retire", "path": "/p/.claude/skills/code-evaluator",
+                "removable": ["references/x.md"]}
+    for _rel, _want in (("references/x.md", True), ("hooks/../references/x.md", True),
+                        ("./references/x.md", True), ("hooks/../../other/y.md", True),
+                        ("$D/x.md", True), ("hooks/gate.sh", False), ("hooks/./gate.sh", False)):
+        _got = _cat.registration_removes({"targets": [("code-evaluator", _rel)]}, _verdict)
+        if _got is not _want:
+            _rv6.append(f"{_rel} -> {_got}, expected {_want}")
+except Exception as _exc:                                # noqa: BLE001
+    _rv6.append(f"wf-catalog would not load ({_exc})")
+check(
+    "review 1.63.0: wf-catalog treats a hook path with `..`, `./` or `$` as naming what the retirement removes",
+    not _rv6,
+    "; ".join(_rv6),
+)
+
+# 7. ONLY A REGULAR FILE IS READ, AND NEVER WITHOUT END. A `.md` linked to `/dev/zero` in a
+# project's output-styles, or among the live readers under `.claude/`, was read until memory ran
+# out. A FIFO is the sharper probe: a read of one blocks forever, so a missing regular-file test
+# shows as a timeout rather than as memory.
+_rv7 = []
+try:
+    import tempfile as _tf
+    if os.name != "posix":
+        raise RuntimeError("needs mkfifo and /dev/zero")
+    with _tf.TemporaryDirectory(prefix="wf-check-rv7-") as _t:
+        _cfg, _proj = os.path.join(_t, "cfg"), os.path.join(_t, "proj")
+        _rv_put(os.path.join(_cfg, "settings.json"), '{\n  "outputStyle": "Plain Speak"\n}\n')
+        _styles = os.path.join(_proj, ".claude", "output-styles")
+        os.makedirs(_styles)
+        os.mkfifo(os.path.join(_styles, "fifo.md"))
+        os.symlink("/dev/zero", os.path.join(_styles, "zero.md"))
+        try:
+            _r = _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-settings-apply"), "--scope", "user",
+                          "--wire-defaults"], cwd=_proj, env={"CLAUDE_CONFIG_DIR": _cfg, "HOME": _t},
+                         timeout=30)
+            if "would be cleared" not in _r.stdout or "Error" in _r.stderr:
+                _rv7.append(f"the output-styles scan did not finish cleanly: {_r.stderr.strip()[-160:]}")
+        except subprocess.TimeoutExpired:
+            _rv7.append("the output-styles scan hung on a FIFO named *.md")
+        _notes = os.path.join(_proj, ".claude", "notes")
+        os.makedirs(_notes)
+        os.mkfifo(os.path.join(_notes, "fifo.md"))
+        os.symlink("/dev/zero", os.path.join(_notes, "zero.md"))
+        try:
+            _r = _rv_run([sys.executable, "-c",
+                          "import importlib.machinery as m, importlib.util as u, sys\n"
+                          "sys.dont_write_bytecode = True\n"
+                          "l = m.SourceFileLoader('c', sys.argv[1])\n"
+                          "c = u.module_from_spec(u.spec_from_loader('c', l)); l.exec_module(c)\n"
+                          "print(len(c.live_readers(sys.argv[2], sys.argv[2] + '/.claude/skills/none')))\n",
+                          os.path.join(_RV_BIN, "wf-catalog"), _proj], env=_RV_NOCFG, timeout=30)
+            if _r.returncode != 0:
+                _rv7.append(f"wf-catalog live_readers failed on a device or FIFO: {_r.stderr.strip()[-160:]}")
+        except subprocess.TimeoutExpired:
+            _rv7.append("wf-catalog live_readers hung on a FIFO under .claude/")
+except Exception as _exc:                                # noqa: BLE001
+    _rv7.append(f"the device probe would not run ({_exc})")
+check(
+    "review 1.63.0: the output-styles and live-reader scans read only regular files, capped",
+    not _rv7,
+    "; ".join(_rv7),
+)
+
+# 8. wf-live RUNS WITHOUT `ast.unparse`, which is 3.9 against a 3.6 floor. The AttributeError was
+# uncaught, so on RHEL 8 every registry run died.
+_rv8 = []
+try:
+    _r = _rv_run([sys.executable, "-c",
+                  "import ast, importlib.machinery as m, importlib.util as u, sys\n"
+                  "del ast.unparse\n"
+                  "sys.dont_write_bytecode = True\n"
+                  "l = m.SourceFileLoader('lv', sys.argv[1])\n"
+                  "v = u.module_from_spec(u.spec_from_loader('lv', l)); l.exec_module(v)\n"
+                  "print(len(v.code_chunks(open(sys.argv[1], encoding='utf-8').read())))\n",
+                  os.path.join(_RV_BIN, "wf-live")], timeout=60)
+    if _r.returncode != 0 or not _r.stdout.strip().isdigit() or int(_r.stdout.strip()) < 2:
+        _rv8.append(f"code_chunks with no ast.unparse: exit {_r.returncode}, {_r.stderr.strip()[-160:]}")
+except Exception as _exc:                                # noqa: BLE001
+    _rv8.append(f"the unparse probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-live's code_chunks falls back when ast.unparse is absent",
+    not _rv8,
+    "; ".join(_rv8),
+)
+
+# 9. A PRESENT-TENSE SENTENCE ABOUT A RETIRED NAME IS NEVER HISTORY. "shipped", "written", "held",
+# "once" and "until" counted as past-tense cues, so a sentence telling a reader the thing is there
+# was hidden. A simple past still counts.
+_rv9 = []
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory(prefix="wf-check-rv9-") as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf, ignore=_sh.ignore_patterns("__pycache__"))
+        with open(os.path.join(_wf, "references", "passes.md"), "a", encoding="utf-8") as _fh:
+            _fh.write("\n`wf-canary-a` is written by every install.\n")
+            _fh.write("\n`wf-canary-b` is shipped in output-styles and selected once per session.\n")
+            _fh.write("\n`wf-canary-c` is reported by every run until the next audit.\n")
+            _fh.write("\n`wf-ceiling-probe` fired twice in the clean run.\n")
+        _o = _wf_live_run(_wf)
+    for _name in ("wf-canary-a", "wf-canary-b", "wf-canary-c"):
+        if not re.search(r"stale\s+%s\b" % re.escape(_name), _o):
+            _rv9.append(f"a present-tense sentence naming {_name} was classed as history")
+    if re.search(r"stale\s+wf-ceiling-probe\b", _o):
+        _rv9.append("a simple-past sentence (`fired`) about a retired name reported stale")
+except Exception as _exc:                                # noqa: BLE001
+    _rv9.append(f"the tense probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-live's history cue reads only past markers, so a present-tense claim still reports",
+    not _rv9,
+    "; ".join(_rv9),
+)
+
+# 10. ONE LIST, READ FROM ITS OWNER. wf-catalog kept its own copy of wf-census.SACRED_SCRATCH and of
+# wf-code-eval.MARKER. The loaded values must be the owners', and no literal copy may come back.
+_rv10 = []
+try:
+    _cat_src = read("workforce/bin/wf-catalog")
+    if '".code-eval-reviewed"' in _cat_src:
+        _rv10.append("wf-catalog spells the .code-eval-reviewed name itself")
+    if 'os.path.join("workforce", "work")' in _cat_src:
+        _rv10.append("wf-catalog spells the run-scratch list itself")
+    _cat = _rv_load("wf-catalog")
+    if tuple(_cat.NOT_READERS) != tuple(_rv_load("wf-census").SACRED_SCRATCH):
+        _rv10.append(f"NOT_READERS {_cat.NOT_READERS!r} is not wf-census.SACRED_SCRATCH")
+    if _cat.STAMP_MARKER != _rv_load("wf-code-eval").MARKER:
+        _rv10.append(f"STAMP_MARKER {_cat.STAMP_MARKER!r} is not wf-code-eval.MARKER")
+except Exception as _exc:                                # noqa: BLE001
+    _rv10.append(f"the constant probe would not run ({_exc})")
+check(
+    "review 1.63.0: wf-catalog reads NOT_READERS and STAMP_MARKER from the scripts that own them",
+    not _rv10,
+    "; ".join(_rv10),
+)
+
 # THE EVALUATORS ARE NOT PROJECT-MATERIALIZED COMPANIONS (DEF-Q-18, 2026-09-16). Since 1.52.0 the
 # five evaluators ship in the user install (manifest `sibling` rows) and Step 6-F retires project
 # copies, under the 2026-09-10 directive. audit-setup.md Step 0.3 still said they were "written from

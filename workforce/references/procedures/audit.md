@@ -211,7 +211,7 @@ is a project whose work has not been written down yet.
    everything downstream reads *it*. *Amended 2026-08-05 by user directive: this step read "Write
    `CLAUDE.md` if absent — the project needs one regardless", which would have this run creating the
    file the same run evacuates and deletes, and re-creating it on every subsequent audit of an
-   already-evacuated project.* *Further corrected 2026-09-10: this closed by saying the standing
+   already-evacuated project.* *Further corrected 2026-09-10: this used to close by saying the standing
    cold-reader request "lives in the `wf-standing-request` hook, which re-injects it every turn".
    That hook was removed in 1.30.2 on the user's marks, so the sentence named a live carrier for a
    thing nothing carries. Nothing is written to `CLAUDE.md` either way, which is what this step is

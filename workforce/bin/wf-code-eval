@@ -37,8 +37,9 @@ NO GATE, NO WRITE. A project with no gate wired gets a no-op and exit 0, exactly
 enforcer's coordination block was "a no-op unless enforcement is wired". A stamp nothing reads is
 residue.
 
-Exit codes: 0 done or nothing to do · 1 a registered gate's script is missing, or the stamp could
-not be recorded · 2 bad arguments.
+Exit codes: 0 done or nothing to do · 1 a registered gate's script is missing, the stamp could
+not be recorded, or a write was refused because its path is a symlink or resolves outside the
+project · 2 bad arguments.
 """
 
 import argparse
@@ -86,22 +87,31 @@ def settings_files(root):
     return out
 
 
-def command_paths(cmd, root):
-    """The file paths a hook command names, with the variables the harness expands resolved."""
-    home = os.path.expanduser("~")
-    expanded = cmd
-    for var, val in (("${CLAUDE_PROJECT_DIR}", root), ("$CLAUDE_PROJECT_DIR", root),
-                     ("${CLAUDE_CONFIG_DIR}", config_root()), ("$CLAUDE_CONFIG_DIR", config_root()),
-                     ("${HOME}", home), ("$HOME", home)):
-        expanded = expanded.replace(var, val)
-    out = []
-    for tok in re.findall(r"[^\s\"';|&()<>]+", expanded):
-        if tok.startswith("~/"):
-            tok = os.path.join(home, tok[2:])
-        if "/" not in tok:
-            continue
-        out.append(tok if os.path.isabs(tok) else os.path.join(root, tok))
-    return out
+def _sibling(name):
+    """A sibling shipped script, imported by path, leaving no bytecode in the shipped `bin/`."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+def refuse_write(root, path, what):
+    """True, after saying why, when `path` must not be written: `wf-settings-apply.write_refusal`,
+    the one CWE-59 test. A `.code-eval-active` or `.code-eval-reviewed` linked out of the project
+    was truncated or overwritten through the link (review of the 1.63.0 fix batch, finding 1)."""
+    why = _sibling("wf-settings-apply").write_refusal(root, path)
+    if why:
+        print("code-eval %s: REFUSED — %s; nothing written" % (what, why), file=sys.stderr)
+    return bool(why)
 
 
 def gates(root):
@@ -110,7 +120,15 @@ def gates(root):
     A registration whose script is not on disk but whose NAME says it is the commit gate is
     reported as missing rather than dropped: a dead gate fails open in the harness, and nothing
     else would say the enforcement is gone.
+
+    THE SCRIPT IS THE ONE `wf-census.Census.resolve_hook_command` NAMES, never every path-like
+    token in the command. This file had its own parser that took each token with a slash as a
+    candidate gate, so an ARGUMENT file mentioning `.code-eval-reviewed` and handling `--stamp`
+    was run as the gate by `--stamp` (review of the 1.63.0 fix batch, finding 5). An undecidable
+    command (an inline `bash -c`, a bare name on PATH) is no gate here, as it is dead wiring
+    nowhere else.
     """
+    census = _sibling("wf-census").Census(root)
     out = []
     for path in settings_files(root):
         try:
@@ -128,16 +146,18 @@ def gates(root):
                     cmd = h.get("command") if isinstance(h, dict) else None
                     if not isinstance(cmd, str):
                         continue
-                    for script in command_paths(cmd, root):
-                        body = slurp(script) if os.path.isfile(script) else ""
-                        if MARKER in body:
-                            out.append({"settings": path, "event": event, "command": cmd,
-                                        "script": script, "present": True,
-                                        "self_stamps": bool(SELF_STAMP_RX.search(body))})
-                        elif not os.path.exists(script) and "commit-gate" in os.path.basename(script):
-                            out.append({"settings": path, "event": event, "command": cmd,
-                                        "script": script, "present": False,
-                                        "self_stamps": False})
+                    script, _exists = census.resolve_hook_command(cmd)
+                    if script is None:
+                        continue
+                    body = slurp(script) if os.path.isfile(script) else ""
+                    if MARKER in body:
+                        out.append({"settings": path, "event": event, "command": cmd,
+                                    "script": script, "present": True,
+                                    "self_stamps": bool(SELF_STAMP_RX.search(body))})
+                    elif not os.path.exists(script) and "commit-gate" in os.path.basename(script):
+                        out.append({"settings": path, "event": event, "command": cmd,
+                                    "script": script, "present": False,
+                                    "self_stamps": False})
     return out
 
 
@@ -158,6 +178,33 @@ def canonical_hash(root):
     return hashlib.sha256(stream).hexdigest()
 
 
+def gate_argv(script):
+    """The argv that runs a gate script, decided by the gate and never by its file name.
+
+    THE SHEBANG DECIDES. Every script without `.py` used to run under `bash`, so an extensionless
+    Python gate had `import os, sys` executed as ImageMagick's `import`, hung for the full
+    timeout and wrote no stamp (review of the 1.63.0 fix batch, finding 4). An executable script
+    with a shebang is run directly, as the harness runs it. One that is not executable is run
+    by the interpreter its shebang names (`env` unwrapped; any Python is this interpreter). Only
+    a script with no shebang falls back to its extension: `.py` to Python, anything else `bash`.
+    """
+    try:
+        with open(script, "rb") as fh:
+            first = fh.readline(512)
+    except OSError:
+        first = b""
+    words = first[2:].decode("utf-8", "replace").split() if first.startswith(b"#!") else []
+    if words and os.name != "nt" and os.access(script, os.X_OK):
+        return [script]
+    if words and os.path.basename(words[0]) == "env":
+        words = [w for w in words[1:] if not w.startswith("-")]
+    if words:
+        if os.path.basename(words[0]).startswith("python"):
+            return [sys.executable] + words[1:] + [script]
+        return words + [script]
+    return [sys.executable if script.endswith(".py") else "bash", script]
+
+
 def stamp(root, found):
     live = [g for g in found if g["present"]]
     if not live:
@@ -167,10 +214,9 @@ def stamp(root, found):
     own = next((g for g in live
                 if g["self_stamps"]), None)
     if own:
-        runner = [sys.executable] if own["script"].endswith(".py") else ["bash"]
         env = dict(os.environ, CLAUDE_PROJECT_DIR=root)
         try:
-            p = subprocess.run(runner + [own["script"], "--stamp"], cwd=root, env=env,
+            p = subprocess.run(gate_argv(own["script"]) + ["--stamp"], cwd=root, env=env,
                                stdin=subprocess.DEVNULL, timeout=TIMEOUT)
         except (OSError, subprocess.SubprocessError) as exc:
             print("code-eval stamp: the gate's own --stamp could not run: %s" % exc, file=sys.stderr)
@@ -183,8 +229,11 @@ def stamp(root, found):
         print("code-eval stamp: %s is not a git work tree — the gate cannot compare one, "
               "nothing recorded" % root, file=sys.stderr)
         return 1
+    marker = os.path.join(root, ".claude", MARKER)
+    if refuse_write(root, marker, "stamp"):
+        return 1
     try:
-        with open(os.path.join(root, ".claude", MARKER), "w", encoding="utf-8") as fh:
+        with open(marker, "w", encoding="utf-8") as fh:
             fh.write(h + "\n")
         for name in DEBT:
             try:
@@ -205,6 +254,8 @@ def active(root, state):
     if state == "on":
         if not os.path.isdir(os.path.dirname(flag)):
             return 0
+        if refuse_write(root, flag, "active"):
+            return 1
         with open(flag, "w", encoding="utf-8"):
             pass
         return 0

@@ -64,6 +64,7 @@ not make.**
 import argparse
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -1038,11 +1039,30 @@ def classify(root, kind):
     }
 
 
-# Directories under `.claude/` whose files are records of past runs, never live readers. A run
-# report that quotes a path is history; counting it would keep a file forever on the strength of
-# a sentence about a run that is over. `retired/` is the archive this migration itself writes.
-NOT_READERS = (os.path.join("workforce", "work"), os.path.join("workforce", "staging"),
-               os.path.join("workforce", "retired"))
+def _sibling(name):
+    """A sibling shipped script, imported by path, leaving no bytecode in the shipped `bin/`.
+    Used only for constants a sibling OWNS, so one list cannot become two that disagree."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+# Directories whose files are records of past runs, never live readers. A run report that quotes
+# a path is history; counting it would keep a file forever on the strength of a sentence about a
+# run that is over. `retired/` is the archive this migration itself writes. THE LIST IS
+# `wf-census.SACRED_SCRATCH`, project-relative, read from its owner: this file kept its own copy
+# (review of the 1.63.0 fix batch, finding 10), and two copies of one list drift apart.
+NOT_READERS = _sibling("wf-census").SACRED_SCRATCH
 READER_MAX_BYTES = 1 << 20
 
 
@@ -1057,7 +1077,7 @@ def live_readers(root, proj):
     """
     out = []
     base = os.path.join(root, ".claude")
-    skip = {os.path.join(base, d) for d in NOT_READERS} | {os.path.realpath(proj)}
+    skip = {os.path.join(root, d) for d in NOT_READERS} | {os.path.realpath(proj)}
     for dirpath, dirnames, filenames in os.walk(base):
         dirnames[:] = sorted(
             x for x in dirnames
@@ -1073,12 +1093,20 @@ def live_readers(root, proj):
         out.append(claude_md)
     readers = []
     for f in out:
+        # A REGULAR FILE, AND NEVER MORE THAN THE CAP IS READ. `getsize` alone reads 0 for a
+        # device, so a reader linked to `/dev/zero` passed it and was read until memory ran out
+        # (review of the 1.63.0 fix batch, finding 7). The read is capped as well as the stat,
+        # because a file can grow between the two.
+        real = os.path.realpath(f)
         try:
-            if os.path.getsize(f) > READER_MAX_BYTES:
+            if not os.path.isfile(real) or os.path.getsize(real) > READER_MAX_BYTES:
                 continue
+            with open(real, encoding="utf-8", errors="replace") as fh:
+                text = fh.read(READER_MAX_BYTES + 1)
         except OSError:
             continue
-        text = slurp(f)
+        if len(text) > READER_MAX_BYTES:
+            continue
         if text:
             readers.append((os.path.relpath(f, root), text))
     return readers
@@ -1308,6 +1336,12 @@ def registration_removes(hook, verdict):
     UNPARSEABLE FAILS CLOSED. A registration naming the skill directory itself, or a path this
     cannot read out of the command, is treated as naming something removed: the refusal is the
     safe direction and the report shows the command, so it is never silent.
+
+    A PATH IS COMPARED NORMALISED. `hooks/../references/x.md` and `./references/x.md` name a
+    removed file and compared unequal to it, so the retirement went ahead and left a hook
+    pointing at a deleted file (review of the 1.63.0 fix batch, finding 6). `posixpath.normpath`
+    folds both; a path still holding `..` after that leaves the skill directory, and one holding
+    `$` has a variable this cannot expand, so both are treated as removed.
     """
     if verdict.get("verdict") != "retire" or not verdict.get("removable"):
         return False
@@ -1317,12 +1351,20 @@ def registration_removes(hook, verdict):
         if sk != name:
             continue
         rel = rel.strip("/")
-        if not rel or rel in removable or any(r.startswith(rel + "/") for r in removable):
+        if rel:
+            rel = posixpath.normpath(rel)
+            if rel == ".":
+                rel = ""
+        if (not rel or "$" in rel or ".." in rel.split("/")
+                or rel in removable or any(r.startswith(rel + "/") for r in removable)):
             return True
     return False
 
 
-STAMP_MARKER = ".code-eval-reviewed"
+# The file a code-eval commit gate compares the tree against. `wf-code-eval.MARKER` owns the name
+# and this reads it from there (review of the 1.63.0 fix batch, finding 10): a gate renamed in one
+# place and not the other would make every orphaned stamper read as none.
+STAMP_MARKER = _sibling("wf-code-eval").MARKER
 
 
 def code_eval_stamper(root):
