@@ -976,6 +976,26 @@ is the requirement."* Measured on the same repository: `operating-principles` ca
 against 13 shipped — five project-specific principles a "successful" force-refresh would have deleted.
 `UNMANAGED` is a reported state with a named reason, never a silent pass and never a failure.
 
+**A Core skill older than its region is MIGRATED by the same `--execute`, so it heals on this audit.**
+*Added 2026-09-16 (customer DEF-Q-21).* An org built before 1.52.0 holds workforce's shipped principles
+inside the same `origin: user | immutable: true` span as its own items, and `personnel-ledger` had no
+region at all. Both were skipped on every audit, so no later shipped item reached them. Now:
+
+- **`operating-principles`** — an item leaves the user span only when its text matches a text some
+  release shipped (`references/principles-history.md`); position never decides. The span is extracted
+  verbatim to `.claude/workforce/directives/operating-principles.md` and read back BEFORE the skill is
+  written (T2), the shipped items go into `WF-PRINCIPLES`, and every other line stays in the user span.
+  `origin: workforce` blocks that hold only shipped items are removed. The row reads `migrated`.
+- **When the split cannot be proved** (shipped items in two user spans, outside any span, or mixed with
+  other text in a workforce block), nothing is moved: the shipped items the file lacks go into a
+  `WF-PRINCIPLES-SUPPLEMENT` block below everything, and the row reads `supplemented` with the reason,
+  every run.
+- **`personnel-ledger`** — a customized copy gains the shipped `WF-LEDGER-DOCTRINE` region below its
+  own text, every existing byte kept.
+
+A split changes a sacred span, so Step 5-STAMP's `wf-stamp --directives --execute --restamp` must follow
+it; the row prints that line. `INV-CORE` counts `migrated` and `supplemented` apart from `refreshed`.
+
 ## Step 4b — Tier canary (the last step before anything is registered)
 
 Run `staging.md` § Phase C now — after the org is designed, before a single handbook is authored or

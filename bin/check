@@ -10335,6 +10335,9 @@ CANONICAL_HOME = {
     # doctrine without touching the project's own ratified items, which live below the
     # END marker inside an `origin: user` span (added 2026-09-11).
     "WF-PRINCIPLES": {"workforce/references/templates.md"},
+    # The shipped half of `personnel-ledger`, refreshed into existing orgs the same way
+    # (DEF-Q-21, 2026-09-16).
+    "WF-LEDGER-DOCTRINE": {"workforce/references/personnel-templates.md"},
 }
 BODY_MIN = 200
 
@@ -10388,6 +10391,8 @@ PRODUCERS = {
     ".claude/workforce/.directives.sha": "workforce/references/procedures/checksums.md",
     # a measured handbook length floor, written by `wf-stamp --floor` (DEF-Q-23, 2026-09-16)
     ".claude/workforce/length-floors.md": "workforce/references/procedure-for-procedures.md",
+    # T2 before a constitution split (DEF-Q-21): `extract_first` appends the span verbatim.
+    ".claude/workforce/directives/operating-principles.md": "workforce/bin/wf-companion",
     ".claude/workforce/.settings-owned.json": "workforce/references/audit-setup.md",
     # The settings heal's once-per-state failure record (hooks.md § Healing), written by
     # `announce_once` and removed by `clear_notice`, both in the script named here.
@@ -15637,12 +15642,25 @@ check(
     f"{_pf_missing} — each of DEC/INC/PAT/FLW needs a `## <T>` section carrying "
     "Status/Subjects/Anchors/Recorded/Supersedes, the shape stated once and referenced everywhere",
 )
+# ONE STATUS SET (DEF-Q-20, 2026-09-16). The templates' `**Status:**` lines, § Invariants, and
+# `wf-ledger.STATUSES` must name the same four values. `deprecated` was legal under the
+# awareness-ledger DEC template and missing from both, so `check` called real records ILLEGAL.
+_st_code = re.search(r'^STATUSES = \(([^)]*)\)', read("workforce/bin/wf-ledger"), re.M)
+_st_code = tuple(re.findall(r'"([a-z]+)"', _st_code.group(1))) if _st_code else ()
+# The four project-family templates only; AMD and RFI carry lifecycles of their own.
+_st_tpl = []
+for _t in ("DEC", "INC", "PAT", "FLW"):
+    _m = re.search(r"^## " + _t + r"\n\n```markdown\n.*?^\*\*Status:\*\* ([^\n]*)$", _ptk, re.S | re.M)
+    _st_tpl.append(tuple(v.strip() for v in _m.group(1).split("|")) if _m else None)
+_st_tpl = set(_st_tpl)
 check(
-    "knowledge: Status is exactly proposed|accepted|superseded",
-    "carries a `Status:` of exactly `proposed`\\|`accepted`\\|`superseded`" in _ptk,
-    "personnel-templates.md § Invariants must fix the three legal lifecycle states as a "
-    "mechanical invariant; without it a record can carry any Status and the consult filter "
-    "has nothing to trust",
+    "knowledge: Status is exactly proposed|accepted|superseded|deprecated, in the templates and in wf-ledger",
+    "carries a `Status:` of exactly `proposed`\\|`accepted`\\|`superseded`\\|`deprecated`" in _ptk
+    and _st_code == ("proposed", "accepted", "superseded", "deprecated")
+    and _st_tpl == {_st_code},
+    f"wf-ledger.STATUSES {_st_code}, template Status lines {sorted(_st_tpl)} — § Invariants, "
+    "every project template and the gateway must state one set, or `check` calls a record "
+    "illegal that the template allows",
 )
 check(
     "knowledge: a proposed record is never served by a consult",
@@ -16112,6 +16130,231 @@ check(
     f"{_rpt_hits or 'the main-loop note on report.md, or the handbook-template warning, is gone'}"
     " — a subagent's Write to such a name is refused with 'Subagents should return findings "
     "as text', so the deliverable never lands and the probe fails for the harness's reason",
+)
+
+# ── customer report 2026-09-16 (apps-patch): DEF-Q-20, DEF-Q-21, item 10 ────────────
+# Each block RUNS the shipped script on a fixture tree copied to a temp dir, because every
+# one of these defects read correctly in the source and was wrong on a real tree.
+def _cr_run(script, *args, env=None):
+    r = subprocess.run([sys.executable, f"workforce/bin/{script}"] + list(args),
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       universal_newlines=True, timeout=120, env=env)
+    return r.returncode, r.stdout
+
+
+def _cr_tree(tmp, name):
+    import shutil as _crsh
+    dst = os.path.join(tmp, name)
+    _crsh.copytree(os.path.join("fixtures", "scripts", name), dst, symlinks=True)
+    return dst
+
+
+# DEF-Q-20. A Records Owner's sectioned link index read as 0 records by `wf-ledger check`
+# (105 NOT INDEXED, 2 ILLEGAL STATUS on `deprecated` DECs) while `wf-conform` counted an ID
+# named in prose as indexed. One reader, one status set, and a hand-kept index is never
+# rebuilt over.
+def _cr_ledger():
+    import tempfile as _crt
+    bad = []
+    with _crt.TemporaryDirectory(prefix="wf-cr-ledger-") as t:
+        d = _cr_tree(t, "ledger-sectioned-index")
+        idx = os.path.join(d, ".claude/workforce/personnel/index.md")
+        c, o = _cr_run("wf-ledger", "check", "--root", d)
+        if "index states 4 record(s)" not in o or "ILLEGAL STATUS" in o \
+                or "NOT INDEXED: DEF-named-in-prose-only" not in o or "NOT INDEXED: DEF-linked" in o:
+            bad.append(f"wf-ledger check read the sectioned index wrong: {o.strip()!r}")
+        c1, _ = _cr_run("wf-conform", "--root", d, "--def",
+                        ".claude/workforce/personnel/DEF-named-in-prose-only.md")
+        c2, _ = _cr_run("wf-conform", "--root", d, "--def", ".claude/workforce/personnel/DEF-linked.md")
+        if (c1, c2) != (1, 0):
+            bad.append(f"wf-conform --def disagrees with wf-ledger: prose-only exit {c1}, linked exit {c2}")
+        before = read(idx)
+        _cr_run("wf-ledger", "index", "--root", d, "--execute")
+        after = read(idx)
+        c, o = _cr_run("wf-ledger", "check", "--root", d)
+        _cr_run("wf-ledger", "index", "--root", d, "--execute")
+        if not after.startswith(before) or "WF-LEDGER-UNINDEXED" not in after or c != 0 \
+                or read(idx) != after:
+            bad.append(f"index --execute did not keep the hand-kept index as an exact prefix, "
+                       f"left a record unindexed, or changed it on a second run: {o.strip()!r}")
+    return bad
+
+
+_cr_lb = _cr_ledger()
+check(
+    "ledger: one index reader serves wf-ledger and wf-conform, and a hand-kept index is never rebuilt over",
+    not _cr_lb and "_load_sibling(\"wf-ledger\").indexed_ids(index)" in read("workforce/bin/wf-conform"),
+    f"{_cr_lb} — two tools counting one index two ways is DEF-Q-20: 105 NOT INDEXED from one, "
+    "3 from the other, and a rebuild that would have erased the Records Owner's narrative",
+)
+
+# Item 10. `hooks … 1 undecidable` named nothing: not the row, not the reason.
+_cr_cen_env = dict(os.environ)
+_cr_cen_env.pop("WF_UNSET_HOOK_HOME", None)
+
+
+def _cr_census():
+    import tempfile as _crt
+    with _crt.TemporaryDirectory(prefix="wf-cr-census-") as t:
+        d = _cr_tree(t, "census-undecidable-named")
+        env = dict(_cr_cen_env, CLAUDE_CONFIG_DIR=os.path.join(d, ".nocfg"), HOME=t)
+        return _cr_run("wf-census", "--root", d, env=env)[1]
+
+
+_cr_co = _cr_census()
+_cr_und = [l.strip() for l in _cr_co.splitlines() if l.strip().startswith("UNDECIDABLE")]
+check(
+    "census: every undecidable hook is named with its event, its settings file and the reason",
+    "3 undecidable" in _cr_co and len(_cr_und) == 3
+    and any("`type: agent` hook" in l for l in _cr_und)
+    and any("inline script (`bash -c`)" in l for l in _cr_und)
+    and any("carries a variable this process cannot expand" in l for l in _cr_und)
+    and all(" — " in l and ".claude/settings.json" in l for l in _cr_und),
+    f"{_cr_und or _cr_co[-400:]!r} — a count names nothing: a reader could not find the row "
+    "or tell an agent hook (fine) from a script path behind a variable (maybe dead)",
+)
+
+# DEF-Q-21. A constitution older than WF-PRINCIPLES held the shipped items inside the
+# user's own immutable span, and nothing migrated it. The split is by shipped TEXT, T2
+# comes first, a split that cannot be proved becomes a supplement, and every path is named.
+def _cr_history():
+    """The shipped item texts in git history of templates.md plus the working tree, or None."""
+    import importlib.machinery as _crm, importlib.util as _cru
+    sys.dont_write_bytecode = True
+    ld = _crm.SourceFileLoader("_cr_wc", "workforce/bin/wf-companion")
+    sp = _cru.spec_from_loader("_cr_wc", ld)
+    wc = _cru.module_from_spec(sp)
+    ld.exec_module(wc)
+
+    def items(t):
+        i = (t or "").find("## `operating-principles`")
+        f = re.search(r"^```markdown\n(.*?)^```\n", t[i:], re.S | re.M) if i >= 0 else None
+        return [wc.item_digest(x[3]) for x in wc.principle_items(f.group(1).split("\n"))] if f else []
+    r = subprocess.run(["git", "log", "--follow", "--format=%h", "--",
+                        "workforce/references/templates.md"],
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True)
+    if r.returncode != 0 or not r.stdout.split():
+        return None, wc
+    got = set(items(read("workforce/references/templates.md")))
+    for sha in r.stdout.split():
+        got |= set(items(subprocess.run(["git", "show", f"{sha}:workforce/references/templates.md"],
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                        universal_newlines=True).stdout))
+    return got, wc
+
+
+try:
+    _cr_hist, _cr_wc = _cr_history()
+except Exception as _exc:                                # noqa: BLE001
+    _cr_hist, _cr_wc = None, None
+if _cr_hist is None:
+    skip("constitution: principles-history.md holds every item text templates.md ever shipped",
+         "no git history here (a tarball checkout), so the shipped set cannot be rebuilt")
+else:
+    _cr_file = set(_cr_wc.HISTORY_ITEM_RX.findall(read("workforce/references/principles-history.md")))
+    check(
+        "constitution: principles-history.md holds every item text templates.md ever shipped",
+        bool(_cr_hist) and _cr_file == _cr_hist,
+        f"missing {sorted(_cr_hist - _cr_file)[:3]} · extra {sorted(_cr_file - _cr_hist)[:3]} — "
+        "wf-companion lifts an item out of a user span only when its text is in this file, so a "
+        "missing text strands a shipped item in the user's span and an extra one takes the user's",
+    )
+
+
+def _cr_constitution():
+    import tempfile as _crt
+    bad = []
+    op_rel = ".claude/skills/operating-principles/SKILL.md"
+    with _crt.TemporaryDirectory(prefix="wf-cr-const-") as t:
+        d = _cr_tree(t, "companion-interleaved-constitution")
+        op = os.path.join(d, op_rel)
+        orig = read(op)
+        user_spans = re.findall(r"^<!-- origin: user \| immutable: true -->\n.*?^<!-- /origin -->",
+                                orig, re.S | re.M)
+        # T2 FIRST: with directives/ unwritable the constitution must not change at all.
+        os.makedirs(os.path.join(d, ".claude/workforce"), exist_ok=True)
+        with open(os.path.join(d, ".claude/workforce/directives"), "w") as fh:
+            fh.write("not a directory\n")
+        c, o = _cr_run("wf-companion", "--root", d, "--execute")
+        if read(op) != orig or c != 1:
+            bad.append(f"a failed T2 extraction still wrote SKILL.md (exit {c})")
+        os.remove(os.path.join(d, ".claude/workforce/directives"))
+        c, o = _cr_run("wf-companion", "--root", d, "--execute")
+        new = read(op)
+        ext = read(os.path.join(d, ".claude/workforce/directives/operating-principles.md")) or ""
+        src = read("workforce/references/templates.md")
+        canon = src[src.index("<!-- WF-PRINCIPLES START"):]
+        canon = canon[:canon.index("<!-- WF-PRINCIPLES END -->") + len("<!-- WF-PRINCIPLES END -->")]
+        after_spans = re.findall(r"^<!-- origin: user \| immutable: true -->\n.*?^<!-- /origin -->",
+                                 new, re.S | re.M)
+        kept_items = ("8. **Staging only.**", "9. **Tabs, not spaces,**", "10. **Ask the owner",
+                      "11. Every decision conforms to the budget sheet", "12. **Two reviewers**",
+                      "16. Your own registered handbook is yours")
+        if c != 0 or new.count(canon) != 1:
+            bad.append(f"the region is not the shipped span exactly once (exit {c})")
+        if user_spans[0] not in new or not user_spans[1] in ext:
+            bad.append("the objective span changed, or the split span was not extracted verbatim")
+        if len(after_spans) != 2 or not all(k in after_spans[1] for k in kept_items) \
+                or any(re.search(r"^\d+\. ", l) and not l.startswith(kept_items)
+                       for l in after_spans[1].splitlines()):
+            bad.append("the project's items are not alone, whole, in the user span after the split")
+        for line in user_spans[1].splitlines():
+            if line.startswith(kept_items) and line not in new:
+                bad.append(f"a project line lost bytes: {line[:40]!r}")
+        c2, o2 = _cr_run("wf-companion", "--root", d, "--execute")
+        if read(op) != new or "operating-principles   current" not in o2:
+            bad.append("a second run changed the migrated constitution")
+        d2 = _cr_tree(t, "companion-constitution-unsplittable")
+        op2 = os.path.join(d2, op_rel)
+        orig2 = read(op2)
+        c3, o3 = _cr_run("wf-companion", "--root", d2, "--execute")
+        new2 = read(op2)
+        if not new2.startswith(orig2.rstrip("\n")) or "WF-PRINCIPLES-SUPPLEMENT END" not in new2 \
+                or "not split (shipped items sit in 2 separate user spans)" not in o3:
+            bad.append("the unprovable split did not fall back to a named supplement with every "
+                       "byte kept")
+    return bad
+
+
+try:
+    _cr_cb = _cr_constitution()
+except Exception as _exc:                                # noqa: BLE001
+    _cr_cb = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "constitution: an org older than WF-PRINCIPLES is migrated by shipped text, T2 first, or supplemented and named",
+    not _cr_cb,
+    f"{_cr_cb} — without the migration an existing org never receives a shipped item added "
+    "after 1.52.0 (DEF-Q-21), and a split by position would move the user's own words",
+)
+
+# The ledger half of DEF-Q-21: a customized personnel-ledger gains the shipped region.
+def _cr_ledger_region():
+    import tempfile as _crt
+    with _crt.TemporaryDirectory(prefix="wf-cr-plr-") as t:
+        d = os.path.join(t, "tree")
+        os.makedirs(os.path.join(d, ".claude/skills/personnel-ledger"))
+        _cr_run("wf-companion", "--root", d, "--execute")
+        p = os.path.join(d, ".claude/skills/personnel-ledger/SKILL.md")
+        full = read(p)
+        i = full.find("<!-- WF-LEDGER-DOCTRINE START")
+        custom = full[:i].rstrip("\n") + "\n\nA rule this project wrote.\n"
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write(custom)
+        _c1, o1 = _cr_run("wf-companion", "--root", d)
+        reported_only = read(p) == custom
+        _c2, o2 = _cr_run("wf-companion", "--root", d, "--execute")
+        after = read(p)
+        return (i > 0 and "personnel-ledger       MIGRATE" in o1 and reported_only
+                and after.startswith(custom) and after.count("<!-- WF-LEDGER-DOCTRINE END -->") == 1
+                and "personnel-ledger       current" in _cr_run("wf-companion", "--root", d)[1]), o2
+
+
+_cr_plok, _cr_plo = _cr_ledger_region()
+check(
+    "core refresh: a customized personnel-ledger with no region gains the shipped one, every byte kept",
+    bool(_cr_plok),
+    f"{_cr_plo[-300:]!r} — a customized ledger skill was UNMANAGED forever, so the project "
+    "family, the fourth status and the index rules never reached an existing org",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1340,7 +1340,10 @@ def def_record_findings(stem, body, index):
             detail = ("names an intention rather than a file — a class fix is a change to a "
                       "named workforce file, or it is INSTANCE-ONLY with a reason")
         out.append((ok, f"{stem}: Class fix is a file or a reasoned INSTANCE-ONLY", detail))
-    out.append((index is not None and stem in index, f"{stem}: appears in the personnel index",
+    # `wf-ledger.indexed_ids` is the ONE index reader: a row or a link, never a substring,
+    # which counted an ID named in a narrative paragraph as indexed (DEF-Q-20).
+    out.append((index is not None and stem in _load_sibling("wf-ledger").indexed_ids(index),
+                f"{stem}: appears in the personnel index",
                 "a record nothing points at is one the next reader never finds"))
     return out
 

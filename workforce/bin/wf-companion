@@ -32,6 +32,12 @@ a skill has no region, the skill is reported UNMANAGED with the drift signal tha
 matter, and it is counted in `unrefreshed` naming that precondition — which is the
 outcome Step 4's own prose already sanctions. It is NEVER silently overwritten.
 
+A SKILL OLDER THAN ITS REGION IS MIGRATED, not skipped (2026-09-16, DEF-Q-21): the region
+is inserted, and for `operating-principles` the shipped items are lifted out of the
+user's span by exact shipped TEXT after a verbatim T2 extraction. A split that cannot be
+proved becomes a supplement block below everything, and the row names why. See
+§ migration below.
+
 Measured on the same repository: `operating-principles` carries 18 numbered items
 against 13 shipped. That is not staleness, it is five project-specific principles this
 project added, and a force-refresh that "won" would delete them. The three-state rule is
@@ -91,12 +97,18 @@ CORE = [
         "region": ("<!-- WF-PRINCIPLES START", "<!-- WF-PRINCIPLES END -->"),
         "source": ("references", "templates.md"),
         "unit": "item",
+        # An org older than the region gets one on its next audit (DEF-Q-21).
+        "migrate": "migrate_operating_principles",
     },
     {
         "name": "personnel-ledger",
         "materialize": "materialize_personnel_ledger",
-        "region": None,
+        # A REGION HERE TOO, for the same reason `operating-principles` gained one: a
+        # customized ledger skill was UNMANAGED forever, so the project family, the fourth
+        # status and the index rules never reached it (DEF-Q-21, 2026-09-16).
+        "region": ("<!-- WF-LEDGER-DOCTRINE START", "<!-- WF-LEDGER-DOCTRINE END -->"),
         "source": ("references", "personnel-templates.md"),
+        "migrate": "migrate_append_region",
         "unit": "record type",
         # A data skill (personnel-templates.md § personnel-ledger). A customized copy is
         # never overwritten, but a required contract section it lacks is appended.
@@ -318,6 +330,10 @@ def materialize_personnel_ledger(wf):
     if not rows:
         return None
     body = "\n\n".join(f"{h}\n\n{cell.strip()}" for h, cell in rows)
+    sp = span(src, LEDGER_MARKERS)
+    if sp is None:
+        return None
+    body += "\n\n" + src[sp[0]:sp[1]]
     return f"""---
 name: personnel-ledger
 description: "The org's personnel records — EMP, PERF, DEF, AMD, RFI, ORG, and the project family DEC, INC, PAT, FLW."
@@ -406,8 +422,350 @@ def frontmatter_ok(text):
     return False, "frontmatter block is never closed"
 
 
+# ── migration: an org older than a region gets one ──────────────────────────────
+# DEF-Q-21, 2026-09-16. `operating-principles` gained `WF-PRINCIPLES` in 1.52.0, and an org
+# built before that held the shipped items INSIDE the same `origin: user | immutable: true`
+# span as its own items, renumbered around them. This script reported NO-REGION and
+# skipped it on every audit, so no later shipped item could arrive. The customer's run
+# hand-added shipped item 14 as "rule 20" in an `origin: workforce` block to get it there.
+#
+# A SACRED SPAN IS THE USER'S WORDS, so nothing is lifted out of one by POSITION. An item
+# leaves the span only when its text equals a text some release shipped. Every such text
+# is recorded, as a sha256, in `references/principles-history.md`, read from git history of
+# `templates.md`, and
+# `bin/check` holds that file equal to the history. Equal means the item's words line by
+# line, leading and trailing whitespace aside, and the number aside: renumbering is what an
+# old audit did to them, and continuation indent follows the number's width. Anything else
+# stays in the user span, whatever it looks like.
+#
+# PROVABLE OR NOT DONE. The split is performed only when every shipped item sits in ONE
+# user span, or in `origin: workforce` blocks holding nothing else, and the origin markers
+# balance. Otherwise the shipped items the file lacks go into a supplement block below
+# everything, no existing byte changes, and the row says why every run.
+#
+# T2 COMES FIRST. The span being split is written verbatim to
+# `.claude/workforce/directives/operating-principles.md` and read back before SKILL.md is
+# touched; a failed extraction writes nothing (`templates.md` § The extracted-directives file).
+PRINCIPLES_MARKERS = ("<!-- WF-PRINCIPLES START", "<!-- WF-PRINCIPLES END -->")
+SUPPLEMENT_MARKERS = ("<!-- WF-PRINCIPLES-SUPPLEMENT START", "<!-- WF-PRINCIPLES-SUPPLEMENT END -->")
+LEDGER_MARKERS = ("<!-- WF-LEDGER-DOCTRINE START", "<!-- WF-LEDGER-DOCTRINE END -->")
+HISTORY_REL = ("references", "principles-history.md")
+GOP_HEADING = "## General Operating Principles"
+ITEM_RX = re.compile(r"^(\d+)\. (.*)$")
+ORIGIN_OPEN_RX = re.compile(r"^<!--\s*origin:\s*([A-Za-z-]+)\b[^\n]*-->[ \t]*$")
+ORIGIN_CLOSE_RX = re.compile(r"^<!--\s*/origin\s*-->[ \t]*$")
+HISTORY_ITEM_RX = re.compile(r"^- `([0-9a-f]{64})`", re.M)
+
+
+def principle_items(lines):
+    """[(first, end, number, text)] per numbered item. `end` is exclusive; `text` is the
+    comparison form: the words after the number, each line stripped, joined by newlines."""
+    out, i = [], 0
+    while i < len(lines):
+        m = ITEM_RX.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(lines) and lines[j].strip() and lines[j][:1] in " \t":
+            j += 1
+        text = "\n".join([m.group(2).strip()] + [l.strip() for l in lines[i + 1:j]])
+        out.append((i, j, int(m.group(1)), text))
+        i = j
+    return out
+
+
+def origin_spans(lines):
+    """[(open, close, origin)] by line index, or None when the markers nest or do not pair."""
+    out, cur = [], None
+    for k, line in enumerate(lines):
+        mo = ORIGIN_OPEN_RX.match(line)
+        if mo:
+            if cur is not None:
+                return None
+            cur = (k, mo.group(1).lower())
+        elif ORIGIN_CLOSE_RX.match(line):
+            if cur is None:
+                return None
+            out.append((cur[0], k, cur[1]))
+            cur = None
+    return None if cur is not None else out
+
+
+def item_digest(text):
+    """sha256 of an item's comparison form — what `principles-history.md` records."""
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def shipped_texts(wf):
+    """The digest of every item text any release shipped, or None when unreadable."""
+    hist = read(os.path.join(wf, *HISTORY_REL))
+    if hist is None:
+        return None
+    return set(HISTORY_ITEM_RX.findall(hist))
+
+
+def lone_marker(text, markers):
+    """True when exactly one of a marker pair is present, line-anchored."""
+    has = [bool(re.search(r"^" + re.escape(t), text, re.M)) for t in markers]
+    return has[0] != has[1]
+
+
+def _drop_block(text, markers):
+    """`text` without a marker block and the blank line before it."""
+    sp = span(text, markers)
+    if sp is None:
+        return text
+    start = sp[0]
+    while start > 0 and text[start - 1] == "\n" and (start < 2 or text[start - 2] == "\n"):
+        start -= 1
+    end = sp[1] + 1 if text[sp[1]:sp[1] + 1] == "\n" else sp[1]
+    return text[:start] + text[end:]
+
+
+def _renumbered(canon_lines, item, n):
+    """One canonical item's own lines under a new number, continuation re-indented to it."""
+    first, end, _num, _t = item
+    head = ITEM_RX.match(canon_lines[first])
+    pad = " " * len(f"{n}. ")
+    return [f"{n}. {head.group(2)}"] + [pad + l.strip() for l in canon_lines[first + 1:end]]
+
+
+def migrate_operating_principles(inst, wf, canonical):
+    """(state, detail, new_body, t2_blocks) for a constitution with no WF-PRINCIPLES region.
+
+    States: MIGRATE (split or insert, provable), SUPPLEMENT (not provable; missing shipped
+    items go below), SUPPLEMENTED (not provable and nothing to add), UNMANAGED (cannot write
+    at all, with the reason). `t2_blocks` is [(first_line, last_line, block_text)] for every
+    user span the write would change, 1-based.
+    """
+    if lone_marker(inst, PRINCIPLES_MARKERS) or lone_marker(inst, SUPPLEMENT_MARKERS):
+        return ("NO-REGION", "installed copy carries one marker without its pair — REPORT "
+                "and SKIP, never auto-repair (procedures/org.md step 5)", None, [])
+    shipped = shipped_texts(wf)
+    if not shipped:
+        return ("UNMANAGED", f"shipped {'/'.join(HISTORY_REL)} is unreadable, so no item can "
+                "be told from the user's own; nothing is moved", None, [])
+    canon_lines = canonical.split("\n")
+    canon_items = principle_items(canon_lines)
+    base = _drop_block(inst, SUPPLEMENT_MARKERS)
+    lines = base.split("\n")
+    spans = origin_spans(lines)
+    items = principle_items(lines)
+    matched = [it for it in items if item_digest(it[3]) in shipped]
+
+    def host(it):
+        for sp in spans or ():
+            if sp[0] < it[0] and it[1] <= sp[1]:
+                return sp
+        return None
+
+    why = []
+    if spans is None:
+        why.append("its origin markers nest or do not pair")
+    else:
+        user_hosts = sorted({host(it) for it in matched if host(it) and host(it)[2] == "user"})
+        wf_hosts = sorted({host(it) for it in matched if host(it) and host(it)[2] == "workforce"})
+        if len(user_hosts) > 1:
+            why.append(f"shipped items sit in {len(user_hosts)} separate user spans")
+        if any(host(it) is None for it in matched):
+            why.append("a shipped item sits outside any origin span")
+        if any(host(it) and host(it)[2] not in ("user", "workforce") for it in matched):
+            why.append("a shipped item sits in a span of another origin")
+        for sp in wf_hosts:
+            covered = {k for it in matched if host(it) == sp for k in range(it[0], it[1])}
+            if any(lines[k].strip() and k not in covered for k in range(sp[0] + 1, sp[1])):
+                why.append("an `origin: workforce` block mixes shipped items with other text")
+                break
+
+    if why:
+        present = {it[3] for it in items}
+        missing = [it for it in canon_items if it[3] not in present]
+        reason = "; ".join(why)
+        if not missing:
+            if base != inst:
+                return ("SUPPLEMENT", f"not split ({reason}); every shipped item is now present, "
+                        "so the supplement block is removed", base, [])
+            return ("SUPPLEMENTED", f"not split ({reason}); every current shipped item is "
+                    "present, and the user span keeps its bytes", None, [])
+        hazard = append_hazard(base)
+        if hazard:
+            return ("UNMANAGED", f"not split ({reason}), and the {len(missing)} missing shipped "
+                    f"item(s) cannot be appended: {hazard}", None, [])
+        n = max([it[2] for it in items] or [0])
+        body = [f"{SUPPLEMENT_MARKERS[0]} — shipped items this constitution lacks. They are not "
+                f"in a WF-PRINCIPLES region because {reason.replace('`', '')}. Refreshed by every "
+                "audit; nothing above is changed. -->"]
+        for k, it in enumerate(missing, 1):
+            body += _renumbered(canon_lines, it, n + k)
+        body.append(SUPPLEMENT_MARKERS[1])
+        new = base.rstrip("\n") + "\n\n" + "\n".join(body) + "\n"
+        if new == inst:
+            return ("SUPPLEMENTED", f"not split ({reason}); {len(missing)} shipped item(s) are "
+                    "kept current in the supplement block below the user span", None, [])
+        return ("SUPPLEMENT", f"not split ({reason}); {len(missing)} missing shipped item(s) "
+                "go into a supplement block below, every existing byte kept", new, [])
+
+    edits = []                       # (start, end_exclusive, replacement lines, t2 block)
+    for sp in wf_hosts:
+        start = sp[0] - 1 if sp[0] > 0 and not lines[sp[0] - 1].strip() else sp[0]
+        edits.append((start, sp[1] + 1, [], None))
+    placed = False
+    for sp in user_hosts:            # at most one, by the test above
+        o, c = sp[0], sp[1]
+        removed = {k for it in matched if host(it) == sp for k in range(it[0], it[1])}
+        content = [k for k in range(o + 1, c)]
+        nonblank = [k for k in content if lines[k].strip() and k not in removed]
+        lift_heading = bool(nonblank) and lines[nonblank[0]] == GOP_HEADING
+        if lift_heading:
+            removed.add(nonblank[0])
+        keep = [lines[k] for k in content if k not in removed]
+        while keep and not keep[0].strip():
+            keep.pop(0)
+        while keep and not keep[-1].strip():
+            keep.pop()
+        longest = run = 0
+        for k in content:
+            run = run + 1 if not lines[k].strip() else 0
+            longest = max(longest, run)
+        tidy = []
+        for line in keep:
+            if not line.strip() and len(tidy) >= longest and all(
+                    not x.strip() for x in tidy[len(tidy) - longest:]):
+                continue
+            tidy.append(line)
+        # THE PROOF: every non-blank line of the span either stays, in order, or is a line
+        # of an item whose text some release shipped, or is the template's own heading.
+        if [lines[k] for k in content if lines[k].strip() and k not in removed] != \
+                [l for l in tidy if l.strip()]:
+            return ("UNMANAGED", "the split could not be proved byte-exact; nothing is moved",
+                    None, [])
+        repl = ([GOP_HEADING, ""] if lift_heading else []) + canon_lines
+        if any(l.strip() for l in tidy):
+            repl += ["", lines[o]] + tidy + [lines[c]]
+        edits.append((o, c + 1, repl, (o + 1, c + 1, "\n".join(lines[o:c + 1]))))
+        placed = True
+    if not placed:
+        heads = [k for k, l in enumerate(lines) if l == GOP_HEADING
+                 and not any(s[0] < k < s[1] for s in spans)]
+        if heads:
+            h = heads[0]
+            tail = [""] if h + 1 < len(lines) and lines[h + 1].strip() else []
+            edits.append((h + 1, h + 1, [""] + canon_lines + tail, None))
+        else:
+            hazard = append_hazard(base)
+            if hazard:
+                return ("UNMANAGED", f"no region, and the shipped items cannot be appended: "
+                        f"{hazard}", None, [])
+            end = len(lines) - 1 if lines and lines[-1] == "" else len(lines)
+            while end > 0 and not lines[end - 1].strip():
+                end -= 1
+            heading = [] if any(l == GOP_HEADING for l in lines) else [GOP_HEADING, ""]
+            edits.append((end, len(lines), [""] + heading + canon_lines + [""], None))
+    for start, end, repl, _b in sorted(edits, key=lambda e: e[0], reverse=True):
+        lines[start:end] = repl
+    new = "\n".join(lines)
+    moved = sum(1 for it in matched if host(it) in user_hosts)
+    how = (f"{moved} shipped item(s) lifted out of the user span, which keeps every other line"
+           if user_hosts else "no shipped item in any user span; the region is inserted")
+    if wf_hosts:
+        how += f"; {len(wf_hosts)} workforce block(s) holding only shipped items removed"
+    if base != inst:
+        how += "; the supplement block is replaced by the region"
+    return ("MIGRATE", how, new, [e[3] for e in edits if e[3]])
+
+
+def migrate_append_region(inst, wf, canonical):
+    """(state, detail, new_body, []) — a customized data skill gains its region at the end."""
+    hazard = append_hazard(inst)
+    if hazard:
+        return ("UNMANAGED", f"customized, no machine-owned region, and one cannot be appended: "
+                f"{hazard}. A customized Core skill is never overwritten "
+                "(audit-setup.md § Step 0.3, state 3)", None, [])
+    return ("MIGRATE", "customized, no machine-owned region; the shipped region is appended "
+            "below it, every existing byte kept", inst.rstrip("\n") + "\n\n" + canonical + "\n", [])
+
+
+def extract_first(root, blocks, source_text):
+    """T2: every block in `blocks` is in the directives file, verbatim, before a write.
+
+    Returns (ok, detail). Appends only; an existing extraction is never rewritten."""
+    import datetime
+    import hashlib
+    rel = OP_REL.replace(os.sep, "/")
+    path = os.path.join(root, ".claude", "workforce", "directives", "operating-principles.md")
+    prior = read(path)
+    todo = [b for b in blocks if b[2] not in (prior or "")]
+    if not todo:
+        return True, f"{len(blocks)} of {len(blocks)} span(s) already extracted verbatim"
+    today = datetime.date.today().isoformat()
+    if prior is None:
+        sha = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+        out = (f"# Directives extracted from `operating-principles`\n\n"
+               f"Extracted {today} by `wf-companion`, before the WF-PRINCIPLES split.\n"
+               f"Source: `{rel}` (sha {sha}).\n\n"
+               f"{len(todo)} immutable block(s), verbatim and in original order.\n\n---\n")
+    else:
+        out = prior.rstrip("\n") + "\n\n---\n"
+    for _a, _b, text in todo:
+        # Cited where the span sits in the file as it is on disk now, never in a working copy.
+        a = source_text[:source_text.find(text)].count("\n") + 1 if text in source_text else _a
+        b = a + text.count("\n")
+        out += (f"\n<!-- extracted: {rel}:{a}-{b} | by wf-companion {today}, before the "
+                f"WF-PRINCIPLES split -->\n{text}\n")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(out)
+    except OSError as exc:
+        return False, f"T2 extraction to {os.path.relpath(path, root)} failed: {exc.strerror}"
+    back = read(path) or ""
+    if not all(b[2] in back for b in blocks) or (prior and not back.startswith(prior.rstrip("\n"))):
+        return False, "T2 extraction read back short — nothing else is written"
+    return True, f"{len(blocks)} of {len(blocks)} span(s) extracted verbatim to " \
+                 f"{os.path.relpath(path, root)}"
+
+
+def _user_blocks(text):
+    lines = text.split("\n")
+    return ["\n".join(lines[o:c + 1]) for o, c, origin in (origin_spans(lines) or ())
+            if origin == "user"]
+
+
+def migrate_write(root, wf, entry, path, new_body, t2):
+    """Perform one MIGRATE or SUPPLEMENT, T2 first, and prove it. (ok, detail).
+
+    On any read-back failure the file is put back to the bytes it had."""
+    before = read(path)
+    if before is None:
+        return False, "unreadable before the write"
+    detail = "no sacred span changed"
+    if t2:
+        ok, detail = extract_first(root, t2, before)
+        if not ok:
+            return False, detail + "; SKILL.md not written"
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(new_body)
+    except OSError as exc:
+        return False, exc.strerror
+    back = read(path) or ""
+    state = evaluate(root, wf, entry)[0]
+    changed = {b[2] for b in t2}
+    lost = [b for b in _user_blocks(before) if b not in changed and b not in back]
+    want = "CURRENT" if span(back, entry["region"]) else "SUPPLEMENTED"
+    if back != new_body or state != want or lost:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(before)
+        return False, (f"read back {state} (want {want}), {len(lost)} other user span(s) "
+                       "changed — the original bytes are restored")
+    kept = len(_user_blocks(before)) - len(changed)
+    return True, f"{detail}; {kept} other user span(s) byte-identical"
+
+
 def evaluate(root, wf, entry):
-    """One row: (state, detail, installed_path, new_body_or_None)."""
+    """One row: (state, detail, installed_path, new_body_or_None, t2_blocks)."""
     name = entry["name"]
     inst_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
     inst = read(inst_path)
@@ -431,83 +789,81 @@ def evaluate(root, wf, entry):
             return ("UNPRODUCIBLE",
                     "no SKILL.md and no shipped producer for this companion — "
                     "`audit-setup.md` Step 0.3 must materialize it by hand",
-                    inst_path, None)
+                    inst_path, None, [])
         body = builder(wf)
         if body is None:
             return ("UNREADABLE",
                     "no SKILL.md, and the shipped doctrine it would be built from is "
                     "unreadable — a companion assembled from half its source is worse "
                     "than an absence somebody can see",
-                    inst_path, None)
-        return ("ABSENT", "no SKILL.md; a producer exists for it", inst_path, body)
+                    inst_path, None, [])
+        return ("ABSENT", "no SKILL.md; a producer exists for it", inst_path, body, [])
 
     src_path = os.path.join(wf, *entry["source"])
     src = read(src_path)
     if src is None:
         return ("UNREADABLE", f"shipped source {os.path.join(*entry['source'])} unreadable",
-                inst_path, None)
+                inst_path, None, [])
 
-    if entry["region"] is None:
-        # A DATA-SKILL COMPANION GAINS WHAT ITS CONTRACT LACKS, AND NOTHING ELSE. The file
-        # is customized and is never overwritten, but a required contract section it is
-        # missing can be APPENDED from shipped source without touching one byte that is
-        # already there. Without this, a copy authored before a section became required
-        # fails `wf-conform`'s data-skill contract on every verify, and nothing could clear
-        # it. MEASURED 2026-09-15 on pythom-space: `personnel-ledger` carries `## Layout`
-        # and no `## Schema`. `## Layout` is left exactly as written and is not taken as the
-        # Schema: the appended `## Schema` states the flat layout the shipped contract names.
-        if entry.get("contract") == "data-skill":
-            gaps = contract_gaps(inst)
-            if gaps:
-                builder = globals().get(entry.get("materialize") or "")
-                shipped = builder(wf) if builder else None
-                blocks = [shipped_section(shipped or "", h) for h in gaps]
-                why_not = append_hazard(inst)
-                if any(b is None for b in blocks) or why_not:
-                    return ("UNMANAGED",
-                            f"customized, and missing contract section(s) {gaps} that cannot "
-                            f"be appended: "
-                            + (why_not or "the shipped template carries no text for them"),
-                            inst_path, None)
-                new_body = (inst.rstrip("\n") + "\n\n" + APPEND_NOTE + "\n\n"
-                            + "\n\n".join(blocks) + "\n")
-                return ("INCOMPLETE",
-                        f"customized; missing {', '.join(gaps)} — append from shipped "
-                        f"source, every existing byte kept",
-                        inst_path, new_body)
-        # No marker convention defined for this skill yet, so there is no span to replace
-        # and no way to tell generated prose from the project's own. Report the drift
-        # signal and refuse — Step 4's sanctioned `unrefreshed` outcome.
-        return ("UNMANAGED",
-                "no machine-owned region defined; refresh would have to overwrite the "
-                "whole file, and a customized Core skill is never overwritten "
-                "(audit-setup.md § Step 0.3, state 3)",
-                inst_path, None)
-
-    inst_span = span(inst, entry["region"])
     src_span = span(src, entry["region"])
     if src_span is None:
         return ("UNREADABLE",
                 f"shipped {os.path.join(*entry['source'])} carries no canonical span "
                 f"between {entry['region'][0]!r} and its END marker",
-                inst_path, None)
-    if inst_span is None:
-        return ("NO-REGION",
-                "installed copy carries no marker pair (or only one of the two) — "
-                "REPORT and SKIP, never auto-repair (procedures/org.md step 5)",
-                inst_path, None)
-
+                inst_path, None, [])
     canonical = src[src_span[0]:src_span[1]]
+    inst_span = span(inst, entry["region"])
+
+    # A DATA-SKILL COMPANION GAINS WHAT ITS CONTRACT LACKS, AND NOTHING ELSE. The file
+    # is customized and is never overwritten, but a required contract section it is
+    # missing can be APPENDED from shipped source without touching one byte that is
+    # already there. Without this, a copy authored before a section became required
+    # fails `wf-conform`'s data-skill contract on every verify, and nothing could clear
+    # it. MEASURED 2026-09-15 on pythom-space: `personnel-ledger` carries `## Layout`
+    # and no `## Schema`. `## Layout` is left exactly as written and is not taken as the
+    # Schema: the appended `## Schema` states the flat layout the shipped contract names.
+    if entry.get("contract") == "data-skill":
+        gaps = contract_gaps(inst)
+        if gaps:
+            builder = globals().get(entry.get("materialize") or "")
+            shipped = builder(wf) if builder else None
+            blocks = [shipped_section(shipped or "", h) for h in gaps]
+            why_not = append_hazard(inst)
+            if any(b is None for b in blocks) or why_not:
+                return ("UNMANAGED",
+                        f"customized, and missing contract section(s) {gaps} that cannot "
+                        f"be appended: "
+                        + (why_not or "the shipped template carries no text for them"),
+                        inst_path, None, [])
+            new_body = (inst.rstrip("\n") + "\n\n" + APPEND_NOTE + "\n\n"
+                        + "\n\n".join(blocks) + "\n")
+            if inst_span is None and not lone_marker(inst, entry["region"]):
+                new_body += "\n" + canonical + "\n"
+            return ("INCOMPLETE",
+                    f"customized; missing {', '.join(gaps)} — append from shipped "
+                    f"source, every existing byte kept",
+                    inst_path, new_body, [])
+
+    if inst_span is None:
+        migrate = globals().get(entry.get("migrate") or "")
+        if migrate is None or lone_marker(inst, entry["region"]):
+            return ("NO-REGION",
+                    "installed copy carries no marker pair (or only one of the two) — "
+                    "REPORT and SKIP, never auto-repair (procedures/org.md step 5)",
+                    inst_path, None, [])
+        state, detail, new_body, t2 = migrate(inst, wf, canonical)
+        return (state, detail, inst_path, new_body, t2)
+
     current = inst[inst_span[0]:inst_span[1]]
     if current == canonical:
         return ("CURRENT", f"region matches shipped ({count_units(current)} "
-                           f"{entry['unit']}s)", inst_path, None)
+                           f"{entry['unit']}s)", inst_path, None, [])
 
     detail = (f"region differs from shipped "
               f"({count_units(current)} {entry['unit']}s installed vs "
               f"{count_units(canonical)} shipped)")
     new_body = inst[:inst_span[0]] + canonical + inst[inst_span[1]:]
-    return ("DRIFTED", detail, inst_path, new_body)
+    return ("DRIFTED", detail, inst_path, new_body, [])
 
 
 # ── the Strategic Objective: detect the placeholder, and draft over it ─────────
@@ -650,11 +1006,11 @@ def main():
           f"{ver if ver else '<unreadable — no staleness claim made>'}\n")
 
     refreshed = unrefreshed = current = appended = 0
-    materialized = absent = 0
+    materialized = absent = migrated = supplemented = 0
     failed = False
     print("CORE SKILLS")
     for entry in CORE:
-        state, detail, path, new_body = evaluate(root, wf, entry)
+        state, detail, path, new_body, t2 = evaluate(root, wf, entry)
         name = entry["name"]
 
         if state == "CURRENT":
@@ -691,6 +1047,37 @@ def main():
                   f"(from shipped source; the customized text above is unchanged)")
             continue
 
+        if state == "SUPPLEMENTED":
+            # Named every run: the shipped items arrived, and the reason the file has no
+            # region is still true. Not a failure and not silent.
+            supplemented += 1
+            print(f"  = {name:22s} supplemented {detail}")
+            continue
+
+        if state in ("MIGRATE", "SUPPLEMENT"):
+            if not args.execute:
+                unrefreshed += 1
+                print(f"  ~ {name:22s} {state:10s} {detail} — would "
+                      f"{'migrate' if state == 'MIGRATE' else 'supplement'}")
+                continue
+            ok, why = migrate_write(root, wf, entry, path, new_body, t2)
+            if not ok:
+                failed = True
+                unrefreshed += 1
+                print(f"  ! {name:22s} FAILED    {why}", file=sys.stderr)
+                continue
+            if state == "MIGRATE":
+                migrated += 1
+                print(f"  + {name:22s} migrated  {detail} · {why}")
+            else:
+                supplemented += 1
+                print(f"  + {name:22s} supplemented {detail} · {why}")
+            if t2:
+                print(f"      the split changed a sacred span: run `wf-stamp --directives "
+                      f"--execute --restamp` (audit Step 5-STAMP) so `.directives.sha` "
+                      f"follows it")
+            continue
+
         if state in ("DRIFTED", "ABSENT"):
             verb, past = (("refresh", "refreshed") if state == "DRIFTED"
                           else ("materialize", "materialized"))
@@ -715,15 +1102,12 @@ def main():
                 # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
                 # its own output has not finished (`checksums.md` rule 2).
                 #
-                # A MATERIALIZED companion with no machine-owned region reads back
-                # UNMANAGED, not CURRENT, and that is correct rather than a failure:
-                # `operating-principles` and `personnel-ledger` define no marker pair, so
-                # the refresh path has nothing to compare and says so. What this read-back
-                # must establish for them is that the FILE IS THERE AND PARSES — anything
-                # stricter would fail every successful creation, which is the
-                # always-fails-so-nobody-reads-it defect this script already carries a
-                # scar from.
-                back_state, back_detail, _, _ = evaluate(root, wf, entry)
+                # A MATERIALIZED companion must read back CURRENT or name a precondition
+                # (UNMANAGED, NO-REGION); what this read-back must establish is that the
+                # FILE IS THERE AND PARSES — anything stricter would fail every successful
+                # creation, which is the always-fails-so-nobody-reads-it defect this script
+                # already carries a scar from.
+                back_state = evaluate(root, wf, entry)[0]
                 ok = (back_state == "CURRENT" or
                       (verb == "materialize" and back_state in ("UNMANAGED", "NO-REGION")))
                 if ok and verb == "materialize":
@@ -762,7 +1146,7 @@ def main():
     # events, and one number cannot tell a reader which happened.
     print(f"\nINV-CORE  {total} core skill(s) · current {current} · refreshed {refreshed} "
           f"· materialized {materialized} · appended {appended} · unrefreshed {unrefreshed} "
-          f"· absent {absent} "
+          f"· absent {absent} · migrated {migrated} · supplemented {supplemented} "
           f"· each unrefreshed names its precondition")
     if not args.execute and unrefreshed:
         print("Re-run with --execute to materialize the absent companions and refresh the "
