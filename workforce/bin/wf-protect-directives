@@ -115,7 +115,8 @@ def main():
         # let an edit to a stamped block through the link go unreported while the same edit by
         # its real path reported DRIFT (review of the 1.63.0 fix batch, finding 2). What the
         # edit changed is the file the link lands on, so that file decides.
-        _real = os.path.realpath(path)
+        _real = os.path.abspath(path)
+        _real = os.path.realpath(_real)     # every link on the way, the last one included
         for _s in _mod.SACRED_SCRATCH:
             _d = os.path.realpath(os.path.join(root, _s))
             if _real.startswith(_d + os.sep):

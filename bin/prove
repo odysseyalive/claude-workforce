@@ -603,6 +603,61 @@ CASES = [
      "workforce/bin/wf-code-eval", "del", '                if g["self_stamps"]'),
     ("code-eval: the shipped evaluator stamps a project's commit gate, and the migration refuses an orphaned one",
      "workforce/skills/code-evaluator/SKILL.md", "del", '"$WF/bin/wf-code-eval" --stamp'),
+    # ── review of the 1.63.0 fix batch (2026-09-16) ─────────────────────────────────────────
+    # Each break puts one reviewed defect back and leaves the file valid.
+    ("review 1.63.0: wf-stamp --floor and wf-code-eval --active/--stamp refuse a path linked out of the project",
+     STMP, "del", '    refusal = _load_sibling("wf-settings-apply").write_refusal(root, path)\n'
+                  '    if refusal:\n'
+                  '        print(f"  ! REFUSED  {base}: {refusal} — nothing written", file=sys.stderr)\n'
+                  '        return 2\n'),
+    ("review 1.63.0: wf-stamp --floor and wf-code-eval --active/--stamp refuse a path linked out of the project",
+     "workforce/bin/wf-code-eval", "del", '        if refuse_write(root, flag, "active"):\n            return 1\n'),
+    ("review 1.63.0: wf-stamp --floor and wf-code-eval --active/--stamp refuse a path linked out of the project",
+     "workforce/bin/wf-code-eval", "del", '    if refuse_write(root, marker, "stamp"):\n        return 1\n'),
+    # The scratch test goes back to the unresolved path.
+    ("review 1.63.0: wf-protect-directives skips run scratch by resolved path, so a link into it hides no drift",
+     "workforce/bin/wf-protect-directives", "del",
+     "        _real = os.path.realpath(_real)     # every link on the way, the last one included\n"),
+    # One except branch again: a record failure after the removal reads "NOT cleared" and a
+    # settings failure reads "REMOVED".
+    ("review 1.63.0: a retired outputStyle removed but not recorded is reported REMOVED, never NOT cleared",
+     WSA, "del",
+     '    except (OSError, ValueError, RuntimeError) as exc:\n'
+     '        print(f"  ! outputStyle {value!r} NOT cleared from {spath}: {exc.__class__.__name__}: {exc}")\n'
+     '        return 1\n'
+     '    # THE KEY IS GONE FROM HERE ON, so a failure below is a removal nobody recorded, never "NOT\n'
+     '    # cleared". One except branch used to cover both halves, and a full disk on the record\n'
+     '    # printed "NOT cleared" for a key the re-read had just proven removed (review of the 1.63.0\n'
+     '    # fix batch, finding 3). Said the way `_heal_one` says it.\n'
+     '    try:\n'),
+    # A non-executable gate's shebang is ignored, so the extension decides again.
+    ("review 1.63.0: wf-code-eval runs a gate by its shebang, not by its file extension",
+     "workforce/bin/wf-code-eval", "del",
+     '        if os.path.basename(words[0]).startswith("python"):\n'
+     '            return [sys.executable] + words[1:] + [script]\n'
+     '        return words + [script]\n'),
+    # An undecidable command reaches the gate test as None.
+    ("review 1.63.0: wf-code-eval takes the gate from wf-census's one hook resolver, never from an argument",
+     "workforce/bin/wf-code-eval", "del", "                    if script is None:\n                        continue\n"),
+    ("review 1.63.0: wf-catalog treats a hook path with `..`, `./` or `$` as naming what the retirement removes",
+     CATL, "del", "            rel = posixpath.normpath(rel)\n"),
+    ("review 1.63.0: wf-catalog treats a hook path with `..`, `./` or `$` as naming what the retirement removes",
+     CATL, "del", ' or ".." in rel.split("/")'),
+    ("review 1.63.0: the output-styles and live-reader scans read only regular files, capped",
+     WSA, "del", " and os.path.isfile(p)"),
+    ("review 1.63.0: the output-styles and live-reader scans read only regular files, capped",
+     CATL, "del", "not os.path.isfile(real) or "),
+    ("review 1.63.0: wf-live's code_chunks falls back when ast.unparse is absent",
+     "workforce/bin/wf-live", "del",
+     '        if not hasattr(ast, "unparse"):\n            raise SyntaxError("ast.unparse needs Python 3.9")\n'),
+    # "is reported" counts as the past again.
+    ("review 1.63.0: wf-live's history cue reads only past markers, so a present-tense claim still reports",
+     "workforce/bin/wf-live", "del", r"(?<!\bis )"),
+    # A private copy of an owned constant comes back.
+    ("review 1.63.0: wf-catalog reads NOT_READERS and STAMP_MARKER from the scripts that own them",
+     CATL, "append", '\nSTAMP_MARKER = ".code-eval-reviewed"\n'),
+    ("review 1.63.0: wf-catalog reads NOT_READERS and STAMP_MARKER from the scripts that own them",
+     CATL, "append", '\nNOT_READERS = ()\n'),
     # ── say the state, not the journey (2026-09-07) ──────────────────────────
     # Seven carriers, seven breaks. The user scoped this to "any project using
     # workforce", so the handbook template and wf-conform are load-bearing in a way
