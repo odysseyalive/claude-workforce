@@ -873,7 +873,11 @@ def _style_file_present(name, dirs):
             continue
         if os.path.isfile(os.path.join(d, RETIRED_OUTPUT_STYLES.get(name, ""))):
             return True
-        for f in os.listdir(d):
+        try:
+            names = os.listdir(d)
+        except OSError:
+            return True     # unreadable: the style may be there, and a clear must not guess
+        for f in names:
             if f.endswith(".md"):
                 m = re.search(r"^name:\s*(.+?)\s*$", read(os.path.join(d, f)) or "", re.M)
                 if m and m.group(1).strip("'\"") == name:
