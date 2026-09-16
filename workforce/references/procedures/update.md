@@ -76,7 +76,12 @@ locations have been looked at.
    | project install | `${CLAUDE_PROJECT_DIR}/.claude/skills/workforce` | `--project` |
    | personal install | `~/.claude/skills/workforce` | `--user` |
 
-   Read each one's `WORKFORCE-VERSION`. **Report every copy found, and which is active**, before
+   Read each one's version from **`<copy>/references/version.md`**, the line `WORKFORCE-VERSION: x.y.z`
+   (`grep -m1 '^WORKFORCE-VERSION:' <copy>/references/version.md`). No file named `WORKFORCE-VERSION`
+   exists at an install root, so a copy with no readable line there is reported `version: unknown`,
+   never guessed; the `version:` in its `SKILL.md` frontmatter is a mirror of that line, not a second
+   source. This is the file both installers read for their downgrade guard and their
+   `Installed workforce <version>` line. **Report every copy found, and which is active**, before
    writing anything. Skills resolve enterprise > personal > project, so with both present the personal
    one wins; an update to the shadowed copy changes nothing observable until the shadowing copy is
    removed — say so rather than letting the user conclude the update failed.
@@ -126,7 +131,7 @@ locations have been looked at.
 6. **Report what changed** — the version before and after, the path, the file count — and stop. The
    installer itself now echoes `Installed workforce <version> at <path> (<scope>)` per scope it
    touched, so the "after" version is the number it printed on its way out; the "before" is the
-   `WORKFORCE-VERSION` the step-1 census read at that path.
+   version the step-1 census read from that path's `references/version.md`.
 7. **Say what those two numbers MEAN**, by running the shipped query against them:
 
    ```
@@ -180,10 +185,16 @@ Running the real installer means its **settings pass runs too**: it writes
 part of the release; a release that changes it would otherwise land as a skill that expects a setting
 nobody wrote. The pass is idempotent and additive — it reports `already set` rather than rewriting.
 
-One precondition comes with it: **a `--project` install refuses to run without a `CLAUDE.md` at the
-repo root.** For an update this is normally already satisfied, since the copy being updated could not
-have been installed without it. If the file has since been deleted the installer stops with a bootstrap
-prompt — report that as the precondition it is, and do not work around it.
+**A `--project` update has no `CLAUDE.md` precondition.** The installer never tests for that file: the
+2026-08-05 directive evacuates and deletes it, and `wf-claude-md` treats its absence as the goal
+state, so a precondition on it would lock every evacuated project out of updating its own copy. When
+neither `.claude/settings.local.json` nor `.claude/settings.json` exists the installer creates
+`.claude/settings.local.json` holding `{}` and says so; an existing one is never overwritten. What
+makes the working directory the project is step 4's rule — run it from the root that holds the
+`.claude/skills/workforce` the census found — and nothing a workforce run deletes.
+*Corrected 2026-09-16: this paragraph said the install refuses without a root `CLAUDE.md` and stops
+with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
+outlived it by six weeks.*
 
 ### The five evaluators come with it, and so does `blueprint`
 

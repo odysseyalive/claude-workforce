@@ -1178,7 +1178,8 @@ deferred, never handed back as an optional keep-or-resolve.
 
 **Open on the chart's stamp, once, before touching a handbook.** `.claude/workforce/org-chart.md`'s
 header carries `workforce-version:` (`org-chart-format.md` § `workforce-version:` on the header) — the
-release that last indexed this org. Compare it to the installed `WORKFORCE-VERSION`:
+release that last indexed this org. Compare it to the installed `WORKFORCE-VERSION` (the line in the
+install's `references/version.md`):
 
 | Chart stamp | What it means | This step |
 |---|---|---|

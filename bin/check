@@ -1134,13 +1134,15 @@ try:
                           "in the HOST layout — skill_dirs() no longer reads <skills-root>/<name>/")
     if "references/never-existed.md" not in _ho:
         _live_host.append("the host-layout resolution hid a file no skill has")
-    _hbad = [l.strip() for l in _ho.splitlines()
-             if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", l)
-             and "never-existed" not in l]
-    _hwhy = [l.strip() for l in _ho.splitlines()[1:] if l.startswith("             ")]
+    _hl = _ho.splitlines()
+    _hbad = [f"{_hl[_i].strip()} ({_hl[_i + 1].strip() if _i + 1 < len(_hl) else ''})"
+             for _i in range(len(_hl))
+             if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", _hl[_i])
+             and "never-existed" not in _hl[_i]
+             and not (_i + 1 < len(_hl) and "never-existed" in _hl[_i + 1])]
     if _hbad:
         _live_host.append(f"the installed layout reports {len(_hbad)} disagreement(s): "
-                          f"{list(zip(_hbad, _hwhy))[:4]}")
+                          f"{_hbad[:4]}")
 except Exception as _exc:                                # noqa: BLE001
     _live_host.append(f"the host-layout probe would not run ({_exc})")
 check(
@@ -1185,6 +1187,20 @@ try:
                           "swallowed a real defect would look like a clean tree")
 except Exception as _exc:                                # noqa: BLE001
     _live_hist.append(f"the history probe would not run ({_exc})")
+# RETIRED_EXTERNAL is wf-live's copy of the manifest's `retired` rows, stored because the
+# manifest does not reach a host. The manifest stays the authority: they must be equal.
+_rx_live = re.search(r"RETIRED_EXTERNAL = frozenset\(\{(.*?)\}\)", read("workforce/bin/wf-live"), re.S)
+_rx_set = set(re.findall(r'"([a-z0-9-]+)"', _rx_live.group(1))) if _rx_live else set()
+_rx_man = {os.path.basename(_l.split(None, 1)[1].strip())[:-3]
+           for _l in read("manifest.txt").splitlines()
+           if _l.startswith("retired ") and _l.strip().endswith(".md")}
+check(
+    "wf-live: RETIRED_EXTERNAL equals the manifest's retired rows",
+    bool(_rx_man) and _rx_set == _rx_man,
+    f"wf-live {sorted(_rx_set)} vs manifest {sorted(_rx_man)} — a retired row added to the "
+    "manifest without this set reports its name stale on every host; a name here the manifest "
+    "never retired hides a phantom",
+)
 check(
     "wf-live: history needs a retired name AND a past-tense sentence; either alone still reports",
     not _live_hist,
@@ -3601,6 +3617,89 @@ check(
     "each shape is an install wf-seed was measured erroring on; every one must PLAN a "
     "seed into the file the evaluator actually reads. Got: "
     + "; ".join(f"{k}={v}" for k, v in _seed_shapes.items()),
+)
+
+
+# ── THE PROJECT ROOT IS NOT A FILE WORKFORCE DELETES (2026-09-16) ────────────────────────────
+# update.md § What the installer does said a `--project` install "refuses to run without a
+# `CLAUDE.md` at the repo root" and stops with a bootstrap prompt. The 2026-08-05 directive deletes
+# that file and `wf-claude-md` treats ABSENT as the goal, so the documented precondition locked
+# every evacuated project out of updating its own copy. Reported by a peer project on 1.63.0.
+# The installer had already dropped the check; the prose had not. Both halves are held here: the
+# SHIPPED installer, run for real in a project with no CLAUDE.md, and no shipped prose claiming
+# the refusal.
+def _mini_install(project, home, args, extra_rows=()):
+    """Run the shipped `install` against a one-row manifest. Returns the CompletedProcess."""
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-mini-") as _t:
+        _repo = os.path.join(_t, "repo")
+        os.makedirs(_repo)
+        os.symlink(os.path.join(ROOT, "workforce"), os.path.join(_repo, "workforce"))
+        with open(os.path.join(_repo, "manifest.txt"), "w", encoding="utf-8") as _fh:
+            _fh.write("\n".join(["workforce/references/version.md", *extra_rows]) + "\n")
+        _env = dict(os.environ, HOME=home, WORKFORCE_REPO_URL="file://" + _repo)
+        for _k in ("CLAUDE_CONFIG_DIR", "CLAUDE_PROJECT_DIR", "WORKFORCE_SCOPE", "WORKFORCE_CONFIG_DIR"):
+            _env.pop(_k, None)
+        return subprocess.run(["bash", os.path.join(ROOT, "install"), *args], cwd=project,
+                              env=_env, capture_output=True, text=True, timeout=120)
+
+
+_noclaude = []
+try:
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-noclaude-") as _t:
+        _proj, _home = os.path.join(_t, "proj"), os.path.join(_t, "home")
+        os.makedirs(_proj)
+        os.makedirs(_home)
+        _r = _mini_install(_proj, _home, ["--project", "--no-automode", "--no-wire", "--force"])
+        _nc_ver = os.path.join(_proj, ".claude", "skills", "workforce", "references", "version.md")
+        _nc_set = os.path.join(_proj, ".claude", "settings.local.json")
+        if _r.returncode != 0 or not os.path.isfile(_nc_ver):
+            _noclaude.append(f"install --project exited {_r.returncode} in a project with no CLAUDE.md "
+                             f"and installed {'nothing' if not os.path.isfile(_nc_ver) else 'the tree'}: "
+                             f"{(_r.stdout + _r.stderr)[-300:]!r}")
+        if not os.path.isfile(_nc_set):
+            _noclaude.append("no .claude/settings.local.json was bootstrapped")
+        if os.path.exists(os.path.join(_proj, "CLAUDE.md")):
+            _noclaude.append("the install CREATED a CLAUDE.md, the file the audit deletes")
+except Exception as _exc:                                # noqa: BLE001
+    _noclaude.append(f"the installer probe would not run ({_exc})")
+_REFUSE_CLAUDE_RX = re.compile(
+    r"(?:refus\w*|stops?|requires?|precondition)[^.]{0,80}?(?:without|no|absent|missing)[^.]{0,20}?`?CLAUDE\.md`?",
+    re.I)
+for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + ["README.md", "COMMANDS.md"]:
+    if _p.startswith("workforce/changes/"):
+        continue
+    for _m in _REFUSE_CLAUDE_RX.finditer(_SACRED_SPAN_RX.sub("", read(_p))):
+        _ctx = read(_p)[max(0, read(_p).find(_m.group(0)) - 200):read(_p).find(_m.group(0)) + 300]
+        if re.search(r"Corrected \d{4}-\d{2}-\d{2}|USED TO|used to|dropped|no longer|never tests", _ctx):
+            continue
+        _noclaude.append(f"{_p}: {' '.join(_m.group(0).split())[:90]}")
+check(
+    "install: a --project install needs no CLAUDE.md, and no shipped prose says it refuses without one",
+    not _noclaude,
+    "; ".join(_noclaude[:4]) + " — the 2026-08-05 directive deletes CLAUDE.md, so a project root test "
+    "keyed on it locks every evacuated project out of `update --project`",
+)
+
+# WHERE AN INSTALL'S VERSION IS READ. update.md step 1 told a run to read each copy's
+# `WORKFORCE-VERSION` as if a file by that name sat at the install root; none ships. The version is
+# the `WORKFORCE-VERSION:` line of `references/version.md`. Every procedure step that tells a run to
+# READ or COMPARE an install's `WORKFORCE-VERSION` must name that file in the same paragraph.
+_ver_where = []
+for _p in sorted(glob.glob("workforce/references/**/*.md", recursive=True)):
+    for _para in re.split(r"\n\s*\n", read(_p)):
+        if "`WORKFORCE-VERSION`" not in _para:
+            continue
+        if not re.search(r"\b(?:[Rr]ead|[Cc]ompare)\w*\b[^.]{0,120}`WORKFORCE-VERSION`", _para):
+            continue
+        if "version.md" not in _para:
+            _ver_where.append(f"{_p}: {' '.join(_para.split())[:100]}")
+check(
+    "version: every step that reads an install's WORKFORCE-VERSION names references/version.md",
+    not _ver_where,
+    f"{_ver_where[:4]} — no file named WORKFORCE-VERSION ships; a reader told to read one looks for "
+    "a file at the install root, finds nothing, and reports every copy as unversioned",
 )
 
 
@@ -10370,10 +10469,10 @@ check("audit wires the canary PASS to wf-apply --record-canary, not a hand-write
       "the PASS-on-record step must run wf-apply --record-canary --execute with an explicit "
       "absolute --root and state the ${CLAUDE_PROJECT_DIR}-is-unset hazard, or a run hand-"
       "composes platform-local.md and the producer is never called")
-check("verify prints the wf-apply --record-canary command, with the absolute-path hazard",
+check("verify names the wf-apply --record-canary producer, with the absolute-path hazard",
       "--record-canary" in vfy and "${CLAUDE_PROJECT_DIR}" in vfy,
-      "verify reports the fix and never applies it, so it prints the exact command to run; "
-      "shipping the ${CLAUDE_PROJECT_DIR} form prints a command that exits 2 every time")
+      "verify records a canary PASS through that producer and never composes the file by hand; "
+      "shipping the ${CLAUDE_PROJECT_DIR} form runs a command that exits 2 every time")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixing the instance is not fixing the defect
@@ -11751,6 +11850,12 @@ for _c in _ro_single:
             # 2026-09-07 directive is that the next use of workforce heals it. Exempted by
             # the exact producer and flag pair, so any OTHER executing line still fails.
             if _c == "verify" and "/bin/wf-settings-apply\"" in _ln and "--heal --execute" in _ln:
+                continue
+            # THE SECOND NAMED EXCEPTION, 2026-09-16: § Deferred tier canary records a PASS it
+            # measured. The write is platform-local.md on PASS only, measured by the check named
+            # "verify: a canary PASS it measures is recorded…". Exempted by producer and flag.
+            if (_c == "verify" and "/bin/wf-apply\"" in _ln and "--run-canary" in _ln
+                    and _ln.rstrip().endswith("--execute")):
                 continue
             if any(_flag in _ln for _flag in _EXECUTING):
                 _ro_violations.append(f"{_c}.md: {_ln.strip()[:90]}")
@@ -15423,6 +15528,35 @@ if os.name == "posix" and _ck_mod:
 else:
     skip("canary: the runner measures end to end against a stub claude and writes nothing",
          "not a POSIX host, or wf-apply did not import — the stub is a shebang script")
+
+# VERIFY RECORDS A PASS IT MEASURED, AND NOTHING ELSE (2026-09-16). A peer host's
+# platform-local.md said 2.1.268 on a 2.1.273 harness; `verify` ran `--run-canary` WITHOUT
+# `--execute`, got PASS on every run, printed a command, and left the file stale until an audit —
+# so every verify re-ran a canary that had just passed. verify.md now runs the same call with
+# `--execute`. What makes that safe in a read-only command is that the write is exactly one file
+# and only on PASS; both halves are measured here against the stub, not read from prose.
+_vck_problems = []
+if not re.search(r"wf-apply\" --root <absolute path to project> --run-canary[^\n]*--execute", vfy):
+    _vck_problems.append("verify.md § Deferred tier canary no longer runs --run-canary with --execute")
+if "that is the whole write" not in vfy or "writes two things, and only those two" not in vfy:
+    _vck_problems.append("verify.md no longer states the canary record is its one narrow write")
+if os.name == "posix" and _ck_mod:
+    _ck_exec = _ck_run(_CK_STUB, ["--attempts", "1", "--execute"])
+    _ck_exec_na = _ck_run("import time\ntime.sleep(30)\n", ["--timeout", "1", "--attempts", "1", "--execute"])
+    if not (_ck_exec[0] == 0 and _ck_exec[2] == [os.path.join("root", ".claude", "workforce", "platform-local.md")]
+            and "verified on disk: MEASURED-ON:" in _ck_exec[1]):
+        _vck_problems.append(f"--run-canary --execute on PASS: exit {_ck_exec[0]}, left {_ck_exec[2]} — "
+                             "it must write platform-local.md and no other file")
+    if _ck_exec_na[0] != 3 or _ck_exec_na[2]:
+        _vck_problems.append(f"--run-canary --execute on UNAVAILABLE: exit {_ck_exec_na[0]}, left "
+                             f"{_ck_exec_na[2]} — a canary that did not pass must write nothing")
+else:
+    _vck_problems.append("not a POSIX host or wf-apply did not import, so the write could not be measured")
+check(
+    "verify: a canary PASS it measures is recorded in platform-local.md, and that is the only file written",
+    not _vck_problems,
+    "; ".join(_vck_problems),
+)
 
 # NO PROCEDURE MAY TELL A RUN TO WRITE A CANARY INTO AN AGENTS DIRECTORY. Classified by
 # grammar, as staging.md § Phase A rule 2 classifies tool mentions: a present-tense or

@@ -130,12 +130,23 @@ PROJECT_AGENT = re.compile(r"(?:\.claude/)?agents/$")
 # A mention is HISTORY, and is counted rather than listed, only when BOTH hold:
 #   1. the name is one the distribution RETIRED, read from the tree's own records and never
 #      from a list kept here — `RETIRED_HOOKS` in wf-settings-apply (bin/check pins it to git
-#      history), the `retired` rows of `manifest.txt` where the repository is beside the tree,
-#      and `CANARY_RX` in wf-apply, the throwaway fixture names workforce itself wrote;
+#      history), `RETIRED_EXTERNAL` below (bin/check pins it to the `retired` rows of
+#      `manifest.txt`), and `CANARY_RX` in wf-apply, the throwaway fixture names workforce
+#      itself wrote;
 #   2. the sentence it sits in speaks of the past.
 # A name nobody retired still reports, whatever tense its sentence is in, so a cue word cannot
 # hide a phantom. And a retired name in a present-tense sentence ("`wf-reload-probe` is left in
 # `.claude/agents/`") still reports, because that sentence tells a reader the thing is there.
+# THE ONE STORED SET, AND WHY IT IS NOT READ FROM THE MANIFEST. The manifest's `retired` rows
+# name the canary fixtures and the output style that shipped OUTSIDE the skill directory, but
+# `manifest.txt` is not installed, so a host's wf-live cannot read it. MEASURED 2026-09-16 in a
+# bin/dev-sandbox install: reading the manifest classified `wf-model-canary` as history in this
+# repository and as stale on the host. bin/check fails when this set and those rows disagree,
+# so it cannot drift from the authority it copies.
+RETIRED_EXTERNAL = frozenset({
+    "plain-speak", "wf-canary-a", "wf-canary-b", "wf-canary-c", "wf-ceiling-probe",
+    "wf-model-canary",
+})
 HISTORY_CUE = re.compile(
     r"\b(?:removed|retired|deleted|swept|deprecated|went|gone|no longer|used to|until|"
     r"had been|was|were|shipped|held|written|reported|returned|measured|attempted|"
@@ -253,10 +264,8 @@ def retired_names():
     block = re.search(r"RETIRED_HOOKS = frozenset\(\{(.*?)\}\)", sa, re.S)
     for n in re.findall(r'"(wf-[a-z0-9-]+)"', block.group(1) if block else ""):
         out.setdefault(n, "RETIRED_HOOKS")
-    for line in slurp(os.path.join(REPO, "manifest.txt")).splitlines():
-        if line.startswith("retired "):
-            base = os.path.basename(line.split(None, 1)[1].strip())
-            out.setdefault(base[:-3] if base.endswith(".md") else base, "manifest.txt retired")
+    for n in RETIRED_EXTERNAL:
+        out.setdefault(n, "RETIRED_EXTERNAL")
     return out
 
 
