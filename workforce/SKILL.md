@@ -651,6 +651,35 @@ Mechanics at `references/evaluators.md` § The five skills ship in the install, 
 operational reading is — **ship the five evaluators and workforce into the user install, make
 `update` the only thing a user runs, and when an ask is clear, build that ask.***
 
+> **"More weight should be given on evidence, on evidence based on the latest date going
+> backwards.That includes current chats and requests."**
+
+> **"And I'm specifically meeting user requests and notes, not Interpretations by AI"**
+
+> **"Those two differences are generally documented in notes and everywhere else."**
+
+*— Added 2026-09-16, source: user directive, stated during `/workforce dev` after an interview of the
+`apps-odyssey-alive` session found why it answered "the home page doesn't have any data there for the
+DocuSign" with a menu whose Recommended option left the card looking the same. A grounding employee had
+reported an August owner decision as a standing constraint — "Widening or superseding it is the CEO's
+call" — and nothing told the session that the user's request that day outranked it, so it offered the
+old decision back as an option. **The rule is about ORDER, not about trust**: evidence is weighed by
+date, newest first, and the current conversation — the ask in front of you and what the user said
+earlier in it — is the newest evidence there is. **The second message narrows what counts as evidence,
+and it is the half that would have caught this case**: the user's own requests and notes, NOT an AI's
+interpretation of them. The grounding report was the most recent thing in the room and it was an
+interpretation; recency never promotes an agent's reading of the user above the user's words. **The third message says
+how to tell them apart, and it means no new marking scheme is needed**: projects already document the
+difference — quoted user words, `origin: user` blocks, `source: user` attributions, the user's own
+notes — so an agent reads those marks rather than guessing from tone. An older
+decision that a newer request contradicts is superseded by the request; it is reported that way, and
+never re-offered as a "keep it as it was" choice. Mechanics at operating-principles item 12
+(`references/templates.md`), `/org` dispatch rung 14 and rung 6f (`references/procedures/org.md`), and
+both `## Sources` sections of `references/handbook-templates.md`, so the employee that reads the records
+applies it as well as the session that reads the report. The operational reading is — **the user's own
+words decide, newest first; an AI's interpretation is never the user's evidence, and an old decision
+never outvotes a new ask.***
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a
