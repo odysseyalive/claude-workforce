@@ -2202,6 +2202,42 @@ CASES = [
     # Without the migrator the ledger skill is NO-REGION forever again.
     ("core refresh: a customized personnel-ledger with no region gains the shipped one, every byte kept",
      "workforce/bin/wf-companion", "del", '        "migrate": "migrate_append_region",\n'),
+
+    # ── review of the 1.63.0 fix batch: wf-companion and wf-ledger writes ──
+    # Each `append` redefines a wf-ledger helper at the end of the file. A script run never
+    # reaches it (it follows `sys.exit(main())`), but every MODULE load does, and that is
+    # how wf-companion reads and writes and how bin/check probes the helpers.
+    # The truncate-then-write, back: a failed write leaves a short file.
+    ("atomic writes: a write that fails leaves the constitution and the hand-kept index byte-for-byte",
+     "workforce/bin/wf-ledger", "append",
+     '\n\ndef atomic_write(root, path, data, makedirs=False):\n'
+     '    with open(path, "wb") as fh:\n'
+     '        fh.write(data)\n'
+     '    return path\n'),
+    # The forgiving reader, back: CRLF folds to LF and Latin-1 becomes U+FFFD.
+    ("byte-exact: a CRLF constitution migrates with every CR kept, and a non-UTF-8 one is refused by name",
+     "workforce/bin/wf-ledger", "append",
+     '\n\ndef read_exact(path):\n'
+     '    try:\n'
+     '        with open(path, encoding="utf-8", errors="replace") as fh:\n'
+     '            return fh.read(), "\\n", None\n'
+     '    except FileNotFoundError:\n'
+     '        return None, None, None\n'),
+    # No containment: a symlinked directives dir leads the T2 extraction out of the project.
+    ("containment: wf-companion and wf-ledger refuse a write that resolves outside the project, and write through a link inside it",
+     "workforce/bin/wf-ledger", "append",
+     "\n\ndef inside_root(root, path):\n    return True\n"),
+    # The proof computed and ignored: a splice that drops a user line is written.
+    ("constitution: the split is proved on the rebuilt file, and a splice that drops a user line is refused",
+     "workforce/bin/wf-companion", "del",
+     "    if unproved:\n"
+     '        return ("UNMANAGED", f"the split could not be proved ({unproved}); nothing is moved",\n'
+     "                None, [])\n"),
+    # The header-phrase test, back: an index with hand-written sections reads as generated.
+    ("ledger: an index is rebuilt only when every line of it is generated layout",
+     "workforce/bin/wf-ledger", "append",
+     '\n\ndef hand_kept(text):\n'
+     '    return bool((text or "").strip()) and GENERATED_MARK not in text\n'),
 ]
 
 

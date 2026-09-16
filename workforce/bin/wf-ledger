@@ -204,6 +204,111 @@ def read_text(path):
         return None
 
 
+# ── writing a file this tool did not create ──────────────────────────────────
+# `wf-companion` loads these two by path as well, so there is one reader and one writer
+# for every file either script rewrites. They live here because this script loads nothing
+# at import, so loading it costs a caller nothing.
+
+def read_exact(path):
+    """(text, eol, error) for a file that may be rewritten.
+
+    Strict UTF-8 and NO newline translation. The old readers used universal newlines, and
+    `wf-companion` added `errors="replace"`: a CRLF constitution came back LF everywhere,
+    the untouched Strategic Objective span included, and a Latin-1 `é` became U+FFFD in
+    SKILL.md and in the "verbatim" extraction, while the row said byte-identical
+    (review of the 1.63.0 fix batch, finding 2). `text` keeps the file's bytes; `eol` is
+    "\\r\\n" when every line ends that way, "\\n" otherwise, and None when the file mixes
+    the two, so no rewrite can keep every line. `text` is None when the file is absent
+    (`error` None) or cannot be read (`error` names why)."""
+    try:
+        with open(path, "rb") as fh:
+            raw = fh.read()
+    except FileNotFoundError:
+        return None, None, None
+    except OSError as exc:
+        return None, None, "cannot be read: %s" % exc.strerror
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return None, None, ("is not valid UTF-8 (byte 0x%02x at offset %d), so no byte of it "
+                            "can be kept exactly" % (raw[exc.start], exc.start))
+    crlf = text.count("\r\n")
+    if not crlf:
+        return text, "\n", None
+    return text, ("\r\n" if crlf == text.count("\n") else None), None
+
+
+def inside_root(root, path):
+    """True when `path`, every symlink resolved, is `root` or below it."""
+    real_root = os.path.realpath(root)
+    real = os.path.realpath(path)
+    return os.path.commonpath([real_root, real]) == real_root
+
+
+def atomic_write(root, path, data, makedirs=False):
+    """Replace `path`'s bytes with `data`, or leave them exactly as they were.
+
+    A temp file in the target's own directory, flushed and fsynced, then renamed over it.
+    `open(path, "w")` truncated first: under a file-size limit a 6009-byte constitution
+    became 2048 bytes and a 7459-byte hand-kept index 7168, and neither was put back
+    (review of the 1.63.0 fix batch, finding 1).
+
+    REFUSED, as an OSError naming the reason, when the path resolves outside `root`: a
+    symlinked `.claude/workforce/directives` took the T2 extraction into a directory
+    outside the project (finding 3). A symlink INSIDE the root is written THROUGH,
+    deliberately: the rename happens in the target's directory, so the link survives and
+    keeps pointing where it did. A rename in place over the link would replace it with a
+    regular file, which is the hazard SKILL.md § Atomic-or-Absent rule 3 names. Refused
+    too when the file has other hard links, because a rename would leave them holding the
+    old bytes and an in-place write is the truncation this function exists to remove."""
+    import errno
+    import stat
+    import tempfile
+    if not inside_root(root, path):
+        raise OSError(errno.EPERM, "resolves to %s, outside the project root %s; nothing "
+                      "is written there" % (os.path.realpath(path), os.path.realpath(root)),
+                      path)
+    real = os.path.realpath(path)
+    if makedirs:
+        os.makedirs(os.path.dirname(real), exist_ok=True)
+    try:
+        st = os.stat(real)
+    except FileNotFoundError:
+        st = None
+    if st is not None and st.st_nlink > 1:
+        raise OSError(errno.EMLINK, "has %d hard links; a rename would split them and an "
+                      "in-place write is not atomic, so it is left alone" % st.st_nlink, path)
+    if st is not None:
+        mode = stat.S_IMODE(st.st_mode)
+    else:
+        umask = os.umask(0)
+        os.umask(umask)
+        mode = 0o666 & ~umask
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(real), prefix=".wf-write.")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(tmp, mode)
+        os.replace(tmp, real)
+    except BaseException:
+        if os.path.lexists(tmp):
+            os.unlink(tmp)
+        raise
+    try:
+        dfd = os.open(os.path.dirname(real), os.O_RDONLY)
+    except OSError:
+        return real
+    try:
+        os.fsync(dfd)
+    except OSError:
+        pass              # a directory that cannot be fsynced here still holds the rename
+    finally:
+        os.close(dfd)
+    return real
+
+
 def header_of(root, rec_id, lines=24):
     """The field lines only — never the body. This is what makes a fallback scan of
     the whole directory cheap enough to be honest about."""
@@ -281,14 +386,23 @@ def project_row(rec):
     return row
 
 
+GENERATED_TITLE = "# Personnel index"
+GENERATED_NOTE = ("Project rows are rebuilt from each record; org-family rows "
+                  "(EMP, PERF, DEF, AMD, RFI, ORG) are carried through unchanged, because "
+                  "the procedures that own those records write them.")
+# Every other non-row line `render_index` has ever written (fa463a2 through 3e70676).
+RETIRED_GENERATED_NOTES = ("Never hand-edited.",)
+_GENERATED_LAYOUT_RE = re.compile(
+    r"^(?:%s|%s, \d{4}-\d{2}-\d{2}\.|\*\*\d+ records\.\*\*|- `[A-Za-z]+-[A-Za-z0-9._-]+` — .*)$"
+    % (re.escape(GENERATED_TITLE), re.escape(GENERATED_MARK)))
+
+
 def render_index(root, records):
     today = datetime.date.today().isoformat()
     carried = carried_org_rows(root)
-    out = ["# Personnel index", "",
+    out = [GENERATED_TITLE, "",
            "%s, %s." % (GENERATED_MARK, today),
-           "Project rows are rebuilt from each record; org-family rows "
-           "(EMP, PERF, DEF, AMD, RFI, ORG) are carried through unchanged, because "
-           "the procedures that own those records write them.", "",
+           GENERATED_NOTE, "",
            "**%d records.**" % len(records), ""]
     for rec in records:
         out.append(carried.get(rec["id"]) if not is_project(rec["id"]) and rec["id"] in carried
@@ -297,8 +411,18 @@ def render_index(root, records):
 
 
 def hand_kept(text):
-    """True when an index exists, holds text, and was not written by `render_index`."""
-    return bool((text or "").strip()) and GENERATED_MARK not in text
+    """True when an index exists, holds text, and any line of it is outside the layout
+    `render_index` writes.
+
+    DECIDED BY CONTENT, never by the header phrase. The phrase test called an index
+    generated when it merely STARTED with the old generated header, so a Records Owner who
+    kept writing sections under that header lost "By department" and "Run narrative" on the
+    next rebuild (review of the 1.63.0 fix batch, finding 5). One line a rebuild would not
+    write again is enough to make the index somebody's."""
+    lines = [l.rstrip("\r") for l in (text or "").split("\n") if l.strip()]
+    return bool(lines) and not all(
+        _GENERATED_LAYOUT_RE.match(l) or l in (GENERATED_NOTE,) + RETIRED_GENERATED_NOTES
+        for l in lines)
 
 
 def unindexed_block_span(text):
@@ -330,7 +454,9 @@ def indexed_ids(text):
     3 DEFs, because it counted an ID named in a narrative paragraph as indexed. Both were
     wrong. The link reader gives 98, and the 7 others really are named only in prose.
     """
-    text = text or ""
+    # CRLF folded here, because `index` now reads a hand-kept index byte for byte and the
+    # row grammar is `$`-anchored: a `\r` before the line end would unindex every row.
+    text = (text or "").replace("\r\n", "\n")
     ids = {m.group("id") for m in _INDEX_ROW_RE.finditer(text) if _ID_RE.match(m.group("id"))}
     ids |= {m.group("id") for m in _LINK_RE.finditer(text) if _ID_RE.match(m.group("id"))}
     return ids
@@ -432,9 +558,7 @@ def do_new(root, args):
         print(text, end="")
         print("write with: --execute")
     else:
-        os.makedirs(store_dir(root), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(text)
+        atomic_write(root, path, text.encode("utf-8"), makedirs=True)
         print("wrote %s — %s, %s" % (os.path.relpath(path, root), rec_id, status))
     if subjects == UNCLASSIFIED:
         # REPORTED, never quietly shown to everyone. An untagged record is invisible
@@ -477,11 +601,24 @@ def do_pending(root, args):
     return 0
 
 
+def _read_record_for_rewrite(rec_id):
+    """(text with LF line ends, eol, error) for a record a field is about to change in.
+
+    The field regexes are line-anchored on `\\n`, so a CRLF record is edited as LF and
+    written back with CRLF: every line the edit does not touch keeps its bytes."""
+    text, eol, err = read_exact(rec_id)
+    if text is None:
+        return None, None, err
+    if eol is None:
+        return None, None, "mixes CRLF and LF line ends, so a rewrite could not keep its bytes"
+    return text.replace("\r\n", "\n"), eol, None
+
+
 def _set_status(root, rec_id, want_from, new_status, execute, extra=None):
     path = record_path(root, rec_id)
-    text = read_text(path)
+    text, eol, err = _read_record_for_rewrite(path)
     if text is None:
-        return None, "no such record: %s" % rec_id
+        return None, ("%s %s" % (rec_id, err)) if err else "no such record: %s" % rec_id
     rec = parse_fields(text, rec_id)
     if want_from and rec["status"] not in want_from:
         return None, "%s is %s, not %s" % (rec_id, rec["status"] or "(no status)",
@@ -490,8 +627,7 @@ def _set_status(root, rec_id, want_from, new_status, execute, extra=None):
     for field, value in (extra or {}).items():
         out = _FIELD_RE[field].sub("**%s:** %s" % (field, value), out, count=1)
     if execute:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(out)
+        atomic_write(root, path, out.replace("\n", eol).encode("utf-8"))
     return out, None
 
 
@@ -510,17 +646,18 @@ def do_accept(root, args):
 def do_supersede(root, args):
     if not args.by:
         return _die("supersede requires --by <id>, the record that replaces this one")
-    if not os.path.exists(record_path(root, args.by)):
-        return _die("no such record: %s (given to --by)" % args.by)
+    heir_path = record_path(root, args.by)
+    text, eol, err = _read_record_for_rewrite(heir_path)
+    if text is None:
+        return _die(("%s (given to --by) %s" % (args.by, err)) if err
+                    else "no such record: %s (given to --by)" % args.by)
     _, err = _set_status(root, args.id, ("accepted", "proposed"), "superseded",
                          args.execute)
     if err:
         return _die(err)
     if args.execute:
-        text = read_text(record_path(root, args.by))
         heir = _FIELD_RE["Supersedes"].sub("**Supersedes:** %s" % args.id, text, count=1)
-        with open(record_path(root, args.by), "w", encoding="utf-8") as fh:
-            fh.write(heir)
+        atomic_write(root, heir_path, heir.replace("\n", eol).encode("utf-8"))
         print("superseded %s — %s carries Supersedes: %s" % (args.id, args.by, args.id))
     else:
         print("would supersede %s, and record Supersedes: %s on %s"
@@ -608,8 +745,9 @@ def do_consult(root, args):
     return 0
 
 
-def render_unindexed(prior, records):
-    """(new_text, missing_ids, error) for an index this tool did NOT generate.
+def render_unindexed(prior, records, eol="\n"):
+    """(new_text, missing_ids, error) for an index this tool did NOT generate. The block is
+    written with `eol`, the index's own line end, so a CRLF index stays CRLF.
 
     A HAND-KEPT INDEX IS NEVER REWRITTEN. A customer's Records Owner keeps a sectioned
     index whose per-run narrative and By-Department roster live in no record, and
@@ -633,10 +771,10 @@ def render_unindexed(prior, records):
             "## Not yet indexed", ""]
     body += [project_row(r) for r in missing] or [
         "(none — every record on disk is linked from this index)"]
-    block = "\n".join(body + [UNINDEXED_BLOCK[1]])
+    block = eol.join(body + [UNINDEXED_BLOCK[1]])
     if sp is None:
-        sep = "" if prior.endswith("\n") else "\n"
-        return prior + sep + "\n" + block + "\n", [r["id"] for r in missing], None
+        sep = "" if prior.endswith("\n") else eol
+        return prior + sep + eol + block + eol, [r["id"] for r in missing], None
     return prior[:sp[0]] + block + prior[sp[1]:], [r["id"] for r in missing], None
 
 
@@ -644,14 +782,16 @@ def do_index(root, args):
     recs = [r for r in (header_of(root, i) for i in record_ids(root)) if r]
     recs.sort(key=lambda r: r["id"])
     path = index_path(root)
-    prior = read_text(path)
+    prior, eol, err = read_exact(path)
+    if err:
+        # NEVER "no index" FOR AN INDEX THAT IS THERE. Reading an undecodable index as
+        # absent would rebuild over it, which is the loss the hand-kept rule exists to stop.
+        return _die("%s %s; it is left alone" % (os.path.relpath(path, root), err))
     if hand_kept(prior):
-        return _index_hand_kept(root, args, prior, recs)
+        return _index_hand_kept(root, args, prior, eol or "\n", recs)
     text = render_index(root, recs)
     if args.execute:
-        os.makedirs(store_dir(root), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(text)
+        atomic_write(root, path, text.encode("utf-8"), makedirs=True)
         print("wrote %s — %d record(s), enumerated from the filesystem"
               % (os.path.relpath(path, root), len(recs)))
     else:
@@ -662,10 +802,10 @@ def do_index(root, args):
     return 0
 
 
-def _index_hand_kept(root, args, prior, recs):
+def _index_hand_kept(root, args, prior, eol, recs):
     path = index_path(root)
     rel = os.path.relpath(path, root)
-    text, missing, err = render_unindexed(prior, recs)
+    text, missing, err = render_unindexed(prior, recs, eol)
     if err:
         return _die("%s: %s" % (rel, err))
     block = UNINDEXED_BLOCK[0].split()[1]
@@ -682,14 +822,13 @@ def _index_hand_kept(root, args, prior, recs):
             print("  + %s" % rec_id)
         print("write with: --execute")
         return 0
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(text)
-    # READ BACK: the bytes outside the block are the Records Owner's and must be exactly
-    # what they were (a first append adds only newlines after them), and every record on
-    # disk must now be indexed.
-    back = read_text(path) or ""
+    atomic_write(root, path, text.encode("utf-8"))
+    # READ BACK, in bytes: the file is exactly what was written, the bytes outside the block
+    # are the Records Owner's and are exactly what they were (a first append adds only line
+    # ends after them), and every record on disk is now indexed.
+    back = read_exact(path)[0] or ""
     ob, op = outside_unindexed(back), outside_unindexed(prior)
-    if not (ob.startswith(op) and not ob[len(op):].strip("\n")) or \
+    if back != text or not (ob.startswith(op) and not ob[len(op):].strip("\r\n")) or \
             not {r["id"] for r in recs} <= indexed_ids(back):
         return _die("wrote %s and read back changed bytes outside the block, or a record "
                     "still unindexed — restore it from version control" % rel)
@@ -822,11 +961,17 @@ def main(argv=None):
         return _die("no personnel store at %s — nothing has been recorded for this "
                     "project yet." % os.path.join(STORE))
 
-    return {
-        "new": do_new, "pending": do_pending, "accept": do_accept,
-        "supersede": do_supersede, "consult": do_consult, "index": do_index,
-        "check": do_check,
-    }[args.mode](root, args)
+    try:
+        return {
+            "new": do_new, "pending": do_pending, "accept": do_accept,
+            "supersede": do_supersede, "consult": do_consult, "index": do_index,
+            "check": do_check,
+        }[args.mode](root, args)
+    except OSError as exc:
+        # `atomic_write` refused or failed. The file keeps the bytes it had, so this is a
+        # named refusal, never a traceback over a half-written store.
+        return _die("%s: not written — %s" % (
+            os.path.relpath(exc.filename, root) if exc.filename else "write", exc.strerror))
 
 
 if __name__ == "__main__":
