@@ -323,7 +323,7 @@ staffed. Report both handbooks by name. The remedy is `org index`, which rewrite
 `direct-reports` from the edge set (`org-chart-format.md` § Regeneration), or `audit` Step 5g when
 the org needs the rest of the heal too.
 
-*`HANDOFF-UNWIRED` is REMOVED (2026-09-10), and its row above with it.* It read as the `verify`
+*`HANDOFF-UNWIRED` is REMOVED (2026-09-10), and its row above with it.* It was counted as the `verify`
 leg of the three-paths rule on the grounds that "the installer ships `wf-handoff`". It does not —
 the simplification release deleted that script, `handoff.md` went with it, and
 `audit.md` had already removed its own step saying exactly that. This file did not get the same

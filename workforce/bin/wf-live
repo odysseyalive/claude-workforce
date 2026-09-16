@@ -147,10 +147,19 @@ RETIRED_EXTERNAL = frozenset({
     "plain-speak", "wf-canary-a", "wf-canary-b", "wf-canary-c", "wf-ceiling-probe",
     "wf-model-canary",
 })
+#
+# ONLY WORDS THAT MARK THE PAST. `shipped`, `written`, `held`, `wired` are as often present passive
+# ("`wf-canary-a` is written by every install") or an adjective ("a shipped script"), `once` and
+# `until` are no tense at all, `saying` and `read as` are present forms and `history` is a noun, so
+# each of them classed a present-tense claim as history (review of the 1.63.0 fix batch, finding
+# 9). A participle that can be a simple past (`reported`, `fired`, ...) counts only when no
+# present-tense auxiliary sits right before it: "`wf-x` reported" is the past, "`wf-x` is
+# reported" is not. The retirement words count in any form, because they are the record itself.
 HISTORY_CUE = re.compile(
-    r"\b(?:removed|retired|deleted|swept|deprecated|went|gone|no longer|used to|until|"
-    r"had been|was|were|shipped|held|written|reported|returned|measured|attempted|"
-    r"history|previously|earlier|once|said|saying|did|fired|wired|ran|read as)\b", re.I)
+    r"\b(?:removed|retired|deleted|swept|deprecated|went|gone|no longer|used to|had been|was|"
+    r"were|previously|earlier|said|did|ran|wrote"
+    r"|(?<!\bis )(?<!\bare )(?<!\bbe )(?<!\bgets )(?<!\bget )"
+    r"(?:reported|returned|measured|attempted|fired))\b", re.I)
 SENTENCE_END = re.compile(r"(?<=[.!?])[*_`)\]]*\s+|\s\|\s|^\s*\|\s*|\s*\|\s*$")
 
 
@@ -337,11 +346,19 @@ def artifact_names(src):
 # so a function that opened any file became a "reader" of an artifact only its prose named.
 # Found 2026-09-13 by review. Each function is re-rendered from its syntax tree with every
 # docstring and bare string statement dropped, and a tree carries no comments.
+#
+# `ast.unparse` IS PYTHON 3.9, and the floor is 3.6 (platform.md `PYTHON-FLOOR`, RHEL 8). On 3.6-3.8
+# the AttributeError was uncaught and every run of this registry died (review of the 1.63.0 fix
+# batch, finding 8). Without it the regex split below answers, as it does for a file that is not
+# Python: comments are stripped, docstrings are not, so an older interpreter can over-count a
+# reader but never runs without a report.
 def code_chunks(src):
     try:
+        if not hasattr(ast, "unparse"):
+            raise SyntaxError("ast.unparse needs Python 3.9")
         tree = ast.parse(src)
     except SyntaxError:
-        # Not Python: fall back to the split, with whole-line and trailing comments removed.
+        # Not Python, or no unparser: the split, with whole-line and trailing comments removed.
         return re.split(r"\n(?=def )", re.sub(r"(?m)(^|\s)#.*$", r"\1", src))
 
     class _NoProse(ast.NodeTransformer):
