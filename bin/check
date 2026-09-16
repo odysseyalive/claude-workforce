@@ -3290,6 +3290,85 @@ check(
     f"names — {len(_spec_keys)} key(s) seen. A row whose assertion nothing evaluates "
     "passes for the same reason an empty row does",
 )
+
+# THE SUITE ITSELF, RUN TO THE END. Every row above asserted that bin/script-conformance
+# EXISTS, and none ran it, so 1.63.0 shipped with 25 of its cases red: the release added a
+# hook, every fixture's fake install went incomplete, and every heal case stopped healing
+# (2026-09-16). A red suite now fails this run.
+#
+# COST. The suite is ~45 s, and bin/prove runs bin/check once per mutation. A prove child
+# names its mutated file in WF_PROVE_MUTATION, and runs only the cases that file can reach
+# (`--touching`); a file no case executes skips the row out loud. Prove's baseline is a
+# plain bin/check, so the full suite runs once before any case, and a mutation to a
+# shipped script or a fixture still runs every case that script can alter.
+_sc_mut = os.environ.get("WF_PROVE_MUTATION", "")
+if _sc_mut and not (_sc_mut == "bin/script-conformance"
+                    or _sc_mut.startswith(("fixtures/scripts/", "workforce/bin/"))):
+    skip("scripts: the script-conformance suite passes, every case it selects",
+         f"bin/prove child mutating {_sc_mut}, which no conformance case executes; "
+         "prove's baseline ran the whole suite before its first case")
+else:
+    try:
+        _scr = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "bin", "script-conformance")]
+            + (["--touching", _sc_mut] if _sc_mut else []),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+            timeout=1800)
+        _sc_out, _sc_rc = _scr.stdout, _scr.returncode
+    except (OSError, subprocess.SubprocessError) as _exc:
+        _sc_out, _sc_rc = f"would not run ({_exc})", -1
+    _sc_sum = re.search(r"^(\d+) passed, (\d+) failed, (\d+) of (\d+) cases run$", _sc_out, re.M)
+    _sc_bad = [l.strip() for l in _sc_out.splitlines() if l.strip().startswith("FAIL")]
+    check(
+        "scripts: the script-conformance suite passes, every case it selects",
+        _sc_rc == 0 and bool(_sc_sum) and _sc_sum.group(2) == "0" and int(_sc_sum.group(1)) > 0,
+        "exit %s, %s%s — a shipped script is doing something its fixtures say it must not, "
+        "or a fixture no longer describes the release. Run `bin/script-conformance` to see "
+        "every case" % (_sc_rc, _sc_sum.group(0) if _sc_sum else "no summary line: "
+                        + _sc_out.strip()[-300:],
+                        ("; " + " | ".join(_sc_bad[:8])) if _sc_bad else ""),
+    )
+
+# A MARKED FAKE INSTALL IS FILLED FROM THE HOOK LIST THE RELEASE SHIPS. Behavioural: the
+# harness's own fill runs on a scratch install, and the result must be exactly
+# CURRENT_HOOK_SCRIPTS with the marker gone, so a fill that freezes, skips or leaves the
+# marker fails here even while every fixture happens to pass.
+_fill_bad = []
+try:
+    import importlib.machinery as _fim, importlib.util as _fiu, tempfile as _ftf
+    sys.dont_write_bytecode = True
+    _fl = _fim.SourceFileLoader("_wf_sc", os.path.join(ROOT, "bin", "script-conformance"))
+    _fmod = _fiu.module_from_spec(_fiu.spec_from_loader(_fl.name, _fl))
+    _fl.exec_module(_fmod)
+    _fwant = set(_fmod.current_hook_scripts())
+    _fsl = _fim.SourceFileLoader("_wf_sa_fill", os.path.join(ROOT, "workforce/bin/wf-settings-apply"))
+    _fsa = _fiu.module_from_spec(_fiu.spec_from_loader(_fsl.name, _fsl))
+    _fsl.exec_module(_fsa)
+    if _fwant != set(_fsa.CURRENT_HOOK_SCRIPTS) or not _fwant:
+        _fill_bad.append(f"harness reads {sorted(_fwant)}, wf-settings-apply ships "
+                         f"{sorted(_fsa.CURRENT_HOOK_SCRIPTS)}")
+    with _ftf.TemporaryDirectory(prefix="wf-fill-") as _ft:
+        _fb = os.path.join(_ft, "cfg", "skills", "workforce", "bin")
+        _fp = os.path.join(_ft, "part", "skills", "workforce", "bin")
+        os.makedirs(_fb)
+        os.makedirs(_fp)
+        open(os.path.join(_fb, _fmod.COMPLETE_INSTALL_MARKER), "w").close()
+        open(os.path.join(_fp, "wf-protect-directives"), "w").close()
+        _fprob = _fmod.fill_complete_installs(_ft)
+        if _fprob:
+            _fill_bad.append("fill reported " + "; ".join(_fprob))
+        if set(os.listdir(_fb)) != _fwant:
+            _fill_bad.append(f"marked install holds {sorted(os.listdir(_fb))}")
+        if os.listdir(_fp) != ["wf-protect-directives"]:
+            _fill_bad.append(f"partial install was changed to {sorted(os.listdir(_fp))}")
+except Exception as _exc:  # noqa: BLE001 — a harness that cannot load is a failure here
+    _fill_bad.append(f"could not exercise the fill ({type(_exc).__name__}: {_exc})")
+check(
+    "scripts: a marked fixture install is filled with every hook the release ships",
+    not _fill_bad,
+    "; ".join(_fill_bad) + " — a complete fake install frozen as stub files goes incomplete "
+    "the day a hook is added, and every heal case then keeps what it should remove",
+)
 check(
     "catalogs: the portable corpora ship, for text AND code",
     len(_vend_text) >= 2 and len(_vend_code) >= 5,
@@ -9419,6 +9498,30 @@ if os.path.isdir(_fx):
             "untracked, so absent from any clone and silently unasserted there: "
             + ", ".join(_untracked[:5]) + (" …" if len(_untracked) > 5 else ""),
         )
+        # A LINK IS TRACKED AND ITS TARGET MAY NOT BE. git stores the link and never an
+        # empty directory, so `*-dotdot-kernel/link -> real/inner` resolved here and dangled
+        # in every fresh clone and worktree, where bin/prove's copy then crashed before its
+        # first case (2026-09-16). A target counts only if git carries it: a tracked path,
+        # or a directory holding one.
+        _dirs = {os.path.dirname(_x) for _x in _tracked}
+        for _x in list(_dirs):
+            while _x:
+                _x = os.path.dirname(_x)
+                _dirs.add(_x)
+        _dangling = []
+        for _x in sorted(_tracked):
+            if os.path.islink(_x):
+                _t = os.readlink(_x)
+                _to = os.path.normpath(os.path.join(os.path.dirname(_x), _t))
+                if os.path.isabs(_t) or not (_to in _tracked or _to in _dirs):
+                    _dangling.append(f"{_x} -> {_t}")
+        check(
+            "fixtures: every fixture link resolves to something git carries",
+            not _dangling,
+            "dangling in a fresh clone, where the copy bin/prove takes fails before any case "
+            "runs and the case asserting through the link measures nothing: "
+            + ", ".join(_dangling) + ". FIX: track a placeholder (`.keep`) in the target",
+        )
     except Exception as _e:  # no git, no assertion — never a false pass
         warn("fixtures: tracked-ness not asserted", f"git unavailable ({_e})")
 
@@ -12220,6 +12323,31 @@ check(
     "without the copy, bin/prove is back to mutating tracked files in place — a "
     "181-second window in which the working tree carries a deliberately-sabotaged "
     "file, and any kill that is not SIGINT leaves it there unattributed",
+)
+# A COPY THAT FOLLOWS LINKS CRASHES ON ONE THAT DANGLES, and a fresh clone always has
+# one git could not carry: bin/prove died in `shutil.copytree` before its first case on
+# `fixtures/scripts/apply-deadhook-dotdot-kernel/link` (2026-09-16). Read from the syntax
+# tree, so a comment naming the keyword cannot pass it.
+_copy_nolinks = []
+for _cp in ("bin/prove", "bin/idempotence", "bin/script-conformance"):
+    try:
+        _cpt = ast.parse(read(_cp))
+    except SyntaxError:
+        _copy_nolinks.append(f"{_cp} (does not parse)")
+        continue
+    _calls = [_cc for _cc in ast.walk(_cpt) if isinstance(_cc, ast.Call)
+              and isinstance(_cc.func, ast.Attribute) and _cc.func.attr == "copytree"]
+    if not _calls:
+        _copy_nolinks.append(f"{_cp} (no copytree call found)")
+    for _cc in _calls:
+        if not any(_k.arg == "symlinks" and isinstance(_k.value, ast.Constant)
+                   and _k.value.value is True for _k in _cc.keywords):
+            _copy_nolinks.append(f"{_cp}:{_cc.lineno}")
+check(
+    "harness: every tree copy keeps links as links",
+    not _copy_nolinks,
+    "copytree without symlinks=True at %s — it follows each link, so a dangling one "
+    "raises shutil.Error and the whole run proves nothing" % ", ".join(_copy_nolinks),
 )
 check(
     "prove: cases are applied to the copy, not to ROOT",

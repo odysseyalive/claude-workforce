@@ -2178,11 +2178,27 @@ CASES = [
     ("companions: no reference says the evaluators are materialized into a project or that no skill ships",
      "workforce/references/audit-setup.md", "append",
      "\n\nThe distribution ships no companion skill directory; the evaluators are written from `references/evaluators.md`.\n"),
+    # THE CONFORMANCE GATE, reached three ways. A shipped script that removes a retired row
+    # from a partial install; a fixture that no longer holds the row its case removes; and
+    # a harness whose fill leaves the marker behind.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WSA, "del", '    if not _complete_install(wh["cfg"]):\n        return "install", wh\n'),
+    ("scripts: the script-conformance suite passes, every case it selects",
+     "fixtures/scripts/sa-heal-crlf/.claude/settings.local.json", "del", "wf-budget-guard"),
+    ("scripts: a marked fixture install is filled with every hook the release ships",
+     "bin/script-conformance", "del", "        os.remove(os.path.join(d, COMPLETE_INSTALL_MARKER))\n"),
+    # A tree copy that follows links again.
+    ("harness: every tree copy keeps links as links", PRV, "delall", ", symlinks=True"),
 ]
 
 
-def failing_checks(root):
+def failing_checks(root, mutated=None):
     """Names of the checks bin/check reports failing, run against `root`'s own copy.
+
+    `mutated` is the one file a case broke. It reaches bin/check as WF_PROVE_MUTATION so
+    the conformance row runs only the cases that file can reach, instead of the whole
+    ~45 s suite once per case. The baseline and the closing run pass nothing, so both run
+    the whole suite.
 
     A completed bin/check exits 0 (green) or 1 (has FAILS) and always prints its
     `N passed, M failed` summary. Any other outcome means the RUN broke, not that
@@ -2192,7 +2208,12 @@ def failing_checks(root):
     loudly; never return a verdict from an incomplete run.
     """
     for _ in range(3):
-        r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True)
+        env = dict(os.environ)
+        env.pop("WF_PROVE_MUTATION", None)
+        if mutated:
+            env["WF_PROVE_MUTATION"] = mutated
+        r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True,
+                           env=env)
         if r.returncode in (0, 1) and "passed," in r.stdout and "failed," in r.stdout:
             return {ln.strip()[2:].strip()
                     for ln in r.stdout.splitlines() if ln.strip().startswith("✗ ")}
@@ -2223,7 +2244,12 @@ def run_shard(shard):
     out = []
     with tempfile.TemporaryDirectory(prefix="wf-prove-") as tmp:
         work = pathlib.Path(tmp) / "tree"
-        shutil.copytree(ROOT, work, ignore=IGNORE)
+        # LINKS ARE COPIED AS LINKS. The default follows each one, so a link whose target
+        # git does not carry raised shutil.Error out of every worker and the run proved
+        # nothing: `fixtures/scripts/*-dotdot-kernel/link` points at an empty directory,
+        # absent from every fresh clone and worktree (2026-09-16). Following a link would
+        # also turn a fixture's link into a real directory, which is not what it tests.
+        shutil.copytree(ROOT, work, ignore=IGNORE, symlinks=True)
         for name, relpath, mode, payload in shard:
             if STOP.is_set():
                 break
@@ -2284,7 +2310,7 @@ def run_shard(shard):
                 else:
                     target.write_text(text + payload)
 
-                fails = failing_checks(work)
+                fails = failing_checks(work, relpath)
                 if name in fails:
                     out.append((name, "PROVEN", f"fired on mutated {relpath}"))
                 elif fails:
