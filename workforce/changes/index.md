@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.63.0 | 2026-09-16 | changes, hooks, scripts, installer | no | Rank original human code above AI code, and say which is which at the edit |
 | 1.62.2 | 2026-09-16 | changes, scripts, installer | no | Give spawned employees the user-words rule too, on SubagentStart |
 | 1.62.1 | 2026-09-16 | handbook, chart, principles, changes, scripts, installer | **yes** | Move newest-first weighing of the user's words out of the org and into the install |
 | 1.62.0 | 2026-09-16 | handbook, chart, principles, changes, installer | **yes** | Weigh the user's own words newest first, and never re-offer an old decision against a new ask |
