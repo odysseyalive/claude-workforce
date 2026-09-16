@@ -66,6 +66,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 
@@ -73,10 +74,10 @@ import time
 # are the installed-skill directory names a project copy may occupy, in the spelling each
 # generator used. NEVER a guess from a directory name — `evaluators.md` § The evaluators
 # names these three and no others, and a fourth kind arrives by editing this table.
-# `additions` is workforce's OWN authored slot for this kind, shipped beside the vendored
-# corpus at `references/evaluator-additions/<slot>` and named exactly as `wf-seed.CATALOGS`
-# names it. A kind workforce has authored nothing for carries None, which is a first-class
-# answer and never an empty file.
+# `additions` is workforce's OWN authored slot for this kind, a file in the evaluator skill's
+# own `references/`, named exactly as `wf-seed.CATALOGS` names it where wf-seed seeds the kind.
+# A kind workforce has authored nothing for carries None, which is a first-class answer and
+# never an empty file.
 CATALOGS = {
     "code":     {"skills": ("code-evaluator",),     "anchor": "code-eval-ref-version",
                  "additions": "additions.md", "additions_anchor": "code-additions-version"},
@@ -89,9 +90,20 @@ CATALOGS = {
     # resolve, and the alternative is a copy that drifts under a synonym.
     "image":    {"skills": ("image-eval",),         "anchor": "image-eval-ref-version",
                  "additions": None,            "additions_anchor": None},
+    # THE UI SLOT IS `rendered-checks.md`, and it always was workforce's authored half: its own
+    # header calls it "the seed contribution", the entries the carried catalog did not cover. It
+    # was listed as None, so the report never said the ui corpus has two provenances and a
+    # project anchor recording `additions-seeded: tag=design` read against no slot. DEF-Q-12,
+    # reported 2026-09-11 from apps-odyssey-alive. Named in place rather than renamed, because
+    # handbooks cite `rendered-checks.md` by name.
     "ui":       {"skills": ("ui-design", "design-eval"), "anchor": "ui-design-ref-version",
-                 "additions": None,            "additions_anchor": None},
+                 "additions": "rendered-checks.md", "additions_anchor": "ui-additions-version"},
 }
+
+# The file a project's house rules live in, beside every evaluator copy and after every
+# retirement. It is never shipped, so any file by this name under a project's skills root is
+# the project's own.
+ANCHOR = "CATALOG-ANCHOR.md"
 
 # A tell that a copy carries the project's own words and is never removable, whatever else
 # is true of it. BYTE-IDENTICAL to wf-conform's `IMMUTABLE_OPEN_RX` (bin/check § grammar
@@ -421,6 +433,33 @@ def project_dir(root, kind):
     return None
 
 
+def project_anchors(root, kind):
+    """Every project house-rules file for `kind`, as `[(label, path)]`, in skill-name order.
+
+    THE RULES AND THE AMENDMENTS ARE PART OF WHAT A READER RESOLVES, NOT A SEPARATE LOOK-UP.
+    `--migrate` leaves `CATALOG-ANCHOR.md` standing on purpose: it holds the supersession
+    register, the `origin: user` spans lifted out of the copy, and the project's own catalog
+    amendments. The resolver then answered every read from the install alone, so none of it
+    was reachable. MEASURED 2026-09-14 on apps-odyssey-alive (DEF-Q-12): a `--kind ui --grep`
+    for the anchor's own `Project catalog amendments` heading exited 1 while the heading sat at
+    `.claude/skills/design-eval/CATALOG-ANCHOR.md`. Every project rule ID was invisible to
+    every read that resolves one, which is the only read tier-3 is told to make.
+
+    EVERY SPELLING, not the first. `ui` has two directory names and a project can hold an
+    anchor under either; stopping at the first would hide the second the same way.
+
+    Not ownership-tested. The file is never shipped, so one found under a skill `install`
+    wrote is still the project's own, written there by an audit.
+    """
+    out, seen = [], set()
+    for name in CATALOGS[kind]["skills"]:
+        f = os.path.join(root, ".claude", "skills", name, ANCHOR)
+        if os.path.isfile(f) and os.path.realpath(f) not in seen:
+            seen.add(os.path.realpath(f))
+            out.append(("project:%s/%s" % (name, ANCHOR), f))
+    return out
+
+
 def catalog_files(d):
     """Markdown in a catalog directory, recursively, sorted. Used for the INSTALL side and
     for reading a version anchor; the copy side walks `all_files`, which excludes nothing.
@@ -701,6 +740,11 @@ def resolve(root, kind):
         "files": len(corpus_files(chosen, adds)) if chosen else 0,
         "lines": sum(len(slurp(f).splitlines()) for f in corpus_files(chosen, adds)) if chosen else 0,
     }
+    # The project's house rules, read beside the corpus. A copy answering as `project` already
+    # lists its own anchor among its files, so only anchors outside the chosen corpus count.
+    in_corpus = {os.path.realpath(f) for f in corpus_files(chosen, adds)} if chosen else set()
+    info["anchors"] = [f for _l, f in project_anchors(root, kind)
+                       if os.path.realpath(f) not in in_corpus]
     # ADDITIONS STALENESS, project side. The install ships the slot; a copy holds a snapshot
     # of it, and until now nothing compared the two.
     info["seeded_version"] = seeded_version(chosen) if (chosen and source == "project") else None
@@ -963,10 +1007,14 @@ def classify(root, kind):
         elif parts[0] in ("scripts", "hooks") and rel not in inst_rels:
             keep_rel.add(rel)
     rels = {os.path.relpath(f, proj) for f in all_files(proj)}
+    cited = cited_project_files(root, kind, proj, rels, keep_rel)
+    keep_rel |= set(cited)
     if rels <= keep_rel:
         return {"kind": kind, "verdict": "retired", "path": proj, "removable": [], "kept": sorted(rels),
-                "why": "already retired — only the house rules remain, and the shipped "
-                       "evaluator is what this project reads"}
+                "cited": cited,
+                "why": "already retired — only the house rules%s remain, and the shipped "
+                       "evaluator is what this project reads"
+                       % (" and %d project file(s) live readers cite" % len(cited) if cited else "")}
     removable, kept = [], []
     for f in all_files(proj):
         rel = os.path.relpath(f, proj)
@@ -979,14 +1027,135 @@ def classify(root, kind):
 
     return {
         "kind": kind, "verdict": "retire", "path": proj,
-        "removable": sorted(removable), "kept": sorted(kept),
+        "removable": sorted(removable), "kept": sorted(kept), "cited": cited,
         "spans": [(rel, line) for rel, line, _t in spans],
         "why": ("the shipped %s evaluator is installed and current, so this copy is the old "
-                "one — %d file(s) go, CATALOG-ANCHOR.md stays%s"
+                "one — %d file(s) go, CATALOG-ANCHOR.md stays%s%s"
                 % (kind, len(removable),
+                   ", %d project file(s) a live reader cites stay" % len(cited) if cited else "",
                    ", and %d `origin: user` span(s) are lifted into it verbatim first"
                    % len(spans) if spans else "")),
     }
+
+
+# Directories under `.claude/` whose files are records of past runs, never live readers. A run
+# report that quotes a path is history; counting it would keep a file forever on the strength of
+# a sentence about a run that is over. `retired/` is the archive this migration itself writes.
+NOT_READERS = (os.path.join("workforce", "work"), os.path.join("workforce", "staging"),
+               os.path.join("workforce", "retired"))
+READER_MAX_BYTES = 1 << 20
+
+
+def live_readers(root, proj):
+    """`[(relpath_from_root, text)]` for every file that can still READ a path in this copy.
+
+    The project's `.claude/` tree and its `CLAUDE.md`: handbooks, other skills, commands,
+    maintainer scripts, ledger records. Excluded: the copy itself (its own files are asked
+    separately, because only the ones that stay are live), the run-history directories above,
+    and settings files, whose registrations are `hook_registrations`' question and are answered
+    there by a refusal keyed on what would be removed.
+    """
+    out = []
+    base = os.path.join(root, ".claude")
+    skip = {os.path.join(base, d) for d in NOT_READERS} | {os.path.realpath(proj)}
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = sorted(
+            x for x in dirnames
+            if not os.path.islink(os.path.join(dirpath, x))
+            and os.path.join(dirpath, x) not in skip
+            and os.path.realpath(os.path.join(dirpath, x)) not in skip)
+        for fn in sorted(filenames):
+            if fn.startswith("settings") and fn.endswith(".json"):
+                continue
+            out.append(os.path.join(dirpath, fn))
+    claude_md = os.path.join(root, "CLAUDE.md")
+    if os.path.isfile(claude_md):
+        out.append(claude_md)
+    readers = []
+    for f in out:
+        try:
+            if os.path.getsize(f) > READER_MAX_BYTES:
+                continue
+        except OSError:
+            continue
+        text = slurp(f)
+        if text:
+            readers.append((os.path.relpath(f, root), text))
+    return readers
+
+
+def _cite_lines(text, needle):
+    return [n for n, line in enumerate(text.splitlines(), 1) if needle in line]
+
+
+def cited_project_files(root, kind, proj, rels, keep_rel):
+    """`{rel: ["reader:line", ...]}` for every PROJECT-ONLY file in the copy a live reader cites.
+
+    RETIRING A FILE SOMETHING STILL READS IS A BREAK WITH NO MAKE. The copy goes because the
+    install ships the same capability — true of the corpus, false of a file the install ships no
+    counterpart for. MEASURED 2026-09-11 on apps-odyssey-alive (DEF-Q-13 b): `graphic-system.md`
+    and `palette.md`, read by three handbooks, `/image` and `odyssey-apps`, and five text-eval
+    files read by the four staying text agents, `edit-validator` and `copy-truth`, were all
+    listed `retire` with nothing protecting them. The audit moved seven files and repointed 32
+    lines by hand to keep those readers working.
+
+    KEPT IN PLACE, NOT REFUSED. The 2026-09-10 directive is that the old copies go and `update`
+    is the only thing a user runs, so a refusal that parks the whole kind until a human moves
+    files is the wrong answer; so is a relocation that rewrites handbooks and other skills this
+    script does not own. A cited project file stays where its readers already point, and the
+    report names each reader so the citation can be moved deliberately. Once nothing cites it,
+    the next run retires it.
+
+    PROJECT-ONLY MEANS THE INSTALL SHIPS NOTHING LIKE IT: no file with the same normalised
+    content and none with the same name. A copy of a shipped file, even a modified one, is read
+    through the resolver — `evaluators.md` § tier-3, healed by audit Step 5d 2c — so a citation
+    of it is repointed, not protected.
+
+    A READER INSIDE THE COPY COUNTS ONLY IF IT STAYS. A project agent the shipped skill does not
+    ship stays, and the files it cites are its grounding, so the set is closed to a fixpoint: a
+    file kept because it is cited can itself cite another. A reader that is itself being retired
+    reads nothing after the run.
+    """
+    by_name, by_content = install_index(root, kind)
+    name = os.path.basename(proj)
+    candidates = []
+    for rel in sorted(rels - keep_rel):
+        f = os.path.join(proj, rel)
+        if os.path.islink(f):
+            continue
+        body = norm(slurp(f))
+        if (body and body in by_content) or os.path.basename(rel) in by_name:
+            continue
+        candidates.append(rel)
+    if not candidates:
+        return {}
+    readers = live_readers(root, proj)
+    cited = {}
+    for rel in candidates:
+        needle = "%s/%s" % (name, rel.replace(os.sep, "/"))
+        hits = ["%s:%d" % (path, n) for path, text in readers for n in _cite_lines(text, needle)]
+        if hits:
+            cited[rel] = hits
+    # The copy's own staying files, to a fixpoint.
+    changed = True
+    while changed:
+        changed = False
+        staying = (keep_rel | set(cited)) & rels
+        for rel in candidates:
+            if rel in cited:
+                continue
+            needle = rel.replace(os.sep, "/")
+            hits = []
+            for reader in sorted(staying):
+                if reader == rel:
+                    continue
+                text = slurp(os.path.join(proj, reader))
+                hits += ["%s/%s:%d" % (os.path.relpath(proj, root), reader, n)
+                         for n in _cite_lines(text, needle)]
+            if hits:
+                cited[rel] = hits
+                changed = True
+    return cited
 
 
 def hook_registrations(root):
@@ -1049,9 +1218,12 @@ def hook_registrations(root):
                     if not isinstance(cmd, str):
                         continue
                     for kind, meta in CATALOGS.items():
-                        if any("skills/%s/" % sk in cmd for sk in meta["skills"]):
+                        targets = [(sk, rel) for sk in meta["skills"]
+                                   for rel in re.findall(
+                                       r"skills/%s/([^\s\"'`;|&)<>]*)" % re.escape(sk), cmd)]
+                        if targets:
                             out.append({"file": path, "event": event, "kind": kind,
-                                        "command": cmd})
+                                        "command": cmd, "targets": targets})
     dupes = {}
     for r in out:
         dupes.setdefault((r["file"], r["event"], r["command"]), []).append(r)
@@ -1102,6 +1274,9 @@ def report(root, args):
             # the project's: the reader gets the vendored corpus and none of the additions,
             # which is the silent half-corpus this resolution exists to end.
             flags.append("ADDITIONS SLOT MISSING (%s)" % CATALOGS[r["kind"]]["additions"])
+        if r["anchors"]:
+            flags.append("+ project rules %s" % ", ".join(
+                os.path.relpath(f, root) for f in r["anchors"]))
         print("  %-9s %-8s v%-5s %3d file(s) %5d line(s)  %s%s"
               % (r["kind"], r["source"],
                  r["version"] if r["version"] is not None else "?",
@@ -1119,16 +1294,101 @@ def report(root, args):
     return 1 if unresolved_n else 0
 
 
+def registration_removes(hook, verdict):
+    """Does this settings registration name a file the retirement of `verdict` would remove?
+
+    THE REFUSAL IS KEYED ON WHAT GOES, NOT ON WHERE A PATH POINTS. It was keyed on the kind: any
+    registration whose command contained `skills/<evaluator>/` refused the whole retirement.
+    MEASURED 2026-09-11 on apps-odyssey-alive (DEF-Q-13 a): `code-evaluator`'s three enforce
+    hooks were all in the STAYS set — `hooks/` files the install does not ship are kept — and
+    the retirement was refused anyway, so the audit moved the hooks out by hand to get a
+    migration the refusal existed to protect. A registration whose file stays is not broken by
+    the retirement, and refusing on it only parks the kind.
+
+    UNPARSEABLE FAILS CLOSED. A registration naming the skill directory itself, or a path this
+    cannot read out of the command, is treated as naming something removed: the refusal is the
+    safe direction and the report shows the command, so it is never silent.
+    """
+    if verdict.get("verdict") != "retire" or not verdict.get("removable"):
+        return False
+    name = os.path.basename(verdict["path"])
+    removable = set(r.replace(os.sep, "/") for r in verdict["removable"])
+    for sk, rel in hook.get("targets", []):
+        if sk != name:
+            continue
+        rel = rel.strip("/")
+        if not rel or rel in removable or any(r.startswith(rel + "/") for r in removable):
+            return True
+    return False
+
+
+STAMP_MARKER = ".code-eval-reviewed"
+
+
+def code_eval_stamper(root):
+    """The shipped stamper for a project's code-eval commit gate, or None.
+
+    Two halves, both required: `wf-code-eval` beside this script, and the shipped
+    code-evaluator's SKILL.md naming it — a script no step calls stamps nothing.
+    """
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-code-eval")
+    inst = install_dir(root, "code")
+    skill = os.path.join(os.path.dirname(inst), "SKILL.md") if inst else ""
+    calls = re.search(r"wf-code-eval\"?\s+--stamp", slurp(skill))
+    return script if os.path.isfile(script) and calls else None
+
+
+def code_eval_gates(root, stamper):
+    """The gates `wf-code-eval` finds, or None when it cannot be asked. It owns gate discovery;
+    reading settings for the same thing twice is two answers waiting to disagree."""
+    if not stamper:
+        return None
+    try:
+        p = subprocess.run([sys.executable, stamper, "--root", root, "--json"],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+        return json.loads(p.stdout.decode("utf-8", "replace")).get("gates", [])
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def orphaned_stamp(root, verdict, stamper):
+    """The file in this retirement that is the project's only writer of `.code-eval-reviewed`.
+
+    DEF-Q-14: a project's commit gate compares the tree against `.code-eval-reviewed`, and the
+    one writer was the copy's own SKILL.md § Enforcement coordination. Retiring that with no
+    shipped stamper on disk leaves a gate that blocks every commit forever, so the retirement is
+    REFUSED for this kind — the one refusal left that `update` fixes, by installing the stamper.
+    """
+    if stamper or verdict.get("verdict") != "retire":
+        return None
+    for rel in verdict["removable"]:
+        if STAMP_MARKER in slurp(os.path.join(verdict["path"], rel)):
+            return rel
+    return None
+
+
 def migrate(root, args):
     verdicts = [classify(root, k) for k in sorted(CATALOGS)]
     hooks = hook_registrations(root)
-    blocked = {h["kind"] for h in hooks}
+    by_kind = {v["kind"]: v for v in verdicts}
+    for h in hooks:
+        h["removes"] = registration_removes(h, by_kind.get(h["kind"], {}))
+    blocked = {h["kind"] for h in hooks if h["removes"]}
+    stamper = code_eval_stamper(root)
+    gates = code_eval_gates(root, stamper)
+    orphan = orphaned_stamp(root, by_kind.get("code", {}), stamper)
+    if orphan:
+        blocked.add("code")
     n_removable = sum(len(v["removable"]) for v in verdicts)
     n_kept = sum(len(v["kept"]) for v in verdicts)
     refused = [v for v in verdicts if v["removable"] and v["kind"] in blocked]
+    n_hook_refused = sum(1 for v in refused if any(
+        h["removes"] for h in hooks if h["kind"] == v["kind"]))
 
     if args.json:
         json.dump({"root": root, "migration": verdicts, "hooks": hooks,
+                   "code_eval_gates": gates, "code_eval_stamper": stamper,
+                   "orphaned_stamp": orphan,
                    "refused": [v["kind"] for v in refused]}, sys.stdout, indent=2)
         sys.stdout.write("\n")
         return 1 if refused else 0
@@ -1142,21 +1402,44 @@ def migrate(root, args):
             print("               retire     %s" % f)
         if len(v["removable"]) > 4:
             print("               retire     … and %d more" % (len(v["removable"]) - 4))
-        for f in v["kept"][:4]:
+        # A cited file is printed in full with its readers: it is the one STAYS a person may want
+        # to act on, by moving the citation, and a truncated list would hide exactly that.
+        cited = v.get("cited") or {}
+        for f in sorted(cited):
+            print("               STAYS      %s — cited by %s%s"
+                  % (f, ", ".join(cited[f][:3]),
+                     " (+%d more)" % (len(cited[f]) - 3) if len(cited[f]) > 3 else ""))
+        rest = [f for f in v["kept"] if f not in cited]
+        for f in rest[:4]:
             print("               STAYS      %s" % f)
-        if len(v["kept"]) > 4:
-            print("               STAYS      … and %d more" % (len(v["kept"]) - 4))
+        if len(rest) > 4:
+            print("               STAYS      … and %d more" % (len(rest) - 4))
 
     if hooks:
         print("\n  hook registrations pointing into a project copy:")
         for h in hooks:
             dup = "  ** REGISTERED %d TIMES **" % h["duplicate"] if h.get("duplicate") else ""
-            print("    %-13s %s%s" % (h["event"], h["command"], dup))
+            what = ("names a file this retirement REMOVES" if h.get("removes")
+                    else "its file stays")
+            print("    %-13s %s%s  · %s" % (h["event"], h["command"], dup, what))
 
-    print("\nINV-CATMIG   %d file(s) removable · %d stay · %d hook registration(s)%s%s"
-          % (n_removable, n_kept, len(hooks),
+    if gates:
+        print("\n  code-eval commit gate(s) — stamped by the shipped `wf-code-eval --stamp`:")
+        for g in gates:
+            print("    %-13s %s%s" % (g["event"], os.path.relpath(g["script"], root),
+                                     "" if g["present"] else "  · MISSING on disk"))
+    if orphan:
+        print("\n  ORPHANED GATE: %s/%s is this project's only writer of %s, and no shipped "
+              "stamper is reachable. Run `workforce update` first."
+              % (os.path.relpath(by_kind["code"]["path"], root), orphan, STAMP_MARKER))
+
+    print("\nINV-CATMIG   %d file(s) removable · %d stay · %d cited · %d hook registration(s)%s"
+          " · %d code-eval gate(s)%s"
+          % (n_removable, n_kept, sum(len(v.get("cited") or {}) for v in verdicts), len(hooks),
              " · %d duplicated" % sum(1 for h in hooks if h.get("duplicate")) if hooks else "",
-             " · %d kind(s) REFUSED on hooks" % len(refused) if refused else ""))
+             len(gates or []),
+             "".join((" · %d kind(s) REFUSED on hooks" % n_hook_refused if n_hook_refused else "",
+                      " · code REFUSED on an orphaned gate" if orphan else ""))))
 
     if not args.execute:
         if n_removable:
@@ -1180,9 +1463,15 @@ def migrate(root, args):
         # worst direction for a deletion report: it reads as collateral damage.
         removed = 0
         if v["kind"] in blocked:
-            print("\n  REFUSED  %s — %d settings hook registration(s) still point into it. "
-                  "Unregister them first; this script does not edit settings."
-                  % (v["kind"], sum(1 for h in hooks if h["kind"] == v["kind"])))
+            n_reg = sum(1 for h in hooks if h["kind"] == v["kind"] and h["removes"])
+            if n_reg:
+                print("\n  REFUSED  %s — %d settings hook registration(s) name a file this "
+                      "retirement would remove. Unregister them first; this script does not "
+                      "edit settings." % (v["kind"], n_reg))
+            else:
+                print("\n  REFUSED  %s — ORPHANED GATE: %s is the only writer of %s and no "
+                      "shipped stamper is reachable. Run `workforce update` first."
+                      % (v["kind"], orphan, STAMP_MARKER))
             continue
         # EXTRACTION BEFORE REMOVAL, AND IT IS BLOCKING PER KIND. The user's own words are
         # written into CATALOG-ANCHOR.md and read back before a single file goes; a failed
@@ -1299,15 +1588,22 @@ def main():
         # The additions slot lives OUTSIDE the catalog directory, so a name relative to it
         # would climb out with `../`. A file under the corpus keeps its relative name; the
         # slot is labelled for what it is, which is also what the reader needs to see.
-        for f in corpus_files(info["path"], info["additions_path"]):
-            label = ("additions:" + os.path.basename(f)
-                     if f == info["additions_path"] else os.path.relpath(f, info["path"]))
+        # THE PROJECT'S HOUSE RULES ARE SEARCHED AFTER THE CORPUS, labelled `project:` so a
+        # reader can tell a shipped rule from a project one by the prefix alone (DEF-Q-12).
+        sources = [(("additions:" + os.path.basename(f)) if f == info["additions_path"]
+                    else os.path.relpath(f, info["path"]), f)
+                   for f in corpus_files(info["path"], info["additions_path"])]
+        anchors = set(info["anchors"])
+        sources += [(lbl, f) for lbl, f in project_anchors(root, args.kind) if f in anchors]
+        for label, f in sources:
             for n, line in enumerate(slurp(f).splitlines(), 1):
                 if rx.search(line):
                     hits += 1
                     print("%s:%d:%s" % (label, n, line.rstrip()))
         if not hits:
-            print("no match in %s (%s)" % (info["path"], info["source"]), file=sys.stderr)
+            print("no match in %s (%s)%s" % (
+                info["path"], info["source"],
+                "".join(" or %s" % f for f in info["anchors"])), file=sys.stderr)
         return 0 if hits else 1
 
     if args.migrate:

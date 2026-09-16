@@ -3626,7 +3626,7 @@
     ]
   },
   "catalog-residue-but-hooked": {
-    "_why": "A retirement is REFUSED while a settings entry still registers a hook inside the copy. Removing files and leaving the registration gives every later session a hook pointing at nothing -- the double activation this migration exists to end rather than cause. Measured live the day it shipped: hither-lands and apps-odyssey-alive register three such hooks each, and odyssey-alive has one registered TWICE on PostToolUse. This is an ORDERING requirement and not an exception to the directive: `hooks` unregisters in the same audit and the next run retires the copy. The refusal exits 1 so a caller can tell it from a clean migration -- it returned 0 at first, which made a refusal and a success indistinguishable. Display mode is asserted: the suite must never reach a path that deletes.",
+    "_why": "A registration whose file STAYS does not refuse the retirement, and is still reported. This row asserted the opposite until DEF-Q-13 (a): the refusal was keyed on the KIND, so any registration naming `skills/text-eval/` refused, even though `hooks/post.sh` is a hooks file the install does not ship and is kept. MEASURED 2026-09-11 on apps-odyssey-alive: code-evaluator's three enforce hooks were all in the STAYS set and the retirement was refused anyway, and the audit moved the hooks out by hand to get past its own safeguard. The registration breaks nothing when its file stays, so the retirement proceeds and the report says `its file stays`. The refusal is still live where it belongs, pinned by `catalog-hook-names-removed-file`. Measured against HEAD's wf-catalog on this identical tree: `1 kind(s) REFUSED on hooks`, exit 1. Display mode is asserted: the suite must never reach a path that deletes.",
     "script": "wf-catalog",
     "args": [
       "--migrate"
@@ -3634,16 +3634,17 @@
     "env": {
       "CLAUDE_CONFIG_DIR": "/nonexistent-config"
     },
-    "exit": 1,
+    "exit": 0,
     "want": [
       "text      retire",
       "retire     text-tells.md",
       "STAYS      hooks/post.sh",
       "hook registrations pointing into a project copy",
-      "1 kind(s) REFUSED on hooks",
+      "hooks/post.sh\"  · its file stays",
       "DISPLAY ONLY"
     ],
     "must_not": [
+      "REFUSED",
       "REMOVED",
       "ARCHIVED"
     ]
@@ -5004,5 +5005,225 @@
     "script": "wf-stamp",
     "want": ["stamped", "stamped 1"],
     "after": {".claude/agents/g.md": {"want": ["contract-stamp: sha256:"], "not": ["(set at registration)"]}}
+  },
+  "catalog-grep-reads-project-anchor": {
+    "_why": "DEF-Q-12, MEASURED 2026-09-14 on apps-odyssey-alive: after the migration leaves `CATALOG-ANCHOR.md` standing, a `--kind ui --grep` for the anchor's own `Project catalog amendments` heading exited 1, because the resolver read the install corpus alone. The anchor holds the supersession register and every project-drafted catalog amendment, so every project rule ID was invisible to the one read tier-3 is told to make. The anchor sits under `design-eval`, the SECOND spelling of the ui kind, which a first-spelling-only lookup would also miss. Hits carry a `project:` label so a shipped rule and a project rule are told apart by prefix. Measured against HEAD's wf-catalog on this identical tree: `no match`, exit 1.",
+    "script": "wf-catalog",
+    "args": [
+      "--kind",
+      "ui",
+      "--grep",
+      "Project catalog amendments|HERO-01"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "project:design-eval/CATALOG-ANCHOR.md:8:## Project catalog amendments",
+      "project:design-eval/CATALOG-ANCHOR.md:10:> **HERO-01**"
+    ],
+    "not": [
+      "no match"
+    ]
+  },
+  "catalog-report-names-project-rules": {
+    "_why": "DEF-Q-12, the report half. The ui kind carried `additions: None` although `rendered-checks.md` is workforce's own authored contribution (its header calls it the seed contribution), so the report never showed the ui corpus has two provenances. The ui line now reads `+ additions v1` from the file's `ui-additions-version` anchor, and names the project's house-rules file it reads beside the corpus. Measured against HEAD's wf-catalog on this identical tree: the ui line carried neither flag.",
+    "script": "wf-catalog",
+    "args": [],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "want": [
+      "ui        install  v1       2 file(s)",
+      "+ additions v1",
+      "+ project rules .claude/skills/design-eval/CATALOG-ANCHOR.md"
+    ],
+    "not": [
+      "ADDITIONS SLOT MISSING"
+    ]
+  },
+  "catalog-cited-file-stays": {
+    "_why": "DEF-Q-13 (b), MEASURED 2026-09-11 on apps-odyssey-alive: project-only `references/` files that live readers cite -- `palette.md` and `graphic-system.md`, read by three handbooks and two skills, and five text-eval files read by agents that stay -- were listed `retire` with nothing protecting them, and the audit moved seven files and repointed 32 lines by hand. A cited project-only file now STAYS in place and the report names its readers. Three shapes: `palette.md` is cited by a handbook outside the copy; `graphic-system.md` is cited only by a project agent INSIDE the copy that itself stays, which a scan of outside readers alone would miss; `old-notes.md` is quoted only by a run report under `workforce/work/`, which is history rather than a reader, so it still goes. `image-tells.md` is the shipped file and goes. Measured against HEAD's wf-catalog on this identical tree: `retire references/palette.md` and `retire references/graphic-system.md`.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "image     retire",
+      "retire     references/image-tells.md",
+      "retire     references/old-notes.md",
+      "STAYS      references/palette.md \u2014 cited by .claude/agents/designer.md:6",
+      "STAYS      references/graphic-system.md \u2014 cited by .claude/skills/image-eval/agents/palette-keeper/AGENT.md:5",
+      "STAYS      agents/palette-keeper/AGENT.md",
+      "2 cited"
+    ],
+    "not": [
+      "retire     references/palette.md",
+      "retire     references/graphic-system.md",
+      "REMOVED"
+    ]
+  },
+  "catalog-cited-file-stays-execute": {
+    "_why": "The same tree as `catalog-cited-file-stays`, EXECUTED, and asserted on what is left on disk rather than on what was printed: the cited files are still there with their bytes, the shipped duplicate and the uncited file are gone, and the handbook citing `palette.md` still names a file that exists.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "ARCHIVED 2 file(s)",
+      "REMOVED  2 file(s)"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/palette.md": {
+        "want": [
+          "navy #16324F"
+        ]
+      },
+      ".claude/skills/image-eval/references/graphic-system.md": {
+        "want": [
+          "Stroke language"
+        ]
+      },
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/references/old-notes.md": {
+        "absent": true
+      }
+    }
+  },
+  "catalog-hook-names-removed-file": {
+    "_why": "DEF-Q-13 (a), the half of the refusal that stays. Keying the refusal on files that would actually be removed must not lose the case it exists for: this registration names `text-tells.md`, a byte-identical copy of the shipped file that the retirement removes, so every later session would run a hook against a path that is gone. Refused, exit 1, and the registration line says why. Paired with `catalog-residue-but-hooked`, where the registered file stays and the retirement proceeds.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "want": [
+      "retire     text-tells.md",
+      "names a file this retirement REMOVES",
+      "1 kind(s) REFUSED on hooks"
+    ],
+    "not": [
+      "its file stays",
+      "REMOVED"
+    ]
+  },
+  "catalog-code-orphaned-gate-refused": {
+    "_why": "DEF-Q-14. A project's code-eval commit gate blocks `git commit` until `.claude/.code-eval-reviewed` matches the tree, and the project copy's SKILL.md is the only thing that writes it. The shipped SKILL.md in THIS tree carries no stamp step, so no shipped stamper is reachable, and retiring the copy would leave a gate that blocks every commit forever -- MEASURED 2026-09-11 on apps-odyssey-alive, caught before the retirement and patched by hand. The retirement is refused and names the file. The gate script itself is a hooks file the install does not ship, so it stays and is not what refuses. Measured against HEAD's wf-catalog on this identical tree: `1 kind(s) REFUSED on hooks` for the registration, and no mention of the stamp.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "want": [
+      "ORPHANED GATE: .claude/skills/code-evaluator/SKILL.md is this project's only writer of .code-eval-reviewed",
+      "code REFUSED on an orphaned gate",
+      "hooks/code-eval-commit-gate.sh\"  \u00b7 its file stays"
+    ],
+    "not": [
+      "REFUSED on hooks",
+      "REMOVED"
+    ]
+  },
+  "catalog-code-gate-stamped-by-install": {
+    "_why": "DEF-Q-14, the fixed state. The shipped code-evaluator carries the stamp step (`wf-code-eval --stamp`), so the copy's SKILL.md is no longer the only writer of `.code-eval-reviewed`: the retirement proceeds and the migration lists the gate as stamped by the shipped evaluator. Identical to `catalog-code-orphaned-gate-refused` except the shipped SKILL.md names the stamper.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "code-eval commit gate(s) \u2014 stamped by the shipped `wf-code-eval --stamp`",
+      "PreToolUse    .claude/skills/code-evaluator/hooks/code-eval-commit-gate.sh",
+      "1 code-eval gate(s)"
+    ],
+    "not": [
+      "ORPHANED",
+      "REFUSED"
+    ]
+  },
+  "code-eval-no-gate": {
+    "_why": "No gate wired, no write. The shipped code-evaluator calls `wf-code-eval --stamp` after every clean review in every project, and most projects wire no gate: a stamp nothing reads is residue, so it is a no-op that exits 0, exactly as the enforcer's coordination block was a no-op unless enforcement was wired.",
+    "script": "wf-code-eval",
+    "args": [
+      "--stamp"
+    ],
+    "exit": 0,
+    "want": [
+      "nothing to stamp"
+    ],
+    "after": {
+      ".claude/.code-eval-reviewed": {
+        "absent": true
+      }
+    }
+  },
+  "code-eval-delegates-stamp": {
+    "_why": "THE GATE DECIDES THE HASH. apps-odyssey-alive's gate excludes four record paths from its tree hash and carries its own `--stamp` so the gate and the stamp read one exclusion list; a stamp computed any other way still blocks. A gate that handles `--stamp` is asked to stamp itself, and the artifact is the gate's own write.",
+    "script": "wf-code-eval",
+    "args": [
+      "--stamp"
+    ],
+    "exit": 0,
+    "want": [
+      "delegated to the gate's own --stamp"
+    ],
+    "after": {
+      ".claude/.code-eval-reviewed": {
+        "want": [
+          "stamped-by-the-gate"
+        ]
+      }
+    }
+  },
+  "code-eval-mention-is-not-a-stamp": {
+    "_why": "A gate that only MENTIONS `--stamp` in a message has no stamp branch. Delegating to it would run the hook, record nothing and report a delegation. It gets the enforcer hash instead; outside a git work tree that hash cannot be taken, so the stamp refuses with exit 1 rather than writing a value the gate never recomputes.",
+    "script": "wf-code-eval",
+    "args": [
+      "--stamp"
+    ],
+    "exit": 1,
+    "want": [
+      "not a git work tree"
+    ],
+    "not": [
+      "delegated"
+    ],
+    "after": {
+      ".claude/.code-eval-reviewed": {
+        "absent": true
+      }
+    }
+  },
+  "code-eval-missing-gate": {
+    "_why": "A registration naming a commit-gate script that is not on disk is reported MISSING with exit 1. A dead hook fails open in the harness, so without this row nothing says the project's enforcement is gone -- the state a retirement that removed the gate's file would leave.",
+    "script": "wf-code-eval",
+    "args": [],
+    "exit": 1,
+    "want": [
+      "MISSING",
+      "1 missing"
+    ]
   }
 }

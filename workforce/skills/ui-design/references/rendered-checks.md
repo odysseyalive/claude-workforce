@@ -1,4 +1,5 @@
 <!-- ui-design-ref-version: 1 -->
+<!-- ui-additions-version: 1 -->
 <!-- SEED CONTRIBUTION. Materialized 2026-09-10 from the workforce distribution's shipped
      ui-design-seed.md (version anchor 1), carrying ONLY what design-quality-catalog.md does not
      already cover — evaluators.md item 3b: the existing built catalog is canonical and the seed

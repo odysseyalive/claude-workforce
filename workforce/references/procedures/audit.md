@@ -1971,8 +1971,11 @@ name, and left with a named remedy when it does not. A dangling registration is 
 one — the host lists the agent type and the spawn fails at use.
 
 **The hook registrations are a REFUSAL, not a warning.** `wf-catalog` reads project AND user scope and
-refuses to retire a copy any registration still points into, exiting 1 so the run can tell a refusal
-from a clean migration. That is an ORDERING requirement, not an exception: `hooks` unregisters in the
+refuses a retirement that would remove a file a registration names, exiting 1 so the run can tell a
+refusal from a clean migration. A registration whose file stays refuses nothing. A project-only file a
+live reader cites stays in place, printed with its readers, and a code-eval commit gate is listed as
+stamped by the shipped `wf-code-eval --stamp`, or refuses `code` as an ORPHANED GATE when no shipped
+stamper is reachable (`evaluators.md` § Migration). That is an ORDERING requirement, not an exception: `hooks` unregisters in the
 same audit and this step then completes. **Duplicated registrations are their own finding** —
 `odyssey-alive` carried `chain-image-eval.sh` twice on `PostToolUse` before this step existed, which is
 the double activation this migration exists to end rather than to create.

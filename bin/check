@@ -1240,6 +1240,73 @@ check(
     % (_ct_seq or "nothing", _sd_seq or "nothing", _want_seq),
 )
 
+# DEF-Q-12, DEF-Q-13 AND DEF-Q-14, reported 2026-09-11 from apps-odyssey-alive and re-confirmed
+# against 1.58.0. BEHAVIOURAL: each check RUNS the shipped script against its fixtures through
+# `bin/script-conformance`, because every defect below was a script that read clean while doing
+# the wrong thing, and a source-string assertion would pass on a comment describing the fix.
+def _sc_cases(*names):
+    """Run each named fixture row; return the failures as `name: detail` strings."""
+    bad = []
+    for _n in names:
+        try:
+            _r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "script-conformance"), _n],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                universal_newlines=True, timeout=300)
+        except (OSError, subprocess.SubprocessError) as _exc:
+            bad.append("%s: would not run (%s)" % (_n, _exc))
+            continue
+        if _r.returncode != 0:
+            bad.append("%s: %s" % (_n, " | ".join(
+                l.strip() for l in _r.stdout.splitlines() if "FAIL" in l) or _r.stdout[-300:]))
+    return bad
+
+
+_q12 = _sc_cases("catalog-grep-reads-project-anchor", "catalog-report-names-project-rules")
+_uirc = read("workforce/skills/ui-design/references/rendered-checks.md")
+if "<!-- ui-additions-version: 1 -->" not in _uirc:
+    _q12.append("the shipped ui additions slot `rendered-checks.md` lost its `ui-additions-version` "
+                "anchor, so the report cannot say which version of the authored half ships")
+check(
+    "catalog: --grep reads the project's house rules beside the corpus, and ui has an additions slot",
+    not _q12,
+    "; ".join(_q12) + " — after a retirement the project's register and its catalog amendments "
+    "live only in CATALOG-ANCHOR.md; a resolver that reads the install alone makes every project "
+    "rule ID invisible to the one read tier-3 is told to make (DEF-Q-12: a grep for the anchor's "
+    "own amendments heading exited 1)",
+)
+_q13a = _sc_cases("catalog-residue-but-hooked", "catalog-hook-names-removed-file")
+check(
+    "catalog: the hook refusal is keyed on a file the retirement removes, not on the kind",
+    not _q13a,
+    "; ".join(_q13a) + " — keyed on the kind, a registration whose file STAYS refused the whole "
+    "retirement (code-evaluator's three enforce hooks on apps-odyssey-alive, DEF-Q-13 a); keyed "
+    "on nothing, a registration naming a removed file would run against a path that is gone",
+)
+_q13b = _sc_cases("catalog-cited-file-stays", "catalog-cited-file-stays-execute")
+check(
+    "catalog: a project-only file a live reader cites stays in place, named with its readers",
+    not _q13b,
+    "; ".join(_q13b) + " — `palette.md`, `graphic-system.md` and five text-eval files read by "
+    "handbooks, skills and staying agents were listed `retire` with nothing protecting them "
+    "(DEF-Q-13 b); the audit moved seven files and repointed 32 lines by hand",
+)
+_q14 = _sc_cases("catalog-code-orphaned-gate-refused", "catalog-code-gate-stamped-by-install",
+                 "code-eval-no-gate", "code-eval-delegates-stamp",
+                 "code-eval-mention-is-not-a-stamp", "code-eval-missing-gate")
+if '"$WF/bin/wf-code-eval" --stamp' not in read("workforce/skills/code-evaluator/SKILL.md"):
+    _q14.append("the shipped code-evaluator SKILL.md no longer calls `wf-code-eval --stamp`, so "
+                "nothing a project runs writes .code-eval-reviewed once its copy retires")
+if "exec workforce/bin/wf-code-eval" not in read("manifest.txt").splitlines():
+    _q14.append("wf-code-eval is not shipped as an exec in manifest.txt, so `update` never "
+                "delivers the stamper")
+check(
+    "code-eval: the shipped evaluator stamps a project's commit gate, and the migration refuses an orphaned one",
+    not _q14,
+    "; ".join(_q14) + " — a project's commit gate blocks until .code-eval-reviewed matches the "
+    "tree, and the retired project copy's SKILL.md was its only writer: retiring it with no "
+    "shipped stamper blocks every commit forever (DEF-Q-14)",
+)
+
 # THE SCORE IS GONE AND THE DISPLAY MUST SAY SO. Reported 2026-09-10 by the user, who read
 # a Stop line, saw `sight n/a · hearing n/a · touch 20 · taste n/a` and asked why the
 # yes/no/abstain verdict was not showing up instead. The mechanism HAD been converted in
