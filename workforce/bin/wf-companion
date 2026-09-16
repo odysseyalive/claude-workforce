@@ -139,6 +139,8 @@ def installed_version():
 
 
 def read(path):
+    """SHIPPED doctrine only, which this script never writes. Every file it may rewrite is
+    read with `load`, which keeps bytes; this one forgives them, and must never feed a write."""
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             return fh.read()
@@ -358,22 +360,63 @@ APPEND_NOTE = ("<!-- Appended by `wf-companion` from `references/personnel-templ
                "§ Required sections). Everything above is unchanged. -->")
 
 
-def _conform():
-    """`wf-conform`, loaded by path without bytecode. It owns `DATA_SKILL_SECTIONS`, and a
-    second copy of that list here is how the heal and the check would drift apart."""
+_SIBLINGS = {}
+
+
+def _sibling(name):
+    """A sibling script in this `bin/`, loaded by path without bytecode, once per run."""
+    if name in _SIBLINGS:
+        return _SIBLINGS[name]
     import importlib.machinery
     import importlib.util
     prev = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
     try:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-conform")
-        loader = importlib.machinery.SourceFileLoader("wf_conform", path)
-        spec = importlib.util.spec_from_loader("wf_conform", loader)
+        mod_name = name.replace("-", "_")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        loader = importlib.machinery.SourceFileLoader(mod_name, path)
+        spec = importlib.util.spec_from_loader(mod_name, loader)
         mod = importlib.util.module_from_spec(spec)
         loader.exec_module(mod)
+        _SIBLINGS[name] = mod
         return mod
     finally:
         sys.dont_write_bytecode = prev
+
+
+def _conform():
+    """`wf-conform`. It owns `DATA_SKILL_SECTIONS`, and a second copy of that list here is
+    how the heal and the check would drift apart."""
+    return _sibling("wf-conform")
+
+
+def load(path):
+    """(text with LF line ends, eol, error) for a file this script may rewrite.
+
+    `wf-ledger.read_exact` does the reading: strict UTF-8, no newline translation. The text
+    is handed to the parsers with CRLF folded to LF, because every marker and item pattern
+    here is anchored on `\\n`, and every body built from it is converted back with `eol`
+    before it is written, so an untouched CRLF line keeps its bytes. `eol` is None when the
+    file mixes the two, and then nothing is written to it."""
+    text, eol, err = _sibling("wf-ledger").read_exact(path)
+    return (text.replace("\r\n", "\n") if text is not None else None), eol, err
+
+
+def write(root, path, text, eol="\n", makedirs=False):
+    """Write `text` (LF line ends) atomically with `eol`, inside `root` only.
+
+    Raises OSError, the file keeping its old bytes, on a failed or refused write."""
+    body = text.replace("\n", eol) if eol != "\n" else text
+    _sibling("wf-ledger").atomic_write(root, path, body.encode("utf-8"), makedirs=makedirs)
+
+
+def raw_bytes(path):
+    """The file's bytes, or None. The read-back compares these, never decoded text."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
 
 
 def contract_gaps(body):
@@ -532,6 +575,112 @@ def _renumbered(canon_lines, item, n):
     return [f"{n}. {head.group(2)}"] + [pad + l.strip() for l in canon_lines[first + 1:end]]
 
 
+def _split_plan(lines, spans, items, shipped):
+    """(matched, host_of, user_hosts, wf_hosts, why) — which items are shipped text, where
+    each one sits, and every reason the split cannot be proved. `why` empty means provable."""
+    matched = [it for it in items if item_digest(it[3]) in shipped]
+    host_of = {}
+    for it in matched:
+        host_of[it] = next((sp for sp in spans or () if sp[0] < it[0] and it[1] <= sp[1]), None)
+    if spans is None:
+        return matched, host_of, [], [], ["its origin markers nest or do not pair"]
+    hosts = [h for h in host_of.values() if h]
+    user_hosts = sorted({h for h in hosts if h[2] == "user"})
+    wf_hosts = sorted({h for h in hosts if h[2] == "workforce"})
+    why = []
+    if len(user_hosts) > 1:
+        why.append(f"shipped items sit in {len(user_hosts)} separate user spans")
+    if any(h is None for h in host_of.values()):
+        why.append("a shipped item sits outside any origin span")
+    if any(h[2] not in ("user", "workforce") for h in hosts):
+        why.append("a shipped item sits in a span of another origin")
+    for sp in wf_hosts:
+        covered = {k for it in matched if host_of[it] == sp for k in range(it[0], it[1])}
+        if any(lines[k].strip() and k not in covered for k in range(sp[0] + 1, sp[1])):
+            why.append("an `origin: workforce` block mixes shipped items with other text")
+            break
+    return matched, host_of, user_hosts, wf_hosts, why
+
+
+def _supplement(inst, base, items, canon_lines, reason):
+    """The unprovable path: the shipped items the file lacks go into a block below it."""
+    present = {it[3] for it in items}
+    missing = [it for it in principle_items(canon_lines) if it[3] not in present]
+    if not missing:
+        if base != inst:
+            return ("SUPPLEMENT", f"not split ({reason}); every shipped item is now present, "
+                    "so the supplement block is removed", base, [])
+        return ("SUPPLEMENTED", f"not split ({reason}); every current shipped item is "
+                "present, and the user span keeps its bytes", None, [])
+    hazard = append_hazard(base)
+    if hazard:
+        return ("UNMANAGED", f"not split ({reason}), and the {len(missing)} missing shipped "
+                f"item(s) cannot be appended: {hazard}", None, [])
+    n = max([it[2] for it in items] or [0])
+    body = [f"{SUPPLEMENT_MARKERS[0]} — shipped items this constitution lacks. They are not "
+            f"in a WF-PRINCIPLES region because {reason.replace('`', '')}. Refreshed by every "
+            "audit; nothing above is changed. -->"]
+    for k, it in enumerate(missing, 1):
+        body += _renumbered(canon_lines, it, n + k)
+    body.append(SUPPLEMENT_MARKERS[1])
+    new = base.rstrip("\n") + "\n\n" + "\n".join(body) + "\n"
+    if new == inst:
+        return ("SUPPLEMENTED", f"not split ({reason}); {len(missing)} shipped item(s) are "
+                "kept current in the supplement block below the user span", None, [])
+    return ("SUPPLEMENT", f"not split ({reason}); {len(missing)} missing shipped item(s) "
+            "go into a supplement block below, every existing byte kept", new, [])
+
+
+def _longest_blank_run(lines):
+    longest = run = 0
+    for line in lines:
+        run = run + 1 if not line.strip() else 0
+        longest = max(longest, run)
+    return longest
+
+
+def _tidy(keep, longest):
+    """The kept lines with outer blanks trimmed and no blank run longer than `longest`."""
+    keep = list(keep)
+    while keep and not keep[0].strip():
+        keep.pop(0)
+    while keep and not keep[-1].strip():
+        keep.pop()
+    tidy = []
+    for line in keep:
+        if not line.strip() and len(tidy) >= longest and all(
+                not x.strip() for x in tidy[len(tidy) - longest:]):
+            continue
+        tidy.append(line)
+    return tidy
+
+
+def prove_split(before, lifted, new, canonical):
+    """None when `new` is `before` with only the `lifted` lines taken out and the shipped
+    region put in; otherwise what failed, naming the line.
+
+    Outside the WF-PRINCIPLES region, the non-blank lines of `new` must be exactly the
+    non-blank lines of `before` that were not lifted, in the same order, with nothing added
+    but the template's `## General Operating Principles` heading. The region itself must be
+    the shipped span byte for byte. Blank lines are the one thing a split may change."""
+    sp = span(new, PRINCIPLES_MARKERS)
+    if sp is None or new[sp[0]:sp[1]] != canonical:
+        return "the rebuilt file does not carry the shipped WF-PRINCIPLES span exactly"
+    want = [l for k, l in enumerate(before) if l.strip() and k not in lifted]
+    got = [l for l in (new[:sp[0]] + new[sp[1]:]).split("\n") if l.strip()]
+    i = 0
+    for line in got:
+        if i < len(want) and line == want[i]:
+            i += 1
+        elif line != GOP_HEADING:
+            if i < len(want):
+                return f"the original line {want[i][:60]!r} is missing or out of order"
+            return f"{line[:60]!r} is in the rebuilt file and not in the original"
+    if i < len(want):
+        return f"the original line {want[i][:60]!r} is missing or out of order"
+    return None
+
+
 def migrate_operating_principles(inst, wf, canonical):
     """(state, detail, new_body, t2_blocks) for a constitution with no WF-PRINCIPLES region.
 
@@ -548,102 +697,37 @@ def migrate_operating_principles(inst, wf, canonical):
         return ("UNMANAGED", f"shipped {'/'.join(HISTORY_REL)} is unreadable, so no item can "
                 "be told from the user's own; nothing is moved", None, [])
     canon_lines = canonical.split("\n")
-    canon_items = principle_items(canon_lines)
     base = _drop_block(inst, SUPPLEMENT_MARKERS)
     lines = base.split("\n")
     spans = origin_spans(lines)
     items = principle_items(lines)
-    matched = [it for it in items if item_digest(it[3]) in shipped]
-
-    def host(it):
-        for sp in spans or ():
-            if sp[0] < it[0] and it[1] <= sp[1]:
-                return sp
-        return None
-
-    why = []
-    if spans is None:
-        why.append("its origin markers nest or do not pair")
-    else:
-        user_hosts = sorted({host(it) for it in matched if host(it) and host(it)[2] == "user"})
-        wf_hosts = sorted({host(it) for it in matched if host(it) and host(it)[2] == "workforce"})
-        if len(user_hosts) > 1:
-            why.append(f"shipped items sit in {len(user_hosts)} separate user spans")
-        if any(host(it) is None for it in matched):
-            why.append("a shipped item sits outside any origin span")
-        if any(host(it) and host(it)[2] not in ("user", "workforce") for it in matched):
-            why.append("a shipped item sits in a span of another origin")
-        for sp in wf_hosts:
-            covered = {k for it in matched if host(it) == sp for k in range(it[0], it[1])}
-            if any(lines[k].strip() and k not in covered for k in range(sp[0] + 1, sp[1])):
-                why.append("an `origin: workforce` block mixes shipped items with other text")
-                break
-
+    matched, host_of, user_hosts, wf_hosts, why = _split_plan(lines, spans, items, shipped)
     if why:
-        present = {it[3] for it in items}
-        missing = [it for it in canon_items if it[3] not in present]
-        reason = "; ".join(why)
-        if not missing:
-            if base != inst:
-                return ("SUPPLEMENT", f"not split ({reason}); every shipped item is now present, "
-                        "so the supplement block is removed", base, [])
-            return ("SUPPLEMENTED", f"not split ({reason}); every current shipped item is "
-                    "present, and the user span keeps its bytes", None, [])
-        hazard = append_hazard(base)
-        if hazard:
-            return ("UNMANAGED", f"not split ({reason}), and the {len(missing)} missing shipped "
-                    f"item(s) cannot be appended: {hazard}", None, [])
-        n = max([it[2] for it in items] or [0])
-        body = [f"{SUPPLEMENT_MARKERS[0]} — shipped items this constitution lacks. They are not "
-                f"in a WF-PRINCIPLES region because {reason.replace('`', '')}. Refreshed by every "
-                "audit; nothing above is changed. -->"]
-        for k, it in enumerate(missing, 1):
-            body += _renumbered(canon_lines, it, n + k)
-        body.append(SUPPLEMENT_MARKERS[1])
-        new = base.rstrip("\n") + "\n\n" + "\n".join(body) + "\n"
-        if new == inst:
-            return ("SUPPLEMENTED", f"not split ({reason}); {len(missing)} shipped item(s) are "
-                    "kept current in the supplement block below the user span", None, [])
-        return ("SUPPLEMENT", f"not split ({reason}); {len(missing)} missing shipped item(s) "
-                "go into a supplement block below, every existing byte kept", new, [])
+        return _supplement(inst, base, items, canon_lines, "; ".join(why))
 
     edits = []                       # (start, end_exclusive, replacement lines, t2 block)
+    lifted = set()                   # line indices of `lines` the split takes out on purpose
     for sp in wf_hosts:
         start = sp[0] - 1 if sp[0] > 0 and not lines[sp[0] - 1].strip() else sp[0]
         edits.append((start, sp[1] + 1, [], None))
+        lifted.update(range(sp[0], sp[1] + 1))
     placed = False
-    for sp in user_hosts:            # at most one, by the test above
+    for sp in user_hosts:            # at most one, by the plan
         o, c = sp[0], sp[1]
-        removed = {k for it in matched if host(it) == sp for k in range(it[0], it[1])}
-        content = [k for k in range(o + 1, c)]
+        removed = {k for it in matched if host_of[it] == sp for k in range(it[0], it[1])}
+        content = range(o + 1, c)
         nonblank = [k for k in content if lines[k].strip() and k not in removed]
         lift_heading = bool(nonblank) and lines[nonblank[0]] == GOP_HEADING
         if lift_heading:
             removed.add(nonblank[0])
-        keep = [lines[k] for k in content if k not in removed]
-        while keep and not keep[0].strip():
-            keep.pop(0)
-        while keep and not keep[-1].strip():
-            keep.pop()
-        longest = run = 0
-        for k in content:
-            run = run + 1 if not lines[k].strip() else 0
-            longest = max(longest, run)
-        tidy = []
-        for line in keep:
-            if not line.strip() and len(tidy) >= longest and all(
-                    not x.strip() for x in tidy[len(tidy) - longest:]):
-                continue
-            tidy.append(line)
-        # THE PROOF: every non-blank line of the span either stays, in order, or is a line
-        # of an item whose text some release shipped, or is the template's own heading.
-        if [lines[k] for k in content if lines[k].strip() and k not in removed] != \
-                [l for l in tidy if l.strip()]:
-            return ("UNMANAGED", "the split could not be proved byte-exact; nothing is moved",
-                    None, [])
+        tidy = _tidy([lines[k] for k in content if k not in removed],
+                     _longest_blank_run(lines[k] for k in content))
+        lifted |= removed
         repl = ([GOP_HEADING, ""] if lift_heading else []) + canon_lines
         if any(l.strip() for l in tidy):
             repl += ["", lines[o]] + tidy + [lines[c]]
+        else:
+            lifted |= {o, c}         # nothing of the user's is left, so the span goes too
         edits.append((o, c + 1, repl, (o + 1, c + 1, "\n".join(lines[o:c + 1]))))
         placed = True
     if not placed:
@@ -663,10 +747,19 @@ def migrate_operating_principles(inst, wf, canonical):
                 end -= 1
             heading = [] if any(l == GOP_HEADING for l in lines) else [GOP_HEADING, ""]
             edits.append((end, len(lines), [""] + heading + canon_lines + [""], None))
+    before = list(lines)
     for start, end, repl, _b in sorted(edits, key=lambda e: e[0], reverse=True):
         lines[start:end] = repl
     new = "\n".join(lines)
-    moved = sum(1 for it in matched if host(it) in user_hosts)
+    # THE PROOF, on the file as it would be written. The old proof compared the kept lines
+    # with a list built from those same lines, so it could not fail, and a splice that
+    # dropped the user's own items still read "byte-identical" (review of the 1.63.0 fix
+    # batch, finding 4).
+    unproved = prove_split(before, lifted, new, canonical)
+    if unproved:
+        return ("UNMANAGED", f"the split could not be proved ({unproved}); nothing is moved",
+                None, [])
+    moved = sum(1 for it in matched if host_of[it] in user_hosts)
     how = (f"{moved} shipped item(s) lifted out of the user span, which keeps every other line"
            if user_hosts else "no shipped item in any user span; the region is inserted")
     if wf_hosts:
@@ -687,42 +780,47 @@ def migrate_append_region(inst, wf, canonical):
             "below it, every existing byte kept", inst.rstrip("\n") + "\n\n" + canonical + "\n", [])
 
 
-def extract_first(root, blocks, source_text):
+def extract_first(root, blocks, source_text, eol="\n"):
     """T2: every block in `blocks` is in the directives file, verbatim, before a write.
 
-    Returns (ok, detail). Appends only; an existing extraction is never rewritten."""
+    Returns (ok, detail). Appends only; an existing extraction is never rewritten.
+    `source_text` is SKILL.md exactly as it is on disk, and every block in `blocks` is in
+    that same form, CRLF included, so what lands here is the user's bytes and not a
+    re-encoding of them. The file is written by `wf-ledger.atomic_write`, so a symlinked
+    `directives/` that leads outside the project is refused rather than followed."""
     import datetime
     import hashlib
     rel = OP_REL.replace(os.sep, "/")
     path = os.path.join(root, ".claude", "workforce", "directives", "operating-principles.md")
-    prior = read(path)
+    prior, _prior_eol, err = _sibling("wf-ledger").read_exact(path)
+    if err:
+        return False, f"T2 extraction target {os.path.relpath(path, root)} {err}"
     todo = [b for b in blocks if b[2] not in (prior or "")]
     if not todo:
         return True, f"{len(blocks)} of {len(blocks)} span(s) already extracted verbatim"
     today = datetime.date.today().isoformat()
     if prior is None:
         sha = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
-        out = (f"# Directives extracted from `operating-principles`\n\n"
-               f"Extracted {today} by `wf-companion`, before the WF-PRINCIPLES split.\n"
-               f"Source: `{rel}` (sha {sha}).\n\n"
-               f"{len(todo)} immutable block(s), verbatim and in original order.\n\n---\n")
+        head = (f"# Directives extracted from `operating-principles`\n\n"
+                f"Extracted {today} by `wf-companion`, before the WF-PRINCIPLES split.\n"
+                f"Source: `{rel}` (sha {sha}).\n\n"
+                f"{len(todo)} immutable block(s), verbatim and in original order.\n\n---\n")
+        out = head.replace("\n", eol)
     else:
-        out = prior.rstrip("\n") + "\n\n---\n"
+        out = prior.rstrip("\r\n") + (eol + eol + "---" + eol)
     for _a, _b, text in todo:
         # Cited where the span sits in the file as it is on disk now, never in a working copy.
         a = source_text[:source_text.find(text)].count("\n") + 1 if text in source_text else _a
         b = a + text.count("\n")
-        out += (f"\n<!-- extracted: {rel}:{a}-{b} | by wf-companion {today}, before the "
-                f"WF-PRINCIPLES split -->\n{text}\n")
+        out += (f"{eol}<!-- extracted: {rel}:{a}-{b} | by wf-companion {today}, before the "
+                f"WF-PRINCIPLES split -->{eol}{text}{eol}")
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(out)
+        _sibling("wf-ledger").atomic_write(root, path, out.encode("utf-8"), makedirs=True)
     except OSError as exc:
         return False, f"T2 extraction to {os.path.relpath(path, root)} failed: {exc.strerror}"
-    back = read(path) or ""
-    if not all(b[2] in back for b in blocks) or (prior and not back.startswith(prior.rstrip("\n"))):
-        return False, "T2 extraction read back short — nothing else is written"
+    back = (raw_bytes(path) or b"").decode("utf-8", "replace")
+    if back != out:
+        return False, "T2 extraction read back different bytes — nothing else is written"
     return True, f"{len(blocks)} of {len(blocks)} span(s) extracted verbatim to " \
                  f"{os.path.relpath(path, root)}"
 
@@ -736,39 +834,78 @@ def _user_blocks(text):
 def migrate_write(root, wf, entry, path, new_body, t2):
     """Perform one MIGRATE or SUPPLEMENT, T2 first, and prove it. (ok, detail).
 
-    On any read-back failure the file is put back to the bytes it had."""
-    before = read(path)
+    `new_body` and every block in `t2` are in the file's own line ends already (`evaluate`
+    converts them). The write is atomic, so a failed write leaves the old bytes where they
+    were; a read-back that disagrees puts them back the same way and says whether that
+    worked."""
+    before = raw_bytes(path)
     if before is None:
         return False, "unreadable before the write"
+    try:
+        before_text = before.decode("utf-8")
+    except UnicodeDecodeError:
+        return False, "stopped decoding as UTF-8 between the read and the write; nothing written"
+    eol = "\r\n" if "\r\n" in before_text else "\n"
     detail = "no sacred span changed"
     if t2:
-        ok, detail = extract_first(root, t2, before)
+        ok, detail = extract_first(root, t2, before_text, eol)
         if not ok:
             return False, detail + "; SKILL.md not written"
+    want_bytes = new_body.encode("utf-8")
     try:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(new_body)
+        write(root, path, new_body)
     except OSError as exc:
-        return False, exc.strerror
-    back = read(path) or ""
+        return False, f"not written, the file keeps its bytes: {exc.strerror}"
+    back = raw_bytes(path) or b""
     state = evaluate(root, wf, entry)[0]
-    changed = {b[2] for b in t2}
-    lost = [b for b in _user_blocks(before) if b not in changed and b not in back]
-    want = "CURRENT" if span(back, entry["region"]) else "SUPPLEMENTED"
-    if back != new_body or state != want or lost:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(before)
+    back_lf = back.decode("utf-8", "replace").replace("\r\n", "\n")
+    before_lf = before_text.replace("\r\n", "\n")
+    changed = {b[2].replace("\r\n", "\n") for b in t2}
+    lost = [b for b in _user_blocks(before_lf) if b not in changed and b not in back_lf]
+    want = "CURRENT" if span(back_lf, entry["region"]) else "SUPPLEMENTED"
+    if back != want_bytes or state != want or lost:
+        try:
+            write(root, path, before_text)
+            restored = "the original bytes are restored"
+        except OSError as exc:
+            restored = f"and restoring the original FAILED ({exc.strerror})"
+        if raw_bytes(path) != before:
+            restored = "and the file does NOT hold its original bytes — restore it from version control"
         return False, (f"read back {state} (want {want}), {len(lost)} other user span(s) "
-                       "changed — the original bytes are restored")
-    kept = len(_user_blocks(before)) - len(changed)
+                       f"changed — {restored}")
+    kept = len(_user_blocks(before_lf)) - len(changed)
     return True, f"{detail}; {kept} other user span(s) byte-identical"
 
 
 def evaluate(root, wf, entry):
-    """One row: (state, detail, installed_path, new_body_or_None, t2_blocks)."""
-    name = entry["name"]
-    inst_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
-    inst = read(inst_path)
+    """One row: (state, detail, installed_path, new_body_or_None, t2_blocks).
+
+    `new_body` and the `t2` block texts come back in the installed file's own line ends.
+    The installed file is read strictly (`load`): one that does not decode is UNDECODABLE,
+    named, and never written, and one that mixes CRLF and LF is never rewritten, because
+    no rewrite of either can keep every byte of an `origin: user` span it does not touch."""
+    inst_path = os.path.join(root, ".claude", "skills", entry["name"], "SKILL.md")
+    inst, eol, err = load(inst_path)
+    if err:
+        return ("UNDECODABLE",
+                f"{os.path.relpath(inst_path, root)} {err} — refused: nothing is migrated, "
+                "refreshed or appended until it is saved as UTF-8",
+                inst_path, None, [])
+    row = _evaluate_text(root, wf, entry, inst_path, inst)
+    state, detail, _path, new_body, t2 = row
+    if new_body is None or inst is None or eol == "\n":
+        return row
+    if eol is None:
+        return ("UNMANAGED",
+                f"{detail} — but the file mixes CRLF and LF line ends, so no rewrite can keep "
+                "every line's bytes; nothing is written",
+                inst_path, None, [])
+    return (state, detail, inst_path, new_body.replace("\n", eol),
+            [(a, b, text.replace("\n", eol)) for a, b, text in t2])
+
+
+def _evaluate_text(root, wf, entry, inst_path, inst):
+    """`evaluate` on the installed text with LF line ends; None when there is no file."""
     if inst is None:
         # ABSENT IS THIS SCRIPT'S JOB NOW, AND THAT IS THE FIX, NOT AN EXPANSION OF
         # SCOPE. This branch used to read "Step 0.3 materializes companions and
@@ -903,8 +1040,10 @@ def _flat(text):
 def objective_state(root, wf):
     """(state, detail, path, text, placeholder-span-match-or-None)."""
     path = os.path.join(root, OP_REL)
-    text = read(path)
+    text, _eol, err = load(path)
     ph = objective_placeholder(wf)
+    if err:
+        return "UNREADABLE", f"{OP_REL} {err}", path, None, None
     if text is None:
         return "ABSENT", "no operating-principles/SKILL.md", path, None, None
     if ph is None:
@@ -958,8 +1097,17 @@ def draft_objective(root, wf, draft, by, execute):
             print(f"  | {line}")
         print("  write with: --execute")
         return 0
-    with open(path, "w", encoding="utf-8") as fh:     # through a symlink, never over it
-        fh.write(new)
+    eol = load(path)[1]
+    if eol is None:
+        print(f"objective          PLACEHOLDER · {rel} · cannot draft: the file mixes CRLF and LF "
+              "line ends, so no rewrite can keep the other sacred blocks' bytes", file=sys.stderr)
+        return 1
+    try:
+        write(root, path, new, eol)       # atomic; through a symlink, never over it
+    except OSError as exc:
+        print(f"objective          FAILED · {rel} · not written, the file keeps its bytes: "
+              f"{exc.strerror}", file=sys.stderr)
+        return 1
     back = objective_state(root, wf)
     kept = [s for s in USER_SPAN_RX.findall(text) if _flat(objective_placeholder(wf)) not in _flat(s)]
     ok = back[0] == "DRAFTED" and all(s in USER_SPAN_RX.findall(back[3] or "") for s in kept)
@@ -1026,16 +1174,15 @@ def main():
                 print(f"  ~ {name:22s} {state:10s} {detail} — would append")
                 continue
             try:
-                with open(path, "w", encoding="utf-8") as fh:
-                    fh.write(new_body)
+                write(root, path, new_body)
             except OSError as exc:
                 failed = True
                 unrefreshed += 1
-                print(f"  ! {name:22s} FAILED    {exc.strerror}", file=sys.stderr)
+                print(f"  ! {name:22s} FAILED    not written, the file keeps its bytes: "
+                      f"{exc.strerror}", file=sys.stderr)
                 continue
-            before = read(path) or ""
-            inst_before = new_body[:new_body.index(APPEND_NOTE)].rstrip("\n")
-            if not before.startswith(inst_before) or contract_gaps(before):
+            back = raw_bytes(path)
+            if back != new_body.encode("utf-8") or contract_gaps(load(path)[0] or ""):
                 failed = True
                 unrefreshed += 1
                 print(f"  ! {name:22s} FAILED    appended and read back with a contract gap "
@@ -1092,13 +1239,15 @@ def main():
                 # whose parent is missing is a target that moved under the run, and
                 # `makedirs` would turn that into a confident write to a path nobody
                 # named.
-                if state == "ABSENT":
-                    os.makedirs(os.path.dirname(path), exist_ok=True)
-                # WRITE THROUGH A SYMLINK, NEVER OVER IT. A Core skill may be symlinked
-                # into a shared doctrine tree, and `open(path, "w")` truncates the TARGET
-                # rather than replacing the link (SKILL.md Atomic-or-Absent rule 3).
-                with open(path, "w", encoding="utf-8") as fh:
-                    fh.write(new_body)
+                #
+                # WRITE THROUGH A SYMLINK, NEVER OVER IT, AND NEVER OUT OF THE PROJECT.
+                # `write` renames a temp file over the link's TARGET, so the link survives
+                # (SKILL.md Atomic-or-Absent rule 3), and it refuses a target that resolves
+                # outside the root: a Core skill symlinked into a shared tree is another
+                # project's file, and this run was not pointed at that project.
+                write(root, path, new_body, makedirs=(state == "ABSENT"))
+                if raw_bytes(path) != new_body.encode("utf-8"):
+                    raise OSError(0, "read back different bytes from the ones written")
                 # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
                 # its own output has not finished (`checksums.md` rule 2).
                 #
@@ -1111,7 +1260,7 @@ def main():
                 ok = (back_state == "CURRENT" or
                       (verb == "materialize" and back_state in ("UNMANAGED", "NO-REGION")))
                 if ok and verb == "materialize":
-                    fm_ok, why = frontmatter_ok(read(path) or "")
+                    fm_ok, why = frontmatter_ok(load(path)[0] or "")
                     if not fm_ok:
                         ok, back_state = False, f"unloadable frontmatter ({why})"
                 if not ok:
@@ -1138,6 +1287,12 @@ def main():
         unrefreshed += 1
         if state in ("UNPRODUCIBLE", "UNREADABLE") and not os.path.exists(path):
             absent += 1
+        if state == "UNDECODABLE":
+            # NEVER 0 ON A FILE THIS RUN COULD NOT READ — the rule `main` states for the
+            # tree, applied to the one file. The row names the file and the byte.
+            failed = True
+            print(f"  ! {name:22s} {state:9s} {detail}", file=sys.stderr)
+            continue
         print(f"  ~ {name:22s} {state:9s} {detail}")
 
     total = len(CORE)

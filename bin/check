@@ -16142,9 +16142,9 @@ def _cr_run(script, *args, env=None):
     return r.returncode, r.stdout
 
 
-def _cr_tree(tmp, name):
+def _cr_tree(tmp, name, as_=None):
     import shutil as _crsh
-    dst = os.path.join(tmp, name)
+    dst = os.path.join(tmp, as_ or name)
     _crsh.copytree(os.path.join("fixtures", "scripts", name), dst, symlinks=True)
     return dst
 
@@ -16355,6 +16355,305 @@ check(
     bool(_cr_plok),
     f"{_cr_plo[-300:]!r} — a customized ledger skill was UNMANAGED forever, so the project "
     "family, the fourth status and the index rules never reached an existing org",
+)
+
+# ── review of the 1.63.0 fix batch: wf-companion and wf-ledger writes ──────────────
+# Each finding was reproduced on a copy of a fixture before it was fixed, and each block
+# below fails against the code as it was. They run the shipped scripts, and they also
+# load `wf-ledger` as a module, because `wf-companion` reads and writes through it: an
+# `append` in bin/prove that puts the old behaviour back takes effect exactly there.
+_rv_py = sys.executable
+_rv_op = ".claude/skills/operating-principles/SKILL.md"
+_rv_ext = ".claude/workforce/directives/operating-principles.md"
+_rv_idx = ".claude/workforce/personnel/index.md"
+
+
+def _rv_bytes(p):
+    try:
+        with open(p, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _rv_put(p, data):
+    with open(p, "wb") as fh:
+        fh.write(data)
+
+
+def _rv_limited(limit, argv):
+    """Run `argv` with RLIMIT_FSIZE at `limit` bytes. (exit, output)."""
+    import resource as _rvr
+
+    def _cap():
+        _rvr.setrlimit(_rvr.RLIMIT_FSIZE, (limit, limit))
+    r = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       preexec_fn=_cap, timeout=120)
+    return r.returncode, r.stdout.decode("utf-8", "replace")
+
+
+def _rv_module(name):
+    import importlib.machinery as _rvm, importlib.util as _rvu
+    sys.dont_write_bytecode = True
+    ld = _rvm.SourceFileLoader("_rv_" + name.replace("-", "_"), f"workforce/bin/{name}")
+    mod = _rvu.module_from_spec(_rvu.spec_from_loader(ld.name, ld))
+    ld.exec_module(mod)
+    return mod
+
+
+# Finding 1. `open(path, "w")` truncated first. Under a file-size limit the interleaved
+# constitution went 6009 B -> 2048 B (principles 8-19 gone) and the hand-kept index lost its
+# tail with a traceback, and neither was restored. Each limit here sits one byte below the
+# size the write needs, so only a write that truncates before it fails can change the file.
+def _rv_atomic():
+    import tempfile as _rvt
+    bad = []
+    with _rvt.TemporaryDirectory(prefix="wf-rv-atomic-") as t:
+        full = _cr_tree(t, "companion-interleaved-constitution", "full")
+        c, o = _cr_run("wf-companion", "--root", full, "--execute")
+        migrated = _rv_bytes(os.path.join(full, _rv_op)) or b""
+        if c != 0 or b"WF-PRINCIPLES START" not in migrated:
+            bad.append(f"the unlimited migration did not run (exit {c})")
+        d = _cr_tree(t, "companion-interleaved-constitution", "limited")
+        orig = _rv_bytes(os.path.join(d, _rv_op))
+        os.makedirs(os.path.join(d, os.path.dirname(_rv_ext)))
+        _rv_put(os.path.join(d, _rv_ext), _rv_bytes(os.path.join(full, _rv_ext)) or b"")
+        c, o = _rv_limited(len(migrated) - 1, [_rv_py, "workforce/bin/wf-companion",
+                                               "--root", d, "--execute"])
+        if _rv_bytes(os.path.join(d, _rv_op)) != orig or c != 1 or "keeps its bytes" not in o:
+            bad.append(f"wf-companion: a failed write changed SKILL.md "
+                       f"({len(orig)} B -> {len(_rv_bytes(os.path.join(d, _rv_op)) or b'')} B, exit {c})")
+        li = _cr_tree(t, "ledger-sectioned-index")
+        prior = _rv_bytes(os.path.join(li, _rv_idx))
+        c, o = _rv_limited(len(prior) + 40, [_rv_py, "workforce/bin/wf-ledger", "index",
+                                            "--root", li, "--execute"])
+        if _rv_bytes(os.path.join(li, _rv_idx)) != prior or c != 2 or "Traceback" in o:
+            bad.append(f"wf-ledger: a failed index write changed the hand-kept index or "
+                       f"tracebacked (exit {c}): {o.strip()[-160:]!r}")
+        # The helper itself, in a child with the limit, on a file it cannot finish writing.
+        victim = os.path.join(t, "victim.md")
+        _rv_put(victim, b"x" * 100)
+        code = ("import importlib.machinery as m, importlib.util as u, sys\n"
+                "l = m.SourceFileLoader('wl', 'workforce/bin/wf-ledger')\n"
+                "w = u.module_from_spec(u.spec_from_loader('wl', l)); l.exec_module(w)\n"
+                "try:\n    w.atomic_write(sys.argv[1], sys.argv[2], b'y' * 4096)\n"
+                "except OSError:\n    sys.exit(3)\n")
+        c, o = _rv_limited(1024, [_rv_py, "-B", "-c", code, t, victim])
+        if _rv_bytes(victim) != b"x" * 100 or c != 3:
+            bad.append(f"atomic_write under a 1 KiB limit left {len(_rv_bytes(victim) or b'')} B, exit {c}")
+    return bad
+
+
+try:
+    import resource as _rv_res  # noqa: F401
+    _rv_have_limit = True
+except ImportError:
+    _rv_have_limit = False
+if not _rv_have_limit:
+    skip("atomic writes: a write that fails leaves the constitution and the hand-kept index byte-for-byte",
+         "no `resource` module on this platform, so no file-size limit can be set")
+else:
+    try:
+        _rv_ab = _rv_atomic()
+    except Exception as _exc:                                # noqa: BLE001
+        _rv_ab = [f"the probe could not complete: {_exc!r}"[:200]]
+    check(
+        "atomic writes: a write that fails leaves the constitution and the hand-kept index byte-for-byte",
+        not _rv_ab,
+        f"{_rv_ab} — a truncate-then-write that fails part way destroys the user's principles "
+        "or the Records Owner's index and reports only the error",
+    )
+
+
+# Finding 2. Universal newlines and `errors="replace"`: a CRLF constitution came back LF,
+# the untouched Strategic Objective included, and a Latin-1 é became U+FFFD in SKILL.md and
+# in the "verbatim" extraction, while the row said byte-identical.
+def _rv_bytes_exact():
+    import tempfile as _rvt
+    bad = []
+    with _rvt.TemporaryDirectory(prefix="wf-rv-bytes-") as t:
+        lf = _cr_tree(t, "companion-interleaved-constitution", "lf")
+        _cr_run("wf-companion", "--root", lf, "--execute")
+        d = _cr_tree(t, "companion-interleaved-constitution", "crlf")
+        op = os.path.join(d, _rv_op)
+        crlf = (_rv_bytes(op) or b"").replace(b"\n", b"\r\n")
+        _rv_put(op, crlf)
+        objective = crlf[crlf.index(b"<!-- origin: user"):crlf.index(b"<!-- /origin -->") + 16]
+        c, o = _cr_run("wf-companion", "--root", d, "--execute")
+        got = _rv_bytes(op) or b""
+        ext = _rv_bytes(os.path.join(d, _rv_ext)) or b""
+        if c != 0 or got != (_rv_bytes(os.path.join(lf, _rv_op)) or b"").replace(b"\n", b"\r\n"):
+            bad.append(f"a CRLF constitution did not migrate to the LF result with CRLF kept (exit {c})")
+        if objective not in got or b"\n" in got.replace(b"\r\n", b"") or b"\n" in ext.replace(b"\r\n", b""):
+            bad.append("a CRLF sacred span or the extraction lost a CR")
+        d2 = _cr_tree(t, "companion-interleaved-constitution", "latin1")
+        op2 = os.path.join(d2, _rv_op)
+        latin = (_rv_bytes(op2) or b"").replace(b"**Tabs, not spaces,**", b"**Tabs, not spaces, caf\xe9**")
+        _rv_put(op2, latin)
+        c, o = _cr_run("wf-companion", "--root", d2, "--execute")
+        if c != 1 or "UNDECODABLE" not in o or "operating-principles/SKILL.md is not valid UTF-8" not in o \
+                or _rv_bytes(op2) != latin or os.path.exists(os.path.join(d2, _rv_ext)):
+            bad.append(f"a Latin-1 constitution was not refused by name with every byte kept "
+                       f"(exit {c}): {o.strip()[-200:]!r}")
+        # The reader the migration goes through, loaded the way wf-companion loads it.
+        rd = _rv_module("wf-ledger").read_exact
+        probe = os.path.join(t, "probe.md")
+        _rv_put(probe, b"a\r\nb\r\n")
+        if rd(probe)[:2] != ("a\r\nb\r\n", "\r\n"):
+            bad.append(f"wf-ledger.read_exact translated line ends: {rd(probe)!r}")
+        _rv_put(probe, b"caf\xe9\n")
+        if rd(probe)[0] is not None or "not valid UTF-8" not in (rd(probe)[2] or ""):
+            bad.append(f"wf-ledger.read_exact decoded Latin-1 instead of refusing it: {rd(probe)!r}")
+    return bad
+
+
+try:
+    _rv_bb = _rv_bytes_exact()
+except Exception as _exc:                                    # noqa: BLE001
+    _rv_bb = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "byte-exact: a CRLF constitution migrates with every CR kept, and a non-UTF-8 one is refused by name",
+    not _rv_bb,
+    f"{_rv_bb} — a migration that re-encodes the file changes the bytes of the user's immutable "
+    "spans while its row reports them byte-identical",
+)
+
+
+# Finding 3. A symlinked `.claude/workforce/directives` took the T2 extraction outside the
+# project. Every write of both scripts resolves its target first; a link INSIDE the root is
+# written through and survives.
+def _rv_contained():
+    import tempfile as _rvt
+    bad = []
+    with _rvt.TemporaryDirectory(prefix="wf-rv-link-") as t:
+        out = os.path.join(t, "outside")
+        os.makedirs(out)
+        d = _cr_tree(t, "companion-interleaved-constitution", "link-out")
+        orig = _rv_bytes(os.path.join(d, _rv_op))
+        os.makedirs(os.path.join(d, ".claude/workforce"))
+        os.symlink(out, os.path.join(d, ".claude/workforce/directives"))
+        c, o = _cr_run("wf-companion", "--root", d, "--execute")
+        if os.listdir(out) or c != 1 or "outside the project root" not in o \
+                or _rv_bytes(os.path.join(d, _rv_op)) != orig:
+            bad.append(f"wf-companion wrote through a directives link out of the project "
+                       f"(exit {c}, outside holds {os.listdir(out)})")
+        li = _cr_tree(t, "ledger-sectioned-index")
+        store = os.path.join(li, ".claude/workforce/personnel")
+        out2 = os.path.join(t, "outside-store")
+        os.rename(store, out2)
+        os.symlink(out2, store)
+        c, o = _cr_run("wf-ledger", "new", "DEC", "--slug", "escaped", "--subjects", "a",
+                       "--root", li, "--execute")
+        if os.path.exists(os.path.join(out2, "DEC-escaped.md")) or c != 2 \
+                or "outside the project root" not in o:
+            bad.append(f"wf-ledger wrote a record through a store link out of the project (exit {c})")
+        inside = _cr_tree(t, "companion-interleaved-constitution", "link-in")
+        real = os.path.join(inside, "shared", "operating-principles.md")
+        os.makedirs(os.path.dirname(real))
+        os.rename(os.path.join(inside, _rv_op), real)
+        os.symlink(os.path.join("..", "..", "..", "shared", "operating-principles.md"),
+                   os.path.join(inside, _rv_op))
+        c, o = _cr_run("wf-companion", "--root", inside, "--execute")
+        if c != 0 or not os.path.islink(os.path.join(inside, _rv_op)) \
+                or b"WF-PRINCIPLES START" not in (_rv_bytes(real) or b""):
+            bad.append(f"a SKILL.md linked inside the project was not written through with its link kept (exit {c})")
+        w = _rv_module("wf-ledger")
+        if w.inside_root(inside, os.path.join(d, ".claude/workforce/directives/x.md")):
+            bad.append("wf-ledger.inside_root accepted a path in another tree")
+    return bad
+
+
+try:
+    _rv_cb = _rv_contained()
+except Exception as _exc:                                    # noqa: BLE001
+    _rv_cb = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "containment: wf-companion and wf-ledger refuse a write that resolves outside the project, and write through a link inside it",
+    not _rv_cb,
+    f"{_rv_cb} — a symlinked directory turns a project-scoped heal into a write to a tree "
+    "nobody named, and a rename over an in-project link would replace it with a copy",
+)
+
+
+# Finding 4. The split's proof compared `tidy` with the lines `tidy` was built from, so it
+# could not fail. The proof now reads the rebuilt file: a splice that loses one of the
+# user's lines must come back UNMANAGED, and `prove_split` must name the missing line.
+def _rv_proof():
+    bad = []
+    wc = _rv_module("wf-companion")
+    wf = os.path.abspath("workforce")
+    inst = read(os.path.join("fixtures/scripts/companion-interleaved-constitution", _rv_op))
+    src = read("workforce/references/templates.md")
+    sp = wc.span(src, wc.PRINCIPLES_MARKERS)
+    canonical = src[sp[0]:sp[1]]
+    state, _detail, good, _t2 = wc.migrate_operating_principles(inst, wf, canonical)
+    if state != "MIGRATE":
+        bad.append(f"the fixture no longer migrates ({state})")
+    real_tidy = wc._tidy
+    wc._tidy = lambda keep, longest: [l for l in real_tidy(keep, longest)
+                                      if not l.startswith("9. **Tabs, not spaces,**")]
+    try:
+        state, detail, new, _t2 = wc.migrate_operating_principles(inst, wf, canonical)
+    finally:
+        wc._tidy = real_tidy
+    if state != "UNMANAGED" or new is not None or "could not be proved" not in detail \
+            or "Tabs, not spaces" not in detail:
+        bad.append(f"a splice that drops the user's item 9 was not refused by the proof: {state} {detail[:160]!r}")
+    lines = inst.split("\n")
+    if good and wc.prove_split(lines, set(), good, canonical) is None:
+        bad.append("prove_split accepted a rebuild that lifted lines it was not told were lifted")
+    return bad
+
+
+try:
+    _rv_pb = _rv_proof()
+except Exception as _exc:                                    # noqa: BLE001
+    _rv_pb = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "constitution: the split is proved on the rebuilt file, and a splice that drops a user line is refused",
+    not _rv_pb,
+    f"{_rv_pb} — a proof built from its own output passes every split, including one that "
+    "deletes the project's principles, and reports the span byte-identical",
+)
+
+
+# Finding 5. `hand_kept` read only the header phrase, so an index that started with the old
+# generated header and carried hand-written sections under it was rebuilt from scratch.
+def _rv_hand_kept():
+    import tempfile as _rvt
+    bad = []
+    wl = _rv_module("wf-ledger")
+    old = read("fixtures/scripts/ledger-old-header-hand-sections/" + _rv_idx)
+    pure = read("fixtures/scripts/ledger-index-rebuild/" + _rv_idx)
+    if not wl.hand_kept(old):
+        bad.append("hand_kept called an index with hand-written sections generated")
+    if wl.hand_kept(pure) or wl.hand_kept(pure.replace("\n", "\r\n")):
+        bad.append("hand_kept called a purely generated index (old header) hand-kept")
+    with _rvt.TemporaryDirectory(prefix="wf-rv-hk-") as t:
+        d = _cr_tree(t, "ledger-old-header-hand-sections")
+        p = os.path.join(d, _rv_idx)
+        before = _rv_bytes(p)
+        c, o = _cr_run("wf-ledger", "index", "--root", d, "--execute")
+        after = _rv_bytes(p) or b""
+        if c != 0 or not after.startswith(before) or b"## Run narrative" not in after \
+                or b"DEC-unlinked" not in after:
+            bad.append(f"index --execute rebuilt over the hand-written sections (exit {c}): {o.strip()[-160:]!r}")
+        g = _cr_tree(t, "ledger-index-rebuild")
+        c, o = _cr_run("wf-ledger", "index", "--root", g, "--execute")
+        if b"DEC-phantom" in (_rv_bytes(os.path.join(g, _rv_idx)) or b""):
+            bad.append("a purely generated old index was not rebuilt")
+    return bad
+
+
+try:
+    _rv_hb = _rv_hand_kept()
+except Exception as _exc:                                    # noqa: BLE001
+    _rv_hb = [f"the probe could not complete: {_exc!r}"[:200]]
+check(
+    "ledger: an index is rebuilt only when every line of it is generated layout",
+    not _rv_hb,
+    f"{_rv_hb} — a header phrase is not authorship: an index that starts generated and gains "
+    "hand-written sections loses them on the next rebuild",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
