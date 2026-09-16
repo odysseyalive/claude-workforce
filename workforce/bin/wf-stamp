@@ -12,6 +12,10 @@
     wf-stamp --root <dir> --directives --execute --restamp
                                        ALSO rewrite a row whose digest no longer matches
 
+    wf-stamp --root <dir> --floor <handbook> --evidence <path> [--execute]
+                                       record a handbook's measured length floor, which
+                                       wf-conform reports instead of re-ordering the split
+
 THE SECOND HALF, AND IT IS THE SAME DEFECT ONE FILE OVER. `.directives.sha` is the
 sidecar `wf-protect-directives` compares every edit against and `wf-conform` re-hashes
 at every `verify`. `checksums.md` § Where it runs names its path so that "a generator
@@ -25,7 +29,8 @@ two rows stale after the 1.24.0 install rewrote their files, three sacred blocks
 carrying no row at all, and no shipped command able to write either.
 
 SCOPE IS DECLARED, NEVER INFERRED, AND IT IS ONE FUNCTION. Blocks are collected over
-`wf-census.sacred_scope`: every `.md` under `.claude/` except the run scratch, minus
+`wf-census.sacred_scope`: every `.md` under `.claude/` except the run scratch
+(`wf-census.SACRED_SCRATCH`: `workforce/work`, `workforce/staging`, `workforce/retired`), minus
 anything `.censusignore` declares out. That is the exact set `wf-conform` demands a row
 for, and it is a superset of the paths `wf-protect-directives` guards, so the hook can
 never fire on a block the sidecar has no row for.
@@ -86,6 +91,7 @@ import hashlib
 import os
 import re
 import sys
+import time
 
 # CANONICAL GRAMMAR, COPIED VERBATIM FROM `wf-conform`, NOT IMPORTED. `checksums.md`
 # rule 1 — "two readers of one artifact must share one grammar and one normalization,
@@ -128,32 +134,104 @@ def section(body, heading):
     return m.group(1) if m else None
 
 
-def contract_digest(body):
-    """sha256 over the normalized `## Procedure` + `## Verification` sections.
+def declared_scripts(body, root):
+    """[(project-relative path, sha256 of its bytes or None if absent)] for every script a
+    declared `Check:` or `Negative:` in `## Verification` runs, sorted and deduplicated.
+
+    THE CHECK IS WHAT THE SCRIPT DOES, NOT WHAT THE BULLET SAYS (apps-odyssey-alive DEF-Q-22,
+    2026-09-16). A byte-density split moved 26 long check commands into
+    `.claude/workforce/checks/<employee>/*.sh` and left each bullet reading `bash <script>`,
+    so an edit inside a script changed what the check does and the stamp, which hashed only
+    the bullet text, could not see it.
+
+    WHICH BULLETS AND WHICH SCRIPT ARE `wf-checkrun`'S ANSWER, imported, never restated: the
+    same masking (a `Check:` shown inside a fence or comment is not declared), the same
+    section locator, and `wf-census.Census.resolve_hook_command`, the one resolver that
+    unwraps `bash <path>` and its relatives and calls an inline `bash -c` or a bare PATH
+    name undecidable. So the scripts folded here are exactly the ones `wf-checkrun` reports
+    as `resolved` or `dead`. Only a script INSIDE the project is folded: a path under an
+    install or `$HOME` differs per machine and is not this handbook's contract. A declared
+    script that is not on disk is folded as absent, so deleting it is drift too. Only the
+    script a bullet names is read, never what that script sources in turn.
+    """
+    if root is None:
+        return []
+    checkrun = _load_sibling("wf-checkrun")
+    masked, _ambiguous = checkrun.mask_regions(body)
+    span = checkrun.section_span(masked)
+    if not isinstance(span, tuple):
+        return []
+    decl = masked[span[0]:span[1]]
+    cmds = checkrun.CHECK_RX.findall(decl) + checkrun.NEGATIVE_RX.findall(decl)
+    if not cmds:
+        return []
+    census = _load_sibling("wf-census").Census(root)
+    real_root = os.path.realpath(root)
+    out = {}
+    for cmd in cmds:
+        script, exists = census.resolve_hook_command(cmd)
+        if script is None:
+            continue
+        real = os.path.realpath(script)
+        if not real.startswith(real_root + os.sep):
+            continue
+        rel = os.path.relpath(real, real_root).replace(os.sep, "/")
+        sha = None
+        if exists and os.path.isfile(real):
+            try:
+                sha = hashlib.sha256(open(real, "rb").read()).hexdigest()
+            except OSError:
+                sha = None
+        out[rel] = sha
+    return sorted(out.items())
+
+
+def contract_digest(body, root=None, scripts=None):
+    """sha256 over the normalized `## Procedure` + `## Verification` sections, plus the
+    bytes of every script a declared check in `## Verification` runs (`declared_scripts`).
 
     Returns None when either section is absent: a handbook missing one of them has no
     contract to stamp, and `wf-conform` already owns that verdict. The two normalized
     sections are joined by a single newline so that moving a line from the end of one
     to the start of the other CHANGES the digest — concatenating them bare would make
     that edit invisible, and it is exactly the kind of edit a drift check exists for.
+
+    A HANDBOOK THAT CALLS NO SCRIPT HASHES EXACTLY AS IT DID BEFORE SCRIPTS WERE FOLDED, so
+    the change moves no stamp that has nothing new to cover. Each script adds one line,
+    `script:<path>:<sha256 or ABSENT>`. `root=None` gives the pre-fold text-only digest,
+    which `classify` uses to recognise a stamp an older release wrote.
     """
     proc, ver = section(body, "## Procedure"), section(body, "## Verification")
     if proc is None or ver is None:
         return None
     payload = normalize(proc) + "\n" + normalize(ver)
+    if scripts is None:
+        scripts = declared_scripts(body, root)
+    for rel, sha in scripts:
+        payload += f"\nscript:{rel}:{sha or 'ABSENT'}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def classify(body):
+def classify(body, root=None):
     """(state, recomputed, recorded) for one handbook body.
 
     States: NO-RECORD (not governed), N/A (a delegating tier, which correctly has no
     procedure contract), NO-SECTIONS, UNSTAMPED (placeholder or no line at all), OK,
-    MISMATCH.
+    PRE-FOLD, MISMATCH.
+
+    PRE-FOLD is a stamp an older release wrote over the text alone, on a handbook whose
+    checks run scripts. Its text still matches, so nothing a reader could compare has
+    moved, and calling it MISMATCH would raise CONTRACT-DRIFT across every such handbook
+    the day this release installs, with `--restamp` as the only way out, the gesture that
+    also blesses real drift. So it is written under plain `--execute`, like a first stamp:
+    the script half never had a prior claim. The cost is stated, not hidden: an edit made
+    to a script before its first folded stamp cannot be detected, because nothing recorded
+    those bytes.
     """
     if not ORG_RECORD_RX.search(body):
         return "NO-RECORD", None, None
-    want = contract_digest(body)
+    scripts = declared_scripts(body, root)
+    want = contract_digest(body, root, scripts)
     if want is None:
         # A DELEGATING TIER HAS NOTHING TO HASH, AND THAT IS THE DESIGN, NOT A DEFECT.
         # `handbook-templates.md` § Lead: `tier: 2` carries "no `## Procedure` — a
@@ -177,6 +255,8 @@ def classify(body):
         return "UNSTAMPED", want, recorded      # the placeholder, or any non-digest
     if hit.group(1) == want:
         return "OK", want, recorded
+    if scripts and hit.group(1) == contract_digest(body, None, []):
+        return "PRE-FOLD", want, recorded
     return "MISMATCH", want, recorded
 
 
@@ -219,8 +299,14 @@ SIDECAR_HEADER = (
 )
 
 
+_SIBLINGS = {}
+
+
 def _load_sibling(name):
-    """Import a sibling shipped script by path, without leaving bytecode in `bin/`."""
+    """Import a sibling shipped script by path, without leaving bytecode in `bin/`.
+    Loaded once per process: the contract half asks for two siblings per handbook."""
+    if name in _SIBLINGS:
+        return _SIBLINGS[name]
     import importlib.machinery
     import importlib.util
     _prev = sys.dont_write_bytecode
@@ -234,6 +320,7 @@ def _load_sibling(name):
         loader.exec_module(mod)
     finally:
         sys.dont_write_bytecode = _prev
+    _SIBLINGS[name] = mod
     return mod
 
 
@@ -417,6 +504,92 @@ def report_symlink_drift(before, after):
     return lost + retargeted
 
 
+def record_floor(root, name, evidence, execute):
+    """Record a handbook's measured length floor in `wf-conform.LENGTH_FLOORS_REL`.
+
+    THE NUMBERS ARE MEASURED HERE, NEVER TYPED (DEF-Q-23, 2026-09-16). The row says a
+    relocation pass stopped at this size, and `wf-conform` stops ordering the split while
+    the handbook stays at or under it. A floor somebody typed could be any number, so the
+    writer reads the handbook's lines and bytes itself, at the moment the pass ends.
+
+    Refused, exit 2: no such handbook; not governed (no ORG-RECORD); a Lead or CEO, whose
+    length `wf-conform` already observes without ordering anything; evidence that is not a
+    file inside the project, because a floor with nothing behind it is an assertion. Not
+    recorded, exit 0: a handbook within both budgets has no split to stop ordering.
+    The grammar, the path and the budget are `wf-conform`'s, imported.
+    """
+    conform = _load_sibling("wf-conform")
+    base = name[:-3] if name.endswith(".md") else name
+    hb = os.path.join(root, ".claude", "agents", base + ".md")
+    rel_file = conform.LENGTH_FLOORS_REL.replace(os.sep, "/")
+    print(f"wf-stamp --floor — {root}")
+    try:
+        body = open(hb, encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"  ! REFUSED  {base}: {hb} unreadable ({type(exc).__name__})", file=sys.stderr)
+        return 2
+    if not ORG_RECORD_RX.search(body):
+        print(f"  ! REFUSED  {base}: no ORG-RECORD — workforce did not author it", file=sys.stderr)
+        return 2
+    tier = TIER_RX.search(body)
+    if tier and tier.group(1) in ("1", "2"):
+        print(f"  ! REFUSED  {base}: tier {tier.group(1)} — wf-conform observes this length and "
+              f"orders no split, so there is nothing for a floor to stop", file=sys.stderr)
+        return 2
+    ev = os.path.normpath(evidence or "")
+    ev_real = os.path.realpath(os.path.join(root, ev))
+    if (not evidence or os.path.isabs(evidence)
+            or not ev_real.startswith(os.path.realpath(root) + os.sep)
+            or not os.path.isfile(ev_real)):
+        print(f"  ! REFUSED  {base}: evidence {evidence!r} is not a file inside {root}. Cite the "
+              f"report that measured the floor, by project-relative path", file=sys.stderr)
+        return 2
+    ev = ev.replace(os.sep, "/")
+    lines, size = len(body.splitlines()), len(body.encode("utf-8"))
+    ceiling = conform.DEFAULT_LENGTH_CEILING
+    budget = ceiling * conform.MEASURED_BYTES_PER_LINE
+    if lines <= ceiling and size <= budget:
+        print(f"  . nothing to record  {base}.md  {lines} lines, {size:,} B — within {ceiling} "
+              f"lines and {budget:,} B, so no split is ordered and no floor is needed")
+        return 0
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    row = f"| `{base}.md` | {lines} | {size} | `{ev}` | {today} |"
+    path = os.path.join(root, conform.LENGTH_FLOORS_REL)
+    if not execute:
+        print(f"  ~ would record  {row}\n  Re-run with --execute to write {rel_file}.")
+        return 0
+    try:
+        old = open(path, encoding="utf-8").read()
+    except FileNotFoundError:
+        old = conform.LENGTH_FLOORS_HEADER
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"  ! {rel_file} unreadable ({type(exc).__name__}) — nothing written", file=sys.stderr)
+        return 2
+    out, replaced = [], False
+    for line in old.splitlines():
+        m = conform.FLOOR_ROW_RX.match(line.strip())
+        if m and m.group(1) == base + ".md":
+            if not replaced:
+                out.append(row)
+                replaced = True
+            continue
+        out.append(line)
+    if not replaced:
+        out.append(row)
+    new = "\n".join(out) + "\n"
+    if new != old:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w", encoding="utf-8").write(new)
+    # READ BACK WITH THE READER THAT WILL USE IT (`checksums.md` rule 2).
+    floors, _bad = conform.read_length_floors(root)
+    got = floors.get(base + ".md")
+    if not got or (got["lines"], got["bytes"], got["evidence"]) != (lines, size, ev):
+        print(f"  ! wrote {rel_file} and wf-conform read back {got!r} — not counted", file=sys.stderr)
+        return 2
+    print(f"  + recorded  {row}  ({rel_file}, read back by wf-conform)")
+    return 0
+
+
 def staged_path(root, name):
     return os.path.join(root, ".claude", "workforce", "staging", name, "HANDBOOK.md")
 
@@ -429,6 +602,11 @@ def main():
                     help="also overwrite a MISMATCH — the authorized-amendment path")
     ap.add_argument("--directives", action="store_true",
                     help="stamp `.directives.sha` instead of the handbook contract stamps")
+    ap.add_argument("--floor", metavar="HANDBOOK",
+                    help="record this handbook's measured length floor, so wf-conform reports "
+                         "it instead of ordering the split again")
+    ap.add_argument("--evidence", metavar="PATH",
+                    help="with --floor: the project-relative report that measured the floor")
     args = ap.parse_args()
 
     root = os.path.abspath(args.root)
@@ -437,6 +615,8 @@ def main():
     # eval baseline is old, while a drifted directive block means the user's own words
     # may have been reworded. Folding them into one flag would let a run that meant to
     # refresh an eval baseline silently re-bless a changed directive.
+    if args.floor:
+        return record_floor(root, args.floor, args.evidence, args.execute)
     if args.directives:
         if not os.path.isdir(os.path.join(root, ".claude")):
             print(f"wf-stamp: no .claude under {root}", file=sys.stderr)
@@ -469,7 +649,7 @@ def main():
             print(f"  ! UNREADABLE  {name}  ({exc.strerror})")
             continue
 
-        state, want, recorded = classify(body)
+        state, want, recorded = classify(body, root)
 
         if state == "NO-RECORD":
             counts[state] += 1
@@ -502,12 +682,18 @@ def main():
                   f"amendment IS the authorization, `wf-stamp --execute --restamp`.")
             continue
 
-        verb, future = ("restamped", "restamp") if state == "MISMATCH" else ("stamped", "stamp")
+        verb, future = {"MISMATCH": ("restamped", "restamp"),
+                        "PRE-FOLD": ("upgraded", "upgrade")}.get(state, ("stamped", "stamp"))
         if not args.execute:
-            counts["UNSTAMPED" if state == "UNSTAMPED" else "MISMATCH"] += 1
+            # PRE-FOLD COUNTS AS UNSTAMPED: its script half has never been stamped, and
+            # plain `--execute` is what writes it, which is what that count's hint says.
+            counts["MISMATCH" if state == "MISMATCH" else "UNSTAMPED"] += 1
             had = "placeholder" if recorded else "no stamp line"
             if state == "MISMATCH":
                 had = f"sha256:{recorded[7:19]}…"
+            elif state == "PRE-FOLD":
+                had = (f"sha256:{recorded[7:19]}… (text-only stamp from before check scripts "
+                       f"were folded; the text still matches, so this is not drift)")
             print(f"  ~ would {future:9s} {name}  {had} -> sha256:{want[:12]}…")
             continue
 
@@ -523,7 +709,7 @@ def main():
         # a generator that cannot verify its own output has not finished, and the
         # inherited incident it cites is a generator whose parser could not read its
         # own rows. `STAMPED` is never printed on a write that was not re-read.
-        back, _, _ = classify(open(path, encoding="utf-8").read())
+        back, _, _ = classify(open(path, encoding="utf-8").read(), root)
         if back != "OK":
             counts["UNREADABLE"] += 1
             print(f"  ! {name}  wrote the stamp and read back {back} — not counted as stamped")

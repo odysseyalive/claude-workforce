@@ -66,16 +66,23 @@ _WF_META = set("$`\"';&|<>(){}*?[]!#~\n\t")
 # stamp could not write. The BLOCKING row cleared only when someone hand-edited
 # `.censusignore`. The denominator comes from the tree (conform's doctrine), so stamp now
 # covers what conform demands. Conform does not check less.
+#
+# `retired/` JOINED THE LIST 2026-09-16 (apps-odyssey-alive DEF-Q-19). audit Step 6-F archives a
+# migrated catalog there byte-for-byte AFTER lifting every `origin: user` span into its
+# `CATALOG-ANCHOR.md` and reading it back, so the archive is an undo copy whose spans are
+# guarded at source, the same kind of copy `staging/` holds. Stamping it guards nothing. Left
+# in scope, it was the org's only hard `wf-conform` failure: 8 blocks in two archives.
 SACRED_SCRATCH = (os.path.join(".claude", "workforce", "work"),
-                  os.path.join(".claude", "workforce", "staging"))
+                  os.path.join(".claude", "workforce", "staging"),
+                  os.path.join(".claude", "workforce", "retired"))
 
 
 def sacred_scope(root):
     """(files, scratch_skipped): every `.md` under `<root>/.claude` whose sacred blocks the
     sidecar must stamp, sorted, plus the number of `.md` files in run scratch left out.
 
-    Excluded, and nothing else: the run scratch (`workforce/work`, `workforce/staging`),
-    which holds COPIES whose originals are guarded at source (`wf-conform` § check_sidecar
+    Excluded, and nothing else: the run scratch (`SACRED_SCRATCH`: `workforce/work`,
+    `workforce/staging`, `workforce/retired`), which holds COPIES whose originals are guarded at source (`wf-conform` § check_sidecar
     records the 846-file measurement), and whatever `.censusignore` declares. It is
     DECLARED, never inferred, and read through `Census.ignored`, the one matcher. A
     project-created folder like `.claude/workforce/migrated/` is in scope, because nothing
