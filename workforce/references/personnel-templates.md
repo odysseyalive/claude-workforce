@@ -61,6 +61,27 @@ are below; this is the artifact that holds them.
 | `## Seed` | an empty `personnel/` directory and an index stating zero records across both families |
 | `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it. It also fails any project-family record whose `Status:` is not `proposed`\|`accepted`\|`superseded`\|`deprecated` or that carries no `Subjects:` line |
 
+**The shipped half of the skill sits in a machine-owned region**, so a doctrine change reaches an org
+that already exists. `wf-companion` copies the block below byte-for-byte into every `personnel-ledger`
+it creates, appends it below a customized copy that lacks it, and refreshes it on every audit.
+Everything outside the markers is the project's and is never touched.
+
+```markdown
+<!-- WF-LEDGER-DOCTRINE START — shipped record doctrine, refreshed by every `/workforce audit`. Write this project's own ledger rules outside these markers. -->
+**Shipped record doctrine** (from the `workforce` skill; formats are its `references/personnel-templates.md`)
+
+- **Record types.** Org family `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG`; project family `DEC`, `INC`,
+  `PAT`, `FLW`. This skill does not restate their formats.
+- **Project-family Status** is one of `proposed`, `accepted`, `superseded`, `deprecated`. Only an
+  `accepted` record is served by `wf-ledger consult`.
+- **One gateway.** Project-family records are written and read through `wf-ledger`: `new`, `pending`,
+  `accept`, `supersede`, `consult --subjects`, `index`, `check`.
+- **The index.** A bare row or a link to the record file is an index row; a name in a paragraph is
+  not. `wf-ledger index --execute` never rebuilds a hand-kept index: it lists the records the index
+  does not link in a `WF-LEDGER-UNINDEXED` block and keeps every other byte.
+<!-- WF-LEDGER-DOCTRINE END -->
+```
+
 **Naming.** Data skills workforce *derives* are `records-<dataset>`; this one ships under a fixed name
 because the companion list installs it by that name. Stating the exemption here is the point — two
 naming conventions colliding silently is how a project ends up with `records-personnel` and
@@ -494,7 +515,7 @@ By Department / By Employee / By Status / Statistics, in claude-enforcer's aware
 `ledger` reuses the proven index-scan-then-read triage.
 
 **Two row shapes are an index row, and one reader reads both.** A generated index carries bare rows
-(`` - `ID` — TYPE … ``); a Records Owner's sectioned index carries links (`- [ID](ID.md) — …`) under
+(`` - `ID` — TYPE … ``); a Records Owner's sectioned index carries Markdown links whose target is the record file under
 its own headings. `wf-ledger.indexed_ids` accepts either, and `wf-conform`'s DEF check calls it
 rather than keeping a grammar of its own. **An ID named only in a narrative paragraph is not
 indexed**: a reader cannot find a record by a sentence that mentions it.

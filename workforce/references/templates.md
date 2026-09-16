@@ -188,6 +188,13 @@ precisely the shape the user's 2026-09-07 directive forbids — a fix that reach
 strands existing ones. The seam is what makes the heal path possible without overwriting a single word
 any project's user ratified.*
 
+*Added 2026-09-16 (DEF-Q-21). The seam reached new orgs only: an org older than it holds the shipped
+items inside its own user span, and `wf-companion` skipped it. It now MIGRATES such a file by shipped
+TEXT, never by position — an item leaves the span only when its text is one a release shipped
+(`references/principles-history.md`) — after extracting the span verbatim to `directives/` (T2). A
+split it cannot prove becomes a `WF-PRINCIPLES-SUPPLEMENT` block below everything, named on every run
+(`procedures/audit.md` Step 4).*
+
 ---
 
 ## The CLAUDE.md Constitution Gate — RETRACTED 2026-08-06
