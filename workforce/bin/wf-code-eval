@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""wf-code-eval — the shipped half of code-eval enforcement: the loop guard and the review stamp.
+
+    wf-code-eval --root <tree>                 report the commit gates this project wires
+    wf-code-eval --root <tree> --json          the same, machine-readable
+    wf-code-eval --root <tree> --active on     set the loop guard at the START of a review
+    wf-code-eval --root <tree> --active off    clear it at the END, pass or fail
+    wf-code-eval --root <tree> --stamp         record the reviewed state after a CLEAN review
+
+WHY THIS EXISTS. A project that ran claude-enforcer's `/skill-builder code-eval enforce` wires
+three hooks, and one of them is a commit gate: `git commit` and `git push` are blocked while the
+working tree differs from the hash in `.claude/.code-eval-reviewed`. Nothing in the hooks writes
+that file. Only the project copy of `code-evaluator/SKILL.md` did, in its § Enforcement
+coordination block. The 2026-09-10 directive retires that copy in favour of the shipped
+evaluator, which carried no such step, so a retired project's gate blocks every commit forever.
+MEASURED 2026-09-11 on apps-odyssey-alive (DEF-Q-14): the audit found it before the retirement
+and patched a `--stamp` into the project's gate by hand. `hither-lands` wires the same gate, from
+inside its code-evaluator copy, with no `--stamp` at all.
+
+WHY THE STAMP SHIPS AND THE HOOKS DO NOT. `update` is the only thing a user runs, so the half
+every gated project loses at retirement has to arrive through `update`: this script, and the
+shipped SKILL.md step that calls it. The gate hooks themselves stay the project's. Workforce has
+no opt-in hook tier — `wf-settings-apply`'s `SHIPPED_HOOKS` is wired into every project by
+`install` and `update` (`enforcement.md` § Nothing ships dormant) — so shipping the gate would put
+a hard `exit 2` on every commit and every first code write in every project on every host,
+including the ones that never asked for enforcement. The predecessor made it a per-host opt-in
+for that reason and recorded it as "host-generated, never shipped".
+
+THE GATE DECIDES THE HASH, NOT THIS SCRIPT. A gate hashes the tree its own way. The enforcer's
+hashes `git diff HEAD` then `git status --porcelain`; apps-odyssey-alive's excludes four record
+paths and carries its own `--stamp` so the gate and the stamp read one exclusion list. So a gate
+whose script accepts `--stamp` is asked to stamp itself, and only a gate without one gets the
+enforcer's hash computed here. Writing a hash the gate will not recompute is a stamp that still
+blocks, which is the defect this exists to end.
+
+NO GATE, NO WRITE. A project with no gate wired gets a no-op and exit 0, exactly as the
+enforcer's coordination block was "a no-op unless enforcement is wired". A stamp nothing reads is
+residue.
+
+Exit codes: 0 done or nothing to do · 1 a registered gate's script is missing, or the stamp could
+not be recorded · 2 bad arguments.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+
+MARKER = ".code-eval-reviewed"
+ACTIVE = ".code-eval-active"
+DEBT = (".code-eval-pending", ".code-eval-advised")
+TIMEOUT = 30
+# A script that HANDLES `--stamp`, not one that mentions it. A postwrite hook's reminder text
+# names the gate's `--stamp` in a sentence; asking that hook to stamp would run a hook with no
+# stamp branch and record nothing while reporting a delegation.
+SELF_STAMP_RX = re.compile(r"""["']--stamp["']\s*\]|==\s*["']--stamp["']|["']--stamp["']\s+in\b|^\s*--stamp\)""", re.M)
+
+
+def config_root():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def slurp(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def settings_files(root):
+    """Project then personal settings, each real file once (a project that IS `$HOME` names the
+    personal pair twice)."""
+    seen, out = set(), []
+    for cand in (os.path.join(root, ".claude", "settings.local.json"),
+                 os.path.join(root, ".claude", "settings.json"),
+                 os.path.join(config_root(), "settings.json"),
+                 os.path.join(config_root(), "settings.local.json")):
+        key = os.path.realpath(cand)
+        if key not in seen:
+            seen.add(key)
+            out.append(cand)
+    return out
+
+
+def command_paths(cmd, root):
+    """The file paths a hook command names, with the variables the harness expands resolved."""
+    home = os.path.expanduser("~")
+    expanded = cmd
+    for var, val in (("${CLAUDE_PROJECT_DIR}", root), ("$CLAUDE_PROJECT_DIR", root),
+                     ("${CLAUDE_CONFIG_DIR}", config_root()), ("$CLAUDE_CONFIG_DIR", config_root()),
+                     ("${HOME}", home), ("$HOME", home)):
+        expanded = expanded.replace(var, val)
+    out = []
+    for tok in re.findall(r"[^\s\"';|&()<>]+", expanded):
+        if tok.startswith("~/"):
+            tok = os.path.join(home, tok[2:])
+        if "/" not in tok:
+            continue
+        out.append(tok if os.path.isabs(tok) else os.path.join(root, tok))
+    return out
+
+
+def gates(root):
+    """Every registered hook whose script reads `.code-eval-reviewed`, as dicts.
+
+    A registration whose script is not on disk but whose NAME says it is the commit gate is
+    reported as missing rather than dropped: a dead gate fails open in the harness, and nothing
+    else would say the enforcement is gone.
+    """
+    out = []
+    for path in settings_files(root):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        hooks = data.get("hooks") if isinstance(data, dict) else None
+        if not isinstance(hooks, dict):
+            continue
+        for event, matchers in hooks.items():
+            for m in matchers if isinstance(matchers, list) else []:
+                entries = m.get("hooks") if isinstance(m, dict) else None
+                for h in entries if isinstance(entries, list) else []:
+                    cmd = h.get("command") if isinstance(h, dict) else None
+                    if not isinstance(cmd, str):
+                        continue
+                    for script in command_paths(cmd, root):
+                        body = slurp(script) if os.path.isfile(script) else ""
+                        if MARKER in body:
+                            out.append({"settings": path, "event": event, "command": cmd,
+                                        "script": script, "present": True,
+                                        "self_stamps": bool(SELF_STAMP_RX.search(body))})
+                        elif not os.path.exists(script) and "commit-gate" in os.path.basename(script):
+                            out.append({"settings": path, "event": event, "command": cmd,
+                                        "script": script, "present": False,
+                                        "self_stamps": False})
+    return out
+
+
+def canonical_hash(root):
+    """The enforcer gate's hash: `{ git diff HEAD; git status --porcelain; } | sha256sum`.
+
+    BYTES, never decoded text, because the gate hashes the raw stream. None outside a git work
+    tree, where the enforcer gate fails open and there is nothing to stamp."""
+    def git(*args):
+        return subprocess.run(["git", "-C", root] + list(args), stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL, timeout=TIMEOUT)
+    try:
+        if git("rev-parse", "--is-inside-work-tree").returncode != 0:
+            return None
+        stream = git("diff", "HEAD").stdout + git("status", "--porcelain").stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return hashlib.sha256(stream).hexdigest()
+
+
+def stamp(root, found):
+    live = [g for g in found if g["present"]]
+    if not live:
+        print("code-eval stamp: no commit gate reading %s is wired here — nothing to stamp" % MARKER)
+        return 0
+    # The first gate that HANDLES `--stamp` (SELF_STAMP_RX), never one that only mentions it.
+    own = next((g for g in live
+                if g["self_stamps"]), None)
+    if own:
+        runner = [sys.executable] if own["script"].endswith(".py") else ["bash"]
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=root)
+        try:
+            p = subprocess.run(runner + [own["script"], "--stamp"], cwd=root, env=env,
+                               stdin=subprocess.DEVNULL, timeout=TIMEOUT)
+        except (OSError, subprocess.SubprocessError) as exc:
+            print("code-eval stamp: the gate's own --stamp could not run: %s" % exc, file=sys.stderr)
+            return 1
+        print("code-eval stamp: delegated to the gate's own --stamp (%s), exit %d"
+              % (os.path.relpath(own["script"], root), p.returncode))
+        return 0 if p.returncode == 0 else 1
+    h = canonical_hash(root)
+    if not h:
+        print("code-eval stamp: %s is not a git work tree — the gate cannot compare one, "
+              "nothing recorded" % root, file=sys.stderr)
+        return 1
+    try:
+        with open(os.path.join(root, ".claude", MARKER), "w", encoding="utf-8") as fh:
+            fh.write(h + "\n")
+        for name in DEBT:
+            try:
+                os.remove(os.path.join(root, ".claude", name))
+            except FileNotFoundError:
+                pass
+    except OSError as exc:
+        print("code-eval stamp: could not write %s: %s" % (MARKER, exc), file=sys.stderr)
+        return 1
+    print("code-eval stamp: reviewed state recorded (%s)" % h)
+    return 0
+
+
+def active(root, state):
+    """The loop guard every gate honours: while it exists the hooks skip, so the evaluator's own
+    fixes never re-trigger the before-write and at-write gates. A no-op with no gate wired."""
+    flag = os.path.join(root, ".claude", ACTIVE)
+    if state == "on":
+        if not os.path.isdir(os.path.dirname(flag)):
+            return 0
+        with open(flag, "w", encoding="utf-8"):
+            pass
+        return 0
+    try:
+        os.remove(flag)
+    except FileNotFoundError:
+        pass
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--stamp", action="store_true")
+    ap.add_argument("--active", choices=("on", "off"))
+    args = ap.parse_args()
+    root = os.path.abspath(args.root)
+    if args.stamp and args.active:
+        print("--stamp and --active are separate steps of a review", file=sys.stderr)
+        return 2
+
+    found = gates(root)
+    if args.active:
+        if not any(g["present"] for g in found):
+            return 0
+        return active(root, args.active)
+    if args.stamp:
+        return stamp(root, found)
+
+    missing = [g for g in found if not g["present"]]
+    if args.json:
+        json.dump({"root": root, "gates": found}, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 1 if missing else 0
+    print("code-eval gates — %s" % root)
+    for g in found:
+        if not g["present"]:
+            state = "MISSING — the registration names a script that is not on disk"
+        elif g["self_stamps"]:
+            state = "stamped by its own --stamp, through `wf-code-eval --stamp`"
+        else:
+            state = "stamped by `wf-code-eval --stamp` (the enforcer hash)"
+        print("  %-12s %s  · %s" % (g["event"], os.path.relpath(g["script"], root), state))
+    print("\nINV-CODEEVAL-GATE  %d gate(s) · %d missing · stamper shipped"
+          % (len(found), len(missing)))
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

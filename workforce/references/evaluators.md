@@ -178,6 +178,14 @@ phrasing *"pre-empted that conflict rather than leaving me stuck."*
 A handbook names the KIND and the pattern — `"$WF/bin/wf-catalog" --kind text --grep 'em-dash'` — and
 the resolver answers with the file and line.
 
+**The same grep reads the project's house rules.** After the corpus it searches every
+`.claude/skills/<evaluator>/CATALOG-ANCHOR.md` for the kind, under each of the kind's directory names:
+the supersession register, the `origin: user` spans lifted in by a retirement, and the anchor's
+`## Project catalog amendments`. Those hits are labelled `project:<skill>/CATALOG-ANCHOR.md:<line>`, so
+a shipped rule and a project rule are told apart by prefix. **A rule-ID lookup needs no second read.**
+*Until DEF-Q-12 (2026-09-14) the grep read the install alone, and a search for the anchor's own
+amendments heading on apps-odyssey-alive exited 1: every project rule was invisible to this row.*
+
 **Write the `$WF` prefix, never a bare `wf-catalog`.** Nothing in this distribution puts `bin/` on
 `PATH` — every other procedure invokes `"$WF/bin/wf-stamp"`, `"$WF/bin/wf-seed"` and the rest through
 the two-line resolver at `references/scopes.md` § Resolving the shipped scripts, and a bare command
@@ -441,9 +449,35 @@ Unremovable is now the default and identity is the only thing that lifts it; the
 **The hook registrations are reported and are a REFUSAL, not a warning.** A copy carries its own
 `hooks/` scripts and the project's settings register them by path — **project scope and user scope
 both**, since a registration in `~/.claude` naming `$CLAUDE_PROJECT_DIR/.claude/skills/<evaluator>/`
-is exactly what the refusal exists to catch. `wf-catalog` refuses to remove from a copy any
-registration still points into, and exits 1 so a caller can tell a refusal from a clean migration.
-Unregistering is `hooks`' job and this script does not edit settings — one owner per file.
+is exactly what the refusal exists to catch. `wf-catalog` refuses a retirement that would **remove a
+file a registration names**, and exits 1 so a caller can tell a refusal from a clean migration. A
+registration whose file STAYS is reported as `its file stays` and refuses nothing, because the
+retirement breaks nothing it runs. A registration naming the skill directory itself, or a path the
+command does not spell out, fails closed. *Until DEF-Q-13 (2026-09-11) the refusal was keyed on the
+kind, and code-evaluator's three enforce hooks on apps-odyssey-alive refused the retirement while every
+one of them was in the STAYS set.* Unregistering is `hooks`' job and this script does not edit
+settings — one owner per file.
+
+**A project-only file a live reader cites STAYS where its readers point.** A file the install ships
+nothing like, by content or by name, is not the old copy of anything, and retiring it breaks every
+handbook or skill that reads it. The readers are the project's `.claude/` tree and `CLAUDE.md`, minus
+run history (`workforce/work/`, `staging/`, `retired/`) and settings files, plus the copy's own files
+that stay: a project agent kept because nothing ships it keeps the files it cites. The report prints
+each such file as `STAYS <file> — cited by <reader>:<line>`. It is kept, not refused, because the
+directive is that `update` is the only thing a user runs; once nothing cites it, the next run retires
+it. *Measured on apps-odyssey-alive 2026-09-11 (DEF-Q-13): `palette.md`, `graphic-system.md` and five
+text-eval files were listed `retire` while three handbooks, two skills and six agents read them.* A
+modified copy of a SHIPPED file is not protected: its readers are repointed at the resolver by audit
+Step 5d item 2c.
+
+**A code-eval commit gate is stamped by the shipped evaluator.** A project that wired claude-enforcer's
+code-eval enforcement has a commit gate that blocks until `.claude/.code-eval-reviewed` matches the
+tree, and the only writer of that file was the project copy's SKILL.md. The shipped code-evaluator
+stamps it through `wf-code-eval --stamp`, delegating to the gate's own `--stamp` when the gate has one.
+`--migrate` lists every gate it finds and **refuses the `code` retirement as an ORPHANED GATE** when a
+removed file writes `.code-eval-reviewed` and no shipped stamper is reachable. The gate hooks stay the
+project's: workforce has no opt-in hook tier, so shipping them would wire a hard commit block into
+every project (DEF-Q-14).
 **Duplicated registrations are their own finding**: `odyssey-alive` carried `chain-image-eval.sh` twice
 on `PostToolUse` before this step existed, which is the double activation the migration exists to end
 rather than to create.
