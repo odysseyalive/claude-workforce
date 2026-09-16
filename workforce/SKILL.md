@@ -682,6 +682,37 @@ project until someone re-audited it. The operational reading is — **the user's
 words decide, newest first; an AI's interpretation is never the user's evidence, and an old decision
 never outvotes a new ask.***
 
+> **"Here's another factor that I think is a really strong proposal. Please don't dismiss me. I would
+> really like a strong opinion in both cases on what I'm about to propose. I believe this issue is also
+> the reason why current coding constraints of a project aren't being utilized when adding new code or
+> modifying existing code. because the code itself isn't given that date of essence. Meaning that
+> because the code was created prior to the AI looking at it, it has precedent just like a human would
+> have precedence over what is being requested. So the current code would trump the newly devised code
+> by AI, especially if it doesn't meet the current mechanisms and style of delivery and overall
+> communication style of the current code. Does any of that make sense?"**
+
+> **"Now, can you tell the difference? This is a big part. Can you tell the difference between the
+> original code base coded by humans and AI code base? So that also you understand that the AI code
+> base that's programmed on top has less precedent than the original code base does."**
+
+*— Added 2026-09-16, source: user directive, stated during `/workforce dev` the same day as the
+user-words directive above and named by the user as the same disease in code: new code arrives in the
+AI's own default style because nothing gives the existing code standing. **The second message narrows
+it the way the user-words directive was narrowed**: not "existing code" but ORIGINAL HUMAN code, with
+AI code layered on top ranking below it even when it is newer. The model's own position, asked for
+and given, added three things the user approved with "let's do it": existing code decides HOW and
+never outranks the user's words on WHAT, or botched recurs as "the code already does it this way";
+where a project has almost no human code the user's words are its human precedent; and the look-up
+must happen at the edit, not be left to a reminder a long session skips. **Origin is read from git,
+never guessed from style**: a commit carrying a Claude Code marker is AI, one dated before a
+repository's first marked commit is human, and an unmarked commit after that is unknown until the user
+settles it once per project in `.claude/code-origin.json` — measured on `odyssey-alive`, 161 such
+commits, too many to ask about one by one. Mechanics live in the install, so no audit is needed:
+`wf-task-tag` states the order (`USER_WORDS`) on every message and to every spawned agent, and
+`wf-code-origin` on `PreToolUse` reports each file's human, AI and unknown lines before the edit. The
+operational reading is — **the user's words decide what; original human code decides how, newest
+first; AI code in the project comes after it; the AI's own preferences come last.***
+
 *One further user directive — on skills that build and run agents — is recorded at
 `references/conversion-taxonomy.md`, beside the mechanics it governs. A second, on where permission
 findings are reported, is at `references/audit-setup.md` § Permissions. Neither is restated here: a

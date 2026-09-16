@@ -13472,6 +13472,77 @@ check(
     "it?\" as a plan the turn failed to carry out",
 )
 
+# CODE PRECEDENCE, RUN RATHER THAN READ. User directive 2026-09-16: original human code has
+# precedent over AI code layered on top of it, and over what the AI devises. `wf-code-origin`
+# classifies each line of a file by git history before an edit. This builds a real repository
+# with one commit of each origin and asserts the split, the user's once-per-project note that
+# settles unmarked commits, and that `wf-task-tag` states the order to the session AND to a
+# spawned agent, since a rule only the main loop hears leaves the employee reading old code blind.
+def _code_origin_run():
+    import tempfile
+    hook = os.path.join(ROOT, "workforce/bin/wf-code-origin")
+    got = {}
+    with tempfile.TemporaryDirectory() as d:
+        def g(*a, date=None):
+            env = dict(os.environ, GIT_AUTHOR_DATE=date or "", GIT_COMMITTER_DATE=date or "")
+            if not date:
+                env.pop("GIT_AUTHOR_DATE"); env.pop("GIT_COMMITTER_DATE")
+            subprocess.run(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t"] + list(a),
+                           capture_output=True, text=True, env=env, timeout=30, check=True)
+        def put(text):
+            with open(os.path.join(d, "a.js"), "a") as fh:
+                fh.write(text)
+        g("init", "-q")
+        put("human1\nhuman2\n"); g("add", "a.js"); g("commit", "-qm", "start", date="2025-01-01T00:00:00")
+        put("ai1\n"); g("commit", "-qam", "ai\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+                         date="2025-06-01T00:00:00")
+        put("who1\n"); g("commit", "-qam", "misc", date="2025-07-01T00:00:00")
+        def run(path):
+            r = subprocess.run([hook], input=json.dumps({"tool_name": "Edit", "cwd": d,
+                               "tool_input": {"file_path": path}}),
+                               capture_output=True, text=True, timeout=30)
+            try:
+                return json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+            except (ValueError, KeyError):
+                return ""
+        got["split"] = run(os.path.join(d, "a.js"))
+        got["new"] = run(os.path.join(d, "b.js"))
+        os.makedirs(os.path.join(d, ".claude"))
+        with open(os.path.join(d, ".claude/code-origin.json"), "w") as fh:
+            json.dump({"unmarked_after_ai": "human", "source": "user", "date": "2025-08-01"}, fh)
+        got["settled"] = run(os.path.join(d, "a.js"))
+    tag = os.path.join(ROOT, "workforce/bin/wf-task-tag")
+    with tempfile.TemporaryDirectory() as d:
+        r = subprocess.run([tag], input=json.dumps({"hook_event_name": "SubagentStart",
+                           "session_id": "co", "scratchpad_dir": d, "cwd": d}),
+                           capture_output=True, text=True, timeout=30)
+        got["spawn"] = r.stdout
+    return got
+
+
+_co = _code_origin_run()
+check(
+    "code precedence: wf-code-origin splits a file into human, AI and unknown lines by git history",
+    "2 human lines, 1 AI lines, 1 unknown" in _co["split"]
+    and "Human lines: 1-2" in _co["split"] and "AI lines: 3" in _co["split"]
+    and "code-origin.json" in _co["split"],
+    f"got {_co['split'][:300]!r} — a commit before the first Claude marker is human, a marked "
+    "one is AI, an unmarked one after it is unknown until the user settles it",
+)
+check(
+    "code precedence: the user's note settles unmarked commits, and a new file gets its human neighbours",
+    "3 human lines, 1 AI lines, 0 unknown" in _co["settled"]
+    and "a.js" in _co["new"] and "new file" in _co["new"],
+    f"settled {_co['settled'][:200]!r}; new {_co['new'][:200]!r}",
+)
+check(
+    "code precedence: a spawned agent hears the order, not only the main session",
+    "original human-written code decides how" in _co["spawn"]
+    and "even when it is newer" in _co["spawn"],
+    f"SubagentStart output {_co['spawn'][:200]!r} — an employee editing code never sees "
+    "UserPromptSubmit context",
+)
+
 # THE ASKS CHECKLIST, RUN RATHER THAN READ. The user's spec, 2026-09-12: each ask "gets a
 # checkpoint and they each get evaluated. And when the response comes back, each response
 # keeps the topic separated. It has to work that way." `wf-task-tag` opens a checklist the

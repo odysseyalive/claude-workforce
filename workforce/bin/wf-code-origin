@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""wf-code-origin — PreToolUse hook: before an edit, say who wrote the code being edited.
+
+User directive 2026-09-16 (SKILL.md § Directives): code that existed before the AI
+looked at it has precedent over what the AI devises, and ORIGINAL HUMAN code has more
+precedent than AI code layered on top of it. The order `USER_WORDS` in `wf-task-tag`
+states is: the user's newest requests and notes decide WHAT; the original human code,
+newest first, decides HOW; AI code already in the project comes after it even when it
+is newer; the AI's own preferences come last.
+
+WHY A HOOK AT THE EDIT, NOT A RULE ALONE. A rule stated at the head of a turn is a
+reminder, and the look-up it asks for is the step a long session skips. This runs on
+the edit itself, so the split for THIS file arrives at the moment it matters and
+cannot be skipped. It lives in the install and `update` refreshes it, so it reaches
+every project, org or no org, with no audit.
+
+HOW ORIGIN IS KNOWN — FROM GIT, NEVER FROM STYLE. Guessing authorship from how code
+reads is not good enough to rank by. A commit is AI when its message carries a
+Claude Code marker (`Co-Authored-By: Claude`, `Claude-Session:`, `Generated with
+Claude Code`). A commit dated before the repository's first marked commit is HUMAN:
+it predates AI use there. An unmarked commit after that date is UNKNOWN — it may be
+the user's own edit or AI work committed by hand, and nothing on record says which.
+`git blame` maps every line to its commit.
+
+UNKNOWN IS SETTLED BY THE USER, ONCE PER PROJECT. Asking commit by commit is a flood
+(measured 2026-09-16: `odyssey-alive` had 161 unmarked commits after AI use began).
+The answer lives in `.claude/code-origin.json` at the repository root —
+`{"unmarked_after_ai": "human" | "ai", "source": "user", "date": "YYYY-MM-DD"}` —
+committed with the project so it travels to every server. Once present it is the
+user's note, and it classifies every unmarked commit.
+
+MOSTLY-AI PROJECTS. Where the human layer is nearly empty, the context says so: the
+user's own words — directives, notes, requests — are that project's human precedent.
+
+FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. Not a
+git repository, git missing, a timeout, a binary file: no output. A new file gets the
+human-created files beside it instead of a blame.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+AI_MARK = re.compile(r"Co-Authored-By:\s*Claude|Claude-Session:|Generated with \[?Claude Code",
+                     re.IGNORECASE)
+NOTE = ".claude/code-origin.json"
+TIMEOUT = 4
+
+
+def git(root, *args):
+    # Python 3.6 floor (RHEL 8): no capture_output= or text=.
+    return subprocess.run(["git", "-C", root] + list(args), stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True,
+                          timeout=TIMEOUT, check=True).stdout
+
+
+def commit_origins(root):
+    """{sha: "ai" | "human" | "unknown"} for every commit. No cache: one `git log` is
+    fast next to an edit, and a cache file would be one more thing left in /tmp."""
+    log = git(root, "log", "--format=%x1e%H%x1f%ct%x1f%B")
+    commits = []
+    for rec in log.split("\x1e")[1:]:
+        sha, ct, body = rec.split("\x1f", 2)
+        commits.append((sha, int(ct), bool(AI_MARK.search(body))))
+    ai_times = [ct for _, ct, ai in commits if ai]
+    cutoff = min(ai_times) if ai_times else None
+    note = read_note(root)
+    unmarked = note if note in ("human", "ai") else "unknown"
+    out = {}
+    for sha, ct, ai in commits:
+        if ai:
+            out[sha] = "ai"
+        elif cutoff is None or ct < cutoff:
+            out[sha] = "human"
+        else:
+            out[sha] = unmarked
+    return out
+
+
+def read_note(root):
+    try:
+        with open(os.path.join(root, NOTE), encoding="utf-8") as fh:
+            return json.load(fh).get("unmarked_after_ai")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def ranges(lines):
+    """[3,4,5,9] -> '3-5, 9', capped."""
+    spans, start, prev = [], None, None
+    for n in lines:
+        if start is None:
+            start = prev = n
+        elif n == prev + 1:
+            prev = n
+        else:
+            spans.append((start, prev))
+            start = prev = n
+    if start is not None:
+        spans.append((start, prev))
+    text = ", ".join(f"{a}-{b}" if a != b else f"{a}" for a, b in spans[:8])
+    return text + (f", +{len(spans) - 8} more" if len(spans) > 8 else "")
+
+
+def describe_file(root, rel, origins):
+    blame = git(root, "blame", "--line-porcelain", "--", rel)
+    per = {"human": [], "ai": [], "unknown": []}
+    sha, lineno = None, None
+    for line in blame.splitlines():
+        m = re.match(r"^([0-9a-f]{40}) \d+ (\d+)", line)
+        if m:
+            sha, lineno = m.group(1), int(m.group(2))
+            continue
+        if line.startswith("\t") and sha:
+            kind = origins.get(sha, "unknown")
+            if sha.startswith("0000000"):   # not committed yet: no record of who wrote it
+                kind = "unknown"
+            per[kind].append(lineno)
+    total = sum(len(v) for v in per.values())
+    if not total:
+        return None
+    parts = [f"Where the code in {rel} came from, by git history: "
+             f"{len(per['human'])} human lines, {len(per['ai'])} AI lines, "
+             f"{len(per['unknown'])} unknown."]
+    if per["human"]:
+        parts.append(f"Human lines: {ranges(per['human'])}. They set how new code in this file "
+                     "is written — its mechanisms, helpers, error handling, naming, and comments — "
+                     "and they outrank the AI lines even where the AI lines are newer.")
+    if per["ai"]:
+        parts.append(f"AI lines: {ranges(per['ai'])}. They rank below any human code in the "
+                     "project, and above the AI's own preferences.")
+    if per["unknown"]:
+        parts.append(f"Unknown lines: {ranges(per['unknown'])}. {unknown_hint()}")
+    if not per["human"] and not per["unknown"]:
+        parts.append(mostly_ai_hint())
+    return " ".join(parts)
+
+
+def describe_new(root, rel, origins):
+    d = os.path.dirname(rel) or "."
+    out = git(root, "log", "--diff-filter=A", "--format=%x1e%H", "--name-only", "--", d)
+    human = []
+    for rec in out.split("\x1e")[1:]:
+        lines = [x for x in rec.strip().splitlines() if x]
+        if lines and origins.get(lines[0]) == "human":
+            human += [p for p in lines[1:] if os.path.dirname(p) == os.path.dirname(rel)
+                      and os.path.exists(os.path.join(root, p))]
+    if human:
+        return (f"{rel} is a new file. Files beside it that humans created, which set how it is "
+                f"written: {', '.join(sorted(set(human))[:5])}. They outrank AI-created files "
+                "in the same place.")
+    return None
+
+
+def unknown_hint():
+    return ("Nothing on record says whether unmarked commits after AI use began were written by "
+            f"the user or by AI. The user settles it once for the project, and the answer goes in "
+            f"{NOTE} as {{\"unmarked_after_ai\": \"human\" or \"ai\", \"source\": \"user\", "
+            "\"date\": ...}.")
+
+
+def mostly_ai_hint():
+    return ("No human-written lines in this file, so the human precedent here is the user's own "
+            "words: directives, notes, and requests.")
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return 0
+    ti = payload.get("tool_input") or {}
+    path = ti.get("file_path") or ti.get("notebook_path")
+    if not path:
+        return 0
+    try:
+        cwd = payload.get("cwd") or os.getcwd()
+        path = os.path.abspath(os.path.join(cwd, path))
+        root = git(os.path.dirname(path) if os.path.isdir(os.path.dirname(path)) else cwd,
+                   "rev-parse", "--show-toplevel").strip()
+        origins = commit_origins(root)
+        rel = os.path.relpath(path, root)
+        tracked = subprocess.run(["git", "-C", root, "ls-files", "--error-unmatch", "--", rel],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=TIMEOUT).returncode == 0
+        text = describe_file(root, rel, origins) if tracked else describe_new(root, rel, origins)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0
+    if text:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": text,
+        }}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
