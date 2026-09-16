@@ -15052,12 +15052,21 @@ check(
     f"{_pf_missing} — each of DEC/INC/PAT/FLW needs a `## <T>` section carrying "
     "Status/Subjects/Anchors/Recorded/Supersedes, the shape stated once and referenced everywhere",
 )
+# ONE STATUS SET (DEF-Q-20, 2026-09-16). The templates' `**Status:**` lines, § Invariants, and
+# `wf-ledger.STATUSES` must name the same four values. `deprecated` was legal under the
+# awareness-ledger DEC template and missing from both, so `check` called real records ILLEGAL.
+_st_code = re.search(r'^STATUSES = \(([^)]*)\)', read("workforce/bin/wf-ledger"), re.M)
+_st_code = tuple(re.findall(r'"([a-z]+)"', _st_code.group(1))) if _st_code else ()
+_st_tpl = {tuple(v.strip() for v in _m.split("|"))
+           for _m in re.findall(r"^\*\*Status:\*\* (proposed \|[^\n]*)$", _ptk, re.M)}
 check(
-    "knowledge: Status is exactly proposed|accepted|superseded",
-    "carries a `Status:` of exactly `proposed`\\|`accepted`\\|`superseded`" in _ptk,
-    "personnel-templates.md § Invariants must fix the three legal lifecycle states as a "
-    "mechanical invariant; without it a record can carry any Status and the consult filter "
-    "has nothing to trust",
+    "knowledge: Status is exactly proposed|accepted|superseded|deprecated, in the templates and in wf-ledger",
+    "carries a `Status:` of exactly `proposed`\\|`accepted`\\|`superseded`\\|`deprecated`" in _ptk
+    and _st_code == ("proposed", "accepted", "superseded", "deprecated")
+    and _st_tpl == {_st_code},
+    f"wf-ledger.STATUSES {_st_code}, template Status lines {sorted(_st_tpl)} — § Invariants, "
+    "every project template and the gateway must state one set, or `check` calls a record "
+    "illegal that the template allows",
 )
 check(
     "knowledge: a proposed record is never served by a consult",

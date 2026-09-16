@@ -97,6 +97,11 @@ Report migrated-count against filesystem-count as **`INV-LEDGER`**. `N of N`, ne
 By Department / By Employee / By Status / Statistics, plus the project family by tag — the shape
 inherited from the predecessor's ledger, which was sound.
 
+**A sectioned, hand-kept index is legal, and it is never rebuilt over.** `wf-ledger` reads a bare row
+or a link to the record file as an index row, and `index --execute` lists what such an index does not
+link inside a `WF-LEDGER-UNINDEXED` block, keeping every other byte (`personnel-templates.md`
+§ index.md).
+
 **Statistics carries the fix ratio**: `AMD + DEF + PERF` against completed work orders, monthly. It
 should fall over time; a ratio not falling across quarters is an org-health finding rather than a
 number (`review.md`).

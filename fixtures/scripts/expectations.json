@@ -230,6 +230,25 @@
       "gone/hooks/vanished.sh"
     ]
   },
+  "census-undecidable-named": {
+    "_why": "A COUNT NAMES NOTHING (customer report item 10, 2026-09-16): the census printed `hooks ... 1 undecidable` and a reader could not find the row or tell an agent hook from a script path hidden behind a variable. Three undecidable shapes, each named with its event, its settings file and the rule that refused to decide it. None is dead.",
+    "env": {
+      "CLAUDE_CONFIG_DIR": ".nocfg",
+      "WF_UNSET_HOOK_HOME": null
+    },
+    "exit": 0,
+    "not": [
+      "DEAD  ",
+      "no reason recorded"
+    ],
+    "script": "wf-census",
+    "want": [
+      "3 wired · 0 inside a skill dir · 0 dead · 3 undecidable",
+      "UNDECIDABLE  Stop           .claude/settings.json — `type: agent` hook — it runs no command",
+      "UNDECIDABLE  PreToolUse     .claude/settings.json — inline script (`bash -c`)",
+      "UNDECIDABLE  PreToolUse     .claude/settings.json — `$WF_UNSET_HOOK_HOME/hooks/guard.sh` carries a variable this process cannot expand"
+    ]
+  },
   "census-duplicate": {
     "exit": 0,
     "not": [
@@ -1732,6 +1751,25 @@
     "want": [
       "wrote .claude/workforce/personnel/DEC-untagged-thing.md",
       "UNCLASSIFIED: DEC-untagged-thing carries no Subjects and will NOT be served"
+    ]
+  },
+  "ledger-sectioned-index": {
+    "_why": "DEF-Q-20, 2026-09-16. A Records Owner's sectioned index links its records (`- [ID](ID.md)`) under headings, and `wf-ledger check` read 0 of them and called a `deprecated` DEC illegal, while `wf-conform` counted an ID named in a narrative paragraph as indexed. One reader now serves both tools: the four linked records are indexed, `./DEC-served.md` included; the one named only in prose is NOT; and `deprecated` is a legal Status. bin/check runs `index --execute` and `wf-conform --def` on this same tree.",
+    "args": [
+      "check"
+    ],
+    "exit": 2,
+    "not": [
+      "ILLEGAL STATUS",
+      "NOT INDEXED: DEF-linked",
+      "NOT INDEXED: DEC-served",
+      "NOT INDEXED: EMP-platform-engineer"
+    ],
+    "script": "wf-ledger",
+    "want": [
+      "INDEX DRIFT: index states 4 record(s), the filesystem holds 5",
+      "NOT INDEXED: DEF-named-in-prose-only",
+      "2 finding(s)"
     ]
   },
   "ledger-pending-order": {

@@ -54,12 +54,12 @@ are below; this is the artifact that holds them.
 | Section | For the personnel dataset |
 |---|---|
 | `## Schema` | one file per record at `.claude/workforce/personnel/<TYPE>-<subject>.md`, flat (no subdirectories); types `EMP`, `PERF`, `DEF`, `AMD`, `RFI`, `ORG` (org family) and `DEC`, `INC`, `PAT`, `FLW` (project family), each shaped by its template below |
-| `## Invariants` | the universal one, stated verbatim because it is how every reader recognizes a data skill (`wf-conform.is_data_skill`): **Degraded state may cause more work. It may never authorize a write.** **Plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`); every project-family record carries a `Status:` of exactly `proposed`\|`accepted`\|`superseded` (`mechanical`); a `proposed` record is never returned by a `consult` (`mechanical`); every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value and a reported finding, never an absence (`mechanical`) |
+| `## Invariants` | the universal one, stated verbatim because it is how every reader recognizes a data skill (`wf-conform.is_data_skill`): **Degraded state may cause more work. It may never authorize a write.** **Plus**: every `EMP` names a roster row that exists (`mechanical`); every `PERF` carries an `Attribution` (`mechanical`); a record is append-only once written (`mechanical`, needs a stored digest); a `DEF` is closed only by an amendment or a declared decline (`contextual`); every project-family record carries a `Status:` of exactly `proposed`\|`accepted`\|`superseded`\|`deprecated` (`mechanical`); a `proposed` record is never returned by a `consult` (`mechanical`); every project-family record carries a `Subjects:` line, `(unclassified)` being a legal value and a reported finding, never an absence (`mechanical`) |
 | `## Degradation` | absent → the org has no history and `review` says so rather than reporting a clean record; empty → same; stale → the index is rebuilt from the filesystem; corrupt → **stop, never rewrite** |
 | `## Owner` | HR. Exactly one Records Owner; its Lead is the second key |
 | `## Git policy` | tracked by default — an org's history is not disposable — and the rule's file is named by path |
 | `## Seed` | an empty `personnel/` directory and an index stating zero records across both families |
-| `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it. It also fails any project-family record whose `Status:` is not `proposed`\|`accepted`\|`superseded` or that carries no `Subjects:` line |
+| `## Maintainers` | `check-personnel-index.sh` — index count equals file count, exits nonzero on mismatch. Negative test: hide one record → exits 2 and names it. It also fails any project-family record whose `Status:` is not `proposed`\|`accepted`\|`superseded`\|`deprecated` or that carries no `Subjects:` line |
 
 **Naming.** Data skills workforce *derives* are `records-<dataset>`; this one ships under a fixed name
 because the companion list installs it by that name. Stating the exemption here is the point — two
@@ -376,7 +376,10 @@ performed the act and skipped the record left the org's history unable to say wh
 
 **These four are about the project, not the org** (`procedures/ledger.md` § Two families, one
 ledger). They live in the same flat store as the org family and share one lifecycle: `proposed` on
-draft, `accepted` when the user confirms, `superseded` when a later record replaces them. **A
+draft, `accepted` when the user confirms, `superseded` when a later record replaces them, and
+`deprecated` when it no longer applies and nothing replaces it. That set of four is the whole set:
+`wf-ledger.STATUSES` holds the same four, and neither a `superseded` nor a `deprecated` record is
+served. **A
 `proposed` record is never returned by a `consult`** — the draft exists so nothing is lost while the
 user is busy, and it carries no authority until the user accepts it. This is what lets capture draft
 automatically without manufacturing a history nobody agreed to.
@@ -392,7 +395,7 @@ bodies differ per type; the field lines never do.
 ```markdown
 # DEC-<slug>
 
-**Status:** proposed | accepted | superseded
+**Status:** proposed | accepted | superseded | deprecated
 **Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
 **Anchors:** <path or glob>[, …] | (none)
 **Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
@@ -416,7 +419,7 @@ bodies differ per type; the field lines never do.
 ```markdown
 # INC-<slug>
 
-**Status:** proposed | accepted | superseded
+**Status:** proposed | accepted | superseded | deprecated
 **Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
 **Anchors:** <path or glob>[, …] | (none)
 **Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
@@ -440,7 +443,7 @@ bodies differ per type; the field lines never do.
 ```markdown
 # PAT-<slug>
 
-**Status:** proposed | accepted | superseded
+**Status:** proposed | accepted | superseded | deprecated
 **Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
 **Anchors:** <path or glob>[, …] | (none)
 **Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
@@ -464,7 +467,7 @@ bodies differ per type; the field lines never do.
 ```markdown
 # FLW-<slug>
 
-**Status:** proposed | accepted | superseded
+**Status:** proposed | accepted | superseded | deprecated
 **Subjects:** <tag>[, <tag>…]          — which crafts this belongs to; drives the slice
 **Anchors:** <path or glob>[, …] | (none)
 **Recorded:** YYYY-MM-DD by capture | human:<user> | <employee-name>
@@ -489,6 +492,18 @@ bodies differ per type; the field lines never do.
 
 By Department / By Employee / By Status / Statistics, in claude-enforcer's awareness-ledger shape so
 `ledger` reuses the proven index-scan-then-read triage.
+
+**Two row shapes are an index row, and one reader reads both.** A generated index carries bare rows
+(`` - `ID` — TYPE … ``); a Records Owner's sectioned index carries links (`- [ID](ID.md) — …`) under
+its own headings. `wf-ledger.indexed_ids` accepts either, and `wf-conform`'s DEF check calls it
+rather than keeping a grammar of its own. **An ID named only in a narrative paragraph is not
+indexed**: a reader cannot find a record by a sentence that mentions it.
+
+**`wf-ledger index --execute` never rewrites an index it did not generate.** A hand-kept index
+carries narrative and rosters that live in no record. On such an index it lists the records the
+index does not link inside one `WF-LEDGER-UNINDEXED` marker block, appended once and replaced in
+place afterwards, and it reads back that every byte outside the block is unchanged. A record the
+Records Owner links in their own section leaves the block on the next run.
 
 **Statistics carries the fix-ratio**: `AMD + DEF + PERF` (fixing) against completed work orders
 (maintaining), monthly. Carpenter's health measure — the fixing share should fall over time. A ratio

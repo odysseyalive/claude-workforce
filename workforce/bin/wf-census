@@ -670,8 +670,39 @@ class Census:
                 return resolved, os.path.exists(resolved)
         return None, None
 
+    def undecidable_why(self, hook, cmd):
+        """Why a registration resolved to no file, in words a reader can act on.
+
+        A COUNT NAMES NOTHING. The census printed `1 undecidable` and stopped, so a
+        reader could neither find the registration nor tell a `type: agent` hook (no
+        command at all, correct) from a script path hidden behind a variable this
+        process cannot expand (possibly dead). MEASURED 2026-09-16 on a customer tree:
+        the one undecidable row was a user-scope `Stop` agent hook, and nothing said so.
+        The reason comes from the SAME segment grammar `resolve_hook_command` walks
+        (`_segment_verdict`), so the explanation and the verdict cannot disagree.
+        """
+        htype = (hook or {}).get("type") or "command"
+        if htype != "command":
+            return f"`type: {htype}` hook — it runs no command, so there is no script to find"
+        raw = (cmd or "").strip()
+        if not raw:
+            return "empty `command`"
+        segments = self.shell_segments(raw)
+        if not segments:
+            return "the command does not lex (unbalanced quote)"
+        whys = []
+        for tokens in segments:
+            why = self._segment_verdict(tokens)[1]
+            if why and why not in whys:
+                whys.append(why)
+        return "; ".join(whys) or "no segment names a script"
+
     def _resolve_segment(self, tokens):
-        """The one file a single command runs, or None when it cannot be decided.
+        """The one file a single command runs, or None when it cannot be decided."""
+        return self._segment_verdict(tokens)[0]
+
+    def _segment_verdict(self, tokens):
+        """(path, None) for the one file a single command runs, or (None, why).
 
         AN ENVIRONMENT PREFIX IS NOT THE COMMAND. `FOO=bar cmd` and `env FOO=bar cmd`
         both run `cmd`; the assignments are shell grammar sitting in front of it.
@@ -686,26 +717,29 @@ class Census:
                           or (tokens[0] == "env" and len(tokens) > 1)):
             tokens = tokens[1:]
         if not tokens:
-            return None
+            return None, "only environment assignments, no command"
         first = tokens[0]
         # An interpreter invocation runs its script argument, not itself.
         if os.path.basename(first) in ("sh", "bash", "zsh", "python", "python3", "node", "pwsh"):
             args = [t for t in tokens[1:] if not t.startswith("-")]
             if len(tokens) > 1 and tokens[1] in ("-c", "-Command"):
-                return None                # inline script: nothing to stat
+                # inline script: nothing to stat
+                return None, f"inline script (`{os.path.basename(first)} {tokens[1]}`)"
             if not args:
-                return None
+                return None, f"`{os.path.basename(first)}` with no script argument"
             first = args[0]
 
         if "/" not in first:
-            return None                    # resolved via PATH; not ours to judge
+            # resolved via PATH; not ours to judge
+            return None, f"`{first}` is a bare name resolved on PATH"
 
         path = first
         for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
             path = path.replace(var, self.root)
         path = os.path.expandvars(os.path.expanduser(path))
         if "$" in path:
-            return None                    # an env var this process cannot know
+            # an env var this process cannot know
+            return None, f"`{first}` carries a variable this process cannot expand"
         if not os.path.isabs(path):
             path = os.path.join(self.root, path)
         # NEVER NORMALISED LEXICALLY. `os.path.normpath` resolves `..` against the TEXT, so
@@ -714,7 +748,7 @@ class Census:
         # `os.path.exists` uses on the joined path, is physically correct across links, and
         # a `..` row is decided like any other — HEAD's behaviour for foreign rows, which
         # refusing `..` outright had lost (review 3, L5).
-        return path
+        return path, None
 
     def owning_skill(self, resolved):
         """Which skill directory this hook's script lives in, exactly.
@@ -764,6 +798,7 @@ class Census:
                         cmd = h.get("command", "")
                         resolved, exists = self.resolve_hook_command(cmd)
                         owner = self.owning_skill(resolved)
+                        why = (self.undecidable_why(h, cmd) if exists is None else None)
                         self.hooks.append(
                             {
                                 "settings": rel,
@@ -778,6 +813,9 @@ class Census:
                                 "skill": owner,
                                 "resolved": resolved,
                                 "exists": exists,
+                                # Set only when `exists` is None: which rule refused
+                                # to decide, so an undecidable row is named, not counted.
+                                "why": why,
                                 # The registration itself, so a remover can judge the
                                 # row it would delete (type, args) and not a summary.
                                 "hook": h,
@@ -929,6 +967,12 @@ def main():
         # that someone can act on it, and `3 dead` is not actionable.
         for h in _dead:
             print(f"                DEAD  {h['event']:<14} {h['resolved']}")
+        # So is an undecidable one, with the rule that refused it. `1 undecidable` alone
+        # could not tell an agent hook (fine) from a path behind a variable (maybe dead).
+        for h in s['hooks']:
+            if h.get('exists') is None:
+                print(f"                UNDECIDABLE  {h['event']:<14} {h['settings']} — "
+                      f"{h.get('why') or 'no reason recorded'}")
         print(f"  aliases     {len(s['aliases'])} file(s) reachable by >1 path (symlinks — not collisions)")
         print(f"  namespace   {len(s['namespace'])} in-skill template name(s) shared "
               f"(advisory — loaded by path, not resolved by name)")
