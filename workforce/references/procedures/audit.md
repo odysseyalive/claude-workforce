@@ -1245,7 +1245,10 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    into the grounding library, the core left reading it on demand — and Step 7 forbids handing that back
    in any form. The split preserves every word by construction, which is why it is not a rewrite and why
    directive one permits it where trimming is forbidden. **Do not read this clause as a refusal to
-   relocate**; a run that leaves a 95,832 B handbook in place citing it has inverted the rule.
+   relocate**; a run that leaves a 95,832 B handbook in place citing it has inverted the rule. A pass
+   that stops at a floor it measured records it with `wf-stamp --floor <handbook> --evidence <path>
+   --execute`, and later runs report that floor instead of ordering the split again
+   (`procedure-for-procedures.md` § The handbook length ceiling).
 2b. **Heal the FRONTMATTER, which is not a contract section and was reachable from no step.**
    Item 2 is scoped to contract sections and item 2's own closing rule bars touching `## Procedure`
    prose — correctly — but a handbook's `tools:`, `disallowedTools:` and `model:` lines sit outside

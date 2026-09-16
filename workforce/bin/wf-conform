@@ -1547,15 +1547,14 @@ def check_removal_set(root, body, staging, res):
         # `work-reap-audit-20260911T152332Z` read `"ok": true` with that sentence, the undo
         # tree on disk at the first path listed, and an audit filed the reap as having
         # lost its undo. The reap was right; this sentence was not.
+        detail = ((f"its COMMITTED T8 row records the sweep, and the undo it names is at "
+                   f"none of: {shown}. "
+                   if name in swept else f"absent at {shown}. ")
+                  + "A T7s target is unlinked ENTIRELY — references/, "
+                  "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
+                  "an undo for the least of what the sweep removes.")
         if tree:
             detail = f"undo found at {os.path.relpath(tree, root)}"
-        else:
-            detail = ((f"its COMMITTED T8 row records the sweep, and the undo it names is at "
-                       f"none of: {shown}. "
-                       if name in swept else f"absent at {shown}. ")
-                      + "A T7s target is unlinked ENTIRELY — references/, "
-                      "scripts/, hooks/, and every dataset go with it — so SKILL.md.orig is "
-                      "an undo for the least of what the sweep removes.")
         res.add(bool(tree), f"removal set: {name} staged its whole directory", detail)
 
     # THE DECIDED-BUT-UNSTAGED CASE. Keyed on the taxonomy's own category token so a

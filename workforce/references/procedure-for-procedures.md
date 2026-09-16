@@ -281,7 +281,7 @@ MEASURED 2026-09-10 on the live `apps-odyssey-alive` org: **all five of its IC h
 is 4.9× the byte weight of the artifact the ceiling was measured on, and every byte of it is injected
 into that employee's context on every spawn. A line count cannot see this, and **the cost it cannot
 see is the entire reason the ceiling exists.** So `wf-conform` measures both, fires the
-split-is-PERFORMED row on either budget, and says which one was blown — the remedy is the same
+split-is-owed row on either budget, and says which one was blown — the remedy is the same
 relocation either way, but an author told a document is too long will skim it for long sections and
 find none. Where the weight sits is measured too, never asserted: the row reports the longest line
 and calls the shape concentrated or uniformly dense from it.
@@ -359,6 +359,25 @@ the prose, because that risks dropping the user's verbiage and a condensed safet
 (directive one is retention). The 154-line authored body and the 18-line `ORG-*` allowance are
 what the measured floor protects: binding imperative prose and the auto-generated block are never
 condensed to fit, because there is nothing left to relocate once a handbook is down to one job.
+
+**The row names who performs the split, and a measured floor replaces the order.** `wf-conform` runs
+inside read-only commands too, so its row says the split is owed and that `/workforce audit` performs
+it (Step 5d); it no longer says "this run". When a relocation pass stops at a floor it measured — every
+remaining block has a per-section reason it cannot move — the run records that floor:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --floor <handbook> --evidence <report path> --execute
+```
+
+The writer measures the handbook's lines and bytes itself and writes one row to
+`.claude/workforce/length-floors.md`, citing the report by project-relative path. While the handbook
+stays at or under both numbers and the evidence file is on disk, the length row reports the floor
+(`IC handbook length at its MEASURED FLOOR`) and orders nothing. The moment the handbook grows past
+either number, or the evidence is gone, the floor stops counting and the split is ordered again, with
+the reason in the row. A Lead is refused: its length is already observed, never ordered. *Added
+2026-09-16 (apps-odyssey-alive DEF-Q-23): five IC handbooks at 24,132 to 34,658 B, each relocated to a
+measured floor in `audit-20260914T065649Z`, were ordered to split again by the next audit.*
 
 ### Description bytes — reported, never capped
 
