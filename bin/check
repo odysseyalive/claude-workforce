@@ -1092,6 +1092,147 @@ check(
     "; ".join(_attr),
 )
 
+
+# ── wf-live ON THE TREE A HOST ACTUALLY HAS, AND THE HISTORY TIER (2026-09-16) ──────────────
+# A peer project ran the installed 1.63.0 `wf-live` and got 0 BROKEN over 19 `stale` names, 4
+# missing `references/additions.md` citations, and a DETECTOR row for `wf-asks`. Reproduced in a
+# bin/dev-sandbox install. Three separate defects, each proven here by RUNNING the shipped CLI:
+#   1. the evaluators sit BESIDE `skills/workforce/` on a host, and wf-live looked only under
+#      `workforce/skills/`, so every skill-owned citation resolved in this repo and on no host;
+#   2. roles were decided per FILE in the shipped copy after bin/components had moved to per
+#      function, so `wf-widen` (which saves a file of its own) could never read `wf-asks`;
+#   3. correct past-tense prose about a retired hook reported every run, so the one tier that
+#      could show a real stale name was a list nobody reads.
+def _wf_live_run(root):
+    return subprocess.run([sys.executable, os.path.join(root, "bin", "wf-live"), "--root", root],
+                          capture_output=True, text=True, timeout=120).stdout
+
+
+def _host_layout(td):
+    """A copy of the tree laid out as the installer lays it out: skills/workforce + siblings."""
+    import shutil as _sh
+    skills = os.path.join(td, "skills")
+    _ign = _sh.ignore_patterns("__pycache__")
+    _sh.copytree("workforce", os.path.join(skills, "workforce"),
+                 ignore=_sh.ignore_patterns("__pycache__", "skills"))
+    for _s in sorted(os.listdir("workforce/skills")):
+        _sh.copytree(os.path.join("workforce/skills", _s), os.path.join(skills, _s), ignore=_ign)
+    return os.path.join(skills, "workforce")
+
+
+_live_host = []
+try:
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _hw = _host_layout(_td)
+        with open(os.path.join(_hw, "references", "evaluators.md"), "a", encoding="utf-8") as _fh:
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/additions.md`.\n")
+            _fh.write("\nGrowth goes to the evaluator skill's own `references/never-existed.md`.\n")
+        _ho = _wf_live_run(_hw)
+    if "references/additions.md" in _ho:
+        _live_host.append("an attributed citation of a file the sibling skill holds reports missing "
+                          "in the HOST layout — skill_dirs() no longer reads <skills-root>/<name>/")
+    if "references/never-existed.md" not in _ho:
+        _live_host.append("the host-layout resolution hid a file no skill has")
+    _hl = _ho.splitlines()
+    _hbad = [f"{_hl[_i].strip()} ({_hl[_i + 1].strip() if _i + 1 < len(_hl) else ''})"
+             for _i in range(len(_hl))
+             if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", _hl[_i])
+             and "never-existed" not in _hl[_i]
+             and not (_i + 1 < len(_hl) and "never-existed" in _hl[_i + 1])]
+    if _hbad:
+        _live_host.append(f"the installed layout reports {len(_hbad)} disagreement(s): "
+                          f"{_hbad[:4]}")
+except Exception as _exc:                                # noqa: BLE001
+    _live_host.append(f"the host-layout probe would not run ({_exc})")
+check(
+    "wf-live: the tree as a host installs it resolves its skill-owned citations and reports no disagreement",
+    not _live_host,
+    "; ".join(_live_host),
+)
+
+_live_repo_out = _wf_live_run("workforce")
+_live_repo_bad = [l.strip() for l in _live_repo_out.splitlines()
+                  if re.match(r"\s+(stale|BROKEN|DETECTOR|command|hook)\s", l)]
+check(
+    "wf-live: the shipped tree has no disagreement — every retired name it still mentions is history",
+    not _live_repo_bad and "history" in _live_repo_out,
+    f"{_live_repo_bad[:6]} — a `stale` row now means prose that names a retired thing in the "
+    "present tense, or names something no record retired. Reword it as history or correct it. "
+    "Never add the name to a registry to quiet it: RETIRED_HOOKS is pinned to git",
+)
+
+# THE HISTORY TIER CANNOT HIDE A PHANTOM OR A PRESENT-TENSE CLAIM. Three sentences, one tree.
+_live_hist = []
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf, ignore=_sh.ignore_patterns("__pycache__"))
+        with open(os.path.join(_wf, "references", "passes.md"), "a", encoding="utf-8") as _fh:
+            _fh.write("\n`wf-pin-check` was removed in the simplification release.\n")
+            _fh.write("\n`wf-budget-guard` blocks every mis-rendered picker.\n")
+            _fh.write("\n`wf-never-shipped-guard` was removed long ago.\n")
+        _o = _wf_live_run(_wf)
+    if not re.search(r"stale\s+wf-budget-guard", _o):
+        _live_hist.append("a retired name in a PRESENT-TENSE sentence was counted as history — "
+                          "that sentence tells a reader the hook is there")
+    if not re.search(r"stale\s+wf-never-shipped-guard", _o):
+        _live_hist.append("a name no record retired was hidden by a past-tense cue — the cue "
+                          "alone became a way to silence a phantom")
+    if re.search(r"stale\s+wf-pin-check", _o):
+        _live_hist.append("a retired hook in a past-tense sentence still reports stale")
+    if not re.search(r"history\s+\d+\s+past-tense", _o):
+        _live_hist.append("the history tier is not counted on the report, so a rule that "
+                          "swallowed a real defect would look like a clean tree")
+except Exception as _exc:                                # noqa: BLE001
+    _live_hist.append(f"the history probe would not run ({_exc})")
+# RETIRED_EXTERNAL is wf-live's copy of the manifest's `retired` rows, stored because the
+# manifest does not reach a host. The manifest stays the authority: they must be equal.
+_rx_live = re.search(r"RETIRED_EXTERNAL = frozenset\(\{(.*?)\}\)", read("workforce/bin/wf-live"), re.S)
+_rx_set = set(re.findall(r'"([a-z0-9-]+)"', _rx_live.group(1))) if _rx_live else set()
+_rx_man = {os.path.basename(_l.split(None, 1)[1].strip())[:-3]
+           for _l in read("manifest.txt").splitlines()
+           if _l.startswith("retired ") and _l.strip().endswith(".md")}
+check(
+    "wf-live: RETIRED_EXTERNAL equals the manifest's retired rows",
+    bool(_rx_man) and _rx_set == _rx_man,
+    f"wf-live {sorted(_rx_set)} vs manifest {sorted(_rx_man)} — a retired row added to the "
+    "manifest without this set reports its name stale on every host; a name here the manifest "
+    "never retired hides a phantom",
+)
+check(
+    "wf-live: history needs a retired name AND a past-tense sentence; either alone still reports",
+    not _live_hist,
+    "; ".join(_live_hist),
+)
+
+# THE ACTOR RULE IN THE SHIPPED COPY: a script that saves a file of its own can still READ a
+# hand-off, and a hand-off nobody reads still fires.
+_live_det = []
+if re.search(r"DETECTOR\s+wf-asks|stale\s+wf-asks", _live_repo_out):
+    _live_det.append("wf-asks reads as orphaned or phantom, while wf-widen.checklist() reads it "
+                     "and with_checklist hands it to the juror at Stop")
+try:
+    import shutil as _sh, tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _wf = os.path.join(_td, "workforce")
+        _sh.copytree("workforce", _wf, ignore=_sh.ignore_patterns("__pycache__"))
+        with open(os.path.join(_wf, "bin", "wf-orphan-demo"), "w", encoding="utf-8") as _fh:
+            _fh.write("import json, os\n\n\ndef save(d, sid):\n"
+                      "    with open(os.path.join(d, f\"wf-orphan-note.{sid}.json\"), \"w\") as fh:\n"
+                      "        json.dump({}, fh)\n")
+        _o = _wf_live_run(_wf)
+    if not re.search(r"DETECTOR\s+wf-orphan-note", _o):
+        _live_det.append("a hand-off written and read by nothing no longer fires DETECTOR")
+except Exception as _exc:                                # noqa: BLE001
+    _live_det.append(f"the orphan probe would not run ({_exc})")
+check(
+    "wf-live: a hand-off a shipped script reads is not orphaned; one nothing reads still fires",
+    not _live_det,
+    "; ".join(_live_det),
+)
+
 # THE CORPUS RESOLVES FROM THE INSTALL; THE HOUSE RULES STAY LOCAL. `wf-catalog` is the
 # resolver, and the properties below are the ones whose absence would make it dangerous
 # rather than merely wrong. MEASURED 2026-09-10 across thirteen projects: one corpus in
@@ -3543,6 +3684,167 @@ check(
     "each shape is an install wf-seed was measured erroring on; every one must PLAN a "
     "seed into the file the evaluator actually reads. Got: "
     + "; ".join(f"{k}={v}" for k, v in _seed_shapes.items()),
+)
+
+
+# ── THE PROJECT ROOT IS NOT A FILE WORKFORCE DELETES (2026-09-16) ────────────────────────────
+# update.md § What the installer does said a `--project` install "refuses to run without a
+# `CLAUDE.md` at the repo root" and stops with a bootstrap prompt. The 2026-08-05 directive deletes
+# that file and `wf-claude-md` treats ABSENT as the goal, so the documented precondition locked
+# every evacuated project out of updating its own copy. Reported by a peer project on 1.63.0.
+# The installer had already dropped the check; the prose had not. Both halves are held here: the
+# SHIPPED installer, run for real in a project with no CLAUDE.md, and no shipped prose claiming
+# the refusal.
+def _mini_install(project, home, args, extra_rows=()):
+    """Run the shipped `install` against a one-row manifest. Returns the CompletedProcess."""
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-mini-") as _t:
+        _repo = os.path.join(_t, "repo")
+        os.makedirs(_repo)
+        os.symlink(os.path.join(ROOT, "workforce"), os.path.join(_repo, "workforce"))
+        with open(os.path.join(_repo, "manifest.txt"), "w", encoding="utf-8") as _fh:
+            _fh.write("\n".join(["workforce/references/version.md", *extra_rows]) + "\n")
+        _env = dict(os.environ, HOME=home, WORKFORCE_REPO_URL="file://" + _repo)
+        for _k in ("CLAUDE_CONFIG_DIR", "CLAUDE_PROJECT_DIR", "WORKFORCE_SCOPE", "WORKFORCE_CONFIG_DIR"):
+            _env.pop(_k, None)
+        return subprocess.run(["bash", os.path.join(ROOT, "install"), *args], cwd=project,
+                              env=_env, capture_output=True, text=True, timeout=120)
+
+
+_noclaude = []
+try:
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-noclaude-") as _t:
+        _proj, _home = os.path.join(_t, "proj"), os.path.join(_t, "home")
+        os.makedirs(_proj)
+        os.makedirs(_home)
+        _r = _mini_install(_proj, _home, ["--project", "--no-automode", "--no-wire", "--force"])
+        _nc_ver = os.path.join(_proj, ".claude", "skills", "workforce", "references", "version.md")
+        _nc_set = os.path.join(_proj, ".claude", "settings.local.json")
+        if _r.returncode != 0 or not os.path.isfile(_nc_ver):
+            _noclaude.append(f"install --project exited {_r.returncode} in a project with no CLAUDE.md "
+                             f"and installed {'nothing' if not os.path.isfile(_nc_ver) else 'the tree'}: "
+                             f"{(_r.stdout + _r.stderr)[-300:]!r}")
+        if not os.path.isfile(_nc_set):
+            _noclaude.append("no .claude/settings.local.json was bootstrapped")
+        if os.path.exists(os.path.join(_proj, "CLAUDE.md")):
+            _noclaude.append("the install CREATED a CLAUDE.md, the file the audit deletes")
+except Exception as _exc:                                # noqa: BLE001
+    _noclaude.append(f"the installer probe would not run ({_exc})")
+_REFUSE_CLAUDE_RX = re.compile(
+    r"(?:refus\w*|stops?|requires?|precondition)[^.]{0,80}?(?:without|no|absent|missing)[^.]{0,20}?`?CLAUDE\.md`?",
+    re.I)
+for _p in sorted(glob.glob("workforce/**/*.md", recursive=True)) + ["README.md", "COMMANDS.md"]:
+    if _p.startswith("workforce/changes/"):
+        continue
+    for _m in _REFUSE_CLAUDE_RX.finditer(_SACRED_SPAN_RX.sub("", read(_p))):
+        _ctx = read(_p)[max(0, read(_p).find(_m.group(0)) - 200):read(_p).find(_m.group(0)) + 300]
+        if re.search(r"Corrected \d{4}-\d{2}-\d{2}|USED TO|used to|dropped|no longer|never tests", _ctx):
+            continue
+        _noclaude.append(f"{_p}: {' '.join(_m.group(0).split())[:90]}")
+check(
+    "install: a --project install needs no CLAUDE.md, and no shipped prose says it refuses without one",
+    not _noclaude,
+    "; ".join(_noclaude[:4]) + " — the 2026-08-05 directive deletes CLAUDE.md, so a project root test "
+    "keyed on it locks every evacuated project out of `update --project`",
+)
+
+# A RETIRED OUTPUT STYLE STAYS SELECTED AFTER ITS FILE IS PRUNED (DEF-Q-16, 2026-09-16). The
+# installer removed `plain-speak.md` and never cleared the user-scope `outputStyle: "Plain Speak"`
+# that 1.20.0-1.30.x wrote. Run the shipped `--wire-defaults` at user scope in a throwaway config
+# root, four shapes: the retired name with no file (cleared, recorded, rest of the file
+# byte-identical), the retired name with its file still present (kept), a style workforce never
+# shipped (kept), and display mode (nothing written).
+def _style_probe(settings_text, with_file=False, execute=True):
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-style-") as _t:
+        _cfg, _proj = os.path.join(_t, "cfg"), os.path.join(_t, "proj")
+        os.makedirs(_cfg)
+        os.makedirs(_proj)
+        with open(os.path.join(_cfg, "settings.json"), "w", encoding="utf-8") as _fh:
+            _fh.write(settings_text)
+        if with_file:
+            os.makedirs(os.path.join(_cfg, "output-styles"))
+            with open(os.path.join(_cfg, "output-styles", "plain-speak.md"), "w", encoding="utf-8") as _fh:
+                _fh.write("---\nname: Plain Speak\n---\n")
+        _env = dict(os.environ, CLAUDE_CONFIG_DIR=_cfg, HOME=_t)
+        _r = subprocess.run([sys.executable, os.path.join(ROOT, "workforce/bin/wf-settings-apply"),
+                             "--scope", "user", "--wire-defaults"] + (["--execute"] if execute else []),
+                            cwd=_proj, env=_env, capture_output=True, text=True, timeout=120)
+        _after = json.loads(read(os.path.join(_cfg, "settings.json")) or "{}")
+        _owned = read(os.path.join(_cfg, "workforce", ".settings-owned.json")) or "{}"
+        return _r, _after, json.loads(_owned)
+
+
+_style_bad = []
+try:
+    _sty_src = '{\n  "model": "opus",\n  "outputStyle": "Plain Speak",\n  "theme": "dark"\n}\n'
+    _r, _a, _o = _style_probe(_sty_src)
+    _cl = _o.get("output_style_cleared") or []
+    if "outputStyle" in _a or _a.get("model") != "opus" or _a.get("theme") != "dark":
+        _style_bad.append(f"the retired selection with no file was not cleared cleanly: {_a}")
+    if not (len(_cl) == 1 and _cl[0].get("previous") == "Plain Speak"):
+        _style_bad.append(f"the clear was not recorded in output_style_cleared: {_cl}")
+    if "outputStyle 'Plain Speak' cleared" not in _r.stdout:
+        _style_bad.append("the clear was not reported on the run's output")
+    _r, _a, _o = _style_probe(_sty_src, with_file=True)
+    if _a.get("outputStyle") != "Plain Speak":
+        _style_bad.append("a retired name whose style file is still on disk was cleared")
+    _r, _a, _o = _style_probe(_sty_src.replace("Plain Speak", "Explanatory"))
+    if _a.get("outputStyle") != "Explanatory" or _o.get("output_style_cleared"):
+        _style_bad.append("a style workforce never shipped was cleared")
+    _r, _a, _o = _style_probe(_sty_src, execute=False)
+    if _a.get("outputStyle") != "Plain Speak":
+        _style_bad.append("display mode wrote the settings file")
+except Exception as _exc:                                # noqa: BLE001
+    _style_bad.append(f"the style probe would not run ({_exc})")
+check(
+    "settings: --wire-defaults clears a user-scope outputStyle naming a retired style with no file, and nothing else",
+    not _style_bad,
+    "; ".join(_style_bad),
+)
+
+# THE EVALUATORS ARE NOT PROJECT-MATERIALIZED COMPANIONS (DEF-Q-18, 2026-09-16). Since 1.52.0 the
+# five evaluators ship in the user install (manifest `sibling` rows) and Step 6-F retires project
+# copies, under the 2026-09-10 directive. audit-setup.md Step 0.3 still said they were "written from
+# references/evaluators.md" and that "there is no `workforce/skills/`", contradicting its own
+# INV-COMPANIONS paragraph. A claim of that shape anywhere outside a dated correction note fails.
+_eval_scope = []
+_EVAL_SCOPE_RX = re.compile(
+    r"ships no companion skill director|there is no `workforce/skills/`|the manifest lists none"
+    r"|evaluators are written from|render in the companion gate when absent", re.I)
+if os.path.isdir("workforce/skills") and any(l.startswith("sibling ") for l in read("manifest.txt").splitlines()):
+    for _p in sorted(glob.glob("workforce/references/**/*.md", recursive=True)) + ["workforce/SKILL.md"]:
+        for _para in re.split(r"\n\s*\n", read(_p)):
+            if _EVAL_SCOPE_RX.search(_para) and not re.search(r"Corrected \d{4}-\d{2}-\d{2}", _para):
+                _eval_scope.append(f"{_p}: {' '.join(_EVAL_SCOPE_RX.search(_para).group(0).split())}")
+if "The three evaluators are NOT materialized here" not in _asu:
+    _eval_scope.append("audit-setup.md Step 0.3 no longer says the evaluators come from the install")
+check(
+    "companions: no reference says the evaluators are materialized into a project or that no skill ships",
+    not _eval_scope,
+    f"{_eval_scope[:4]} — the evaluators ship as sibling skills in the user install and Step 6-F retires "
+    "a project's copies; a step saying otherwise has a run write back the copies the same audit removes",
+)
+
+# WHERE AN INSTALL'S VERSION IS READ. update.md step 1 told a run to read each copy's
+# `WORKFORCE-VERSION` as if a file by that name sat at the install root; none ships. The version is
+# the `WORKFORCE-VERSION:` line of `references/version.md`. Every procedure step that tells a run to
+# READ or COMPARE an install's `WORKFORCE-VERSION` must name that file in the same paragraph.
+_ver_where = []
+for _p in sorted(glob.glob("workforce/references/**/*.md", recursive=True)):
+    for _para in re.split(r"\n\s*\n", read(_p)):
+        if "`WORKFORCE-VERSION`" not in _para:
+            continue
+        if not re.search(r"\b(?:[Rr]ead|[Cc]ompare)\w*\b[^.]{0,120}`WORKFORCE-VERSION`", _para):
+            continue
+        if "version.md" not in _para:
+            _ver_where.append(f"{_p}: {' '.join(_para.split())[:100]}")
+check(
+    "version: every step that reads an install's WORKFORCE-VERSION names references/version.md",
+    not _ver_where,
+    f"{_ver_where[:4]} — no file named WORKFORCE-VERSION ships; a reader told to read one looks for "
+    "a file at the install root, finds nothing, and reports every copy as unversioned",
 )
 
 
@@ -10314,10 +10616,10 @@ check("audit wires the canary PASS to wf-apply --record-canary, not a hand-write
       "the PASS-on-record step must run wf-apply --record-canary --execute with an explicit "
       "absolute --root and state the ${CLAUDE_PROJECT_DIR}-is-unset hazard, or a run hand-"
       "composes platform-local.md and the producer is never called")
-check("verify prints the wf-apply --record-canary command, with the absolute-path hazard",
+check("verify names the wf-apply --record-canary producer, with the absolute-path hazard",
       "--record-canary" in vfy and "${CLAUDE_PROJECT_DIR}" in vfy,
-      "verify reports the fix and never applies it, so it prints the exact command to run; "
-      "shipping the ${CLAUDE_PROJECT_DIR} form prints a command that exits 2 every time")
+      "verify records a canary PASS through that producer and never composes the file by hand; "
+      "shipping the ${CLAUDE_PROJECT_DIR} form runs a command that exits 2 every time")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixing the instance is not fixing the defect
@@ -11695,6 +11997,12 @@ for _c in _ro_single:
             # 2026-09-07 directive is that the next use of workforce heals it. Exempted by
             # the exact producer and flag pair, so any OTHER executing line still fails.
             if _c == "verify" and "/bin/wf-settings-apply\"" in _ln and "--heal --execute" in _ln:
+                continue
+            # THE SECOND NAMED EXCEPTION, 2026-09-16: § Deferred tier canary records a PASS it
+            # measured. The write is platform-local.md on PASS only, measured by the check named
+            # "verify: a canary PASS it measures is recorded…". Exempted by producer and flag.
+            if (_c == "verify" and "/bin/wf-apply\"" in _ln and "--run-canary" in _ln
+                    and _ln.rstrip().endswith("--execute")):
                 continue
             if any(_flag in _ln for _flag in _EXECUTING):
                 _ro_violations.append(f"{_c}.md: {_ln.strip()[:90]}")
@@ -15575,6 +15883,35 @@ if os.name == "posix" and _ck_mod:
 else:
     skip("canary: the runner measures end to end against a stub claude and writes nothing",
          "not a POSIX host, or wf-apply did not import — the stub is a shebang script")
+
+# VERIFY RECORDS A PASS IT MEASURED, AND NOTHING ELSE (2026-09-16). A peer host's
+# platform-local.md said 2.1.268 on a 2.1.273 harness; `verify` ran `--run-canary` WITHOUT
+# `--execute`, got PASS on every run, printed a command, and left the file stale until an audit —
+# so every verify re-ran a canary that had just passed. verify.md now runs the same call with
+# `--execute`. What makes that safe in a read-only command is that the write is exactly one file
+# and only on PASS; both halves are measured here against the stub, not read from prose.
+_vck_problems = []
+if not re.search(r"wf-apply\" --root <absolute path to project> --run-canary[^\n]*--execute", vfy):
+    _vck_problems.append("verify.md § Deferred tier canary no longer runs --run-canary with --execute")
+if "that is the whole write" not in vfy or "writes two things, and only those two" not in vfy:
+    _vck_problems.append("verify.md no longer states the canary record is its one narrow write")
+if os.name == "posix" and _ck_mod:
+    _ck_exec = _ck_run(_CK_STUB, ["--attempts", "1", "--execute"])
+    _ck_exec_na = _ck_run("import time\ntime.sleep(30)\n", ["--timeout", "1", "--attempts", "1", "--execute"])
+    if not (_ck_exec[0] == 0 and _ck_exec[2] == [os.path.join("root", ".claude", "workforce", "platform-local.md")]
+            and "verified on disk: MEASURED-ON:" in _ck_exec[1]):
+        _vck_problems.append(f"--run-canary --execute on PASS: exit {_ck_exec[0]}, left {_ck_exec[2]} — "
+                             "it must write platform-local.md and no other file")
+    if _ck_exec_na[0] != 3 or _ck_exec_na[2]:
+        _vck_problems.append(f"--run-canary --execute on UNAVAILABLE: exit {_ck_exec_na[0]}, left "
+                             f"{_ck_exec_na[2]} — a canary that did not pass must write nothing")
+else:
+    _vck_problems.append("not a POSIX host or wf-apply did not import, so the write could not be measured")
+check(
+    "verify: a canary PASS it measures is recorded in platform-local.md, and that is the only file written",
+    not _vck_problems,
+    "; ".join(_vck_problems),
+)
 
 # NO PROCEDURE MAY TELL A RUN TO WRITE A CANARY INTO AN AGENTS DIRECTORY. Classified by
 # grammar, as staging.md § Phase A rule 2 classifies tool mentions: a present-tense or

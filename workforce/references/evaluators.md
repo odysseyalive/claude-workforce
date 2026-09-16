@@ -569,7 +569,7 @@ claude-enforcer and never hand-edited) and **workforce-distilled** (`security`, 
 re-distilled from its pins). Both are read-mostly, version-anchored, and greppable; they differ in
 origin and in who may edit them.
 
-**So growth goes to the evaluator skill's own `references/additions.md`, and that is the whole reason it exists.**
+**So growth goes to the evaluator skill's own `skills/<evaluator>/references/additions.md`, and that is the whole reason it exists.**
 Until 2026-08-06 there were two slots and neither could take a new entry authored here: the vendored
 corpus may not be edited, and a project's own catalog under `.claude/skills/<evaluator>/` does not
 ship. The paragraph below called growing the seed a release task while the paragraph above forbade
@@ -579,8 +579,8 @@ tracked, shipped, and attributable to this project rather than to a predecessor 
 them.
 
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
-carry more of the weight — **which now means adding to the evaluator skill's own `references/additions.md`, never to
-the evaluator skill's shipped `references/`.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
+carry more of the weight — **which now means adding to the evaluator skill's own `skills/<evaluator>/references/additions.md`, never to
+the evaluator skill's vendored corpus beside it.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
 was, and that checklist has five items and has never carried one for the seed, and the honest signal
 is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
 corpus.
@@ -701,7 +701,7 @@ receives the unconditional append. Nothing above weakens that case.
 
 **And the workforce-authored additions are a SEPARATE append with a SEPARATE gate.** Everything in this
 section governs the vendored corpus and the supersession register that guards it.
-The evaluator skill's own `references/additions.md` is neither vendored nor superseded — it is workforce's own — so its append
+The evaluator skill's own `skills/<evaluator>/references/additions.md` is neither vendored nor superseded — it is workforce's own — so its append
 (§ Seeding step 1b) is stopped by **exactly one** thing, the insertion-point blocker above, and by nothing
 else: not an empty supersession register, not a foreign version anchor, not foreign ownership of the skill.
 A run that withholds the additions for any of those reasons has confused the two appends — the error
@@ -735,8 +735,9 @@ its edits.
 
 ## Wiring into the org
 
-**`audit`** — the catalogs render in the companion gate when absent, checkbox to install
-(`references/audit-setup.md` § Step 0.3; `route`/`operating-principles` precedent). Present catalogs receive unconditional maintenance: the
+**`audit`** — the evaluators are not installed by the companion gate; they ship in the user install and
+the gate checks each is reachable, project first (`references/audit-setup.md` § Step 0.3), while Step
+6-F retires a project's own copy. Present catalogs receive unconditional maintenance: the
 version comparison and forcible append run whether or not anything was checked, because that is
 maintenance of something already installed rather than a new install.
 

@@ -778,9 +778,11 @@ install_to_scope() {
             "canary "*) flag="canary"; path="${line#canary }" ;;
             # `style` files do NOT live in the skill directory either: an output
             # style is read from `<config-root>/output-styles/` or the project's
-            # `.claude/output-styles/`, and nowhere else. It modifies the system
-            # prompt, which is why the plain-speak rule lands here rather than in
-            # a reference the model has to still be paying attention to.
+            # `.claude/output-styles/`, and nowhere else. NO `style` ROW SHIPS NOW:
+            # `plain-speak.md` was retired in 1.31.0 and is a `retired` row, so the
+            # prune removes the file, and `wf-settings-apply --wire-defaults` clears a
+            # user-scope `outputStyle` that still selects it. The flag stays so a
+            # future style has a destination.
             "style "*) flag="style"; path="${line#style }" ;;
             # `sibling` files do NOT live in the workforce skill directory: they are
             # WHOLE SKILLS OF THEIR OWN — the five evaluators — and a skill is only
@@ -1042,12 +1044,12 @@ if changed:
     # `verify` reports an unwired hook, and an install that aborts here leaves a tree
     # that is complete and looks broken.
     if [ "$WANTS_WIRE" = "no" ]; then
-        echo "  Skipping hook wiring and output style (--no-wire)."
+        echo "  Skipping hook wiring and the retired output-style clear (--no-wire)."
     elif ! command -v python3 &>/dev/null; then
         echo "  Warning: python3 not found; hooks are installed but NOT wired."
         echo "  Wire them later with: /workforce hooks --execute"
     else
-        echo "Wiring hooks and selecting the output style..."
+        echo "Wiring hooks and clearing any retired output-style selection..."
         # THE EXIT STATUS IS THE APPLIER'S, NOT sed's. `cmd | sed … || warn` tested sed,
         # which always succeeds, so a wiring run that crashed before wiring anything
         # printed a traceback, skipped the warning, and the install said it was complete

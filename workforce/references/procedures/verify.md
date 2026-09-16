@@ -2,9 +2,11 @@
 
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 33 assertion(s) in bin/check name this file; 66 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Headless-safe, executes
-immediately, and read-only with ONE exception: § Hook wiring removes this project's workforce hook rows
+immediately, and read-only with TWO narrow exceptions: § Hook wiring removes this project's workforce hook rows
 whose script the distribution retired, before it counts, because a row that fails on every event is not a finding anybody
-should have to act on (§ Output says why this is the only write).
+should have to act on; and § Deferred tier canary records a canary PASS it measured this run into
+`.claude/workforce/platform-local.md` and nothing else, because a measurement is data about the host, not
+a change to the project (§ Output says why these are the only writes).
 
 `/workforce verify`
 
@@ -18,7 +20,7 @@ instead. The division of labour, stated so it stops blurring:
 
 | | Owns |
 |---|---|
-| `verify` | **detecting** every silent-failure class below, across the whole org, changing nothing except the one heal in § Hook wiring |
+| `verify` | **detecting** every silent-failure class below, across the whole org, changing nothing except the heal in § Hook wiring and the canary record in § Deferred tier canary |
 | `reconcile` | resolving cross-employee conflicts it detects — collisions, races, orphans |
 | `checksums` | the integrity-stamp mechanism whose states it reports |
 | `review` | per-employee performance, where the subject is the document |
@@ -79,9 +81,12 @@ not there.
 project `vendor` was a live command and `wf-handoff` was a shipped script. Both were wrong, both were
 written down, and both were believed. Nothing here is stored, so nothing here can go stale.
 
-**Two tiers, because a guard that cries wolf gets ignored.** `BROKEN` is a name sitting where a
-reader is told to run it. `stale` is a name mentioned anywhere else — often correctly, since a change
-record naming a swept mechanism is a change record doing its job. Only the first tier is a failure.
+**Its rows are split by kind, because a guard that cries wolf gets ignored.** `BROKEN` is a name sitting where a
+reader is told to run it. `history` is a name the distribution retired, in a sentence about the past;
+it is counted on one line and listed only under `--json`, because prose recording a removal is the
+record doing its job. `stale` is every other mention of something that is not there: a retired name in
+a present-tense sentence, or a name nothing retired. Report `BROKEN` as a failure and each `stale` row
+as a finding with its `path:line`.
 
 ## Where the evaluator catalogs resolve from
 
@@ -216,19 +221,38 @@ An audit whose canary came back `UNAVAILABLE` registered its employees with the 
 and told the user `verify` re-runs it (`audit.md` Step 7). **This is where that promise is kept.**
 
 - IF `platform-local.md` already matches the running harness → `PASS (on record)`; nothing to spawn.
-- ELSE → **run `staging.md` § Phase C** — `wf-apply --root <absolute path> --run-canary`, without
-  `--execute` — and report the result with the `INV-CANARY` line it prints.
+- ELSE → **run `staging.md` § Phase C with `--execute`**, and report the result with the `INV-CANARY`
+  line it prints:
+
+  ```bash
+  WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+  "$WF/bin/wf-apply" --root <absolute path to project> --run-canary --by 'verify, <YYYY-MM-DD>' --execute
+  ```
+
+  `--root` takes an explicit absolute path, never `"${CLAUDE_PROJECT_DIR}"`: that variable is unset in
+  the Bash tool and the script exits 2 on an empty root.
+- **On `PASS` that call records the measurement, and that is the whole write.** `--execute` hands the
+  measured C1, C2, tier limit and running harness version to the recorder named below, which writes
+  `.claude/workforce/platform-local.md`, re-reads it, and prints `verified on disk: MEASURED-ON: …`.
+  Paste that line into the report as `canary: PASS — platform-local.md recorded (<version>)`. Nothing
+  else is touched: no handbook, no `Tier ceiling:` mark, no org-config row. On `FAIL` or `UNAVAILABLE`
+  the call writes nothing at all, because the recorder runs only on a PASS.
+  *Why a read-only command writes this, 2026-09-16:* a peer host's `platform-local.md` said 2.1.268
+  while the host ran 2.1.273, so every `verify` re-ran the canary, it passed every time, and the file
+  stayed stale until an audit, since `verify` only printed the command. A fresh measurement is data,
+  not a project change, and a PASS measured and not written down is re-measured on the next run.
 - IF it returns `UNAVAILABLE` → report `canary: UNAVAILABLE` with the cause the runner named, and say
   plainly that the ceiling is still unverified. Never report a clean org.
 - On `FAIL` → a finding of the first rank: employees are live on a host whose delegation semantics differ
   from the design's. Report it against the org, not against any one handbook.
 
-**This is the SECOND of the three spawns `verify` makes, and all three write nothing.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement — and the third is the applied-model canary in the subsection below. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
-observation; it does not touch the org. On `PASS`, print the exact `wf-apply … --record-canary
---execute` command to run — with an explicit absolute `--root`, never `--root "${CLAUDE_PROJECT_DIR}"`
-(unset in the Bash tool; the script exits 2 on it) — and name `/workforce amend` as what clears the
-`Tier ceiling: unverified this run` marks — **`verify` reports the fix, it never applies it** (§ Output). The alternative was a promise in every degraded audit's closing
-report that no command fulfilled.
+**This is the SECOND of the three spawns `verify` makes. The other two write nothing, and this one
+writes only the measurement above.** The first is the throwaway ambient-policy probe in the table above — a verdict about spawning at zero attempts is a reading, not a measurement — and the third is the applied-model canary in the subsection below. *Corrected 2026-08-04: this line read "the one place `verify` spawns anything", and an executor believing it skips the probe whose absence cost an entire `odyssey-alive` run.* Spawning a canary is
+observation; recording what it observed does not touch the org. The record is `wf-apply …
+--record-canary --execute`, called by `--run-canary --execute` itself; never compose the file by hand.
+On `PASS`, name `/workforce amend` as what clears the `Tier ceiling: unverified this run` marks —
+**`verify` records the measurement, it never applies a fix to a handbook** (§ Output). The alternative
+was a promise in every degraded audit's closing report that no command fulfilled.
 
 ### Applied-model canary — does a `model:` pin survive to runtime
 
@@ -802,7 +826,10 @@ restart notice — **whose wording is `platform.md` fact 3's, quoted from there 
 | the field or rule at fault, by name | not "invalid frontmatter" — *which key* |
 | **the literal text that would fix it** | `/doctor` shows an exec-form example when a hook is missing its `command` field. The gates in SKILL.md already do this well; reports do not |
 
-**`verify` fixes one thing, and only that one: § Hook wiring's heal.** Everything else it reports;
+**`verify` writes two things, and only those two: § Hook wiring's heal, and § Deferred tier canary's
+record of a PASS it measured this run.** The record is not a fix: it writes the host measurement into
+`platform-local.md` and changes nothing about the org, so it is safe in the same uncertain state the
+heal is, and a verify that dropped it would re-measure the same host on every run. Everything else it reports;
 `audit` and `amend` change things. A health check that mutates cannot be run safely when you are unsure
 of the state — which is exactly when it is needed. The heal is safe to run in that state because what it
 removes cannot be anybody's intent: its script was retired by the distribution, so it fails on every

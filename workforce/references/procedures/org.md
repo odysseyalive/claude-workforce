@@ -215,7 +215,7 @@ now 1.30.2` — and say `no prior stamp` where the prior chart had none. An unre
 an ordinary re-index.
 
 **8. Verify.** Re-read the chart: header present, honesty line verbatim, **the `workforce-version:`
-value equals the installed `WORKFORCE-VERSION`**, every roster row has a file on disk, fan-out
+value equals the installed `WORKFORCE-VERSION`** in `references/version.md`, every roster row has a file on disk, fan-out
 arithmetic matches the roster. Failures are reported, not silently retried. The stamp is re-read
 rather than assumed written, because a generator that does not read back what it wrote is the
 failure `org-chart-format.md` opens on.

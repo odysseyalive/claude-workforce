@@ -126,8 +126,8 @@ and it shipped that way for two hours on 2026-09-07 because the record looked ri
 
 **Where each path lives:** `install` and `install.ps1` call `wf-settings-apply --wire-defaults
 --execute` after the files land; `audit` Step 6-H calls the same thing, which is what makes it a heal
-rather than a fresh-install-only improvement; `verify` § Hook wiring and § Output style report the state
-of both. All three write through **one producer**, so the wired set cannot drift between them.
+rather than a fresh-install-only improvement; `verify` § Hook wiring reports the state
+of that wiring. All three write through **one producer**, so the wired set cannot drift between them.
 
 **Retiring a hook needs the same three paths, and the first two were not enough.** `--wire-defaults`
 prunes only the ONE settings file its scope resolves, so a personal `update` cleaned

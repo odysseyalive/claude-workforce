@@ -861,7 +861,7 @@ function Install-ClaudeWorkforce {
         # install whose files all landed must not fail over a registration; `verify`
         # reports an unwired hook.
         if (-not $script:WantsWire) {
-            Write-Host '  Skipping hook wiring and output style (-NoWire).'
+            Write-Host '  Skipping hook wiring and the retired output-style clear (-NoWire).'
         } elseif (-not (Get-Command python -ErrorAction SilentlyContinue) -and
                   -not (Get-Command python3 -ErrorAction SilentlyContinue)) {
             Write-Host '  Warning: python not found; hooks are installed but NOT wired.'
@@ -869,7 +869,7 @@ function Install-ClaudeWorkforce {
         } else {
             $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
             $applier = Join-Path $skillDir 'bin/wf-settings-apply'
-            Write-Host 'Wiring hooks and selecting the output style...'
+            Write-Host 'Wiring hooks and clearing any retired output-style selection...'
             $wireArgs = if ($scope -eq 'user') {
                 @($applier, '--scope', 'user', '--wire-defaults', '--execute')
             } else {

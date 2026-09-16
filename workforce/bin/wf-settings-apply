@@ -814,6 +814,8 @@ def do_wire_defaults(root, scope, execute):
     # PRUNE FIRST. A dead row is not a registration, and a presence check that ran over
     # it before it was gone would read the file in a state this run is about to change.
     rc = prune_dead_hooks(root, scope, execute)
+    if scope == "user":
+        rc = max(rc, clear_retired_style(root, execute))
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
     report_duplicate_firing(root)
@@ -855,6 +857,101 @@ def prune_dead_hooks(root, scope, execute):
               execute and not out["refused"], None)
     _print_result(out, execute and not out["refused"], quiet=True)
     return out["rc"]
+
+
+# OUTPUT STYLES THE DISTRIBUTION RETIRED, by the `name:` a settings `outputStyle` selects them by,
+# with the file each shipped as. `Plain Speak` shipped as `output-styles/plain-speak.md` and went
+# in 1.31.0 (manifest.txt § Retired external paths). Only these names are ever cleared: a
+# selection of any other style, however broken, is the user's and is left alone.
+RETIRED_OUTPUT_STYLES = {"Plain Speak": "plain-speak.md"}
+
+
+def _style_file_present(name, dirs):
+    """Does any output-styles directory still hold a style called `name`?"""
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        if os.path.isfile(os.path.join(d, RETIRED_OUTPUT_STYLES.get(name, ""))):
+            return True
+        try:
+            names = os.listdir(d)
+        except OSError:
+            return True     # unreadable: the style may be there, and a clear must not guess
+        for f in names:
+            if f.endswith(".md"):
+                m = re.search(r"^name:\s*(.+?)\s*$", read(os.path.join(d, f)) or "", re.M)
+                if m and m.group(1).strip("'\"") == name:
+                    return True
+    return False
+
+
+def clear_retired_style(root, execute):
+    """Clear a USER-SCOPE `outputStyle` that selects a style workforce retired and whose file is gone.
+
+    DEF-Q-16, 2026-09-16. The installer's prune removes the retired `plain-speak.md` from
+    `<config-root>/output-styles/` (the `retired` rows of manifest.txt), and nothing cleared the
+    `outputStyle: "Plain Speak"` that 1.20.0 through 1.30.x wrote beside it. So every host that
+    had it kept a selection naming a style that no longer exists. `audit` Step 5h clears a project's
+    selection, and a user-scope file is written by nobody but this installer path.
+
+    THREE CONDITIONS, all required: the value is a name in RETIRED_OUTPUT_STYLES, exactly; no
+    output-styles directory the session reads (the config root's, and the working project's) holds a
+    style by that name; and the reversal record can be written. The edit removes the one key,
+    character by character, re-reads the file, and only then appends `output_style_cleared` to
+    `.settings-owned.json`, the same record `hooks_removed` lives in.
+    """
+    spath = user_settings_path()
+    if not os.path.lexists(spath):
+        return 0
+    data, text, err = _load_strict(spath)
+    value = data.get("outputStyle") if isinstance(data, dict) else None
+    if err or not isinstance(value, str) or value not in RETIRED_OUTPUT_STYLES:
+        return 0
+    project = root or os.getcwd()
+    dirs = [os.path.join(config_root(), "output-styles"), os.path.join(project, ".claude", "output-styles")]
+    if _style_file_present(value, dirs):
+        print(f"  . outputStyle {value!r} kept — a style file by that name is still on disk")
+        return 0
+    cfg = config_root()
+    owned_path = os.path.join(cfg, "workforce", ".settings-owned.json")
+    if not execute:
+        print(f"  ~ outputStyle {value!r} would be cleared from {spath} (a style workforce retired; "
+              f"no file for it remains)")
+        return 0
+    refusal = _record_refusal(owned_path, os.path.join(os.path.realpath(cfg), "workforce"))
+    if refusal:
+        print(f"  ! outputStyle {value!r} NOT cleared from {spath}: {refusal}")
+        return 1
+    try:
+        top = _spans(text)
+        idx, _node = _member(top, "outputStyle")
+        start, end = _cut(top["c"], idx)
+        new = text[:start] + text[end:]
+        want = {k: v for k, v in data.items() if k != "outputStyle"}
+        if json.loads(new) != want:
+            raise RuntimeError("the character-level edit did not reproduce the intended settings")
+        _atomic_write(os.path.realpath(spath), new, text)
+        back, _t, _e = _load_strict(spath)
+        if not isinstance(back, dict) or "outputStyle" in back:
+            raise RuntimeError(f"re-read of {spath} still selects an output style")
+        rec, rtext, rerr = (_load_strict(owned_path) if os.path.lexists(owned_path)
+                            else ({}, "", None))
+        if rerr or not isinstance(rec, dict):
+            raise ValueError(f"{owned_path} is not a JSON object: {rerr}")
+        if not isinstance(rec.get("output_style_cleared"), list):
+            rec["output_style_cleared"] = []
+        rec["output_style_cleared"].append({
+            "settings": spath, "previous": value,
+            "reason": f"retired by workforce — {RETIRED_OUTPUT_STYLES[value]} is on no "
+                      f"output-styles path"})
+        os.makedirs(os.path.dirname(owned_path), exist_ok=True)
+        _atomic_write(owned_path, _render(rec, rtext or "{\n  }\n"))
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"  ! outputStyle {value!r} NOT cleared from {spath}: {exc.__class__.__name__}: {exc}")
+        return 1
+    print(f"  - outputStyle {value!r} cleared from {spath} (a style workforce retired; no file "
+          f"for it remains) — recorded in {owned_path} § output_style_cleared")
+    return 0
 
 
 def known_roots(root):
@@ -2017,8 +2114,9 @@ def do_automode(execute):
 # existing ones, which is the failure the user's 2026-09-07 propagation directive names.
 #
 # So: nothing selects a style, and the code that un-selects one stays until no install
-# in the world still carries the record. `audit` Step 5h clears a selected style whose
-# file is absent, which covers the installs this script never runs against.
+# in the world still carries the record. A selection with NO record behind it is cleared
+# too: `clear_retired_style` at user scope on every install and update, and `audit` Step 5h
+# for a project's own settings.
 
 
 def main(argv=None):

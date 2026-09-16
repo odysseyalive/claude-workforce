@@ -82,7 +82,8 @@ running release — the copy of the skill that generated the chart — not the r
 built on. That is deliberate: the chart is regenerated whole on every index, so a stamp claiming an
 older release would be describing a file that no longer exists.
 
-**What reads it.** `audit` compares it against the running `WORKFORCE-VERSION` and takes one of three
+**What reads it.** `audit` compares it against the running `WORKFORCE-VERSION` (the line in the
+install's `references/version.md`) and takes one of three
 branches, and the comparison is the whole point of the field:
 
 | Chart stamp vs running release | Meaning | What `audit` does |
