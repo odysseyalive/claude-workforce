@@ -427,7 +427,7 @@ mechanism. The measured case, and both halves are now history: `wf-plain-guard` 
 nothing but a human typing `hooks --execute` — the guard was itself retired in 1.30.2 — and `audit.md` Step 6-G had read "this sits alongside the settings-hook wiring of the
 same run" the whole time while **no step performed that wiring**. Mechanics at `references/enforcement.md`
 § Three paths, or it does not propagate, `references/procedures/audit.md` § Step 6-H,
-`references/procedures/verify.md` § Output style, and `wf-settings-apply --wire-defaults`, which is the
+`references/procedures/verify.md` § Hook wiring, and `wf-settings-apply --wire-defaults`, which is the
 single producer all three paths call so the wired set cannot drift between them. The operational reading
 is — **three paths or it does not propagate: the installer wires it, `audit` wires it again, and
 `verify` reports it absent. A per-machine command is not a path** — it reaches exactly the machines

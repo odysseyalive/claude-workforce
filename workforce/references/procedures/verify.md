@@ -81,7 +81,7 @@ not there.
 project `vendor` was a live command and `wf-handoff` was a shipped script. Both were wrong, both were
 written down, and both were believed. Nothing here is stored, so nothing here can go stale.
 
-**Three tiers, because a guard that cries wolf gets ignored.** `BROKEN` is a name sitting where a
+**Its rows are split by kind, because a guard that cries wolf gets ignored.** `BROKEN` is a name sitting where a
 reader is told to run it. `history` is a name the distribution retired, in a sentence about the past;
 it is counted on one line and listed only under `--json`, because prose recording a removal is the
 record doing its job. `stale` is every other mention of something that is not there: a retired name in

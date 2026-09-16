@@ -10,9 +10,9 @@ executes its own recommendations.
 /workforce audit --quick    frontmatter, chart drift, and budget only
 ```
 
-**Autonomy model:** companions are materialized from shipped doctrine on absence — never copied, because
-the distribution ships no companion skill directory (`references/audit-setup.md` § Step 0.3); the org is
-designed from evidence and built.
+**Autonomy model:** the three Core companions are materialized from shipped doctrine on absence, and the
+evaluators are reached from the user install rather than written into the project
+(`references/audit-setup.md` § Step 0.3); the org is designed from evidence and built.
 **The only questions are consent, the backup, the model budget, and the effort budget** — whether to
 proceed, whether to archive first, and which model and effort each lane runs at
 (`references/audit-setup.md` § The question budget). The lanes the budgets manage separately are
@@ -1728,7 +1728,10 @@ what neither reached.
    exist, keep the one under the config directory this run is installed to.
 3. **Clear an output style whose file is gone.** A selected `outputStyle` naming a file that no longer
    exists is inert, not neutral — it reads as configured behaviour to anyone inspecting the settings,
-   and it is what a user who asked for a style to be removed will check first.
+   and it is what a user who asked for a style to be removed will check first. This step clears the
+   PROJECT's selection. The USER-SCOPE one is cleared by the installer's `wf-settings-apply
+   --wire-defaults` pass (`hooks.md` § Healing), only when it names a style workforce retired and no
+   file for it remains, and recorded in `.settings-owned.json` § `output_style_cleared`.
 4. **Unregister shipped fixtures that no longer ship.** The five canaries are registered in
    `.claude/agents/`, so their names and descriptions enter the agent menu of **every session in the
    project** whether or not a measurement is running. Remove a registration whose definition is no

@@ -3682,6 +3682,84 @@ check(
     "keyed on it locks every evacuated project out of `update --project`",
 )
 
+# A RETIRED OUTPUT STYLE STAYS SELECTED AFTER ITS FILE IS PRUNED (DEF-Q-16, 2026-09-16). The
+# installer removed `plain-speak.md` and never cleared the user-scope `outputStyle: "Plain Speak"`
+# that 1.20.0-1.30.x wrote. Run the shipped `--wire-defaults` at user scope in a throwaway config
+# root, four shapes: the retired name with no file (cleared, recorded, rest of the file
+# byte-identical), the retired name with its file still present (kept), a style workforce never
+# shipped (kept), and display mode (nothing written).
+def _style_probe(settings_text, with_file=False, execute=True):
+    import tempfile as _tfm
+    with _tfm.TemporaryDirectory(prefix="wf-check-style-") as _t:
+        _cfg, _proj = os.path.join(_t, "cfg"), os.path.join(_t, "proj")
+        os.makedirs(_cfg)
+        os.makedirs(_proj)
+        with open(os.path.join(_cfg, "settings.json"), "w", encoding="utf-8") as _fh:
+            _fh.write(settings_text)
+        if with_file:
+            os.makedirs(os.path.join(_cfg, "output-styles"))
+            with open(os.path.join(_cfg, "output-styles", "plain-speak.md"), "w", encoding="utf-8") as _fh:
+                _fh.write("---\nname: Plain Speak\n---\n")
+        _env = dict(os.environ, CLAUDE_CONFIG_DIR=_cfg, HOME=_t)
+        _r = subprocess.run([sys.executable, os.path.join(ROOT, "workforce/bin/wf-settings-apply"),
+                             "--scope", "user", "--wire-defaults"] + (["--execute"] if execute else []),
+                            cwd=_proj, env=_env, capture_output=True, text=True, timeout=120)
+        _after = json.loads(read(os.path.join(_cfg, "settings.json")) or "{}")
+        _owned = read(os.path.join(_cfg, "workforce", ".settings-owned.json")) or "{}"
+        return _r, _after, json.loads(_owned)
+
+
+_style_bad = []
+try:
+    _sty_src = '{\n  "model": "opus",\n  "outputStyle": "Plain Speak",\n  "theme": "dark"\n}\n'
+    _r, _a, _o = _style_probe(_sty_src)
+    _cl = _o.get("output_style_cleared") or []
+    if "outputStyle" in _a or _a.get("model") != "opus" or _a.get("theme") != "dark":
+        _style_bad.append(f"the retired selection with no file was not cleared cleanly: {_a}")
+    if not (len(_cl) == 1 and _cl[0].get("previous") == "Plain Speak"):
+        _style_bad.append(f"the clear was not recorded in output_style_cleared: {_cl}")
+    if "outputStyle 'Plain Speak' cleared" not in _r.stdout:
+        _style_bad.append("the clear was not reported on the run's output")
+    _r, _a, _o = _style_probe(_sty_src, with_file=True)
+    if _a.get("outputStyle") != "Plain Speak":
+        _style_bad.append("a retired name whose style file is still on disk was cleared")
+    _r, _a, _o = _style_probe(_sty_src.replace("Plain Speak", "Explanatory"))
+    if _a.get("outputStyle") != "Explanatory" or _o.get("output_style_cleared"):
+        _style_bad.append("a style workforce never shipped was cleared")
+    _r, _a, _o = _style_probe(_sty_src, execute=False)
+    if _a.get("outputStyle") != "Plain Speak":
+        _style_bad.append("display mode wrote the settings file")
+except Exception as _exc:                                # noqa: BLE001
+    _style_bad.append(f"the style probe would not run ({_exc})")
+check(
+    "settings: --wire-defaults clears a user-scope outputStyle naming a retired style with no file, and nothing else",
+    not _style_bad,
+    "; ".join(_style_bad),
+)
+
+# THE EVALUATORS ARE NOT PROJECT-MATERIALIZED COMPANIONS (DEF-Q-18, 2026-09-16). Since 1.52.0 the
+# five evaluators ship in the user install (manifest `sibling` rows) and Step 6-F retires project
+# copies, under the 2026-09-10 directive. audit-setup.md Step 0.3 still said they were "written from
+# references/evaluators.md" and that "there is no `workforce/skills/`", contradicting its own
+# INV-COMPANIONS paragraph. A claim of that shape anywhere outside a dated correction note fails.
+_eval_scope = []
+_EVAL_SCOPE_RX = re.compile(
+    r"ships no companion skill director|there is no `workforce/skills/`|the manifest lists none"
+    r"|evaluators are written from|render in the companion gate when absent", re.I)
+if os.path.isdir("workforce/skills") and any(l.startswith("sibling ") for l in read("manifest.txt").splitlines()):
+    for _p in sorted(glob.glob("workforce/references/**/*.md", recursive=True)) + ["workforce/SKILL.md"]:
+        for _para in re.split(r"\n\s*\n", read(_p)):
+            if _EVAL_SCOPE_RX.search(_para) and not re.search(r"Corrected \d{4}-\d{2}-\d{2}", _para):
+                _eval_scope.append(f"{_p}: {' '.join(_EVAL_SCOPE_RX.search(_para).group(0).split())}")
+if "The three evaluators are NOT materialized here" not in _asu:
+    _eval_scope.append("audit-setup.md Step 0.3 no longer says the evaluators come from the install")
+check(
+    "companions: no reference says the evaluators are materialized into a project or that no skill ships",
+    not _eval_scope,
+    f"{_eval_scope[:4]} — the evaluators ship as sibling skills in the user install and Step 6-F retires "
+    "a project's copies; a step saying otherwise has a run write back the copies the same audit removes",
+)
+
 # WHERE AN INSTALL'S VERSION IS READ. update.md step 1 told a run to read each copy's
 # `WORKFORCE-VERSION` as if a file by that name sat at the install root; none ships. The version is
 # the `WORKFORCE-VERSION:` line of `references/version.md`. Every procedure step that tells a run to
