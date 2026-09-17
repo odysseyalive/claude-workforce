@@ -14030,6 +14030,118 @@ check(
     "sidecar's only writer is a person typing rows by hand",
 )
 
+# ── a DRIFT row blocks itself, never the rows around it (2026-09-17) ─────────
+# Customer re-test of 1.64.0. `--execute` wrote NOTHING while any drift stood, so a
+# tree holding one missing row and one drifted row got neither: display mode said
+# "re-run with --directives --execute to write the missing rows" and --execute then
+# wrote nothing. Reach was every project at once — a release that edits workforce's
+# own `## Directives` block drifts the sidecar row recording it, so `checksums
+# --execute` was a no-op everywhere until someone restamped by hand, and --restamp
+# is the gesture that also blesses real drift. Second defect in the same function:
+# the counts were computed once, before the write, so a run that HAD written the
+# missing rows still printed `unprotected 1` and an audit read the write as failed.
+# Both probes RUN the shipped script; a probe that cannot run is a failure.
+_dsw = []
+try:
+    import tempfile as _tf
+    _blk = "# h\n<!-- origin: user | immutable: true -->\n{}\n<!-- /origin -->\n"
+
+    def _dsw_stamp(_root, *_extra):
+        return _rv_run([sys.executable, os.path.join(_RV_BIN, "wf-stamp"),
+                        "--root", _root, "--directives", "--execute", *_extra],
+                       env=_RV_NOCFG)
+
+    def _dsw_rows(_root):
+        return read_sidecar_rows(os.path.join(
+            _root, ".claude", "workforce", ".directives.sha"))
+
+    def read_sidecar_rows(_p):
+        _out = {}
+        for _ln in (read(_p) if os.path.isfile(_p) else "").splitlines():
+            if _ln.strip() and not _ln.lstrip().startswith("#"):
+                _sha, _key = _ln.split(None, 1)
+                _out[_key.strip()] = _sha
+        return _out
+
+    with _tf.TemporaryDirectory(prefix="wf-check-dsw-") as _t:
+        _ag = os.path.join(_t, ".claude", "agents")
+        _rv_put(os.path.join(_ag, "alpha.md"), _blk.format("A"))
+        _rv_put(os.path.join(_ag, "beta.md"), _blk.format("B"))
+        _dsw_stamp(_t)
+        _base = _dsw_rows(_t)
+        if len(_base) != 2:
+            _dsw.append(f"the clean first stamp wrote {len(_base)} row(s), expected 2")
+        # one block drifts, one arrives with no row at all
+        _rv_put(os.path.join(_ag, "beta.md"), _blk.format("B EDITED"))
+        _rv_put(os.path.join(_ag, "gamma.md"), _blk.format("C"))
+        _r = _dsw_stamp(_t)
+        _now = _dsw_rows(_t)
+        if ".claude/agents/gamma.md:directive:1" not in _now:
+            _dsw.append("a drift row suppressed the write of a MISSING row — the loop "
+                        "the customer hit: display says re-run with --execute, and "
+                        "--execute writes nothing")
+        if _now.get(".claude/agents/beta.md:directive:1") != \
+                _base.get(".claude/agents/beta.md:directive:1"):
+            _dsw.append("the drifted row was re-blessed by a plain --execute; only "
+                        "--restamp may move it")
+        if _r.returncode != 1:
+            _dsw.append(f"unresolved drift exited {_r.returncode}, expected 1")
+        if "unprotected 0 · drift 1" not in _r.stdout:
+            _dsw.append("INV-DIRECTIVES reported the state BEFORE its own write: "
+                        + (_r.stdout.split("INV-DIRECTIVES")[-1].strip()[:90]
+                           if "INV-DIRECTIVES" in _r.stdout else "no INV line"))
+        # --restamp remains the separate gesture, and it clears the drift
+        _r2 = _dsw_stamp(_t, "--restamp")
+        if _r2.returncode != 0 or "drift 0" not in _r2.stdout:
+            _dsw.append(f"--restamp did not clear the drift (exit {_r2.returncode})")
+
+    # drift ALONE still writes nothing: the row has a prior claim to erase
+    with _tf.TemporaryDirectory(prefix="wf-check-dsw2-") as _t2:
+        _rv_put(os.path.join(_t2, ".claude", "agents", "solo.md"), _blk.format("S"))
+        _dsw_stamp(_t2)
+        _was = read(os.path.join(_t2, ".claude", "workforce", ".directives.sha"))
+        _rv_put(os.path.join(_t2, ".claude", "agents", "solo.md"), _blk.format("S EDITED"))
+        _r3 = _dsw_stamp(_t2)
+        if read(os.path.join(_t2, ".claude", "workforce", ".directives.sha")) != _was:
+            _dsw.append("a drift-ONLY --execute rewrote the sidecar; with no missing "
+                        "row to write it must touch nothing")
+        if _r3.returncode != 1:
+            _dsw.append(f"a drift-only --execute exited {_r3.returncode}, expected 1")
+except Exception as _exc:                                # noqa: BLE001
+    _dsw.append(f"the directives-write probe would not run ({_exc})")
+check(
+    "directives sidecar: a DRIFT row blocks itself, never the missing rows around it",
+    not _dsw,
+    "; ".join(_dsw) + " — checksums.md: `--execute` writes a MISSING row only, and "
+    "`--restamp` is the separate gesture. The two findings are independent",
+)
+
+check(
+    "directives sidecar: --execute never tells a reader to re-run the command it just ran",
+    "A DRIFT row is not written by --execute, and it holds up nothing else"
+    in _ds_stamp,
+    "the drift line sat beside 'Re-run with --directives --execute to write the "
+    "missing rows' and the reader looped. It must say the missing rows are already "
+    "written and that only the drifted row awaits --restamp",
+)
+
+# ── the canary chain hands over its own measurement (2026-09-17) ─────────────
+# Same customer re-test. `run_canary` has ALWAYS chained into `record_canary`,
+# handing over the values it measured seconds earlier. main() tested
+# `--record-canary` first, so an operator typing BOTH flags — which the usage block
+# invites — reached the recorder alone, which demanded --tier-limit/--c1/--c2/--by
+# and exited 2. The measurement was in the process and the operator retyped it.
+_dsc = read("workforce/bin/wf-apply")
+_dsc_run = _dsc.find('if "--run-canary" in argv:')
+_dsc_rec = _dsc.find('if "--record-canary" in argv:')
+check(
+    "canary: --run-canary is dispatched before --record-canary, so the chain is reachable",
+    -1 < _dsc_run < _dsc_rec and "code = record_canary(root, rec, execute)" in _dsc,
+    "run_canary calls record_canary itself. Dispatched second it is unreachable "
+    "whenever both flags are typed, and the operator retypes numbers the process "
+    "already holds. A bare --record-canary must still demand every field",
+)
+
 # ── the symlink census (2026-09-08) ──────────────────────────────────────────
 # Atomic-or-Absent rule 3 ended "record both before the first write and re-read them
 # after, and a drop is the whole detector", and nothing recorded anything: wf-census

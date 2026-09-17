@@ -1121,10 +1121,19 @@ def main(argv):
         print(f"wf-apply: not a directory: {root}", file=sys.stderr)
         return 2
 
-    if "--record-canary" in argv:
-        return record_canary(root, argv, execute)
+    # `--run-canary` IS TESTED FIRST, AND THE ORDER IS THE WHOLE FIX. It already
+    # chains into `record_canary` itself, handing over the values it measured
+    # seconds earlier in this same process. Tested second, a run that typed BOTH
+    # flags — which the usage block above invites, "on PASS, hand the result to
+    # --record-canary" — dispatched to the recorder alone, which then demanded
+    # --tier-limit/--c1/--c2/--by and exited 2, so the operator retyped numbers the
+    # process already held. Requiring those values from a BARE `--record-canary` is
+    # right and is unchanged: that form is the hand-entry path, and refusing a
+    # hand-composed measurement file is why the recorder exists.
     if "--run-canary" in argv:
         return run_canary(root, argv, execute)
+    if "--record-canary" in argv:
+        return record_canary(root, argv, execute)
 
     applied = reported = refused = 0
 

@@ -413,10 +413,21 @@ def stamp_directives(root, execute, restamp):
     for pth, exc in unreadable:
         print(f"  ! UNREADABLE   {pth}  ({exc}) — NOT counted as covered")
 
-    refuse = bool(drift) and not restamp
-    will_write = fresh or (drift and restamp) or orphan or malformed
+    # A DRIFT ROW BLOCKS ITSELF, NEVER THE ROWS AROUND IT. The two findings are
+    # independent, and `merged` below already keeps a drifted row at its RECORDED
+    # digest, so writing the missing rows re-blesses nothing. Until 2026-09-17 one
+    # drift row suppressed the whole write: display mode said "re-run with --execute
+    # to write the missing rows", `--execute` then wrote nothing, and the reader
+    # looped. Reach is every project at once, not one tree — any release that edits
+    # workforce's own `## Directives` block drifts the sidecar row recording it, so
+    # `checksums --execute` became a no-op everywhere until someone restamped by hand
+    # (customer re-test of 1.64.0, 2026-09-17). This is `classify`'s PRE-FOLD lesson
+    # above arriving at the directives half: a state every install enters on the same
+    # day must not have `--restamp` as its only exit, because that gesture also
+    # blesses real drift.
+    will_write = fresh or orphan or malformed or (drift and restamp)
 
-    if execute and not refuse and will_write:
+    if execute and will_write:
         # WRITE, THEN READ BACK WITH THIS SCRIPT'S OWN READER (`checksums.md` rule 2).
         # An ORPHAN row is dropped here and nowhere else: it names a block that no
         # longer exists, so nothing can ever re-hash it, and keeping it is a row that
@@ -434,6 +445,18 @@ def stamp_directives(root, execute, restamp):
                   file=sys.stderr)
             return 2
         print(f"  + wrote {DIRECTIVES_REL}  {len(merged)} row(s), read back and re-parsed")
+        print("    the counts below are the state AFTER this write, re-read from disk")
+        # RE-DERIVE FROM WHAT IS NOW ON DISK, never from what was found before the
+        # write. The counts used to be computed once, at the top, so a run that had
+        # just written the missing rows still printed `unprotected 1` — an audit
+        # reading INV-DIRECTIVES after `--execute` concluded the write had failed.
+        # `back` is this script's own reader applied to its own output, which is the
+        # same measurement the read-back check above trusts.
+        recorded, malformed = back, []
+        fresh = sorted(k for k in found if k not in recorded)
+        drift = sorted(k for k in found if k in recorded and recorded[k] != found[k])
+        agree = sorted(k for k in found if k in recorded and recorded[k] == found[k])
+        orphan = sorted(k for k in recorded if k not in found)
 
     print(f"\nINV-DIRECTIVES  {len(found)} block(s) in scope · covered {len(agree)} · "
           f"unprotected {len(fresh)} · drift {len(drift)} · orphan {len(orphan)} · "
@@ -443,9 +466,11 @@ def stamp_directives(root, execute, restamp):
         print("Re-run with --directives --execute to write the missing rows. Until a "
               "block carries one, wf-protect-directives reports it UNPROTECTED on every "
               "edit and wf-conform can verify nothing about it.")
-    if refuse:
-        print("A DRIFT row is not written by --execute. A sacred block changed after it "
-              "was stamped; confirm the change was authorized, then "
+    if drift and not restamp:
+        print("A DRIFT row is not written by --execute, and it holds up nothing else: "
+              "every missing row above is written, and the drifted row keeps its "
+              "recorded digest. A sacred block changed after it was stamped; confirm "
+              "the change was authorized, then "
               "`wf-stamp --directives --execute --restamp`.")
         return 1
     return 0

@@ -3216,6 +3216,30 @@
       "drift 1"
     ]
   },
+  "stampdir-drift-plus-missing": {
+    "_why": "The shape a customer hit re-testing 1.64.0: one DRIFT row and one MISSING row in the same tree. Until 2026-09-17 the drift suppressed the whole write, so display mode said 'Re-run with --directives --execute to write the missing rows' and --execute then wrote nothing — the reader looped, and --restamp, the gesture that also blesses real drift, was the only way out. Reach was every project at once, because a release that edits workforce's own ## Directives block drifts the sidecar row recording it, so `checksums --execute` became a no-op everywhere. The two findings are independent: `after` proves the missing row IS written while the drifted row keeps its stale digest, and exit 1 proves the drift is still refused. stampdir-drift-execute holds the other half — drift ALONE still writes nothing, because that row has a prior claim to erase.",
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "de1e7ed",
+          ".claude/skills/new/SKILL.md:directive:1"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "DRIFT",
+      "UNPROTECTED",
+      "wrote .claude/workforce/.directives.sha",
+      "unprotected 0 · drift 1",
+      "it holds up nothing else"
+    ]
+  },
   "stampdir-ignored": {
     "_why": "Scope is DECLARED, never inferred. A vendored skill excluded by .censusignore carries a real sacred block, and stamping it would freeze someone else's text as this project's directive \u2014 the same reason wf-census refuses to count a fixture corpus as user directives. One block in scope, not two, and `not` names the excluded path so a regression that widened the walk fails here rather than passing with a larger number.",
     "args": [
@@ -3248,7 +3272,7 @@
     ]
   },
   "stampdir-orphan": {
-    "_why": "A row naming a block that no longer exists can never be re-hashed, so it reports coverage of nothing \u2014 the shape checksums.md calls a sidecar reporting clean about blocks it never examined. It is named in display mode and DROPPED on write, and `after` proves the drop happened while the live row survived. Dropping is safe here and only here: there is no content left to protect.",
+    "_why": "A row naming a block that no longer exists can never be re-hashed, so it reports coverage of nothing \u2014 the shape checksums.md calls a sidecar reporting clean about blocks it never examined. It is named in display mode and DROPPED on write, and `after` proves the drop happened while the live row survived. Dropping is safe here and only here: there is no content left to protect. The case asserts BOTH halves of the report, because 2026-09-17 split them: the `! ORPHAN ROW` finding line still names what was dropped, so a reader sees it, while `orphan 0` is the state AFTER this run's own write. Until that date the counts were computed once, before the write, so `--execute` printed the tree it had just stopped describing — and a run that had written every missing row still reported `unprotected 1`, which an audit reads as a failed write.",
     "after": {
       ".claude/workforce/.directives.sha": {
         "not": [
@@ -3268,7 +3292,8 @@
     "want": [
       "ORPHAN ROW",
       ".claude/skills/gone/SKILL.md:directive:1",
-      "orphan 1"
+      "the counts below are the state AFTER this write",
+      "orphan 0"
     ]
   },
   "stampdir-restamp": {
