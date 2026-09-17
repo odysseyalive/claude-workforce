@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.64.1 | 2026-09-17 | changes, scripts, installer | no | Fix two defects nc-audit reproduced re-testing 1.64.0 |
 | 1.64.0 | 2026-09-16 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Merge test-harness fixes: derived fixture installs, conformance gate in bin/check, link-safe tree copies |
 | 1.63.0 | 2026-09-16 | changes, hooks, scripts, installer | no | Rank original human code above AI code, and say which is which at the edit |
 | 1.62.2 | 2026-09-16 | changes, scripts, installer | no | Give spawned employees the user-words rule too, on SubagentStart |
