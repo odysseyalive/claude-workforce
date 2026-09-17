@@ -2,7 +2,8 @@
 name: image-validator
 description: Evaluate images for AI generation tells and watercolor authenticity
 persona: "Art authenticator trained in watercolor connoisseurship who can spot a forged wash technique from across the room"
-allowed-tools: Read, Glob
+tools: Read, Bash
+disallowedTools: Agent
 context: none
 model: claude-opus-4-6
 ---

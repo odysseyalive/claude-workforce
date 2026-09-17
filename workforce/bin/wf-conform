@@ -3147,9 +3147,13 @@ def check_companions(root, res, governed_n):
                               for d in scopes)]
     total = len(CORE_COMPANIONS) + len(EVALUATOR_COMPANIONS)
     if not missing and not unreachable:
-        res.add(True, f"INV-COMPANIONS: all {total} core companion skills exist "
-                      f"({len(CORE_COMPANIONS)} project-local, "
-                      f"{len(EVALUATOR_COMPANIONS)} resolved in the install)")
+        # `count()`, NOT a passing row, for the reason INV-CATREAD carries below:
+        # `invariants.md` row 23 and `audit-setup.md` both print this line as a counted
+        # measurement, and a passing row reaches no reader — so the healthy state of a
+        # named invariant was the one state nobody could see.
+        res.count(f"INV-COMPANIONS: all {total} core companion skills exist "
+                  f"({len(CORE_COMPANIONS)} project-local, "
+                  f"{len(EVALUATOR_COMPANIONS)} resolved in the install)")
         return
 
     # NAMES EVERY MISSING ONE, not a count. "3 companions missing" sends the reader
@@ -3386,8 +3390,12 @@ def main():
     # Printed with its zero, like every other census here: a detector that reports nothing
     # and a detector that examined nothing read identically in a report until one says so.
     if governed_n:
-        res.add(True, f"write instructions: {_selfcon['checked']} handbook(s) · "
-                      f"{_selfcon['flagged']} ordering an act the same file forbids")
+        # `count()`, NOT a passing row. A passing row is never printed (see the output
+        # block in `main`), so this line's own comment above — "Printed with its zero" —
+        # described something that had never happened. `count()` is the one channel that
+        # prints on every run, zero included, and it exists for exactly this.
+        res.count(f"write instructions: {_selfcon['checked']} handbook(s) · "
+                  f"{_selfcon['flagged']} ordering an act the same file forbids")
     # INV-CATREAD — PRINTED, including the zero. The first draft of this row named an
     # invariant in a docstring and emitted nothing, so `verify.md` and `audit` 2c both
     # instructed printing a count no tool produced. A named invariant that nothing emits is
@@ -3405,7 +3413,14 @@ def main():
         if _catread["flagged"]:
             res.advise(_cr_line, _cr_why + ". ADVISORY: this row blocks nothing")
         else:
-            res.add(True, _cr_line, _cr_why)
+            # `count()`, NOT a passing row — a passing row is never printed, so on a
+            # clean org this named invariant reached NO reader while its own comment
+            # above, `audit.md` Step 5d item 2c and `verify.md` all said to report it
+            # including the zeroes. Customer DEF-Q-011, measured on 4 governed handbooks
+            # with 0 on a literal path: the line appeared nowhere in the output. Same
+            # shape as the `n/a` vs `no-sections` fix in INV-STAMP — a zero has to be
+            # visible to be a measurement.
+            res.count(_cr_line)
     check_companions(root, res, governed_n)
     check_journal(root, res)
     check_defects(root, res)

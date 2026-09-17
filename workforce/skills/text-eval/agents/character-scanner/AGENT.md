@@ -2,7 +2,8 @@
 name: character-scanner
 description: Mechanical scan for prohibited characters (em-dashes, rhetorical colons, en-dashes)
 persona: "Hot-metal-era typesetter who reads pages character by character and trusts no font to hide a stray glyph"
-allowed-tools: Read, Grep
+tools: Read, Bash
+disallowedTools: Agent
 context: none
 model: claude-opus-4-6
 ---

@@ -928,8 +928,16 @@ check(
 # The distribution's own rule had said "never assume Grep/Glob" in four files and
 # nothing checked the artifacts that ship.
 _PHANTOM_TOOLS = ("Grep", "Glob", "WebFetch")
+# BOTH LOCATIONS, and the second one is why this is a fix rather than a tidy-up. The
+# glob read `workforce/agents/*/AGENT.md` only, so the four definitions bundled INSIDE
+# skills were never scanned — and two of them granted `Glob, Grep, Bash` for as long as
+# they have shipped. The manifest registers all eleven the same way, so a rule that
+# reaches seven of them is a rule with a hole the size of the evaluator panel
+# (customer DEF-Q-010, 2026-09-17).
+_SHIPPED_AGENT_DEFS = sorted(glob.glob("workforce/agents/*/AGENT.md")
+                             + glob.glob("workforce/skills/*/agents/*/AGENT.md"))
 _grant_problems = []
-for _ag in sorted(glob.glob("workforce/agents/*/AGENT.md")):
+for _ag in _SHIPPED_AGENT_DEFS:
     for _ln in read(_ag).splitlines():
         if _ln.startswith("tools:"):
             _granted = [t.strip() for t in _ln[len("tools:"):].split(",")]
@@ -947,6 +955,87 @@ check(
     "re-measured 2.1.266) and silently dropped from a grant (fact 13b), so the "
     "agent runs with less reach than its own frontmatter claims and nothing says so",
 )
+
+# ── the tool key is `tools:`, and the ceiling is BOTH lines (2026-09-17) ──────
+# Customer DEF-Q-010. `character-scanner` and `image-validator` declared
+# `allowed-tools:` — not a key the harness reads — so each install registered an
+# agent whose ceiling was INERT. Confirmed from the host's own agent listing, which
+# showed both as "Tools: All tools" beside the two `tools:` siblings printing their
+# real allowlist. It is a package defect, not audit work: the manifest ships both
+# AGENT.md files and `agent` rows register them, so every install re-created it and a
+# local edit would be overwritten by the next `update`.
+#
+# The ceiling is asserted here as SKILL.md rule 3 states it — `tools:` AND
+# `disallowedTools: Agent`, because a plain spawn and a named-teammate spawn each
+# discard a different one. Rule 3 closes "it is what the shipped panel agents already
+# do", and that sentence was true of the seven under `workforce/agents/` and false of
+# all four bundled inside skills. A BLOCKING gate citing an example that does not hold
+# is the overclaim Core Principle 6 exists to catch, so the fix made the claim true
+# rather than softening it.
+_tool_key_problems = []
+for _ag in _SHIPPED_AGENT_DEFS:
+    _head = read(_ag).split("---")[1] if read(_ag).startswith("---") else read(_ag)
+    _name = os.path.basename(os.path.dirname(_ag))
+    if re.search(r"^allowed-tools:", _head, re.M):
+        _tool_key_problems.append(f"{_name} declares `allowed-tools:` (no such key)")
+    if not re.search(r"^tools:", _head, re.M):
+        _tool_key_problems.append(f"{_name} has no `tools:` allowlist")
+    if not re.search(r"^disallowedTools:\s*Agent\b", _head, re.M):
+        _tool_key_problems.append(f"{_name} lacks `disallowedTools: Agent`")
+check(
+    "every shipped agent definition carries `tools:` and `disallowedTools: Agent`",
+    not _tool_key_problems,
+    "; ".join(_tool_key_problems) + " — `allowed-tools:` is not read by the harness, so "
+    "the agent receives ALL tools while its frontmatter reads like a ceiling. SKILL.md "
+    "rule 3 cites these files as the worked example of carrying both lines",
+)
+
+
+# ── a measurement nobody can see is not a measurement (2026-09-17) ────────────
+# Customer DEF-Q-011 and its class. `wf-conform` prints only counts, failures,
+# advisories and adopted notes — a PASSING row is never printed. So three named,
+# documented census lines reached no reader in exactly the state a healthy project is
+# in: INV-CATREAD (audit.md Step 5d item 2c and verify.md both say to report it
+# "including the zeroes"), INV-COMPANIONS (invariants.md row 23 prints it as a counted
+# line), and the write-instructions row, whose own comment read "Printed with its zero"
+# beside a call that has never printed anything. `count()` is the channel that prints on
+# every run including the zero, and its docstring names this exact failure — a check
+# that examined nothing and a check that found nothing wrong look identical.
+_cf_src = read("workforce/bin/wf-conform")
+_invisible = [_n for _n, _needle in (
+    ("INV-CATREAD", "res.add(True, _cr_line"),
+    ("INV-COMPANIONS", 'res.add(True, f"INV-COMPANIONS'),
+    ("write instructions", 'res.add(True, f"write instructions'),
+) if _needle in _cf_src]
+check(
+    "wf-conform: a documented census line is emitted through `count()`, not a passing row",
+    not _invisible,
+    ", ".join(_invisible) + " emitted through res.add(True, …). A passing row is counted "
+    "in the totals and never printed, so the healthy state of a named invariant is the "
+    "one state nobody can see, while the procedures instruct a reader to report it",
+)
+
+_pf_src = read("workforce/bin/wf-preflight")
+check(
+    "wf-preflight: the auto-mode probe matches the spelling the CLI actually prints",
+    'r"[-_\\s]+"' in _pf_src and '"automode" in flat' in _pf_src
+    and '"autoMode" in (out.stdout' not in _pf_src,
+    "MEASURED 2026-09-17 on 2.1.273/2.1.274: `claude auto-mode config` prints 77,038 B "
+    "carrying `Auto-Mode` and `auto-mode` and NEITHER `autoMode` nor `auto mode`, the "
+    "two literals the probe tested — so it returned False on every host and the "
+    "preflight recommended the `--automode` remedy to readers who already had the grant. "
+    "Separators are stripped rather than alternated so a respelling cannot reopen it",
+)
+
+check(
+    "wf-preflight: the auto-mode row claims `configured`, never `ACTIVE`",
+    "auto mode detected ACTIVE" not in _pf_src,
+    "the probe reads the classifier POLICY document, which says auto mode exists on this "
+    "host and nothing about this session. Whether the classifier fires is measured at "
+    "the write — which is why the row is advisory — so `ACTIVE` claims what no probe here "
+    "has ever established",
+)
+
 check(
     "wf-widen writes the flag the widening agent reads",
     "def raise_flag(" in _wd and "wf-widen-flag" in _wd,
