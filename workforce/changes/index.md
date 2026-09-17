@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.65.0 | 2026-09-17 | audit, changes, installer | no | A split author owns its handbook and its scratch, and proves retention against the right snapshot |
 | 1.64.3 | 2026-09-17 | changes, scripts, installer | no | wf-conform: the reported length floor is one a handbook can stand on |
 | 1.64.2 | 2026-09-17 | changes, scripts, installer | no | Fix four defects from nc-audit's 1.64.0 re-test, three wider than reported |
 | 1.64.1 | 2026-09-17 | changes, scripts, installer | no | Fix two defects nc-audit reproduced re-testing 1.64.0 |
