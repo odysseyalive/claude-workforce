@@ -117,6 +117,19 @@ recommendation first and the current value last. *The case was left undecided un
 customer run above improvised it: the advisor's recorded model, one the pool had since replaced, rendered FIRST
 as `(current)` and the cheapest pool model was dropped.*
 
+**THIS ROW HAS NEVER EXECUTED ON A REAL HOST, and the trigger is a release, not an audit.** MEASURED
+2026-09-17 by `nc-audit`: a full six-question setup returned
+`INV-BUDGET rendered 6 of 6 owed · 6 messages · in order`.
+Every recorded value was IN the pool, so each of the six rendered as
+`(current · recommended)` and this branch was never entered. It is the only row here with no
+observation behind it. **It fires when a lane's recorded model LEAVES the pool, which a re-audit
+cannot cause on its own — retiring a statics row in `org-config.template.md` is the event that
+activates it, simultaneously, in every org that had recorded the retired value.** So the release that
+next retires a model is the one that owes this row its first real exercise, and a maintainer doing
+that should expect to be the first reader to see it. There is no producer script to hold a fixture
+against — the rendering is executor-followed — which is why the warning lives here rather than in
+`bin/check`.
+
 ---
 
 ## Step 0.01 — The RUN ORDER: capture the ask verbatim, resolve the root, echo both
