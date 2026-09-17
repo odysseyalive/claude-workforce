@@ -2041,7 +2041,7 @@ CASES = [
     # fix can silently come undone, because the failure was never "the doctrine is
     # wrong" - it was "the doctrine shipped and no step performed it".
     ("contract-stamp: audit restamps what Step 5 amended",
-     AUD, "del", "Step 5-STAMP"),
+     AUD, "delall", "Step 5-STAMP"),
     ("contract-stamp: INV-STAMP row names its text and token in invariants.md",
      INV, "del", "INV-STAMP"),
     ("contract-stamp: audit emits INV-STAMP with its counts",
@@ -2313,7 +2313,10 @@ def run_shard(shard):
                 fails = failing_checks(work, relpath)
                 if name in fails:
                     out.append((name, "PROVEN", f"fired on mutated {relpath}"))
-                elif fails:
+                # THE CONFORMANCE GATE IS NOT A WRECKED FILE. It fails on any behaviour
+                # change to a shipped script, including a clean one, so counting it here
+                # would relabel a VACUOUS assertion BAD-CASE whenever its target is a script.
+                elif fails - {"scripts: the script-conformance suite passes, every case it selects"}:
                     # TWO VERDICTS, NOT ONE, AND THE DIFFERENCE IS WHOSE FAULT IT IS.
                     #
                     # `VACUOUS` is a finding about the ASSERTION: its target was broken
