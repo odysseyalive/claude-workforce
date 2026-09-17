@@ -324,8 +324,18 @@ and binds no directives, so none of it is user text. Heading through the line be
 preamble 30 (frontmatter 11, `ORG-RECORD` 9, tier-ceiling line 1, H1 and persona 9) · Role 13 · Scope 20 ·
 Directives 3 · Sources 28 · Procedure 41 · Verification 27 · Guardrails 42 · Exit criteria 11 · Escalation
 12 (6 of them `ORG-CHAIN`) · Probe 36 (a table carrying the rows `wf-conform` demands) · Reporting 34.
-With Scope, Sources, Procedure and Verification relocated entirely it is still **181**. The size comes
-from the mandated section set plus the role's own binding Guardrails, Probe and Reporting.
+With Scope, Sources, Procedure and Verification relocated down to their residue it is still **189**. The
+size comes from the mandated section set plus the role's own binding Guardrails, Probe and Reporting.
+
+*The figure was 181 until 2026-09-17, and 181 assumed those four sections relocate to ZERO lines. They
+cannot: `wf-conform`'s own required-section list mandates `## Scope`, `## Procedure` and
+`## Verification`, so a body at 181 would fail the section row in the same script that printed the
+number — and Core Principle 3 keeps the runnable `Check:`/`Negative:` lines in the handbook, which is
+the one content that relocates nowhere. The floor now keeps each relocated section's residue: the
+mandated heading, one pointer line, and Verification's check lines. Reported by `nc-audit` on the same
+host that produced the counts above, who declined to file it because design and accident could not be
+told apart from there; they separate mechanically, because the computation deleted sections the script
+requires.*
 
 **What this does to "a MEASURED floor".** 172 is still a measurement, but a measurement of one IC,
 `engineering-site`. Four ICs have now been measured above it after relocation, so it is not a floor for
@@ -334,9 +344,13 @@ can reach it. No universal replacement number is asserted, because none has been
 `wf-conform` applies the Lead branch's reasoning to an IC: it reports the length with a per-section
 breakdown and counts the lines it itself requires (frontmatter, `ORG-*` blocks, the tier-ceiling line,
 the Probe rows citing a section) as their own component, apart from the authored lines. It orders the
-split only when removing every line of `## Scope`, `## Sources`, `## Procedure` and `## Verification`
-would bring the handbook to the ceiling. When even that cannot, the row says the required content
-alone exceeds the ceiling and orders nothing. Immutable user spans were not the cause here; the
+split only when reducing `## Scope`, `## Sources`, `## Procedure` and `## Verification` to their
+RESIDUE — the mandated heading, a pointer line, and Verification's `Check:`/`Negative:` lines — would
+bring the handbook to the ceiling. When even that cannot, the row says the required content alone
+exceeds the ceiling and orders nothing. *Residue, not removal, since 2026-09-17: an understated floor
+does not merely misreport, it makes this branch fire too RARELY, so a handbook that cannot reach the
+ceiling gets ordered to split anyway — the defect this paragraph exists to end, surviving in the
+arithmetic beneath it.* Immutable user spans were not the cause here; the
 customer's count found none.
 
 **Over the ceiling still never blocks a sweep — but not-blocking is not not-acting.** Under the

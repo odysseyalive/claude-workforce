@@ -1068,6 +1068,37 @@ attribution is DOCUMENT **by omission** and the cure is these lines, not a note 
 **And the same omission produced the divergence below**: an author still editing after T5 is an author
 who was never told that T5 had happened.
 
+**BLOCKING — a dispatched author OWNS its handbook and its scratch until hand-back, and a retention
+proof is only as good as the snapshot it is proved against.** Three lines, and the third is the one
+that makes this a rule rather than a note. Reported 2026-09-17 as `DEF-Q-012` from a live Step 5d
+split, measured twice in a single run:
+
+> You have EXCLUSIVE ownership of `<handbook>` until you hand it back. Nobody else edits it while you
+> hold it, and you edit no handbook but this one. Your scratch is
+> `.claude/workforce/work/<run-id>/<employee>/` and nothing outside it is yours to write. Before you
+> prove retention against a snapshot, confirm the snapshot is the right file:
+> `grep -q '^name: <employee>$' <snapshot>` — a snapshot of ANOTHER handbook passes every containment
+> check you can run against it.
+
+**What happened without them, and neither failure lost a word — which is the point.** *(1)* Two split
+authors each wrote `original.md` into the shared scratch ROOT rather than a private subdirectory, and
+one then extracted the OTHER handbook's text into its grounding files. *(2)* The principal edited a
+handbook while its author was mid-round, having read an idle `ListAgents` row as "finished" — the rule
+directly below says liveness is confirmed by the returned artifact and never by a reachability
+listing, and that rule governs concluding DEATH; it never said the listing is equally worthless for
+concluding it is safe to TOUCH the file. Both were caught on read-back because both agents verified
+rather than trusted, and both still produced duplicate relocations of two blocks into two grounding
+files. **Residue is a defect in its own right** (§ Directives, 2026-07-30), so "nothing was lost" does
+not close either one.
+
+**Why the snapshot guard is the load-bearing line.** A retention proof asks whether every line of the
+before-text survives in the handbook plus its grounding library. Run against a snapshot of a DIFFERENT
+handbook, that question is still well-formed and still answerable — it simply proves the wrong thing,
+cleanly and with no error anywhere. A contaminated snapshot passes its own containment checks, so the
+proof reports success in exactly the case it exists to catch. The `name:` frontmatter is the cheapest
+thing that distinguishes them and it is mechanical, which is why it is a `grep` in the brief rather
+than an instruction to be careful.
+
 **Then author — BY DISPATCH, never inline.** One subagent authors one handbook and returns it, through
 `handbook.md`, under the transaction order in `hire.md` § Transaction Order. Greenfield authors the whole
 roster as a batch (`hire.md` § Initial roster); brownfield authors conversions and new hires together.
