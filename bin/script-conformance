@@ -23,6 +23,8 @@ reads clean about something it never examined.
 Usage
     bin/script-conformance            # run all
     bin/script-conformance census     # run cases whose name contains "census"
+    bin/script-conformance --touching workforce/bin/wf-census
+                                      # the cases a change to that file can reach
 """
 
 import json
@@ -85,6 +87,63 @@ def _sub_tree(arg, tree):
     return str(arg).replace("${TREE}", tree)
 
 
+# A COMPLETE FAKE INSTALL IS DERIVED, NEVER FROZEN. wf-settings-apply removes a retired
+# hook row only when the install it points into holds every CURRENT_HOOK_SCRIPTS file.
+# The fixtures held that set as stub files, so the release that added wf-code-origin
+# (1.63.0) made every fake install incomplete at once, and 25 heal cases went red with no
+# fixture edited. A bin dir that carries this marker is filled here, in the COPY, with a
+# stub for every hook the script under test ships today. A deliberately partial install
+# carries no marker and is copied exactly as authored.
+COMPLETE_INSTALL_MARKER = ".complete-install"
+_STUB = "#!/bin/sh\nexit 0\n"
+_hook_scripts = []
+
+
+def current_hook_scripts():
+    """CURRENT_HOOK_SCRIPTS, read from wf-settings-apply itself, once per run."""
+    if not _hook_scripts:
+        import importlib.machinery
+        import importlib.util
+        sys.dont_write_bytecode = True   # a .pyc in workforce/bin/ is an undeclared shipped file
+        path = os.path.join(BIN, "wf-settings-apply")
+        loader = importlib.machinery.SourceFileLoader("_wf_settings_apply", path)
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(mod)
+        _hook_scripts.extend(sorted(mod.CURRENT_HOOK_SCRIPTS))
+        if not _hook_scripts:
+            raise RuntimeError(f"{path} names no CURRENT_HOOK_SCRIPTS")
+    return _hook_scripts
+
+
+def fill_complete_installs(tree):
+    """Give every marked bin dir under `tree` a stub for each current hook script, then
+    drop the marker. Returns problems; a marker anywhere but `skills/workforce/bin` is one."""
+    problems = []
+    for d, dirs, files in os.walk(tree):
+        dirs.sort()
+        rel = os.path.relpath(d, tree)
+        if COMPLETE_INSTALL_MARKER not in files:
+            # The other half of the class: an unmarked install that happens to hold every
+            # current hook today is the next release's incomplete one.
+            if (d.endswith(os.path.join("skills", "workforce", "bin"))
+                    and set(current_hook_scripts()) <= set(files)):
+                problems.append(f"{rel}: holds every current hook as frozen stubs; replace "
+                                f"them with {COMPLETE_INSTALL_MARKER}")
+            continue
+        if not d.endswith(os.path.join("skills", "workforce", "bin")):
+            problems.append(f"{rel}: {COMPLETE_INSTALL_MARKER} outside a skills/workforce/bin dir")
+            continue
+        os.remove(os.path.join(d, COMPLETE_INSTALL_MARKER))
+        for s in current_hook_scripts():
+            if s in files:
+                problems.append(f"{rel}/{s}: a marked install must not freeze a current hook stub")
+                continue
+            with open(os.path.join(d, s), "w", encoding="utf-8") as fh:
+                fh.write(_STUB)
+            os.chmod(os.path.join(d, s), 0o755)
+    return problems
+
+
 def run_case(name, spec):
     src = os.path.join(FIX, name)
     script = os.path.join(BIN, spec["script"])
@@ -106,6 +165,9 @@ def run_case(name, spec):
     # the settings-heal cases (2026-09-14), so no earlier case changes meaning.
     shutil.copytree(src, tree, symlinks=True)
     try:
+        problems = fill_complete_installs(tree)
+        if problems:
+            return False, "; ".join(problems)
         return _run_in(tree, script, spec)
     finally:
         # A case may make a directory read-only (`chmod`); give every directory its write
@@ -264,14 +326,66 @@ def _run_in(tree, script, spec):
     return (not problems), "; ".join(problems) or "ok"
 
 
+def touching(relpath, cases):
+    """The cases a change to `relpath` can alter, or None when no case executes it.
+
+    `bin/prove` runs `bin/check` once per mutation, and this suite is the slowest thing in
+    it, so a prove child asks for the cases its one mutated file can reach instead of all
+    of them. The full suite still runs in every plain `bin/check`, and in prove's own
+    baseline before the first case, so nothing a narrowed child skips goes unrun.
+
+      bin/script-conformance, fixtures/scripts/expectations.json   every case
+      fixtures/scripts/<case>/...                                   that case
+      workforce/bin/<script>                                        every case whose script
+          is <script> or loads it: a script whose source holds another's name as a
+          quoted string (how every loader here spells the path), followed until nothing
+          new is added, because wf-settings-apply runs wf-census's code
+    """
+    rel = relpath.replace(os.sep, "/")
+    if rel in ("bin/script-conformance", "fixtures/scripts/expectations.json"):
+        return sorted(cases)
+    if rel.startswith("fixtures/scripts/"):
+        case = rel.split("/")[2]
+        return [case] if case in cases else None
+    if not rel.startswith("workforce/bin/"):
+        return None
+    import re
+    reach = {rel.split("/")[2]}
+    srcs = {}
+    for n in os.listdir(BIN):
+        try:
+            with open(os.path.join(BIN, n), encoding="utf-8") as fh:
+                srcs[n] = fh.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+    grew = True
+    while grew:
+        grew = False
+        for n, body in srcs.items():
+            if n not in reach and any(re.search(r"""(["'])%s\1""" % re.escape(r), body)
+                                      for r in reach):
+                reach.add(n)
+                grew = True
+    return sorted(c for c in cases if isinstance(cases[c], dict)
+                  and cases[c].get("script") in reach) or None
+
+
 def main():
-    filt = sys.argv[1] if len(sys.argv) > 1 else ""
+    argv = sys.argv[1:]
     spec_path = os.path.join(FIX, "expectations.json")
     if not os.path.isfile(spec_path):
         print(f"no expectations at {spec_path}", file=sys.stderr)
         return 2
     cases = json.load(open(spec_path))
-    names = sorted(n for n in cases if filt in n)
+    if argv[:1] == ["--touching"]:
+        if len(argv) != 2:
+            print("usage: bin/script-conformance --touching <repo-relative path>", file=sys.stderr)
+            return 2
+        names = touching(argv[1], cases) or []
+        filt = f"--touching {argv[1]}"
+    else:
+        filt = argv[0] if argv else ""
+        names = sorted(n for n in cases if filt in n)
 
     # A run that matched no case must not exit 0 — "nothing to check" and "all
     # checks passed" are the same output otherwise, which is the failure mode

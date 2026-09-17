@@ -159,7 +159,9 @@ def run_writer(name, spec):
         # `.git` is excluded: it is large, it is not what any writer touches, and
         # copying it makes this slow enough that nobody runs it — which is how the
         # original defect survived.
-        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "node_modules"))
+        # Links stay links: following one crashes on a target git does not carry (bin/prove).
+        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "node_modules"),
+                        symlinks=True)
 
         # A writer that REFUSES to create what is not there needs the thing to exist
         # before the case can measure its refresh. `seed_dirs` makes those directories
