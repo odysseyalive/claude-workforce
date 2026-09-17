@@ -1015,6 +1015,58 @@ check(
     "one state nobody can see, while the procedures instruct a reader to report it",
 )
 
+# ── the reported floor has to be a floor a handbook can actually stand on ────
+# Customer observation, 2026-09-17. `_ic_floor` subtracted every line of Scope,
+# Sources, Procedure and Verification — relocating all four to ZERO — and the docstring
+# called the result "the shortest the handbook can get by relocation". `SECTIONS`
+# MANDATES three of those four, so a body that reached the number would fail this same
+# script's section check: an unreachable target, reported as a reachable one, to an
+# author who is being told to trim toward it. The second consequence is worse and is
+# not about prose: the caller enters "no relocation is ordered: it cannot reach the
+# target" only when the floor still exceeds the ceiling, so an understated floor makes
+# that branch fire too RARELY and a handbook that cannot reach the ceiling gets ordered
+# to split anyway. Asserted on a synthetic body rather than a string match, because the
+# defect is arithmetic.
+_fl_problems = []
+try:
+    # Loaded inline: `_rv_load` is defined further down this file than this check runs.
+    # `dont_write_bytecode` for the same reason it does — importing a shipped script
+    # otherwise drops a __pycache__ into workforce/bin/, which the manifest check then
+    # reports as an undeclared shipped file.
+    import importlib.util as _fl_iu
+    from importlib.machinery import SourceFileLoader as _FlLoader
+    _fl_prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        _fl_ld = _FlLoader("_fl_conform", os.path.join(ROOT, "workforce", "bin", "wf-conform"))
+        _fl_mod = _fl_iu.module_from_spec(_fl_iu.spec_from_loader(_fl_ld.name, _fl_ld))
+        _fl_ld.exec_module(_fl_mod)
+    finally:
+        sys.dont_write_bytecode = _fl_prev
+    _fl_body = ("---\nname: x\n---\n## Role\nr\n## Scope\n" + "s\n" * 5
+                + "## Procedure\n" + "1. a\n" * 5
+                + "## Verification\nCheck: run it\nNegative: break it\nprose\nprose\n"
+                + "## Reporting\nr\n")
+    _fl_floor, _fl_mand, _fl_brk = _fl_mod._ic_floor(_fl_body)
+    _fl_total = len(_fl_body.splitlines())
+    # Scope 6 and Procedure 6 each keep heading+pointer; Verification 5 keeps those
+    # plus its two Check/Negative lines. 24 - (4 + 4 + 1) = 15. Zeroing all three
+    # would give 7, which is the number this used to print.
+    if _fl_floor != 15:
+        _fl_problems.append(f"floor {_fl_floor} on a 24-line body, expected 15 "
+                            f"(zeroing the sections gives 7)")
+    if _fl_floor >= _fl_total:
+        _fl_problems.append("the floor is not below the body — relocation buys nothing")
+except Exception as _exc:                                # noqa: BLE001
+    _fl_problems.append(f"the floor probe would not run ({_exc})")
+check(
+    "wf-conform: a relocated section keeps its residue, so the reported floor is reachable",
+    not _fl_problems,
+    "; ".join(_fl_problems) + " — `SECTIONS` mandates ## Scope, ## Procedure and "
+    "## Verification, and Core Principle 3 keeps the runnable check in the handbook, so "
+    "a floor computed by deleting them names a body that fails this script",
+)
+
 _pf_src = read("workforce/bin/wf-preflight")
 check(
     "wf-preflight: the auto-mode probe matches the spelling the CLI actually prints",

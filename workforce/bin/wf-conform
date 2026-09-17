@@ -344,8 +344,13 @@ def _ic_floor(body):
     condense: the frontmatter, every line of an `ORG-*` block (the `embed` step writes
     them), the tier-ceiling line, and each `## Probe` substitution-table row that cites a
     section in backticks (the rows the probe-table check demands). `floor` is the line
-    count with every RELOCATABLE_SECTIONS section removed, heading included, which is the
-    shortest the handbook can get by relocation. `breakdown` is every block's line count,
+    count with every RELOCATABLE_SECTIONS section relocated down to its RESIDUE — the
+    heading `SECTIONS` mandates plus a pointer line, and for `## Verification` the
+    `Check:`/`Negative:` lines that Core Principle 3 keeps in the handbook. That is the
+    shortest the handbook can get by relocation AND still pass this script.
+    *Corrected 2026-09-17: it subtracted those sections ENTIRELY and called the result
+    the same thing, so the figure named a body that would fail the section check above.*
+    `breakdown` is every block's line count,
     heading through the line before the next heading, in file order, so an author can see
     what drives the size.
     """
@@ -382,8 +387,35 @@ def _ic_floor(body):
             name, count = mh.group(1), 0
         count += 1
     blocks.append((name, count))
-    relocatable = sum(c for h, c in blocks
-                      if any(h == s or h.startswith(s + " ") for s in RELOCATABLE_SECTIONS))
+    # A RELOCATED SECTION LEAVES A RESIDUE; IT DOES NOT GO TO ZERO. This used to
+    # subtract every line of all four sections, and the docstring called the result
+    # "the shortest the handbook can get by relocation" — a figure no handbook can
+    # reach, because `SECTIONS` above MANDATES `## Scope`, `## Procedure` and
+    # `## Verification`, so a body that actually hit it would fail this same script's
+    # section check. It reported an unreachable target as a reachable one.
+    #
+    # Two consequences, and the second is the worse: an author trimming toward the
+    # number cuts content the handbook is required to carry, and — because the caller
+    # enters its "it cannot reach the target" branch only when the floor still exceeds
+    # the ceiling — an understated floor makes that branch fire too RARELY, so a
+    # handbook that cannot reach the ceiling is ordered to split anyway. Found by a
+    # customer re-test, 2026-09-17, on a handbook whose reported 132 was unreachable.
+    #
+    # The residue is counted from what this script itself demands, never estimated:
+    # the heading (mandated) plus one line pointing at where the content went, and for
+    # `## Verification` the `Check:` and `Negative:` lines as the file actually carries
+    # them — Core Principle 3 puts the runnable check IN the handbook, so it is the one
+    # content that cannot relocate anywhere.
+    _CHECK_RESIDUE_RX = re.compile(r"^\s*(?:\*\*)?(?:Check|Negative)\b\s*:", re.I)
+    relocatable = 0
+    for _h, _c in blocks:
+        if not any(_h == s or _h.startswith(s + " ") for s in RELOCATABLE_SECTIONS):
+            continue
+        residue = 2                                   # heading + a pointer line
+        if _h == "Verification" or _h.startswith("Verification "):
+            residue += sum(1 for l in (section(body, "## " + _h) or "").splitlines()
+                           if _CHECK_RESIDUE_RX.match(l))
+        relocatable += max(0, _c - residue)
     breakdown = " · ".join(f"{h} {c}" for h, c in blocks if c)
     return len(lines) - relocatable, mandated, breakdown
 
@@ -837,8 +869,9 @@ def check_handbook(path, body, res, ceiling, floors=None):
             f"ceiling",
             f"{body_lines} lines, {_density}: {_mand} are lines this check itself requires "
             f"(frontmatter, ORG-* blocks, the tier-ceiling line, the Probe rows citing a "
-            f"section), and {body_lines - _mand} are authored. With every line of the "
-            f"relocatable sections moved out, it would still be {_floor} lines, over "
+            f"section), and {body_lines - _mand} are authored. With the relocatable "
+            f"sections reduced to the heading, a pointer and Verification's Check/Negative "
+            f"lines \u2014 the least this script will still pass \u2014 it would be {_floor} lines, over "
             f"{ceiling}, so no relocation is ordered: it cannot reach the target. By section: "
             f"{_brk}. The {ceiling}-line figure was measured on one IC; why that does not "
             f"bind this one: procedure-for-procedures.md § The handbook length ceiling. "
@@ -871,7 +904,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
         if body_lines > ceiling:
             _f, _m, _b = _ic_floor(body)
             _why += (f" ({_m} of them required by this check, {body_lines - _m} authored; "
-                     f"{_f} with the relocatable sections moved out. By section: {_b})")
+                     f"{_f} with the relocatable sections at their irreducible residue. By section: {_b})")
         # A RECORDED FLOOR REPLACES THE ORDER WHILE IT HOLDS (DEF-Q-23, see LENGTH_FLOORS_REL).
         _fl = (floors or {}).get(n)
         if (_fl and _fl["evidence_ok"] and body_lines <= _fl["lines"]
