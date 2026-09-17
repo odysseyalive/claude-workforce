@@ -10441,7 +10441,36 @@ check("wf-conform excludes servers named only to forbid them",
 # Detection only, and deliberately: `bin/sync` rebuilds DEST_ROOT by deleting it,
 # and pointing that at a directory outside the repo is not a change this check
 # should make on anyone's behalf.
-_personal = os.path.expanduser("~/.claude/skills/workforce")
+# THE RUNTIME RESOLVER, NOT A HARDCODED `~/.claude` — the same expression `bin/sync`
+# line 57 uses and the same one this file already calls canonical where it asserts the
+# seed script's form: `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce`. Hardcoded,
+# the two disagreed on any machine that sets the variable: `--personal` refreshed
+# $CLAUDE_CONFIG_DIR and this check read `~/.claude`, so it reported drift the fix it
+# names could not clear, on every run, forever. MEASURED 2026-09-17 on this machine —
+# CLAUDE_CONFIG_DIR=~/.claude-brooke at 1.64.1, ~/.claude at 1.63.0, `--personal` run
+# twice, still 32 stale. A check whose remedy provably does not work is the flag the
+# user's directive forbids, and it is worse than an absent check: it trains a reader to
+# expect that one line of red.
+_config_root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+_personal = os.path.join(_config_root, "skills", "workforce")
+# This file is the only place the resolver was ever hardcoded; every shipped script
+# already reads the variable. Asserted rather than remembered, because the drift it
+# causes is invisible on a machine that leaves CLAUDE_CONFIG_DIR unset — which is the
+# machine a maintainer usually tests on.
+# The needle is ASSEMBLED, never written whole, or this line matches itself and the
+# assertion fails on the very file it guards.
+_cfg_needle = 'expanduser("~/.cl' + 'aude/'
+_cfg_hardcoded = [f"{_p}:{_i}" for _p in ("bin/check", "bin/sync")
+                  for _i, _l in enumerate(read(_p).splitlines(), 1)
+                  if _cfg_needle in _l]
+check(
+    "check: the personal install is resolved the way the runtime resolves it",
+    not _cfg_hardcoded,
+    "; ".join(_cfg_hardcoded) + " — bin/sync --personal writes "
+    "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce. A hardcoded ~/.claude reads a "
+    "tree the sync never writes on any machine that sets the variable, so the check "
+    "reports drift its own FIX line cannot clear, on every run, forever",
+)
 if os.path.isdir(_personal):
     # EVERY shipped file, never a hand-picked list. The sampled form (SKILL.md plus
     # three bin/ scripts) passed on 2026-08-04 while eleven reference files carrying a
@@ -10528,7 +10557,7 @@ if os.path.isdir(_personal):
     check("personal install matches source (it shadows the runtime)",
           not _drift and not _missing and not _ahead,
           f"{len(_drift)} stale, {len(_ahead)} RUNTIME-FIRST, {len(_missing)} absent of "
-          f"{len(declared)} shipped files ({_shown}) — `~/.claude/skills/workforce` "
+          f"{len(declared)} shipped files ({_shown}) — `{_personal}` "
           "resolves BEFORE `.claude/skills/workforce`, so this is the copy a session "
           "loads. FIX for the stale and absent ones: `bin/sync --personal`. "
           "Do NOT plain `./install` — it fetches the PUBLISHED tree and will overwrite "
