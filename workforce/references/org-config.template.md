@@ -36,11 +36,12 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 | # | Model ID | Context | Max output | Notes |
 |---|---|---|---|---|
 | 1 | `claude-fable-5-1` | 1M | 128K | the most capable model, priced above the Opus tier ($10/$50); sees what it judges. **Recommended for creative-visual** (graphics & frontend design); the session advisor's pick too (§ Session advisor) |
-| 2 | `claude-opus-5` | 1M | 128K | the Opus-tier workhorse ($5/$25); commits and drives. **Recommended for code** |
-| 3 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical Lead** (agents that coordinate) and **Recommended for analytical IC** (agents that do the work) |
-| 4 | `claude-opus-4-6` | 1M | 128K | **Recommended for creative-text** (writing & copy) |
+| 2 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical Lead** (agents that coordinate) and **Recommended for analytical IC** (agents that do the work) |
+| 3 | `claude-opus-4-6` | 1M | 128K | the Opus tier two generations back ($5/$25). **Recommended for creative-text** (writing & copy) |
+| 4 | `claude-opus-5-5` | 1M | 128K | the current Opus, and the cheapest row in this pool ($4/$20); commits and drives. **Recommended for code** |
 
-**One row may be recommended for several lanes.** Row 2 carries two `Recommended for` annotations, and
+**One row may be recommended for several lanes.** Row 2 (`claude-opus-4-8`) carries two `Recommended for`
+annotations — both analytical tiers — and
 both budget emitters read every annotation a row carries; a lane is never recommended twice, but a model
 may be recommended for as many lanes as its Notes cell names.
 
@@ -57,11 +58,15 @@ in § Model statics: the picker is derived from this section and from nowhere th
 so the budget and this table can never drift.
 
 **Ordered by cost, most expensive first, and presented in that order every time** (`claude-fable-5-1`
-is the `$10/$50` tier and sits first; `claude-opus-5`, `claude-opus-4-8` and `claude-opus-4-6` all share
-the `$5/$25` tier and are ordered newest-first within it). The blank "Other" field
+is the `$10/$50` tier and sits first; `claude-opus-4-8` and `claude-opus-4-6` share
+the `$5/$25` tier and are ordered newest-first within it; `claude-opus-5-5` is `$4/$20` and is the
+cheapest row, so it sits last). **Since 2026-09-22 the code lane's pick is the cheapest row in the
+pool rather than the second-dearest, which is why this table reordered** — read the order, not the row
+number, when you need to know what a lane costs. The blank "Other" field
 accepts any model ID typed by hand — this is how a project reaches a model not in the four, e.g.
 `claude-haiku-4-5` for high-volume mechanical ICs ($1/$5, 200K/64K, **and note it does not accept an
-effort setting**), or `claude-opus-4-8`, the analytical-Lead pick this pool carried until 2026-09-05. On the advisor
+effort setting**), or `claude-opus-5` ($5/$25), the code pick this pool carried between 2026-09-05 and
+2026-09-22. On the advisor
 object, the blank field is where the user types **none** to decline one — which removes the `advisorModel`
 key entirely (§ Session advisor).
 
@@ -97,6 +102,18 @@ describes are gone.** `claude-opus-4-8` is `$5/$25`, so the two tiers are now pr
 is the only lever between them (§ Tier defaults). A directive is not a measurement of THIS project's work either — treat the picks
 as the user's defaults, not a certificate. Edit the Notes column when that changes; the budget question
 reads these cells and has no other source.*
+
+***The 2026-09-22 revision is also a user decision.** It moved the Opus row and the **code** lane to
+`claude-opus-5-5`, replacing `claude-opus-5`, which left the pool and is now reachable only by hand
+through "Other". **Unlike the swap above, this one is not price-neutral, and it reordered the table.**
+Verified that day against the Anthropic model reference (the `claude-api` skill, cached 2026-06-24):
+`claude-opus-5-5` is **$4/$20**, 1M context, 128K max output, and accepts all five effort rungs `low`
+through `max`. At $4/$20 against `claude-opus-5`'s $5/$25 it is the cheapest row in the pool, so the
+Opus row fell from 2 to 4 — below both `$5/$25` rows — and a code employee costs about 20% less per
+token than it did. **One behavior does not carry over: this model's effort default is `medium`, not
+`high`** (`references/platform.md` fact 12c, read 2026-09-22). The `high` this file recommends for
+`code` is unchanged, but it is now a deliberate raise rather than a restatement of the API default —
+§ Effort statics carries that distinction.*
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 
@@ -134,7 +151,7 @@ cost.** Because the recommended rung is the forced first-run default (INV-BUDGET
 the cost lever: `medium` is a deliberate floor a re-audit must not silently ratchet upward, and neither
 creative lane is ever recommended `high`, `xhigh`, or `max`. For `creative-visual`, whose model
 `claude-fable-5-1` spans the full ladder (`platform.md` fact 12c), the higher rungs are opt-in cost the
-user chooses, never the starting point. `code` spans the same full ladder on `claude-opus-5` (fact 12c
+user chooses, never the starting point. `code` spans the same full ladder on `claude-opus-5-5` (fact 12c
 again) and starts at `high` for the reason § Code gives.
 
 **Why these rungs are the cost-effective ones for this pool (the receipt).** Read 2026-09-02 from the
@@ -143,15 +160,20 @@ Anthropic model reference's measured effort curves (the `claude-api` skill, § E
 accuracy at 70–85% of its cost, and the default bought nothing measurable over `medium` on any benchmark
 measured, so `creative-visual` and `creative-text` sit at `medium`. On long-horizon coding the curve is
 steep: `medium` gave up about 2 points of pass rate for half the cost and `low` about 8 for a quarter, and
-a weak patch ships a bug the check must then catch, so `code` sits at `high`, which is the API default and
-the reference's own stated minimum for intelligence-sensitive work on `claude-opus-5` (`xhigh`/`max` only
-where an eval shows a quality difference). The Leads' `high` and the ICs' `medium` are the spawn-count argument in § The
+a weak patch ships a bug the check must then catch, so `code` sits at `high`, which is
+the reference's own stated minimum for intelligence-sensitive work (`xhigh`/`max` only
+where an eval shows a quality difference). **On `claude-opus-5-5` that `high` is a deliberate raise, not
+a restatement of the platform.** This model's effort default is `medium` (`references/platform.md` fact
+12c, read 2026-09-22) — one rung below the `claude-opus-5` this lane ran until 2026-09-22, whose default
+WAS `high`, which is why the sentence above no longer calls `high` the API default. The rung the budget
+recommends did not move; what moved is that leaving the field unset would now land a rung lower.
+The Leads' `high` and the ICs' `medium` are the spawn-count argument in § The
 four lanes. The advisor has no rung at all, because it runs in the main session, not in a spawn (§ Session
 advisor). Re-read the curves when the pool changes; they are per-model and per-workload.
 
 **Availability is not uniform, and the budget offers only rungs the lane's selected model supports.**
 Three that bite with this pool: `claude-opus-4-6` (the creative-text pick) has no `xhigh` — its ladder
-is `max`/`high`/`medium`/`low`; `claude-fable-5-1` (creative-visual) and `claude-opus-5` (code) each
+is `max`/`high`/`medium`/`low`; `claude-fable-5-1` (creative-visual) and `claude-opus-5-5` (code) each
 accept all five rungs, but the budget offers the four nearest each lane's recommendation: for
 creative-visual's `medium` that is `xhigh`/`high`/`medium`/`low`, dropping the far `max` end; for code's
 `high` it is `max`/`xhigh`/`high`/`medium`, dropping `low` (`references/platform.md` fact 12c, DOCUMENTED
@@ -263,7 +285,7 @@ rows name one model and differ in effort alone** — the reasoning is under the 
 
 **No CEO row.** The CEO is the main session — it runs on whatever model the user chose for their
 Claude Code session, not a budget setting. (The recommendation for that seat is Opus — the Lead now
-takes `claude-opus-4-8`, and `claude-opus-5` remains the code-lane pick — but the CEO's is a `/model`
+takes `claude-opus-4-8`, and `claude-opus-5-5` is the code-lane pick — but the CEO's is a `/model`
 choice, never written here.)
 
 A blank model cell means the employee inherits the session model.
@@ -295,7 +317,8 @@ so every value here is a deliberate override of whatever the user is running.
   The standing argument for the current value is steerability — a coordinating seat should stay a
   thought-partner rather than commit to its own reading — which is a preference and was never a
   measurement on this project's work. Both models are the same `$5/$25` tier, so neither swap changed
-  what a Lead costs.* `claude-opus-5` is reachable by typing it into the budget's "Other" field.
+  what a Lead costs.* `claude-opus-5` is reachable by typing it into the budget's "Other" field — and
+  since 2026-09-22, when the Opus row moved to `claude-opus-5-5`, that field is the ONLY way to reach it.
 
 **The Lead default is conditional on the domain the Lead oversees.** The `analytical` seat is the
 Lead default for a pure-orchestration seat: a routing Lead stays analytical because routing is the
@@ -365,17 +388,19 @@ the employee (`transfer.md`) or to pin it below (§ Employee overrides).
 
 ### Code
 
-| Code model | `claude-opus-5` |
+| Code model | `claude-opus-5-5` |
 |---|---|
 | Code effort | high |
 | Departments on code | |
 
 A blank model cell falls to the analytical row for that employee's tier — the same meaning a blank has
-everywhere else in this file. The shipped default is `claude-opus-5`, set by the user's 2026-09-05
+everywhere else in this file. The shipped default is `claude-opus-5-5`, set by the user's 2026-09-22
 directive: code output is executed rather than read, so this lane takes a model that commits and drives,
-and at `$5/$25` it does so at half the frontier row's price.
-Between 2026-09-02 and that directive this was `claude-fable-5-1`, which remains row 1 of the pool and is
-one selection away for a project whose code work earns the frontier price.
+and at `$4/$20` it does so for well under half the frontier row's price — this lane's pick is now the
+cheapest row in the pool, not the second-dearest. It replaced `claude-opus-5` (`$5/$25`), which the
+2026-09-05 directive had set and which now sits outside the pool entirely.
+Between 2026-09-02 and that earlier directive this was `claude-fable-5-1`, which remains row 1 of the
+pool and is one selection away for a project whose code work earns the frontier price.
 
 **Code runs `high` regardless of tier.** It is the one lane whose output is executed rather than read:
 a weak paragraph is edited, a weak patch ships a bug, and the check that catches it costs more than the
@@ -390,7 +415,7 @@ The advisor model runs alongside the main session only — it does not reach spa
 why it has no effort setting: nothing spawns at an effort level it controls. **Its recommendation is the
 pool row whose Notes cell names the session advisor** (§ Model statics, row 1 as shipped: the same pick
 as creative-visual, and the one seat where the frontier model is recommended over the code lane's
-`claude-opus-5`, because the advisor is a second opinion on the main session's own reasoning and that is
+`claude-opus-5-5`, because the advisor is a second opinion on the main session's own reasoning and that is
 where capability pays), marked `(recommended)` in place in the cost order and the default on a
 first run exactly as a lane's recommendation is; on a re-audit the recorded `advisorModel` is the
 `(current)` option instead (`audit-setup.md` § Step 0.2, and § What "pre-selected" means on screen for
