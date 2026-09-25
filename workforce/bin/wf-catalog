@@ -1559,7 +1559,12 @@ def _sibling(name):
 # run that is over. `retired/` is the archive this migration itself writes. THE LIST IS
 # `wf-census.SACRED_SCRATCH`, project-relative, read from its owner: this file kept its own copy
 # (review of the 1.63.0 fix batch, finding 10), and two copies of one list drift apart.
-NOT_READERS = _sibling("wf-census").SACRED_SCRATCH
+_CENSUS = _sibling("wf-census")
+NOT_READERS = _CENSUS.SACRED_SCRATCH
+# And the record FILES, by the same owner's rule: a queue, a manifest or a scan output
+# quotes paths and reads none of them. Read from `wf-census` rather than restated here for
+# the reason the line above is — two copies of one list drift apart.
+IS_RECORD_FILE = _CENSUS.is_record_file
 READER_MAX_BYTES = 1 << 20
 
 
@@ -1583,6 +1588,11 @@ def live_readers(root, proj):
             and os.path.realpath(os.path.join(dirpath, x)) not in skip)
         for fn in sorted(filenames):
             if fn.startswith("settings") and fn.endswith(".json"):
+                continue
+            # A RECORD IS NOT A READER. The deferment queue and the installer's manifest
+            # quote the paths they are about; keeping a file because a queue complains
+            # about it is how a retired copy stays on disk forever.
+            if IS_RECORD_FILE(fn):
                 continue
             out.append(os.path.join(dirpath, fn))
     claude_md = os.path.join(root, "CLAUDE.md")
@@ -1609,25 +1619,47 @@ def live_readers(root, proj):
     return readers
 
 
-def _citation_rx(rel):
-    """Every path form a reader writes for one file in the copy, as one pattern.
+def _guarded(*forms):
+    """Those path forms as one pattern, each stopped at a word boundary on both sides.
 
-    `references/x.md` and a bare `x.md` are the same citation, and `<skill>/references/x.md`
-    contains the first — so matching the rel and the basename covers all three.
-
-    THE LEFT GUARD ADMITS A SEPARATOR AND STOPS A WORD. `/` must pass, because the longest
-    real form is exactly the short one with a path in front of it; what the guard is for is
-    `myreferences/x.md` and `palette.md` inside `not-palette.md`. Written the other way for
-    an hour, it rejected the one citation the fixture exists for — a handbook naming
-    `.claude/skills/image-eval/references/palette.md`, the most ordinary spelling there is.
+    THE LEFT GUARD ADMITS A SEPARATOR AND STOPS A WORD. `/` must pass, because a citation
+    is routinely the short form with a longer path in front of it; what the guard is for is
+    `myreferences/x.md`, and `palette.md` inside `not-palette.md`.
     """
-    forms = {rel.replace(os.sep, "/"), posixpath.basename(rel.replace(os.sep, "/"))}
     return re.compile("|".join(r"(?<![\w.-])" + re.escape(f) + r"(?![\w-])"
-                               for f in sorted(forms, key=len, reverse=True)))
+                               for f in sorted(set(forms), key=len, reverse=True)))
+
+
+def _outside_citation_rx(skill, rel):
+    """How a reader OUTSIDE the copy names one of its files: the skill is in the path.
+
+    **A CITATION IS MATCHED THE WAY A PATH RESOLVES, AND FROM OUTSIDE, A BARE BASENAME
+    RESOLVES TO NOTHING.** `<skill>/<rel>` is the form every longer spelling contains —
+    `.claude/skills/<skill>/<rel>` and `~/.claude/skills/<skill>/<rel>` both end in it — so
+    one needle covers all three and a name with no skill in it covers none.
+
+    MEASURED 2026-09-25 on a real project, and it is why this is not the basename form the
+    first fix used. `SKILL.md` matched every mention of any SKILL.md anywhere in the tree —
+    *"cited by .claude/agents/bible-scholar.md:41 … (+502 more)"*. `image-eval`'s
+    `references/ai-patterns.md` was held by an agent reading **text-eval's** file of the
+    same name, and `references/templates.md` by `awareness-ledger` reading its own. One
+    copy went from 1 removable file to 33 kept, which is not a cautious migration: it is a
+    copy that can never retire, against a directive that says the old copies go.
+    """
+    return _guarded("%s/%s" % (skill, rel.replace(os.sep, "/")))
+
+
+def _inside_citation_rx(rel):
+    """How a reader INSIDE the copy names one of its files: relative to itself, or to the
+    skill root. `references/x.md` and a bare `x.md` both resolve from in here, which is why
+    `image-eval/references/invocation.md` citing `output-formats.md` is a real read and the
+    same three words in an agent two directories away are not."""
+    rel = rel.replace(os.sep, "/")
+    return _guarded(rel, posixpath.basename(rel))
 
 
 def _cite_lines(text, rx):
-    """Line numbers where `rx` — a pattern from `_citation_rx` — matches."""
+    """Line numbers where `rx` — a pattern from one of the citation builders — matches."""
     return [n for n, line in enumerate(text.splitlines(), 1) if rx.search(line)]
 
 
@@ -1661,12 +1693,14 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
     project-only one is, and its project-only ROWS are lifted into the house-rules layer by
     `project_only_rows` when it does go.
 
-    A CITATION IS MATCHED IN EVERY PATH FORM A READER WRITES. The needle was
-    `<skill>/<rel>` and nothing else, so `references/output-formats.md` and a bare
-    `output-formats.md` — `image-eval/references/invocation.md:38,44,50` writes both — were
-    invisible, and the file they name was removed under a reader that still points at it.
-    The rel form subsumes the `<skill>/<rel>` form; the basename form is matched only where
-    it is not already part of a longer path, so one citation is never counted twice.
+    A CITATION IS MATCHED THE WAY THE PATH RESOLVES FOR THE READER THAT WROTE IT, and the
+    two readers are not the same. From INSIDE the copy, `references/x.md` and a bare `x.md`
+    both resolve — `image-eval/references/invocation.md:38,44,50` writes both, and the file
+    they name was removed under them. From OUTSIDE, neither resolves to anything: only a
+    citation naming the skill does, and `<skill>/<rel>` is the form that
+    `.claude/skills/<skill>/<rel>` and `~/.claude/skills/<skill>/<rel>` both contain. See
+    `_outside_citation_rx` for what matching a bare basename from outside cost when this
+    was written the generous way — 33 kept files on a copy with one removable.
 
     A READER INSIDE THE COPY COUNTS ONLY IF IT STAYS. A project agent the shipped skill does not
     ship stays, and the files it cites are its grounding, so the set is closed to a fixpoint: a
@@ -1674,6 +1708,7 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
     reads nothing after the run.
     """
     _by_name, by_content = install_index(root, kind)
+    name = os.path.basename(proj)
     candidates = []
     for rel in sorted(rels - keep_rel):
         f = os.path.join(proj, rel)
@@ -1688,7 +1723,7 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
     readers = live_readers(root, proj)
     cited = {}
     for rel in candidates:
-        rx = _citation_rx(rel)
+        rx = _outside_citation_rx(name, rel)
         hits = ["%s:%d" % (path, n) for path, text in readers for n in _cite_lines(text, rx)]
         if hits:
             cited[rel] = hits
@@ -1700,7 +1735,7 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
         for rel in candidates:
             if rel in cited:
                 continue
-            rx = _citation_rx(rel)
+            rx = _inside_citation_rx(rel)
             hits = []
             for reader in sorted(staying):
                 if reader == rel:

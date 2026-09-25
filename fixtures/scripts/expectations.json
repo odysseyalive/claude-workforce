@@ -4128,6 +4128,27 @@
       "verified on disk"
     ]
   },
+  "catalog-same-basename-other-skill-goes": {
+    "_why": "THE NEGATIVE FOR THE CITATION FORMS, and the defect that wrote it. MEASURED 2026-09-25 on a real project: matching a bare basename from OUTSIDE the copy held `image-eval/SKILL.md` on `.claude/agents/bible-scholar.md:41 … (+502 more)` — every mention of any SKILL.md in the tree — held image-eval's `references/ai-patterns.md` on an agent reading TEXT-EVAL's file of the same name, and held `references/templates.md` on awareness-ledger's own templates. A copy that can never retire breaks the 2026-09-10 directive as surely as one that retires too much. This tree is that collision in miniature: two skills each carry `references/ai-patterns.md` and one outside agent cites text-eval's by name. Against HEAD's wf-catalog: `0 file(s) removable · 2 stay`, both held by the same two lines. Now only text-eval's stays, and image-eval's retires with its project-only rows lifted first.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "retire     references/ai-patterns.md",
+      "STAYS      references/ai-patterns.md — cited by .claude/agents/text-evaluator.md:6",
+      "1 file(s) removable",
+      "1 stay",
+      "1 cited"
+    ],
+    "not": [
+      "text-evaluator.md:7"
+    ]
+  },
   "catalog-subdir-execute-refused": {
     "_why": "THE WALK-UP MUST NOT REACH A DELETION. catalog-resolves-from-subdir fixes a READ that reported a false absence by climbing to the nearest ancestor carrying a `.claude/`; inferring the tree to READ from and inferring the tree to DELETE from are not the same act, and the second was never asked for. A `--migrate --execute` run from `~/lab/foo/bar` whose nearest `.claude/` sits at `~/lab` would retire copies under a directory nobody named, after the operator had already consented to deletion of something else. Identical tree to catalog-resolves-from-subdir; the only difference is the flags, which is what isolates the refusal to `--execute`. Exit 2 rather than 1: this is a caller error with a stated remedy, not a resolution that failed. The refusal PRINTS the root it found, because a refusal that withholds the one argument that would satisfy it is a dead end.",
     "script": "wf-catalog",
@@ -5665,7 +5686,7 @@
     ]
   },
   "catalog-cited-in-any-form-stays": {
-    "_why": "MEASURED 2026-09-25 (item 7): the citation guard protected PROJECT-ONLY files only — `no file with the same normalised content AND none with the same name` — so `text-tells.md` and `human-markers.md`, which DIFFER from the install by cmp and are read by text-eval/SKILL.md:69,71 and finishing-chain.md:63,69, were listed retire and their delta went to retired/ with no live reader. And the needle was `<skill>/<rel>` alone, so a reader writing `references/output-formats.md` or a bare `output-formats.md` (image-eval/references/invocation.md:38,44,50) was invisible. Against HEAD's wf-catalog this tree prints three `retire` rows and no STAYS. Now: the differing shipped-name file stays with its reader named, the bare-basename citation is seen, and the file that is byte-identical to a shipped one still goes — a citation of THAT is repointed to the resolver, not protected, or nothing could ever migrate.",
+    "_why": "MEASURED 2026-09-25 (item 7): the citation guard protected PROJECT-ONLY files only — `no file with the same normalised content AND none with the same name` — so `text-tells.md`, which DIFFERS from the install and is read by an agent, was listed retire and its delta went to retired/ with no live reader. And the needle was `<skill>/<rel>` alone, so a reader INSIDE the copy writing a bare `output-formats.md` (image-eval/references/invocation.md:38,44,50 in the real case) was invisible. A citation is matched the way it RESOLVES for the reader that wrote it: this tree asserts all three forms at once — an outside agent naming the full `.claude/skills/text-eval/references/…` path, an outside agent naming `text-eval/references/invocation.md`, and invocation.md itself linking a bare `output-formats.md` from inside the copy. The same agent also writes a bare `output-formats.md` from OUTSIDE, which must NOT be what keeps it, and the reader printed says so. `human-markers.md` is byte-identical to a shipped file and is retired even though it is cited by full path — a citation of that is repointed to the resolver, or nothing could ever migrate.",
     "script": "wf-catalog",
     "args": [
       "--migrate"
@@ -5676,13 +5697,15 @@
     "exit": 0,
     "want": [
       "STAYS      references/text-tells.md — cited by .claude/agents/writer.md:6",
-      "STAYS      references/output-formats.md — cited by .claude/agents/writer.md:8",
+      "STAYS      references/invocation.md — cited by .claude/agents/writer.md:8",
+      "STAYS      references/output-formats.md — cited by .claude/skills/text-eval/references/invocation.md:5",
       "retire     references/human-markers.md",
-      "2 cited"
+      "3 cited"
     ],
     "not": [
       "retire     references/text-tells.md",
-      "retire     references/output-formats.md"
+      "retire     references/output-formats.md",
+      "references/output-formats.md — cited by .claude/agents/writer.md"
     ]
   },
   "catalog-cited-file-stays": {

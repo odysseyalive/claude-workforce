@@ -77,6 +77,41 @@ SACRED_SCRATCH = (os.path.join(".claude", "workforce", "work"),
                   os.path.join(".claude", "workforce", "retired"))
 
 
+# ── a record is not a reader ─────────────────────────────────────────────────
+# Beside the scratch DIRECTORIES above, the record FILES a workforce tool writes about a
+# run. A tool's own output quotes paths by the dozen and reads none of them: `deferred.md`
+# is a queue of findings, `.symlink-manifest.txt` is a list of what `install` linked,
+# `census.json` is what a scan saw. MEASURED 2026-09-25 on a real project: `wf-catalog
+# --migrate` counted both of the first two as live readers and kept nine files of an
+# already-retired copy on the strength of a deferment-queue line quoting their paths. A
+# queue outliving the thing it complains about is how a copy becomes unretirable, against
+# the directive that says the old copies go.
+#
+# A RULE, NOT TODAY'S FILENAMES (`evaluators.md` § A register scoped by enumeration goes
+# stale). Three shapes of tool output, each measured on a real tree: a scan or sidecar
+# (`census.json`, `conform.json`, `.directives.sha`, `scheduled_tasks.lock`), anything
+# named `manifest` (`.symlink-manifest.txt`, `.agents-symlink-manifest.txt`), and the two
+# prose records a run writes by name.
+#
+# WHAT IS DELIBERATELY NOT HERE, because an employee reads it and a path it names is a
+# real read: `grounding/`, `recruiting/`, `personnel/`, `directives/`, every handbook,
+# every skill, and `CLAUDE.md`.
+RECORD_SUFFIXES = (".json", ".sha", ".lock")
+RECORD_NAMES = ("deferred.md", "dispositions.md")
+
+
+def is_record_file(path):
+    """True when `path` is a tool's own record of a run rather than something read.
+
+    Decided on the BASENAME, so it holds wherever the file sits — a project that keeps its
+    census output one directory over still gets the right answer, and a caller does not
+    have to know the layout to ask the question.
+    """
+    base = os.path.basename(path).lower()
+    return (base in RECORD_NAMES or "manifest" in base
+            or base.endswith(RECORD_SUFFIXES))
+
+
 def sacred_scope(root):
     """(files, scratch_skipped): every `.md` under `<root>/.claude` whose sacred blocks the
     sidecar must stamp, sorted, plus the number of `.md` files in run scratch left out.
