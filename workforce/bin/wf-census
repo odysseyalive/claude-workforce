@@ -98,18 +98,40 @@ SACRED_SCRATCH = (os.path.join(".claude", "workforce", "work"),
 # every skill, and `CLAUDE.md`.
 RECORD_SUFFIXES = (".json", ".sha", ".lock")
 RECORD_NAMES = ("deferred.md", "dispositions.md")
+# AND THE PERSONNEL STORE, whole. `AMD-`, `DEF-`, `ORG-`, `PERF-` and `EMP-` files are
+# records ABOUT a change, an employee or a defect — written after the fact, by the run that
+# made it. No employee grounds on one: an amendment record describes an edit to a handbook,
+# and the handbook is what gets read. MEASURED 2026-09-25 on a real project, where
+# `AMD-2026-09-14-media-producer-audit-heal.md` was the sole hold on image-eval's
+# `references/ai-patterns.md` and part of the hold on text-eval's `SKILL.md` — a retirement
+# blocked by the write-up of an earlier one.
+#
+# THE DIRECTORY, NOT THE `AMD-` PREFIX. The record types are open — `personnel-templates.md`
+# adds to them — so a prefix list here would go stale the first time one did. The store's
+# owner is `wf-ledger.STORE`, and the path is stated here rather than imported for the same
+# reason `wf-catalog.install_candidates` restates wf-seed's list: a shipped script importing
+# a sibling AT IMPORT TIME breaks whenever that sibling cannot be read. The two must agree,
+# and `bin/check` is where that is asserted.
+#
+# STILL READERS, and the distinction is what a file is FOR: `directives/` (the user's own
+# words), `grounding/` and `recruiting/` (written to be read by the employee they name).
+RECORD_DIRS = (os.path.join(".claude", "workforce", "personnel"),)
 
 
 def is_record_file(path):
-    """True when `path` is a tool's own record of a run rather than something read.
+    """True when `path` is a record of what happened rather than something an employee reads.
 
-    Decided on the BASENAME, so it holds wherever the file sits — a project that keeps its
-    census output one directory over still gets the right answer, and a caller does not
-    have to know the layout to ask the question.
+    Two questions, because records come in two shapes. The BASENAME answers the first, so it
+    holds wherever the file sits — a project keeping its census output one directory over
+    still gets the right answer. The PATH answers the second: the personnel store is a store,
+    and what is in it is in it because a run filed it there.
     """
     base = os.path.basename(path).lower()
-    return (base in RECORD_NAMES or "manifest" in base
-            or base.endswith(RECORD_SUFFIXES))
+    if (base in RECORD_NAMES or "manifest" in base or base.endswith(RECORD_SUFFIXES)):
+        return True
+    norm = path.replace(os.sep, "/")
+    return any(("/" + d.replace(os.sep, "/") + "/") in ("/" + norm.lstrip("/"))
+               for d in RECORD_DIRS)
 
 
 def sacred_scope(root):

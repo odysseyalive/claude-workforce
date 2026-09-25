@@ -1589,10 +1589,12 @@ def live_readers(root, proj):
         for fn in sorted(filenames):
             if fn.startswith("settings") and fn.endswith(".json"):
                 continue
-            # A RECORD IS NOT A READER. The deferment queue and the installer's manifest
-            # quote the paths they are about; keeping a file because a queue complains
-            # about it is how a retired copy stays on disk forever.
-            if IS_RECORD_FILE(fn):
+            # A RECORD IS NOT A READER. The deferment queue, the installer's manifest and
+            # the personnel store quote the paths they are ABOUT; keeping a file because a
+            # queue complains about it, or because an amendment record writes up the audit
+            # that touched it, is how a retired copy stays on disk forever. The WHOLE path
+            # is asked, not the basename: one of the two rules is about where a file sits.
+            if IS_RECORD_FILE(os.path.join(dirpath, fn)):
                 continue
             out.append(os.path.join(dirpath, fn))
     claude_md = os.path.join(root, "CLAUDE.md")

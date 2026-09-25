@@ -3780,6 +3780,22 @@ except ValueError:
     _fix_json = {}
 _fix_cases = json.loads(read(_fix_spec)) if os.path.exists(_fix_spec) else {}
 _covered = {c["script"] for c in _fix_cases.values()}
+# THE PERSONNEL STORE HAS ONE ADDRESS. `wf-ledger.STORE` owns it and `wf-census.RECORD_DIRS`
+# restates it, because a shipped script importing a sibling at import time breaks whenever
+# that sibling cannot be read (the same trade `install_candidates` makes). Restated is only
+# safe while the two agree: move the store in one and this fails here rather than on a tree
+# where a run's own amendment records quietly start counting as live readers again.
+_led_store = read("workforce/bin/wf-ledger")
+_cen_rec = read("workforce/bin/wf-census")
+check(
+    "records: wf-census and wf-ledger name the same personnel store",
+    'STORE = os.path.join(".claude", "workforce", "personnel")' in _led_store
+    and 'os.path.join(".claude", "workforce", "personnel")' in _cen_rec
+    and "RECORD_DIRS" in _cen_rec,
+    "wf-ledger.STORE and wf-census.RECORD_DIRS disagree about where personnel records live, "
+    "so `is_record_file` stops recognising them — and an AMD write-up of a past audit goes "
+    "back to holding a retired catalog file on disk, which is what it did until 2026-09-25",
+)
 check(
     "scripts: every shipped script has re-runnable fixtures",
     os.path.exists("bin/script-conformance")
