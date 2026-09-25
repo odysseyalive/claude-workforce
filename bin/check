@@ -3722,6 +3722,46 @@ check(
 # ─────────────────────────────────────────────────────────────────────────────
 _vend_text = [p_ for p_ in VENDORED if "/text-eval/" in p_]
 _vend_code = [p_ for p_ in VENDORED if "/code-evaluator/" in p_]
+# ─────────────────────────────────────────────────────────────────────────────
+# NO SHIPPED CATALOG ROW SETTLES ABSOLUTELY WHAT A HOUSE RULE MAY OVERRIDE.
+#
+# `evaluators.md` § House rules dominate: the project's house rules and its supersession
+# register are the sole authority over a demotion, and an evaluator APPLIES them rather
+# than renegotiating them against the file in front of it. A shipped row that reads *"One
+# em dash is not a finding"* contradicts a project whose house rules make exactly that a
+# MUST FIX — and the evaluator reading both has been handed the argument for ignoring the
+# one that is supposed to win. MEASURED 2026-09-25 (audit-20260925T180537Z, P1) on
+# `text-eval/references/additions.md:187`, where that sentence sat beside a project
+# carrying the opposite rule.
+#
+# DELIBERATELY NARROW, and the narrowness is the point: TABLE ROWS ONLY — the shape an
+# evaluator greps and quotes — and only the phrases that close the question outright.
+# Prose that reasons about when something is not a finding is argument, not a row, and is
+# left alone. A row may still say a thing is not a finding; it may not say so without
+# naming the authority that outranks it.
+_ABSOLUTE_NONFINDING = ("not a finding", "never a finding", "basis of a finding",
+                        "not the basis of a finding")
+_nonfinding_rows = []
+for p_ in sorted(VENDORED | {"workforce/skills/text-eval/references/additions.md",
+                             "workforce/skills/code-evaluator/references/additions.md"}):
+    if not p_.endswith(".md"):
+        continue
+    for n_, line_ in enumerate(read(p_).splitlines(), 1):
+        if not line_.lstrip().startswith("|") or line_.count("|") < 3:
+            continue
+        low_ = line_.lower()
+        if any(t_ in low_ for t_ in _ABSOLUTE_NONFINDING) and "house rule" not in low_:
+            _nonfinding_rows.append(f"{p_}:{n_}")
+check(
+    "catalog: no shipped row rules out a finding a house rule may require",
+    not _nonfinding_rows,
+    f"{_nonfinding_rows} — a shipped catalog row settling that something is not a finding, "
+    "with no deference to the project's house rules, arms an evaluator against the one "
+    "authority that outranks it (`evaluators.md` § House rules dominate). Say `unless a "
+    "house rule says otherwise` in the row, or make the row about the threshold rather "
+    "than about the verdict",
+)
+# ─────────────────────────────────────────────────────────────────────────────
 # Every shipped script has a RE-RUNNABLE test, not a prose anecdote. The four were
 # released on negative tests run by hand in a scratch directory and written up in
 # plan/. bin/baseline's own docstring: "A census that can be re-run is the only kind

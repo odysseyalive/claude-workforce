@@ -279,6 +279,13 @@ CASES = [
     # reverted 3.7+ calls back into a shipped script, so the scan must name it. The last one
     # lowers nothing and raises the floor instead: without `PYTHON-FLOOR:` the constant check
     # fires by name.
+    # THE HOUSE-RULES DEFERENCE (audit-20260925T180537Z, P1). APPEND rather than `del`:
+    # the row that carried the defect no longer contains the phrase at all — it was
+    # rewritten to be about the threshold — so the only way to break this is to put an
+    # absolute row back, which is exactly the regression the guard exists to stop.
+    ("catalog: no shipped row rules out a finding a house rule may require",
+     "workforce/skills/text-eval/references/additions.md", "append",
+     "\n| A single em dash | One em dash is not a finding |\n"),
     ("python floor: no shipped script uses an API newer than PYTHON-FLOOR",
      "workforce/bin/wf-preflight", "append",
      "\n\ndef _floor_probe():\n    import subprocess\n"

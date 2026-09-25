@@ -132,7 +132,7 @@ already exists and is reused unchanged.
 | **small-and-bounded** | N is small and fixed — the conversion / hoist / reserve cost is not repaid (a tiny list beats a set; a few concatenations) |
 | **lifetime-matches** | a listener / timer / cache lives exactly as long as the app by design (RC3) |
 | **needs-the-value** | the reference or closure genuinely needs the whole value, or identity / mutation-in-place is the real contract |
-| **cold-path** | the code is not hot — off a loop / handler / large-N / long-lived path it is at most a note, never a finding |
+| **cold-path** | the code is not hot — off a loop / handler / large-N / long-lived path it is at most a note, and not a finding unless a house rule says otherwise |
 
 ### Detection — a reading pass; where a tool exists, the tool is the verdict
 

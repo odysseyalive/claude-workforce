@@ -183,8 +183,8 @@ indicate AI and most likely to convict a human.
 | Mixed casual and formal register | Equally the signature of a technical writer, a young writer, a playful one, a neurodivergent one, or a document with several authors |
 | "Bland" or "robotic" feel | Untrained readers do not reliably perceive model output as robotic; it skews positive and verbose rather than mechanical. This is a vibe, and the catalog exists to replace vibes |
 | "Fancy," academic, or formal prose generally | The measured correlation is to **specific overused words** and does not generalize to formality, register, or reading level |
-| Output of an AI-detection classifier | Not reproducible, not falsifiable by the reader, documented to misfire on non-native English. It may not be the basis of a finding |
-| A single em dash | The `[hard]` row is a *density* rule with a stated threshold. One em dash is not a finding, and the tell is publicly contested; apply the threshold, never the presence |
+| Output of an AI-detection classifier | Not reproducible, not falsifiable by the reader, documented to misfire on non-native English. It is not the basis of a finding on its own, unless a house rule says otherwise |
+| A single em dash | The `[hard]` row is a *density* rule with a stated threshold, so presence alone is not what it measures, and the tell is publicly contested; apply the threshold, never the presence. **Unless a house rule says otherwise** — the project's house rules and supersession register dominate this row as they dominate every other (`evaluators.md` § House rules dominate), so where one makes a single em dash a MUST FIX, it is one |
 
 **This narrows one shipped row.** The host catalog's *"Perfect grammar, zero personality"* survives on
 its second half only: zero deliberate irregularity is the signal, and grammar may never be reported
