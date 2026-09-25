@@ -174,6 +174,10 @@ Give the executor the handbook's own `## Probe` task:
 ```
 You have never seen this project before. Read <staged handbook path> and follow it exactly.
 Task: <the handbook's ## Probe task, verbatim>
+Inputs the dispatcher supplies (bound here to real values, one line each; `(none)` when the
+## Probe task names none):
+<`<run-id>` = the run id; `<scratch>` = an absolute run-scoped directory that ALREADY EXISTS;
+ and every other input the task says is "supplied by the dispatcher">
 Constraints (from the run order, verbatim — these OUTRANK the handbook you are following):
 <the `Constraints:` block of ${run-dir}/RUN-ORDER.md, quoted unedited; `(none)` if empty>
 The Constraints are the whole of what is forbidden here. With `(none)`, follow the handbook as
@@ -193,6 +197,16 @@ that most needs them.
 Write your work product to .claude/workforce/work/<run-id>/probe-<name>/OUTPUT.md
 Then return ONLY: PASS | FAIL:<one line> | AMBIGUOUS:<the question you would have had to ask a human>
 ```
+
+**A probe task that names an input the dispatcher supplies is not dispatchable until that line
+binds it.** § A probe task must be RE-RUNNABLE tells an author to point the deliverable at *"a
+run-scoped scratch path the executor is given"* — and this block had nowhere to give it. The
+executor then reads `<scratch>` as a placeholder and invents one, or asks, and a probe that had to
+ask a question about its own dispatch returns `AMBIGUOUS` against a handbook that was correct.
+**Bind each one, and create the directory before the spawn**: an executor told to write into a path
+that does not exist fails on the harness rather than on the handbook. *Measured 2026-09-25
+(audit-20260925T180537Z, P3): two probe tasks in one run named `<run-id>` and `<scratch>` as
+dispatcher-supplied and the brief template had no slot for either.*
 
 **The work-product name is `OUTPUT.md` and stays outside one pattern:** a probe is a subagent, and the
 harness refuses a subagent's `Write` to a basename beginning REPORT, SUMMARY, FINDINGS or ANALYSIS and
