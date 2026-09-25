@@ -1731,6 +1731,46 @@ def check_removal_extraction(root, name, res):
                "`file:line`, or the target is marked ✗ and NOT swept."))
 
 
+def undo_orig(root, staging, name, recorded):
+    """(the staged `SKILL.md.orig` on disk or None, every path looked at for it).
+
+    THE SURGICAL UNDO IS RELOCATED BY THE SWEEP EXACTLY AS THE WHOLE-DIRECTORY ONE IS, so
+    it is searched exactly where `undo_tree` searches — the candidate list is that
+    function's own, one directory up, never a second search order that can disagree with
+    it. `.orig` and `tree/` are siblings under `staging/<name>/`, and the sweep moves the
+    directory holding both.
+
+    Measured 2026-09-25 on `conform-removal-swept-relocated`: the fixture's correctly
+    swept `oldgen` keeps its `.orig` at `work/<run-id>/staging/oldgen/SKILL.md.orig`, and
+    a lookup hard-coded to `staging/oldgen/SKILL.md.orig` calls a present undo absent.
+    """
+    _tree, tried = undo_tree(root, staging, name, recorded)
+    cands = []
+    for t in tried:
+        f = os.path.join(os.path.dirname(t), "SKILL.md.orig")
+        if f not in cands:
+            cands.append(f)
+    for f in cands:
+        if os.path.exists(f):
+            return f, cands
+    return None, cands
+
+
+def _journal_path_shaped(cell):
+    """Is this journal `path` cell a PATH, as opposed to the name of a class of edits?
+
+    Read off the cell alone, never off disk, because whether the directory is still there
+    is the answer the check is looking for rather than a precondition of asking. An
+    aggregate row names a class — `(all skills)`, `scaffolding blocks`, `—` — and a path
+    does not: it has no spaces, is not parenthesised, and either carries a separator or
+    ends in a file extension. Everything else is a path and is checked as one.
+    """
+    cell = (cell or "").strip()
+    if not cell or cell.startswith("(") or any(c.isspace() for c in cell):
+        return False
+    return "/" in cell or os.sep in cell or bool(re.search(r"\.[A-Za-z0-9]+$", cell))
+
+
 def check_journal(root, res):
     """Every T7 and T7s row's `.orig` exists on disk and hashes to its prior-sha.
 
@@ -1768,6 +1808,7 @@ def check_journal(root, res):
 
     staging = os.path.join(root, ".claude", "workforce", "staging")
     check_removal_set(root, body, staging, res)
+    swept = swept_undo_paths(body)
     rows = 0
     for line in body.splitlines():
         cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
@@ -1781,23 +1822,36 @@ def check_journal(root, res):
 
         # AGGREGATE ROWS ARE NOT SKILLS. A journal may mark a class of edits in one
         # row — "(all skills) | scaffolding blocks emitted by skill-builder" — and
-        # such a row has no single SKILL.md and never had an `.orig`. The path cell
-        # decides it: a real conversion row names a skill directory that exists.
-        # Without this the check demanded `staging/(all skills)/SKILL.md.orig`, a
-        # path nothing was ever going to write, and reported its absence as the same
-        # defect as a genuinely missing undo. One finding was real and one was the
-        # check misreading a row; reporting them identically devalues both.
-        if not os.path.isdir(os.path.join(root, path_cell)):
+        # such a row has no single SKILL.md and never had an `.orig`. Without this
+        # the check demanded `staging/(all skills)/SKILL.md.orig`, a path nothing was
+        # ever going to write, and reported its absence as the same defect as a
+        # genuinely missing undo. One finding was real and one was the check
+        # misreading a row; reporting them identically devalues both.
+        #
+        # THE ROW'S SHAPE DECIDES IT, NEVER DISK. This asked `os.path.isdir` —
+        # "a real conversion row names a skill directory that exists" — and that is
+        # the one question whose FALSE answer is the defect the check exists for.
+        # A row with a typo'd path and a swept skill, whose directory is gone BY
+        # DESIGN (that is what the sweep does), both answered "not a directory" and
+        # were waved through as aggregates, so the `.orig` and the sha were never
+        # compared for exactly the rows whose undo matters most. Measured
+        # 2026-09-25 on the audit-20260925T180537Z report. A path-shaped cell always
+        # gets the `.orig` + sha check, present directory or not.
+        if not _journal_path_shaped(path_cell):
             res.add(True, f"journal: {name} {step} is an aggregate row (undo is the backup)")
             continue
 
         rows += 1
-        orig = os.path.join(staging, name, "SKILL.md.orig")
-        if not os.path.exists(orig):
+        orig, tried = undo_orig(root, staging, name, swept.get(name))
+        if orig is None:
+            shown = ", ".join(os.path.relpath(t, root) for t in tried[:4])
+            if len(tried) > 4:
+                shown += f" (+{len(tried) - 4} more)"
             res.add(False, f"journal: {name} {step} `.orig` exists on disk",
-                    f"row stages {name} at {step} with status {status}, and {orig} is absent. "
-                    "The sweep's single-file undo does not exist. Restore it from the "
-                    "pre-run backup before any deletion.")
+                    f"row stages {name} at {step} with status {status}, and no "
+                    f"SKILL.md.orig is at any recorded or conventional staging path: "
+                    f"{shown}. The sweep's single-file undo does not exist. Restore it "
+                    "from the pre-run backup before any deletion.")
             continue
         res.add(True, f"journal: {name} {step} `.orig` exists on disk")
         if not re.fullmatch(r"[0-9a-f]{64}", prior or "", re.I):

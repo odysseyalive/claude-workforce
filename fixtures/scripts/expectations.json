@@ -1777,6 +1777,15 @@
       "single-file undo does not exist"
     ]
   },
+  "journal-orig-swept": {
+    "_why": "MEASURED 2026-09-25 (audit-20260925T180537Z, item 1): the T7 `.orig` check decided aggregate-ness from DISK — `os.path.isdir(path_cell)` — so a row whose path cell is a real path that is no longer a directory was waved through as an aggregate row and its undo never checked. A swept skill's directory is gone BY DESIGN, and a typo'd path looks identical, so the rows whose undo matters most were the exact rows nobody checked. This fixture is a T7 row naming `.claude/skills/demo` with the directory swept and no `.orig` staged. Against HEAD's wf-conform: 0 failed, exit 0. `journal-orig-ok` is the negative — its `(all skills)` / `scaffolding blocks` row is still read as an aggregate by SHAPE and still passes.",
+    "script": "wf-conform",
+    "exit": 1,
+    "want": [
+      "T7 `.orig` exists on disk",
+      "single-file undo does not exist"
+    ]
+  },
   "journal-orig-ok": {
     "exit": 0,
     "script": "wf-conform",
