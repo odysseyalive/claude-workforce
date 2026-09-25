@@ -140,7 +140,12 @@ what success depends on, and what it will not do.>
     whose options are all "do less" is a deferment queue with a nicer interface: it spends the
     reader's attention to buy the run permission to stop. Where something is genuinely blocked, say
     what blocked it in one line and finish everything else — a partial result delivered beats a
-    complete result withheld pending an answer.
+    complete result withheld pending an answer. **When a decision genuinely does need the user, ask
+    it with an `AskUserQuestion` chooser in that same turn** — never as prose they have to decode
+    and type an answer back to, and never as an instruction to reply in codes or option letters. A
+    question written in plain text scrolls away the moment anything else finishes, and a turn that
+    parks on one is a run stopped on nobody's authority. At most four options per question and four
+    questions per call, and one call in the message.
 13. **Say the state, not the journey.** A resolved thing is never described as unresolved: every
     finding carries its outcome in the same breath — fixed, blocked by <the named thing>, or the
     reader's call because <reason>. **A finding is never retroactively downgraded to a non-finding**;

@@ -38,6 +38,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-turn-ledger` | `SubagentStop` | *(none)* | the same ledger on a spawned employee. A subagent has **zero residency** — fresh context, no history, one shot — so it is the node most exposed to authoring from the thin surface in front of it. `SubagentStop` carries `agent_type`, `agent_transcript_path` and `last_assistant_message` for that agent. § The turn ledger below |
 | `wf-widen` | `Stop` | *(none)* | **acts where the ledger reports.** Checks, for each sense its claim needs, whether the turn opened that channel (a count of the tool calls that did), and returns `decision: "block"` when one went unopened — the reason names the instruments on this machine that were untouched. Also blocks a turn that announced it was continuing and then ended. Each block happens once per turn. The asks checklist never blocks: once per list, the Stop that ends the turn hands the list and the reply to the widening agent when the tag counted two or more asks or the list holds two or more items, an empty list included, and the tag records that the list's turn has ended. § The widen below |
 | `wf-widen` | `SubagentStop` | *(none)* | the same widen on a spawned employee, for the reason the ledger has both rows: a subagent has zero residency and is the node most exposed to authoring from the thin surface in front of it. |
+| `wf-chooser` | `Stop` | *(none)* | **the other way a turn stops when it should not: parked on the user, in prose.** Blocks a turn whose final reply puts a decision to the user as markdown the user has to decode and type back — an answer in codes (`1-4 accept, 5-6 sbdc`), a numbered list the reply asks them to choose from, or "still waiting on your decisions" — while the turn made no `AskUserQuestion` call at all. The reason is the fix: decide everything reversible, finish the work that unblocks, and ask whatever genuinely remains with a chooser in the same turn. Silent on `SubagentStop`, because a spawned employee has no user to ask and no `AskUserQuestion` in its tool set, and silent on `stop_hook_active`. Its three trigger classes were measured at 1.29% of 3,634 real turns before it shipped, against the 1.5% `wf-widen`'s are held to; a fourth class, the end-of-reply offer, measured 4.87% and was not shipped. § The chooser below |
 | `wf-task-tag` | `UserPromptSubmit` | *(none)* | classifies the ASK before the turn runs and injects the sense that closes it — `history`/`world` need hearing, `behaviour` needs touch, `existence` needs taste. On a message of a dozen words or more it also starts an empty asks checklist, `wf-asks.<session>.json`, which the session fills with each separate ask and updates as it works. A `<task-notification>` arriving mid-turn keeps a checklist whose turn no Stop has ended yet; every other message replaces it. Names, never blocks: `decision: "block"` on this event erases the user's prompt. § The widen below |
 | `wf-task-tag` | `SubagentStart` | *(none)* | gives every spawned agent the rule on the user's words and on code precedence (`USER_WORDS`) and nothing else. A spawned agent never sees `UserPromptSubmit` context, so without this row an employee reading old records would not know that a newer request supersedes them. Returns before the widen flag is cleared, since a spawn mid-turn is not the head of a turn. |
 | `wf-code-origin` | `PreToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit` | before an edit, reports which lines of the file are human, AI, or unknown by git history, so the precedence `USER_WORDS` states (human code decides how new code is written; AI code ranks below it even when newer) arrives at the edit instead of relying on a look-up a long session skips. A commit carrying a Claude Code marker is AI; one dated before the repository's first marked commit is human; an unmarked commit after that is unknown until the user settles it once in `.claude/code-origin.json`. A new file gets the human-created files beside it. Context only: never denies, silent outside git. |
@@ -437,6 +438,66 @@ prompt-injection defences and gets surfaced to the user — which would turn an 
 into one more thing a human has to do.
 
 **`stop_hook_active` returns immediately.** A widen that can widen forever is a wedged session.
+
+## The chooser
+
+`wf-chooser` answers a different question from the widen. The widen asks whether the turn looked at
+enough. This asks whether the turn stopped on the user, and whether it did so in a form the user can
+act on.
+
+**The reported defect, 2026-09-24.** An `/agenda today` run posted 31 proposed items as plain
+markdown and asked for an answer in codes — "1-4 accept, 5-6 sbdc, 7-31 S". Six background employees
+then finished one after another, and every hand-back produced another assistant turn that scrolled
+the list off the screen and ended "still waiting on your decisions". The run sat about fifteen
+minutes until the user asked what was held up. Most of the 31 items were bulk decisions on dateless
+TODOs that needed nobody.
+
+**The user's words are the spec.** *"You shouldn't be waiting on my answer, especially if it isn't
+absolutely evident that you need my input on something. ... If there is an answer that it is needed,
+it needs to be evident in a chooser situation"* — *"much like we choose the budget for audit"* —
+*"and this functionality needs baked into the workforce process itself without org."* It rides the
+user-scope install rather than `/org` for that last clause: an org-dispatch rule reaches only a
+project somebody re-audits, and this one arrives on the next `update`.
+
+**Three trigger classes, each measured before it shipped**, over 1,539 transcripts and 3,634
+completed turns of this operator's real traffic. A turn that called `AskUserQuestion` is excluded
+from the count, because it asked the way it was meant to.
+
+| Trigger | Fires on | Rate |
+|---|---|---|
+| `codes` | the reply asks for an answer in codes — a reply verb beside a legend, or a pair of legends | 0.19% (7 turns) |
+| `waiting` | the reply says it is parked on the user's decision, answer or call, NOW | 0.94% (34 turns) |
+| `options` | a numbered or lettered list the reply asks the user to choose from | 0.19% (7 turns) |
+| union | any of the three, with no `AskUserQuestion` call in the turn | **1.29% (47 turns)** |
+
+All 47 were read by hand: 46 are a decision put to the user in prose, and one is a report that uses
+the phrase "needing your decision" to describe a design change. One turn in 3,634 — 0.03%.
+
+**The class that was measured and NOT shipped.** An end-of-reply offer — "want me to …?", "should I
+…?", "let me know" — fires on 4.87% of turns, more than three times the budget. It is also
+`wf-widen`'s HANDOFF exemption, the one stop this distribution has already decided is correct: the
+user's own rule is not to stop mid-work *"unless you actually really do need input, your soliciting
+input from me."* An offer IS that solicitation. Firing on it would block the honest hand-off along
+with the stall, which is how the 7.0% guard earned its retirement (`changes/1.30.1.md`).
+
+**The reason is the fix, in three ordered steps**: decide everything you could decide and reverse,
+finish the work that decision unblocks, and put whatever genuinely remains into `AskUserQuestion` in
+the same turn — at most 4 options per question, 4 questions per call, and one call in the message,
+because several calls in one message are presented newest-first and the user answers them backwards
+(`references/platform.md` fact 26).
+
+**There is no `background_tasks` exemption, and that is deliberate.** `wf-widen` has one because it
+judges evidence and a waiting turn has run nothing. This judges one fact about the reply, and the run
+it was built from is the counter-example: four of its turns were waiting on background rails AND on
+the user at once, and it was the user's half that sat. A between-batches turn is still silent, but
+structurally rather than by a guard — the nouns in the `waiting` class are the user's own.
+
+**Silent on `SubagentStop`.** A spawned employee has no user to ask and no `AskUserQuestion` in its
+tool set, so blocking its hand-back would demand a call it cannot make, forever. The question buried
+in that hand-back is caught at the main turn's own Stop, which is the turn that buried it.
+
+**`stop_hook_active` returns immediately**, before anything is read. A hook that can block forever is
+a wedged session, and a wedged session is worse than the defect it watches.
 
 ## The commitment ledger
 

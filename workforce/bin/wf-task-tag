@@ -214,6 +214,32 @@ USER_WORDS = (
 )
 
 
+# WHEN TO STOP AND ASK, AND IN WHAT FORM. User directive 2026-09-24, after an `/agenda
+# today` run put 31 items to the user as plain markdown, asked for an answer in codes,
+# buried the list under six background hand-backs and sat about fifteen minutes: "You
+# shouldn't be waiting on my answer, especially if it isn't absolutely evident that you
+# need my input on something. ... If there is an answer that it is needed, it needs to be
+# evident in a chooser situation" — "much like we choose the budget for audit" — "and this
+# functionality needs baked into the workforce process itself without org."
+#
+# IT LIVES HERE FOR THE SAME REASON `USER_WORDS` DOES, which is the "without org" clause
+# made mechanical: this hook is wired at user scope, so the rule reaches every project on
+# the next `update` and arrives at the head of every turn. A copy in the operating
+# principles reaches only a project somebody re-audits. `wf-chooser` enforces the same
+# rule at `Stop`; this is the half that arrives in time to change what the turn does
+# rather than grading it afterwards.
+#
+# Stated as facts, never as an instruction (see the note above the injection in `main`).
+CHOOSER_RULE = (
+    "Stopping to ask this user is for a decision that genuinely needs them: anything that "
+    "can be decided and reversed is decided, said in one line, and the work it unblocks is "
+    "finished rather than reported as pending. When a decision does need them, it is put "
+    "in an AskUserQuestion chooser in that same turn, never in prose the user has to "
+    "decode and type an answer back to — a question written as plain text scrolls away the "
+    "moment anything else finishes."
+)
+
+
 SENSE_HOW = {
     "hearing": "read the record that decided it (`git log`, `workforce/changes/`), or ask "
                "a source outside this turn's own reasoning",
@@ -487,7 +513,8 @@ def main():
             pass
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": "\n\n".join(x for x in (USER_WORDS, checklist_line) if x),
+            "additionalContext": "\n\n".join(
+                x for x in (USER_WORDS, CHOOSER_RULE, checklist_line) if x),
         }}))
         return 0
 
@@ -519,7 +546,8 @@ def main():
     # explicit that text framed as an out-of-band command trips the prompt-injection
     # defences and gets surfaced to the user instead of read — which would turn a tag
     # into one more thing a human has to deal with.
-    lines = [USER_WORDS, "", "This ask is of a kind whose wrong answers are on record in this project."]
+    lines = [USER_WORDS, "", CHOOSER_RULE, "",
+             "This ask is of a kind whose wrong answers are on record in this project."]
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
                      f"In practice: {SENSE_HOW[h['sense']]}.")

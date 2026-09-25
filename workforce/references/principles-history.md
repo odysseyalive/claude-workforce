@@ -37,3 +37,4 @@ holds the text.
 - `b0219d35542231bf68d7b08e83ed9cfdf18a310604ab4ff8a130031ddf543c70` — item 14 as of `d5fbc0a` (2026-09-13): **One heading per thing asked.** When a message asks for mor
 - `622824a723ab80e5681e1515fc05ffaca38e99422e11c8cde35531b443b22fdf` — item 14 as of `ef16aca` (2026-09-13): **One heading per thing asked.** When a message asks for mor
 - `223db4c34b9b48b6669ba4a126db590e32889b933bbc556ee62018bedf3b1c5b` — item 12 as of `2594bbc` (2026-09-16): **Finish rather than hedge.** When the work is doable, do it
+- `912da4273b6a05d60eb4ea9000542dbc42b83c69e9f13b87fa0bae5634f692cb` — item 12 as of the working tree (2026-09-24, the chooser release): **Finish rather than hedge.** When the work is doable, do it

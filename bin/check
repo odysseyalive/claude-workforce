@@ -1904,6 +1904,75 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# THE RUN STOPS ON THE USER ONLY IN A CHOOSER (wf-chooser, 2026-09-24)
+#
+# REPORTED BY THE USER. An `/agenda today` run posted 31 proposed items as plain
+# markdown and asked for an answer in codes — "1-4 accept, 5-6 sbdc, 7-31 S". Six
+# background employees finished one after another, every hand-back scrolled the list off
+# the screen and ended "still waiting on your decisions", and the run sat about fifteen
+# minutes. Most of the 31 items were bulk decisions on dateless TODOs that needed nobody.
+# The spec, verbatim: "If there is an answer that it is needed, it needs to be evident in
+# a chooser situation" — "much like we choose the budget for audit" — "and this
+# functionality needs baked into the workforce process itself without org."
+#
+# THE FIXTURES PROVE THE DECISION; THIS PROVES THE THINGS A FIXTURE CANNOT SEE. Nine
+# `chooser-*` cases in `fixtures/scripts/` replay the payloads. What they cannot see is
+# whether the rule reaches a turn BEFORE it stops, whether the measurement that licenses
+# the trigger is recorded where the next reader finds it, and whether the `Stop`-only
+# registration survives someone tidying it into a pair like `wf-widen`'s.
+import tempfile as _ch_tf
+_ch_src = read("workforce/bin/wf-chooser")
+_ch_sa = read("workforce/bin/wf-settings-apply")
+_ch_tmpl = read("workforce/references/templates.md")
+_ch_problems = []
+if '"wf-chooser": ("Stop", None),' not in _ch_sa:
+    _ch_problems.append("wf-chooser is not wired on Stop in SHIPPED_HOOKS")
+# NEVER ON SubagentStop, and this is the half most likely to be "fixed" by symmetry with
+# the two hooks above it in that table. `AskUserQuestion` is not in a spawned employee's
+# tool set, so a block there demands a call the agent cannot make — forever.
+if "wf-chooser@subagent" in _ch_sa:
+    _ch_problems.append("wf-chooser is registered on SubagentStop — a subagent has no "
+                        "user to ask and cannot call AskUserQuestion, so that block "
+                        "can never be satisfied")
+# THE MEASUREMENT, RECORDED WITH ITS CORPUS. A speech guard was retired here at 7.0%
+# (changes/1.30.1.md) and wf-widen's triggers were held to 1.5%; a trigger whose rate is
+# asserted rather than measured is the shape that earned that retirement.
+for _lit in ("3,634 completed turns", "1.29%", "4.87%"):
+    if _lit not in _ch_src:
+        _ch_problems.append(f"wf-chooser's header no longer records {_lit} — the "
+                            "measured rate, its corpus, and the class that came in over "
+                            "budget and was NOT shipped")
+# THE RULE ARRIVES BEFORE THE TURN STOPS, and it is RUN rather than read: the constant
+# existing in the source proves nothing about whether it reaches a prompt.
+with _ch_tf.TemporaryDirectory(prefix="wf-check-chooser-") as _ch_dir:
+    # Its own scratchpad, because the hook WRITES this turn's tag there. A check that
+    # leaves an artifact in the shared temp directory is a check that pollutes the
+    # machine it runs on, and this one runs on every gate.
+    _ch_ctx = subprocess.run(
+        [sys.executable, "workforce/bin/wf-task-tag"],
+        input=json.dumps({"hook_event_name": "UserPromptSubmit", "prompt": "walk the agenda",
+                          "session_id": "check-chooser", "scratchpad_dir": _ch_dir}),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+if "AskUserQuestion chooser in that same turn" not in _ch_ctx.stdout:
+    _ch_problems.append("wf-task-tag no longer injects the chooser rule into the "
+                        "per-message context — the half that arrives in time to change "
+                        "what the turn does instead of grading it afterwards")
+# AND IN THE CONSTITUTION EVERY EMPLOYEE PRELOADS. "without org" means the hook reaches
+# every project on the next update; this is the copy an employee reads.
+if "never as an instruction to reply in codes or option letters" not in _ch_tmpl:
+    _ch_problems.append("operating-principles item 12 no longer carries the chooser "
+                        "clause — the hook blocks the stall and this is what tells an "
+                        "employee what to do instead")
+check(
+    "chooser: the parked-on-the-user guard is wired, measured, and stated where it is read",
+    not _ch_problems,
+    "; ".join(_ch_problems) + ". The user asked for this 'baked into the workforce "
+    "process itself without org', which is three surfaces at once: the Stop hook that "
+    "blocks the stall, the per-message context that prevents it, and the constitution "
+    "item that says what to do instead",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # A DETECTOR SHIPS WITH ITS FIX — ENFORCED OVER HOOK ARTIFACTS (2026-09-09)
 #
 # THE DIRECTIVE HAS BEEN IN `SKILL.md` SINCE 2026-08-05 AND NOTHING ENFORCED IT HERE:

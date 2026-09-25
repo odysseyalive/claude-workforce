@@ -595,6 +595,107 @@
       "1 resolved"
     ]
   },
+  "chooser-asked-with-a-chooser-is-silent": {
+    "_why": "THE FIX ITSELF MUST NOT BE BLOCKED. Byte for byte the park of chooser-handback-waiting-blocks -- \"still waiting on your decisions\" -- with one difference: the turn called AskUserQuestion. The question was put the way the user asked for it (\"if there is an answer that it is needed, it needs to be evident in a chooser situation\"), so there is nothing left to object to, and prose describing the chooser beside the chooser is not the defect. Read from the transcript, never inferred from the reply, because the call leaves a record and the prose does not.",
+    "exit": 0,
+    "not": [
+      "\"decision\""
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The 25 dateless TODOs stay dateless, which is reversible, so I took that myself.\\n\\nI am still waiting on your decisions for the four dated ones, in the chooser above.\"}",
+    "want": [
+      "asked with a chooser"
+    ]
+  },
+  "chooser-background-task-and-parked-still-blocks": {
+    "_why": "THE EXEMPTION THAT IS DELIBERATELY NOT WRITTEN. wf-widen stops judging a turn while background_tasks is non-empty, and copying that here would have made this hook blind to the exact run it was built from: four turns of the 2026-09-24 agenda run say \"Invest, research and YNAB are still running. I'm still waiting on your decisions for items 1-31\", and it was the user's half that sat for fifteen minutes. A task that does not involve the user never excuses parking on them. This row is the absence of that exemption, asserted rather than described.",
+    "exit": 0,
+    "not": [
+      "a background task is still running"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The opportunity scout is done and found nothing actionable.\\n\\nInvest, research and YNAB are still running. I am still waiting on your decisions for items 1-31.\", \"background_tasks\": [{\"id\": \"invest\"}, {\"id\": \"research\"}]}",
+    "want": [
+      "\"decision\": \"block\"",
+      " waiting ",
+      "ASK WITH A CHOOSER"
+    ]
+  },
+  "chooser-between-batches-is-silent": {
+    "_why": "SILENT ON A BETWEEN-BATCHES TURN, AND STRUCTURALLY RATHER THAN BY A GUARD. The reply is byte for byte widen-between-batches-is-silent's: a batch landed, the turn is holding for the next one. Nobody has been asked anything, so nothing here fires -- the nouns in WAITING are the USER'S (your decision, your answer, your call) and \"waiting on the next batch\" carries none of them. A guard would be a second thing to keep in step; this is the detector being narrow in the first place.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}"
+  },
+  "chooser-finished-report-is-silent": {
+    "_why": "THE ORDINARY TURN, which is ~98.7% of them and must never pay for this hook. A finished report with a numbered result, a decision the turn made and reversed itself, and nothing outstanding. Measured: the kept classes fire on 47 of 3,634 real turns (1.29%), inside the 1.5% budget wf-widen's triggers are held to and well inside the 7.0% that retired wf-speak-guard. A guard that fires on a correct turn is the guard that teaches its reader to ignore it.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both gates are green: `bin/check` 1404 passed, 0 failed, and `bin/prove` returned PROVEN on all 3 selected cases.\\n\\nThe two dateless items I left dateless, since that reverses in one edit. Nothing is outstanding.\"}"
+  },
+  "chooser-handback-waiting-blocks": {
+    "_why": "THE THIRD DEFECT OF THE 2026-09-24 REPORT: a background hand-back turn that narrates over a question already pending. Six employees finished one after another, and every hand-back scrolled the 31-item list away and ended \"still waiting on your decisions\". The turn is not excused by the notification that opened it -- it is the turn that buried the question, so it is the turn that re-presents it as a chooser.",
+    "exit": 0,
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"That notice is the YNAB pulse finishing. The finance feed is saved and ready.\\n\\nInvest and research are still running. I am still waiting on your decisions for items 1-31.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      " waiting ",
+      "waiting on your decisions",
+      "AskUserQuestion"
+    ]
+  },
+  "chooser-promise-to-ask-later-is-silent": {
+    "_why": "THE NARROWING THAT COST THE MOST FALSE FIRES. Unnarrowed, the waiting class fired on 50 real turns and six of the fourteen read were a PROMISE TO ASK LATER -- \"when Order A lands I'll bring you one message with everything that needs your decision.\" That turn is working, not parked, and blocking it would demand a question it has not formed yet. A sentence carrying a first-person future marker is exempt, the same distinction wf-widen's CONDITIONAL exemption draws for the promise trigger.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Orders B and C are still running.\\n\\nWhen Order A's `OUTPUT.md` lands I'll bring you one message with everything that needs your decision at once, in a chooser. Nothing irreversible happens before then.\"}"
+  },
+  "chooser-reply-codes-blocks": {
+    "_why": "THE REPORTED DEFECT, verbatim. An /agenda today run posted 31 proposals as plain markdown and asked for an answer in codes -- \"1-4 accept, 5-6 sbdc, 7-31 S\" -- then sat for about fifteen minutes. The user's spec: \"If there is an answer that it is needed, it needs to be evident in a chooser situation\", \"much like we choose the budget for audit\". The block quotes the turn its own words back, because a reason that says \"try harder\" hands the tunnel back to itself.",
+    "exit": 0,
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"31 proposals are on the list above: 4 date changes, 2 index adds, and 25 dateless TODOs.\\n\\nReply with decisions, e.g. `1-4 accept, 5-6 sbdc, 7-31 S`, or `all accept` to take the set as proposed.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      " codes ",
+      "Reply with decisions",
+      "AskUserQuestion",
+      "4 options per question"
+    ]
+  },
+  "chooser-stop-hook-active-is-silent": {
+    "_why": "A HOOK THAT CAN BLOCK FOREVER IS A WEDGED SESSION, and a wedged session is worse than the defect it watches. Byte for byte the park of chooser-handback-waiting-blocks, with stop_hook_active set: this Stop is the continuation of a turn already blocked once, so the guard returns before it reads anything at all. Checked FIRST and unconditionally, which is why the trigger text is left in -- an absence proved by a reply nothing would have fired on proves nothing.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"That notice is the YNAB pulse finishing. The finance feed is saved and ready.\\n\\nInvest and research are still running. I am still waiting on your decisions for items 1-31.\", \"stop_hook_active\": true}"
+  },
+  "chooser-subagent-is-silent": {
+    "_why": "A SPAWNED EMPLOYEE HAS NO USER TO ASK. AskUserQuestion is not in a subagent's tool set, so blocking its hand-back would demand a call it cannot make, forever. Again the park is left in the reply and only the event changes, so the row proves the guard rather than the absence of a trigger. The hand-back is read by the MAIN turn, and the main turn's own Stop is where a question buried in that report gets caught -- which is chooser-handback-waiting-blocks.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"That notice is the YNAB pulse finishing. The finance feed is saved and ready.\\n\\nInvest and research are still running. I am still waiting on your decisions for items 1-31.\"}"
+  },
   "claudemd-absent": {
     "_why": "An absent CLAUDE.md is the GOAL STATE (SKILL.md - Directives, 2026-08-05), not a gap to fill. This fixture asserted the opposite until then -- it required the script to CREATE the file containing the generated region, which under the evacuation directive would have one audit writing the file it then deletes, and re-creating it on every later run of an already-evacuated project. Inverted rather than removed: the superseded behaviour is exactly the drift a future edit would reintroduce, because its own comment read well.",
     "exit": 0,

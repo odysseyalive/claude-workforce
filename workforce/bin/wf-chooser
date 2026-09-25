@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+"""wf-chooser — a decision put to the user arrives as a chooser, or the turn does not stop.
+
+WHAT WENT WRONG, and it is the whole specification. An `/agenda today` run posted 31
+proposed items as plain markdown and asked for an answer in codes — "1-4 accept, 5-6
+sbdc, 7-31 S". Six background employees then finished one after another, and every
+hand-back produced another assistant turn that scrolled the list off the screen and
+ended "still waiting on your decisions". The run sat for about fifteen minutes until the
+user asked what was held up. Most of the 31 items were bulk decisions on dateless TODOs
+that needed nobody.
+
+THE USER'S WORDS ARE THE SPEC, 2026-09-24: "You shouldn't be waiting on my answer,
+especially if it isn't absolutely evident that you need my input on something. ... If
+there is an answer that it is needed, it needs to be evident in a chooser situation" —
+"much like we choose the budget for audit" — "and this functionality needs baked into
+the workforce process itself without org."
+
+So there are three defects and one mechanism. A turn parked on input it did not need; it
+parked in prose the user had to decode instead of in the harness's own chooser; and a
+later turn narrated over the pending question instead of re-presenting it. `Stop` is the
+only place all three are visible at once: the reply is written, the tool calls are
+recorded, and the harness — not the turn — decides what happens next. `decision:
+"block"` turns the reason into the next instruction.
+
+WHY NOT `/org`. The user asked for this "without org", so it rides the user-scope
+install: `wf-settings-apply --wire-defaults` registers it and `update` refreshes it, the
+same path `wf-task-tag` takes. An org-dispatch rule reaches only projects somebody
+re-audits.
+
+WHAT IT DOES NOT DO. It never judges whether the decision was worth asking — that is a
+reading, and a hook has no model. It judges one mechanical fact: the reply parks on the
+user, and this turn made no `AskUserQuestion` call. The remedy is in the reason.
+
+────────────────────────────────────────────────────────────────────────────────────
+PRECISION IS MEASURED, NEVER ASSERTED. A speech guard was retired from this
+distribution at a 7.0% false-fire rate for teaching its reader to ignore it
+(`changes/1.30.1.md`), and `wf-widen`'s two evidence triggers were held to 0.5% and 1.5%
+before either shipped. Same bar here, same method: every turn under
+`~/.claude/projects/` was walked, the reply that ENDED each turn was taken (the text
+after that row's last tool call), turns that already called `AskUserQuestion` were
+dropped, and each candidate class was counted against the total.
+
+  CORPUS   1,539 transcripts across 38 project directories under `~/.claude/projects`,
+           3,634 completed turns, this operator's real traffic, measured 2026-09-24.
+
+  KEPT     codes     0.19%   (7 turns)    the reply asks for an answer in codes
+           waiting   0.94%   (34 turns)   parked on the user's answer NOW
+           options   0.19%   (7 turns)    a list the reply asks the user to choose from
+           union     1.29%   (47 turns)   inside the 1.5% budget wf-widen is held to
+
+  ALL 47 FIRES WERE READ BY HAND. 46 are a reply that puts a decision to the user in
+  prose with no chooser — including four turns of the agenda run this was built from,
+  each ending "I'm still waiting on your decisions for items 1-31". ONE is wrong: a
+  sentence describing a design change ("TODOs without a date will stay without one by
+  default instead of each needing your decision") is a report, not a park. That is a
+  measured false-fire rate of 1 turn in 3,634 — 0.03%.
+
+  DROPPED  offer     4.87%   (177 turns)  "want me to …?", "should I …?", "let me know"
+           at the end of a reply. Over budget by more than three times, and the
+           measurement says why it has to be: the same shape is `wf-widen`'s HANDOFF
+           exemption, the one stop this distribution has already decided is CORRECT —
+           the user's own rule is not to stop mid-work "unless you actually really do
+           need input, your soliciting input from me." An offer IS that solicitation.
+           Firing on it would block the honest hand-off along with the stall, which is
+           precisely how the 7.0% guard earned its retirement. Not shipped.
+
+  Four narrowings the measurement forced, each kept because dropping it cost precision
+  rather than because it read better:
+    · An instruction-only `codes` class ("reply with codes/letters/numbers") fired 3
+      times and was wrong all 3 — "I'll have a real answer, with verify's own exit
+      code" matches "answer … with … code". The verb has to land near an actual
+      LEGEND (`1-4 accept`, `S = skip`) before it means anything. A legend ALONE is
+      also noise: at 2.20% it caught this project's own canary reports, whose
+      conclusion is the line `C=no-agent`.
+    · `waiting` unnarrowed fired on 50 turns, and six of the fourteen read were a
+      PROMISE TO ASK LATER — "when Order A lands I'll bring you one message with
+      everything that needs your decision." That turn is working, not parked. A
+      sentence carrying a first-person future marker is exempt, which is the same
+      distinction `wf-widen`'s CONDITIONAL exemption draws for the promise trigger.
+    · A quoted phrase is a label being reported, not a question being put: two fires
+      were a turn saying it had left rows marked "needs your call".
+    · `say which` had to be addressed to the reader. "The graphics review will … say
+      which slide types need a clean diagram" is a sentence about a review.
+────────────────────────────────────────────────────────────────────────────────────
+
+EXIT CODES: 0 always, and `stop_hook_active` returns immediately. A hook that can block
+forever is a wedged session, and a wedged session is worse than the defect it watches.
+"""
+
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _sibling(name):
+    """Share a sibling hook's transcript reader rather than write a second one.
+
+    `wf-turn-ledger` owns where this stop's reply lives and how it is confirmed against
+    the transcript, and a second copy is a second thing to keep in step — the copy that
+    drifts is the one that fires wrong. NEVER WRITE BYTECODE: importing by path makes
+    CPython drop a `__pycache__/` inside the SHIPPED directory, which `bin/check` reports
+    as an undeclared file on the first run.
+    """
+    sys.dont_write_bytecode = True
+    modname = name.replace("-", "_")
+    loader = importlib.machinery.SourceFileLoader(modname, os.path.join(HERE, name))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(modname, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+TL = _sibling("wf-turn-ledger")
+
+# THE TAIL ONLY, AND LONGER THAN `wf-widen`'S. A question asked in the middle of a long
+# reply and answered by the reply itself is not this defect; the last words are where
+# the parking happens. 600 rather than 400 because the shape this exists for is a long
+# proposal list whose "reply with …" line sits under it — at 400 the agenda case's own
+# instruction fell outside the window on one of the four transcripts that carry it.
+TAIL = 600
+
+# ── CLASS 1: THE REPLY ASKS FOR AN ANSWER IN CODES ───────────────────────────────
+# A LEGEND is a token standing for a meaning: `1-4 accept`, `7-31 S`, `S = skip`. On its
+# own it is ordinary prose (`C=no-agent` appears in this project's own canary reports),
+# so it counts only next to a reply verb, or repeated — a pair of mappings in one clause
+# is a key, and a key exists to be answered in.
+_LEGEND = (r"\b\d{1,2}\s*[-–]\s*\d{1,2}\s+[A-Za-z]{1,12}\b"
+           r"|(?<![\w-])[A-Za-z]{1,4}\s*=\s*[A-Za-z]")
+CODES = re.compile(
+    r"\b(?:reply|respond|answer|send back)\b[^\n]{0,120}?(?:" + _LEGEND + r")"
+    r"|(?:" + _LEGEND + r")[^\n]{0,30}?,[^\n]{0,30}?(?:" + _LEGEND + r")", re.I)
+
+# ── CLASS 2: THE TURN SAYS IT IS PARKED ON THE USER ──────────────────────────────
+# The nouns are the user's own: a decision, an answer, a call. "Waiting on the gate" or
+# "blocked on four background agents" is a different fact and is not here — that turn is
+# waiting on a machine, and `wf-widen` already handles it.
+WAITING = re.compile(
+    r"\b(?:waiting|wait|held|holding|blocked|stalled|paused|parked|pending)\b[^.\n]{0,30}"
+    r"\b(?:on|for)\b\s+(?:your|you)\b[^.\n]{0,30}"
+    r"\b(?:decisions?|answers?|replies|reply|responses?|response|input|call|go-?ahead"
+    r"|confirmation|sign-?offs?|choices?|choice|direction|verdict|approval)\b"
+    r"|\b(?:need|needs|needing|await|awaiting)\b[^.\n]{0,20}\byour\b[^.\n]{0,20}"
+    r"\b(?:decisions?|answers?|reply|response|input|call|go-?ahead|confirmation"
+    r"|sign-?offs?|choices?|choice|direction|verdict|approval)\b"
+    r"|\bover to you\b|\bball is in your court\b", re.I)
+# A FIRST-PERSON FUTURE MARKER IN THE SAME SENTENCE MEANS THE ASK IS STILL TO COME.
+# "When the order lands I'll bring you everything that needs your decision" describes a
+# turn that is working; blocking it would push a question the turn has not formed yet.
+LATER = re.compile(r"\bi\s?['’]?ll\b|\bi will\b|\bi'?\s?m going to\b"
+                   r"|\bi am going to\b|\bi'?\s?ll be\b", re.I)
+_SENTENCE = re.compile(r"(?<=[.!?:])\s+|\n+")
+
+# ── CLASS 3: A LIST THE REPLY ASKS THE USER TO CHOOSE FROM ───────────────────────
+# Both halves are required. A numbered list alone is how every report in this project is
+# written; a choosing phrase alone is usually an offer, which is the class measured over
+# budget and deliberately not shipped.
+OPTION_LIST = re.compile(r"^\s{0,3}(?:\(?\d{1,2}[.)]|[-*]\s*\**[A-D][.):]|[A-D][.)])\s+\S", re.M)
+# `pick` is bare nowhere here: "may pick up the 5.5 GB" and "pick them back up" were two
+# of the four false fires in the unnarrowed class, both of them phrasal verbs.
+CHOOSE = re.compile(
+    r"\bwhich (?:one|option|of (?:these|those)|do you|would you)\b"
+    r"|\bwhich\b[^.\n]{0,40}\bdo you want\b"
+    r"|\b(?:pick|choose|select) (?:one|which|any|either|from|the one)\b"
+    r"|\b(?:tell|let) me know which\b|\byour pick\b"
+    # ADDRESSED TO THE READER, NOT NARRATED. "Say which, and I'll do it" is a chooser in
+    # prose; "the review will judge every image and say which slide types need a
+    # diagram" is a sentence about a review, and it was one of the measured false fires.
+    r"|(?:^|[.\n:]\s*)(?:just |please |then )?say which\b"
+    r"|\b(?:say|reply|respond)(?: back)? (?:the|a|with the|with a) number\b"
+    r"|\boption \d\b", re.I)
+
+CLASS_WHY = {
+    "codes": "the reply asks for an answer in codes, which is a chooser rendered as "
+             "homework: the user has to hold a key in their head, scroll back for the "
+             "list, and type it out",
+    "waiting": "the reply says it is parked on the user's answer, and nothing on screen "
+               "is a question the harness will keep in front of them",
+    "options": "the reply lists options and asks the user to choose from them in prose, "
+               "which is exactly what AskUserQuestion renders",
+}
+
+
+def parked(reply):
+    """The classes this reply trips, with the words that tripped each. [] when none."""
+    tail = (reply or "")[-TAIL:]
+    hits = []
+    m = CODES.search(tail)
+    if m:
+        hits.append(("codes", m.group(0).strip()))
+    # A QUOTED PHRASE IS A LABEL, NOT A PARK, and the mask is `wf-turn-ledger`'s own —
+    # the same one the universal-claim trigger uses, for the same reason. MEASURED: two
+    # of the 36 `waiting` fires were a turn REPORTING that it had left rows marked
+    # “needs your call”, which is a finished piece of work being named, not a
+    # question being put. Masking is applied here only: the `codes` class reads legends
+    # that are written in backticks on purpose.
+    for seg in _SENTENCE.split(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), tail)):
+        if LATER.search(seg):
+            continue
+        m = WAITING.search(seg)
+        if m:
+            hits.append(("waiting", m.group(0).strip()))
+            break
+    m = CHOOSE.search(tail)
+    if m and OPTION_LIST.search(tail):
+        hits.append(("options", m.group(0).strip()))
+    return hits
+
+
+def asked_with_a_chooser(payload):
+    """True when this turn called `AskUserQuestion`.
+
+    The question was put the way the user asked for it, so there is nothing to block —
+    whatever the prose around it says. Walked from the transcript rather than inferred
+    from the reply, because the call leaves a record and the prose does not.
+    """
+    lines = TL._read_lines(TL.reply_transcript(payload))
+    if not lines:
+        return False
+    for line in lines[TL.current_turn(lines):]:
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(d, dict) or d.get("type") != "assistant":
+            continue
+        for b in (d.get("message") or {}).get("content") or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use" \
+                    and b.get("name") == "AskUserQuestion":
+                return True
+    return False
+
+
+def reason(hits):
+    """The block payload. The reason IS the fix, never "try harder".
+
+    Three instructions in the order they have to happen: decide what needs no one,
+    finish that work, and put whatever genuinely remains into the harness's own chooser.
+    The caps are platform facts, not style — `AskUserQuestion` takes at most four options
+    per question and four questions per call, and several calls in one message are
+    presented NEWEST FIRST, so the user answers them backwards (`platform.md` fact 26).
+    """
+    lines = ["This turn stopped on a decision put to the user in plain text, and called "
+             "`AskUserQuestion` nowhere in it.", ""]
+    for cls, quote in hits:
+        lines.append(f"  · {cls} — {CLASS_WHY[cls]}. It reads: “{quote}”")
+    lines += [
+        "",
+        "Do these in order, in THIS turn:",
+        "",
+        "1. DECIDE EVERYTHING THAT DOES NOT NEED THE USER. Anything you could decide and "
+        "reverse is yours to decide; say in one line what you decided and move on. The "
+        "run this guard was built from put 31 items to the user, and most of them were "
+        "bulk decisions on dateless items that needed nobody.",
+        "2. FINISH THE WORK THAT DECISION UNBLOCKS, rather than reporting that it is "
+        "pending. A partial result delivered beats a complete result withheld waiting "
+        "for an answer.",
+        "3. IF A GENUINE DECISION REMAINS — one that changes what gets built and that "
+        "you cannot make — ASK IT NOW WITH `AskUserQuestion`, in this same turn. At "
+        "most 4 options per question and 4 questions per call, and ONE call in the "
+        "message: several calls in one message are shown newest-first, so the user "
+        "answers them backwards. Never an option whose effect is to stop, and never "
+        "permission for work already asked for.",
+        "",
+        "A question in prose scrolls away the moment anything else finishes. A chooser "
+        "does not, which is the whole reason the user asked for one: “if there is an "
+        "answer that it is needed, it needs to be evident in a chooser situation.”",
+    ]
+    return "\n".join(lines)
+
+
+def chooser(payload):
+    """The decision for this Stop, or None to say nothing at all."""
+    # THE LOOP STOP, FIRST AND UNCONDITIONAL. This is a continuation of a turn already
+    # blocked once; blocking it again is a session that can never end.
+    if payload.get("stop_hook_active"):
+        return None
+
+    # A SUBAGENT HAS NO USER TO ASK. `AskUserQuestion` is not in a spawned employee's
+    # tool set, so blocking its hand-back would demand a call it cannot make, forever.
+    # Its hand-back is read by the MAIN turn, and the main turn's own Stop is where a
+    # question buried in that report gets caught.
+    if payload.get("hook_event_name") == "SubagentStop":
+        return None
+
+    reply = TL.confirmed_reply(payload)[0]
+    # A REPLY THE TRANSCRIPT DOES NOT HOLD IS A SIDE QUERY, NOT THE END OF A TURN
+    # (`wf-turn-ledger`, `confirmed_reply`). Nothing is judged: the turn is still going.
+    if reply is None:
+        return None
+
+    hits = parked(reply)
+    if not hits:
+        return None
+
+    # THE QUESTION WAS ASKED PROPERLY. Prose describing the chooser beside the chooser
+    # is not the defect; the defect is the chooser's absence.
+    if asked_with_a_chooser(payload):
+        return {"systemMessage": "CHOOSER  a decision is pending and was asked with a chooser"}
+
+    # THERE IS NO `background_tasks` EXEMPTION HERE, AND THAT IS DELIBERATE RATHER THAN
+    # AN OMISSION. `wf-widen` exempts a turn with a task running because it judges
+    # EVIDENCE, and a turn that is waiting has run nothing — judging it would block it
+    # into doing work it was already waiting on. This hook judges no evidence. It judges
+    # one fact about the reply, and the run it was built from is the counter-example the
+    # exemption would have to survive: four of its turns say, in the measured corpus,
+    # "Invest, research and YNAB are still running. I'm still waiting on your decisions
+    # for items 1-31." Those turns were waiting on background rails AND on the user at
+    # the same time, and it was the user's half that sat for fifteen minutes. A task that
+    # does not involve the user never excuses parking on them, so the exemption is not
+    # written; `chooser-background-task-and-parked-still-blocks` pins its absence.
+    #
+    # A BETWEEN-BATCHES TURN IS STILL SILENT, and structurally rather than by a guard:
+    # the nouns in WAITING are the USER'S — your decision, your answer, your call — so
+    # "I am waiting on the next batch before anything else moves" matches nothing here.
+    # `chooser-between-batches-is-silent` pins that, against `wf-widen`'s own fixture text.
+    return {
+        "decision": "block",
+        "reason": reason(hits),
+        "systemMessage": ("CHOOSER  parked on the user in prose ("
+                          + ", ".join(c for c, _ in hits)
+                          + ") — decide what you can, then ASK WITH A CHOOSER"),
+    }
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    decided = chooser(payload)
+    if decided:
+        print(json.dumps(decided))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
