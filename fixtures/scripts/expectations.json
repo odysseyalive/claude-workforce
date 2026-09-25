@@ -631,6 +631,16 @@
     "script": "wf-chooser",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}"
   },
+  "chooser-describes-removed-decision-is-silent": {
+    "_why": "THE KNOWN FALSE FIRE THAT SHIPPED, AND THEN FIRED. 1.67.0 recorded in wf-chooser's own header that one of its 47 measured fires was wrong -- a sentence describing a design change rather than putting one -- and shipped anyway. It tripped on that exact shape the first live run it had, on the operator's closing report: \"**TODOs without a date:** they now stay undated instead of each one needing your decision.\" The words are the same words a real park uses, so only what governs them tells the two apart; a marker of removal or absence immediately in front of the trigger (instead of, no longer, without, nothing, neither) exempts it. A guard whose first live fire is wrong teaches its reader to ignore it on day one, which is exactly how the 7.0% speech guard earned its retirement in changes/1.30.1.md.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"That is odyssey-alive reporting back, and it did its part:\\n- **Old memory:** it rewrote the one that pushed plain-text questions.\\n- **Triage step:** platform-lead is changing it to use a chooser.\\n- **TODOs without a date:** they now stay undated instead of each one needing your decision.\\n\\nI have sent that session the version number and the test list. Nothing is outstanding.\"}"
+  },
   "chooser-finished-report-is-silent": {
     "_why": "THE ORDINARY TURN, which is ~98.7% of them and must never pay for this hook. A finished report with a numbered result, a decision the turn made and reversed itself, and nothing outstanding. Measured: the kept classes fire on 47 of 3,634 real turns (1.29%), inside the 1.5% budget wf-widen's triggers are held to and well inside the 7.0% that retired wf-speak-guard. A guard that fires on a correct turn is the guard that teaches its reader to ignore it.",
     "exit": 0,
@@ -652,6 +662,16 @@
       "waiting on your decisions",
       "AskUserQuestion"
     ]
+  },
+  "chooser-neither-needs-your-input-is-silent": {
+    "_why": "THE SECOND SHAPE OF THE SAME DEFECT, found by re-reading the corpus after the first one fired live. \"engineering-coder raised two points as decisions for you. Neither needs your input\" is a turn REPORTING that it settled both -- the opposite of a park -- and the un-narrowed trigger read the nouns and blocked it. This row exists beside chooser-describes-removed-decision-is-silent because the two markers are different (a negative subject, not a substitution), and a narrowing pinned by one example is a narrowing that survives being rewritten to cover only that example.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The failing test is fixed and `bin/check` is back to 0 failed.\\n\\nengineering-coder raised two points as decisions for you. Neither needs your input:\\n- **The personal-install check** fails during any test that edits a shipped file, which the tool expects.\\n- **No test deletes that mention on its own**, because another rule still guards the line.\"}"
   },
   "chooser-promise-to-ask-later-is-silent": {
     "_why": "THE NARROWING THAT COST THE MOST FALSE FIRES. Unnarrowed, the waiting class fired on 50 real turns and six of the fourteen read were a PROMISE TO ASK LATER -- \"when Order A lands I'll bring you one message with everything that needs your decision.\" That turn is working, not parked, and blocking it would demand a question it has not formed yet. A sentence carrying a first-person future marker is exempt, the same distinction wf-widen's CONDITIONAL exemption draws for the promise trigger.",
@@ -695,6 +715,18 @@
     ],
     "script": "wf-chooser",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"That notice is the YNAB pulse finishing. The finance feed is saved and ready.\\n\\nInvest and research are still running. I am still waiting on your decisions for items 1-31.\"}"
+  },
+  "chooser-three-items-need-your-decision-blocks": {
+    "_why": "THE NARROWING MUST NOT COST THE PLAINEST PARK THERE IS. Every other blocking row here carries the word \"waiting\"; this one is the bare second branch of WAITING -- \"Three items need your decision:\" -- which is the sentence a turn writes when it hands the user a list and stops. NOT_A_PARK exempts a trigger governed by a marker of removal, and the way that narrowing fails is by growing until it swallows the sentence in front of it too. This row is the floor it cannot sink below.",
+    "exit": 0,
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The sweep is done and the eight reversible calls are made and recorded.\\n\\nThree items need your decision: the expander label, the render order, and whether 1.58.0 lands tonight.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      " waiting ",
+      "need your decision",
+      "AskUserQuestion"
+    ]
   },
   "claudemd-absent": {
     "_why": "An absent CLAUDE.md is the GOAL STATE (SKILL.md - Directives, 2026-08-05), not a gap to fill. This fixture asserted the opposite until then -- it required the script to CREATE the file containing the generated region, which under the evacuation directive would have one audit writing the file it then deletes, and re-creating it on every later run of an already-evacuated project. Inverted rather than removed: the superseded behaviour is exactly the drift a future edit would reintroduce, because its own comment read well.",

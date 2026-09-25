@@ -40,23 +40,30 @@ before either shipped. Same bar here, same method: every turn under
 after that row's last tool call), turns that already called `AskUserQuestion` were
 dropped, and each candidate class was counted against the total.
 
-  CORPUS   1,539 transcripts across 38 project directories under `~/.claude/projects`,
-           3,634 completed turns, this operator's real traffic, measured 2026-09-24.
+  CORPUS   1,537 transcripts under `~/.claude/projects` — every directory there that
+           holds one, 20 of the 37 — 3,553 completed turns, this operator's real
+           traffic. Re-measured 2026-09-24 after the NOT_A_PARK narrowing below.
 
-  KEPT     codes     0.19%   (7 turns)    the reply asks for an answer in codes
-           waiting   0.94%   (34 turns)   parked on the user's answer NOW
-           options   0.19%   (7 turns)    a list the reply asks the user to choose from
-           union     1.29%   (47 turns)   inside the 1.5% budget wf-widen is held to
+  KEPT     codes     0.20%   (7 turns)    the reply asks for an answer in codes
+           waiting   0.90%   (32 turns)   parked on the user's answer NOW
+           options   0.20%   (7 turns)    a list the reply asks the user to choose from
+           union     1.27%   (45 turns)   inside the 1.5% budget wf-widen is held to
 
-  ALL 47 FIRES WERE READ BY HAND. 46 are a reply that puts a decision to the user in
-  prose with no chooser — including four turns of the agenda run this was built from,
-  each ending "I'm still waiting on your decisions for items 1-31". ONE is wrong: a
-  sentence describing a design change ("TODOs without a date will stay without one by
-  default instead of each needing your decision") is a report, not a park. That is a
-  measured false-fire rate of 1 turn in 3,634 — 0.03%.
+  ALL 45 FIRES WERE READ BY HAND, and all 45 are a reply that puts a decision to the
+  user in prose with no chooser — including four turns of the agenda run this was built
+  from, each ending "I'm still waiting on your decisions for items 1-31". NONE IS WRONG.
 
-  DROPPED  offer     4.87%   (177 turns)  "want me to …?", "should I …?", "let me know"
-           at the end of a reply. Over budget by more than three times, and the
+  IT SHIPPED WRONG ONCE, AND THAT IS WHY THE NARROWING EXISTS. The first cut of this
+  measurement read 47 fires and recorded that ONE of them was wrong — a sentence
+  describing a design change rather than putting one — then shipped anyway in 1.67.0. It
+  fired on that exact shape the first time it ran for real, on the operator's own closing
+  report. `NOT_A_PARK` is the fix; the re-read found a second shape of it ("Neither needs
+  your input"), so three of the 47 are now silent and pinned by
+  `chooser-describes-removed-decision-is-silent` and
+  `chooser-neither-needs-your-input-is-silent`.
+
+  DROPPED  offer     6.45%   (229 turns)  "want me to …?", "should I …?", "let me know"
+           at the end of a reply. Over budget by more than four times, and the
            measurement says why it has to be: the same shape is `wf-widen`'s HANDOFF
            exemption, the one stop this distribution has already decided is CORRECT —
            the user's own rule is not to stop mid-work "unless you actually really do
@@ -64,7 +71,7 @@ dropped, and each candidate class was counted against the total.
            Firing on it would block the honest hand-off along with the stall, which is
            precisely how the 7.0% guard earned its retirement. Not shipped.
 
-  Four narrowings the measurement forced, each kept because dropping it cost precision
+  Five narrowings the measurement forced, each kept because dropping it cost precision
   rather than because it read better:
     · An instruction-only `codes` class ("reply with codes/letters/numbers") fired 3
       times and was wrong all 3 — "I'll have a real answer, with verify's own exit
@@ -81,6 +88,11 @@ dropped, and each candidate class was counted against the total.
       were a turn saying it had left rows marked "needs your call".
     · `say which` had to be addressed to the reader. "The graphics review will … say
       which slide types need a clean diagram" is a sentence about a review.
+    · A NEED DESCRIBED AWAY IS NOT A NEED PUT, and this is the one narrowing that was
+      found by the guard firing wrong in production rather than in the corpus. Three
+      fires say the user's decision is no longer required — "instead of each one needing
+      your decision", "Neither needs your input" — and a marker of removal or absence
+      immediately in front of the trigger exempts it (`NOT_A_PARK`).
 ────────────────────────────────────────────────────────────────────────────────────
 
 EXIT CODES: 0 always, and `stop_hook_active` returns immediately. A hook that can block
@@ -152,6 +164,37 @@ WAITING = re.compile(
 # turn that is working; blocking it would push a question the turn has not formed yet.
 LATER = re.compile(r"\bi\s?['’]?ll\b|\bi will\b|\bi'?\s?m going to\b"
                    r"|\bi am going to\b|\bi'?\s?ll be\b", re.I)
+# THE NEED IS BEING DESCRIBED AWAY, NOT PUT. A sentence that says the user's decision is
+# NO LONGER required is a report about the product, and the nouns are the same ones a real
+# park uses — which is why the trigger alone cannot tell them apart.
+#
+# MEASURED, AND IT FIRED FOR REAL. This was shipped in 1.67.0 as a known wrong fire ("ONE
+# is wrong", below) and it tripped the first live run: the operator's closing report said
+# “**TODOs without a date:** they now stay undated instead of each one needing your
+# decision.” A KNOWN FALSE FIRE IS NOT ACCEPTABLE — the 7.0% guard retired in
+# `changes/1.30.1.md` earned its retirement by teaching its reader to ignore it, and a
+# guard whose first live fire is wrong teaches that lesson on day one. The re-read of the
+# corpus found a second shape of the same defect: “engineering-coder raised two points as
+# decisions for you. Neither needs your input:”.
+#
+# ONLY THE WORDS IMMEDIATELY GOVERNING THE TRIGGER, never the whole sentence. The same
+# report opens “**TODOs without a date:**”, and a sentence-wide test would be satisfied by
+# that stray `without` 54 characters earlier — silencing the right turn for the wrong
+# reason, and silencing a real park that happens to mention one. The window is the clause
+# the marker can actually reach.
+#
+# AND ONLY MARKERS THAT CAN GOVERN THE TRIGGER ITSELF. A copula negation was in the first
+# draft and taken out: "is not", "was not" cannot negate a NEED, so all they can do is
+# suppress a real park that happens to deny something else nearby — "the branch is not
+# merged and needs your go-ahead". Every marker here either removes the need (instead of,
+# no longer), denies it outright (does not, doesn't), or is the absent subject doing the
+# needing (nothing, neither, nobody).
+NOT_A_PARK = re.compile(
+    r"\b(?:instead of|rather than|no longer"
+    r"|without|nothing|neither|nobody|no one|none of"
+    r"|(?:do|does|did|will|would)\s+not"
+    r"|(?:do|does|did|wo|would)\s?n[’']?t)\b", re.I)
+NOT_A_PARK_BACK = 40
 _SENTENCE = re.compile(r"(?<=[.!?:])\s+|\n+")
 
 # ── CLASS 3: A LIST THE REPLY ASKS THE USER TO CHOOSE FROM ───────────────────────
@@ -200,7 +243,14 @@ def parked(reply):
     for seg in _SENTENCE.split(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), tail)):
         if LATER.search(seg):
             continue
-        m = WAITING.search(seg)
+        # EVERY MATCH IN THE SENTENCE, not the first one. A sentence can describe a
+        # decision away and put another one in the same breath — "they now stay undated
+        # instead of each one needing your decision, but three items still need your
+        # call" — and stopping at the first match would let the real park ride out on the
+        # description in front of it.
+        m = next((w for w in WAITING.finditer(seg)
+                  if not NOT_A_PARK.search(seg[max(0, w.start() - NOT_A_PARK_BACK):w.start()])),
+                 None)
         if m:
             hits.append(("waiting", m.group(0).strip()))
             break
