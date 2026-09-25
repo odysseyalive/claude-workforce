@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.71.1 | 2026-09-25 | audit, changes, scripts, installer | no | Release 1.71.1: a house-rules refresh no longer crashes on a tree that already has a region, and a retired copy is not re-seeded |
 | 1.71.0 | 2026-09-25 | audit, changes, scripts, installer | no | Release 1.71.0: the house rules get a producer, and catalog migration keeps what a live reader cites and nothing else |
 | 1.70.0 | 2026-09-25 | changes, scripts, installer | no | Release 1.70.0: an agent handing back with its own shell still open is sent back to close it |
 | 1.69.0 | 2026-09-25 | changes, scripts, installer | no | Release 1.69.0: the jury weighs incident replies, and Stop names what a session left open |
