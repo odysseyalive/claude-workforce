@@ -463,11 +463,11 @@ def project_anchors(root, kind):
     wrote is still the project's own, written there by an audit.
     """
     out, seen = [], set()
-    for name in CATALOGS[kind]["skills"]:
-        f = os.path.join(root, ".claude", "skills", name, ANCHOR)
+    for d in house_dirs(root, kind):
+        f = os.path.join(d, ANCHOR)
         if os.path.isfile(f) and os.path.realpath(f) not in seen:
             seen.add(os.path.realpath(f))
-            out.append(("project:%s/%s" % (name, ANCHOR), f))
+            out.append(("project:%s/%s" % (os.path.basename(d), ANCHOR), f))
     return out
 
 
@@ -1186,9 +1186,9 @@ def house_state(root, kind):
             if house_region(slurp(f)):
                 stray.append(f)
     source_region = region or (house_region(slurp(stray[0])) if stray else None)
-    body = house_text(rows, carried_rows(source_region, rows))
+    carried = carried_rows(source_region, rows)
     st = {"kind": kind, "dest": dest, "rows": rows, "cites": cites,
-          "carried": carried_rows(source_region, rows), "stray": stray, "body": body}
+          "carried": carried, "stray": stray, "body": house_text(rows, carried)}
     if os.path.islink(dest):
         st.update(verdict="unappendable", why="%s is a symlink; writing through it puts "
                   "the project's house rules somewhere this run never named"
@@ -1236,6 +1236,13 @@ def house_write(root, st):
             run = (fh.read().strip().splitlines() or [""])[0].strip()
     except OSError:
         pass
+    # THE RUN ID GOES INSIDE AN HTML COMMENT, so it is constrained to what a run id is
+    # rather than trusted to be one. A `.current-run` holding `x -->` would close the
+    # provenance comment early and put the rest of the line into the rendered document —
+    # the same output-encoding class as any other untrusted value written into markup,
+    # reached here through a file any process on the machine can write.
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", run or ""):
+        run = ""
     prov = ("<!-- origin: workforce | modifiable: true | source: references/evaluators.md "
             "§ House rules dominate | propagated: %s%s -->"
             % (time.strftime("%Y-%m-%d", time.gmtime()), " run %s" % run if run else ""))
@@ -1619,10 +1626,9 @@ def _citation_rx(rel):
                                for f in sorted(forms, key=len, reverse=True)))
 
 
-def _cite_lines(text, needle):
-    """Line numbers where `needle` — a string or a compiled pattern — appears."""
-    search = needle.search if hasattr(needle, "search") else (lambda l: needle in l)
-    return [n for n, line in enumerate(text.splitlines(), 1) if search(line)]
+def _cite_lines(text, rx):
+    """Line numbers where `rx` — a pattern from `_citation_rx` — matches."""
+    return [n for n, line in enumerate(text.splitlines(), 1) if rx.search(line)]
 
 
 def cited_project_files(root, kind, proj, rels, keep_rel):

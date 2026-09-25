@@ -5539,6 +5539,20 @@
       }
     }
   },
+  "catalog-house-rules-json": {
+    "_why": "The machine-readable half of the producer, exercised rather than assumed: `audit` and `verify` read these verdicts, and `report()`'s own docstring records what an unexercised JSON branch costs — a migration payload that could never run and made the JSON contract look wider than it was. Every kind appears with its verdict, and an unrefreshed one carries the same precondition string the text form prints, so a caller reading JSON is never told less than a caller reading the report. `body` is excluded: it is the region about to be written, not a verdict, and printing it would make the payload unreadable.",
+    "script": "wf-catalog",
+    "args": ["--house-rules", "--json"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "\"house_rules\": [",
+      "\"verdict\": \"no-evaluator\"",
+      "\"verdict\": \"refresh\"",
+      "no code evaluator directory at project scope"
+    ],
+    "not": ["\"body\":"]
+  },
   "catalog-house-rules-relocates-region": {
     "_why": "The region's home is CATALOG-ANCHOR.md and two real projects carry it in a corpus file instead, because that is where the 2026-08-20 propagation put it: code-evaluator's went into references/guards.md and was DELETED by the 2026-09-11 migration (recovered from retired/ by hand), and text-eval's sits in references/ai-patterns.md with the same fate pending. The producer moves it and clears the old copy, verified by readback. This tree also carries a `supersedes:` marker, so the register derives one row FROM STRUCTURE, and a hand-written row already in the region is carried rather than dropped — retention, not a machine-owned overwrite.",
     "script": "wf-catalog",
