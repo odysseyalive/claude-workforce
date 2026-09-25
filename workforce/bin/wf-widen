@@ -401,6 +401,331 @@ def unfinished(reply, payload):
     return m.group(0).strip(" .\n") if m else None
 
 
+# ── CLOSE-OUT: WHAT THIS SESSION STARTED AND NEVER CLOSED ────────────────────────
+# MECHANICAL, NOT A JUROR. Every fact below is a literal string the host wrote into the
+# transcript, so there is nothing here for a model to judge and nothing to spend a spawn
+# on. It sits beside the promise trigger for the same reason that one does: the turn is
+# over, and `Stop` is the first instant at which "the work is finished" and "something it
+# started is still running" are visible in the same frame.
+#
+# THE MEASURED CASE, from `~/.claude/projects/.../c11df6f8.../subagents/agent-a2cdce35…`:
+#   21:30:38  a foreground `npx -y playwright-mcp@latest …` timed out and was moved to the
+#             background as shell `buqyin1sk`
+#   21:37:18  the agent called `SubagentHandback` — its report was delivered, the shell was
+#             still open, and nothing was left that would ever read it
+#   06:31:58  NINE HOURS LATER the shell's `<status>failed</status>` notification arrived
+#             and woke the finished agent back up
+# The user saw the same thing from the other side: "we also have an issue with shell items
+# staying open after they have expired and agents staying open after their work is done …
+# the 1 shell gives the impression that the work isn't done here."
+#
+# WHAT IS NOT FLAGGED, and each exclusion is a measured wrong fire rather than caution:
+#   · a shell whose task-notification HAS arrived. That notification IS the harness
+#     reaping it — over the whole incident session, main and subagents, every background
+#     shell that ever got one was closed by it. "Its command already returned its result"
+#     is therefore what makes a shell safe, not what makes it a leak, and it is read here
+#     as a silencer. A build, a dev server or a monitor the turn is still holding for is
+#     silenced one step earlier still: `background_tasks` returns from `widen` before this
+#     runs at all.
+#   · a shell in the MAIN transcript. Nothing in a transcript says whether the session is
+#     still waiting on one, so this abstains rather than guessing.
+#   · a plain subagent. It ends when it hands back. Only a NAMED teammate outlives its own
+#     report, which is why the spawn must carry a `name` for the teammate half to fire.
+SPAWN_OK = "Spawned successfully"
+HANDBACK_MARK = "[Subagent hand-back]"
+# Both frames the host has used to deliver one, so a rename of either does not mute this.
+FROM_ID = re.compile(r'(?:from|teammate_id)="([^"]+)"')
+# ANCHORED AT POSITION ZERO, and that anchor is a measured fix rather than tidiness. The
+# host writes each of these as the WHOLE tool result, so the phrase can only be the first
+# thing in it. Unanchored, the first run of this check reported two shells that did not
+# exist: a turn had grepped these very transcripts and PRINTED an older session's
+# "Command running in background with ID: b447g3ff2" into its own output, and the pattern
+# read the quotation as a start. A session that reads transcripts is exactly the session
+# this check runs in.
+BG_START = re.compile(
+    r"^Command (?:running in background with ID: "
+    r"|did not complete[^.\n]{0,60}moved to the background \(ID: )([A-Za-z0-9_-]+)")
+# Same anchor, same reason: a quoted notification inside a reply or a tool result is not a
+# notification. These are the three openings the host itself uses for one.
+FRAME = ("<task-notification>", "[SYSTEM NOTIFICATION",
+         "Another Claude session sent a message:")
+NOTIFICATION_ROW = re.compile(
+    r"<task-id>([A-Za-z0-9_-]+)</task-id>(.*?)</task-notification>", re.S)
+# KILLED BY HAND. The host answers a stop with this sentence inside a JSON tool result, so
+# it is not at position zero and cannot be anchored; it is read anyway because it can only
+# SILENCE this check, never fire it, and a stray quotation therefore costs a report rather
+# than causing a false one. Hand-reading the eleven fires found two the check would
+# otherwise have named after the session had already killed them.
+STOPPED = re.compile(r"Successfully stopped task: ([A-Za-z0-9_-]+)")
+# THE FOUR TERMINAL STATUSES, and they are the measured ones rather than a plausible list.
+# Over every transcript on this machine: completed 6,351, failed 365, killed 106, stopped 13
+# — and `running` 16, which is a PROGRESS notification and is deliberately not here. Treating
+# any notification as a close would let a progress report silence a shell that is still open,
+# and the first draft of this did exactly that. `cancelled` was in that draft and appears
+# nowhere in 6,851 recorded statuses.
+TERMINAL = re.compile(r"<status>(completed|failed|killed|stopped)</status>", re.I)
+# ONE LINE, ALWAYS. A teammate's description and a shell's command are model-authored text
+# that this check quotes back into the block's reason, and the reason IS the next
+# instruction. A heredoc command carries newlines — several of the measured fires did — so
+# unflattened it breaks the bulleted list and can forge a line at column zero inside it.
+_WS = re.compile(r"\s+")
+
+
+def _flat(text, n):
+    """One line of model-authored text, at most `n` characters. See `_WS`."""
+    return _WS.sub(" ", str(text or "")).strip()[:n]
+
+
+def _norm_agent(name):
+    """One spelling for one agent. The host addresses a teammate as `docs-owner`, prints it
+    as `docs-owner [f8830c]`, and spells its id `docs-owner@session-7b1f6d4c`."""
+    n = (name or "").strip()
+    n = n.split("@", 1)[0]
+    n = n.split(" [", 1)[0]
+    return n.strip()
+
+
+def _row_text(d):
+    """The text a transcript row carries, for the literal strings this check reads.
+
+    Never `json.dumps` of the row: that escapes every quote, so `from="x"` becomes
+    `from=\\"x\\"` and every pattern here would have to carry the escaping too.
+    """
+    if d.get("type") == "attachment":
+        return (d.get("attachment") or {}).get("prompt") or ""
+    # A `queue-operation` row is how the host records a notification it queued for the
+    # SESSION rather than for an agent, and it is the only place a shell started by a
+    # finished agent is ever closed. MEASURED over 277 real sessions: without this row
+    # type the check named 30 shells and 19 of them were already closed, because the
+    # closing notification had been delivered here.
+    if d.get("type") == "queue-operation":
+        c = d.get("content")
+        return c if isinstance(c, str) else ""
+    if d.get("type") != "user":
+        return ""
+    c = (d.get("message") or {}).get("content")
+    if isinstance(c, str):
+        return c
+    if not isinstance(c, list):
+        return ""
+    return "\n".join(_block_text(b) for b in c if isinstance(b, dict))
+
+
+def _block_text(b):
+    """One content block's text. A tool result's `content` is a bare string on some tools
+    and a list of text blocks on others, and both shapes carry the literals read here."""
+    out = []
+    if isinstance(b.get("text"), str):
+        out.append(b["text"])
+    inner = b.get("content")
+    if isinstance(inner, str):
+        out.append(inner)
+    elif isinstance(inner, list):
+        out += [x["text"] for x in inner
+                if isinstance(x, dict) and isinstance(x.get("text"), str)]
+    return "\n".join(out)
+
+
+def closeout_facts(lines):
+    """Walk one transcript and return the close-out facts it states, as literals.
+
+      teammates  name -> what it was spawned for, for spawns that carried a `name` AND
+                 whose tool result says the spawn took
+      handed     every agent id or teammate name whose hand-back is in this transcript
+      finished   agent ids whose task-notification reports a terminal status
+      shutdown   every name a `shutdown_request` was addressed to
+      shells     background shell id -> the command that made it
+      closed     shell and task ids closed by a terminal notification or an explicit stop
+    """
+    spawned, pending, tool_cmd = {}, {}, {}
+    f = {"teammates": {}, "handed": set(), "finished": set(), "shutdown": set(),
+         "shells": {}, "closed": set()}
+    for line in lines:
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(d, dict):
+            continue
+        if d.get("type") == "assistant":
+            for b in (d.get("message") or {}).get("content") or []:
+                if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                    continue
+                name, inp = b.get("name") or "", b.get("input") or {}
+                if not isinstance(inp, dict):
+                    continue
+                if name == "Agent" and isinstance(inp.get("name"), str) and inp["name"].strip():
+                    pending[b.get("id")] = (_norm_agent(inp["name"]),
+                                            _flat(inp.get("description"), 80))
+                elif name == "SendMessage":
+                    msg = inp.get("message")
+                    kind = msg.get("type") if isinstance(msg, dict) else inp.get("type")
+                    if kind == "shutdown_request":
+                        f["shutdown"].add(_norm_agent(inp.get("to") or inp.get("recipient")))
+                elif name == "Bash":
+                    tool_cmd[b.get("id")] = _flat(inp.get("command"), 120)
+            continue
+        # A TOOL RESULT IS READ ON ITS OWN, never as part of a joined row, because both
+        # patterns below are anchored at its first character.
+        c = (d.get("message") or {}).get("content")
+        for b in (c if isinstance(c, list) else []):
+            if not (isinstance(b, dict) and b.get("type") == "tool_result"):
+                continue
+            tid, rtext = b.get("tool_use_id"), _block_text(b).lstrip()
+            # A spawn that reports back `Spawned successfully` is a teammate that exists.
+            # One that errored is not, and must not be reported as left running.
+            if tid in pending and rtext.startswith(SPAWN_OK):
+                nm, why = pending[tid]
+                f["teammates"][nm] = why
+            m = BG_START.match(rtext)
+            if m and tid in tool_cmd:
+                f["shells"][m.group(1)] = tool_cmd[tid]
+            f["closed"].update(STOPPED.findall(rtext))
+        text = _row_text(d).lstrip()
+        if not text.startswith(FRAME):
+            continue
+        if HANDBACK_MARK in text:
+            for who in FROM_ID.findall(text):
+                f["handed"].add(_norm_agent(who))
+        for tid, body in NOTIFICATION_ROW.findall(text):
+            if "SubagentHandback" in body:
+                f["handed"].add(_norm_agent(tid))
+            # A `running` notification is progress, not a close, and is the reason this is
+            # gated on the status rather than on the notification arriving at all.
+            if TERMINAL.search(body):
+                f["closed"].add(tid)
+                f["finished"].add(_norm_agent(tid))
+    return f
+
+
+def agent_transcripts(main_path):
+    """Every spawned agent's own transcript beside the session's: id -> path.
+
+    The host writes them to `<transcript dir>/<session id>/subagents/agent-<id>.jsonl`, so
+    the map is read off the filenames rather than guessed. Missing directory, empty map,
+    and nothing is reported — an absent transcript is the abstain case.
+    """
+    base = main_path[:-6] if main_path.endswith(".jsonl") else main_path
+    d = os.path.join(base, "subagents")
+    out = {}
+    try:
+        names = sorted(os.listdir(d))
+    except OSError:
+        return out
+    for n in names:
+        if n.startswith("agent-") and n.endswith(".jsonl"):
+            out[n[len("agent-"):-len(".jsonl")]] = os.path.join(d, n)
+    return out
+
+
+def closeout_path(payload):
+    """Path to the once-per-session record of what has already been reported.
+
+    REPORTED ONCE, NEVER EVERY TURN. The block's reason is the next instruction, so the
+    turn shuts the teammate down and the next Stop is clean. A session that decides to
+    keep one says so and is not asked again: a guard that repeats an answered question is
+    the 7.0% false-positive rate that retired this distribution's last speech guard
+    (`changes/1.30.1.md`), reached by repetition instead of by a bad detector.
+
+    IT IS NOT A HAND-OFF, and the two functions below are why that is visible rather than
+    asserted. `wf-live` reports a file written and never read as a detector shipped with no
+    fix, deciding the roles PER FUNCTION, so the read and the write are separate functions
+    here and both are in this file — which is also simply true, since nothing else ever
+    looks at it.
+    """
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    return os.path.join(d, f"wf-closeout.{TT.session_component(payload)}.json")
+
+
+def closeout_reported(payload):
+    """What this session has already been told about. An unreadable record is an empty one:
+    the cost of forgetting is one repeated report, and the cost of failing here is none."""
+    try:
+        with open(closeout_path(payload), encoding="utf-8") as fh:
+            return set(json.load(fh))
+    except (OSError, ValueError, TypeError):
+        return set()
+
+
+def closeout_record(payload, add):
+    """Add to the record. Never fatal — a block that cannot be remembered still blocks."""
+    try:
+        with open(closeout_path(payload), "w", encoding="utf-8") as fh:
+            json.dump(sorted(closeout_reported(payload) | set(add)), fh)
+    except OSError:
+        pass
+
+
+def closeout(payload):
+    """What this session started and never closed, or None. Reads only transcripts."""
+    path = payload.get("transcript_path")
+    lines = TL._read_lines(path if isinstance(path, str) else "")
+    if not lines:
+        return None
+    f = closeout_facts(lines)
+
+    seen = closeout_reported(payload)
+
+    # A TEAMMATE THAT REPORTED AND WAS NEVER RELEASED. The hand-back is its report; the
+    # `shutdown_request` is the only thing that ends it.
+    stale = [n for n, _why in sorted(f["teammates"].items())
+             if n in f["handed"] and n not in f["shutdown"] and ("t:" + n) not in seen]
+
+    # A SHELL LEFT OPEN BY AN AGENT THAT IS ALREADY DONE. Read from the agent's own
+    # transcript, because that is where its shells are recorded; the session's transcript
+    # only says that the agent finished.
+    done = f["handed"] | f["finished"]
+    shells = []
+    for aid, apath in sorted(agent_transcripts(path or "").items()):
+        if _norm_agent(aid) not in done or ("s:" + aid) in seen:
+            continue
+        alines = TL._read_lines(apath)
+        if not alines:
+            continue
+        af = closeout_facts(alines)
+        # CLOSED IN EITHER TRANSCRIPT IS CLOSED. Once an agent has finished, its shell's
+        # completion notification is delivered to the SESSION instead, so the record that
+        # closes the shell is not in the file that opened it. MEASURED over 277 real
+        # sessions: reading only the agent's own transcript named 30 shells, and 19 of
+        # them — 63% — had been closed in the session's. The union names 11.
+        for sid, cmd in sorted(af["shells"].items()):
+            if sid not in af["closed"] and sid not in f["closed"] and ("s:" + sid) not in seen:
+                shells.append((aid, sid, cmd))
+    if not stale and not shells:
+        return None
+
+    closeout_record(payload, {"t:" + n for n in stale}
+                    | {"s:" + s for _a, s, _c in shells})
+
+    lines_out = ["This session started something it has not closed, and the turn is over."]
+    if stale:
+        lines_out.append("")
+        lines_out.append("Named teammates that handed back their report and were never "
+                         "sent a shutdown_request:")
+        for n in stale:
+            lines_out.append(f"  · {n} — {f['teammates'][n] or 'no description'}")
+        lines_out.append(
+            "A named teammate does not end when it returns its report; it waits for a "
+            "`shutdown_request`. Send one to each, or say in one line why it is being "
+            "kept.")
+    if shells:
+        lines_out.append("")
+        lines_out.append("Background shells still open, whose starting agent has already "
+                         "handed back:")
+        for aid, sid, cmd in shells:
+            lines_out.append(f"  · {sid} — started by {aid} — {cmd}")
+        lines_out.append(
+            "Nothing is left that will read these. MEASURED 2026-09-24: one such shell "
+            "outlived its agent by nine hours and then woke it up again. Kill each one, "
+            "or say why it is being left.")
+    named = [n for n in stale] + [s for _a, s, _c in shells]
+    return {
+        "decision": "block",
+        "reason": "\n".join(lines_out),
+        "systemMessage": "WIDEN  close-out — " + ", ".join(named) + " still open",
+    }
+
+
 SENSE_COUNT = {
     "sight": lambda c: c[1] and len(c[1]),      # distinct sources read
     "hearing": lambda c: c[3],                  # web, spawned readers, skills
@@ -655,6 +980,17 @@ def widen(payload):
             "systemMessage": f"WIDEN  stopped mid-work after \u201c{promise}\u201d — CONTINUING",
         }
 
+    # THE CLOSE-OUT, AFTER THE PROMISE AND BEFORE THE SENSES. After the promise, because a
+    # turn that stopped mid-work has not finished with anything yet and must not be told to
+    # shut down a teammate it is about to use again. Before the senses, because it is a
+    # fact in the transcript rather than a judgement, and a fact that can be checked for
+    # free is checked before anything is spawned. Main `Stop` only: a subagent's Stop is
+    # its own turn and this session's teammates are not its to close.
+    if not subagent:
+        left_open = closeout(payload)
+        if left_open:
+            return left_open
+
     masked = TL.mask_code(reply or "")
     trips = []
     if TL.ABSENCE.search(masked):
@@ -674,9 +1010,11 @@ def widen(payload):
     # THE TAG IS THE SESSION'S ASK, so it is the main turn's and a subagent never inherits
     # it: the spawned agent was given a different job by a different message, and scoring
     # its reply against the user's tagged ask is the cross-turn case above in miniature.
+    incident = False
     for h in ([] if subagent else (task_tag(payload) or {}).get("hits") or []):
         applicable.add(h["sense"])
         why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
+        incident = incident or h["kind"] == "incident"
 
     # A TURN SCORED AGAINST NOTHING DOES NOT GET A PERFECT SCORE. Printing 100/100
     # for a turn that tripped no trigger is a number with nothing under it, and a
@@ -763,6 +1101,23 @@ def widen(payload):
         # verdict, so a run is reproducible and a fixture can pin it.
         sampled = (hashlib.sha256((reply or "").encode("utf-8")).digest()[0] % rate) == 0
 
+    # AN INCIDENT ASK IS TRIED EVERY TIME, not one turn in five, and not only when a
+    # channel was left shut. The four questions the jury puts to a diagnosis — is every
+    # stated cause read off a record, is the replying node's OWN part named first, is each
+    # proposed rule no broader than the defect, and was a regression this turn caused
+    # FIXED rather than offered as a choice — are all answerable on a turn that opened
+    # hearing perfectly well. The measured failure did open one: it read the repository at
+    # length and never opened the one record that held the cause, the IC's own OUTPUT.md.
+    # Sampling that at 1-in-5 would have let four such turns in five go out unread.
+    #
+    # IT RIDES THE SAMPLE PATH, so nothing new can block: the jury sits, and a verified
+    # `no` from any juror sends the turn back through the path that already exists.
+    # WF_AUDIT_SAMPLE does not switch it off, because that dial is documented as a COST
+    # dial over passing turns and this is a standing charge on one kind of ask, measured
+    # at 1.49% of real prompts.
+    if incident and not unopened and not subagent:
+        sampled = True
+
     if not unopened and not sampled:
         return {"systemMessage": f"WIDEN  {shown} — required channels opened"}
 
@@ -790,7 +1145,9 @@ def widen(payload):
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
         # this hook has nothing to object to. The audit is the agent's job and runs on
         # the same `Stop`; blocking here would punish a turn for being picked.
-        return {"systemMessage": f"WIDEN  {shown} — sampled for audit"}
+        return {"systemMessage": f"WIDEN  {shown} — "
+                                 + ("incident charge — the jury reads the diagnosis"
+                                    if incident else "sampled for audit")}
 
     return {
         "decision": "block",

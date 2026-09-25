@@ -917,6 +917,90 @@ check(
     not _ag_problems,
     "; ".join(_ag_problems),
 )
+
+# ── THE INCIDENT CHARGE, END TO END ──────────────────────────────────────────
+# USER DIRECTIVE 2026-09-24, after a session diagnosed a hung shell by asserting a cause it
+# had not read and then proposing two bans: "we never ever want this type of response from
+# you when dealing with an issue, make sure that is something built into the @workforce-dev
+# jury in the proper sense." Their two earlier corrections are the shape of the charge —
+# "are we causing more problems by using some drastic rule instead of actually identifying
+# the issue you caused?" and "Those aren't two choices for me. neither one is acceptable."
+#
+# THREE PIECES, AND ALL THREE HAVE TO BE PRESENT OR THE CHARGE NEVER REACHES ANYONE: the
+# ask has to be classified, the jury has to be seated on it, and the prompt has to put the
+# questions. Each is asserted on the file that owns it.
+_tt_inc = read("workforce/bin/wf-task-tag")
+_wd_inc = read("workforce/bin/wf-widen")
+_inc_problems = []
+if '("incident"' not in _tt_inc:
+    _inc_problems.append("wf-task-tag no longer classifies an incident ask, so the jury is "
+                         "never seated on a diagnosis and the charge reaches nothing")
+if ('HEAD_ONLY = frozenset({"incident"})' not in _tt_inc
+        or "[:HEAD] if name in HEAD_ONLY" not in _tt_inc):
+    _inc_problems.append("the head bound on the incident pattern is gone. Unbounded it "
+                         "fires on 2.97% of real prompts against 1.49% bounded, every extra "
+                         "one a phrase buried in a pasted diff, a skill preamble or a log")
+if "incident and not unopened and not subagent" not in _wd_inc:
+    _inc_problems.append("wf-widen no longer seats the jury on every incident ask. Sampled "
+                         "at 1-in-5 it would read one diagnosis in five, and the measured "
+                         "failure had opened its hearing channel — it read the repository at "
+                         "length and never opened the record that held the cause")
+for _q, _what in (
+        ("cause-from-the-record", "every stated cause has to cite the record it came from"),
+        ("own-part-first", "the replying node's own order in the cause chain has to be named first"),
+        ("proportional-fix", "a rule that would also have blocked what WORKED is too broad"),
+        ("no-self-caused-fix-as-a-choice",
+         "a regression the turn caused is fixed, never offered as an option")):
+    if _q not in _sa_agent:
+        _inc_problems.append(f"the jury prompt dropped the `{_q}` juror — {_what}")
+check(
+    "an incident ask is classified, always tried, and the jury puts the four questions",
+    not _inc_problems,
+    "; ".join(_inc_problems),
+)
+
+# ── THE CLOSE-OUT AT STOP ────────────────────────────────────────────────────
+# USER REPORT 2026-09-24: "we also have an issue with shell items staying open after they
+# have expired and agents staying open after their work is done like in this instance,
+# docs-owner and the 1 shell gives the impression that the work isn't done here."
+#
+# EVERY ASSERTION BELOW IS A MEASURED WRONG FIRE THAT WAS FIXED BEFORE THIS SHIPPED, over
+# 277 real sessions and 2,796 turns on this machine. Remove any one and the check names
+# shells that were closed, or misses the one that was not.
+_co_problems = []
+if "def closeout(" not in _wd_inc or "left_open = closeout(payload)" not in _wd_inc:
+    _co_problems.append("the close-out is gone from the Stop path; a teammate that handed "
+                        "back and a shell that outlived its agent both stop being reported")
+if "^Command (?:running in background with ID: " not in _wd_inc:
+    _co_problems.append("the background-shell pattern is no longer anchored at the start of "
+                        "the tool result. Unanchored it read a transcript QUOTED in a reply "
+                        "as a shell start and named two shells that never existed")
+if '"queue-operation"' not in _wd_inc:
+    _co_problems.append("queue-operation rows are no longer read. Once an agent has "
+                        "finished, its shell's closing notification is delivered to the "
+                        "SESSION in one of those rows: without them 19 of 30 named shells "
+                        "had already been closed")
+if "Successfully stopped task: " not in _wd_inc:
+    _co_problems.append("a shell the session explicitly killed is no longer recognised as "
+                        "closed; hand-reading the eleven remaining fires found two of them "
+                        "were shells the session had already stopped")
+if 'sid not in af["closed"] and sid not in f["closed"]' not in _wd_inc:
+    _co_problems.append("the closed set is read from one transcript again. A shell is "
+                        "opened in the agent's and closed in the session's, so either file "
+                        "alone answers the wrong question")
+if 'isinstance(inp.get("name"), str)' not in _wd_inc:
+    _co_problems.append("the teammate half no longer requires a `name` on the spawn. A plain "
+                        "subagent ENDS when it hands back; only a named teammate outlives "
+                        "its own report, and reporting both is the blanket rule the user "
+                        "rejected")
+if "shutdown_request" not in _wd_inc:
+    _co_problems.append("nothing reads the shutdown_request, so a teammate that WAS released "
+                        "is reported exactly like one that was not")
+check(
+    "Stop reports what this session started and never closed, and nothing it did close",
+    not _co_problems,
+    "; ".join(_co_problems),
+)
 # ── A grant may not name a tool this host has no registry entry for ──────────
 # MEASURED 2026-09-10 on 2.1.266 (measurements/2026-09-10-subagent-grant.md):
 # `Grep`, `Glob` and `WebFetch` are absent from the subagent namespace loaded and

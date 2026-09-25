@@ -185,7 +185,68 @@ KINDS = [
      "taste",
      "a claim about a SET is closed by enumerating the set. Point reads sample it, and a "
      "sample cannot show what is absent"),
+
+    # THE INCIDENT KIND, and it is the only one here whose wrong answer the user wrote out
+    # in full. User directive 2026-09-24, on a session that diagnosed a hung shell: "we
+    # never ever want this type of response from you when dealing with an issue, make sure
+    # that is something built into the @workforce-dev jury in the proper sense."
+    #
+    # WHAT THE TURN DID, from the playwright-mcp record. It stated a cause — "the IC guessed
+    # the command from your project's name" — without reading that IC's OUTPUT.md or its
+    # transcript, and the real cause was its OWN work order naming `web_fetch` to an agent
+    # whose `tools:` did not hold it. It then proposed two bans, "never reach a missing tool
+    # through the shell" and "never npx an unpinned package", either of which would also have
+    # blocked the `curl` and the `npx -y n lts` that WORKED in the same incident. Its own part
+    # came out only after two rounds of pushback: "are we causing more problems by using some
+    # drastic rule instead of actually identifying the issue you caused?" and "Those aren't
+    # two choices for me. neither one is acceptable."
+    #
+    # THE SENSE IS HEARING, for the reason `senses.md` gives the record: an OUTPUT.md, a
+    # transcript, a `git log` and a command's own output are TESTIMONY, and they are the only
+    # things that know why an agent did what it did. A cause read off this turn's own
+    # reasoning is the tunnel, exactly.
+    #
+    # MEASURED over 1,212 real non-injected prompts from this machine's transcripts: 18
+    # fires, 1.49%, against the 1.5% budget the two shipped reply triggers were held to. All
+    # 18 were hand-read and all 18 are genuine — "why did the sound go silent?", "please
+    # diagnose why the voice chat is not working", "we also have an issue with shell items
+    # staying open", the `diagnose-crash` crash reports, and the two pushbacks quoted above.
+    ("incident", re.compile(
+        r"\b(?:root cause|post-?mortem)\b"
+        r"|\bwhat (?:went wrong|happened here)\b"
+        r"|\bwhat caused\b"
+        r"|\bwhy did (?:it|this|that|you|the|we)\b"
+        r"|\bwhy (?:is|are|was|were) (?:it|this|that|there|the)\b[^.\n]{0,40}"
+        r"\b(?:fail\w*|broke\w*|broken|error|wrong|happening|stuck|hanging)\b"
+        r"|\b(?:diagnose|troubleshoot)\b"
+        r"|\b(?:it|this|that|they) (?:broke|crashed|hung|is broken|are broken|stopped working)\b"
+        r"|\b(?:issue|bug|error|failure|crash|problem|defect|regression)\b[^.\n]{0,40}"
+        r"\b(?:you|we|i) (?:caused|created|introduced)\b"
+        r"|\bwe (?:also )?have (?:an|a) (?:issue|problem|bug)\b"
+        r"|\b(?:i'?m|we'?re) (?:still )?(?:running into|hitting|getting) (?:an? )?"
+        r"(?:issue|error|problem)\b"
+        r"|\bcrashed\b", re.I),
+     "hearing",
+     "a cause is testimony before it is anything else. Every stated cause — and above all "
+     "every claim about WHY an agent did something — is read off the record it came from: "
+     "that agent's OUTPUT.md, its transcript, `git log`, the command's own output. A cause "
+     "inferred from this turn's own reasoning is the tunnel, and a rule proposed on one "
+     "bans whatever it happens to reach"),
 ]
+
+# THE FIRST 400 CHARACTERS ONLY, for the kinds named here.
+#
+# A PASTED DIFF IS NOT AN ASK, and neither is a skill's preamble, an artifact page contract,
+# or a wall of log output — but each of them is long, and a long body will eventually contain
+# any phrase. MEASURED over the same 1,212 prompts: `incident` fires 36 times (2.97%) unbounded
+# and 18 (1.49%) on the head. Every one of the 18 dropped was a phrase buried in pasted
+# material — "Errors explain what went wrong and how to fix it" inside a design brief, "don't
+# cause regression" inside a quoted goal, `debug.log` inside an npm dump. None was an ask.
+#
+# IT IS A SET RATHER THAN A FIFTH TUPLE FIELD, so the four shipped rows keep the shape they
+# were measured in and nothing has to be re-verified to add one bound.
+HEAD = 400
+HEAD_ONLY = frozenset({"incident"})
 
 # THE USER'S WORDS DECIDE, NEWEST FIRST — carried on every message, in every project.
 # User directive 2026-09-16 (SKILL.md § Directives). It lives HERE, in a hook the install
@@ -385,7 +446,8 @@ def classify(prompt):
 
     hits = []
     for name, pat, sense, why in KINDS:
-        if pat.search(prompt or ""):
+        subject = (prompt or "")[:HEAD] if name in HEAD_ONLY else (prompt or "")
+        if pat.search(subject):
             # `world` only: a statement about the world is not a question about it.
             if name == "world" and not ASKING.search(prompt or ""):
                 continue

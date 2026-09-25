@@ -3645,6 +3645,26 @@
       "looked at nothing"
     ]
   },
+  "tasktag-incident-seats-the-docket": {
+    "_why": "THE CHARGE THE USER ASKED FOR, seated where it can arrive in time: \"we never ever want this type of response from you when dealing with an issue, make sure that is something built into the @workforce-dev jury in the proper sense.\" A diagnosis is closed by HEARING because a cause is testimony before it is anything else - the failing agent's OUTPUT.md, its transcript, `git log`, the command's own output. The measured turn read none of them, stated a cause anyway, and proposed two bans that would have blocked the `curl` and the `npx -y n lts` that worked in the same incident. Measured at 18 fires, 1.49%, over 1,212 real non-injected prompts.",
+    "exit": 0,
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"prompt\": \"why did the shell stay open after the agent handed back? diagnose it\", \"session_id\": \"fx\"}",
+    "want": [
+      "incident \\u2014 closed by HEARING",
+      "OUTPUT.md",
+      "a rule proposed on one bans whatever it happens to reach"
+    ]
+  },
+  "tasktag-ordinary-ask-seats-no-incident": {
+    "_why": "THE NARROWNESS, asserted. An instruction to change something is not a diagnosis, and a docket on every `fix the X` would put the four incident questions on ordinary work - the 7.0% false-positive rate that retired this distribution's last speech guard, reached by a wider regex. `fix the` ALONE was measured and REJECTED: it fires on 2.81% of real prompts by itself, almost all of them plain instructions like this one.",
+    "exit": 0,
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"prompt\": \"fix the seating-chart section links and commit it\", \"session_id\": \"fx\"}",
+    "not": [
+      "incident"
+    ]
+  },
   "tasktag-history": {
     "_why": "THE MEASURED MISS THIS EXISTS FOR. Asked to decide the fate of four removed scripts, a turn read the live requirements, never read the record that removed them, and concluded they should come back - wrong, the removal was deliberate. No absence or universal claim was made, so the reply scan was silent and right to be. The ASK was a history question and hearing is what closes it.",
     "exit": 0,
@@ -3714,6 +3734,66 @@
     "script": "wf-task-tag",
     "stdin_raw": "{\"prompt\": \"make the button blue\", \"session_id\": \"fx\"}",
     "want": []
+  },
+  "widen-teammate-not-shut-down-blocks": {
+    "_why": "THE REPORTED DEFECT, first half. Four ICs on one run were still running 7-8 h after handing back: they were spawned as NAMED teammates, and a named teammate does not end when it returns its report - it waits for a `shutdown_request` that no step in the dispatch protocol ever sent. The user saw it from the outside: \"agents staying open after their work is done like in this instance, docs-owner\". Every fact here is a literal the host wrote: the `name` on the Agent call, `Spawned successfully`, and the `[Subagent hand-back]` frame. The block names the teammate, because a reason that says \"clean up\" hands the tunnel back to itself.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The README now has one command per block.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "close-out",
+      "docs-owner",
+      "shutdown_request"
+    ]
+  },
+  "widen-teammate-shut-down-is-silent": {
+    "_why": "THE CONTROL, and it is what keeps the rule from becoming the ban the user rejected: \"are we causing more problems by using some drastic rule\". A teammate is the right shape for work you must talk to while it runs, so the defect was never teammates - it was the missing close-out. The same transcript with one `shutdown_request` on it must go silent, or the check is an argument against named teammates rather than a check that they were released.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The README now has one command per block.\"}",
+    "not": [
+      "close-out",
+      "docs-owner"
+    ],
+    "want": [
+      "not scored"
+    ]
+  },
+  "widen-shell-outlives-agent-blocks": {
+    "_why": "THE REPORTED DEFECT, second half, reproduced from the record. In `agent-a2cdce354a1a97c24` a foreground `npx -y playwright-mcp@latest \u2026 | head -200` timed out at 21:30:38 and was moved to the background as `buqyin1sk`; the agent called SubagentHandback at 21:37:18 with the shell still open; the shell's own notification arrived NINE HOURS later and woke the finished agent up again. The shells live in the agent's transcript and the hand-back lives in the session's, so this fires only when both are read.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The Node upgrade section is in.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "close-out",
+      "buqyin1sk",
+      "a2cd0001"
+    ]
+  },
+  "widen-shell-agent-still-running-is-silent": {
+    "_why": "A SHELL THE TURN IS STILL WAITING ON IS NOT A LEAK - a build, a dev server, a monitor. The same open shell, in the same agent transcript, with no hand-back in the session's: nothing says that agent is done, so nothing says the shell is finished-with, and the check abstains rather than guessing. Without this the rule would tell a turn to kill the build it is holding for.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The docs agent is writing the section; the dev build is still going.\"}",
+    "not": [
+      "close-out",
+      "buqyin1sk"
+    ],
+    "want": [
+      "not scored"
+    ]
+  },
+  "widen-closeout-stop-hook-active-is-silent": {
+    "_why": "THE LOOP BOUND, on the new block as on every other. A blocked Stop continues with `stop_hook_active: true`; a close-out that judged the same transcript again would block the continuation it just caused, forever. Measured once already on the widening agent - five blocked Stops in a row, four of them continuations re-reading one stale conclusion - and that is the failure this row exists to keep from arriving by a second route.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"stop_hook_active\": true, \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The Node upgrade section is in.\"}",
+    "not": [
+      "close-out",
+      "buqyin1sk"
+    ]
   },
   "widen-sampled-not-blocked": {
     "_why": "A PASSING turn picked by the 1-in-5 audit sample is reported and NOT blocked. It opened every channel its ask required, so this hook has nothing to object to - the audit is the agent's job on the same Stop, and blocking here would punish a turn for being picked. The sample exists because auditing only self-declared failures is the self-scoring bias one step removed: looking fine is exactly what a tunnel does from inside.",
