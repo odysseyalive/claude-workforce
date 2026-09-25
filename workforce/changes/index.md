@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.67.1 | 2026-09-24 | changes, hooks, scripts, installer | no | Release 1.67.1: wf-chooser stops blocking reports that describe a decision being removed |
 | 1.67.0 | 2026-09-24 | principles, changes, hooks, scripts, installer | **yes** | Release 1.67.0: a run parked on a plain-text question is sent back to use a chooser |
 | 1.66.0 | 2026-09-22 | changes, installer, platform | **yes** | Release 1.66.0: the code lane and Opus pool row run claude-opus-5-5 |
 | 1.65.1 | 2026-09-17 | audit, changes, installer | no | Record that the out-of-pool budget row has never executed, and what fires it |
