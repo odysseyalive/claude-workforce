@@ -905,22 +905,42 @@ question. So each run re-propagates the current register **and** the precedence 
 evaluator, in the same **never skipped, never offered, never a question** manner as § Forcible propagation —
 that section refreshes the catalog CONTENTS an evaluator applies; this refreshes the RULES it applies them
 under. **Both writes execute at Step 6-E**: the CONTENTS append (workforce's additions) is performed
-mechanically by `bin/wf-seed`, and this RULES refresh runs beside it. Report it per evaluator, including the zeroes, in the same block as the reconciliation, and print the
-run roll-up **`INV-HOUSERULES`** (`invariants.md` row 22) with it:
+mechanically by `bin/wf-seed`, and this RULES refresh by `bin/wf-catalog --house-rules` beside it.
+
+**`wf-catalog --house-rules` IS THE PRODUCER. Run it; do not perform this by hand.**
+
+```bash
+"$WF/bin/wf-catalog" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --house-rules            # report
+"$WF/bin/wf-catalog" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --house-rules --execute  # propagate
+```
+
+It writes the `WF-HOUSE-RULES` machine-owned region into each evaluator's **`CATALOG-ANCHOR.md`**, which is
+the one file Step 6-F leaves standing; derives the supersession register from structure — an `origin: user`
+span's own `supersedes:` attribute, never a prose grep (`evaluators.md` § A register scoped by enumeration
+goes stale); carries verbatim any register row a person added that it cannot derive; and RELOCATES a region
+an earlier audit propagated into a corpus file, which is how `code-evaluator`'s came to be deleted by the
+2026-09-11 migration. It reports per evaluator including the zeroes and closes with the run roll-up
+**`INV-HOUSERULES`** (`invariants.md` row 22):
 
 ```
-HOUSE RULES     text-eval  register 2 rows refreshed · precedence clause present
-                code-evaluator  register 0 rows · precedence clause appended
-                security-evaluator  register 0 rows (empty) · precedence clause present
-INV-HOUSERULES  3 evaluators · 3 registers refreshed · precedence present · 0 unrefreshed
+HOUSE RULES     + text-eval    register 2 row(s) · 1 carried · .claude/skills/text-eval/CATALOG-ANCHOR.md
+                ~ image-eval   UNREFRESHED no image evaluator directory at project scope (tried …)
+INV-HOUSERULES  5 evaluator(s) · 3 register(s) refreshed · 1 current · precedence present · 1 unrefreshed · each unrefreshed names its precondition
 ```
 
-An evaluator that cannot receive the refresh — a `catalog-unappendable` copy that is immutable end to end,
-leaving no position to open a machine-owned region (§ When the catalog cannot be appended) — is counted in
-`unrefreshed` and **names that precondition, with the file and the spans**. A *missing* machine-owned region
-is never this case: the refresh creates the region. `INV-HOUSERULES` is `NOT UPHELD` only when an
-unrefreshed evaluator cites nothing: the same uncited-refusal shape as `INV-SWEPT`, so a run cannot skip the
-refresh silently and still close clean.
+An evaluator that cannot receive the refresh — a `catalog-unappendable` anchor that is immutable end to end,
+leaving no position to open a machine-owned region (§ When the catalog cannot be appended), or a kind this
+project holds no evaluator directory for — is counted in `unrefreshed` and **names that precondition, with
+the file and the spans**. A *missing* machine-owned region is never this case: the refresh creates the
+region. `INV-HOUSERULES` is `NOT UPHELD` only when an unrefreshed evaluator cites nothing: the same
+uncited-refusal shape as `INV-SWEPT`, so a run cannot skip the refresh silently and still close clean.
+
+*Until 2026-09-25 this section was the whole mechanism, exactly as § Force-refresh the Core skills was
+before `wf-companion`: a paragraph instructing a run to propagate, with no script behind it. **MEASURED on
+one project audited three times — 2026-08-20, 2026-09-14, 2026-09-25 — `grep -rl WF-HOUSE-RULES` over the
+install's `bin/` returned nothing on every one of them**, and the last run wrote `image-eval`'s region by
+hand from `code-evaluator`'s. A step performed by whoever remembers is the shape `wf-seed` and
+`wf-companion` were both built to end.*
 
 A run that refreshes the catalog but leaves the rules stale has updated what the evaluator checks and not
 how it is allowed to demote what it finds — the half that produced the README question this clause was
@@ -2007,8 +2027,15 @@ and the supersession register — which guards only the VENDORED append — neve
 additions. A catalog it reports `unappendable` is immutable end to end, and it names the file and the
 spans. Print its `INV-SEED` line, including the zeroes.
 
-Then refresh the house rules (§ Step 4, "Refresh the house rules in every installed evaluator") and print
-`INV-HOUSERULES` in the same block. The additions carry the catalog CONTENTS; the house-rules refresh
+Then refresh the house rules — the producer, not by hand (§ Step 4, "Refresh the house rules in every
+installed evaluator") — and print `INV-HOUSERULES` in the same block:
+
+```
+wf-catalog --root ${CLAUDE_PROJECT_DIR} --house-rules
+wf-catalog --root ${CLAUDE_PROJECT_DIR} --house-rules --execute
+```
+
+The additions carry the catalog CONTENTS; the house-rules refresh
 carries the RULES the evaluator applies them under — both are "never skipped, never offered, never a
 question," and both run here before `verify` so `verify` checks their result.
 

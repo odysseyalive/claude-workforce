@@ -5481,6 +5481,182 @@
       "ADDITIONS SLOT MISSING"
     ]
   },
+  "catalog-house-rules-writes-anchor": {
+    "_why": "MEASURED 2026-09-25 (audit-20260925T180537Z, items 2/3/4): `audit.md` Step 4 and Step 6-E both require the WF-HOUSE-RULES refresh every run, 'never skipped, never offered, never a question', both print INV-HOUSERULES, and NO SHIPPED SCRIPT WROTE A BYTE OF IT — `grep -rl WF-HOUSE-RULES` over the install's bin/ returned nothing on three audits of one project, and the last of them wrote image-eval's region by hand. This is the report half: the producer names the destination anchor and every kind it cannot refresh names its precondition, which is what keeps INV-HOUSERULES an uncited-refusal rather than a silent skip. Against HEAD's wf-catalog: `unrecognized arguments: --house-rules`, exit 2.",
+    "script": "wf-catalog",
+    "args": [
+      "--house-rules"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "would refresh into .claude/skills/text-eval/CATALOG-ANCHOR.md",
+      "UNREFRESHED no code evaluator directory at project scope",
+      "INV-HOUSERULES  5 evaluator(s)",
+      "each unrefreshed names its precondition",
+      "DISPLAY ONLY — nothing written"
+    ]
+  },
+  "catalog-house-rules-writes-anchor-execute": {
+    "_why": "The same tree with --execute, asserted on disk: the region lands in CATALOG-ANCHOR.md — the one file every migration leaves standing — with the precedence clause and an empty register derived from structure rather than scraped from prose. The anchor did not exist before the run, so this also proves the producer creates the project-specific layer rather than requiring an audit to have made one by hand.",
+    "script": "wf-catalog",
+    "args": [
+      "--house-rules",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "register 0 row(s)",
+      "INV-HOUSERULES  5 evaluator(s) · 1 register(s) refreshed"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "<!-- WF-HOUSE-RULES START — propagated by /workforce audit; machine-owned, safe to replace -->",
+          "House rules dominate, and the supersession register is the SOLE source of a demotion or exemption",
+          "### Supersession register",
+          "<!-- WF-HOUSE-RULES END -->"
+        ]
+      }
+    }
+  },
+  "catalog-house-rules-relocates-region": {
+    "_why": "The region's home is CATALOG-ANCHOR.md and two real projects carry it in a corpus file instead, because that is where the 2026-08-20 propagation put it: code-evaluator's went into references/guards.md and was DELETED by the 2026-09-11 migration (recovered from retired/ by hand), and text-eval's sits in references/ai-patterns.md with the same fate pending. The producer moves it and clears the old copy, verified by readback. This tree also carries a `supersedes:` marker, so the register derives one row FROM STRUCTURE, and a hand-written row already in the region is carried rather than dropped — retention, not a machine-owned overwrite.",
+    "script": "wf-catalog",
+    "args": [
+      "--house-rules",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "register 1 row(s) · 1 carried · lifted out of .claude/skills/text-eval/references/ai-patterns.md"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| Em dash density | this house uses the em dash as a structural connector |",
+          "| hand-kept row | a maintainer wrote this into the region by hand |",
+          "<!-- WF-HOUSE-RULES END -->"
+        ]
+      },
+      ".claude/skills/text-eval/references/ai-patterns.md": {
+        "want": [
+          "Productive tangent"
+        ],
+        "not": [
+          "WF-HOUSE-RULES"
+        ]
+      }
+    }
+  },
+  "catalog-migrate-lifts-house-rules": {
+    "_why": "MEASURED 2026-09-25 (item 6): NON_CORPUS holds only SKILL.md and CATALOG-ANCHOR.md, so a WF-HOUSE-RULES region propagated into a corpus file is removed with it — which is exactly what happened to code-evaluator's on 2026-09-11 while Step 6-F promised the house rules survive. Against HEAD's wf-catalog this tree prints `retire references/ai-patterns.md` and nothing else: the region goes. The region is now lifted into CATALOG-ANCHOR.md and read back BEFORE anything is removed, and the file goes only after that.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "LIFTED   the house-rules region out of references/ai-patterns.md",
+      "REMOVED  1 file(s)"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "<!-- WF-HOUSE-RULES START",
+          "House rules dominate",
+          "<!-- WF-HOUSE-RULES END -->"
+        ]
+      },
+      ".claude/skills/text-eval/references/ai-patterns.md": {
+        "absent": true
+      }
+    }
+  },
+  "catalog-migrate-lifts-project-rows": {
+    "_why": "MEASURED 2026-09-25 (items 2/3/4): project graders cite rows no shipped catalog carries — `Productive tangent — minimum/absent` from university's text-eval copy and `Consistent edge quality` from its image-eval watercolor.md. They are PROJECT rows, so they do not belong in the shipped corpus; the migration used to send them to retired/, where `wf-catalog --grep` never looks, leaving a live grader citing a row nothing can resolve. The headings and table-row keys a removed file carries and the install does not are now lifted into the house-rules layer, verified, before the file goes — after which `--grep 'Productive tangent'` resolves (see catalog-grep-reads-house-rules-layer).",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "LIFTED    2 project-only row(s) from references/flag-severity.md",
+      "LIFTED    2 project-only row(s) from references/watercolor.md"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| Productive tangent | minimum/absent |"
+        ]
+      },
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| Consistent edge quality | BLOCK |"
+        ]
+      },
+      ".claude/skills/text-eval/references/flag-severity.md": {
+        "absent": true
+      }
+    }
+  },
+  "catalog-grep-reads-house-rules-layer": {
+    "_why": "The other half of the lift, and the reason it is worth doing: a row living in the house-rules layer must be reachable by the one read a tier-3 IC is told to make. `project_anchors` already searches CATALOG-ANCHOR.md for the ui kind (catalog-grep-reads-project-anchor); this asserts it for the text kind against the exact needle the 2026-09-25 report named, so the copy can retire and the handbook can drop its literal-path read. Hits carry the `project:` prefix, which is how a shipped rule and a project rule are told apart.",
+    "script": "wf-catalog",
+    "args": [
+      "--kind",
+      "text",
+      "--grep",
+      "Productive tangent"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "project:text-eval/CATALOG-ANCHOR.md:23:| Productive tangent | minimum/absent |"
+    ],
+    "not": [
+      "no match"
+    ]
+  },
+  "catalog-cited-in-any-form-stays": {
+    "_why": "MEASURED 2026-09-25 (item 7): the citation guard protected PROJECT-ONLY files only — `no file with the same normalised content AND none with the same name` — so `text-tells.md` and `human-markers.md`, which DIFFER from the install by cmp and are read by text-eval/SKILL.md:69,71 and finishing-chain.md:63,69, were listed retire and their delta went to retired/ with no live reader. And the needle was `<skill>/<rel>` alone, so a reader writing `references/output-formats.md` or a bare `output-formats.md` (image-eval/references/invocation.md:38,44,50) was invisible. Against HEAD's wf-catalog this tree prints three `retire` rows and no STAYS. Now: the differing shipped-name file stays with its reader named, the bare-basename citation is seen, and the file that is byte-identical to a shipped one still goes — a citation of THAT is repointed to the resolver, not protected, or nothing could ever migrate.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "STAYS      references/text-tells.md — cited by .claude/agents/writer.md:6",
+      "STAYS      references/output-formats.md — cited by .claude/agents/writer.md:8",
+      "retire     references/human-markers.md",
+      "2 cited"
+    ],
+    "not": [
+      "retire     references/text-tells.md",
+      "retire     references/output-formats.md"
+    ]
+  },
   "catalog-cited-file-stays": {
     "_why": "DEF-Q-13 (b), MEASURED 2026-09-11 on apps-odyssey-alive: project-only `references/` files that live readers cite -- `palette.md` and `graphic-system.md`, read by three handbooks and two skills, and five text-eval files read by agents that stay -- were listed `retire` with nothing protecting them, and the audit moved seven files and repointed 32 lines by hand. A cited project-only file now STAYS in place and the report names its readers. Three shapes: `palette.md` is cited by a handbook outside the copy; `graphic-system.md` is cited only by a project agent INSIDE the copy that itself stays, which a scan of outside readers alone would miss; `old-notes.md` is quoted only by a run report under `workforce/work/`, which is history rather than a reader, so it still goes. `image-tells.md` is the shipped file and goes. Measured against HEAD's wf-catalog on this identical tree: `retire references/palette.md` and `retire references/graphic-system.md`.",
     "script": "wf-catalog",

@@ -420,21 +420,35 @@ copy. `wf-catalog --kind text --grep <rx>` works in **any** project, including t
 
 An existing copy is not left in place forever: residue is a defect in its own right (SKILL.md
 § Directives, *"I don't want to leave any of the old system still there"*). **Removal is per FILE and
-the proof is byte identity.** A file goes only when the install ships a file of the same name and the
-two are identical once the machine-owned additions region, the version anchor and trailing whitespace
-are normalised away.
+it is unconditional on content** — the user directive of 2026-09-10, *"the audit of a project removes
+the old ones of the project ... No exceptions."* What survives is a closed list, and every entry on it
+is make-before-break rather than a proof about the file's contents.
 
 | Outcome | Meaning |
 |---|---|
-| `identical` | the install ships this exact file — **the only removable state** |
-| `STAYS` | the install ships no file of that name, or ships a different one. Every other file in the copy |
-| `keep-user-span` | an `origin: user \| immutable: true` block anywhere in the copy — the whole copy is held |
+| `retire` | every file not on this list, whatever it contains — **the default** |
+| `STAYS: anchor` | `CATALOG-ANCHOR.md`, and the skill directory itself |
+| `STAYS: cited` | a live reader outside the copy, or a file inside it that stays, names this file **in any path form** — it stays where the reader already points, with every reader printed, until the citation is moved |
+| `STAYS: capability` | an `agents/`, `scripts/` or `hooks/` file the shipped evaluator does not also ship |
 | `keep-symlink` | the copy is a link; removing through it writes somewhere the run never named |
 | `no-install` | workforce ships no catalog for this kind here — nothing to resolve to |
+
+**What is saved before the rest goes, each read back, each blocking**: every `origin: user | immutable:
+true` span; a `WF-HOUSE-RULES` region an earlier audit propagated into a corpus file; and the catalog
+rows the copy carries that no shipped file does — the headings and table-row keys a live grader can
+still be grading on. All three land in `CATALOG-ANCHOR.md`, which is also where `--grep` reads them
+back from (§ Where a catalog resolves from). The whole removed set is archived byte-for-byte into
+`.claude/workforce/retired/` first. **Nothing is removed until what was only in it lives somewhere that
+stays, verified there.**
 
 **The skill directory is never removed.** `SKILL.md`, `CATALOG-ANCHOR.md` — the house rules and the
 supersession register — the handbooks, the scripts and the `hooks/` all survive by construction rather
 than by a gate that has to recognise each of them.
+
+*This table described the FIRST contract until 2026-09-25 — `identical` as "the only removable state",
+a `STAYS` row for "the install ships a different one" — while `classify` had retired unconditionally
+since 2026-09-10. A section that describes a safer command than the one it documents misleads exactly
+the reader who checks before running it.*
 
 *The first design did not work this way, and the record is kept because the failure is instructive.* It
 compared HEADINGS AND TABLE ROWS and removed a whole copy on a pass. An independent code evaluation

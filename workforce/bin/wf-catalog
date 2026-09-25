@@ -7,6 +7,8 @@
     wf-catalog --root <tree> --json              machine-readable, for audit and verify
     wf-catalog --root <tree> --migrate           classify each project copy: residue, or local content
     wf-catalog --root <tree> --migrate --execute remove what it PROVED is residue, and nothing else
+    wf-catalog --root <tree> --house-rules       what the house-rules refresh would propagate
+    wf-catalog --root <tree> --house-rules --execute  propagate it (audit Step 4 / Step 6-E)
 
 WHY THIS EXISTS, and it is a measurement rather than a preference.
 
@@ -40,25 +42,33 @@ holds a copy keeps being answered from it, byte for byte, until a migration prov
 is redundant. Directive one makes preservation the floor: a corpus is not made shared by
 silently answering an existing project from somewhere new.
 
-WHAT `--migrate` WILL AND WILL NOT REMOVE. **Removal is per FILE and the proof is byte
-identity.** A file goes only when the install ships a file of the same name and the two are
-identical once the machine-owned additions region, the version anchor and trailing
-whitespace are normalised away. Everything else stays: a file the install does not ship, a
-file differing by a sentence, a file that could not be read, a copy that is a symlink, a
-copy carrying an `origin: user` span. The skill directory itself is NEVER removed, so
-`SKILL.md`, `CATALOG-ANCHOR.md` — the house rules and the supersession register — the
-handbooks, the scripts and the hooks survive by construction rather than by a gate that has
-to recognise each of them.
+WHAT `--migrate` WILL AND WILL NOT REMOVE. **Removal is per FILE and it is UNCONDITIONAL on
+content** — the user directive of 2026-09-10, stated in `classify`: *"the audit of a project
+removes the old ones of the project ... No exceptions."* What survives is a closed list, and
+every entry is make-before-break rather than a content proof:
 
-*This contract is the second one. The first read "it removes a COPY when every heading and
-table row is present in the install", and an independent code evaluation broke it the day it
-was written: project judgement is usually a paragraph under an existing heading, so a copy
-carrying a real local rule introduced no new heading and classified as pure residue — and
-`residue` then `rmtree`'d the whole skill, house rules and unexamined hook scripts included,
-while this docstring promised the house rules stay local. Every gate protecting that verdict
-was a chance to fail open, and three of them did. Unremovable is now the default and
-identity is the only thing that lifts it.* **A removal it cannot justify is a removal it does
-not make.**
+  `CATALOG-ANCHOR.md`          the house rules, the supersession register, and everything
+                               lifted into them — never removed, and the skill DIRECTORY is
+                               never removed either
+  a symlink                    removing files through one writes somewhere nobody named
+  an `agents/`, `scripts/` or  capability the shipped evaluator does not also ship; removing
+  `hooks/` file the install    it leaves a named capability reachable by zero paths
+  does not ship
+  a file a live reader cites   kept where its readers already point, each reader named in
+  by any path form             the report, until the citation is moved
+
+And what is SAVED before the rest goes, each read back and each blocking: every `origin:
+user` span, a `WF-HOUSE-RULES` region an earlier audit propagated into a corpus file, and
+the catalog rows the copy carries that no shipped file does — all into `CATALOG-ANCHOR.md`.
+The whole removed set is archived byte-for-byte into `.claude/workforce/retired/` first.
+
+*This contract is the third one, and the paragraph here described the FIRST two until
+2026-09-25 while the code had moved on — it claimed "the proof is byte identity ... a file
+differing by a sentence stays", which `classify` stopped doing on 2026-09-10. A header that
+describes a safer script than the one underneath it is worse than no header: the reader who
+checks before running is the one it misleads.* **The proof moved from the removal to the
+retention: nothing is removed until what was only in it has been written somewhere that
+stays, and verified there.**
 """
 
 import argparse
@@ -770,6 +780,179 @@ IMMUTABLE_SPAN_RX = re.compile(
 
 PRESERVE_HEADING = "## Preserved from the retired project copy"
 
+# ── the house rules, and the producer `audit` Step 4 and Step 6-E both require ──────
+#
+# THE REGION HAD NO WRITER. `audit.md` § Step 4 ("Refresh the house rules in every
+# installed evaluator, every run") and Step 6-E both mandate this write "never skipped,
+# never offered, never a question", both print `INV-HOUSERULES`, and no shipped script
+# emitted a single byte of it: `grep -rl WF-HOUSE-RULES` over the install's `bin/`
+# returned nothing on 2026-08-20, 2026-09-14 and again on 2026-09-25, three audits of
+# one project apart. The 2026-09-25 run wrote `image-eval`'s region BY HAND from
+# `code-evaluator`'s. A step performed by whoever remembers is the shape `wf-seed` and
+# `wf-companion` were both built to end, and this is the third of the same family.
+#
+# THE REGION'S HOME IS `CATALOG-ANCHOR.md`, which `--migrate` leaves standing by
+# construction. An earlier audit propagated the rules into `references/guards.md` and
+# `references/ai-patterns.md` — corpus files — and the retirement removed the first of
+# them, house rules included, after Step 6-F had promised they survive (recovered from
+# `retired/` by hand). A region found in any other file of the evaluator is RELOCATED
+# here, which is the same repair made once rather than every audit.
+HOUSE_START = ("<!-- WF-HOUSE-RULES START — propagated by /workforce audit; "
+               "machine-owned, safe to replace -->")
+HOUSE_END = "<!-- WF-HOUSE-RULES END -->"
+HOUSE_RX = re.compile(
+    r"^<!--\s*WF-HOUSE-RULES\s+START\b[^>]*-->.*?^<!--\s*WF-HOUSE-RULES\s+END\s*-->[ \t]*$",
+    re.M | re.S)
+# The provenance line, rewritten on every propagation and therefore EXCLUDED from the
+# comparison that decides whether a propagation is needed at all. A region whose only
+# difference from the current one is the date it was written is not stale, and a writer
+# that rewrites it anyway is not idempotent (`bin/idempotence`, CLASS B).
+HOUSE_PROVENANCE_RX = re.compile(r"^<!--\s*origin:\s*workforce\b[^>]*-->[ \t]*$\n?", re.M)
+HOUSE_REGISTER_HEADING = "### Supersession register"
+# A marker recording, structurally, which shipped entry a customization supersedes.
+# `evaluators.md` § A register scoped by enumeration goes stale: rows come from an
+# `origin: user` span's own attributes or a `supersedes:` key, and from NOTHING else —
+# a prose grep for the word returned one row and it was a fragment of an unrelated
+# sentence, which is an invention with a line number attached.
+SUPERSEDES_RX = re.compile(r"^<!--(?=[^>]*\bsupersedes:)[^>]*-->[ \t]*$", re.M)
+HOUSE_ATTR_RX = re.compile(r"\b([A-Za-z][A-Za-z-]*):\s*([^|>]*?)\s*(?=\||-->|$)")
+
+
+def house_text(rows, carried):
+    """The WF-HOUSE-RULES body — the precedence clause, then the derived register.
+
+    NO DATE IN THE BODY. The provenance comment carries when it was propagated and is
+    excluded from the staleness comparison; a date inside the text would make every run
+    a rewrite and every re-run a second one.
+    """
+    out = ["## House rules — precedence (workforce-owned)", "",
+           "**House rules dominate, and the supersession register is the SOLE source of a "
+           "demotion or exemption.**",
+           "An evaluator APPLIES the house rules; it does not renegotiate them against the "
+           "specific file in front of it.", "",
+           "- The supersession register below is the only place *\"matches this file's own "
+           "house style\"* is a valid",
+           "  reason to demote a finding, and only inside that row's stated scope. Everywhere "
+           "else a HIGH-confidence",
+           "  finding is applied on its own evidence, not demoted by an appeal to local "
+           "convention.",
+           "- **Outside every register row's scope, a settled finding's fix is applied in the "
+           "same pass, never",
+           "  skipped, never offered, never surfaced to the human as a question.** A settled "
+           "house rule handed to",
+           "  the human as a question is a flag, and a flag is not a fix (the no-deferment-queue "
+           "directive;",
+           "  \"A DETECTOR SHIPS WITH ITS FIX\").",
+           "- This constrains the evaluator; it widens no exemption and grants none the register "
+           "never granted.", "",
+           HOUSE_REGISTER_HEADING,
+           "| Shipped entry | Superseded by | Where | Since |",
+           "|---|---|---|---|"]
+    out += [r for r in rows] + [r for r in carried]
+    if not rows and not carried:
+        out += ["",
+                "_Empty: no shipped entry in this catalog carries a structured `supersedes:` "
+                "citation. The register is",
+                "derived from structure, never from a prose grep (`references/evaluators.md` "
+                "§ The supersession register);",
+                "0 rows._"]
+    return "\n".join(out)
+
+
+def house_region(text):
+    """The WF-HOUSE-RULES region in `text`, or None."""
+    m = HOUSE_RX.search(text or "")
+    return m.group(0) if m else None
+
+
+def house_wrap(body, prov):
+    """The region as it sits in a file: markers, provenance line, body."""
+    return "\n".join((HOUSE_START, prov, "", body, "", HOUSE_END))
+
+
+def house_substance(region):
+    """A region reduced to what a staleness comparison may read.
+
+    EVERYTHING BUT THE PROVENANCE LINE, which carries the date and changes on every run
+    by design, AND blank lines, so a re-flow is not mistaken for a change of rules. A
+    comparison that reads either turns every run into a rewrite and the second run into
+    a second one — the CLASS B defect `bin/idempotence` exists for.
+    """
+    text = HOUSE_PROVENANCE_RX.sub("", region or "")
+    return "\n".join(l.rstrip() for l in text.splitlines() if l.strip())
+
+
+def house_dirs(root, kind):
+    """Every project-scope directory that can hold this kind's house rules, in spelling
+    order. NOT ownership-tested, exactly as `project_anchors` is not: the anchor is never
+    shipped, so one sitting under a skill `install` wrote is still the project's own."""
+    return [d for d in (os.path.join(root, ".claude", "skills", n)
+                        for n in CATALOGS[kind]["skills"]) if os.path.isdir(d)]
+
+
+def register_rows(root, kind):
+    """`([row, ...], [(path, line), ...])` — the supersession register, DERIVED.
+
+    Structure only, per `evaluators.md`: a marker carrying a `supersedes:` attribute,
+    wherever it sits in the project's own evaluator directories. Each row cites the
+    customization by `path:line`, so no row is a guess about the user's intent.
+
+    The machine-owned region is removed before the scan. A run that read its own last
+    output would re-derive its rows as evidence for themselves, and the register would
+    grow by one copy of itself per audit.
+    """
+    rows, cites = [], []
+    for d in house_dirs(root, kind):
+        for f in all_files(d):
+            if not f.endswith(".md"):
+                continue
+            text = HOUSE_RX.sub("", slurp(f))
+            for m in SUPERSEDES_RX.finditer(text):
+                attrs = {k.lower(): v for k, v in HOUSE_ATTR_RX.findall(m.group(0))}
+                entry = attrs.get("supersedes", "").strip()
+                if not entry:
+                    continue
+                line = text[:m.start()].count("\n") + 1
+                where = "`%s:%d`" % (os.path.relpath(f, root), line)
+                by = (attrs.get("superseded-by") or attrs.get("by") or "").strip()
+                if not by:
+                    tail = [l.strip() for l in text[m.end():].splitlines() if l.strip()]
+                    by = tail[0][:100] if tail else "the customization at this path"
+                since = (attrs.get("since") or attrs.get("added")
+                         or attrs.get("date") or "undated").strip()
+                rows.append("| %s | %s | %s | %s |"
+                            % (entry, by.replace("|", "\\|"), where, since))
+                cites.append((os.path.relpath(f, root), line))
+    return rows, cites
+
+
+def carried_rows(region, derived):
+    """Register rows the previous region carried that this derivation did not produce.
+
+    KEPT, NOT DROPPED. The region is machine-owned and says so, and a row a person wrote
+    into it by hand is still the project's own words — directive one is retention, and a
+    silent deletion here is the one failure mode this whole file is built against. They
+    are carried verbatim and COUNTED, so a register that is growing rows nothing can
+    derive is visible rather than quietly permanent.
+    """
+    if not region:
+        return []
+    body = region.split(HOUSE_REGISTER_HEADING, 1)
+    if len(body) < 2:
+        return []
+    have = {r.split("|")[1].strip() for r in derived if r.count("|") > 2}
+    out = []
+    for line in body[1].splitlines():
+        line = line.strip()
+        if not line.startswith("|") or line.count("|") < 4:
+            continue
+        first = line.split("|")[1].strip()
+        if not first or first.startswith("---") or first == "Shipped entry":
+            continue
+        if first not in have:
+            out.append(line)
+    return out
+
 
 def user_spans(d):
     """Every `origin: user | immutable: true` span in this copy, verbatim, with its source.
@@ -815,24 +998,48 @@ def preserve_spans(proj, spans):
     NOTHING for that kind. An extraction that was not verified may never authorise a
     deletion.
     """
-    if not spans:
+    chunks = [("*Lifted verbatim from `%s:%d` when the project copy was retired in favour "
+               "of the shipped evaluator. Not reworded.*\n\n%s" % (rel, line, span), span)
+              for rel, line, span in spans]
+    return anchor_append(proj, PRESERVE_HEADING, chunks)
+
+
+def anchor_append(proj, heading, chunks):
+    """Append `chunks` under `heading` in `CATALOG-ANCHOR.md`, then READ THEM BACK.
+
+    `chunks` is `[(text_to_write, needle_that_must_read_back)]`. A chunk whose needle is
+    already in the file is skipped, which is what makes a second run of the same lift a
+    no-op (CLASS B). Returns False on a refused or unverified write, and the caller
+    removes NOTHING on a False — an extraction that was not verified may never authorise
+    a deletion.
+
+    ONE WRITER FOR EVERY LIFT INTO THE ANCHOR. The `origin: user` spans, the house-rules
+    region a migration would otherwise delete, and the project-only catalog rows a
+    differing file carries are three different things to save and exactly one way to save
+    them; three copies of this readback would be three chances for one of them to skip it.
+    """
+    if not chunks:
         return True
-    anchor = os.path.join(proj, "CATALOG-ANCHOR.md")
+    anchor = os.path.join(proj, ANCHOR)
     existing = slurp(anchor)
     if os.path.islink(anchor):
         return False
-    chunks = []
-    for rel, line, span in spans:
-        if span in existing:
-            continue
-        chunks.append("*Lifted verbatim from `%s:%d` when the project copy was retired in "
-                      "favour of the shipped evaluator. Not reworded.*\n\n%s" % (rel, line, span))
-    if not chunks:
+    pending = [(text, needle) for text, needle in chunks if needle not in existing]
+    if not pending:
         return True
+    if not existing.strip():
+        # A LIFT CAN BE THE FIRST THING IN THE FILE, and a file that opens on two blank
+        # lines and a chunk reads like debris rather than like the layer that outranks
+        # the catalog. The header says what the file is to whoever opens it next.
+        existing = ("# CATALOG-ANCHOR - %s\n\nThe project-specific layer: house rules, the "
+                    "supersession register, and everything a retirement lifted out of the "
+                    "project's own copy. The corpus itself resolves from the workforce "
+                    "install (`wf-catalog --kind <kind> --path`).\n"
+                    % os.path.basename(proj))
     body = existing.rstrip("\n")
-    if PRESERVE_HEADING not in body:
-        body += "\n\n" + PRESERVE_HEADING + "\n"
-    body += "\n" + "\n\n".join(chunks) + "\n"
+    if heading not in body:
+        body += "\n\n" + heading + "\n"
+    body += "\n" + "\n\n".join(t for t, _n in pending) + "\n"
     try:
         # `open(path, "w")` FOLLOWS a symlink and truncates its target, which is why the
         # link case is refused above rather than handled here (SKILL.md § Atomic-or-Absent,
@@ -842,7 +1049,283 @@ def preserve_spans(proj, spans):
     except OSError:
         return False
     back = slurp(anchor)
-    return all(span in back for _rel, _line, span in spans)
+    return all(needle in back for _t, needle in chunks)
+
+
+LIFTED_HEADING = "## Project catalog amendments lifted from the retired copy"
+
+
+def file_keys(text):
+    """`{normalised key: (line number, the line verbatim)}` — the comparable units of a
+    catalog file: its headings and its table-row keys, the two things an evaluator greps
+    (`HEADING_RX`, `ROW_KEY_RX`). Prose is excluded for the reason those patterns exist:
+    it reflows between versions and would differ on every copy."""
+    out = {}
+    lines = (text or "").splitlines()
+    for n, line in enumerate(lines, 1):
+        m = HEADING_RX.match(line)
+        if not m:
+            m = ROW_KEY_RX.match(line)
+            if m and set(m.group(1).strip()) <= set("-: "):
+                continue          # a table's separator row is not a key
+            # NOR IS THE HEADER ROW ABOVE IT. `| Check | Severity |` is the table's
+            # column names, identical in every project that writes a table, and lifting
+            # it as a project-only row is noise sitting on top of the real ones.
+            if m and n < len(lines) and set(lines[n].strip()) <= set("|-: ") and "-" in lines[n]:
+                continue
+        if not m:
+            continue
+        key = m.group(1).strip().strip("*`_ ").lower()
+        if key:
+            out.setdefault(key, (n, line.rstrip()))
+    return out
+
+
+def install_keys(root, kind):
+    """Every heading and row key the SHIPPED corpus for `kind` carries."""
+    inst = install_dir(root, kind)
+    keys = set()
+    for f in catalog_files(inst) if inst else []:
+        keys |= set(file_keys(slurp(f)))
+    return keys
+
+
+def project_only_rows(root, kind, proj, rels):
+    """`{rel: [(line, text)]}` — the catalog rows a removable file carries and the install
+    does not, which are the ones a live grader can still be grading on.
+
+    THE DELTA OF A MODIFIED SHIPPED FILE IS PROJECT CONTENT, and until now it went to
+    `retired/` with nothing live holding it. MEASURED 2026-09-25 on `university`: a project
+    grader cited *"Productive tangent — minimum/absent"* from `text-eval`'s copy and
+    *"Consistent edge quality"* from `image-eval`'s `watercolor.md`; neither row is in any
+    shipped catalog, and after the migration `wf-catalog --grep` for either answered `no
+    match` because the only copy was in an archive directory the resolver never reads. They
+    are PROJECT rows and they do not belong in the shipped corpus — so they are lifted into
+    the house-rules layer, which the resolver does read and which survives every migration.
+    """
+    shipped = install_keys(root, kind)
+    out = {}
+    for rel in sorted(rels):
+        f = os.path.join(proj, rel)
+        if os.path.islink(f) or not rel.endswith(".md"):
+            continue
+        rows = [v for k, v in file_keys(HOUSE_RX.sub("", slurp(f))).items()
+                if k not in shipped]
+        if rows:
+            out[rel] = sorted(rows)
+    return out
+
+
+def lift_rows(proj, rows_by_rel):
+    """Write the project-only rows of every removed file into `CATALOG-ANCHOR.md`, verified.
+
+    The row is copied VERBATIM with its source `path:line`, so a reader grepping the layer
+    finds the same text it was grading on, and a person can see where it came from."""
+    chunks = []
+    for rel in sorted(rows_by_rel):
+        body = "\n".join(text for _n, text in rows_by_rel[rel])
+        chunks.append(("*From `%s`, lifted when the project copy was retired. These rows "
+                       "are the project's own — no shipped catalog carries them.*\n\n%s"
+                       % (rel, body), body))
+    return anchor_append(proj, LIFTED_HEADING, chunks)
+
+
+def lift_house_regions(proj, regions):
+    """Move a WF-HOUSE-RULES region out of a file the retirement removes, verified.
+
+    `audit.md` Step 6-F promises the house rules survive a retirement and, for one real
+    project, they did not: an earlier audit had propagated `code-evaluator`'s region into
+    `references/guards.md`, which is corpus, so the migration removed it and the 1,634-byte
+    region was recovered out of `retired/` by hand. `text-eval`'s sits in
+    `references/ai-patterns.md` and is latent in exactly the same way. The region is lifted
+    into the anchor BEFORE anything is removed, and a file whose region could not be lifted
+    is not removed at all.
+    """
+    return anchor_append(proj, PRESERVE_HEADING, [
+        ("*The house rules were propagated into `%s` by an earlier audit. That file is "
+         "corpus and the migration removes corpus, so the region is lifted here verbatim "
+         "— `CATALOG-ANCHOR.md` stays (audit Step 6-F).*\n\n%s" % (rel, reg), reg)
+        for rel, reg in regions])
+
+
+def house_state(root, kind):
+    """What this kind's house rules are, where they live, and what a refresh would do.
+
+    Five verdicts, and each unrefreshed one NAMES ITS PRECONDITION — `audit.md` Step 4:
+    `INV-HOUSERULES` is `NOT UPHELD` only when an unrefreshed evaluator cites nothing,
+    which is the uncited-refusal shape `INV-SWEPT` uses. A run may not skip the refresh
+    silently and still close clean.
+
+      no-evaluator   this project holds no directory for the kind — nothing to refresh
+      unappendable   the anchor is immutable end to end, or is a link out of the tree
+      current        the region is present and says what this run would say
+      relocate       the region is in a corpus file the migration removes; it moves here
+      refresh        the region is absent, or stale
+    """
+    dirs = house_dirs(root, kind)
+    if not dirs:
+        tried = ", ".join(".claude/skills/%s" % n for n in CATALOGS[kind]["skills"])
+        return {"kind": kind, "verdict": "no-evaluator", "why":
+                "no %s evaluator directory at project scope (tried %s), so there is no "
+                "house-rules file to refresh. Run `workforce update` to install the "
+                "evaluators, then re-run." % (kind, tried)}
+    anchors = [os.path.join(d, ANCHOR) for d in dirs]
+    dest = next((a for a in anchors if os.path.isfile(a)), anchors[0])
+    rows, cites = register_rows(root, kind)
+    existing = slurp(dest) if os.path.isfile(dest) else ""
+    region = house_region(existing)
+    # A REGION IN A FILE THE MIGRATION REMOVES. Step 6-F guarantees the house rules
+    # survive a retirement, and a region propagated into corpus by an earlier audit does
+    # not: `code-evaluator`'s went with `references/guards.md` on 2026-09-11 and was
+    # recovered from `retired/` by hand. Found here, it moves to the anchor.
+    stray = []
+    for d in dirs:
+        for f in all_files(d):
+            if f == dest or not f.endswith(".md") or os.path.islink(f):
+                continue
+            if house_region(slurp(f)):
+                stray.append(f)
+    source_region = region or (house_region(slurp(stray[0])) if stray else None)
+    body = house_text(rows, carried_rows(source_region, rows))
+    st = {"kind": kind, "dest": dest, "rows": rows, "cites": cites,
+          "carried": carried_rows(source_region, rows), "stray": stray, "body": body}
+    if os.path.islink(dest):
+        st.update(verdict="unappendable", why="%s is a symlink; writing through it puts "
+                  "the project's house rules somewhere this run never named"
+                  % os.path.relpath(dest, root))
+        return st
+    if existing and not IMMUTABLE_SPAN_RX.sub("", existing).strip():
+        spans = ["%s:%d" % (os.path.relpath(dest, root),
+                            existing[:m.start()].count("\n") + 1)
+                 for m in IMMUTABLE_SPAN_RX.finditer(existing)]
+        st.update(verdict="unappendable", why="%s is immutable end to end — every byte "
+                  "sits inside an `origin: user | immutable: true` span (%s), so there is "
+                  "no position to open a machine-owned region"
+                  % (os.path.relpath(dest, root), ", ".join(spans[:4])))
+        return st
+    if region and not stray and house_substance(region) == house_substance(house_wrap(body, "")):
+        st.update(verdict="current", why="register %d row(s)%s · precedence clause present"
+                  % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else ""))
+        return st
+    if stray and not region:
+        st.update(verdict="relocate", why="register %d row(s) · the region sits in %s, "
+                  "which the migration removes — it moves into %s"
+                  % (len(rows), ", ".join(os.path.relpath(f, root) for f in stray[:3]),
+                     ANCHOR))
+        return st
+    st.update(verdict="refresh",
+              why="register %d row(s)%s · precedence clause %s"
+              % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else "",
+                 "stale" if region else ("appended" if existing else "written")))
+    return st
+
+
+def house_write(root, st):
+    """Write the region into `CATALOG-ANCHOR.md`, read it back, and clear any stray copy.
+
+    `(ok, detail)`. THE READBACK IS BLOCKING and the stray is cleared only after it: the
+    relocation must never be a removal that failed to be a move. Same rule as
+    `preserve_spans`, for the same reason — an extraction that was not verified may not
+    authorise a deletion.
+    """
+    dest, body = st["dest"], st["body"]
+    run = ""
+    try:
+        with open(os.path.join(root, ".claude", "workforce", ".current-run"),
+                  encoding="utf-8", errors="replace") as fh:
+            run = (fh.read().strip().splitlines() or [""])[0].strip()
+    except OSError:
+        pass
+    prov = ("<!-- origin: workforce | modifiable: true | source: references/evaluators.md "
+            "§ House rules dominate | propagated: %s%s -->"
+            % (time.strftime("%Y-%m-%d", time.gmtime()), " run %s" % run if run else ""))
+    region = house_wrap(body, prov)
+    existing = slurp(dest) if os.path.isfile(dest) else ""
+    if not existing:
+        existing = ("# CATALOG-ANCHOR - %s\n\nWritten by `wf-catalog --house-rules` "
+                    "because this project's %s evaluator carried no house-rules file. The "
+                    "corpus resolves from the workforce install (`wf-catalog --kind %s "
+                    "--path`); this file is the project-specific layer that outranks it "
+                    "and survives every migration.\n"
+                    % (os.path.basename(os.path.dirname(dest)), st["kind"], st["kind"]))
+    new = HOUSE_RX.sub("", existing).rstrip("\n") + "\n\n" + region + "\n"
+    try:
+        _sibling("wf-ledger").atomic_write(root, dest, new.encode("utf-8"), makedirs=True)
+    except OSError as exc:
+        return False, "not written, the file keeps its bytes: %s" % exc
+    back = house_region(slurp(dest))
+    if back is None or house_substance(back) != house_substance(region):
+        return False, "written and read back changed or absent — nothing else touched"
+    cleared = []
+    for f in st["stray"]:
+        text = slurp(f)
+        stripped = HOUSE_RX.sub("", text).rstrip("\n") + "\n"
+        try:
+            _sibling("wf-ledger").atomic_write(root, f, stripped.encode("utf-8"))
+        except OSError as exc:
+            return True, ("region written to %s; %s still carries its copy (%s)"
+                          % (os.path.relpath(dest, root), os.path.relpath(f, root), exc))
+        if house_region(slurp(f)):
+            return True, ("region written to %s; %s still carries its copy after the write"
+                          % (os.path.relpath(dest, root), os.path.relpath(f, root)))
+        cleared.append(os.path.relpath(f, root))
+    return True, ("register %d row(s)%s%s"
+                  % (len(st["rows"]),
+                     " · %d carried" % len(st["carried"]) if st["carried"] else "",
+                     " · lifted out of %s" % ", ".join(cleared) if cleared else ""))
+
+
+def house_rules(root, args):
+    """`--house-rules`: the producer for the region `audit` Step 4 and 6-E both require."""
+    states = [house_state(root, k) for k in sorted(CATALOGS)]
+    if args.json:
+        json.dump({"root": root, "house_rules": [
+            {k: v for k, v in s.items() if k != "body"} for s in states]},
+            sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+    print("catalog house rules — %s" % root)
+    refreshed = unrefreshed = current = failed = 0
+    label = "HOUSE RULES"
+    for st in states:
+        name = os.path.basename(os.path.dirname(st["dest"])) if st.get("dest") else st["kind"]
+        if st["verdict"] in ("no-evaluator", "unappendable"):
+            unrefreshed += 1
+            print("%-15s ~ %-20s UNREFRESHED %s" % (label, name, st["why"]))
+            label = ""
+            continue
+        if st["verdict"] == "current":
+            current += 1
+            print("%-15s = %-20s %s" % (label, name, st["why"]))
+            label = ""
+            continue
+        if not args.execute:
+            print("%-15s ~ %-20s %s — would %s into %s"
+                  % (label, name, st["why"], st["verdict"], os.path.relpath(st["dest"], root)))
+            label = ""
+            continue
+        ok, detail = house_write(root, st)
+        if not ok:
+            failed += 1
+            unrefreshed += 1
+            print("%-15s ! %-20s FAILED %s" % (label, name, detail), file=sys.stderr)
+        else:
+            refreshed += 1
+            print("%-15s + %-20s %s · %s"
+                  % (label, name, detail, os.path.relpath(st["dest"], root)))
+        label = ""
+    if not args.execute:
+        pending = len(states) - unrefreshed - current
+        print("\nINV-HOUSERULES  %d evaluator(s) · %d current · %d would refresh · %d "
+              "unrefreshed · each unrefreshed names its precondition"
+              % (len(states), current, pending, unrefreshed))
+        if pending:
+            print("\nDISPLAY ONLY — nothing written. Re-run with --execute to propagate.")
+        return 0
+    print("\nINV-HOUSERULES  %d evaluator(s) · %d register(s) refreshed · %d current · "
+          "precedence present · %d unrefreshed · each unrefreshed names its precondition"
+          % (len(states), refreshed, current, unrefreshed))
+    return 1 if failed else 0
 
 
 def shipped_agents(root, kind):
@@ -1026,9 +1509,16 @@ def classify(root, kind):
         else:
             removable.append(rel)
 
+    # WHAT IS SAVED OUT OF THE REMOVED SET BEFORE IT GOES. The house-rules region an
+    # earlier audit propagated into a corpus file (Step 6-F promises it survives), and the
+    # catalog rows the copy carries that no shipped file does. Both land in the anchor,
+    # both are read back, and a failure of either leaves the file in place.
+    house = [(rel, house_region(slurp(os.path.join(proj, rel)))) for rel in sorted(removable)]
+    house = [(rel, reg) for rel, reg in house if reg]
     return {
         "kind": kind, "verdict": "retire", "path": proj,
         "removable": sorted(removable), "kept": sorted(kept), "cited": cited,
+        "house": house, "rows": project_only_rows(root, kind, proj, removable),
         "spans": [(rel, line) for rel, line, _t in spans],
         "why": ("the shipped %s evaluator is installed and current, so this copy is the old "
                 "one — %d file(s) go, CATALOG-ANCHOR.md stays%s%s"
@@ -1112,8 +1602,27 @@ def live_readers(root, proj):
     return readers
 
 
+def _citation_rx(rel):
+    """Every path form a reader writes for one file in the copy, as one pattern.
+
+    `references/x.md` and a bare `x.md` are the same citation, and `<skill>/references/x.md`
+    contains the first — so matching the rel and the basename covers all three.
+
+    THE LEFT GUARD ADMITS A SEPARATOR AND STOPS A WORD. `/` must pass, because the longest
+    real form is exactly the short one with a path in front of it; what the guard is for is
+    `myreferences/x.md` and `palette.md` inside `not-palette.md`. Written the other way for
+    an hour, it rejected the one citation the fixture exists for — a handbook naming
+    `.claude/skills/image-eval/references/palette.md`, the most ordinary spelling there is.
+    """
+    forms = {rel.replace(os.sep, "/"), posixpath.basename(rel.replace(os.sep, "/"))}
+    return re.compile("|".join(r"(?<![\w.-])" + re.escape(f) + r"(?![\w-])"
+                               for f in sorted(forms, key=len, reverse=True)))
+
+
 def _cite_lines(text, needle):
-    return [n for n, line in enumerate(text.splitlines(), 1) if needle in line]
+    """Line numbers where `needle` — a string or a compiled pattern — appears."""
+    search = needle.search if hasattr(needle, "search") else (lambda l: needle in l)
+    return [n for n, line in enumerate(text.splitlines(), 1) if search(line)]
 
 
 def cited_project_files(root, kind, proj, rels, keep_rel):
@@ -1134,25 +1643,38 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
     report names each reader so the citation can be moved deliberately. Once nothing cites it,
     the next run retires it.
 
-    PROJECT-ONLY MEANS THE INSTALL SHIPS NOTHING LIKE IT: no file with the same normalised
-    content and none with the same name. A copy of a shipped file, even a modified one, is read
-    through the resolver — `evaluators.md` § tier-3, healed by audit Step 5d 2c — so a citation
-    of it is repointed, not protected.
+    THE TEST IS CONTENT IDENTITY, AND IT USED TO BE CONTENT **OR NAME**. A copy of a shipped
+    file that is byte-identical once normalised is read through the resolver — `evaluators.md`
+    § tier-3, healed by audit Step 5d 2c — so a citation of it is repointed, not protected, and
+    that half is unchanged. A file carrying a shipped NAME and different CONTENT is not that
+    file: its delta is the project's own, and excluding it here meant a cited one was removed
+    anyway. MEASURED 2026-09-25 on `university`: `human-markers.md` and `text-tells.md` both
+    differ from the install by `cmp` and are read by `text-eval/SKILL.md:69,71`,
+    `finishing-chain.md:63,69` and `CATALOG-ANCHOR.md:1` — all listed `retire`, their delta
+    bound for `retired/` with no live reader left. A modified file is protected exactly as a
+    project-only one is, and its project-only ROWS are lifted into the house-rules layer by
+    `project_only_rows` when it does go.
+
+    A CITATION IS MATCHED IN EVERY PATH FORM A READER WRITES. The needle was
+    `<skill>/<rel>` and nothing else, so `references/output-formats.md` and a bare
+    `output-formats.md` — `image-eval/references/invocation.md:38,44,50` writes both — were
+    invisible, and the file they name was removed under a reader that still points at it.
+    The rel form subsumes the `<skill>/<rel>` form; the basename form is matched only where
+    it is not already part of a longer path, so one citation is never counted twice.
 
     A READER INSIDE THE COPY COUNTS ONLY IF IT STAYS. A project agent the shipped skill does not
     ship stays, and the files it cites are its grounding, so the set is closed to a fixpoint: a
     file kept because it is cited can itself cite another. A reader that is itself being retired
     reads nothing after the run.
     """
-    by_name, by_content = install_index(root, kind)
-    name = os.path.basename(proj)
+    _by_name, by_content = install_index(root, kind)
     candidates = []
     for rel in sorted(rels - keep_rel):
         f = os.path.join(proj, rel)
         if os.path.islink(f):
             continue
         body = norm(slurp(f))
-        if (body and body in by_content) or os.path.basename(rel) in by_name:
+        if body and body in by_content:
             continue
         candidates.append(rel)
     if not candidates:
@@ -1160,8 +1682,8 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
     readers = live_readers(root, proj)
     cited = {}
     for rel in candidates:
-        needle = "%s/%s" % (name, rel.replace(os.sep, "/"))
-        hits = ["%s:%d" % (path, n) for path, text in readers for n in _cite_lines(text, needle)]
+        rx = _citation_rx(rel)
+        hits = ["%s:%d" % (path, n) for path, text in readers for n in _cite_lines(text, rx)]
         if hits:
             cited[rel] = hits
     # The copy's own staying files, to a fixpoint.
@@ -1172,14 +1694,14 @@ def cited_project_files(root, kind, proj, rels, keep_rel):
         for rel in candidates:
             if rel in cited:
                 continue
-            needle = rel.replace(os.sep, "/")
+            rx = _citation_rx(rel)
             hits = []
             for reader in sorted(staying):
                 if reader == rel:
                     continue
                 text = slurp(os.path.join(proj, reader))
                 hits += ["%s/%s:%d" % (os.path.relpath(proj, root), reader, n)
-                         for n in _cite_lines(text, needle)]
+                         for n in _cite_lines(text, rx)]
             if hits:
                 cited[rel] = hits
                 changed = True
@@ -1440,6 +1962,15 @@ def migrate(root, args):
         print("  %-9s %-14s %s" % (v["kind"], v["verdict"], v["why"]))
         for rel, line in v.get("spans", []):
             print("               PRESERVE   %s:%d → CATALOG-ANCHOR.md (verbatim)" % (rel, line))
+        for rel, _reg in v.get("house") or []:
+            print("               LIFT       %s carries the WF-HOUSE-RULES region → "
+                  "CATALOG-ANCHOR.md (audit Step 6-F)" % rel)
+        for rel in sorted(v.get("rows") or {}):
+            rows = v["rows"][rel]
+            print("               LIFT       %s — %d project-only row(s) → "
+                  "CATALOG-ANCHOR.md: %s%s"
+                  % (rel, len(rows), "; ".join(t.strip()[:60] for _n, t in rows[:2]),
+                     " …" if len(rows) > 2 else ""))
         for f in v["removable"][:4]:
             print("               retire     %s" % f)
         if len(v["removable"]) > 4:
@@ -1536,6 +2067,26 @@ def migrate(root, args):
         if spans:
             print("\n  PRESERVED %d `origin: user` span(s) into %s/CATALOG-ANCHOR.md"
                   % (len(spans), v["path"]))
+        # THE HOUSE RULES AND THE PROJECT'S OWN ROWS, BOTH BEFORE ANY REMOVAL AND BOTH
+        # BLOCKING. Step 6-F promises the first survives and an earlier run deleted it;
+        # the second is the delta of a file the install ships under the same name, which
+        # went to `retired/` with no live reader.
+        if not lift_house_regions(v["path"], v.get("house") or []):
+            print("\n  REFUSED  %s — could not lift %d WF-HOUSE-RULES region(s) into "
+                  "CATALOG-ANCHOR.md and verify them. Nothing removed."
+                  % (v["kind"], len(v.get("house") or [])))
+            continue
+        for rel, _reg in v.get("house") or []:
+            print("\n  LIFTED   the house-rules region out of %s into CATALOG-ANCHOR.md"
+                  % rel)
+        if not lift_rows(v["path"], v.get("rows") or {}):
+            print("\n  REFUSED  %s — could not lift the project-only rows of %d file(s) "
+                  "into CATALOG-ANCHOR.md and verify them. Nothing removed."
+                  % (v["kind"], len(v.get("rows") or {})))
+            continue
+        for rel in sorted(v.get("rows") or {}):
+            print("  LIFTED   %2d project-only row(s) from %s into CATALOG-ANCHOR.md"
+                  % (len(v["rows"][rel]), rel))
         for rel in v["removable"]:
             target = os.path.join(v["path"], rel)
             # Re-assert against the tree AS IT STANDS NOW rather than trusting the
@@ -1576,6 +2127,9 @@ def main():
     ap.add_argument("--grep", metavar="RX", help="search the resolved catalog")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--migrate", action="store_true")
+    ap.add_argument("--house-rules", action="store_true", dest="house_rules",
+                    help="refresh the WF-HOUSE-RULES region in every evaluator's "
+                         "CATALOG-ANCHOR.md (audit Step 4 / Step 6-E)")
     ap.add_argument("--execute", action="store_true")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
@@ -1605,8 +2159,13 @@ def main():
                   % (root, found), file=sys.stderr)
             root = found
 
-    if args.execute and not args.migrate:
-        print("--execute is only meaningful with --migrate", file=sys.stderr)
+    if args.execute and not (args.migrate or args.house_rules):
+        print("--execute is only meaningful with --migrate or --house-rules",
+              file=sys.stderr)
+        return 2
+    if args.house_rules and args.migrate:
+        print("--house-rules and --migrate are separate acts: the rules are propagated "
+              "first (audit Step 6-E), the copies retired after (Step 6-F)", file=sys.stderr)
         return 2
 
     if args.path or args.grep:
@@ -1648,6 +2207,8 @@ def main():
                 "".join(" or %s" % f for f in info["anchors"])), file=sys.stderr)
         return 0 if hits else 1
 
+    if args.house_rules:
+        return house_rules(root, args)
     if args.migrate:
         return migrate(root, args)
     return report(root, args)
