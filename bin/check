@@ -1001,6 +1001,45 @@ check(
     not _co_problems,
     "; ".join(_co_problems),
 )
+
+# ── THE SAME CLOSE-OUT AT `SubagentStop`, WHICH IS WHERE THE LEAK HAPPENED ───
+# The block above catches an abandoned shell on the NEXT main turn and can only tell the
+# parent, which never ran it. This one catches it at the agent's own stop, where the node
+# that opened the shell is still alive and is the only one that can say what it was for.
+# MEASURED over 1,269 real subagent transcripts and 1,395 subagent stops on this machine:
+# 9 stops, 0.65%, naming 19 shells, all 19 hand-read and all genuinely open at the stop.
+_sc_problems = []
+# `find`, NEVER `index`, and that is this file's own rule rather than a style note: a check
+# whose anchor has moved must FAIL, not raise. Written with `index` this crashed every
+# assertion in the file under a bin/prove mutation that deleted the anchor — strictly worse
+# than the check it was guarding, which is the reasoning the manifest parser above already
+# carries. Found 2026-09-25 by bin/prove, which mutates exactly these literals.
+_sc_call = _wd_inc.find("left_open = closeout_subagent(payload)")
+_sc_gate = _wd_inc.find("waiting = waiting_on_background(payload, reply)")
+if "def closeout_subagent(" not in _wd_inc or _sc_call < 0:
+    _sc_problems.append("the close-out is gone from the SubagentStop path, so a shell an "
+                        "agent abandons is only noticed on the parent's next turn — the "
+                        "measured one was noticed nine hours later")
+# THE ORDER IS THE FIX, not a preference, and it is asserted as an order rather than as a
+# pair of `in` tests because both literals survive a move. `wf-widen`'s SubagentStop on the
+# measured agent returned `not judged — a background task is still running`: the
+# `background_tasks` exemption is exactly what let it hand back with a live shell.
+elif _sc_gate < 0 or _sc_call > _sc_gate:
+    _sc_problems.append("the subagent close-out no longer runs ABOVE the background_tasks "
+                        "wait gate, which is the exemption that let the measured agent hand "
+                        "back with a live shell. `you are stopping with a background task "
+                        "running` is the one fact that exemption must not silence")
+if "closeout_facts(slines)[\"closed\"]" not in _wd_inc:
+    _sc_problems.append("the subagent half no longer reads the SESSION's closed set. Once a "
+                        "shell's command finishes the harness delivers the notification to "
+                        "the session queue even while the agent is still alive, so the "
+                        "agent's own file never records the close: without this it named 36 "
+                        "shells and 17 of them, 47%, had already been reaped")
+check(
+    "SubagentStop names the shells the stopping agent itself left running",
+    not _sc_problems,
+    "; ".join(_sc_problems),
+)
 # ── A grant may not name a tool this host has no registry entry for ──────────
 # MEASURED 2026-09-10 on 2.1.266 (measurements/2026-09-10-subagent-grant.md):
 # `Grep`, `Glob` and `WebFetch` are absent from the subagent namespace loaded and

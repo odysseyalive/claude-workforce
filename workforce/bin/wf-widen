@@ -726,6 +726,97 @@ def closeout(payload):
     }
 
 
+# ── THE SAME CLOSE-OUT, ONE EVENT EARLIER ────────────────────────────────────────
+# `SubagentStop` IS THE INSTANT THE MEASURED LEAK HAPPENED. The main `Stop` above catches
+# a shell an agent abandoned, but only on the NEXT turn of the session that spawned it,
+# and it can only tell the parent — which did not start the shell, does not know what it
+# was for, and has to kill something it never ran. At `SubagentStop` the agent that opened
+# the shell is still there, holds the whole reason it opened it, and is the one node that
+# can either kill it or say in its report why it is kept. In the record
+# (`agent-a2cdce354a1a97c24.jsonl`) the shell was opened at 21:30:38, the hand-back came at
+# 21:37:18, and the status notification arrived at 06:31:58 — the block below lands in that
+# six-minute window instead of nine hours later.
+#
+# IT RUNS BEFORE THE `background_tasks` WAIT GATE, and that placement is the whole fix
+# rather than an ordering preference. `wf-widen`'s own `SubagentStop` on that agent returned
+# `WIDEN  not judged — a background task is still running`: the exemption is what let it
+# hand back with a live shell. The exemption is still right for every other judgement here —
+# a turn holding for a batch has run nothing and must not be scored — but "you are stopping
+# with a background task running" is exactly the fact this check is about, so it is the one
+# thing the exemption must not silence.
+#
+# ONLY SHELLS THE STOPPING AGENT STARTED ITSELF, read from its own transcript
+# (`TL.reply_transcript`, the ledger's own rule for which file this stop's evidence is in).
+# A shell the parent or a sibling started is not this agent's to close, and the main `Stop`
+# path above already owns those.
+#
+# MEASURED over 1,269 real subagent transcripts and 1,395 subagent stops on this machine:
+# 9 stops fire, 0.65%, naming 19 shells. All 19 hand-read, all 19 genuinely open at the
+# stop: three `until …; do sleep; done` wait-loops, three `cat > f <<'EOF'` heredocs the
+# harness backgrounded because they were hung on stdin, thirteen `sleep N; echo waitedN`
+# idle timers one agent left running, and `buqyin1sk` itself. Against the 1.5% budget that
+# retired this distribution's last speech guard.
+#
+# THE SESSION'S CLOSED SET IS READ TOO, and it is the one measured wrong-fire class this
+# half has. Once a shell's command finishes, the harness delivers the notification to the
+# SESSION queue — a `queue-operation` row in the parent's transcript — even while the agent
+# that opened it is still alive, so the agent's own file never records the close. Without
+# the union this fired on 36 shells and 17 of them, 47%, had already been reaped by the
+# time the agent stopped. That is the same defect the main path measured at 63%, arriving
+# from the other direction.
+SHELLS_SHOWN = 8
+
+
+def closeout_subagent(payload):
+    """Background shells THIS agent started and has not closed, or None.
+
+    The parent's transcript is opened ONLY when this agent started a shell at all, which
+    is the cost control: a subagent stop that backgrounded nothing costs one read of a
+    file this hook was already going to read for its counts.
+    """
+    lines = TL._read_lines(TL.reply_transcript(payload))
+    if not lines:
+        return None
+    f = closeout_facts(lines)
+    if not f["shells"]:
+        return None
+    spath = payload.get("transcript_path")
+    slines = TL._read_lines(spath if isinstance(spath, str) else "")
+    closed = f["closed"] | (closeout_facts(slines)["closed"] if slines else set())
+
+    seen = closeout_reported(payload)
+    shells = [(sid, cmd) for sid, cmd in sorted(f["shells"].items())
+              if sid not in closed and ("s:" + sid) not in seen]
+    if not shells:
+        return None
+    closeout_record(payload, {"s:" + sid for sid, _c in shells})
+
+    # CAPPED, because one measured fire named twelve at once — an agent that had opened
+    # `sleep 90 … sleep 300` as idle timers and said so in its own reply. The reason string
+    # is the next instruction, and a twelve-item bulleted list of `sleep` calls buries the
+    # sentence that says what to do about them.
+    lines_out = ["You are stopping with a background shell you started still open.", ""]
+    for sid, cmd in shells[:SHELLS_SHOWN]:
+        lines_out.append(f"  · {sid} — {cmd}")
+    if len(shells) > SHELLS_SHOWN:
+        lines_out.append(f"  · … and {len(shells) - SHELLS_SHOWN} more")
+    lines_out += [
+        "",
+        "No terminal-status notification has arrived for any of these and none was "
+        "stopped, so each is still running. Once you hand back, nothing is left that "
+        "will read them. MEASURED 2026-09-24: one such shell outlived its agent by nine "
+        "hours and then woke the finished agent up again.",
+        "",
+        "Kill each one now, or name it in your report with the reason it is being left "
+        "running. Either answer ends this; it is asked once per shell."]
+    return {
+        "decision": "block",
+        "reason": "\n".join(lines_out),
+        "systemMessage": "WIDEN  close-out — " + ", ".join(s for s, _c in shells)
+                         + " still open at hand-back",
+    }
+
+
 SENSE_COUNT = {
     "sight": lambda c: c[1] and len(c[1]),      # distinct sources read
     "hearing": lambda c: c[3],                  # web, spawned readers, skills
@@ -943,6 +1034,15 @@ def widen(payload):
             except OSError:
                 pass
         return {"systemMessage": note}
+
+    # THE STOPPING AGENT'S OWN SHELLS, BEFORE THE WAIT GATE. See `closeout_subagent`: the
+    # `background_tasks` exemption below is precisely what let the measured agent hand back
+    # with a live shell, so this one fact has to be read above it. Nothing else moves — the
+    # exemption still gates every judgement that follows.
+    if subagent:
+        left_open = closeout_subagent(payload)
+        if left_open:
+            return left_open
 
     # THE WAIT IS GATED ONCE, FOR THE WHOLE DECISION. The exemption used to live inside
     # `unfinished` alone, so a turn holding for a background batch was spared the promise

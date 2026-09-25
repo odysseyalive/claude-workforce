@@ -192,6 +192,19 @@ from two facts instead — a task notification opened the turn, which the tag re
 says what it is waiting on. Neither fact alone is a wait, and the same reply with nothing pending
 is the measured mid-work stop, still blocked.
 
+**One fact is read above that exemption: a shell the stopping agent started and never closed.**
+`Stop` names a named teammate that handed back and was never sent a `shutdown_request`, and a
+background shell whose starting agent has already finished. `SubagentStop` names the shells the
+stopping agent started *itself*, read from its own transcript, and it runs before the
+`background_tasks` gate — that gate is precisely what let the measured agent hand back with a live
+shell, and "you are stopping with a background task running" is the one thing it must not silence.
+A shell is closed, and silent, when a terminal-status notification has arrived for it or the session
+stopped it explicitly, in **either** transcript: once a shell's command finishes the harness
+delivers the notification to the session queue even while the agent that opened it is still alive,
+so the agent's own file never records the close. Each is asked about once per session; the answer is
+to kill it or to name it in the report with the reason it is kept. MEASURED 2026-09-24:
+one such shell outlived its agent by nine hours and then woke the finished agent up again.
+
 **Nothing in steps 1 and 2 scores anything, and that is a directive rather than a
 design taste.** *"you have to measure results, not measure what you're doing and it has
 to be aligned with the current request"*, and *"Evaluations are always done by the

@@ -5640,5 +5640,76 @@
       "MISSING",
       "1 missing"
     ]
-  }
+  },
+    "widen-subagent-shell-open-at-handback-blocks": {
+      "_why": "THE REPORTED DEFECT, CAUGHT AT THE INSTANT IT HAPPENS. Reproduced from `agent-a2cdce354a1a97c24`: a foreground `npx -y playwright-mcp@latest ...` was moved to the background as `buqyin1sk` at 21:30:38, the agent handed back at 21:37:18 with it still open, and the shell's `<status>failed</status>` arrived NINE HOURS later and woke the finished agent up. `background_tasks` is set in this payload exactly as it was in the real one -- wf-widen's SubagentStop on that agent returned `WIDEN  not judged - a background task is still running`, so this row also pins that the check sits ABOVE that exemption. Put it below and the leak returns.",
+      "exit": 0,
+      "not": [
+        "not judged"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"background_tasks\": [{\"id\": \"buqyin1sk\", \"status\": \"running\"}], \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}",
+      "want": [
+        "\"decision\": \"block\"",
+        "close-out",
+        "buqyin1sk",
+        "still open at hand-back"
+      ]
+    },
+    "widen-subagent-shell-killed-is-silent": {
+      "_why": "AN AGENT THAT ALREADY CLEANED UP IS NOT ASKED AGAIN. The host answers a stop with `Successfully stopped task: <id>` inside a JSON tool result, so it cannot be anchored; it is read anyway because it can only SILENCE this check. Hand-reading the eleven fires of the main-Stop half found two the check would otherwise have named after the session had already killed them.",
+      "exit": 0,
+      "not": [
+        "close-out",
+        "buqyin1sk"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"background_tasks\": [{\"id\": \"buqyin1sk\", \"status\": \"running\"}], \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}"
+    },
+    "widen-subagent-shell-notified-is-silent": {
+      "_why": "A SHELL WHOSE TERMINAL NOTIFICATION HAS ARRIVED IS CLOSED. That notification IS the harness reaping it -- over the whole incident session every background shell that ever got one was closed by it -- so it is read here as a silencer, not as a trigger. `running` is deliberately not terminal: 16 such progress notifications are on record and treating one as a close would silence a live shell.",
+      "exit": 0,
+      "not": [
+        "close-out",
+        "buqyin1sk"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"background_tasks\": [{\"id\": \"buqyin1sk\", \"status\": \"running\"}], \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}"
+    },
+    "widen-subagent-shell-closed-in-the-session-is-silent": {
+      "_why": "THE ONE MEASURED WRONG-FIRE CLASS OF THIS HALF. Once a shell's command finishes the harness delivers the notification to the SESSION queue -- a `queue-operation` row in the parent's transcript -- even while the agent that opened it is still alive, so the agent's own file never records the close. MEASURED over 1,269 subagent transcripts and 1,395 subagent stops: without reading the parent's closed set this fired on 36 shells and 17 of them, 47%, had already been reaped by the time the agent stopped. The main-Stop half measured the same defect at 63% from the other direction.",
+      "exit": 0,
+      "not": [
+        "close-out",
+        "buqyin1sk"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"background_tasks\": [{\"id\": \"buqyin1sk\", \"status\": \"running\"}], \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}"
+    },
+    "widen-subagent-closeout-stop-hook-active-is-silent": {
+      "_why": "THE LOOP BOUND, on this block as on every other. A blocked SubagentStop continues with `stop_hook_active: true`; a close-out that judged the same transcript again would block the continuation it just caused, forever. The agent cannot kill the shell and write its report in the same instant, so this bound is what lets it do either one.",
+      "exit": 0,
+      "not": [
+        "close-out",
+        "buqyin1sk"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"stop_hook_active\": true, \"background_tasks\": [{\"id\": \"buqyin1sk\", \"status\": \"running\"}], \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}"
+    },
+    "widen-subagent-many-shells-are-capped": {
+      "_why": "THE LIST IS CAPPED, and the cap is measured rather than tidy. One real fire named TWELVE shells at once - an agent that had opened `sleep 90 ... sleep 300` as idle timers and said so in its own reply. The reason string IS the next instruction, and a twelve-item bulleted list of `sleep` calls buries the sentence saying what to do about them. The systemMessage still names every id; only the bulleted reason is cut.",
+      "exit": 0,
+      "not": [
+        "\\u00b7 bwait0009",
+        "\\u00b7 bwait0010"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"PASS | the node upgrade section is written.\"}",
+      "want": [
+        "\"decision\": \"block\"",
+        "\\u00b7 bwait0001 \\u2014 sleep 30",
+        "\\u00b7 bwait0008 \\u2014 sleep 240",
+        "and 2 more"
+      ]
+    }
 }
