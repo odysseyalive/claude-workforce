@@ -1325,7 +1325,18 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    project ledger is a type-2 source on every producing craft) — so a handbook refreshed to the
    installed contract is wired to the store that contract turned on. This is the same Sources heal
    Step 5e owns, applied on the `workforce-version:` stamp so an org authored before the ledger
-   family existed reaches it in this run rather than at the next full sweep. **Role-specific
+   family existed reaches it in this run rather than at the next full sweep.
+
+   **That heal adds a step to `## Procedure`, so it is not finished until `## Probe` counts it.**
+   A consult wired as step 0 leaves a probe reading *"Arm exercised: `## Procedure` steps 1-5"*
+   naming a range that no longer starts where the Procedure does, and a substitution-mapping table
+   with a row per numbered step now missing one. Both are exactly the state
+   `handbook-templates.md` § Probe calls self-reporting: the next cold executor hits a clause the
+   table does not cover and returns `AMBIGUOUS`, which rule 5 counts against the handbook and which
+   this step caused. **So the same amendment extends the arm range to include the new step and adds
+   its row to the mapping table** — a relocation of the contract the heal already changed, not a
+   rewrite of role-specific judgment, and the probe is re-run under item 3 regardless. *Measured
+   2026-09-25 (audit-20260925T180537Z, P2): 5d added the consult and left both untouched.* **Role-specific
    judgment is NEVER rewritten here** — a refresh that touches `## Procedure` prose has exceeded this
    step and is a defect in the run. *This bars REWRITING, not RELOCATING, and the two are separate acts
    with separate authority.* A handbook over the length ceiling is split — heavy material moved verbatim
