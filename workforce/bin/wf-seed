@@ -43,6 +43,7 @@ import json
 import os
 import re
 import sys
+import time
 
 # Immutable-span grammar: content between these markers is never written into. The append
 # lands at end-of-file, so the ONLY thing that forbids it is the file ending INSIDE a span.
@@ -260,6 +261,50 @@ def _region_version(target_text, tag):
     return int(m.group(1)) if m else None
 
 
+# THE THIRD METHOD, and the reason a retirement has to be RECORDED rather than inferred.
+# `plan_catalog` decides a copy is retired by finding a directory that holds nothing but
+# `CATALOG-ANCHOR.md`, or no `references/` at all. Since `wf-catalog --migrate` learned to
+# keep every project file a live reader cites (1.71.0), that is no longer what a retired
+# copy looks like: MEASURED 2026-09-25 on a copy of `university`, retiring `text` removes
+# exactly one file — `references/text-tells.md`, the file the anchor's `region-file=` pins —
+# and leaves fifteen cited ones standing. The directory is not empty, so the retired branch
+# does not fire; `_resolve_target` then falls through the pin to the next candidate that
+# EXISTS, `references/ai-patterns.md`, and the next audit re-seeds workforce's additions into
+# a copy that was just retired and re-pins the anchor at the file it landed in.
+#
+# The end state the retirement is for is the opposite: the kind resolves to the install, and
+# the install already carries the additions. So the migration rewrites the pin to this method
+# and `plan_catalog` reads it exactly as it reads `method=mirror` — a copy wf-seed reports on
+# and never writes into.
+RETIRED_METHOD = "retired"
+
+
+def retired_anchor(anchor_text, tag, when=None):
+    """`anchor_text` with its `additions-seeded` record rewritten to `method=retired`.
+
+    Written by `wf-catalog --migrate --execute` through `_sibling("wf-seed")`, because this
+    record is wf-seed's and one field spelled in two scripts is two fields. The last seeded
+    VERSION is carried through rather than reset: it is the record of how far the additions
+    had propagated before the copy was retired, and `wf-catalog.seeded_version` still reads
+    it. `region-file=` is dropped — it names a file the retirement removed, and a pin to a
+    path that no longer exists is the defect this whole record exists to end.
+
+    Idempotent: a record already at `method=retired` is returned unchanged, so a second
+    migration of the same tree rewrites nothing (`bin/idempotence`, CLASS B).
+    """
+    method, ver = _anchor_seeded(anchor_text)
+    if method == RETIRED_METHOD:
+        return anchor_text
+    line = ("<!-- additions-seeded: tag=%s version=%d method=%s retired=%s -->"
+            % (tag, ver or 0, RETIRED_METHOD,
+               when or time.strftime("%Y-%m-%d", time.gmtime())))
+    if _ANCHOR_LINE_RX.search(anchor_text):
+        return _ANCHOR_LINE_RX.sub(line, anchor_text, count=1)
+    # Same placement rule as `_write_anchor`: after the top version anchor when there is
+    # one, else at the very top. Spelled once there and once here is two, so it is called.
+    return _write_anchor_line(anchor_text, line)
+
+
 def plan_catalog(root, ev_dir, slot_dir=None):
     """Compute the disposition for one evaluator directory without writing anything.
 
@@ -295,6 +340,21 @@ def plan_catalog(root, ev_dir, slot_dir=None):
                              "with it and are read from the install")
         return result
 
+    # THE RECORDED RETIREMENT, and it is read BEFORE the slot lookup for the same reason the
+    # shell test above is: a retired copy is a finished state, and reporting it as
+    # `ERR additions slot not found` because the install happens to be unreachable would put
+    # an error on the success case. See `RETIRED_METHOD` for why emptiness is no longer the
+    # whole test — this is the branch a retirement that kept its cited files lands in.
+    anchor_text = ""
+    if os.path.isfile(anchor_path):
+        anchor_text = open(anchor_path, encoding="utf-8").read()
+    if _anchor_seeded(anchor_text)[0] == RETIRED_METHOD:
+        result.update(action="retired",
+                      detail="retired by `wf-catalog --migrate`; %s records method=%s, so the "
+                             "additions are read from the install and this copy is not seeded"
+                             % (anchor_rel, RETIRED_METHOD))
+        return result
+
     tag = next(k for k, v in CATALOGS.items() if v is spec)
     slot_path = os.path.join(slot_dir, spec["slot"]) if slot_dir else None
     if not slot_path or not os.path.isfile(slot_path):
@@ -314,9 +374,6 @@ def plan_catalog(root, ev_dir, slot_dir=None):
         return result
     result["tag"], result["slot_version"] = tag, slot_ver
 
-    anchor_text = ""
-    if os.path.isfile(anchor_path):
-        anchor_text = open(anchor_path, encoding="utf-8").read()
     method, seeded_ver = _anchor_seeded(anchor_text)
 
     # A catalog seeded by the legacy hand-mirror path (text-eval) is left alone — appending a
@@ -364,13 +421,9 @@ def _render(target_text, tag, slot_path, slot_ver, slot_rel):
     return stripped + "\n\n" + region
 
 
-def _write_anchor(anchor_text, tag, slot_ver, target_rel):
-    """Insert/replace the machine-readable additions-seeded record in the anchor."""
-    line = (f"<!-- additions-seeded: tag={tag} version={slot_ver} method=region "
-            f"region-file={target_rel} -->")
-    if _ANCHOR_LINE_RX.search(anchor_text):
-        return _ANCHOR_LINE_RX.sub(line, anchor_text, count=1)
-    # Place it just after the top version anchor comment if present, else at the top.
+def _write_anchor_line(anchor_text, line):
+    """Place a fresh additions-seeded record: just after the top version anchor comment if
+    present, else at the very top. One placement rule, called by both writers."""
     lines = anchor_text.splitlines()
     for i, l in enumerate(lines):
         if re.search(r"-ref-version:\s*\d+", l):
@@ -378,6 +431,15 @@ def _write_anchor(anchor_text, tag, slot_ver, target_rel):
             lines.insert(i + 2, line)
             return "\n".join(lines) + ("\n" if anchor_text.endswith("\n") else "")
     return line + "\n" + anchor_text
+
+
+def _write_anchor(anchor_text, tag, slot_ver, target_rel):
+    """Insert/replace the machine-readable additions-seeded record in the anchor."""
+    line = (f"<!-- additions-seeded: tag={tag} version={slot_ver} method=region "
+            f"region-file={target_rel} -->")
+    if _ANCHOR_LINE_RX.search(anchor_text):
+        return _ANCHOR_LINE_RX.sub(line, anchor_text, count=1)
+    return _write_anchor_line(anchor_text, line)
 
 
 def apply_catalog(plan):
@@ -433,8 +495,13 @@ def main(argv=None):
         return 2
 
     plans = run(root, args.execute)
+    # `retired` IS COUNTED AND PRINTED. It was in `plans` and in neither, so a project whose
+    # copies had all been retired reported `2 evaluator(s) · 0 seed · 0 current · 0 error` with
+    # no row at all — the success state of the migration, rendered as two evaluators that the
+    # line accounts for nowhere. An audit reading this has to be able to see that the
+    # retirement took, which is the whole point of the `method=retired` pin.
     counts = {k: sum(1 for p in plans if p["action"] == k)
-              for k in ("seed", "current", "mirror", "unappendable", "error")}
+              for k in ("seed", "current", "mirror", "retired", "unappendable", "error")}
 
     if args.json:
         print(json.dumps({"root": root, "executed": args.execute,
@@ -451,12 +518,15 @@ def main(argv=None):
             print(f"  ok    {p['evaluator']}{tag}  {p['detail']}")
         elif p["action"] == "mirror":
             print(f"  keep  {p['evaluator']}{tag}  {p['detail']}")
+        elif p["action"] == "retired":
+            print(f"  ok    {p['evaluator']}{tag}  {p['detail']}")
         elif p["action"] == "unappendable":
             print(f"  HELD  {p['evaluator']}{tag}  catalog-unappendable — {p['detail']}")
         elif p["action"] == "error":
             print(f"  ERR   {p['evaluator']}  {p['detail']}")
     print(f"\nINV-SEED  {len(plans)} evaluator(s) · {counts['seed']} {verb} · "
           f"{counts['current']} current · {counts['mirror']} mirror · "
+          f"{counts['retired']} retired · "
           f"{counts['unappendable']} unappendable · {counts['error']} error")
     if not plans:
         print("  0 evaluator catalogs — nothing to seed.")

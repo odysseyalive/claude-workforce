@@ -5561,6 +5561,70 @@
       }
     }
   },
+  "catalog-migrate-retires-seed-pin": {
+    "_why": "MEASURED 2026-09-25 on a copy of `university`: the text-eval anchor pins `region-file=references/text-tells.md`, `--migrate` retires that exact file, and `references/ai-patterns.md` STAYS because four live readers cite it. wf-seed's only test for a retired copy was an empty directory, so the next audit fell through the dead pin to ai-patterns.md and seeded workforce's additions straight back into the copy that had just been retired. The retirement is now RECORDED: the pin becomes `method=retired`, and the display names the rewrite before `--execute` makes it. This tree reproduces that shape exactly — one removable file, one cited file that keeps the directory non-empty, and a pin naming the file that goes.",
+    "script": "wf-catalog",
+    "args": ["--migrate", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "PIN        CATALOG-ANCHOR.md — its additions-seeded record becomes method=retired",
+      "STAYS      references/ai-patterns.md — cited by .claude/agents/text-evaluator.md:9",
+      "REMOVED  1 file(s)",
+      "records method=retired — wf-seed reads the additions from the install and no longer seeds this copy"
+    ],
+    "not": ["UNPINNED"],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": ["<!-- additions-seeded: tag=text version=7 method=retired retired="],
+        "not": ["method=region", "region-file="],
+        "once": ["additions-seeded:"]
+      },
+      ".claude/skills/text-eval/references/text-tells.md": {"absent": true},
+      ".claude/skills/text-eval/references/ai-patterns.md": {"want": ["Productive tangent"]}
+    }
+  },
+  "seed-retired-pin": {
+    "_why": "The reader half. This is `seed-retargeted-text`'s tree — a copy whose resolvable region target is `references/ai-patterns.md` — with the retirement recorded in its anchor. Against a wf-seed that tests only for an empty directory it reports `SEED … into references/ai-patterns.md · region written`, which is workforce's additions written into a copy the migration just retired; the kind is supposed to resolve to the install from here on, and the install already carries them. `--execute` is deliberate: a read-only assertion could not tell a refusal from a write that happened anyway, so the tree itself is asserted untouched.",
+    "script": "wf-seed",
+    "args": ["--execute"],
+    "exit": 0,
+    "want": [
+      "ok    text-eval  retired by `wf-catalog --migrate`",
+      "CATALOG-ANCHOR.md records method=retired",
+      "1 retired"
+    ],
+    "not": ["SEED  text-eval", "region written", "ERR", "HELD"],
+    "after": {
+      ".claude/skills/text-eval/references/ai-patterns.md": {"not": ["WF-ADDITIONS"]},
+      ".claude/skills/text-eval/references/colon-detection.md": {"not": ["WF-ADDITIONS"]},
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {"not": ["method=region"]}
+    }
+  },
+  "catalog-house-rules-current": {
+    "_why": "MEASURED 2026-09-25 on a copy of a real project: `wf-catalog --root <proj> --house-rules` crashed with `NameError: name 'body' is not defined` at wf-catalog:1206, because the `current` branch compares against a bare `body` that is bound in `house_write` and nowhere in `house_state`. THE ONLY WAY TO REACH THAT BRANCH IS A TREE THAT ALREADY CARRIES A REGION, and every fixture shipped in 1.71.0 was a first-write tree, so 1,411 checks passed over a display-mode read-only call that audit Steps 4 and 6-E both make on every brownfield run. This tree carries the region the producer itself wrote, verbatim: verdict `current`, nothing to refresh, exit 0.",
+    "script": "wf-catalog",
+    "args": ["--house-rules"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "= text-eval            register 1 row(s) · precedence clause present",
+      "INV-HOUSERULES  5 evaluator(s) · 1 current · 0 would refresh"
+    ],
+    "not": ["NameError", "Traceback"]
+  },
+  "catalog-house-rules-stale": {
+    "_why": "The other half of the same branch, and the reason `current` cannot be asserted alone: a comparison that crashes and a comparison that always says `current` are indistinguishable from a row that only ever checks the happy tree. This region is the one the producer writes MINUS one precedence bullet, so `house_substance` differs and the verdict is `refresh · precedence clause stale` rather than `current`. The provenance date differs from today's in both trees, which is what proves the staleness comparison still excludes it.",
+    "script": "wf-catalog",
+    "args": ["--house-rules"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "~ text-eval            register 1 row(s) · precedence clause stale",
+      "INV-HOUSERULES  5 evaluator(s) · 0 current · 1 would refresh"
+    ],
+    "not": ["NameError", "Traceback"]
+  },
   "catalog-house-rules-json": {
     "_why": "The machine-readable half of the producer, exercised rather than assumed: `audit` and `verify` read these verdicts, and `report()`'s own docstring records what an unexercised JSON branch costs — a migration payload that could never run and made the JSON contract look wider than it was. Every kind appears with its verdict, and an unrefreshed one carries the same precondition string the text form prints, so a caller reading JSON is never told less than a caller reading the report. `body` is excluded: it is the region about to be written, not a verdict, and printing it would make the payload unreadable.",
     "script": "wf-catalog",

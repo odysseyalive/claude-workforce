@@ -2038,6 +2038,13 @@ and the supersession register — which guards only the VENDORED append — neve
 additions. A catalog it reports `unappendable` is immutable end to end, and it names the file and the
 spans. Print its `INV-SEED` line, including the zeroes.
 
+A catalog it reports `retired` is a copy `--migrate` has already retired, and that is the finished
+state, not a skip: the kind resolves to the install and the install carries the additions. The
+retirement is read from the `method=retired` record `--migrate --execute` writes into that copy's
+`CATALOG-ANCHOR.md`, never inferred from an empty directory — a retirement keeps every project file a
+live reader cites, so a retired copy is rarely empty, and a run that inferred it seeded workforce's
+additions straight back into the copy it had just retired.
+
 Then refresh the house rules — the producer, not by hand (§ Step 4, "Refresh the house rules in every
 installed evaluator") — and print `INV-HOUSERULES` in the same block:
 

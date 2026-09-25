@@ -1055,6 +1055,42 @@ def anchor_append(proj, heading, chunks):
 LIFTED_HEADING = "## Project catalog amendments lifted from the retired copy"
 
 
+def retire_seed_pin(proj, kind):
+    """Record the retirement in `CATALOG-ANCHOR.md`'s `additions-seeded:` pin.
+
+    Returns True when the file now records `method=retired`, False when the write was
+    refused or could not be verified. The removal has already happened by the time this
+    runs, so a False is reported and never rolled back — the pin is a record ABOUT the
+    retirement, not one of the things the retirement had to preserve.
+
+    WHY THE MIGRATION HAS TO WRITE THIS AT ALL. `wf-seed` decides whether to append its
+    additions region, and its only test for "this copy is retired" was an empty directory.
+    Since the retirement keeps every project file a live reader cites, a retired copy is
+    rarely empty: MEASURED 2026-09-25 on a copy of `university`, retiring `text` removes the
+    one file the pin names, `references/text-tells.md`, and leaves fifteen cited files. The
+    next audit's `wf-seed` then resolved the pin to the next candidate that still existed,
+    `references/ai-patterns.md`, and seeded workforce's additions back into the copy that had
+    just been retired. A pin naming a removed file is the input to that; this replaces it
+    with the fact.
+
+    The record and its spelling belong to `wf-seed`, so the line is built there and this
+    only writes it — one field spelled in two scripts is two fields that drift.
+    """
+    anchor = os.path.join(proj, ANCHOR)
+    if os.path.islink(anchor):
+        return False
+    existing = slurp(anchor) if os.path.isfile(anchor) else ""
+    new = _SEED.retired_anchor(existing, kind)
+    if new == existing:
+        return True
+    try:
+        with open(anchor, "w", encoding="utf-8") as fh:
+            fh.write(new)
+    except OSError:
+        return False
+    return "method=retired" in slurp(anchor)
+
+
 def file_keys(text):
     """`{normalised key: (line number, the line verbatim)}` — the comparable units of a
     catalog file: its headings and its table-row keys, the two things an evaluator greps
@@ -1203,7 +1239,13 @@ def house_state(root, kind):
                   "no position to open a machine-owned region"
                   % (os.path.relpath(dest, root), ", ".join(spans[:4])))
         return st
-    if region and not stray and house_substance(region) == house_substance(house_wrap(body, "")):
+    # `st["body"]`, NOT a bare `body`. Shipped as `house_wrap(body, "")` in 1.71.0, where
+    # `body` is bound in `house_write` and nowhere here: every project whose evaluator
+    # already carried a region — the ONLY way to reach this branch — crashed with
+    # `NameError: name 'body' is not defined`, and audit Steps 4 and 6-E both call this.
+    # Every fixture was a first-write tree, so the branch was never entered and 1,411
+    # checks passed over it. `catalog-house-rules-current` and `-stale` enter it now.
+    if region and not stray and house_substance(region) == house_substance(house_wrap(st["body"], "")):
         st.update(verdict="current", why="register %d row(s)%s · precedence clause present"
                   % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else ""))
         return st
@@ -1560,6 +1602,10 @@ def _sibling(name):
 # `wf-census.SACRED_SCRATCH`, project-relative, read from its owner: this file kept its own copy
 # (review of the 1.63.0 fix batch, finding 10), and two copies of one list drift apart.
 _CENSUS = _sibling("wf-census")
+# The `additions-seeded` record's spelling, read from the script that owns and writes it.
+# `retire_seed_pin` and the `--migrate` display both need it, and a third copy of the line
+# format would be the drift this import exists to prevent.
+_SEED = _sibling("wf-seed")
 NOT_READERS = _CENSUS.SACRED_SCRATCH
 # And the record FILES, by the same owner's rule: a queue, a manifest or a scan output
 # quotes paths and reads none of them. Read from `wf-census` rather than restated here for
@@ -2014,6 +2060,14 @@ def migrate(root, args):
                   "CATALOG-ANCHOR.md: %s%s"
                   % (rel, len(rows), "; ".join(t.strip()[:60] for _n, t in rows[:2]),
                      " …" if len(rows) > 2 else ""))
+        # DISPLAY SAYS WHAT EXECUTE WRITES. The pin rewrite is the one thing `--execute` does
+        # to a file listed STAYS, so it is named here rather than discovered afterwards. The
+        # test is the writer itself, so the two can never disagree about when it fires.
+        if v["removable"]:
+            _anchor_now = slurp(os.path.join(v["path"], ANCHOR))
+            if _SEED.retired_anchor(_anchor_now, v["kind"]) != _anchor_now:
+                print("               PIN        %s — its additions-seeded record becomes "
+                      "method=retired, so wf-seed stops re-seeding this copy" % ANCHOR)
         for f in v["removable"][:4]:
             print("               retire     %s" % f)
         if len(v["removable"]) > 4:
@@ -2157,6 +2211,16 @@ def migrate(root, args):
                     pass
         print("\n  ARCHIVED %d file(s) to %s" % (len(v["removable"]), archive))
         print("  REMOVED  %d file(s) from %s — %s" % (removed, v["path"], v["why"]))
+        # THE RETIREMENT IS RECORDED IN THE ANCHOR, for every kind and not only the two
+        # `wf-seed` currently manages: the record is about what happened to this copy, and a
+        # kind that gains an additions slot later must not need this line written for it
+        # retroactively. See `retire_seed_pin`.
+        if retire_seed_pin(v["path"], v["kind"]):
+            print("  PINNED   %s/%s records method=retired — wf-seed reads the additions "
+                  "from the install and no longer seeds this copy" % (v["path"], ANCHOR))
+        else:
+            print("  UNPINNED %s/%s still carries its additions-seeded pin; the next "
+                  "`wf-seed` may re-seed this copy. Clear it by hand." % (v["path"], ANCHOR))
         for entry, what in clear_registrations(root, v["kind"]):
             print("  AGENT    %-34s %s" % (entry, what))
     return 1 if refused else 0
