@@ -55,6 +55,30 @@ downward" makes CEO→IC the cheap default by design), not automatically a defec
 for five Lead handbooks it never routes through is either mis-routing or over-staffed, and this line
 is what forces the question.
 
+**4c. Close-out, from the same files again.** Every edge is already open; count the ones that record
+an agent nobody shut down and print the line with zeroes:
+
+```
+SPAWN-CLOSE   teammate edges 4 · closed 0 · never closed 4 · plain subagents 248 · pre-schema edges 211
+```
+
+A **plain subagent needs no close-out** — it ends when it returns — so it is counted and then set
+aside. A **teammate does not end**: it waits for a `shutdown_request`, and dispatch CHECKPOINT clause
+6g is the only step in this distribution that sends one. An edge whose `callee-kind:` is `teammate`
+with no `closed:` stamp is therefore the record of an agent still up, and a run of them is a protocol
+nobody followed. Edges written before `callee-kind:` existed are counted separately and never as
+failures, exactly as `EDGE-FIELDS` counts pre-schema edges — the contract post-dates them.
+
+**A never-closed edge is a `PERF` against the CALLER's handbook**, like an unauthorized edge in step
+4 and for the same reason: shutting the agent down was the caller's act, and the callee cannot shut
+itself down. Never against the callee.
+
+*Measured 2026-09-24 and reported by the user, who saw it from the outside before any command did:
+four ICs on one run were still running seven to eight hours after handing back, and a Bash shell
+outlived its subagent by nine. The finished work was invisible behind them — "the 1 shell gives the
+impression that the work isn't done here." Nothing in the org read a spawn edge for whether the thing
+it recorded had ended, so the only detector was a person noticing a live agent in the interface.*
+
 **5. Frontmatter of record.** Confirm `model`, `effort`, `disallowedTools`, and `background` still
 match `org-config.md` and the employee's tier. Drift here is silent and changes cost or capability
 without changing behavior visibly.

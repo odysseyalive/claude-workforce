@@ -1022,6 +1022,31 @@ def check_handbook(path, body, res, ceiling, floors=None):
             "knowing the state. `audit` Step 5d is the fix.",
         )
 
+    # THE REPORT MUST SURVIVE A RUN THAT DOES NOT FINISH (2026-09-24). Every clause above
+    # governs what a report SAYS; this one governs whether it EXISTS. A handbook that has
+    # its employee write the OUTPUT.md at the end has bet the whole deliverable on the run
+    # reaching the end, and a run has three ordinary ways not to: the `maxTurns` ceiling
+    # the IC template sets at 40, an interrupt, and a context limit.
+    #
+    # MEASURED 2026-09-24, on a real run in a sibling project: two ICs hit their turn limit
+    # and stopped with NO hand-back and NO artifact. Their work was neither done nor
+    # recoverable, and — the reason the user saw it at all — from the outside it was
+    # indistinguishable from an agent still working. A partial file on disk would have said
+    # which criteria closed. Nothing anywhere asked a handbook to produce one.
+    #
+    # MATCHED ON THE PHRASE, like its neighbour, and ADVISORY for the same reason: every
+    # handbook authored before this contract is in this state.
+    if seg is not None and "incrementally" not in seg:
+        res.advise(
+            f"{n}: Reporting does not ask for an incremental OUTPUT.md",
+            "add the write-it-incrementally clause to ## Reporting "
+            "(handbook-templates.md § Reporting): the OUTPUT.md opens with the REQUEST "
+            "echo-back and the criterion table BEFORE the work starts, and rows are "
+            "filled in as they are earned. A run stopped by a turn ceiling, an "
+            "interrupt or a context limit loses a report that exists only in context, "
+            "and takes the record of the work with it. `audit` Step 5d is the fix.",
+        )
+
     # THE AUTHORING-VERSION STAMP (2026-09-01). Without `workforce-version:` in the
     # ORG-RECORD, nothing can tell a handbook authored under the current doctrine from
     # one three releases stale — which is how two shipped contract releases sat

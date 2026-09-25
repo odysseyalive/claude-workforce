@@ -1282,7 +1282,22 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    (`SKILL.md` § Directives, 2026-09-07). *That clause is scoped by the user to **every project using workforce**, and an employee
    is where it is hardest to see: every operator-facing carrier reaches the main conversation only,
    because a subagent runs its own system prompt. A handbook missing it is an org whose reports
-   read as problem lists while the work is done, one tier below anyone who can notice.*; a delegating handbook carries the
+   read as problem lists while the work is done, one tier below anyone who can notice.* **and carries
+   the write-it-incrementally clause** — the OUTPUT.md is opened with the REQUEST echo-back and the
+   criterion table before the work starts and filled in as rows are earned, because a run stopped by a
+   turn ceiling, an interrupt or a context limit loses a report that exists only in context
+   (2026-09-24: two ICs on one run hit their turn limit and left no artifact at all, so their work was
+   neither done nor recoverable). **A `## Guardrails` section gains the close-out and package-resolution
+   lines** — no background shell or process left running at the end; a package name known rather than
+   guessed before `npx` runs it; an order naming a tool the employee does not hold answered by saying
+   so in the report and doing the work with what it has. *Those are narrow on purpose. The 2026-09-24
+   incident is easy to over-read into "never use the shell", and the same employee fetched a README
+   with `curl` in the same run and it worked — the defects were a guessed package name resolving to a
+   stdio server and an order naming a tool the callee lacked, and a blanket ban would have cost the
+   working half while keeping both broken ones.* **A delegating handbook additionally gains the
+   spawn close-out guardrail** — prefer a plain subagent for a one-shot order, `shutdown_request` and
+   a `closed:` edge stamp for any teammate spawned, and the tool-grant check before an order is sent
+   (`procedures/org.md` clauses 1c, 6 and 6g); a delegating handbook carries the
    completeness contract, PLAN-READINESS, and the REQUEST-forwarding guardrail; a CEO handbook (where
    one exists) carries verification step (4), the read-back against the REQUEST. **A producing
    handbook whose `## Sources` does not name the project ledger gains it here** —
@@ -1311,7 +1326,16 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    the work re-grounded in `Bash`; a ceiling declared under `allowed-tools:` is renamed to `tools:`;
    an IC missing either half of the tier ceiling gains it. **Never widen a grant here** — removing an
    entry that resolves to nothing changes no capability, while adding one is an org-shape decision that
-   belongs to Step 2. *Added 2026-09-10: measured on `apps-odyssey-alive`, five of nine governed
+   belongs to Step 2. **And never NARROW one either: the removal set is exactly the closed literal set
+   `wf-conform` reports — `Grep`, `Glob`, `WebFetch` — and nothing else.** A `tools:` entry the project
+   added by hand survives this item untouched, `mcp__<server>` entries included. This item heals the
+   frontmatter; it does not normalize it back to the template, and a `tools:` line is not a contract
+   section. *Stated explicitly 2026-09-24 after an IC in a sibling project was found improvising around
+   a tool it did not hold: the fix for that is the tool-grant check on the ORDER (`procedures/org.md`
+   clause 6), and it is worth nothing if the next heal quietly takes the grant back out. An entry whose
+   server is not registered is reported by `wf-conform`'s MCP row for a human to resolve — it is never
+   deleted here, because "this host has no registry entry for it" and "this project does not use it"
+   are different findings and only one of them is this step's to act on.* *Added 2026-09-10: measured on `apps-odyssey-alive`, five of nine governed
    handbooks granted `Grep, Glob`; fact 13b measured that such an entry is dropped with no signal of
    any kind, so each was running with less reach than its own frontmatter claimed and the row saying so
    was advisory-only, which item 4 below forbids treating as a license to report and move on.*

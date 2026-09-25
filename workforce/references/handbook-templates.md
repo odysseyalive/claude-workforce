@@ -231,6 +231,15 @@ stated, never omitted, where one is not.
 Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
 and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
 there is nothing; never drop the heading.
+**Write the OUTPUT.md incrementally, never only at the end.** Open it with the REQUEST echo-back and
+the criterion table before the work starts, and fill each row in as it is earned. A run can stop
+before you get to write — a turn ceiling, an interrupt, a context limit — and a report that exists
+only in your context at that moment is lost completely, taking the work with it, while a partial file
+on disk still tells whoever reads it which criteria closed and which did not. An unfinished row is
+written `IN-PROGRESS`, which is a measurement; an absent row is silence, and silence reads as a pass.
+*Measured 2026-09-24: two ICs on one run hit their turn limit and stopped with no hand-back and no
+artifact. Their work was neither done nor recoverable, and from the outside it was indistinguishable
+from an agent still working.*
 
 **Say the state, not the journey.** Every finding you report carries its outcome in the same breath —
 `fixed`, `blocked by <the named thing>`, or `for <your manager> to decide because <reason>` — attached
@@ -283,6 +292,17 @@ Lead-specific guardrails, **in addition to** the CEO set (which applies unchange
   from the order you received, byte-for-byte — your Task is your decomposition, the REQUEST is not
   yours to edit. And before you report an IC's return upward, Read its OUTPUT.md against that block
   and name any in-scope item it does not cover (dispatch CHECKPOINT clauses 6c and 6d).
+- NEVER name a tool in an order that the IC does not hold. Check every tool you name against that
+  employee's frontmatter — its `tools:` minus its `disallowedTools:` — before you send the order.
+  Missing means one of three things and never a fourth: route to an employee that holds it, say in
+  the order that it is unavailable and name what to use instead, or drop the step. A named tool the
+  callee lacks is an instruction to improvise, and it improvises at the shell (CHECKPOINT clause 6).
+- NEVER leave an employee running after you have read its report. Prefer a PLAIN SUBAGENT for a
+  one-shot order, because it ends when it returns; where you spawned a named teammate, send it a
+  `shutdown_request` the moment the read-back is done and append `closed:` to its `.spawn` edge
+  (CHECKPOINT clauses 1c and 6g). A teammate is a legitimate shape for work you must talk to while it
+  runs — the missing close-out is the defect, not the teammate. Report what is still running, or
+  report that nothing is.
 ```
 
 ## IC
@@ -430,6 +450,14 @@ sections contradict each other, which is the defect itself.*
   there, so a scope line without it forbids the one file every employee must produce.
 - NEVER delete a file you did not create in this run.
 - NEVER report PASS on an unrun check.
+- **If your work order names a tool you do not have, say so in your report and do the work with what
+  you have.** A missing grant is a defect in the order (dispatch CHECKPOINT clause 6), and reporting
+  it is how the order gets fixed; improvising a substitute silently is how it stays broken.
+- NEVER leave a background shell or process running when your work is done. Before running a package
+  through `npx`, know what that name resolves to — this project's own package, a pinned dependency,
+  or a package the task names. **Never guess a package name from a tool's or a project's name**, and
+  reach an MCP server through its tools rather than starting it from the shell. Wrapping a command
+  that might wait on input or on the network in `timeout` is worth doing.
 - <Role-specific NEVER / MUST NOT / STOP lines.>
 
 ## Exit criteria
@@ -491,6 +519,15 @@ return its verdict — do not return `QUESTION:` for the missing block.
 Three parts, in this order, and nothing else: the REQUEST echo-back, the criterion → evidence table,
 and an `## Exceptions` list of whatever failed, was deferred, or was scoped out. Write `(none)` when
 there is nothing; never drop the heading.
+**Write the OUTPUT.md incrementally, never only at the end.** Open it with the REQUEST echo-back and
+the criterion table before the work starts, and fill each row in as it is earned. A run can stop
+before you get to write — a turn ceiling, an interrupt, a context limit — and a report that exists
+only in your context at that moment is lost completely, taking the work with it, while a partial file
+on disk still tells whoever reads it which criteria closed and which did not. An unfinished row is
+written `IN-PROGRESS`, which is a measurement; an absent row is silence, and silence reads as a pass.
+*Measured 2026-09-24: two ICs on one run hit their turn limit and stopped with no hand-back and no
+artifact. Their work was neither done nor recoverable, and from the outside it was indistinguishable
+from an agent still working.*
 
 **Say the state, not the journey.** Every finding you report carries its outcome in the same breath —
 `fixed`, `blocked by <the named thing>`, or `for <your manager> to decide because <reason>` — attached

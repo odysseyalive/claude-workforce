@@ -243,7 +243,9 @@ someone can read instead of re-derive.
 
    1a. **The edge file is a record, not a touch-file.** It carries the order's provenance in named
    fields, one per line: `run-id:`, `caller:`, `callee:`, `rung:`, `request:` (the REQUEST block,
-   verbatim), `task:`, `exit-criteria:`, `artifact:`. An edge missing `request:` or `exit-criteria:`
+   verbatim), `task:`, `exit-criteria:`, `artifact:`, `callee-kind:` (`subagent` or `teammate`, per
+   clause 1c), and `closed:` (an ISO8601 stamp, written at close-out per clause 6g; a `teammate`
+   edge with no `closed:` is an agent nobody shut down). An edge missing `request:` or `exit-criteria:`
    records a dispatch cut loose from its ask — which is the defect these fields exist to make
    visible, because a `review` cannot detect spec loss in an edge that never recorded the spec.
    Measured 2026-09-01 on a real org before this clause existed: 252 recorded edges, mean 3.5 lines,
@@ -255,6 +257,17 @@ someone can read instead of re-derive.
    `→ Dispatching to @agent-<name> (adopted) — <why this is the lowest competent node>`, followed
    by the same edge file and the same `Agent` call. A tier or department printed for it states
    something the chart does not, which is the invention rung 8 forbids.
+
+   1c. **Prefer a PLAIN SUBAGENT for a one-shot order, and an IC spawn is always one-shot.** A named
+   teammate is the right shape for work you must talk to while it runs; a work order with exit
+   criteria is not that. The difference that matters is the ending: a plain subagent ends when it
+   returns, and a teammate waits for a `shutdown_request` that clause 6g is the only step in this
+   protocol that sends. **This is a preference, not a ban** — a teammate you spawn deliberately and
+   close out at 6g is correct, and the defect measured below was the missing close-out, never the
+   teammate. Record which you made in the edge's `callee-kind:` field, so `review` can tell a run that
+   closed out from one that left agents behind. Measured 2026-09-24: four ICs spawned as teammates on
+   one run were still running seven to eight hours after they had handed back, and the user read the
+   live agent and its live shell as work that was not finished.
 
 2. **A command that already does the job beats an agent.** Read the chart's `## Mechanicals` table
    before choosing anyone. A row can answer the whole ask only if its `Scope` cell says `derived` — a
@@ -337,6 +350,20 @@ someone can read instead of re-derive.
    your decomposition and you own its wording; the REQUEST block you only carry. **Do not restate the
    employee's own steps.** Its handbook owns those.
 
+   **An order names only tools the callee actually holds.** Before you send it, check every tool you
+   named against that employee's frontmatter — its `tools:` minus its `disallowedTools:` — and an MCP
+   tool against the `mcp__<server>` entries in the same list. A tool it lacks means one of three
+   things, never a fourth: route the order to an employee that holds the tool, say in the order that
+   the tool is not available and name what to use instead, or drop the step. Measured 2026-09-24: an
+   order told an IC to verify commands "with web_fetch" while its grant was `Read, Edit, Write, Bash,
+   Skill`. The IC recorded the gap in its own report — *"`web_fetch` MCP tool is not in this tier's
+   toolset"* — and improvised to obey anyway, guessing a package name off the tool's name and running
+   `npx -y playwright-mcp@latest`, which resolved to an MCP stdio server and blocked on stdin for nine
+   hours. **A named tool the callee does not have is not a stretch goal; it is an instruction to
+   improvise, and an improvised substitute is unreviewed by construction.** Read the failure narrowly:
+   the same IC fetched a README with `curl` in the same run and it worked, so the shell was not the
+   defect and banning it would have cost the working half and kept the broken one.
+
    6a. **One order, one `<run-id>`.** You assign the run-id, and each independent work order gets its
    own. Never reuse one across two orders. Two orders under a shared run-id write the same
    `<caller>-to-<callee>.spawn` edge and the same `<callee>/OUTPUT.md`, so the second silently
@@ -370,7 +397,7 @@ someone can read instead of re-derive.
    path and state, per exit criterion and per named item in the REQUEST block, where the deliverable
    satisfies it — naming any in-scope item it does not. An unmet criterion is a FAIL to report, never
    a partial to summarize away. You are the one reader guaranteed to exist; an artifact nobody reads
-   back is a dispatch nobody verified.
+   back is a dispatch nobody verified. **Close the order out in the same message** (clause 6g).
 
    6e. **COMPLETENESS is yours as the directing node.** The work order is the single point of
    failure, and you are the one who writes it: whatever you scope out of an order comes back missing,
@@ -380,6 +407,8 @@ someone can read instead of re-derive.
    deliberate scope-out is NAMED in the order. A silent scope-out is how a hole is born. (Canonical
    wording: `references/handbook-templates.md` § CEO Guardrails — this clause is how the contract
    reaches the ordinary org, whose CEO is the main session and holds no handbook to read it from.)
+   **The tool-grant check in clause 6 is part of completeness**: a step the callee cannot perform is a
+   scope-out you did not name, and the callee discovers it alone, mid-order, with no way to ask.
 
    6f. **PLAN-READINESS (Definition of Ready).** An ambiguous or tightly-coupled order is not READY
    to dispatch until an approved PLAN with acceptance criteria exists. Any-of trigger, applied BEFORE
@@ -389,6 +418,29 @@ someone can read instead of re-derive.
    edit; (T4) you cannot state its acceptance criteria in verifiable terms before dispatch. If NONE
    hold the order is EXEMPT and dispatches directly — not everything needs a plan. The acceptance
    criteria you write ARE the vision the work must meet, and they travel with the task.
+
+   6g. **CLOSE THE ORDER OUT, in the same message as 6d's read-back.** A dispatch is not finished when
+   the report arrives; it is finished when nothing it started is still running. Three acts, and none
+   of them waits for the next turn:
+
+   - **Shut down every teammate you spawned for this order**, one `shutdown_request` each, the moment
+     you have read its OUTPUT.md — pass, FAIL, `QUESTION:` or `ESCALATE:` alike. A verdict you did not
+     like is not a reason to leave the agent up; re-dispatch is a new order and a new spawn. Clause 1c
+     is what makes this rare: a plain subagent needs no close-out, so the common case is nothing to do.
+     **This is the step the incident was missing.** Teammates were not the defect; nothing anywhere
+     shut one down.
+   - **Append `closed: <ISO8601>Z` to each `<caller>-to-<callee>.spawn` edge** (clause 1a). The edge
+     is the only durable record that the close-out happened; a shutdown nobody wrote down is
+     indistinguishable at `review` from one that never happened.
+   - **Say what is still running, or say nothing is.** One line, in the reply that reports the order
+     done: the background shells, watchers and agents this order started and the state of each. **An
+     order reported complete while a shell or an agent is still up reads as work that is not
+     finished**, to the one person who cannot see inside either — which is the user report this clause
+     exists for, verbatim: *"shell items staying open after they have expired and agents staying open
+     after their work is done ... gives the impression that the work isn't done here."*
+
+   `review` § 4c counts the teammate edges that never closed, so a protocol nobody followed is visible
+   from the record rather than from somebody noticing a stray agent eight hours later.
 
 7. **Catch yourself skipping the dispatch.** If the next thing you do after announcing is an
    `Edit`, `Write`, or `Bash` call doing the routed work yourself → STOP, say "Dispatch announced but
@@ -617,7 +669,11 @@ guessed — `null` is a measurement and an invented value is a lie the next sess
 **`spawn`** — written in the same act as the edge file and the `Agent` call (rung 1). Read off the edge:
 
 `ts` · `run_id` · `caller` · `callee` · `rung` · `depth` · `edge_path` · `request_present` ·
-`exit_criteria_present` · `artifact_declared`
+`exit_criteria_present` · `artifact_declared` · `callee_kind`
+
+`callee_kind` is the edge's own `callee-kind:` field (rung 1a), `null` on an edge written before it
+existed. It is the only field that says whether a returned agent still needed shutting down, so
+without it the close-out at rung 6g is unmeasurable from the log.
 
 Those last three are the org's own recorded defect made countable: measured 2026-09-01, **252 edges,
 mean 3.5 lines, 2% carrying exit criteria** (§ rung 1a). That number took a bespoke investigation. It

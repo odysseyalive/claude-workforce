@@ -240,6 +240,63 @@ CHOOSER_RULE = (
 )
 
 
+# WHAT IS LEFT RUNNING WHEN THE WORK IS DONE. User report 2026-09-24, on a real run in a
+# sibling project: "we also have an issue with shell items staying open after they have
+# expired and agents staying open after their work is done ... the 1 shell gives the
+# impression that the work isn't done here."
+#
+# THREE MEASURED CAUSES, ONE RULE, because the user asked for the class and not the
+# instance ("so that these type of issues also don't happen in the future").
+#
+#   1. FOUR ICs STILL RUNNING 7-8 HOURS AFTER HANDING BACK. They had been spawned as
+#      NAMED TEAMMATES. A teammate does not end when it returns its report — it waits for
+#      a `shutdown_request` — and no step in this distribution's dispatch protocol sent
+#      one, at any tier. **The defect is the MISSING CLOSE-OUT, not teammates**, so the
+#      rule is a preference plus a shutdown, never a ban: a teammate is the right shape
+#      for work you must talk to while it runs, and one-shot work simply is not that.
+#
+#   2. A SHELL THAT OUTLIVED ITS SUBAGENT BY NINE HOURS. The IC ran
+#      `npx -y playwright-mcp@latest web_fetch '{...}' | head -200` in Bash. Name the
+#      defect precisely, because the obvious reading is wrong: **the shell was not it.**
+#      The same IC fetched a README with `curl` in the same run and it worked. What
+#      failed was a package name GUESSED from the tool's name and fetched at `@latest`,
+#      which resolved to an MCP stdio server — so it blocked on stdin, with no timeout.
+#      A blanket "never use the shell" would have banned the `curl` that worked and left
+#      the guess that hung.
+#
+#   3. THE ORDER IS WHAT SENT IT THERE. The work order told that IC to verify commands
+#      "with web_fetch" while its handbook's `tools:` was `Read, Edit, Write, Bash,
+#      Skill`. Its own report says so — "`web_fetch` MCP tool is not in this tier's
+#      toolset" — and it improvised rather than report the gap. Both halves are addressed
+#      where each one lives: the DIRECTING node checks the name against the callee's
+#      grant before dispatching, and the RUNNING one says so and works with what it has.
+#
+# IT LIVES HERE FOR THE REASON `USER_WORDS` AND `CHOOSER_RULE` DO. This hook is wired at
+# user scope, so the rule reaches every project on the next `update` with no audit, and it
+# is the ONE carrier that fires on both ends: `UserPromptSubmit` for the operator who
+# writes the order, `SubagentStart` for the employee that runs it. The dispatch protocol
+# in `procedures/org.md` and the handbook templates carry the same rule for orgs that
+# re-audit; this is the half that does not wait for one.
+#
+# IT STAYS SHORT. It is paid on every message and on every spawn.
+#
+# Stated as facts, never as an instruction (see the note above the injection in `main`).
+CLEANUP_RULE = (
+    "One-shot work is spawned as a plain subagent by preference: a named teammate outlives "
+    "its own hand-back until something sends it a shutdown_request, so an order reported "
+    "done still shows a running agent. A teammate that was spawned is sent a "
+    "shutdown_request once its report has been read. A work order names only tools the "
+    "agent running it holds — its `tools:` minus its `disallowedTools:`, checked before the "
+    "order is sent — and an order naming a tool the runner lacks is answered by saying so in "
+    "the report and doing the work with what is there. Before a package is run through npx, "
+    "what that name resolves to is known: the project's own package, a pinned dependency, or "
+    "a package the task names. A package name is never guessed from a tool's or a project's "
+    "name, and an MCP server is reached through its tools rather than started from the "
+    "shell. A command that might wait on input or on the network is worth wrapping in "
+    "`timeout`, and no background shell or process is left running once the work is done."
+)
+
+
 SENSE_HOW = {
     "hearing": "read the record that decided it (`git log`, `workforce/changes/`), or ask "
                "a source outside this turn's own reasoning",
@@ -458,13 +515,18 @@ def main():
     except json.JSONDecodeError:
         return 0
 
-    # A SPAWNED AGENT GETS THE USER-WORDS RULE AND NOTHING ELSE. Returned before the widen
-    # flag is cleared: a subagent starting mid-turn is not the head of a turn, and clearing
-    # there would drop a flag the main session's `Stop` still needs.
+    # A SPAWNED AGENT GETS THE USER-WORDS RULE AND THE CLEANUP RULE. Returned before the
+    # widen flag is cleared: a subagent starting mid-turn is not the head of a turn, and
+    # clearing there would drop a flag the main session's `Stop` still needs.
+    #
+    # NOT `CHOOSER_RULE`, and the asymmetry is deliberate: a subagent has no user to ask
+    # and no `AskUserQuestion`. `CLEANUP_RULE` is the opposite case — the employee is
+    # exactly where the shell hangs and the missing-tool workaround happen, and it is the
+    # only text that reaches it, because a subagent runs its own system prompt.
     if payload.get("hook_event_name") == "SubagentStart":
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "SubagentStart",
-            "additionalContext": USER_WORDS,
+            "additionalContext": USER_WORDS + "\n\n" + CLEANUP_RULE,
         }}))
         return 0
 
@@ -514,7 +576,7 @@ def main():
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
-                x for x in (USER_WORDS, CHOOSER_RULE, checklist_line) if x),
+                x for x in (USER_WORDS, CHOOSER_RULE, CLEANUP_RULE, checklist_line) if x),
         }}))
         return 0
 
@@ -546,7 +608,7 @@ def main():
     # explicit that text framed as an out-of-band command trips the prompt-injection
     # defences and gets surfaced to the user instead of read — which would turn a tag
     # into one more thing a human has to deal with.
-    lines = [USER_WORDS, "", CHOOSER_RULE, "",
+    lines = [USER_WORDS, "", CHOOSER_RULE, "", CLEANUP_RULE, "",
              "This ask is of a kind whose wrong answers are on record in this project."]
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "

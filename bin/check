@@ -1973,6 +1973,165 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# NOTHING IS LEFT RUNNING WHEN THE ORDER IS DONE (2026-09-24)
+#
+# User report, on a real run in a sibling project: "we also have an issue with shell
+# items staying open after they have expired and agents staying open after their work
+# is done ... the 1 shell gives the impression that the work isn't done here."
+#
+# THREE MEASURED CAUSES on that one run. (1) Four ICs still running 7-8 h after handing
+# back: they were spawned as NAMED TEAMMATES, which wait for a `shutdown_request`, and no
+# step at any tier of this distribution's dispatch protocol sent one. (2) A Bash shell
+# that outlived its subagent by 9 h: `npx -y playwright-mcp@latest`, a package name
+# GUESSED off the tool's name, which resolved to an MCP stdio server and blocked on stdin.
+# (3) Two ICs hit `maxTurns` and stopped with no hand-back and no artifact at all.
+#
+# AND THE ORDER IS WHAT SENT (2) THERE: it told an IC to verify commands "with web_fetch"
+# while its `tools:` was `Read, Edit, Write, Bash, Skill`. The IC's own OUTPUT.md records
+# the gap — "`web_fetch` MCP tool is not in this tier's toolset" — and it improvised.
+#
+# THE RULES ARE NARROW ON PURPOSE, and this block asserts the narrowness as hard as it
+# asserts the presence. The user rejected the first draft for exactly that: *"could be
+# very problematic in situations where we don't intend this to happen again. are we
+# causing more problems by using some drastic rule instead of actually identifying the
+# issue you caused?"* The record backs them — the SAME IC fetched a README with `curl` in
+# the same run and it worked. The shell was never the defect, and a blanket "never reach a
+# tool through the shell" would have banned the half that worked while keeping the guessed
+# package name that hung. Likewise teammates: the defect was the missing close-out. So the
+# negative assertions below are load-bearing — a future edit that quietly widens one of
+# these rules back into a ban has to fail here.
+_co = []
+_co_org = _org_block                   # the canonical dispatch block, never the prose around it
+_co_rvw = read("workforce/references/procedures/review.md")
+_co_hbt = read("workforce/references/handbook-templates.md")
+_co_aud = read("workforce/references/procedures/audit.md")
+_co_cfm = read("workforce/bin/wf-conform")
+
+# THE INSTALL-LEVEL HALF, and it is RUN rather than read: a constant existing in the
+# source proves nothing about whether it reaches a turn. Both events, because the operator
+# who writes the order and the employee that runs it each own a different half of the fix,
+# and `SubagentStart` is the ONLY carrier that reaches an employee — a subagent runs its
+# own system prompt, so nothing operator-facing arrives there.
+with _ch_tf.TemporaryDirectory(prefix="wf-check-closeout-") as _co_dir:
+    _co_out = {}
+    for _ev_name, _ev_payload in (
+            ("UserPromptSubmit", {"hook_event_name": "UserPromptSubmit", "prompt": "walk the agenda",
+                                  "session_id": "check-closeout", "scratchpad_dir": _co_dir}),
+            ("SubagentStart", {"hook_event_name": "SubagentStart"})):
+        # `timeout=` on purpose, and it is this block's own rule applied to this block:
+        # a gate that runs everywhere must not be the thing that hangs. `_cl_hook` further
+        # down this file has used `timeout=30` for the same reason since it was written.
+        _co_out[_ev_name] = subprocess.run(
+            [sys.executable, "workforce/bin/wf-task-tag"], input=json.dumps(_ev_payload),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            timeout=30).stdout
+
+for _ev_name, _stdout in _co_out.items():
+    # THE LAST TWO ARE THE NARROWNESS, stated positively so a deletion can break them.
+    # `by preference` is what keeps the teammate rule a preference instead of a ban, and
+    # `is worth wrapping in` is what keeps `timeout` advice instead of a mandate. The
+    # negative list below catches a widening that ADDS ban wording; these catch one that
+    # REMOVES the qualifier and leaves the sentence reading as a rule.
+    for _lit in ("shutdown_request once its report has been read",
+                 "names only tools the agent running it holds",
+                 "never guessed from a tool's or a project's name",
+                 "reached through its tools rather than started from the shell",
+                 "plain subagent by preference",
+                 "is worth wrapping in"):
+        if _lit not in _stdout:
+            _co.append(f"wf-task-tag no longer injects {_lit!r} on {_ev_name} — the rule has "
+                       "to reach BOTH the operator who writes the order and the employee "
+                       "that runs it, and this hook is the only carrier wired at user "
+                       "scope, so it is the only one that reaches a project with no audit")
+
+# THE NARROWNESS, asserted on the injected text itself. A ban here is a regression.
+_co_tt_ctx = _co_out.get("SubagentStart", "")
+for _ban in ("never reaching", "never use the shell", "never a named teammate",
+             "never through the shell", "is wrapped in `timeout"):
+    if _ban in _co_tt_ctx:
+        _co.append(f"wf-task-tag's cleanup rule has widened back into a ban ({_ban!r}). The "
+                   "user rejected that draft: the same employee fetched a README with `curl` "
+                   "in the same run and it worked, so the shell was never the defect, and a "
+                   "teammate closed out at clause 6g is correct. Timeout is advice")
+
+# THE DISPATCH PROTOCOL — the close-out step that did not exist, in the CANONICAL block.
+for _lit, _why in (
+        ("Prefer a PLAIN SUBAGENT for a one-shot order",
+         "an IC spawn is one-shot, and a plain subagent ends when it returns"),
+        ("This is a preference, not a ban",
+         "the measured defect was the missing close-out, never the teammate itself"),
+        ("CLOSE THE ORDER OUT",
+         "no step in this protocol ever shut a spawned teammate down, at any tier"),
+        ("closed: <ISO8601>Z",
+         "a shutdown nobody wrote down is indistinguishable at review from one that "
+         "never happened"),
+        ("An order names only tools the callee actually holds",
+         "the order naming `web_fetch` to an IC that did not hold it is the upstream "
+         "half of the nine-hour shell"),
+        ("review` § 4c counts the teammate edges that never closed",
+         "a protocol with no reader is a protocol nobody followed")):
+    if _lit not in _co_org:
+        _co.append(f"the canonical dispatch block no longer states {_lit!r} — {_why}")
+
+# THE READER. Detection with no counter is the shape this project retires.
+if "SPAWN-CLOSE" not in _co_rvw:
+    _co.append("review.md § 4c no longer prints SPAWN-CLOSE — the org had no reader that "
+               "asked whether a spawn edge's agent had ENDED, so the only detector was a "
+               "person noticing a live agent eight hours later")
+if "PERF` against the CALLER" not in _co_rvw:
+    _co.append("review.md § 4c no longer attributes a never-closed edge to the caller — "
+               "the callee cannot shut itself down, exactly as step 4 reasons about an "
+               "unauthorized edge")
+
+# THE HANDBOOK CONTRACT, in BOTH ## Reporting blocks. Counted, not `in`: this file carries
+# the CEO/Lead contract and the IC contract as two separate blocks, and a literal that
+# appears twice makes a bare `in` VACUOUS — delete either copy and it still passes.
+if _co_hbt.count("Write the OUTPUT.md incrementally") != 2:
+    _co.append(f"the write-it-incrementally clause appears "
+               f"{_co_hbt.count('Write the OUTPUT.md incrementally')} times in "
+               "handbook-templates.md, not 2 — both ## Reporting contracts carry it, "
+               "because two ICs hit their turn limit and left no artifact at all and a "
+               "Lead can hit one just as easily")
+for _lit, _why in (
+        ("Never guess a package name from a tool",
+         "the guessed name is what resolved to a stdio server and blocked on stdin"),
+        ("A missing grant is a defect in the order",
+         "the IC recorded the missing tool in its own report and improvised anyway"),
+        ("Prefer a PLAIN SUBAGENT for a",
+         "the Lead is a directing node and owns the same close-out the CEO does")):
+    if _lit not in _co_hbt:
+        _co.append(f"handbook-templates.md no longer states {_lit!r} — {_why}")
+for _ban in ("never reach a tool through the shell", "never launched from a command line",
+             "NEVER leave a shell or a background process"):
+    if _ban in _co_hbt:
+        _co.append(f"the handbook guardrail has widened back into a ban ({_ban!r}) — see the "
+                   "note above this block; the `curl` in the same run worked")
+
+# THE HEAL, so an org that already exists gets this without being re-hired.
+for _lit, _why in (
+        ("write-it-incrementally clause",
+         "Step 5d is how a contract delta reaches a handbook already shipped"),
+        ("the removal set is exactly the closed literal set",
+         "the tool-grant check on the ORDER is worth nothing if the next frontmatter "
+         "heal quietly takes a project's hand-added `mcp__<server>` grant back out")):
+    if _lit not in _co_aud:
+        _co.append(f"audit Step 5d no longer states {_lit!r} — {_why}")
+
+if "Reporting does not ask for an incremental OUTPUT.md" not in _co_cfm:
+    _co.append("wf-conform no longer flags a handbook whose ## Reporting never asks for an "
+               "incremental OUTPUT.md — the row that makes the contract visible between "
+               "audits, exactly as its say-the-state neighbour does")
+
+check(
+    "closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+    not _co,
+    "; ".join(_co) + ". This is four surfaces for one report: the user-scope hook that "
+    "reaches every project with no audit, the dispatch protocol that now closes out what "
+    "it spawned, the handbook contract that survives a run which does not finish, and the "
+    "`review` line that counts the edges nobody closed",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # A DETECTOR SHIPS WITH ITS FIX — ENFORCED OVER HOOK ARTIFACTS (2026-09-09)
 #
 # THE DIRECTIVE HAS BEEN IN `SKILL.md` SINCE 2026-08-05 AND NOTHING ENFORCED IT HERE:

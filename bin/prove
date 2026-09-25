@@ -240,6 +240,41 @@ PWSH_CHECKS = {
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── NOTHING IS LEFT RUNNING WHEN THE ORDER IS DONE (2026-09-24) ──────────────
+    # One assertion over six files, so every file it reads gets a case: a check that
+    # reads six surfaces and is proven against one is proven on one sixth of itself.
+    # The last two are the NEGATIVE half — the rules are narrow on purpose, and a
+    # future edit that widens one back into a blanket ban has to fail the same check.
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TTAG, "del", 'USER_WORDS + "\\n\\n" + CLEANUP_RULE'),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TTAG, "del", "never guessed from a tool's or a project's "),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     ORGP, "del", "6g. **CLOSE THE ORDER OUT"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     ORGP, "del", "An order names only tools the callee actually holds"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     RVW, "del", "SPAWN-CLOSE"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TPL, "del", "Never guess a package name from a tool"),
+    # Counted, not `in`: this file carries the clause in BOTH ## Reporting blocks, so
+    # deleting one copy must still fail. A bare `in` here would be vacuous.
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TPL, "del", "**Write the OUTPUT.md incrementally, never only at the end.** Open it with the "
+     "REQUEST echo-back and\n"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     AUD, "del", "the removal set is exactly the closed literal set"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     CNFM, "del", "Reporting does not ask for an incremental OUTPUT.md"),
+    # The narrowness, broken by DELETING the qualifier rather than appending a ban: an
+    # append to a script lands after `sys.exit(main())` and never executes, so the
+    # mutation could not reach the injected text and the case reported VACUOUS.
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TTAG, "del", "plain subagent by preference"),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TTAG, "del", "is worth wrapping in "),
+    ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
+     TPL, "append", "\n\n- NEVER leave a shell or a background process running, ever.\n"),
     # THE PYTHON FLOOR (customer DEF-Q-001, 2026-09-15). Each case puts one of the three
     # reverted 3.7+ calls back into a shipped script, so the scan must name it. The last one
     # lowers nothing and raises the floor instead: without `PYTHON-FLOOR:` the constant check
