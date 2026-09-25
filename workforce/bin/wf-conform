@@ -773,8 +773,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
         # a Sources channel whose skill the Procedure never mentions at all.
         _proc = section(body, "## Procedure")
         if _proc is not None:
-            _proc = "\n".join(l for l in _proc.splitlines()
-                              if not PROHIBITION_RX.search(l))
+            _proc = strip_prohibitions(_proc)
             for _sk in sorted(set(SOURCES_SKILL_RX.findall(_sources))):
                 # `Skill(<data-skill>)` is the template's own unfilled slot. Reporting
                 # a placeholder as a dead pointer is noise, not a finding.
@@ -1769,6 +1768,48 @@ def _journal_path_shaped(cell):
     if not cell or cell.startswith("(") or any(c.isspace() for c in cell):
         return False
     return "/" in cell or os.sep in cell or bool(re.search(r"\.[A-Za-z0-9]+$", cell))
+
+
+def strip_prohibitions(text):
+    """`text` with its prohibition CLAUSES removed, rather than the whole lines holding them.
+
+    A prohibition names a thing in order to forbid it, so the name must not count as a
+    mention — but a step is one line and routinely does two things:
+
+        1. Consult `Skill(awareness-ledger)` at step 0; never act on an assumption it settles.
+
+    Dropping the line dropped the consult with the prohibition, and the Sources channel that
+    step exists to exercise read as a DEAD POINTER. MEASURED 2026-09-25
+    (audit-20260925T180537Z, P4). The clause is cut instead: from the prohibition keyword to
+    the next sentence or clause boundary, leaving the rest of the step where it is.
+
+    ONE CALLER, DELIBERATELY. The `## Procedure` reader below wants a finer filter because
+    its risk is one-sided the other way — dropping less text can only find MORE mentions and
+    therefore report FEWER dead pointers. The spawning-skill and routing readers that share
+    `PROHIBITION_RX` want the coarse line filter they have: 22 of 22 findings on one real org
+    were false, and a finer filter there would put them back.
+    """
+    out = []
+    for line in (text or "").splitlines():
+        m = PROHIBITION_RX.search(line)
+        if not m:
+            out.append(line)
+            continue
+        head = line[:m.start()]
+        # To the end of the clause the prohibition opens: the next `.`, `;`, `—` or `)` that
+        # is not inside a backtick span. A prohibition with no such boundary runs to the end
+        # of the line, which is the old behaviour and the common case.
+        tail = line[m.start():]
+        cut = len(tail)
+        depth = 0
+        for i, ch in enumerate(tail):
+            if ch == "`":
+                depth ^= 1
+            elif not depth and ch in ".;—)":
+                cut = i + 1
+                break
+        out.append(head + tail[cut:])
+    return "\n".join(out)
 
 
 def check_journal(root, res):
