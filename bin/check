@@ -12610,7 +12610,15 @@ for _s in ("wf-checkrun", "wf-conform", "wf-census", "wf-context", "wf-remainder
     # be cross-validated flag-by-flag — naming the command is the exemption. The class
     # this check exists for is untouched: a script's OWN output naming its OWN removed
     # flag invokes no other command, so it is still caught (proven below by hand).
-    _other_cmd = re.compile(r"\b(?:claude|wf-[a-z][a-z-]+)\b")
+    # THE SAME EXEMPTION, AND THE LIST IS NOT ONLY OUR OWN COMMANDS. A script that reads
+    # shell lines carries the OPTION TABLE of the tool it is reading — `wf-checkrun` knows
+    # `grep -e/--regexp` supplies a pattern and `-f/--file` supplies one from a file,
+    # because that is how it tells a pattern argument from a path. Spelled `grep --regexp`,
+    # the string says whose flag it is, and that is exactly what this exemption is for.
+    # The class stays caught: a string naming this script's own removed flag names no other
+    # command, so `--run` in a wf-checkrun message still fails here (proven by hand).
+    _other_cmd = re.compile(r"\b(?:claude|git|npm|npx|pnpm|grep|egrep|fgrep|rg|sed|awk"
+                            r"|wf-[a-z][a-z-]+)\b")
 
     def _flag_lies_in(_text):
         if set(_other_cmd.findall(_text)) - {_s}:

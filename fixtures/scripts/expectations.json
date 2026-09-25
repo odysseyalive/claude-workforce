@@ -494,6 +494,19 @@
       ". declared-negative"
     ]
   },
+  "checkrun-grep-pattern": {
+    "_why": "MEASURED 2026-09-25 (audit-20260925T180537Z, item 5): the token pass split every fenced or backticked line on whitespace and threw the quoting away, so a grep PATTERN written in the shape of a path — `grep -c \"security-ref-version/catalog.md\" references/security-taxonomy.md` — was resolved as a filesystem path and reported `! dead`. Greping for a path-shaped string (a settings entry, a citation, a marker) is an ordinary check, and the report told its author to go create a file that was never meant to exist. Against HEAD's wf-checkrun: `! dead security-ref-version/catalog.md`. The pattern is now dropped by POSITION — the first non-option argument of a pattern-taking command — and the command's real file argument still resolves, which is what the `want` row asserts.",
+    "script": "wf-checkrun",
+    "exit": 0,
+    "want": [
+      "+ resolved",
+      "references/security-taxonomy.md"
+    ],
+    "not": [
+      "! dead",
+      "security-ref-version/catalog.md"
+    ]
+  },
   "checkrun-indented-wrapper": {
     "_why": "Branch ORDER alone cannot separate two cases the gate found in successive rounds: with HTML first, an indented <div> with no closer quarantined the file; with indent first, an INDENTED <details> whose body is DEDENTED went live and its illustration was read as a real declaration. Lookahead for the matching closer is what distinguishes them.",
     "exit": 0,

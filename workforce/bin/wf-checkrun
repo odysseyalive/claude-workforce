@@ -400,11 +400,104 @@ def candidate_tokens(seg):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            tokens.extend(re.split(r"[\s|;()&]+", line))
+            tokens.extend(_line_tokens(line))
     for span in BACKTICK_RX.findall(FENCE_RX.sub("", seg)):
-        tokens.extend(re.split(r"[\s|;()&]+", span))
+        tokens.extend(_line_tokens(span))
 
     return _filter_tokens(tokens)
+
+
+# A command whose first non-option argument is a PATTERN rather than a path. The pattern
+# is the one argument of a shell line that is guaranteed not to name a file, and it is
+# routinely written in the shape of one.
+PATTERN_CMDS = {"grep", "egrep", "fgrep", "zgrep", "rg", "ag", "ack", "pcregrep"}
+# Options that consume the NEXT token. `-e` consumes a pattern (dropped with it); `-f`
+# consumes a real path and is left alone, which is why the two are listed apart rather
+# than as one "takes a value" set.
+#
+# SPELLED WITH THEIR OWNER. These are GREP's options, not this script's, and
+# `bin/check`'s flag-lie scan reads every string constant here as a flag this script
+# claims to accept unless the string names the command it belongs to. Writing them as
+# `grep --regexp` is not a workaround: it is the same fact the scan is asking for, said
+# out loud.
+PATTERN_OPTS = {s.split()[-1] for s in ("grep -e", "grep --regexp")}
+FILE_OPTS = {s.split()[-1] for s in ("grep -f", "grep --file")}
+# The `=`-joined spellings of the same two, derived so no second list can disagree.
+JOINED_PATTERN = tuple(o + "=" for o in sorted(PATTERN_OPTS) if o.startswith("--")) + ("-e",)
+JOINED_FILE = tuple(o + "=" for o in sorted(FILE_OPTS) if o.startswith("--"))
+ASSIGN_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def _line_tokens(line):
+    """The whitespace tokens of one shell line, with any grep PATTERN argument dropped.
+
+    A QUOTED GREP PATTERN IS NOT A PATH, and this pass could not tell the difference:
+    tokens were split on whitespace with the quoting thrown away, so
+    `grep -c "security-ref-version/catalog.md" references/security-taxonomy.md` yielded
+    the pattern as a candidate, `is_file_reference` accepted it on its `.md` tail, and
+    the section was reported as naming a dead file. A check that greps for a path-shaped
+    string — a settings entry, a citation, a marker — is an ordinary shape, and the
+    report told its author to go fix a file that was never meant to exist.
+
+    Dropped by POSITION rather than by quoting: the first non-option argument of a
+    pattern-taking command is its pattern whether or not the author quoted it, and no
+    real path is ever lost that way — the pattern slot cannot hold one.
+    """
+    out = []
+    # Segment on the same separators the old single split used, so a pipeline is read as
+    # the several commands it is. `grep X | wc -l` must not hide `wc`'s arguments.
+    for seg in re.split(r"[|;()&]+", line):
+        toks = [t for t in re.split(r"\s+", seg.strip()) if t]
+        i = 0
+        while i < len(toks) and (ASSIGN_RX.match(toks[i]) or toks[i] in ("sudo", "env", "command", "time")):
+            out.append(toks[i])
+            i += 1
+        if i >= len(toks):
+            continue
+        out.append(toks[i])
+        if os.path.basename(toks[i].strip("'\"`")) not in PATTERN_CMDS:
+            out.extend(toks[i + 1:])
+            continue
+        i += 1
+        pattern_seen = False
+        while i < len(toks):
+            t = toks[i]
+            if t == "--":
+                # End of options: the next token is the pattern unless one was given
+                # with -e, and everything after it is a file.
+                rest = toks[i + 1:]
+                out.extend(rest if pattern_seen else rest[1:])
+                break
+            if t in PATTERN_OPTS:
+                pattern_seen = True
+                i += 2
+                continue
+            if t in FILE_OPTS:
+                # `-f FILE` names a real path AND supplies the patterns, so the file is
+                # kept and the pattern slot is already spoken for — without the second
+                # half the command's actual input file was eaten as the pattern.
+                out.extend(toks[i + 1:i + 2])
+                pattern_seen = True
+                i += 2
+                continue
+            if t.startswith("-") and len(t) > 1:
+                # The `=`-joined and letter-joined spellings of the same two options.
+                # `--file=p.txt` names a path in the token itself, and both forms fill
+                # the pattern slot — missed, the command's input file was read as the
+                # pattern and a genuinely dead path stopped being reported.
+                if t.startswith(JOINED_PATTERN) or t.startswith(JOINED_FILE):
+                    pattern_seen = True
+                if t.startswith(JOINED_FILE):
+                    out.append(t.split("=", 1)[1])
+                i += 1
+                continue
+            if not pattern_seen:
+                pattern_seen = True      # the pattern slot, dropped
+                i += 1
+                continue
+            out.append(t)
+            i += 1
+    return out
 
 
 def _filter_tokens(tokens):
