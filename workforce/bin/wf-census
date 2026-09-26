@@ -134,6 +134,31 @@ def is_record_file(path):
                for d in RECORD_DIRS)
 
 
+def report_rows(rows, key=None):
+    """Every row set the report prints, in a STABLE order. One helper, called by all five.
+
+    THE ORDER WAS THE FILESYSTEM'S. These maps and lists are filled in `os.walk` order, so a
+    report's rows followed the directory entries of whatever tree was read — and a fresh COPY
+    of one tree enumerates in a different order than the original. MEASURED 2026-09-25 by
+    `bin/corpus`, which runs this script against a copy of a real org and diffs the output
+    against a golden: `image-validator` and `character-scanner` swapped places between two runs
+    of the same unchanged tree, and so did the two `unreadable` rows.
+
+    `audit.md` Step 7 rests on comparing one run's report against another's — *"comparing two
+    runs is the only way to tell whether a change helped"* — and this script's own header says
+    a census that can be re-run is the only kind that can be compared. Rows that move on their
+    own make every such comparison a diff of noise, which is the same defect as a count nobody
+    can reproduce.
+
+    One function rather than five `sorted(...)` calls, so the property is stated once and can be
+    broken in one place: `bin/prove` deletes the sort below and this report goes back to
+    printing whatever order the directory happened to hold.
+    """
+    out = list(rows.items() if hasattr(rows, "items") else rows)
+    out.sort(key=key)
+    return out
+
+
 def sacred_scope(root):
     """(files, scratch_skipped): every `.md` under `<root>/.claude` whose sacred blocks the
     sidecar must stamp, sorted, plus the number of `.md` files in run scratch left out.
@@ -1052,17 +1077,26 @@ def main():
                 print(f"    ! DEAD pattern (matched nothing): {_p}")
         print(f"  duplicates  {len(s['duplicates'])} name(s) installed in BOTH scopes, "
               f"byte-identical (advisory — same behaviour whichever resolves)")
-        for name, paths in s["duplicates"].items():
+        # SORTED, EVERY ONE OF THEM. These maps and lists are filled in `os.walk` order, so
+        # their row order follows the directory entries of whatever tree is being read — and a
+        # fresh copy of one tree enumerates in a different order than the original. MEASURED
+        # 2026-09-25 by `bin/corpus`, which runs this against a copy of a real org and compares
+        # against a golden: `image-validator` and `character-scanner` swapped places between two
+        # runs of the SAME unchanged tree, as did the two `unreadable` rows. `audit.md` Step 7
+        # rests on comparing one run's report with another's — "comparing two runs is the only
+        # way to tell whether a change helped" — and a report whose rows move on their own makes
+        # every such comparison a diff of noise.
+        for name, paths in report_rows(s["duplicates"]):
             print(f"    · {name}: {', '.join(paths)}")
         print(f"  collisions  {len(s['collisions'])} live (resolving locations only)")
-        for name, paths in s["collisions"].items():
+        for name, paths in report_rows(s["collisions"]):
             print(f"    ! {name}: {', '.join(paths)}")
-        for name, paths in s["namespace"].items():
+        for name, paths in report_rows(s["namespace"]):
             print(f"    · {name}: {len(paths)} in-skill copies — advisory; workforce "
                   f"may not claim this name")
-        for f in s["unpaired_markers"]:
+        for f in report_rows(s["unpaired_markers"], key=lambda r: (r["file"], r["family"])):
             print(f"    ! unpaired {f['family']} in {f['file']} (imbalance {f['imbalance']})")
-        for p, why in s["unreadable"]:
+        for p, why in report_rows(s["unreadable"]):
             print(f"    ! unreadable {p}: {why}")
 
     # A collision is blocking: it resolves silently by read order, so a run that

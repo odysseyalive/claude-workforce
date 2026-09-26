@@ -27,6 +27,7 @@ itself. Two processes, one file, and only one of them knew the file was a histor
 | `bin/check` assertion | *"can this defect come back?"* | always, for anything structural — and **proven by breaking it** |
 | `fixtures/scripts/` | *"can this SCRIPT regress?"* | any behavior a shipped script must keep. `bin/script-conformance` re-runs them |
 | `bin/idempotence` | *"is this writer a no-op the second time?"* | every tool that writes. Run it after touching one — `bin/coverage --stamp` duplicated its header for hours because nothing ran it twice |
+| `corpus/` via `bin/corpus` | *"does this still do the right thing on a REAL org?"* | every change to a script an audit runs. The only store whose input this project did not write |
 | `measurements/` | *"is this platform fact true on a host?"* | every MEASURED fact in `platform.md`, with its evidence |
 | `plan/<topic>-<date>.md` | *"why is it built this way, and what did running it cost?"* | mock audits, design records, negative-test results |
 | the commit message | *"what was learned, in the author's own words?"* | every change. **These are the richest record this project has** — 844 lines on 2026-08-03 alone |
@@ -40,6 +41,44 @@ no longer exists. It cannot see coupling that runs through no shared file, name,
 its header lists what that leaves out. *Built 2026-09-13, after a removal plan marked the
 NOTIFICATION keep-rule and the tag's `enforced` marker for deletion while the asks juror depended on
 both.*
+
+**The corpus is the store the other five could not be.** Each of them measures a tree this project
+authored — a fixture states the case its author thought of, and a `bin/check` assertion states the rule
+its author knew to write down. **1.71.0 passed 1,411 checks and 726 prove cases, shipped, and on the
+first real org it was pointed at left 505 false readers; its new `--house-rules` producer crashed with
+`NameError: name 'body' is not defined` on every project that already carried a region.** Neither was
+reachable from anything in this repository, because a real org is 31 skills, 1,511 files, five evaluator
+copies under three spellings, agents registered under two layouts, and citations running between all of
+it. Both were found the same way: copy one real project, run the command, read the output.
+
+```bash
+bin/corpus snapshot /path/to/project   # copies its .claude/ (+ CLAUDE.md) into corpus/<name>/
+bin/corpus list                        # snapshots, and the 27 cases with their citations
+bin/corpus run                         # every case against a throwaway copy, diffed
+bin/corpus run --case catalog-migrate  # one case
+bin/corpus run --accept                # re-record the goldens
+```
+
+**`corpus/` is gitignored and `bin/check` asserts nothing under it is tracked.** This repository is
+public and a snapshot is somebody's private working material; `fixtures/` is where a committed tree
+belongs. On a machine with no snapshots `bin/corpus run` prints one SKIPPED line and exits 0, so a fresh
+clone stays green — the corpus is a local instrument, not a shared one.
+
+**Three properties make a diff mean something.** The install side is a throwaway `bin/sync --personal`
+of the checkout under test, so a diff is this checkout's behaviour and not the operator's live install.
+Volatile fields are masked — the copy's path, the install's path, run ids, stamps, dates, elapsed
+seconds — so an unchanged tree diffs against itself as empty. And a traceback is a failure whatever the
+exit code says, because a golden recorded over a crash makes the crash the expected output.
+
+**The case list is derived, not invented.** Every row cites the `audit.md` or `audit-setup.md` line
+where the audit makes that call in display mode, and `bin/check` re-reads each citation: a procedure
+that stops making a call, or renames its script, fails there rather than leaving the corpus measuring
+this project's memory of the audit.
+
+*Proven against 1.70.0 (`f2c5c64`) in a scratch worktree with the goldens from HEAD: 8 of 27 cases
+differ, and `catalog-migrate`'s diff is the false-reader defect itself — 1.70.0 counted
+`.claude/workforce/personnel/AMD-*.md` and `.claude/workforce/deferred.md` as live readers of the
+catalog. `catalog-house-rules` fails as `rc=2 · unexpected exit`, which is the NameError.*
 
 **And this file is the index.** It is what a fresh session reads, and it is the only store that goes
 stale silently — the others are append-only. **Update the open list in the same change that closes an

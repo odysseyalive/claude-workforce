@@ -47,3 +47,20 @@ __pycache__/
 
 # fixture git histories are recreated by fixtures/init-git.sh, never committed
 fixtures/*/.git/
+
+# The local-only regression corpus: snapshots of REAL customized orgs, and the golden
+# outputs `bin/corpus run` compares against. ANCHORED, and never committed.
+#
+# THIS REPOSITORY IS PUBLIC. A snapshot is another project's `.claude/` verbatim — its
+# handbooks, its prompts, its notes, its users' own words. Committing one would publish
+# somebody's private working material to ship a test fixture, and no fixture is worth that.
+# `fixtures/` is where a committed tree belongs; this is where a real one lives, on one
+# machine, for the person who took it.
+#
+# It exists because every other gate here runs against trees this project wrote itself.
+# 1.71.0 passed 1,411 checks and 726 prove cases and still left 505 false readers on the
+# first real org it touched, and its `--house-rules` crashed on every project that already
+# had a region — a branch no fixture could reach. Both were found by hand, on a copy.
+# `bin/check` asserts nothing under here is tracked, and `bin/corpus run` reports SKIPPED on
+# a machine with no snapshots, so a fresh clone stays green.
+/corpus/

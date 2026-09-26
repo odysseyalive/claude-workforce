@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""corpus — run this distribution's read-only scripts against a REAL customized org.
+
+    bin/corpus snapshot <project-dir>...   copy each project's .claude/ (+ CLAUDE.md) in
+    bin/corpus list                        what is snapshotted, and when
+    bin/corpus run [name ...]              run every case, diff against the goldens
+    bin/corpus run --accept                re-record the goldens instead of diffing
+    bin/corpus run --quiet                 one line unless something fails (bin/check's form)
+
+WHY THIS EXISTS — measured 2026-09-25, on the release the day before.
+
+    Every pre-release gate in this repository runs against fixtures this project wrote
+    itself. 1.71.0 shipped a catalog migration that passed 1,411 checks and 726 prove
+    cases, and on the first real tree it was pointed at it left 505 false readers. The
+    same release shipped `wf-catalog --house-rules`, whose `current` branch crashed with
+    `NameError: name 'body' is not defined` on EVERY project that already had a region —
+    unreachable from any fixture, because every fixture was a first-write tree. Both were
+    found by hand, by copying one real project and running the command.
+
+    A fixture states the case its author thought of. A real org states the case nobody
+    did: 31 skills, 1,511 files, five evaluator copies at three spellings, agents
+    registered under two layouts, and citations between all of it. That is the input this
+    distribution actually runs on, and until now nothing here had ever seen one.
+
+THE CORPUS IS LOCAL-ONLY AND NEVER COMMITTED. `corpus/` is gitignored, and `bin/check`
+asserts that nothing under it is tracked — this repository is PUBLIC, and a snapshot holds
+another project's handbooks, prompts and notes verbatim. A machine with no snapshots is not
+a machine with a failing gate: `run` reports SKIPPED and exits 0, so a fresh clone and
+every other developer stay green.
+
+NOTHING TOUCHES THE REAL PROJECT. `snapshot` reads it once. `run` copies the snapshot to a
+throwaway tree, runs everything against the COPY, and removes it in a `finally` — so a
+traceback, a failing case and a Ctrl-C all still clean up. The real project is never an
+argument to any case.
+
+THE CASES ARE DERIVED, NOT INVENTED. Every row in `CASES` cites the line of
+`references/procedures/audit.md` or `references/audit-setup.md` where the audit makes that
+call in display mode, and `bin/check` re-reads each citation: a procedure that stops making
+a call, or renames its script, fails this list rather than silently leaving it behind.
+"""
+
+import argparse
+import difflib
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CORPUS = os.path.join(ROOT, "corpus")
+BIN = os.path.join(ROOT, "workforce", "bin")
+TREE, GOLDEN, PROV = "tree", "golden", "SNAPSHOT.md"
+
+# `<TREE>` is substituted with the throwaway copy's absolute path at run time. Every case is
+# display-mode: no `--execute`, no `--apply`, no `--capture`, no `--stamp`. `rc` is the exit
+# code a HEALTHY run gives — `wf-companion --objective` exits 1 on a placeholder objective by
+# design, and `wf-catalog --grep` exits 1 on no match, so "nonzero" is not the failure signal.
+# `cite` is a file:line where the audit's own procedure NAMES this script, and `bin/check` reads
+# each one back: a procedure that stops naming a script, or renames it, fails there rather than
+# leaving this list measuring one author's memory of the audit. Where the audit only ever calls a
+# script in write mode — `wf-permissions --apply`, `wf-settings-apply --execute` — the citation is
+# that line and the case still runs the DISPLAY form, because a display run is the only form it is
+# safe to point at a snapshot. `wf-ledger` was dropped for the opposite reason: no audit procedure
+# names it, so a case for it would have been this file inventing a step.
+CASES = [
+    ("census",              "wf-census",       ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:120"),
+    ("census-json",         "wf-census",       ["--root", "<TREE>", "--json",
+                                                "<TREE>/.claude/workforce/census.json"], (0, 1),
+     "workforce/references/procedures/audit.md:252"),
+    ("context",             "wf-context",      ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:163"),
+    ("claude-md",           "wf-claude-md",    ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:164"),
+    ("claude-md-evacuate",  "wf-claude-md",    ["--root", "<TREE>", "--evacuate"], (0, 1),
+     "workforce/references/procedures/audit.md:292"),
+    ("remainder-dead-scripts", "wf-remainder", ["--root", "<TREE>", "--dead-scripts"], (0, 1),
+     "workforce/references/procedures/audit.md:267"),
+    ("remainder-swept-refs", "wf-remainder",   ["--root", "<TREE>", "--swept-refs"], (0, 1),
+     "workforce/references/procedures/audit.md:2397"),
+    ("ratchet",             "wf-ratchet",      ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:327"),
+    ("apply",               "wf-apply",        ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:307"),
+    ("companion",           "wf-companion",    ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:964"),
+    ("companion-objective", "wf-companion",    ["--root", "<TREE>", "--objective"], (0, 1),
+     "workforce/references/procedures/audit.md:432"),
+    ("catalog",             "wf-catalog",      ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:861"),
+    ("catalog-json",        "wf-catalog",      ["--root", "<TREE>", "--json"], (0, 1),
+     "workforce/references/procedures/audit.md:861"),
+    ("catalog-house-rules", "wf-catalog",      ["--root", "<TREE>", "--house-rules"], (0,),
+     "workforce/references/procedures/audit.md:913"),
+    ("catalog-migrate",     "wf-catalog",      ["--root", "<TREE>", "--migrate"], (0, 1),
+     "workforce/references/procedures/audit.md:2071"),
+    # The tier-3 read every IC makes, and the one that was answering `no match` for a row
+    # sitting in a file the migration had kept (`grep_sources`). One kind per case, because a
+    # combined pattern would hide which layer answered.
+    ("catalog-grep-text",   "wf-catalog",      ["--root", "<TREE>", "--kind", "text",
+                                                "--grep", "em-dash"], (0, 1),
+     "workforce/references/procedures/audit.md:861"),
+    ("catalog-grep-image",  "wf-catalog",      ["--root", "<TREE>", "--kind", "image",
+                                                "--grep", "edge quality"], (0, 1),
+     "workforce/references/procedures/audit.md:861"),
+    ("seed",                "wf-seed",         ["--root", "<TREE>"], (0, 3),
+     "workforce/references/procedures/audit.md:2028"),
+    ("stamp",               "wf-stamp",        ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:1448"),
+    ("stamp-directives",    "wf-stamp",        ["--root", "<TREE>", "--directives"], (0, 1),
+     "workforce/references/procedures/audit.md:1450"),
+    ("conform",             "wf-conform",      ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:1535"),
+    ("live",                "wf-live",         ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:2174"),
+    ("code-eval",           "wf-code-eval",    ["--root", "<TREE>"], (0, 1),
+     "workforce/references/procedures/audit.md:2101"),
+    ("preflight-json",      "wf-preflight",    ["--root", "<TREE>", "--json"], (0, 1),
+     "workforce/references/audit-setup.md:265"),
+    ("permissions",         "wf-permissions",  ["--root", "<TREE>"], (0, 1),
+     "workforce/references/audit-setup.md:1015"),
+    ("settings-apply",      "wf-settings-apply", ["--root", "<TREE>"], (0, 1, 2),
+     "workforce/references/audit-setup.md:1247"),
+]
+
+# A traceback is ALWAYS a failure, whatever the exit code and whatever the golden says. Both
+# defects this file exists for printed one: a golden recorded over a crash would make the
+# crash the expected output, which is the single worst thing a regression corpus can do.
+CRASH_RX = re.compile(r"^Traceback \(most recent call last\):|^\w*Error: |NameError", re.M)
+
+
+def _bail(msg):
+    sys.stderr.write("corpus: %s\n" % msg)
+    raise SystemExit(2)
+
+
+def snapshots():
+    """Snapshot names, sorted. A directory without a `tree/` is not one."""
+    if not os.path.isdir(CORPUS):
+        return []
+    return sorted(n for n in os.listdir(CORPUS)
+                  if os.path.isdir(os.path.join(CORPUS, n, TREE)))
+
+
+def normalise(text, tree, name, config=None, sandbox=None):
+    """Mask every field that changes between two runs of the same unchanged tree.
+
+    A golden carrying a timestamp, a run id or the throwaway tree's path diffs against itself
+    on the next run, and a corpus that always reports a difference reports nothing.
+
+    **LONGEST PATH FIRST, and the order is the whole correctness of this function.** The
+    throwaway install sits inside the throwaway HOME, and the copied tree sits beside it, so
+    masking the home first rewrites the prefix of both and leaves their tails behind as noise
+    that still diffs. Each entry below is a strict superpath of the ones after it.
+    """
+    real_home = os.path.expanduser("~")
+    subs = []
+    if config:
+        subs += [(config, "<INSTALL>")]
+    if tree:
+        subs += [(tree, "<TREE>")]
+    if sandbox:
+        subs += [(sandbox, "<SANDBOX>")]
+    subs += [(os.path.join(CORPUS, name), "<SNAP>"), (ROOT, "<REPO>"),
+             (real_home, "<HOME>")]
+    for src, dst in subs:
+        if not src:
+            continue
+        # Both spellings: a script may print the path it was handed or the resolved one, and on
+        # a machine where /home is a link or /tmp is a symlink those differ.
+        for form in (os.path.realpath(src), src):
+            text = text.replace(form, dst)
+    # A run id, an archive stamp and a backup name are all this shape.
+    text = re.sub(r"\d{8}T\d{6}Z", "<STAMP>", text)
+    text = re.sub(r"\d{8}T\d{4}Z", "<STAMP>", text)
+    text = re.sub(r"\b\d{4}-\d{2}-\d{2}\b", "<DATE>", text)
+    text = re.sub(r"\b\d{2}:\d{2}:\d{2}\b", "<TIME>", text)
+    # Elapsed seconds a report prints about itself. The measurement is the tree, not the clock.
+    text = re.sub(r"\b\d+\.\d+s\b", "<ELAPSED>", text)
+    return "\n".join(l.rstrip() for l in text.splitlines()) + "\n"
+
+
+def run_case(case, tree, name, home, config, sandbox):
+    """`(label, rc, normalised_output, crashed)` for one case against the throwaway tree."""
+    label, script, args, want_rc, _cite = case
+    argv = [sys.executable, os.path.join(BIN, script),
+            *[a.replace("<TREE>", tree) for a in args]]
+    env = dict(os.environ, CLAUDE_CONFIG_DIR=config, HOME=home)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=300, env=env)
+        out, rc = r.stdout + r.stderr, r.returncode
+    except subprocess.TimeoutExpired:
+        return label, None, "TIMEOUT after 300s\n", True  # not normalised: no output to mask
+    except OSError as exc:
+        return label, None, "could not run: %s\n" % exc, True
+    crashed = bool(CRASH_RX.search(out)) or rc not in want_rc
+    return label, rc, normalise(out, tree, name, config, sandbox), crashed
+
+
+def materialise_links(src, dest):
+    """Replace a link that leaves `.claude/` but stays inside the project with its content.
+
+    Returns `[(relpath, target)]` for each one replaced.
+
+    MEASURED on the first corpus run ever taken. `university` registers two employees as
+    symlinks into a SIBLING project — `.claude/agents/comms-drafter.md ->
+    ../../pythom-space/.claude/agents/comms-drafter.md`. Copied as links, they dangle in the
+    snapshot, and `wf-census`, `wf-context` and `wf-conform` all exited 2 with `unreadable …
+    FileNotFoundError`. That is a snapshot artefact, not a finding: on the real tree the file
+    is there and every one of them exits 0. A corpus that reproduces a DIFFERENT tree
+    measures nothing, and worse, it would have taught this suite that three scripts crash.
+
+    THE RULE IS NARROW ON PURPOSE, and the narrowness is a real test. A link is materialised
+    only when its target resolves inside the project root and outside `.claude/`. A link that
+    stays inside `.claude/` is left alone — its relative path resolves in the copy exactly as
+    it did in the original. And a link that ESCAPES the project root is left alone too:
+    `university` carries `.claude/workforce/negatives/ops-lead-escape-link -> /etc/hostname`,
+    a negative fixture whose whole subject is a link that points out of the tree. Resolving
+    that one would turn the fixture into an ordinary file and silence the assertion it
+    exists for.
+    """
+    src_root, claude = os.path.realpath(src), os.path.realpath(os.path.join(src, ".claude"))
+    lifted = []
+    for d, _dirs, files in os.walk(dest):
+        for n in files + _dirs:
+            p = os.path.join(d, n)
+            if not os.path.islink(p):
+                continue
+            # Resolve against the ORIGINAL location: a relative link copied into the snapshot
+            # points at the snapshot's own layout, which is not what it named.
+            rel = os.path.relpath(p, dest)
+            orig = os.path.join(src, rel)
+            tgt = os.path.realpath(os.path.join(os.path.dirname(orig), os.readlink(p)))
+            inside_project = tgt == src_root or tgt.startswith(src_root + os.sep)
+            inside_claude = tgt == claude or tgt.startswith(claude + os.sep)
+            if not inside_project or inside_claude or not os.path.isfile(tgt):
+                continue
+            os.unlink(p)
+            shutil.copy2(tgt, p)
+            lifted.append((rel, os.path.relpath(tgt, src_root)))
+    return lifted
+
+
+def do_snapshot(paths):
+    for p in paths:
+        src = os.path.abspath(os.path.expanduser(p))
+        if not os.path.isdir(os.path.join(src, ".claude")):
+            _bail("%s holds no .claude/ — not a workforce project" % src)
+        name = os.path.basename(src.rstrip(os.sep))
+        dest = os.path.join(CORPUS, name, TREE)
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.makedirs(dest)
+        # `.git` and `__pycache__` are excluded for the reason `bin/prove` excludes them: a
+        # nested `.git` is not snapshot content, and a `.pyc` is never source.
+        shutil.copytree(os.path.join(src, ".claude"), os.path.join(dest, ".claude"),
+                        symlinks=True,
+                        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"))
+        if os.path.isfile(os.path.join(src, "CLAUDE.md")):
+            shutil.copy2(os.path.join(src, "CLAUDE.md"), os.path.join(dest, "CLAUDE.md"))
+        lifted = materialise_links(src, dest)
+        n = sum(len(f) for _d, _s, f in os.walk(dest))
+        with open(os.path.join(CORPUS, name, PROV), "w", encoding="utf-8") as fh:
+            fh.write("# corpus snapshot — %s\n\n"
+                     "- source: `%s`\n- taken: %s\n- files: %d\n"
+                     "- workforce: %s\n\n"
+                     "LOCAL ONLY. `corpus/` is gitignored and `bin/check` asserts nothing "
+                     "under it is tracked: this holds another project's own words, and this "
+                     "repository is public.\n%s"
+                     % (name, src, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), n,
+                        _version(),
+                        ("\n## Links materialised\n\nEach left `.claude/` but stayed inside "
+                         "the project, so a copied link would dangle (see "
+                         "`materialise_links`).\n\n"
+                         + "".join("- `%s` ← `%s`\n" % (r, t) for r, t in lifted))
+                        if lifted else ""))
+        print("snapshot %-24s %5d files from %s%s"
+              % (name, n, src,
+                 " · %d link(s) materialised" % len(lifted) if lifted else ""))
+    print("\n%d snapshot(s) in corpus/ — `bin/corpus run` exercises them" % len(snapshots()))
+    return 0
+
+
+def _version():
+    try:
+        with open(os.path.join(ROOT, "workforce", "references", "version.md"),
+                  encoding="utf-8") as fh:
+            m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)", fh.read(), re.M)
+        return m.group(1) if m else "unknown"
+    except OSError:
+        return "unknown"
+
+
+def do_list():
+    names = snapshots()
+    if not names:
+        print("no snapshots. `bin/corpus snapshot <project-dir>` records one.")
+        return 0
+    for n in names:
+        prov = os.path.join(CORPUS, n, PROV)
+        head = ""
+        if os.path.isfile(prov):
+            with open(prov, encoding="utf-8") as fh:
+                head = " · ".join(l.strip("- \n") for l in fh
+                                  if l.startswith("- ")).replace("`", "")
+        golden = os.path.join(CORPUS, n, GOLDEN)
+        g = len(os.listdir(golden)) if os.path.isdir(golden) else 0
+        print("  %-24s %2d golden(s)  %s" % (n, g, head))
+    print("\n%d case(s), each citing where the audit makes the call:" % len(CASES))
+    for label, script, cargs, rc, cite in CASES:
+        print("  %-24s %-18s %-34s rc%s  %s"
+              % (label, script, " ".join(a for a in cargs if a != "--root"),
+                 "/".join(str(x) for x in rc), cite))
+    return 0
+
+
+def build_install():
+    """A THROWAWAY HOME with a fresh install of THIS checkout: `(sandbox, home, config)`.
+
+    THE OPERATOR'S HOME IS NOT AN INPUT, and leaving it as one made three cases diff against
+    themselves. MEASURED while wiring this into `bin/check`, which runs with a temp `HOME`:
+    `wf-census` counted the operator's own `~/.claude/agents/` and printed `image-validator: 2
+    in-skill copies` that a temp-HOME run did not, and `wf-context` charged `3,853 B
+    /home/francis/lab/CLAUDE.md` — a file in the directory ABOVE this repository, belonging to
+    no project here. A golden that moves when the developer edits an unrelated file is not a
+    golden. So every case runs under `HOME=<sandbox>/home`, whose only content is the install,
+    and the throwaway copy lives inside it so the inherited-CLAUDE.md chain a spawn would pay
+    for is the snapshot's own and nothing else.
+
+    THE INSTALL SIDE HAS TO BE THIS CHECKOUT, and getting that wrong silenced the very case
+    this corpus was built to catch. The first version pointed `CLAUDE_CONFIG_DIR` at the
+    snapshot's own `.claude/`, reasoning that the operator's live install must not answer. It
+    must not — but that assignment collapses personal and project scope onto one directory,
+    so `install_dir` and `project_skill_dir` resolve to the SAME path and `--migrate` answered
+    `no-copy · nothing to migrate` for all five kinds on a tree holding five copies. The
+    golden recorded that, and a 1.70.0 checkout reproduced it exactly: a green case over a
+    command that had done nothing.
+
+    So the install is built the way `bin/dev-sandbox` builds one — `bin/sync --personal` into
+    a `CLAUDE_CONFIG_DIR` under `$HOME`, per the 2026-09-09 directive that a dev-time test
+    installs to a temporary place under the user's home and removes it afterwards. It comes
+    from the checkout being tested, which is what makes a diff mean something: the scripts
+    changed, or the corpus they ship changed, and both are the regression this looks for.
+    """
+    sandbox = os.path.join(os.path.expanduser("~"),
+                           ".claude-workforce-corpus.%d" % os.getpid())
+    if os.path.exists(sandbox):
+        _bail("%s already exists; nothing was created or removed" % sandbox)
+    home = os.path.join(sandbox, "home")
+    config = os.path.join(home, ".claude")
+    os.makedirs(os.path.join(config, "skills"))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "sync"), "--personal"],
+                       cwd=ROOT, env=dict(os.environ, CLAUDE_CONFIG_DIR=config),
+                       capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        shutil.rmtree(sandbox, ignore_errors=True)
+        _bail("could not build the throwaway install (rc=%d): %s"
+              % (r.returncode, (r.stdout + r.stderr).strip()[-400:]))
+    return sandbox, home, config
+
+
+def run_snapshot(name, todo, sandbox, home, config, accept, quiet, fails):
+    """Run `todo` against a THROWAWAY copy of one snapshot. Returns (ran, accepted).
+
+    The copy is removed in a `finally`, so a failing case, a traceback and a Ctrl-C all still
+    clean up — the same unconditional-removal rule `bin/dev-sandbox` states, for the same
+    reason: the thing being removed is 18 MB of somebody else's project.
+
+    ONE COPY PER SNAPSHOT, and the cases run in DECLARED ORDER against it. Some display-mode
+    calls still write a report of their own into `.claude/workforce/`, and an audit makes them
+    in sequence on one tree, so this reproduces what the audit actually does. A copy per case
+    would be more isolated and less faithful, and 27x the copying.
+    """
+    snap = os.path.join(CORPUS, name)
+    # INSIDE THE THROWAWAY HOME, not inside `corpus/`. A spawn inherits every CLAUDE.md above
+    # the project root (`wf-context`, platform.md fact 6), and a copy sitting in `corpus/`
+    # inherits this repository's CLAUDE.md and the workspace one above it — two files with
+    # nothing to do with the snapshot, both of which move.
+    work = os.path.join(home, "work-%s" % name)
+    if os.path.exists(work):
+        _bail("%s already exists; nothing was created or removed" % work)
+    gold_dir = os.path.join(snap, GOLDEN)
+    os.makedirs(gold_dir, exist_ok=True)
+    ran = accepted = 0
+    try:
+        shutil.copytree(os.path.join(snap, TREE), work, symlinks=True)
+        for case in todo:
+            ran += 1
+            label, rc, out, crashed = run_case(case, work, name, home, config, sandbox)
+            gold = os.path.join(gold_dir, label + ".out")
+            have = None
+            if os.path.isfile(gold):
+                with open(gold, encoding="utf-8") as fh:
+                    have = fh.read()
+            if crashed:
+                fails.append((name, label, "rc=%s%s" % (
+                    rc, " · TRACEBACK" if CRASH_RX.search(out) else " · unexpected exit"),
+                    out.strip().splitlines()[-6:]))
+                continue
+            if accept or have is None:
+                with open(gold, "w", encoding="utf-8") as fh:
+                    fh.write(out)
+                accepted += 1
+                if not quiet:
+                    print("  %-9s %-24s %s" % ("RECORD" if have is None else "ACCEPT",
+                                               label, name))
+                continue
+            if out != have:
+                diff = list(difflib.unified_diff(
+                    have.splitlines(), out.splitlines(),
+                    fromfile="golden/" + label + ".out", tofile="this run",
+                    lineterm="", n=1))
+                fails.append((name, label, "%d differing line(s)"
+                              % sum(1 for l in diff if l[:1] in "+-"), diff[:14]))
+            elif not quiet:
+                print("  ok        %-24s %s" % (label, name))
+    finally:
+        if os.path.isdir(work):
+            shutil.rmtree(work)
+    return ran, accepted
+
+
+def do_run(only, cases, accept, quiet):
+    if not snapshots():
+        # NOT A FAILURE. A public clone and every other machine have no corpus, and a gate
+        # that goes red on its own absence would be a gate nobody could keep green.
+        print("corpus: SKIPPED — no snapshots in corpus/ "
+              "(`bin/corpus snapshot <project-dir>` records one; it is never committed)")
+        return 0
+    names = [n for n in snapshots() if not only or n in only]
+    if only and not names:
+        _bail("no snapshot named %s" % ", ".join(sorted(only)))
+    todo = [c for c in CASES if not cases or c[0] in cases]
+    if cases and not todo:
+        _bail("no case named %s — `bin/corpus list` names them"
+              % ", ".join(sorted(cases)))
+    fails, total, accepted = [], 0, 0
+    sandbox, home, config = build_install()
+    try:
+        for name in names:
+            ran, acc = run_snapshot(name, todo, sandbox, home, config, accept, quiet, fails)
+            total, accepted = total + ran, accepted + acc
+    finally:
+        shutil.rmtree(sandbox, ignore_errors=True)
+    for name, label, why, detail in fails:
+        print("\nFAIL  %s / %s — %s" % (name, label, why))
+        for l in detail:
+            print("    " + l)
+    verb = "recorded" if accept else "compared"
+    print("\ncorpus: %d case(s) %s across %d snapshot(s) · %d new/accepted · %d FAILED"
+          % (total, verb, len(names), accepted, len(fails)))
+    if fails and not accept:
+        print("A diff is a behaviour change on a REAL org. Read it, then either fix the "
+              "code or re-record with `bin/corpus run --accept`.")
+    return 1 if fails else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    sub = ap.add_subparsers(dest="cmd")
+    s = sub.add_parser("snapshot", help="copy a project's .claude/ into corpus/")
+    s.add_argument("project", nargs="+")
+    sub.add_parser("list", help="what is snapshotted")
+    r = sub.add_parser("run", help="run every case against a throwaway copy")
+    r.add_argument("name", nargs="*", help="snapshot name(s); default every snapshot")
+    r.add_argument("--case", action="append", default=[], metavar="LABEL",
+                   help="only this case, repeatable (`bin/corpus list` names them)")
+    r.add_argument("--accept", action="store_true", help="re-record the goldens")
+    r.add_argument("--quiet", action="store_true", help="one line unless something fails")
+    args = ap.parse_args()
+    if args.cmd == "snapshot":
+        return do_snapshot(args.project)
+    if args.cmd == "list":
+        return do_list()
+    if args.cmd == "run":
+        return do_run(set(args.name), set(args.case), args.accept, args.quiet)
+    ap.print_help()
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

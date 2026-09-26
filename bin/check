@@ -17852,6 +17852,146 @@ check(
     "hand-written sections loses them on the next rebuild",
 )
 
+# ── a report that can be compared has a stable row order (2026-09-25) ────────────────────
+#
+# FOUND BY THE CORPUS BELOW, on its first real run. `wf-census`'s five row sets are filled in
+# `os.walk` order, so the report's rows followed the directory entries of whatever tree was
+# read — and a fresh copy of one tree enumerates differently from the original. Two runs over
+# the SAME unchanged snapshot swapped `image-validator` with `character-scanner`, and swapped
+# the two `unreadable` rows. `audit.md` Step 7 rests on comparing one run's report against the
+# next, and this script's own header says a census that can be re-run is the only kind that can
+# be compared; rows that move on their own make every such comparison a diff of noise.
+#
+# ONE HELPER, so the property is stated once and `bin/prove` can break it in one place. The
+# AST test is what keeps it honest: a sixth row set added straight from a dict would fail here
+# rather than quietly shipping the old behaviour back.
+_cen_src = read("workforce/bin/wf-census")
+_cen_unsorted = []
+try:
+    _cen_tree = ast.parse(_cen_src)
+    for _n in ast.walk(_cen_tree):
+        if not isinstance(_n, ast.For):
+            continue
+        _it = _n.iter
+        # `for … in s["key"]` / `s["key"].items()` — a report loop reading a row set straight
+        # out of the summary, with nothing between it and the printer to fix the order.
+        _sub = _it.func.value if (isinstance(_it, ast.Call)
+                                  and isinstance(_it.func, ast.Attribute)) else _it
+        if (isinstance(_sub, ast.Subscript) and isinstance(_sub.value, ast.Name)
+                and _sub.value.id == "s"
+                # `hooks` IS THE ONE DELIBERATE EXCLUSION, and it is named rather than
+                # pattern-exempted. Its rows come from settings files in the order the
+                # harness will RUN them, which is information; sorting them alphabetically
+                # would destroy it. Every other row set comes from an `os.walk`, where the
+                # order carries nothing and varies per copy. A sixth key added later matches
+                # neither branch and fails here, which is the point of testing the shape.
+                and getattr(_sub.slice, "value", None) != "hooks"):
+            _cen_unsorted.append(
+                "line %d: %s" % (_n.lineno, ast.unparse(_it)[:60]))
+except (SyntaxError, AttributeError, ValueError) as _exc:
+    _cen_unsorted.append(f"could not parse wf-census ({_exc})")
+check(
+    "census: every report row set is printed through the one stable-order helper",
+    "    out.sort(key=key)" in _cen_src and not _cen_unsorted,
+    ("these loops read a row set straight out of the summary, so their order is the "
+     "filesystem's: " + ", ".join(_cen_unsorted[:4])) if _cen_unsorted
+    else "report_rows() no longer sorts — every row set goes back to os.walk order, and two "
+         "runs over one unchanged tree stop being comparable",
+)
+
+# ── the local-only regression corpus (2026-09-25) ────────────────────────────────────────
+#
+# WHY THIS BLOCK EXISTS. Every other gate in this file runs against trees this project wrote
+# itself. 1.71.0 passed 1,411 of these checks and 726 prove cases, and on the first real org
+# it was pointed at it left 505 false readers; the same release's `--house-rules` crashed with
+# a NameError on every project that already carried a region, a branch no fixture could reach
+# because every fixture was a first-write tree. Both were found by hand, by copying one real
+# project and running the command. `bin/corpus` is that gesture made mechanical.
+_corpus_dir = os.path.join(ROOT, "corpus")
+_corpus_snaps = sorted(_n for _n in (os.listdir(_corpus_dir)
+                                     if os.path.isdir(_corpus_dir) else [])
+                       if os.path.isdir(os.path.join(_corpus_dir, _n, "tree")))
+
+# 1. NOTHING UNDER corpus/ IS EVER TRACKED. This repository is PUBLIC and a snapshot is
+# another project's `.claude/` verbatim — its handbooks, its prompts, its users' own words.
+# `.gitignore` carries `/corpus/`, and an ignore rule is not the assertion: `git add -f` beats
+# it, and the fixtures block above exists because exactly that happened in the other
+# direction. This is the assertion.
+try:
+    _r = subprocess.run(["git", "ls-files", "-z", "corpus/"], cwd=ROOT,
+                        capture_output=True, text=True, timeout=30)
+    _corpus_tracked = sorted(_x for _x in _r.stdout.split("\0") if _x) if _r.returncode == 0 else []
+    check(
+        "corpus: no snapshot of a real project is tracked in git",
+        not _corpus_tracked,
+        "TRACKED, and this repository is public — each of these is another project's own "
+        "words: " + ", ".join(_corpus_tracked[:5])
+        + (" …" if len(_corpus_tracked) > 5 else "")
+        + ". `git rm --cached` them; `corpus/` is gitignored and `bin/corpus` rebuilds it",
+    )
+except (OSError, subprocess.SubprocessError) as _exc:
+    skip("corpus: no snapshot of a real project is tracked in git",
+         f"git ls-files could not run ({_exc}) — the tracked set is unknown, not empty")
+
+# 2. THE CASE LIST IS DERIVED, AND THE CITATION IS WHAT KEEPS IT DERIVED. Each row of
+# `bin/corpus`'s CASES names the file:line where a procedure makes that call in display mode.
+# A procedure that stops making the call, or renames the script, must fail HERE — a corpus
+# exercising a call nothing performs is measuring this file's memory of the audit.
+_corp_src = read("bin/corpus")
+_corp_rows = re.findall(
+    r'\(\s*"([a-z0-9-]+)",\s*"(wf-[a-z-]+)",.*?"((?:workforce/references/)[^"]+:\d+)"\s*\)',
+    _corp_src, re.S)
+_corp_drift = []
+for _label, _script, _cite in _corp_rows:
+    _f, _ln = _cite.rsplit(":", 1)
+    _lines = read(_f).splitlines()
+    if not (0 < int(_ln) <= len(_lines)):
+        _corp_drift.append(f"{_label}: {_cite} is past the end of {_f}")
+    elif _script not in _lines[int(_ln) - 1]:
+        _corp_drift.append(f"{_label}: {_cite} no longer names {_script}")
+check(
+    "corpus: every case cites the procedure line that makes its call",
+    _corp_rows and not _corp_drift,
+    (", ".join(_corp_drift[:4]) + (" …" if len(_corp_drift) > 4 else ""))
+    if _corp_rows else "no CASES row parsed out of bin/corpus — the citation check reads nothing",
+)
+check(
+    "corpus: every cited script ships",
+    not [_s for _l, _s, _c in _corp_rows
+         if not os.path.isfile(os.path.join(ROOT, "workforce", "bin", _s))],
+    "a case names a script this distribution does not ship: "
+    + ", ".join(sorted({_s for _l, _s, _c in _corp_rows
+                        if not os.path.isfile(os.path.join(ROOT, "workforce", "bin", _s))})),
+)
+
+# 3. AND IT RUNS. A gate nobody runs is the defect this whole project records, so the corpus
+# is not a command somebody remembers — it is part of `bin/check`. On a machine with no
+# snapshot it prints one SKIPPED line and exits 0, which is what keeps a fresh clone and every
+# other developer green. `bin/prove` excludes `corpus/` from its per-case copies, so this costs
+# nothing inside the prove suite.
+if not _corpus_snaps:
+    skip("corpus: the display-mode scripts still say the same thing on a real org",
+         "no snapshots in corpus/ on this machine, so nothing was run. This is the expected "
+         "state on a fresh clone: a snapshot holds a real project's own words and is never "
+         "committed. `bin/corpus snapshot <project-dir>` records one, `bin/corpus run "
+         "--accept` records its goldens, and this row starts measuring.")
+else:
+    try:
+        _r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "corpus"),
+                             "run", "--quiet"], cwd=ROOT, capture_output=True,
+                            text=True, timeout=1800)
+        _corp_out = (_r.stdout + _r.stderr).strip()
+        check(
+            "corpus: the display-mode scripts still say the same thing on a real org",
+            _r.returncode == 0,
+            _corp_out[-1400:] if _r.returncode else "",
+        )
+    except subprocess.TimeoutExpired:
+        check("corpus: the display-mode scripts still say the same thing on a real org",
+              False, f"bin/corpus run did not finish in 1800s across "
+                     f"{len(_corpus_snaps)} snapshot(s)")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────

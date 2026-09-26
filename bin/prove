@@ -96,7 +96,12 @@ if "--help" in sys.argv[1:] or "-h" in sys.argv[1:]:
     print(__doc__[__doc__.index("USAGE"):].rstrip())
     sys.exit(0)
 
-IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv"}
+# `corpus` is here for a cost reason, not a correctness one, and the cost is multiplied by
+# every case: one snapshot of a real org is ~18 MB and 1,500 files, and this tree is copied
+# ONCE PER CASE. Copied in, it would also be present for the `./bin/check` each case runs, so
+# every case would re-run the whole corpus suite against it. Absent, `bin/corpus run` reports
+# SKIPPED inside the copy and `bin/check` stays the 130 s it was.
+IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "corpus"}
 IGNORE = shutil.ignore_patterns(*IGNORED_DIRS)
 
 # One worker per core. bin/check is CPU-bound Python, and the work each worker does
@@ -302,6 +307,11 @@ CASES = [
     # ── apps-patch report against 1.63.0 (2026-09-16): DEF-Q-19, item 5, DEF-Q-23, DEF-Q-22 ──
     ("sacred scope: a retired archive is run scratch to the stamp and to conform alike",
      CEN, "del", ',\n                  os.path.join(".claude", "workforce", "retired")'),
+    # ── a report that can be compared has a stable row order (2026-09-25) ────────
+    # Deleting the sort leaves valid Python and restores the defect exactly: every row set
+    # goes back to `os.walk` order, which is why the helper exists as a helper.
+    ("census: every report row set is printed through the one stable-order helper",
+     CEN, "del", "    out.sort(key=key)\n"),
     ("removal set: a found undo is reported where it was found, never as absent",
      CFM, "del", '        if tree:\n            detail = f"undo found at {os.path.relpath(tree, root)}"\n'),
     ("length ceiling: a recorded IC byte floor replaces the split order until the handbook grows past it",
