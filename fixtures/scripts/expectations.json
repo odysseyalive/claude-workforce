@@ -5561,6 +5561,95 @@
       }
     }
   },
+  "upstream-report-real-shape": {
+    "_why": "MEASURED 2026-09-25 on `university`, audit run audit-20260925T180537Z: seven surviving deferred rows, every one a defect in THIS distribution, three of them carried through three or more audits — row 7 was re-verified and re-filed on 2026-08-20, 2026-09-14 and 2026-09-25 before a run gave up and wrote the region by hand. `references/deferred.md` lets that row survive and names its own gap in the same breath: the closing mechanism was 'a person noticing the paragraph and opening a session by hand', which it calls a rule with a reader and no producer. This tree is that project's real SHAPE — a run report with `##` sections over `| # | Finding | Evidence | What discharges it |` tables, which is NOT the `| id | opened | … | state |` shape § Location and shape specifies. A parser accepting only the specified shape reads seven rows as zero. The `Discharged this run` section is here because the real file carries one: recording those would re-open work the downstream run has already proven passing. Against HEAD: `unrecognized arguments`, no script.",
+    "script": "wf-upstream",
+    "args": ["--verbose"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "would add row 7          \u2192 upstream-report-real-shape--7.md",
+      "would add row 16         \u2192 upstream-report-real-shape--16.md",
+      "skipped   row 4          sits under \u00a7Discharged this run, which records rows already closed",
+      "INV-UPSTREAM 4 row(s) read \u00b7 3 upstream (0 strict \u00b7 3 loose) \u00b7 1 not",
+      "DISPLAY ONLY \u2014 nothing written"
+    ],
+    "not": ["Traceback", "0 row(s) read"]
+  },
+  "upstream-report-real-shape-execute": {
+    "_why": "The same tree with --execute, asserted on disk. The slug in each filename is the PROJECT DIRECTORY's name, which is why these paths carry `-execute`: the harness copies a fixture to a directory named after the case, and the slug is derived from that rather than passed in. The row is carried VERBATIM — a maintainer reading the inbox must not have to trust a paraphrase of somebody else's finding — with its project root, its run id, the installed version, and which signal matched. `status=open` sits in a machine-readable marker so `--list` and `--resolve` read one field rather than parsing prose. The file also states what a fix here does NOT do: `deferred.md` holds that the row closes when the DOWNSTREAM run re-runs its own reproduction and watches it pass, never on an upstream note claiming a release fixed it.",
+    "script": "wf-upstream",
+    "args": ["--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "added     row 7",
+      "INV-UPSTREAM 4 row(s) read \u00b7 3 upstream"
+    ],
+    "not": ["DISPLAY ONLY"],
+    "after": {
+      ".inbox/workforce/upstream/upstream-report-real-shape-execute--7.md": {
+        "want": [
+          "<!-- wf-upstream: v1 | project=upstream-report-real-shape-execute | row=7 | status=open -->",
+          "- status: **open**",
+          "- run id: `audit-20260925T180537Z`",
+          "| 7 | No shipped script writes the `WF-HOUSE-RULES` region.",
+          "source: `.claude/workforce/deferred.md:20`",
+          "closed by the downstream run that RE-RUNS its own reproduction"
+        ],
+        "once": ["wf-upstream: v1"]
+      },
+      ".inbox/workforce/upstream/upstream-report-real-shape-execute--16.md": {
+        "want": ["`references/output-formats.md:38,44`"]
+      },
+      ".inbox/workforce/upstream/upstream-report-real-shape-execute--4.md": {"absent": true}
+    }
+  },
+  "upstream-canonical-shape": {
+    "_why": "The OTHER shape, the one `references/deferred.md` \u00a7 Location and shape actually specifies, so the parser is proven on both rather than on whichever one the author had in front of them. Three rows, three different outcomes, and the two rejections are the ones that matter: DEF-Q-002 is the other surviving category — a MEASURED HOST LIMIT with its attempt count — and filing a canary failure as a workforce defect would put the host's problem in this repository's inbox. DEF-Q-003 is `CLOSED` in its own state column. DEF-Q-001 is the only row obeying the BLOCKING rule that an other-repository cell names the repository's absolute path and the command that closes it there, so it is the one row reported `strict`.",
+    "script": "wf-upstream",
+    "args": ["--verbose"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "would add row DEF-Q-001  \u2192 upstream-canonical-shape--DEF-Q-001.md \u00b7 strict",
+      "skipped   row DEF-Q-002  neither a repository path nor the category named",
+      "skipped   row DEF-Q-003  row state is CLOSED",
+      "INV-UPSTREAM 3 row(s) read \u00b7 1 upstream (1 strict \u00b7 0 loose) \u00b7 2 not"
+    ],
+    "not": ["Traceback"]
+  },
+  "upstream-hostile-row-id": {
+    "_why": "THE FILENAME IS BUILT FROM PROJECT DATA. The row id comes from a Markdown cell in `deferred.md`, a file an agent edits, and it is joined to a path under the personal config root — so a row id of `../../../../../../tmp/...` is a write outside the inbox, and `/etc/shadow` is an absolute path replacing the join entirely. Three hostile ids here: a traversal, an absolute path, and shell metacharacters. Every one is scrubbed to a single safe component by an allow-list, and the write is then MEASURED to land inside the inbox rather than trusted to \u2014 `dirname(realpath(path)) == realpath(inbox)`, which a prefix test would pass one directory deeper. `not` asserts no path outside the inbox is ever named.",
+    "script": "wf-upstream",
+    "args": ["--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "upstream-hostile-row-id--tmp-wf-upstream-escape.md",
+      "upstream-hostile-row-id--etc-shadow.md",
+      "upstream-hostile-row-id--a-b-whoami-rm--rf.md"
+    ],
+    "not": ["/tmp/wf-upstream-escape.md", "REFUSED", "Traceback",
+            "upstream/../", "upstream--"],
+    "after": {
+      ".inbox/workforce/upstream/upstream-hostile-row-id--etc-shadow.md": {
+        "want": ["| /etc/shadow | an absolute row id |"]
+      }
+    }
+  },
+  "upstream-unparsable": {
+    "_why": "A QUEUE NOBODY COULD PARSE AND A QUEUE WITH NOTHING IN IT ARE DIFFERENT FACTS, and a producer that prints the same line for both is how a silent zero becomes a clean report. This tree writes its residue as prose \u2014 the state \u00a7 Location and shape forbids and real trees still reach \u2014 so the run says it read no table rows in either documented shape and names how many table headers it saw. It still exits 0: an unparsable queue downstream is not this script failing, and a nonzero here would block the audit step that calls it.",
+    "script": "wf-upstream",
+    "args": [],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "holds no table rows in either shape `references/deferred.md` describes (0 table header(s) seen)",
+      "INV-UPSTREAM 0 row(s) read \u00b7 0 upstream"
+    ],
+    "not": ["Traceback", "would add"]
+  },
   "catalog-grep-reads-cited-copy-file": {
     "_why": "MEASURED 2026-09-25 on a copy of `university` with BOTH `--migrate --execute` and `--house-rules --execute` already run: `--kind image --grep 'Consistent edge quality'` answered `no match` while the row sat at `.claude/skills/image-eval/references/watercolor.md:16`, a file the migration itself had listed `STAYS … cited by` five readers. Only the rows of a file that GOES are lifted into CATALOG-ANCHOR.md, so a kept file's rows were in no layer the resolver read — and for three audits the project's own grader was told its rule did not exist (`university` deferred row 3). This tree reproduces that shape exactly: `references/image-tells.md` is byte-identical to the install's and is removable, `references/watercolor.md` has no install counterpart and STAYS because an employee cites it. The grep now reads install, then the anchor, then the copy's staying files, and each hit carries its layer — which is also what proves the removable duplicate is NOT searched a second time from the copy.",
     "script": "wf-catalog",

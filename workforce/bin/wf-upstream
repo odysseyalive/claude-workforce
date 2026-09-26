@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+"""wf-upstream — the inbox for the rows a project cannot fix, because workforce owns them.
+
+    wf-upstream --root <tree>                  report which deferred rows belong upstream
+    wf-upstream --root <tree> --execute        write one file per row into the inbox
+    wf-upstream --list [--json]                open rows in the inbox (what `dev` reads)
+    wf-upstream --resolve <id> --version X     close a row, naming the release that fixed it
+    wf-upstream --resolve <id> --version X --execute
+
+WHY THIS EXISTS. `references/deferred.md` keeps exactly two categories of row alive across
+runs, and one of them is **a fix in another repository** — in practice, this distribution.
+That carve-out is honest about its own limit: *"Nothing in this distribution reaches into
+another repository, and nothing here claims to: the upstream fix is made by a human running
+that command in that tree."* The closing mechanism was *"a person noticing the paragraph and
+opening a session by hand"*, which the same file calls **a rule with a reader and no
+producer**.
+
+MEASURED 2026-09-25 on `university`, audit run `audit-20260925T180537Z`: seven surviving rows
+(`INV-DEFERRED … remaining 7`), every one of them workforce's own defect, and **three of them
+carried through three or more audits**.
+Row 7 — *"No shipped script writes the WF-HOUSE-RULES region"* — was re-verified and re-filed on
+2026-08-20, 2026-09-14 and 2026-09-25, and that run wrote the region by hand rather than wait a
+fourth time. Rows 2 and 3 asked the install to ship catalog rows that are the project's own, so
+they could never have been discharged as written. Nothing on the workforce side read any of it.
+
+So the row leaves the downstream project and lands somewhere the maintainer's own session
+looks: one file per row under `<config-root>/workforce/upstream/`, holding the row VERBATIM
+with its evidence, its project, its run id and the installed version. `/workforce dev` lists
+the open ones when it starts.
+
+WHAT THIS DOES NOT CLAIM. It does not close the downstream row — `deferred.md` is explicit
+that **the row is closed by the downstream run that re-runs its own reproduction and watches it
+pass**, never by an upstream report asserting the fix shipped. `--resolve` records which
+release a maintainer believes fixed it, which is a note for the next downstream audit to TEST,
+not a discharge.
+
+IDEMPOTENT. Re-running the same audit rewrites the same file in place, keyed on project slug
+and row id; it never appends and never writes a second copy. A row already `resolved` is left
+resolved: re-recording it would undo a maintainer's own close on the next audit of that project.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import time
+
+MARKER = "wf-upstream: v1"
+DIRNAME = "upstream"
+
+
+def config_root():
+    """Personal config root. `$CLAUDE_CONFIG_DIR` relocates the whole `~/.claude` tree and is
+    what `bin/dev-sandbox` sets, so reading it is what makes a sandboxed test a test of this
+    code rather than of the live install. Same resolver as `wf-catalog.config_root`."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def inbox_dir():
+    return os.path.join(config_root(), "workforce", DIRNAME)
+
+
+# ── the two things a filename is built from, and why they are scrubbed ────────────────────
+#
+# THE FILENAME IS BUILT FROM PROJECT DATA. The slug comes from a path this process was handed
+# and the row id comes from a Markdown cell in a file any process on the machine can write, so
+# both are untrusted input to a path join. A row id of `../../../.claude/settings.local.json`
+# would otherwise place a write outside the inbox entirely, and `deferred.md` is a file an
+# agent edits — this is the same output-encoding class as `wf-catalog`'s run-id constraint,
+# reached through a file rather than through a name.
+#
+# ALLOW-LIST, NOT A DENY-LIST. `..` stripping alone is the wrong shape: it has to be applied
+# repeatedly to be correct, and it misses the separator forms (`/`, `\\`), the NUL byte, a
+# leading `-` that turns the name into an option, and a name so long the write fails on
+# ENAMETOOLONG. One character class answers all of them.
+SAFE_RX = re.compile(r"[^A-Za-z0-9._-]+")
+NAME_MAX = 72
+
+
+def safe_part(text, fallback):
+    """One path component, from untrusted text. Never empty, never `.`/`..`, never a switch."""
+    part = SAFE_RX.sub("-", (text or "").strip())[:NAME_MAX].strip("-.")
+    # A name that reduced to nothing, or to a relative-path token, is replaced rather than
+    # patched: there is no repair that makes `..` into a component, and a silent empty string
+    # would join to the inbox directory itself.
+    if not part or part in (".", ".."):
+        return fallback
+    return part
+
+
+def inbox_path(slug, row_id):
+    """`(path, None)` or `(None, why)` — the file this row owns, verified to be INSIDE the inbox.
+
+    The containment test is the assertion, not the scrubber. A scrubber is a claim about what
+    it removed; comparing the RESOLVED parent against the resolved inbox is a measurement of
+    where the write would actually land. `dirname(realpath(...)) == realpath(base)` rather than
+    a prefix test, because a prefix test passes a path one directory deeper, and because
+    resolving both sides is what catches an inbox entry that is a symlink out of the tree.
+    """
+    base = inbox_dir()
+    name = "%s--%s.md" % (safe_part(slug, "project"), safe_part(row_id, "row"))
+    full = os.path.join(base, name)
+    try:
+        real_base = os.path.realpath(base)
+        real_full = os.path.realpath(full)
+    except OSError as exc:
+        return None, "could not resolve %s: %s" % (full, exc)
+    if os.path.dirname(real_full) != real_base:
+        return None, ("REFUSED — %s resolves to %s, which is not inside %s"
+                      % (name, real_full, real_base))
+    return full, None
+
+
+# ── reading a project's queue, in either shape it is really written in ─────────────────────
+#
+# TWO SHAPES, AND BOTH ARE REAL. `references/deferred.md` § Location and shape specifies one:
+# `| id | opened | opened by | what | discharged by | age | state |`. Every real queue this
+# project has produced is written the other way — a run report with `##` sections (*Carried*,
+# *Added this run*, *Discharged this run*) over tables whose columns are
+# `| # | Finding | Evidence | What discharges it |`. A parser that accepted only the specified
+# shape would have read `university`'s six open rows as zero, which is the failure this whole
+# script is about, one layer down.
+#
+# So the columns are resolved BY HEADER NAME and the state by section heading, and a row is
+# reported with the shape it was found in. A queue in neither shape is reported as unparsed,
+# never silently as empty: `0 rows` and `could not read the rows` are different facts.
+ID_COLS = ("id", "#", "row", "def")
+WHAT_COLS = ("what", "finding", "was", "item")
+DISCHARGE_COLS = ("discharged by", "what discharges it", "discharges", "outcome",
+                  "remedy", "fix")
+STATE_COLS = ("state", "status")
+# A heading that says the rows under it are already closed. `audit` writes a *Discharged this
+# run* section into the same file as the open ones, and recording those would re-open work the
+# downstream run has already proven passing.
+CLOSED_HEADING_RX = re.compile(r"\b(discharged|closed|resolved|reversal)\b", re.I)
+# `path:line` and `path:line,line` citations, backticked or bare. The evidence a maintainer
+# needs to reproduce, carried across with the row rather than left behind in the project.
+CITE_RX = re.compile(r"`?((?:[\w.@+-]+/)*[\w.@+-]+\.(?:md|py|json|sh|ps1|txt|toml|ya?ml))"
+                     r":(\d+(?:,\d+)*)`?")
+ABS_PATH_RX = re.compile(r"(?<![\w`])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
+# The other-repository signals, weakest last. `deferred.md`'s BLOCKING rule says such a row
+# NAMES the repository's absolute path and the command that closes it there, so an absolute
+# path is the strict signal. Every real row fails that rule and says `An upstream parser fix`
+# or `The install ships these rows` instead — malformed by the spec, and the only data there
+# is. Both are recorded, with which one fired, because a row matched loosely is a row whose
+# citation a maintainer still has to reconstruct.
+LOOSE_RX = re.compile(r"\b(upstream|workforce|the install|another repo\w*|"
+                      r"claude-workforce)\b", re.I)
+# A file-level declaration that the whole queue is the carve-out. `university` opens with
+# exactly this sentence, and it is the most reliable signal in the file — a run that wrote it
+# had already classified every row it kept.
+# MATCHED AGAINST WHITESPACE-COLLAPSED TEXT, because Markdown prose is hard-wrapped and this
+# phrase is longer than a line. `university`'s preamble reads "a fix that lies in\nanother
+# repository" — the sentence broken exactly between the two halves of the signal — and a pattern
+# written over raw text missed it and left two of that project's six rows unrecorded. The period
+# exclusion stays: it keeps the match inside one sentence, which is what makes it a declaration
+# about this queue rather than two unrelated clauses a paragraph apart.
+DECLARED_RX = re.compile(r"(fix|resolution)[^.]{0,80}\b(in|lies in)\b[^.]{0,40}"
+                         r"another repositor", re.I)
+
+
+def flat(text):
+    """`text` with every whitespace run collapsed to one space, for multi-word matching only."""
+    return re.sub(r"\s+", " ", text or "")
+
+
+def split_row(line):
+    """Cells of a Markdown table row, or None. `|` inside backticks is not a separator."""
+    s = line.strip()
+    if not (s.startswith("|") and s.endswith("|")):
+        return None
+    cells, buf, tick = [], [], False
+    for ch in s[1:-1]:
+        if ch == "`":
+            tick = not tick
+        if ch == "|" and not tick:
+            cells.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    cells.append("".join(buf).strip())
+    return cells
+
+
+def _col(headers, wanted):
+    """Index of the first header whose text contains one of `wanted`, or None."""
+    for i, h in enumerate(headers):
+        low = h.strip("* ").lower()
+        for w in wanted:
+            if w == low or w in low:
+                return i
+    return None
+
+
+def plain(cell):
+    """A cell with Markdown emphasis and backticks removed, for matching only. The row is
+    always CARRIED verbatim — this is what the classifier reads, never what is written out."""
+    return re.sub(r"[`*_]", "", cell or "")
+
+
+def read_rows(root):
+    """`(rows, note)` — every queue row in `deferred.md`, in either shape.
+
+    A `row` carries its verbatim line, its id, what it says, its discharge cell, whether the
+    section it sits in declares it closed, and the line number it was read from.
+    """
+    path = os.path.join(root, ".claude", "workforce", "deferred.md")
+    if not os.path.isfile(path):
+        return [], "no %s — this project has no queue" % os.path.relpath(path, root)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError as exc:
+        return [], "could not read %s: %s" % (path, exc)
+    declared = bool(DECLARED_RX.search(flat(text)))
+    rows, heading, headers, tables = [], "", None, 0
+    for n, line in enumerate(text.splitlines(), 1):
+        if line.startswith("#"):
+            heading, headers = line.lstrip("# ").strip(), None
+            continue
+        cells = split_row(line)
+        if cells is None:
+            headers = None
+            continue
+        if all(re.fullmatch(r":?-{2,}:?", c or "") for c in cells if c != ""):
+            continue                      # the |---|---| separator
+        if headers is None:
+            headers, tables = cells, tables + 1
+            continue
+        i_id = _col(headers, ID_COLS)
+        i_what = _col(headers, WHAT_COLS)
+        i_dis = _col(headers, DISCHARGE_COLS)
+        i_state = _col(headers, STATE_COLS)
+        get = lambda i: cells[i] if i is not None and i < len(cells) else ""
+        rows.append({
+            "id": plain(get(i_id) if i_id is not None else cells[0]).strip(),
+            "what": get(i_what) if i_what is not None else (cells[1] if len(cells) > 1 else ""),
+            "discharge": get(i_dis) if i_dis is not None else cells[-1],
+            "state": plain(get(i_state)).strip().upper(),
+            "section": heading,
+            "line": n,
+            "verbatim": line.rstrip(),
+            "declared": declared,
+        })
+    if not rows:
+        return [], ("%s holds no table rows in either shape `references/deferred.md` "
+                    "describes (%d table header(s) seen)"
+                    % (os.path.relpath(path, root), tables))
+    return rows, None
+
+
+def classify(row):
+    """`(is_upstream, shape, why)` for one row.
+
+    `shape` is `strict` when the row obeys `deferred.md`'s BLOCKING rule — it names the
+    repository's absolute path — and `loose` when it only names the category in words. The
+    distinction is reported rather than smoothed over: a loosely-matched row is one whose
+    `discharged by` cell is malformed by the spec, and the maintainer reading the inbox has to
+    reconstruct the reproduction the cell should have carried.
+    """
+    if row["state"] in ("CLOSED", "DONE", "DISCHARGED", "RESOLVED"):
+        return False, None, "row state is %s" % row["state"]
+    if CLOSED_HEADING_RX.search(row["section"] or ""):
+        return False, None, "sits under §%s, which records rows already closed" % row["section"]
+    if not row["id"] or row["id"].lower() in ("id", "#", "row"):
+        return False, None, "no row id"
+    cell = plain(row["discharge"])
+    paths = [p for p in ABS_PATH_RX.findall(cell) if p.count("/") > 1]
+    if paths:
+        return True, "strict", "names %s" % paths[0]
+    m = LOOSE_RX.search(cell)
+    if m:
+        return True, "loose", ("names the category in words (%r) but no repository path — "
+                               "malformed per deferred.md, recorded as found" % m.group(0))
+    if row["declared"]:
+        return True, "loose", ("the queue declares every surviving row is the "
+                               "another-repository carve-out")
+    return False, None, "neither a repository path nor the category named"
+
+
+def citations(row):
+    """Evidence `path:line` citations in the row, de-duplicated, in the order they appear."""
+    out = []
+    for text in (row["what"], row["discharge"], row["verbatim"]):
+        for p, lines in CITE_RX.findall(text or ""):
+            cite = "%s:%s" % (p, lines)
+            if cite not in out:
+                out.append(cite)
+    return out
+
+
+def current_run(root):
+    """The run id this project is inside, or ''. Constrained to what a run id is rather than
+    trusted to be one — it is written into the inbox file and into an HTML comment there."""
+    try:
+        with open(os.path.join(root, ".claude", "workforce", ".current-run"),
+                  encoding="utf-8", errors="replace") as fh:
+            run = (fh.read().strip().splitlines() or [""])[0].strip()
+    except OSError:
+        return ""
+    return run if re.fullmatch(r"[A-Za-z0-9._-]{1,80}", run or "") else ""
+
+
+def installed_version():
+    for cand in (os.path.join(config_root(), "skills", "workforce", "references", "version.md"),
+                 os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "references", "version.md")):
+        try:
+            with open(cand, encoding="utf-8") as fh:
+                m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)", fh.read(), re.M)
+            if m:
+                return m.group(1)
+        except OSError:
+            continue
+    return "unknown"
+
+
+def header_fields(text):
+    """The `key=value` pairs of an inbox file's marker comment."""
+    m = re.search(r"<!--\s*%s\s*\|([^>]*)-->" % re.escape(MARKER), text or "")
+    if not m:
+        return {}
+    out = {}
+    for part in m.group(1).split("|"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def render(slug, root, row, shape, why, run, version):
+    cites = citations(row)
+    return "".join([
+        "<!-- %s | project=%s | row=%s | status=open -->\n" % (MARKER, slug, row["id"]),
+        "# %s — row %s\n\n" % (slug, row["id"]),
+        "- status: **open**\n",
+        "- project root: `%s`\n" % root,
+        "- source: `.claude/workforce/deferred.md:%d`%s\n"
+        % (row["line"], " (§%s)" % row["section"] if row["section"] else ""),
+        "- run id: `%s`\n" % (run or "not recorded"),
+        "- installed workforce: `%s`\n" % version,
+        "- match: %s — %s\n" % (shape, why),
+        "- recorded: %s\n\n" % time.strftime("%Y-%m-%d", time.gmtime()),
+        "## The row, verbatim\n\n",
+        "```\n%s\n```\n\n" % row["verbatim"],
+        "## Evidence\n\n",
+        ("".join("- `%s`\n" % c for c in cites) if cites
+         else "_The row cites no `path:line`. `deferred.md` calls a row whose `Measured` "
+              "evidence cannot be re-executed malformed for the same reason a bare flag is, "
+              "so reproducing this one starts from the text above._\n"),
+        "\n## Closing it\n\n",
+        "A fix here does NOT close the downstream row. `references/deferred.md`: the row is "
+        "closed by the downstream run that RE-RUNS its own reproduction and watches it pass, "
+        "never by an upstream report asserting the fix shipped. Record the release that "
+        "should do it with:\n\n",
+        "```\nwf-upstream --resolve %s --version <X.Y.Z> --execute\n```\n" % row["id"],
+    ])
+
+
+def record(root, args):
+    """Write (or refresh) one inbox file per upstream row. Returns an exit code."""
+    root = os.path.abspath(root)
+    slug = safe_part(os.path.basename(os.path.realpath(root)), "project")
+    rows, note = read_rows(root)
+    run, version = current_run(root), installed_version()
+    picked, skipped = [], []
+    for row in rows:
+        up, shape, why = classify(row)
+        (picked if up else skipped).append((row, shape, why))
+
+    print("upstream inbox — %s" % root)
+    if note:
+        print("  %s" % note)
+    for row, shape, why in picked:
+        path, refuse = inbox_path(slug, row["id"])
+        if refuse:
+            print("  REFUSED   row %-10s %s" % (row["id"], refuse))
+            continue
+        name = os.path.basename(path)
+        existing = ""
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    existing = fh.read()
+            except OSError:
+                existing = ""
+        # A ROW A MAINTAINER ALREADY CLOSED STAYS CLOSED. The downstream project re-files the
+        # same row on every audit until its own reproduction passes, so re-recording would
+        # reopen the close on the next audit and the status field would never hold still.
+        if header_fields(existing).get("status") == "resolved":
+            print("  resolved  row %-10s %s — left as the maintainer closed it (%s)"
+                  % (row["id"], name, header_fields(existing).get("version", "no version")))
+            continue
+        body = render(slug, root, row, shape, why, run, version)
+        if not args.execute:
+            print("  %-9s row %-10s → %s · %s"
+                  % ("would add" if not existing else "would update", row["id"], name, shape))
+            continue
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(body)
+        except OSError as exc:
+            print("  REFUSED   row %-10s could not write %s: %s" % (row["id"], name, exc))
+            continue
+        print("  %-9s row %-10s → %s · %s"
+              % ("added" if not existing else "updated", row["id"], name, shape))
+    if args.verbose:
+        for row, _shape, why in skipped:
+            print("  skipped   row %-10s %s" % (row["id"] or "?", why))
+    print("\nINV-UPSTREAM %d row(s) read · %d upstream (%d strict · %d loose) · %d not · %s"
+          % (len(rows), len(picked),
+             sum(1 for _r, s, _w in picked if s == "strict"),
+             sum(1 for _r, s, _w in picked if s == "loose"),
+             len(skipped), inbox_dir()))
+    if picked and not args.execute:
+        print("DISPLAY ONLY — nothing written. Re-run with --execute.")
+    return 0
+
+
+def open_rows():
+    """`[(path, fields, text)]` for every inbox file, resolved and open alike."""
+    d = inbox_dir()
+    out = []
+    if not os.path.isdir(d):
+        return out
+    for name in sorted(os.listdir(d)):
+        if not name.endswith(".md"):
+            continue
+        p = os.path.join(d, name)
+        if os.path.islink(p) or not os.path.isfile(p):
+            continue
+        try:
+            with open(p, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        out.append((p, header_fields(text), text))
+    return out
+
+
+def do_list(args):
+    rows = open_rows()
+    op = [(p, f, t) for p, f, t in rows if f.get("status") != "resolved"]
+    if args.json:
+        json.dump({"inbox": inbox_dir(),
+                   "open": [{"file": os.path.basename(p), "project": f.get("project"),
+                             "row": f.get("row"),
+                             "title": next((l[2:].strip() for l in t.splitlines()
+                                            if l.startswith("# ")), "")}
+                            for p, f, t in op],
+                   "resolved": sum(1 for _p, f, _t in rows if f.get("status") == "resolved")},
+                  sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+    if not rows:
+        print("upstream inbox: empty (%s)" % inbox_dir())
+        print("  Nothing downstream has filed a workforce defect here. An audit files one at "
+              "Step 7, through `wf-upstream --root <project> --execute`.")
+        return 0
+    for p, f, t in op:
+        title = next((l[2:].strip() for l in t.splitlines() if l.startswith("# ")), "")
+        why = next((l[2:].strip() for l in t.splitlines()
+                    if l.startswith("- match:")), "")
+        print("  OPEN  %-34s %s" % (os.path.basename(p), title))
+        if why:
+            print("        %s" % why[7:].strip() if why.startswith("match:") else why)
+    print("\nINV-UPSTREAM %d open · %d resolved · %s"
+          % (len(op), len(rows) - len(op), inbox_dir()))
+    if op:
+        print("Each is a defect a real project measured in THIS distribution and could not "
+              "fix there. Close one with `wf-upstream --resolve <id> --version <X.Y.Z> "
+              "--execute`.")
+    return 0
+
+
+def do_resolve(args):
+    if not (args.version or "").strip():
+        print("wf-upstream: --resolve needs --version <X.Y.Z> — a row closed without naming "
+              "the release that closed it is the uncited-refusal shape this inbox exists to "
+              "end", file=sys.stderr)
+        return 2
+    want = safe_part(args.resolve, "")
+    hits = [(p, f, t) for p, f, t in open_rows()
+            if want and (safe_part(f.get("row", ""), "") == want
+                         or os.path.basename(p).rsplit(".", 1)[0].endswith("--" + want))]
+    if not hits:
+        print("wf-upstream: no inbox row matching %r in %s" % (args.resolve, inbox_dir()),
+              file=sys.stderr)
+        return 1
+    for p, f, t in hits:
+        if f.get("status") == "resolved":
+            print("  already   %s — resolved in %s" % (os.path.basename(p),
+                                                       f.get("version", "?")))
+            continue
+        new = re.sub(r"(<!--\s*%s[^>]*?)status=open" % re.escape(MARKER),
+                     r"\1status=resolved | version=%s" % args.version, t, count=1)
+        new = new.replace("- status: **open**\n",
+                          "- status: **resolved** in `%s` (%s)\n"
+                          % (args.version, time.strftime("%Y-%m-%d", time.gmtime())), 1)
+        if not args.execute:
+            print("  would close %s → resolved in %s" % (os.path.basename(p), args.version))
+            continue
+        try:
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write(new)
+        except OSError as exc:
+            print("  REFUSED   %s: %s" % (os.path.basename(p), exc))
+            continue
+        print("  closed    %s → resolved in %s" % (os.path.basename(p), args.version))
+    if not args.execute:
+        print("DISPLAY ONLY — nothing written. Re-run with --execute.")
+        return 0
+    print("\nThe DOWNSTREAM row is still open, and that is correct: it closes when that "
+          "project re-runs its own reproduction and watches it pass.")
+    return 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default="", help="project root holding .claude/")
+    ap.add_argument("--execute", action="store_true", help="write; default is a report")
+    ap.add_argument("--list", action="store_true", help="open rows in the inbox")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--resolve", metavar="ID", help="close an inbox row by its row id")
+    ap.add_argument("--version", metavar="X.Y.Z", help="with --resolve: the fixing release")
+    ap.add_argument("--verbose", action="store_true", help="also name the rows NOT taken")
+    args = ap.parse_args(argv)
+
+    if args.resolve:
+        return do_resolve(args)
+    if args.list:
+        return do_list(args)
+    if not (args.root or "").strip():
+        print("wf-upstream: --root is empty. ${CLAUDE_PROJECT_DIR} is unset outside a hook; "
+              "pass an explicit path, or use --list to read the inbox.", file=sys.stderr)
+        return 2
+    if not os.path.isdir(args.root):
+        print("wf-upstream: not a directory: %s" % args.root, file=sys.stderr)
+        return 2
+    return record(args.root, args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

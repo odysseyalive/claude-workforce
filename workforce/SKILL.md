@@ -838,6 +838,34 @@ inherited from claude-enforcer, where reverse-order edits repeatedly landed in t
 vanished. End-of-session check: `git status --short -- workforce/` empty when changes were expected is
 a FAIL.
 
+**Read the upstream inbox FIRST, before anything else in a `dev` session.** It is the queue of defects
+real projects measured in this distribution and could not fix there:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-upstream" --list
+```
+
+The resolver above is the canonical one (`references/scopes.md` § Resolving the shipped scripts). In a
+maintainer checkout with no install of any kind, `workforce/bin/wf-upstream --list` is the same script
+read from the source distribution — and `bin/dev-sandbox` is how anything needing a real install gets one.
+
+Each open row carries the row verbatim, its evidence, the project it came from, that run's id and the
+version it was measured against. **An open row is a downstream project waiting on this repository**, so it
+belongs in the session's plan rather than in whatever the session was opened to do — and a row that has
+been open across several of its project's audits is the strongest defect signal this distribution
+produces, because someone re-measured it and filed it again.
+
+Mark one closed with the release that closed it — `wf-upstream --resolve <id> --version <X.Y.Z>
+--execute`. **That does not discharge the downstream row**, and the wording of the rule matters: the row
+closes when that project re-runs its own reproduction and watches it pass (`references/deferred.md`).
+`--resolve` records a claim for the next audit of that project to TEST.
+
+*Added 2026-09-25. MEASURED on `university`: seven surviving deferred rows, all of them workforce's own
+defects, three carried through three or more audits — and the queue's own closing mechanism was "a
+person noticing the paragraph and opening a session by hand", which `deferred.md` names as a rule with a
+reader and no producer. This is the reader.*
+
 **No install is created in this repo, and no test runs against the live one.** `bin/sync` refreshes
 `.claude/skills/workforce` only if it is already there and never materializes it; `--personal`
 refreshes `~/.claude/skills/workforce` alone. When a test needs a real install, `bin/dev-sandbox

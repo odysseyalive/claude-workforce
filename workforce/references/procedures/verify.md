@@ -537,6 +537,39 @@ its job — it exists so nothing was lost — but a draft nobody has accepted or
 session boundary is evidence the open-list hook is not reaching the user. Report each such record
 by id and age; the fix is `ledger accept <id>` or a rejection, both the user's call.
 
+## The upstream inbox — a queued workforce defect that reached nobody
+
+**The one deferred category `deferred.md` lets survive a run is a fix in ANOTHER repository, and until
+2026-09-25 nothing on the other end read it.** MEASURED that day on `university`: seven surviving rows,
+every one a defect in this distribution, three of them carried through three or more audits — one of
+them re-verified and re-filed across 2026-08-20, 2026-09-14 and 2026-09-25 before a run gave up and did
+the work by hand. The row was correctly written, correctly classified and correctly carried; the reader
+did not exist.
+
+`audit` Step 7 now files each such row through `wf-upstream --execute`. **This is the third path** — the
+installer ships the producer, `audit` runs it, and this row is what reports its absence
+(`enforcement.md` § Three paths).
+
+```
+"$WF/bin/wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+```
+
+| Finding | Meaning |
+|---|---|
+| the script is not in the install | the producer never shipped here — `workforce update`, and the rows stay downstream-only until it does |
+| `INV-UPSTREAM` names rows this queue holds and the inbox does not | Step 7 did not run it, or ran it without `--execute`. **Report each row id** |
+| a row matched `loose` | its `discharged by` cell names the category in words and no repository path, which `references/deferred.md` calls malformed in its own BLOCKING clause on other-repository rows. The row is filed as found — report it so the next audit writes the path and the command |
+| the queue is in neither documented shape | `INV-UPSTREAM` says so rather than reporting `0 rows`. **A queue nobody could parse and a queue with nothing in it are different facts** and must never print the same line |
+
+**Print `INV-UPSTREAM  N read · N upstream (N strict · N loose) · N not · <inbox path>`, always,
+including at every zero.** A project with no workforce defects to report is the state this distribution
+is trying to reach, and it has to be visibly different from a project whose queue was never read.
+
+**It never reports the downstream row closed.** `deferred.md`: the row closes when THIS project re-runs
+its own reproduction and watches it pass, never on an upstream note saying a release fixed it. An inbox
+entry marked `resolved in <version>` is a claim for this run to TEST, and a passing reproduction is what
+discharges the row here.
+
 ## Reversibility — is this org actually disbandable?
 
 **One question: could `disband` undo what is on disk right now?** Its answer is entirely the conversion

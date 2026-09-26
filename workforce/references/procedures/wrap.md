@@ -62,7 +62,29 @@ commits since the last version bump   <n>, oldest first, with subjects
 versions bumped during them           <list>          <- more than one is the defect
 change records missing                <list>
 working tree                          clean | <n> uncommitted
+upstream rows this release closes     <list>          <- from the inbox, see below
 ```
+
+**The last row comes from the upstream inbox, and it is the one line of this census that is
+about somebody else's project.** Each entry under `<config-root>/workforce/upstream/` marked
+`status=resolved` carries the version a maintainer named when they closed it; the ones naming
+the version about to be cut are what this release answers:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-upstream" --list
+```
+
+**It is printed to the operator and it does NOT go into the change record.** `bin/gen-changes`
+writes `workforce/changes/<version>.md`, which is committed, and **this repository is public**.
+An inbox entry holds a downstream project's slug and its deferred row verbatim — another
+project's finding, in its own words, about its own tree. Publishing that to name a fix is the
+same trade `corpus/` refuses, and no release note is worth it. The commit messages already say
+what changed; who asked for it stays local.
+
+*And naming a row here still does not discharge it.* `references/deferred.md` holds that the row
+closes when the downstream project re-runs its own reproduction and watches it pass. A release
+that lists a row is making a claim for that project's next audit to test.
 
 **Step 2 — ask, with the answer's consequence stated.** One question, two real options,
 and the recommendation first:

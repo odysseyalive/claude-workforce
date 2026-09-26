@@ -160,6 +160,7 @@ HK  = "workforce/references/procedures/hooks.md"
 INS = "install"
 PS1 = "install.ps1"
 CEN = "workforce/bin/wf-census"
+UPS = "workforce/bin/wf-upstream"
 SWP = "workforce/references/procedures/sweep.md"
 SKL = "workforce/SKILL.md"
 INV = "workforce/references/invariants.md"
@@ -307,6 +308,29 @@ CASES = [
     # ── apps-patch report against 1.63.0 (2026-09-16): DEF-Q-19, item 5, DEF-Q-23, DEF-Q-22 ──
     ("sacred scope: a retired archive is run scratch to the stamp and to conform alike",
      CEN, "del", ',\n                  os.path.join(".claude", "workforce", "retired")'),
+    # ── the upstream inbox: three paths for the rows workforce itself owes (2026-09-25) ──
+    # Path 1 has no case here on purpose: removing the manifest row also trips "no shipped
+    # file is undeclared", so the mutation would fail two assertions and read as BAD-CASE —
+    # a finding about the case, not about the check. The other five break exactly one each.
+    ("upstream: path 2 — audit files the rows in the same step that writes them",
+     AUD, "del", '"$WF/bin/wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute  # file them\n'),
+    ("upstream: path 3 — verify reports the inbox, including at zero",
+     VFY, "del", "different facts"),
+    ("upstream: the reader is wired into the dev session that would act on it",
+     "workforce/SKILL.md", "del", '"$WF/bin/wf-upstream" --list\n'),
+    # The scrubber and the containment test are one property with two halves, and deleting
+    # the allow-list is the half that restores the traversal.
+    ("upstream: a filename built from project data is scrubbed AND its landing site measured",
+     UPS, "del", 'SAFE_RX = re.compile(r"[^A-Za-z0-9._-]+")\n'),
+    # RETARGETED at the refusal MESSAGE. The first payload deleted `CLOSED_HEADING_RX`, which
+    # takes the binding and both of its uses with it — check then failed on four other
+    # assertions and this one never ran (BAD-CASE, 2026-09-25). The message is a literal whose
+    # removal leaves valid Python and destroys exactly the property: an unparsable queue stops
+    # being distinguishable from an empty one.
+    ("upstream: both documented queue shapes are read, and an unreadable one is not zero",
+     UPS, "del", "holds no table rows in either shape"),
+    ("upstream: the inbox never claims to discharge the downstream row",
+     UPS, "del", "RE-RUNS its own reproduction"),
     # ── a report that can be compared has a stable row order (2026-09-25) ────────
     # Deleting the sort leaves valid Python and restores the defect exactly: every row set
     # goes back to `os.walk` order, which is why the helper exists as a helper.

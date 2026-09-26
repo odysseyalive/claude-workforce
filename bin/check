@@ -17860,6 +17860,92 @@ check(
     "hand-written sections loses them on the next rebuild",
 )
 
+# ── the upstream inbox: three paths for the rows workforce itself owes (2026-09-25) ───────
+#
+# THE QUEUE HAD A WRITER AND NO READER. `references/deferred.md` keeps exactly two categories of
+# row alive across runs, and one is "a fix in another repository" — in practice this
+# distribution. The same file names its own gap: the closing mechanism was "a person noticing
+# the paragraph and opening a session by hand", which it calls **a rule with a reader and no
+# producer**. MEASURED 2026-09-25 on `university`, run audit-20260925T180537Z: seven surviving
+# rows, every one a defect in THIS repository, and three carried through three or more audits.
+# Row 7 — no shipped script writes the WF-HOUSE-RULES region — was re-verified and re-filed on
+# 2026-08-20, 2026-09-14 and 2026-09-25, and the third run wrote the region by hand rather than
+# file it a fourth time.
+_ups = read("workforce/bin/wf-upstream")
+_ups_aud = read("workforce/references/procedures/audit.md")
+_ups_vfy = read("workforce/references/procedures/verify.md")
+_ups_skill = read("workforce/SKILL.md")
+check(
+    "upstream: path 1 — the producer ships, so a host that installs gets it",
+    "exec workforce/bin/wf-upstream" in read("manifest.txt")
+    and os.path.isfile(os.path.join(ROOT, "workforce", "bin", "wf-upstream")),
+    "declared-is-not-shipped runs both ways: a script absent from manifest.txt is fetched by "
+    "neither installer, and a manifest row with no file 404s on every real install while every "
+    "local gate reads green",
+)
+check(
+    "upstream: path 2 — audit files the rows in the same step that writes them",
+    "wf-upstream" in _ups_aud
+    and 'wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute' in _ups_aud
+    and "INV-UPSTREAM" in _ups_aud,
+    "THE ROW THAT GETS SKIPPED. A producer the installer ships and no procedure runs reaches "
+    "every future install and files nothing from any of them — and the projects whose rows "
+    "are already three audits old are exactly the ones nobody re-installs",
+)
+check(
+    "upstream: path 3 — verify reports the inbox, including at zero",
+    "wf-upstream" in _ups_vfy
+    and "INV-UPSTREAM" in _ups_vfy
+    and "different facts" in _ups_vfy,
+    "nobody finds out either way. A project with no workforce defects to report is the state "
+    "this distribution is trying to reach, and it has to be visibly different from a project "
+    "whose queue was never read",
+)
+check(
+    "upstream: the reader is wired into the dev session that would act on it",
+    '"$WF/bin/wf-upstream" --list' in _ups_skill
+    and "Dev Path Discipline" in _ups_skill,
+    "the producer writes into the maintainer's own config root and nothing opens it. A file "
+    "nobody reads is the defect this whole mechanism exists to remove, relocated one hop",
+)
+check(
+    "upstream: a filename built from project data is scrubbed AND its landing site measured",
+    "SAFE_RX = re.compile" in _ups
+    and "def safe_part" in _ups
+    and "os.path.dirname(real_full) != real_base" in _ups,
+    "the row id comes from a Markdown cell in a file an agent edits and is joined to a path "
+    "under the personal config root, so `../../../..` is a write outside the inbox. An "
+    "allow-list scrub is a claim about what it removed; comparing the RESOLVED parent against "
+    "the resolved inbox is a measurement of where the write lands, and a prefix test would "
+    "pass a path one directory deeper",
+)
+check(
+    "upstream: both documented queue shapes are read, and an unreadable one is not zero",
+    'DISCHARGE_COLS = (' in _ups and "def _col" in _ups
+    # THE REFUSAL MESSAGE, not the phrase — `in either shape` also appears twice in this
+    # script's own prose, so pinning it passed on a file whose refusal had been gutted.
+    and "holds no table rows in either shape" in _ups
+    and "CLOSED_HEADING_RX" in _ups,
+    "`deferred.md` § Location and shape specifies `| id | opened | … | state |` and every real "
+    "queue this project has produced is a run report over `| # | Finding | Evidence | What "
+    "discharges it |`. A parser accepting only the specified shape reads university's seven "
+    "rows as zero — and `0 rows` and `could not read the rows` must never print the same line",
+)
+check(
+    "upstream: the inbox never claims to discharge the downstream row",
+    # MATCHED ON ONE LINE OF EACH FILE, not across a wrap. The first spelling of this
+    # conjunct read `"re-runs its own reproduction" in _ups_vfy.lower()` and failed against a
+    # file that says it — the sentence breaks between "re-runs" and "its own reproduction",
+    # because Markdown prose is hard-wrapped. The same trap cost `wf-upstream` two of
+    # university's seven rows an hour earlier, in a regex over the same kind of text.
+    "RE-RUNS its own reproduction" in _ups
+    and "its own reproduction and watches it pass" in _ups_vfy
+    and "--resolve" in _ups,
+    "`deferred.md` is explicit that the row closes when the DOWNSTREAM run re-runs its own "
+    "reproduction and watches it pass, never by an upstream report asserting the fix shipped. "
+    "A `--resolve` that read as a discharge would close rows on a claim",
+)
+
 # ── a report that can be compared has a stable row order (2026-09-25) ────────────────────
 #
 # FOUND BY THE CORPUS BELOW, on its first real run. `wf-census`'s five row sets are filled in

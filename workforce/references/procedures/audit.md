@@ -2656,6 +2656,34 @@ attempt count. Two categories, and `deferred.md` owns the list — it is not res
 **Print `INV-CLOSE`** with the rest of the invariant block; a queue with no classification line is
 indistinguishable from a queue nobody classified.
 
+### The another-repository rows LEAVE — `wf-upstream`, run in the same step that writes them
+
+**Every row whose fix lies in this distribution is filed where a workforce maintainer's own session will
+read it.** Run it immediately after `deferred.md` is written, and print its `INV-UPSTREAM` line:
+
+```
+"$WF/bin/wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}"            # report
+"$WF/bin/wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute  # file them
+```
+
+One file per row under `<config-root>/workforce/upstream/<project>--<row>.md`, holding the row verbatim
+with its evidence, this project's root, this run id and the installed version. Idempotent by project and
+row id: the next audit of the same project rewrites the same file rather than filing a second copy, and a
+row a maintainer has already marked resolved is left resolved.
+
+**It does not close the downstream row, and must not.** `references/deferred.md` is explicit that the row
+is closed by the downstream run that RE-RUNS its own reproduction and watches it pass — never by an
+upstream report asserting the fix shipped. So this step writes the row in BOTH places: the queue keeps
+it until the reproduction passes here, and the inbox is what makes somebody upstream aware it exists.
+
+*Added 2026-09-25. The carve-out that lets an other-repository row survive also names its own gap —
+"the closing mechanism was a person noticing the paragraph and opening a session by hand", which
+`deferred.md` calls **a rule with a reader and no producer**. MEASURED on `university` the same day:
+seven surviving rows, every one a workforce defect, THREE of them carried through three or more audits.
+Row 7 — no shipped script writes the `WF-HOUSE-RULES` region — was re-verified and re-filed on
+2026-08-20, 2026-09-14 and 2026-09-25, and the third run wrote the region by hand rather than file it a
+fourth time. Nothing on the workforce side had ever read any of it.*
+
 **The two canary rows are conditional on Step 6a, and on a passing re-attempt there are none:**
 
 | Row | Queued when | Discharged by |
