@@ -69,7 +69,10 @@ of the checkout under test, so a diff is this checkout's behaviour and not the o
 The environment is BUILT, not inherited: an allow-list of what a subprocess needs, `HOME` and
 `CLAUDE_CONFIG_DIR` pointed at the throwaway install, `TZ`/`LANG` pinned, and every other `CLAUDE_*`
 and `ANTHROPIC_*` absent. Volatile fields are masked — the copy's path, the install's path, run ids,
-stamps, dates, elapsed seconds — so an unchanged tree diffs against itself as empty. And a traceback is
+stamps, dates, elapsed seconds, and **the checkout's own `WORKFORCE-VERSION`**, read from
+`version.md` at run time — so an unchanged tree diffs against itself as empty. A version a PROJECT
+stamped stays: `stamped 1.70.0` is what that handbook was authored against and does not move when
+this checkout bumps, so the two are distinguished by value, which is what they are. And a traceback is
 a failure whatever the exit code says, because a golden recorded over a crash makes the crash the
 expected output.
 
@@ -81,6 +84,14 @@ nobody keeps green. `bin/check` therefore runs the corpus TWICE, under two delib
 sessions' worth of environment, because one run answers "did the behaviour change" and only the pair
 answers "can this suite tell". `PYTHONHASHSEED` is deliberately NOT pinned: a fixed seed would have
 hidden the `wf-census` row-order defect this corpus found on its first run.*
+
+*The release number is the same class, found the same way, one release later. `wf-conform` prints the
+installed version, so the 1.72.0 bump made the golden say `installed 1.71.1` and the run say
+`installed 1.72.0` — **and a version bump is the exact moment this suite runs.** The check that
+guards it BUMPS the version in a throwaway copy of the checkout and expects no diff, rather than
+asserting on the masking regex: the first regex masked `installed 1.72.0` and missed `the installed
+release is 1.72.0.`, the same fact ending a sentence, and only a run at a different version showed
+it.*
 
 **The case list is derived, not invented.** Every row cites the `audit.md` or `audit-setup.md` line
 where the audit makes that call in display mode, and `bin/check` re-reads each citation: a procedure

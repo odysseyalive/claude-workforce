@@ -18132,6 +18132,57 @@ else:
         _corp_fail,
     )
 
+    # AND WHATEVER THE RELEASE NUMBER. MEASURED on the 1.72.0 bump: `wf-conform` prints the
+    # installed version, so the golden said `installed 1.71.1` and the run said `installed
+    # 1.72.0` — `bin/check` failed the corpus on a real org with no behaviour change, and **a
+    # version bump is the exact moment this suite runs.** `normalise` masks the checkout's own
+    # `WORKFORCE-VERSION` to `<WF-VERSION>`, read from `version.md` at run time; a version a
+    # PROJECT stamped is real data and stays, distinguished by value.
+    #
+    # THE TEST BUMPS THE VERSION IN A THROWAWAY COPY, because asserting on the masking regex
+    # would be asserting on my own spelling of it. The first spelling masked `installed 1.72.0`
+    # and missed `the installed release is 1.72.0.` — the same fact ending a sentence — and only
+    # a run at a different version showed it. `corpus/` is SYMLINKED rather than copied: it is
+    # 18 MB, and this run only reads the goldens (every one exists, and nothing is passed
+    # `--accept`, so it writes none of them).
+    import shlex as _bump_shlex
+    _bump_fail = ""
+    if not _shutil.which("tar"):
+        skip("corpus: a release bump is not a behaviour change",
+             "no `tar` on PATH to build the throwaway copy of this checkout")
+    else:
+        _bump = _ch_tf.mkdtemp(prefix="wf-corpus-bump-")
+        try:
+            _r = subprocess.run(
+                "tar -c --exclude=./corpus --exclude=./.git --exclude=./__pycache__ . | "
+                "tar -x -C " + _bump_shlex.quote(_bump),
+                shell=True, cwd=ROOT, capture_output=True, text=True, timeout=300)
+            _vm = os.path.join(_bump, "workforce", "references", "version.md")
+            if _r.returncode or not os.path.isfile(_vm):
+                _bump_fail = ("could not copy the checkout: "
+                              + (_r.stdout + _r.stderr).strip()[-300:])
+            else:
+                os.symlink(os.path.join(ROOT, "corpus"), os.path.join(_bump, "corpus"))
+                _vt = open(_vm, encoding="utf-8").read()
+                open(_vm, "w", encoding="utf-8").write(
+                    re.sub(r"^WORKFORCE-VERSION:.*$", "WORKFORCE-VERSION: 9.99.0",
+                           _vt, count=1, flags=re.M))
+                _r2 = subprocess.run([sys.executable, os.path.join(_bump, "bin", "corpus"),
+                                      "run", "--quiet"], cwd=_bump, capture_output=True,
+                                     text=True, timeout=1800)
+                if _r2.returncode:
+                    _bump_fail = ("at WORKFORCE-VERSION 9.99.0:\n"
+                                  + (_r2.stdout + _r2.stderr).strip()[-1300:])
+        except (OSError, subprocess.SubprocessError) as _exc:
+            _bump_fail = f"the throwaway copy could not be run ({_exc})"
+        finally:
+            _shutil.rmtree(_bump, ignore_errors=True)
+        check(
+            "corpus: a release bump is not a behaviour change",
+            not _bump_fail,
+            _bump_fail,
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

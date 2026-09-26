@@ -144,7 +144,7 @@ def snapshots():
                   if os.path.isdir(os.path.join(CORPUS, n, TREE)))
 
 
-def normalise(text, tree, name, config=None, sandbox=None):
+def normalise(text, tree, name, config=None, sandbox=None, wf_version=None):
     """Mask every field that changes between two runs of the same unchanged tree.
 
     A golden carrying a timestamp, a run id or the throwaway tree's path diffs against itself
@@ -172,6 +172,33 @@ def normalise(text, tree, name, config=None, sandbox=None):
         # a machine where /home is a link or /tmp is a symlink those differ.
         for form in (os.path.realpath(src), src):
             text = text.replace(form, dst)
+    # THE CHECKOUT'S OWN RELEASE NUMBER, masked to a placeholder. MEASURED on the 1.72.0
+    # release: `wf-conform` prints `installed 1.71.1` in the golden and `installed 1.72.0`
+    # after the bump, so `bin/check` failed the corpus on a real org with no behaviour change —
+    # **and a version bump is the exact moment this suite runs.** Same class as the
+    # `CLAUDE_EFFORT` leak: a value that belongs to the environment of the run rather than to
+    # the tree under test. Read from `version.md` at run time, so a scratch worktree at any
+    # version normalises to the same text.
+    #
+    # A VERSION A PROJECT STAMPED IS REAL DATA AND STAYS. `stamped 1.70.0` is what that
+    # handbook was authored against; it does not move when this checkout bumps, and masking it
+    # would stop the golden tracking it. Only the checkout's CURRENT number is replaced, so the
+    # two are distinguished by value — which is what they are. The one collision is a project
+    # whose stamp happens to equal the version being developed: that stamp is masked too,
+    # costing a little precision in the one case where the two numbers are genuinely
+    # indistinguishable, and never producing a false fire.
+    #
+    # THE BOUNDARIES ARE THE FIDDLY PART, and the first spelling got them wrong in a way the
+    # worktree test caught immediately. `(?![\w.])` refuses a version followed by ANY period, so
+    # `installed 1.72.0` in a summary line was masked and `the installed release is 1.72.0.` —
+    # the same fact, ending a sentence — was not. The trailing lookahead therefore blocks a word
+    # character, and a period only when a DIGIT follows it, which is what stops `1.7` rewriting
+    # the front of `1.72.0` while a sentence-ending period passes. The lookbehind blocks a digit
+    # or a dot rather than any word character, so a `v`-prefixed form is still masked and
+    # `11.72.0` is still not.
+    if wf_version:
+        text = re.sub(r"(?<![\d.])" + re.escape(wf_version) + r"(?![\w])(?!\.\d)",
+                      "<WF-VERSION>", text)
     # A run id, an archive stamp and a backup name are all this shape.
     text = re.sub(r"\d{8}T\d{6}Z", "<STAMP>", text)
     text = re.sub(r"\d{8}T\d{4}Z", "<STAMP>", text)
@@ -233,7 +260,7 @@ def run_case(case, tree, name, home, config, sandbox):
     except OSError as exc:
         return label, None, "could not run: %s\n" % exc, True
     crashed = bool(CRASH_RX.search(out)) or rc not in want_rc
-    return label, rc, normalise(out, tree, name, config, sandbox), crashed
+    return label, rc, normalise(out, tree, name, config, sandbox, _version()), crashed
 
 
 def materialise_links(src, dest):
