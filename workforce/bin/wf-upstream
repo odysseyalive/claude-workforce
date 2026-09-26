@@ -331,9 +331,19 @@ def header_fields(text):
 
 def render(slug, root, row, shape, why, run, version):
     cites = citations(row)
+    # THE MARKER CARRIES SCRUBBED VALUES, NEVER THE RAW CELL. `row["id"]` comes from a Markdown
+    # table in a file an agent edits, and this comment is MACHINE-READ — `header_fields` parses
+    # it and `--list`/`--resolve` act on its `status`. A row id containing `-->` closes the
+    # comment early and puts the rest of the line into the rendered document; worse, a crafted
+    # id can emit a second `status=resolved` pair and make a real open row vanish from `--list`.
+    # Same output-encoding class, and the same remedy, as `wf-catalog.house_write`'s constraint
+    # on `.current-run`: a value written into markup is constrained to what that value may be.
+    # The VERBATIM row still appears below, inside a fenced block, which is where untrusted text
+    # belongs — this scrubs the INDEX, not the evidence.
+    row_key = safe_part(row["id"], "row")
     return "".join([
-        "<!-- %s | project=%s | row=%s | status=open -->\n" % (MARKER, slug, row["id"]),
-        "# %s — row %s\n\n" % (slug, row["id"]),
+        "<!-- %s | project=%s | row=%s | status=open -->\n" % (MARKER, slug, row_key),
+        "# %s — row %s\n\n" % (slug, row_key),
         "- status: **open**\n",
         "- project root: `%s`\n" % root,
         "- source: `.claude/workforce/deferred.md:%d`%s\n"
@@ -354,7 +364,7 @@ def render(slug, root, row, shape, why, run, version):
         "closed by the downstream run that RE-RUNS its own reproduction and watches it pass, "
         "never by an upstream report asserting the fix shipped. Record the release that "
         "should do it with:\n\n",
-        "```\nwf-upstream --resolve %s --version <X.Y.Z> --execute\n```\n" % row["id"],
+        "```\nwf-upstream --resolve %s --version <X.Y.Z> --execute\n```\n" % row_key,
     ])
 
 
@@ -475,11 +485,25 @@ def do_list(args):
     return 0
 
 
+# A release identifier, and nothing else. `--version` is written into the machine-read marker
+# comment, so it is constrained rather than trusted for the same reason the row id is: a value
+# holding `-->` closes the comment early, and one holding a second `status=` pair forges a field
+# `--list` reads. Deliberately wider than strict semver — a maintainer may close a row against
+# `1.72.0-rc1` or `1.72.0+dev` — and deliberately narrower than free text.
+VERSION_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,39}")
+
+
 def do_resolve(args):
     if not (args.version or "").strip():
         print("wf-upstream: --resolve needs --version <X.Y.Z> — a row closed without naming "
               "the release that closed it is the uncited-refusal shape this inbox exists to "
               "end", file=sys.stderr)
+        return 2
+    if not VERSION_RX.fullmatch(args.version.strip()):
+        print("wf-upstream: --version %r is not a release identifier. It is written into the "
+              "machine-read marker this inbox is indexed by, so it is constrained to "
+              "[A-Za-z0-9][A-Za-z0-9.+_-]{0,39} — a value carrying `-->` or a second `status=` "
+              "pair would forge a field `--list` reads." % args.version, file=sys.stderr)
         return 2
     want = safe_part(args.resolve, "")
     hits = [(p, f, t) for p, f, t in open_rows()

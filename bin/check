@@ -17931,6 +17931,31 @@ check(
     "discharges it |`. A parser accepting only the specified shape reads university's seven "
     "rows as zero — and `0 rows` and `could not read the rows` must never print the same line",
 )
+# FOUND BY /security-evaluator on this change. The marker comment is MACHINE-READ — it is what
+# `--list` and `--resolve` index the inbox by — and `render()` wrote the RAW row-id cell into it.
+# A row id carrying `-->` closes the comment early; one emitting a second `status=resolved` pair
+# makes a real OPEN row vanish from the only surface built to surface it. `deferred.md` is a file
+# an agent edits, so the cell is untrusted input to markup: same class, same remedy, as
+# `wf-catalog.house_write`'s constraint on `.current-run`. `--version` is the second value written
+# there and is constrained for the same reason.
+check(
+    "upstream: every value written into the machine-read marker is constrained",
+    'row_key = safe_part(row["id"], "row")' in _ups
+    # THE POSITIVE AND THE NEGATIVE, because the positive alone passes on a file that builds
+    # `row_key` and then writes the raw cell anyway. No escape sequences in either literal: the
+    # first spelling of this conjunct quoted the whole format string including `\\n`, which
+    # bin/check's own parser turned into a real newline while wf-upstream's bytes hold a
+    # backslash and an `n` — the check failed on a file that was correct.
+    and "% (MARKER, slug, row_key)" in _ups
+    and '% (MARKER, slug, row["id"])' not in _ups
+    and "VERSION_RX = re.compile" in _ups
+    and "VERSION_RX.fullmatch" in _ups,
+    "the row id and the fixing version are both written into the comment `--list` and "
+    "`--resolve` read, and both come from outside this script. A raw value carrying `-->` or a "
+    "second `status=` pair forges a field the reader acts on — and the forged field that matters "
+    "is `resolved`, which removes a live defect from the inbox silently. The VERBATIM row still "
+    "goes in the fenced block: this scrubs the index, never the evidence",
+)
 check(
     "upstream: the inbox never claims to discharge the downstream row",
     # MATCHED ON ONE LINE OF EACH FILE, not across a wrap. The first spelling of this

@@ -329,6 +329,12 @@ CASES = [
     # being distinguishable from an empty one.
     ("upstream: both documented queue shapes are read, and an unreadable one is not zero",
      UPS, "del", "holds no table rows in either shape"),
+    # The scrub of the machine-read index. Deleting the binding's USE puts the raw cell back in
+    # the marker and leaves valid Python, which is the defect exactly as /security-evaluator
+    # found it — aimed at the use rather than at `row_key =`, because deleting the binding would
+    # take its three uses with it and wreck the file.
+    ("upstream: every value written into the machine-read marker is constrained",
+     UPS, "del", "VERSION_RX.fullmatch"),
     ("upstream: the inbox never claims to discharge the downstream row",
      UPS, "del", "RE-RUNS its own reproduction"),
     # ── a report that can be compared has a stable row order (2026-09-25) ────────

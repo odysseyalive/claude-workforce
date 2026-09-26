@@ -5561,6 +5561,32 @@
       }
     }
   },
+  "upstream-forged-marker": {
+    "_why": "FOUND BY /security-evaluator on this change, 2026-09-25. The inbox marker comment is MACHINE-READ \u2014 `header_fields` parses it and `--list` and `--resolve` act on its `status` \u2014 and `render()` wrote the RAW `row[\"id\"]` into it. A row id carrying `-->` closes the comment early and puts the rest of the line into the document; a crafted id emitting a second `status=resolved` pair makes a real open row vanish from `--list`, which is a genuine open defect silently disappearing from the one surface built to surface it. `deferred.md` is a file an agent edits, so the cell is untrusted input to markup \u2014 the same output-encoding class, and the same remedy, as `wf-catalog.house_write`'s constraint on `.current-run`. The INDEX is scrubbed; the verbatim row still appears in the fenced block below it, because that is where untrusted text belongs and the evidence must not be altered. The `y` row proves BOTH halves at once: its finding cell literally contains the string `status=resolved`, which survives verbatim in the fenced block while never appearing in the marker \u2014 a scrub that sanitised the evidence too would have destroyed the row a maintainer has to read.",
+    "script": "wf-upstream",
+    "args": ["--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": ["upstream-forged-marker--x-------wf-upstream-v1.md"],
+    "not": ["Traceback"],
+    "after": {
+      ".inbox/workforce/upstream/upstream-forged-marker--x-------wf-upstream-v1.md": {
+        "want": [
+          "<!-- wf-upstream: v1 | project=upstream-forged-marker | row=x-------wf-upstream-v1 | status=open -->",
+          "| x --> <!-- wf-upstream: v1 | a row id carrying a comment terminator"
+        ],
+        "not": ["status=resolved"],
+        "once": ["status=open", "wf-upstream: v1 | project="]
+      },
+      ".inbox/workforce/upstream/upstream-forged-marker--y.md": {
+        "want": [
+          "row=y | status=open",
+          "| y | a finding whose own words contain status=resolved |"
+        ],
+        "not": ["| status=resolved"]
+      }
+    }
+  },
   "upstream-report-real-shape": {
     "_why": "MEASURED 2026-09-25 on `university`, audit run audit-20260925T180537Z: seven surviving deferred rows, every one a defect in THIS distribution, three of them carried through three or more audits — row 7 was re-verified and re-filed on 2026-08-20, 2026-09-14 and 2026-09-25 before a run gave up and wrote the region by hand. `references/deferred.md` lets that row survive and names its own gap in the same breath: the closing mechanism was 'a person noticing the paragraph and opening a session by hand', which it calls a rule with a reader and no producer. This tree is that project's real SHAPE — a run report with `##` sections over `| # | Finding | Evidence | What discharges it |` tables, which is NOT the `| id | opened | … | state |` shape § Location and shape specifies. A parser accepting only the specified shape reads seven rows as zero. The `Discharged this run` section is here because the real file carries one: recording those would re-open work the downstream run has already proven passing. Against HEAD: `unrecognized arguments`, no script.",
     "script": "wf-upstream",
