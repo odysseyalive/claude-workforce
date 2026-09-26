@@ -17956,6 +17956,26 @@ check(
     "is `resolved`, which removes a live defect from the inbox silently. The VERBATIM row still "
     "goes in the fenced block: this scrubs the index, never the evidence",
 )
+# MEASURED on this machine's real inbox, seven rows filed from `university`. `--list` prints
+# `university--1.md` and the hint says `--resolve <id>`, and neither that id nor its stem matched
+# anything: the matcher tested `stem.endswith("--" + want)` against the FULL id, and
+# `university--1` never ends with `--university--1`. The only form that worked was a bare `1` —
+# and every project's deferred queue numbers its rows from 1, so a bare `1` matched row 1 of
+# EVERY project and closed all of them, silently, on behalf of an operator looking at one.
+check(
+    "upstream: --resolve takes the id --list prints, and refuses an ambiguous bare row",
+    "def resolve_targets" in _ups
+    and 'os.path.basename(r[0])[:-3] == stem' in _ups
+    and "names none of them" in _ups
+    # THE NEGATIVE IS THE LOAD-BEARING HALF. The broken test is what has to be gone; a file that
+    # added the new matcher and left the old clause in place would satisfy every positive above
+    # and still close another project's row.
+    and 'endswith("--" + want)' not in _ups,
+    "the id `--list` prints has to be the id `--resolve` takes, with or without `.md`. A bare "
+    "row id stays as a convenience only where it is unique across the inbox; where it is not, "
+    "it is refused with its candidates named, because a convenience that quietly edits a queue "
+    "nobody was looking at is worse than no convenience",
+)
 check(
     "upstream: the inbox never claims to discharge the downstream row",
     # MATCHED ON ONE LINE OF EACH FILE, not across a wrap. The first spelling of this

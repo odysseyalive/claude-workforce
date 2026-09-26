@@ -364,7 +364,11 @@ def render(slug, root, row, shape, why, run, version):
         "closed by the downstream run that RE-RUNS its own reproduction and watches it pass, "
         "never by an upstream report asserting the fix shipped. Record the release that "
         "should do it with:\n\n",
-        "```\nwf-upstream --resolve %s --version <X.Y.Z> --execute\n```\n" % row_key,
+        # THE FULL ID, not the bare row. Every project numbers its rows from 1, so a bare row
+        # id names one row in each of them; `resolve_targets` refuses that rather than guessing,
+        # and a hint printing the ambiguous form would walk the reader into the refusal.
+        "```\nwf-upstream --resolve %s--%s --version <X.Y.Z> --execute\n```\n"
+        % (slug, row_key),
     ])
 
 
@@ -493,6 +497,56 @@ def do_list(args):
 VERSION_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,39}")
 
 
+def resolve_targets(want):
+    """`(hits, refusal)` — the inbox rows `--resolve <want>` names, or why it named none.
+
+    THREE SPELLINGS, AND THE LAST ONE IS GUARDED. `--list` prints `university--1.md`, so that is
+    the form a person copies, and it has to work with or without the extension. A bare row id is
+    the convenience, and it is the dangerous one: every project's queue numbers its rows from 1,
+    so a bare `1` names row 1 of EVERY project in the inbox.
+
+    MEASURED on this machine's real inbox with seven rows filed from `university`: neither
+    `--resolve university--1.md` nor `--resolve university--1` matched anything. The old matcher
+    asked whether the file stem ENDED WITH the separator followed by the whole id, which
+    `university--1` never does — it would have to read `university--university--1`. So the only
+    form that worked was a bare `1`, and a bare `1` closed row 1 of every OTHER project too,
+    silently, on behalf of an operator looking at one. A convenience that quietly edits a queue
+    nobody was looking at is worse than no convenience.
+
+    (The old expression is described rather than quoted on purpose: `bin/check` asserts that it
+    is GONE from this file, and a copy of it sitting in a docstring would satisfy the grep and
+    make the assertion pass over the defect.)
+
+    So an ambiguous bare row is REFUSED with its candidates named, never resolved by picking one
+    of them. The full form is always available and always unambiguous, and the refusal says so.
+
+    THE FILE STEM IS COMPARED WHOLE, never split on `--`. A scrubbed row id can itself contain
+    `--` — `x-------wf-upstream-v1` is a real one, from a row id carrying a comment terminator —
+    so splitting the stem on the separator is guesswork, and comparing the whole stem is not.
+    """
+    key = (want or "").strip()
+    if not key:
+        return [], "--resolve needs a row id. `wf-upstream --list` prints one per line."
+    stem = key[:-3] if key.lower().endswith(".md") else key
+    rows = open_rows()
+    if not rows:
+        return [], "the inbox at %s is empty" % inbox_dir()
+    exact = [r for r in rows if os.path.basename(r[0])[:-3] == stem]
+    if exact:
+        return exact, ""
+    bare = safe_part(stem, "")
+    cands = [r for r in rows if safe_part(r[1].get("row", ""), "") == bare]
+    if len(cands) > 1:
+        return [], ("%r is row %s in %d projects, so it names none of them: %s. Pass the full "
+                    "id as `--list` prints it."
+                    % (key, bare, len(cands),
+                       ", ".join(sorted(os.path.basename(p) for p, _f, _t in cands))))
+    if cands:
+        return cands, ""
+    return [], ("no inbox row matching %r in %s. `wf-upstream --list` prints every id, and the "
+                "full `<project>--<row>` form always resolves." % (key, inbox_dir()))
+
+
 def do_resolve(args):
     if not (args.version or "").strip():
         print("wf-upstream: --resolve needs --version <X.Y.Z> — a row closed without naming "
@@ -505,13 +559,9 @@ def do_resolve(args):
               "[A-Za-z0-9][A-Za-z0-9.+_-]{0,39} — a value carrying `-->` or a second `status=` "
               "pair would forge a field `--list` reads." % args.version, file=sys.stderr)
         return 2
-    want = safe_part(args.resolve, "")
-    hits = [(p, f, t) for p, f, t in open_rows()
-            if want and (safe_part(f.get("row", ""), "") == want
-                         or os.path.basename(p).rsplit(".", 1)[0].endswith("--" + want))]
-    if not hits:
-        print("wf-upstream: no inbox row matching %r in %s" % (args.resolve, inbox_dir()),
-              file=sys.stderr)
+    hits, refusal = resolve_targets(args.resolve)
+    if refusal:
+        print("wf-upstream: %s" % refusal, file=sys.stderr)
         return 1
     for p, f, t in hits:
         if f.get("status") == "resolved":

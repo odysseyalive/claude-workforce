@@ -5587,6 +5587,73 @@
       }
     }
   },
+  "upstream-resolve-full-id": {
+    "_why": "MEASURED on this machine's real inbox, seven rows filed from `university`: `--list` prints `university--1.md` and the hint says `--resolve <id>`, and NEITHER `--resolve university--1.md` NOR `--resolve university--1` matched anything. The matcher tested `stem.endswith(\"--\" + want)` against the full id, and `university--1` never ends with `--university--1`. So the only form that worked was a bare `1` \u2014 see `upstream-resolve-ambiguous-bare` for why that is worse than a refusal. This case asserts the form a person actually copies out of `--list`, extension included, and asserts that the OTHER project's row 1 is untouched by it.",
+    "script": "wf-upstream",
+    "args": ["--resolve", "university--1.md", "--version", "1.72.1", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": ["closed    university--1.md \u2192 resolved in 1.72.1"],
+    "not": ["no inbox row matching", "odyssey-alive"],
+    "after": {
+      ".inbox/workforce/upstream/university--1.md": {
+        "want": ["status=resolved | version=1.72.1", "- status: **resolved** in `1.72.1`"],
+        "not": ["status=open"]
+      },
+      ".inbox/workforce/upstream/odyssey-alive--1.md": {
+        "want": ["status=open"],
+        "not": ["1.72.1"]
+      },
+      ".inbox/workforce/upstream/university--97.md": {"want": ["status=open"]}
+    }
+  },
+  "upstream-resolve-stem": {
+    "_why": "The same id without the extension, because a person reading `--list` may type either and both are unambiguous. Same tree, same single row closed, same proof that the other project's row 1 is untouched \u2014 a matcher fixed for one spelling and not the other is the defect half-repaired.",
+    "script": "wf-upstream",
+    "args": ["--resolve", "university--1", "--version", "1.72.1", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": ["closed    university--1.md \u2192 resolved in 1.72.1"],
+    "not": ["no inbox row matching", "odyssey-alive"],
+    "after": {
+      ".inbox/workforce/upstream/university--1.md": {"not": ["status=open"]},
+      ".inbox/workforce/upstream/odyssey-alive--1.md": {"want": ["status=open"]}
+    }
+  },
+  "upstream-resolve-unique-bare": {
+    "_why": "A bare row id is kept as a convenience, and it resolves \u2014 but only where it is unique across the whole inbox. `97` exists in one project here, so it names one row and closes it. This is the half of the guard that must NOT be a refusal: a rule that rejected every bare id would be safe and useless, and the operator would stop using the convenience rather than the ambiguous half of it.",
+    "script": "wf-upstream",
+    "args": ["--resolve", "97", "--version", "1.72.1", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": ["closed    university--97.md \u2192 resolved in 1.72.1"],
+    "not": ["names none of them", "no inbox row matching"],
+    "after": {
+      ".inbox/workforce/upstream/university--97.md": {"not": ["status=open"]},
+      ".inbox/workforce/upstream/university--1.md": {"want": ["status=open"]},
+      ".inbox/workforce/upstream/odyssey-alive--1.md": {"want": ["status=open"]}
+    }
+  },
+  "upstream-resolve-ambiguous-bare": {
+    "_why": "THE DANGEROUS HALF, and the reason the bare form needed a guard rather than a fix. Every project's deferred queue numbers its rows from 1, so a bare `1` names row 1 of EVERY project in the inbox \u2014 and the old matcher would have closed all of them, silently, on behalf of an operator looking at one. A convenience that quietly edits a queue nobody was looking at is worse than no convenience, so the ambiguous case is REFUSED with its candidates named, never resolved by picking one. `--execute` is deliberate: the refusal has to hold in the mode that writes, and both files are asserted still open afterwards.",
+    "script": "wf-upstream",
+    "args": ["--resolve", "1", "--version", "1.72.1", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 1,
+    "want": [
+      "'1' is row 1 in 2 projects, so it names none of them: odyssey-alive--1.md, university--1.md",
+      "Pass the full id as `--list` prints it."
+    ],
+    "not": ["closed", "would close", "resolved in"],
+    "after": {
+      ".inbox/workforce/upstream/university--1.md": {
+        "want": ["status=open"], "not": ["1.72.1"]
+      },
+      ".inbox/workforce/upstream/odyssey-alive--1.md": {
+        "want": ["status=open"], "not": ["1.72.1"]
+      }
+    }
+  },
   "upstream-report-real-shape": {
     "_why": "MEASURED 2026-09-25 on `university`, audit run audit-20260925T180537Z: seven surviving deferred rows, every one a defect in THIS distribution, three of them carried through three or more audits — row 7 was re-verified and re-filed on 2026-08-20, 2026-09-14 and 2026-09-25 before a run gave up and wrote the region by hand. `references/deferred.md` lets that row survive and names its own gap in the same breath: the closing mechanism was 'a person noticing the paragraph and opening a session by hand', which it calls a rule with a reader and no producer. This tree is that project's real SHAPE — a run report with `##` sections over `| # | Finding | Evidence | What discharges it |` tables, which is NOT the `| id | opened | … | state |` shape § Location and shape specifies. A parser accepting only the specified shape reads seven rows as zero. The `Discharged this run` section is here because the real file carries one: recording those would re-open work the downstream run has already proven passing. Against HEAD: `unrecognized arguments`, no script.",
     "script": "wf-upstream",

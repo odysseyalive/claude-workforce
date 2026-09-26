@@ -335,6 +335,12 @@ CASES = [
     # take its three uses with it and wreck the file.
     ("upstream: every value written into the machine-read marker is constrained",
      UPS, "del", "VERSION_RX.fullmatch"),
+    # The ambiguity guard. Deleting the refusal's own words leaves valid Python and puts the
+    # cross-project close back: `len(cands) > 1` then falls through to the single-candidate
+    # branch. Aimed at the message rather than at the `if`, because deleting the condition leaves
+    # a bare `return [], (` and wrecks the file.
+    ("upstream: --resolve takes the id --list prints, and refuses an ambiguous bare row",
+     UPS, "del", "names none of them"),
     ("upstream: the inbox never claims to discharge the downstream row",
      UPS, "del", "RE-RUNS its own reproduction"),
     # ── a report that can be compared has a stable row order (2026-09-25) ────────
