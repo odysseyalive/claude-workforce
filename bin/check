@@ -18064,26 +18064,48 @@ check(
 # other developer green. `bin/prove` excludes `corpus/` from its per-case copies, so this costs
 # nothing inside the prove suite.
 if not _corpus_snaps:
-    skip("corpus: the display-mode scripts still say the same thing on a real org",
+    skip("corpus: the display-mode scripts say the same thing on a real org, whatever the session",
          "no snapshots in corpus/ on this machine, so nothing was run. This is the expected "
          "state on a fresh clone: a snapshot holds a real project's own words and is never "
          "committed. `bin/corpus snapshot <project-dir>` records one, `bin/corpus run "
          "--accept` records its goldens, and this row starts measuring.")
 else:
-    try:
-        _r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "corpus"),
-                             "run", "--quiet"], cwd=ROOT, capture_output=True,
-                            text=True, timeout=1800)
-        _corp_out = (_r.stdout + _r.stderr).strip()
-        check(
-            "corpus: the display-mode scripts still say the same thing on a real org",
-            _r.returncode == 0,
-            _corp_out[-1400:] if _r.returncode else "",
-        )
-    except subprocess.TimeoutExpired:
-        check("corpus: the display-mode scripts still say the same thing on a real org",
-              False, f"bin/corpus run did not finish in 1800s across "
-                     f"{len(_corpus_snaps)} snapshot(s)")
+    # RUN TWICE, UNDER TWO DIFFERENT SESSIONS' WORTH OF ENVIRONMENT. One run answers "did the
+    # behaviour change"; the pair answers "can this suite tell". MEASURED 2026-09-25, the first
+    # time anyone ran the corpus from a second session: `wf-preflight` reports the env vars that
+    # could override an employee's frontmatter, so `CLAUDE_EFFORT=high` went into the golden and
+    # `CLAUDE_EFFORT=medium` came out of the next run — `corpus run` FAILED with no code change.
+    # A known false fire is not shippable, and a suite that fires on the operator's shell is one
+    # nobody keeps green. `bin/corpus` now BUILDS the env rather than filtering it; these two
+    # runs are what proves that, and they are deliberately hostile — a different effort, a
+    # different subagent model, a different timezone and a different locale.
+    _corp_envs = [
+        {"CLAUDE_EFFORT": "high", "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+         "TZ": "UTC", "LANG": "C.UTF-8"},
+        {"CLAUDE_EFFORT": "low", "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+         "ANTHROPIC_MODEL": "haiku", "TZ": "America/New_York", "LANG": "en_US.UTF-8"},
+    ]
+    _corp_fail = ""
+    for _i, _extra in enumerate(_corp_envs, 1):
+        if _corp_fail:
+            break
+        try:
+            _r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "corpus"),
+                                 "run", "--quiet"], cwd=ROOT, capture_output=True,
+                                text=True, timeout=1800,
+                                env=dict(os.environ, **_extra))
+            if _r.returncode:
+                _corp_fail = ("run %d of 2 (%s):\n%s"
+                              % (_i, " ".join("%s=%s" % kv for kv in sorted(_extra.items())),
+                                 (_r.stdout + _r.stderr).strip()[-1300:]))
+        except subprocess.TimeoutExpired:
+            _corp_fail = (f"run {_i} of 2 did not finish in 1800s across "
+                          f"{len(_corpus_snaps)} snapshot(s)")
+    check(
+        "corpus: the display-mode scripts say the same thing on a real org, whatever the session",
+        not _corp_fail,
+        _corp_fail,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

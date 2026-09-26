@@ -64,11 +64,23 @@ public and a snapshot is somebody's private working material; `fixtures/` is whe
 belongs. On a machine with no snapshots `bin/corpus run` prints one SKIPPED line and exits 0, so a fresh
 clone stays green — the corpus is a local instrument, not a shared one.
 
-**Three properties make a diff mean something.** The install side is a throwaway `bin/sync --personal`
+**Four properties make a diff mean something.** The install side is a throwaway `bin/sync --personal`
 of the checkout under test, so a diff is this checkout's behaviour and not the operator's live install.
-Volatile fields are masked — the copy's path, the install's path, run ids, stamps, dates, elapsed
-seconds — so an unchanged tree diffs against itself as empty. And a traceback is a failure whatever the
-exit code says, because a golden recorded over a crash makes the crash the expected output.
+The environment is BUILT, not inherited: an allow-list of what a subprocess needs, `HOME` and
+`CLAUDE_CONFIG_DIR` pointed at the throwaway install, `TZ`/`LANG` pinned, and every other `CLAUDE_*`
+and `ANTHROPIC_*` absent. Volatile fields are masked — the copy's path, the install's path, run ids,
+stamps, dates, elapsed seconds — so an unchanged tree diffs against itself as empty. And a traceback is
+a failure whatever the exit code says, because a golden recorded over a crash makes the crash the
+expected output.
+
+*The env rule is the one that was learned the hard way, on the first run from a second session.
+`wf-preflight` reports which env vars could override an employee's frontmatter, so `CLAUDE_EFFORT=high`
+went into the golden and `CLAUDE_EFFORT=medium` came out of the next run: `corpus run` FAILED with no
+code change. **A known false fire is not shippable** — a suite that fires on the operator's shell is one
+nobody keeps green. `bin/check` therefore runs the corpus TWICE, under two deliberately different
+sessions' worth of environment, because one run answers "did the behaviour change" and only the pair
+answers "can this suite tell". `PYTHONHASHSEED` is deliberately NOT pinned: a fixed seed would have
+hidden the `wf-census` row-order defect this corpus found on its first run.*
 
 **The case list is derived, not invented.** Every row cites the `audit.md` or `audit-setup.md` line
 where the audit makes that call in display mode, and `bin/check` re-reads each citation: a procedure

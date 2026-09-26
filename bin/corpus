@@ -182,13 +182,49 @@ def normalise(text, tree, name, config=None, sandbox=None):
     return "\n".join(l.rstrip() for l in text.splitlines()) + "\n"
 
 
+# ── the environment every case runs under, and nothing else ───────────────────────────────
+#
+# A GOLDEN THAT MOVES WITH THE SESSION IS NOT A GOLDEN, and this was measured the first time
+# anyone ran the corpus from a second session. `wf-preflight` reports the env vars that could
+# override an employee's frontmatter, so `CLAUDE_EFFORT=high` went into the golden and
+# `CLAUDE_EFFORT=medium` came out of the next run: `corpus run` FAILED with no code change,
+# which is a known false fire, and a known false fire is not shippable.
+#
+# THE FIX IS THE CLASS, NOT THE FIELD. Inheriting `os.environ` and deleting the one variable
+# that bit would leave `CLAUDE_CODE_SUBAGENT_MODEL`, `ANTHROPIC_MODEL`, a `TZ` that shifts every
+# printed date by a day, and a `LANG` that changes how a locale-aware sort orders rows — each a
+# diff nobody changed any code to cause. So the env is BUILT rather than filtered: an allow-list
+# of what a subprocess genuinely needs, with everything session-shaped pinned.
+#
+# PYTHONHASHSEED IS DELIBERATELY NOT PINNED. Pinning it would make set-iteration order stable
+# and hide exactly the defect this corpus found on its first run — `wf-census` printed its rows
+# in `os.walk` order, and two runs of one unchanged tree swapped two of them. A fixed seed turns
+# that from a caught regression into a silent one.
+ENV_KEEP = ("PATH", "TMPDIR", "SYSTEMROOT", "COMSPEC")
+ENV_PIN = {"TZ": "UTC", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "LANGUAGE": "",
+           "COLUMNS": "80", "TERM": "dumb", "NO_COLOR": "1"}
+
+
+def scrubbed_env(home, config):
+    """The complete environment a case runs under. Nothing is inherited that is not named here.
+
+    `CLAUDE_CONFIG_DIR` and `HOME` point at the throwaway install; every other `CLAUDE_*` and
+    `ANTHROPIC_*` variable is simply absent, which is a state a script must handle anyway — an
+    env var it reads is one a fresh host may not have set.
+    """
+    env = {k: os.environ[k] for k in ENV_KEEP if k in os.environ}
+    env.update(ENV_PIN)
+    env["HOME"] = home
+    env["CLAUDE_CONFIG_DIR"] = config
+    return env
+
+
 def run_case(case, tree, name, home, config, sandbox):
     """`(label, rc, normalised_output, crashed)` for one case against the throwaway tree."""
     label, script, args, want_rc, _cite = case
     argv = [sys.executable, os.path.join(BIN, script),
             *[a.replace("<TREE>", tree) for a in args]]
-    env = dict(os.environ, CLAUDE_CONFIG_DIR=config, HOME=home)
-    env.pop("CLAUDE_PROJECT_DIR", None)
+    env = scrubbed_env(home, config)
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=300, env=env)
         out, rc = r.stdout + r.stderr, r.returncode
@@ -352,8 +388,11 @@ def build_install():
     home = os.path.join(sandbox, "home")
     config = os.path.join(home, ".claude")
     os.makedirs(os.path.join(config, "skills"))
+    # THE INSTALL IS BUILT UNDER THE SAME SCRUBBED ENV as the cases run under. `bin/sync` reads
+    # `CLAUDE_CONFIG_DIR` and writes the tree every case then resolves, so an install built under
+    # session env is a golden that moves with the session one level further back.
     r = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "sync"), "--personal"],
-                       cwd=ROOT, env=dict(os.environ, CLAUDE_CONFIG_DIR=config),
+                       cwd=ROOT, env=scrubbed_env(home, config),
                        capture_output=True, text=True, timeout=600)
     if r.returncode != 0:
         shutil.rmtree(sandbox, ignore_errors=True)
