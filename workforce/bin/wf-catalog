@@ -774,6 +774,80 @@ def resolve(root, kind):
     return info
 
 
+# The layers a `--grep` reads, in precedence order, and the prefix each hit carries. A
+# reader has to be able to tell which one answered from the line alone, because the four
+# mean four different things: `install` is what `update` advances, `additions` is
+# workforce's own authored slot, `project` is the layer that OUTRANKS the corpus, and
+# `copy` is what a retirement left behind because something still cites it.
+GREP_LAYERS = ("install", "additions", "project", "copy")
+
+
+def grep_sources(root, kind, info):
+    """`[(label, path)]` — every file a `--grep` for `kind` must read, layer-labelled.
+
+    THE THIRD LAYER WAS UNREACHABLE, and it is the one a retirement creates. `--migrate`
+    keeps every project file a live reader cites, and those files can hold catalog rows the
+    install has never shipped: MEASURED 2026-09-25 on a copy of `university`, with the
+    migration and the house-rules refresh both executed, `--kind image --grep 'Consistent
+    edge quality'` answered `no match` while the row sat at
+    `.claude/skills/image-eval/references/watercolor.md:16` — a file the migration had
+    listed `STAYS … cited by` five readers. The row is not lifted into `CATALOG-ANCHOR.md`
+    (only rows of a file that GOES are), and the resolver read the install plus the anchor
+    and nothing else, so for three consecutive audits the project's own grader was told its
+    rule did not exist. That is deferred row 3 of `university`'s queue.
+
+    A file is listed ONCE, by realpath, so a project answering from its own copy does not
+    appear under two layers, and a symlinked anchor does not double a hit.
+
+    `.md` ONLY on the copy layer, which is the same rule the install side already follows
+    (`catalog_files`): a retirement keeps `hooks/` and `scripts/` as capability and those are
+    programs, not catalog — grepping them would answer a catalog question with a shell
+    script. A kept `agents/<name>/AGENT.md` IS read, and deliberately: `university`'s row 2
+    names `Line X:` as a format its grader reads literally, and that string lives in exactly
+    such a file.
+    """
+    out, seen = [], set()
+
+    def add(label, f):
+        real = os.path.realpath(f)
+        if real in seen or not os.path.isfile(f):
+            return
+        seen.add(real)
+        out.append((label, f))
+
+    # The resolved corpus, labelled by WHERE IT RESOLVED FROM rather than assumed to be the
+    # install: with no install reachable the resolver answers from the copy, and calling that
+    # `install:` would be a label that lies about which layer a reader is being shown.
+    if info["path"]:
+        base = "install" if info["source"] == "install" else "copy"
+        for f in corpus_files(info["path"], info["additions_path"]):
+            # The additions slot lives OUTSIDE the catalog directory, so a name relative to
+            # it would climb out with `../`. It is its own layer and is labelled as one.
+            if f == info["additions_path"]:
+                add("additions:" + os.path.basename(f), f)
+            else:
+                add("%s:%s" % (base, os.path.relpath(f, info["path"])), f)
+    # The project's house rules, which OUTRANK the corpus (§ House rules dominate). Already
+    # labelled `project:` by their owner (DEF-Q-12).
+    anchors = set(info["anchors"])
+    for lbl, f in project_anchors(root, kind):
+        if f in anchors:
+            add(lbl, f)
+    # What the retirement kept. `classify` decides, rather than "whatever is still on disk":
+    # before a migration runs, the copy still holds the files that duplicate the install, and
+    # searching those would print every shipped row a second time from a path that is about
+    # to stop existing.
+    proj = project_skill_dir(root, kind)
+    if proj:
+        removable = set(classify(root, kind).get("removable") or [])
+        for f in all_files(proj):
+            rel = os.path.relpath(f, proj)
+            if rel in removable or not rel.endswith(".md"):
+                continue
+            add("copy:%s/%s" % (os.path.basename(proj), rel), f)
+    return out
+
+
 IMMUTABLE_SPAN_RX = re.compile(
     r"^<!--(?=[^>]*\borigin:\s*user\b)(?=[^>]*\bimmutable:\s*true\b)[^>]*-->$"
     r"(?P<body>.*?)(?=^<!--\s*/origin\s*-->$|\Z)", re.M | re.S)
@@ -2293,25 +2367,25 @@ def main():
             print("bad --grep pattern: %s" % exc, file=sys.stderr)
             return 2
         hits = 0
-        # The additions slot lives OUTSIDE the catalog directory, so a name relative to it
-        # would climb out with `../`. A file under the corpus keeps its relative name; the
-        # slot is labelled for what it is, which is also what the reader needs to see.
-        # THE PROJECT'S HOUSE RULES ARE SEARCHED AFTER THE CORPUS, labelled `project:` so a
-        # reader can tell a shipped rule from a project one by the prefix alone (DEF-Q-12).
-        sources = [(("additions:" + os.path.basename(f)) if f == info["additions_path"]
-                    else os.path.relpath(f, info["path"]), f)
-                   for f in corpus_files(info["path"], info["additions_path"])]
-        anchors = set(info["anchors"])
-        sources += [(lbl, f) for lbl, f in project_anchors(root, args.kind) if f in anchors]
+        sources = grep_sources(root, args.kind, info)
         for label, f in sources:
             for n, line in enumerate(slurp(f).splitlines(), 1):
                 if rx.search(line):
                     hits += 1
                     print("%s:%d:%s" % (label, n, line.rstrip()))
         if not hits:
-            print("no match in %s (%s)%s" % (
-                info["path"], info["source"],
-                "".join(" or %s" % f for f in info["anchors"])), file=sys.stderr)
+            # NAME EVERY LAYER THAT WAS SEARCHED, not just the resolved corpus. A refusal
+            # that names one of three layers reads as "this rule does not exist" when what
+            # it means is "it is not in the layer this message mentions" — which is how the
+            # `Consistent edge quality` row came to be reported absent for three audits
+            # while sitting in a file the migration had kept.
+            print("no match in %d file(s) across %s"
+                  % (len(sources), ", ".join(
+                      "%s (%d)" % (lay, sum(1 for l, _f in sources
+                                            if l.split(":", 1)[0] == lay))
+                      for lay in GREP_LAYERS
+                      if any(l.split(":", 1)[0] == lay for l, _f in sources))),
+                  file=sys.stderr)
         return 0 if hits else 1
 
     if args.house_rules:

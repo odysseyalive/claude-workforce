@@ -627,8 +627,16 @@ CASES = [
     # Each break restores the reported defect exactly, as a substring deletion that leaves valid
     # Python, so the behavioural check fails on the fixture rather than on a crash.
     # The project anchor drops out of --grep's sources: the grep reads the install alone again.
+    # RETARGETED 2026-09-25: the source list moved into `grep_sources`, which added the
+    # `copy:` layer, so the one-line comprehension this used to delete no longer exists. The
+    # break is the same one — the anchor layer drops out and the grep reads the install alone
+    # — spelled against the loop that replaced it. Deleting the whole loop leaves `anchors`
+    # bound and unread, which is valid Python, so the behavioural check still fails on the
+    # fixture rather than on a crash.
     ("catalog: --grep reads the project's house rules beside the corpus, and ui has an additions slot",
-     CATL, "del", "sources += [(lbl, f) for lbl, f in project_anchors(root, args.kind) if f in anchors]"),
+     CATL, "del", "    for lbl, f in project_anchors(root, kind):\n"
+                  "        if f in anchors:\n"
+                  "            add(lbl, f)\n"),
     ("catalog: --grep reads the project's house rules beside the corpus, and ui has an additions slot",
      "workforce/skills/ui-design/references/rendered-checks.md", "del", "<!-- ui-additions-version: 1 -->"),
     # `blocked = {h["kind"] for h in hooks}` — the refusal keyed on the kind again.

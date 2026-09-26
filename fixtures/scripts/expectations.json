@@ -5561,6 +5561,21 @@
       }
     }
   },
+  "catalog-grep-reads-cited-copy-file": {
+    "_why": "MEASURED 2026-09-25 on a copy of `university` with BOTH `--migrate --execute` and `--house-rules --execute` already run: `--kind image --grep 'Consistent edge quality'` answered `no match` while the row sat at `.claude/skills/image-eval/references/watercolor.md:16`, a file the migration itself had listed `STAYS … cited by` five readers. Only the rows of a file that GOES are lifted into CATALOG-ANCHOR.md, so a kept file's rows were in no layer the resolver read — and for three audits the project's own grader was told its rule did not exist (`university` deferred row 3). This tree reproduces that shape exactly: `references/image-tells.md` is byte-identical to the install's and is removable, `references/watercolor.md` has no install counterpart and STAYS because an employee cites it. The grep now reads install, then the anchor, then the copy's staying files, and each hit carries its layer — which is also what proves the removable duplicate is NOT searched a second time from the copy.",
+    "script": "wf-catalog",
+    "args": ["--kind", "image", "--grep", "Consistent edge quality|Signature artefact"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "install:image-tells.md:5:| Signature artefact | [hard] |",
+      "copy:image-eval/references/watercolor.md:4:| **Consistent edge quality** |"
+    ],
+    "not": [
+      "no match",
+      "copy:image-eval/references/image-tells.md"
+    ]
+  },
   "catalog-migrate-retires-seed-pin": {
     "_why": "MEASURED 2026-09-25 on a copy of `university`: the text-eval anchor pins `region-file=references/text-tells.md`, `--migrate` retires that exact file, and `references/ai-patterns.md` STAYS because four live readers cite it. wf-seed's only test for a retired copy was an empty directory, so the next audit fell through the dead pin to ai-patterns.md and seeded workforce's additions straight back into the copy that had just been retired. The retirement is now RECORDED: the pin becomes `method=retired`, and the display names the rewrite before `--execute` makes it. This tree reproduces that shape exactly — one removable file, one cited file that keeps the directory non-empty, and a pin naming the file that goes.",
     "script": "wf-catalog",

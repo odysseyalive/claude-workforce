@@ -178,13 +178,31 @@ phrasing *"pre-empted that conflict rather than leaving me stuck."*
 A handbook names the KIND and the pattern — `"$WF/bin/wf-catalog" --kind text --grep 'em-dash'` — and
 the resolver answers with the file and line.
 
-**The same grep reads the project's house rules.** After the corpus it searches every
-`.claude/skills/<evaluator>/CATALOG-ANCHOR.md` for the kind, under each of the kind's directory names:
-the supersession register, the `origin: user` spans lifted in by a retirement, and the anchor's
-`## Project catalog amendments`. Those hits are labelled `project:<skill>/CATALOG-ANCHOR.md:<line>`, so
-a shipped rule and a project rule are told apart by prefix. **A rule-ID lookup needs no second read.**
-*Until DEF-Q-12 (2026-09-14) the grep read the install alone, and a search for the anchor's own
-amendments heading on apps-odyssey-alive exited 1: every project rule was invisible to this row.*
+**The same grep reads all four layers, in this order, and every hit says which one answered.** **A
+rule-ID lookup needs no second read, and no layer needs a path spelled in a handbook.**
+
+| Prefix | Layer | Why it is searched |
+|---|---|---|
+| `install:<rel>` | the shipped corpus `update` advances | the corpus is the half that moves |
+| `additions:<file>` | workforce's own authored slot, the `additions.md` each evaluator skill ships beside its corpus | it completes an install-side answer; a copy carries the same text inlined as a `WF-ADDITIONS` region, so it is not read twice |
+| `project:<skill>/CATALOG-ANCHOR.md` | the project layer that OUTRANKS the corpus | the supersession register, the `origin: user` spans a retirement lifted in, and `## Project catalog amendments` |
+| `copy:<skill>/<rel>` | the `.md` a retirement KEPT — cited, or capability | a kept file can hold rows the install never shipped, and only a file that GOES has its rows lifted |
+
+The resolved corpus is labelled by where it resolved from, so with no install reachable it reads `copy:`
+rather than an `install:` that would be a lie. A file is listed once, by real path. `classify` decides
+what "kept" means rather than "whatever is still on disk", so a copy searched before its migration does
+not print every shipped row a second time from a path that is about to stop existing. On the copy layer
+the set is Markdown only — a retirement also keeps `hooks/` and `scripts/`, and those are programs, not
+catalog.
+
+*Two measured absences, both closed here. DEF-Q-12 (2026-09-14): the grep read the install alone, and a
+search for the anchor's own amendments heading on apps-odyssey-alive exited 1 — every project rule was
+invisible to this row. Then 2026-09-25 on `university`, with the migration AND the house-rules refresh
+both executed: `--kind image --grep 'Consistent edge quality'` answered `no match` while the row sat in
+that project's own `watercolor.md`, a file the same migration had printed `STAYS … cited by` five readers. Three
+consecutive audits told that project's own grader its rule did not exist. A refusal now names every
+layer it searched and the file count in each, because a refusal naming one layer of four reads as
+absence.*
 
 **Write the `$WF` prefix, never a bare `wf-catalog`.** Nothing in this distribution puts `bin/` on
 `PATH` — every other procedure invokes `"$WF/bin/wf-stamp"`, `"$WF/bin/wf-seed"` and the rest through
