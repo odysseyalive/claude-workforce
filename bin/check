@@ -14732,12 +14732,20 @@ check(
 # `--record-canary` first, so an operator typing BOTH flags — which the usage block
 # invites — reached the recorder alone, which demanded --tier-limit/--c1/--c2/--by
 # and exited 2. The measurement was in the process and the operator retyped it.
-_dsc = read("workforce/bin/wf-apply")
-_dsc_run = _dsc.find('if "--run-canary" in argv:')
-_dsc_rec = _dsc.find('if "--record-canary" in argv:')
+# `_apply`, NOT A SECOND `_dsc`. This block bound `_dsc` to `wf-apply` while line 7162 binds
+# the same name to `procedures/discharge.md`, and Python's one namespace makes that a shadow:
+# every `_dsc` assertion after this point silently read a different file than the ones before
+# it. `bin/coverage` maps an assertion to the file its CONDITION names, so it refused the whole
+# tree with `binds _dsc to two files; attribution is ambiguous` — and `bin/idempotence`, whose
+# first pass runs `bin/coverage --stamp`, failed on all nine writers because of it. The fix is
+# the name, not an OVERRIDES entry: an override would silence the refusal and leave the
+# attribution wrong for one of the two files. `_apply` is already bound to `wf-apply` at line
+# 7937 and rebound nowhere, so this reads the file it means and adds no third copy of it.
+_apl_run = _apply.find('if "--run-canary" in argv:')
+_apl_rec = _apply.find('if "--record-canary" in argv:')
 check(
     "canary: --run-canary is dispatched before --record-canary, so the chain is reachable",
-    -1 < _dsc_run < _dsc_rec and "code = record_canary(root, rec, execute)" in _dsc,
+    -1 < _apl_run < _apl_rec and "code = record_canary(root, rec, execute)" in _apply,
     "run_canary calls record_canary itself. Dispatched second it is unreachable "
     "whenever both flags are typed, and the operator retypes numbers the process "
     "already holds. A bare --record-canary must still demand every field",
