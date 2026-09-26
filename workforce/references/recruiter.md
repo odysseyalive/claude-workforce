@@ -1,6 +1,6 @@
 # Recruiter — research the role's standard before its handbook is written
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 17 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 18 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 
 **A role authored without knowing what the role's industry standard IS gets the bar its author already
 had in mind.** That is how this project shipped a website build with the right titles hired and the

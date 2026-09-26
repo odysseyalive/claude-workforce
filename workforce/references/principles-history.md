@@ -1,5 +1,6 @@
 # Shipped operating principles — a digest of every item text a release has shipped
 
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 0 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 `wf-companion` reads this file to tell workforce's own principle items from a project's when it moves
 an older constitution into the `WF-PRINCIPLES` region (`templates.md` § `operating-principles`). An item
 in a project's `origin: user` span leaves that span only when the sha256 of its text is listed below.

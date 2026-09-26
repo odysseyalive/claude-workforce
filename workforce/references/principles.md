@@ -1,6 +1,6 @@
 # Principles
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
+<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 1 assertion(s) in bin/check name this file; 4 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: MEDIUM — the reasoning `SKILL.md`'s Core Principles compress. Read once. -->
 
 `SKILL.md` states its principles in a paragraph each. This file explains the three that are most
