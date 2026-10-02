@@ -47,7 +47,7 @@ First install asks one question: personal or project scope. Personal puts one co
 
 ### Quick start
 
-Then restart Claude Code. You're already running. The install ships skills you can use right now: a text evaluator, a code evaluator, a security reviewer, an image evaluator, a UI design reviewer, and a plan writer. You can also hire individual agents and build new skills before anything else happens.
+Then restart Claude Code. You're already running. The install ships skills you can use right now: a text evaluator, a code evaluator, a security reviewer, an image evaluator, a UI design reviewer, a house style for shared pages, and a plan writer. You can also hire individual agents and build new skills before anything else happens.
 
 ```
 /workforce hire accessibility auditor
