@@ -196,9 +196,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The five evaluators come with it, and so does `blueprint`
+### The five evaluators come with it, and so do `blueprint` and `shared-artifact`
 
-**`update` installs seven skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
+**`update` installs eight skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
 `image-eval` and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -210,6 +210,14 @@ file rather than grading one against a catalog, so it ships no corpus, carries n
 registered in neither `wf-catalog` nor `wf-conform` (`manifest.txt` § blueprint). It is listed here
 because the install count is what a reader checks against, and a skill missing from that count reads
 as a failed install.
+
+**`shared-artifact` rides them too, and is the one sibling with a hook.** It carries the house style
+for any artifact published as a shareable link, and `wf-artifact-style` (`PreToolUse` on `Artifact`)
+is what applies it without anyone typing a command. The skill ships a `references/` directory and is
+still not a catalog: `house-style.md` is a recipe, not a graded corpus, so it is registered in neither
+`wf-catalog` nor `wf-conform` (`manifest.txt` § shared-artifact). The hook arrives by the same
+`--wire-defaults` producer every other shipped hook uses, so an install made before 2026-10-02 picks
+it up on the next `update` or `audit` with nothing to run by hand.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

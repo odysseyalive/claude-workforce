@@ -6222,5 +6222,172 @@
         "\\u00b7 bwait0008 \\u2014 sleep 240",
         "and 2 more"
       ]
+    },
+    "artifact-style-quickstart": {
+      "_why": "The quickstart is the Artifact tool's mandated first call for any new artifact, so it is the one point where the house style can arrive BEFORE a line of the page exists. It must name the skill and carry the HTML-vs-Docs routing rule, and it must never deny: nothing has been written yet.",
+      "exit": 0,
+      "not": [
+        "permissionDecision",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"quickstart\", \"intent\": \"other\"}}",
+      "want": [
+        "shared-artifact",
+        "additionalContext",
+        "Claude Docs is the right"
+      ]
+    },
+    "artifact-style-docs-create": {
+      "_why": "A Claude Docs create carries type_url and no local file. There is nothing to read and the Docs viewer owns its heading styles, so the only useful output is the routing rule. Denying here would block a destination that is correct whenever co-editing is the point.",
+      "exit": 0,
+      "not": [
+        "permissionDecision",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"publish\", \"type_url\": \"https://claude.ai/artifact/AAAA\", \"title\": \"Status Brief\"}}",
+      "want": [
+        "Keep one source of truth"
+      ]
+    },
+    "artifact-style-read-action": {
+      "_why": "read, list and comments write no page. A hook that spoke on every Artifact call of any kind would put the style instruction into turns that are only looking something up, which is how a guard earns its way into being ignored.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"read\", \"url\": \"https://claude.ai/code/artifact/AAAA\"}}"
+    },
+    "artifact-style-bad-json": {
+      "_why": "Fail-open on input it cannot parse. A hook bug must never stand between the user and their own publish, which is the contract wf-code-origin states one file over.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "this is not json"
+    },
+    "artifact-style-asset": {
+      "_why": "An uploaded asset is a file being carried, not a page being styled. Reading it as a page would deny every attachment that happens to end in .html.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"file_path\": \"whatever.html\", \"asset\": true}}"
+    },
+    "artifact-style-missing-file": {
+      "_why": "A path it cannot read is not evidence of a defect. Denying on an unreadable file would block a publish whose page is fine and whose path this hook simply resolved differently.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"file_path\": \"no-such-page.html\"}}"
+    },
+    "artifact-style-not-html": {
+      "_why": "A markdown or image artifact is not this detector's subject, but the recipe still routes the CHOICE of format, so the style instruction goes out and the floor does not.",
+      "exit": 0,
+      "not": [
+        "permissionDecision",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "report.md",
+      "want": [
+        "shared-artifact"
+      ]
+    },
+    "artifact-style-floor-met": {
+      "_why": "A page carrying every floor item passes in silence. A hook that reported on every pass as well as every failure trains its reader to skip the output, and the floor is the only thing it is entitled to speak about.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html"
+    },
+    "artifact-style-light-override": {
+      "_why": "The second accepted form of the light guard: the media block sets dark and a :root[data-theme=\"light\"] rule restates the light tokens after it. A viewer forcing light gets light tokens either way. MEASURED 2026-10-02 on image-swap-proposal.html, which does exactly this and which the single-form check denied.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html"
+    },
+    "artifact-style-advisory-only": {
+      "_why": "A width media query is named and never blocked, because krull-makeover.html is an accepted artifact with none: it is a side-by-side of projector slides. The advisory must arrive as context, not as a denial.",
+      "exit": 0,
+      "not": [
+        "permissionDecision",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html",
+      "want": [
+        "additionalContext",
+        "width media query"
+      ]
+    },
+    "artifact-style-no-dark-block": {
+      "_why": "No prefers-color-scheme block at all: the page is light for every viewer whose system is dark, and the author publishing from a light session never sees it. The denial names the missing block rather than saying the style was not applied.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "prefers-color-scheme"
+      ]
+    },
+    "artifact-style-unguarded-dark": {
+      "_why": "The dark block exists and is reachable by a viewer who forced LIGHT, with no override restating the light tokens. Both repair paths are named in the reason, because a detector ships with its fix.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "forces LIGHT"
+      ]
+    },
+    "artifact-style-no-body-background": {
+      "_why": "Tokens and both dark blocks present, and body sets no background, so the page inherits the host's and dark ink lands on a dark surface. The body rule spans lines here on purpose: a line-scoped read of this reported two known-good pages as broken.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "sets no background"
+      ]
+    },
+    "artifact-style-head-no-viewport": {
+      "_why": "The viewport meta is required only where the page declares its own <head>, because every artifact-published page measured is a fragment whose wrapper the publisher supplies. This case is the half that IS required: a page owning its wrapper owns the viewport.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_file": "page.html",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "viewport"
+      ]
     }
 }

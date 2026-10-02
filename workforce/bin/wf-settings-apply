@@ -153,6 +153,15 @@ SHIPPED_HOOKS = {
     # new code is written (SKILL.md § Directives, 2026-09-16); the split comes from git,
     # per file, so the look-up cannot be skipped. Context only, never a denial.
     "wf-code-origin": ("PreToolUse", "Edit|Write|MultiEdit|NotebookEdit"),
+    # THE HOUSE STYLE FOR A SHAREABLE PAGE, ARRIVING BEFORE THE PAGE IS WRITTEN. User
+    # request 2026-10-02: a skill that formats every shared online artifact, applied
+    # *"automatically without being prompted"*. `PreToolUse` on `Artifact` is the only
+    # point where that is true of a spawned employee as well as the main loop — "workforce
+    # decides to generate one" happens inside an agent that never saw the user's message.
+    # It emits the style instruction on `quickstart` and denies a publish whose page is
+    # missing the dark-mode floor, which is the defect the author provably cannot see:
+    # they publish from one theme and the broken state is the other.
+    "wf-artifact-style": ("PreToolUse", "Artifact"),
     # THE ONLY HOOK HERE THAT ACTS. Everything else in this table reports or decides;
     # this one spawns a reader and opens the channel the turn left shut. Config shape is
     # in AGENT_HOOKS below — it is registered as `type: "agent"`, not `command`.

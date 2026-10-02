@@ -152,10 +152,10 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
-**Update is the whole path.** Installing puts seven skills on your machine, not one. You get
+**Update is the whole path.** Installing puts eight skills on your machine, not one. You get
 `workforce` itself plus five evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
 `image-eval`, `ui-design`), each one complete with the catalog it grades against and the agents it
-runs. The seventh is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. They sit side by side in your skills directory and every project on the machine reaches them.
+runs. The seventh is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. The eighth is `shared-artifact`, the house style for any page you publish as a shareable link, and a hook applies it on its own so you never have to ask for it. They sit side by side in your skills directory and every project on the machine reaches them.
 When an evaluator's catalog changes, `/workforce update` is all you run. You never re-audit a project
 to collect a change. Earlier versions copied them into each project instead, which meant an update
 reached none of them.

@@ -235,6 +235,9 @@ CATL = "workforce/bin/wf-catalog"
 WDN  = "workforce/bin/wf-widen"
 TLDG = "workforce/bin/wf-turn-ledger"
 TTAG = "workforce/bin/wf-task-tag"
+ASTY = "workforce/bin/wf-artifact-style"
+ASTYS = "workforce/skills/shared-artifact/references/house-style.md"
+ASTYT = "workforce/skills/shared-artifact/references/template.html"
 
 # The bin/check assertions that run install.ps1 under PowerShell and are skipped without it.
 PWSH_CHECKS = {
@@ -2414,6 +2417,47 @@ CASES = [
      "bin/script-conformance", "del", "        os.remove(os.path.join(d, COMPLETE_INSTALL_MARKER))\n"),
     # A tree copy that follows links again.
     ("harness: every tree copy keeps links as links", PRV, "delall", ", symlinks=True"),
+    # ── THE SHAREABLE-ARTIFACT STYLE AND THE HOOK THAT APPLIES IT (2026-10-02) ───
+    # Every mutation below is SEMANTIC and leaves the file parseable, which is the
+    # point: a case that breaks the syntax proves only that something reads the file,
+    # not that this assertion covers this behaviour. Each one turns off one floor item
+    # or one narrowing and the fixture row for that item has to notice.
+    #
+    # The prelude collection is where the dark-mode block and the width query are
+    # found. Drop it and every page reads as having neither, so the known-good rows
+    # start denying.
+    ("shared-artifact: each floor item denies, and every shape that is not broken does not",
+     ASTY, "del", "            preludes.append(css[sel_start:o])\n"),
+    # The declaration half of a rule match. Without it a bare `:root {}` counts as a
+    # token block and a `body` rule with no background counts as having one.
+    ("shared-artifact: each floor item denies, and every shape that is not broken does not",
+     ASTY, "del", "and (decl_rx is None or decl_rx.search(decl))"),
+    # The viewport narrowing. Every published artifact page measured is a fragment the
+    # publisher wraps, so dropping the `<head` condition denies all of them.
+    ("shared-artifact: each floor item denies, and every shape that is not broken does not",
+     ASTY, "del", "HEAD_RX.search(text) and "),
+    # The second accepted form of the light guard, which one real page in the corpus
+    # uses. Removing the whole `or` clause keeps the parens balanced.
+    ("shared-artifact: each floor item denies, and every shape that is not broken does not",
+     ASTY, "del",
+     "\n            or any_rule(sels, decls, LIGHT_OVERRIDE_SEL_RX, TOKEN_DECL_RX)"),
+    # THE STARTER MUST PASS ITS OWN GATE. One of the two dark blocks out of the shipped
+    # template, and the template fails the floor everyone who copies it is held to.
+    ("shared-artifact: the shipped template satisfies the floor its own hook enforces",
+     ASTYT, "del", ':root[data-theme="dark"] {'),
+    # The user's grade on the HTML publish. Paraphrased away, the routing rule is an
+    # assertion with no evidence behind it.
+    ("shared-artifact: the user's words on both publishes of one brief are retained",
+     ASTYS, "del", "The new layout is wonderful"),
+    # THE APPLIER. Unwired, the skill reaches a turn only when somebody types its name,
+    # which is the half of the request this hook exists for.
+    ("shared-artifact: the skill is applied by a wired hook, not by being remembered",
+     WSA, "del", '    "wf-artifact-style": ("PreToolUse", "Artifact"),\n'),
+    # THE NEGATIVE: it is a recipe, not a catalog, so registering it makes wf-catalog
+    # ask for a drift anchor that does not exist. APPEND, because the rule is an absence.
+    ("shared-artifact: it is not registered as a catalog kind, the way blueprint is not",
+     "workforce/bin/wf-catalog", "append",
+     "\n# shared-artifact\n"),
 ]
 
 

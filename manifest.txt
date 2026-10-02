@@ -118,6 +118,7 @@ hook workforce/bin/wf-chooser
 hook workforce/bin/wf-task-tag
 hook workforce/bin/wf-code-origin
 hook workforce/bin/wf-commitments
+hook workforce/bin/wf-artifact-style
 
 # ── Output styles ─────────────────────────────────────────────────────────────
 #
@@ -282,6 +283,35 @@ sibling workforce/skills/ui-design/references/rendered-checks.md
 # comment came to be written. The VENDORED exemption already excludes every `SKILL.md` by
 # name, so nothing about the exemption changes for blueprint.
 sibling workforce/skills/blueprint/SKILL.md
+
+# ── shared-artifact — the second SIBLING that is not an evaluator ─────────────
+#
+# Same install mechanism as the six above, same reason: a skill is discoverable at
+# `<skills-root>/<name>/SKILL.md` and nowhere else, so shipping it in the install is what
+# lets `update` alone carry it to every project. User request, 2026-10-02: a skill that
+# formats every shareable online artifact, applied *"automatically without being prompted"*.
+# The automatic half is `hook workforce/bin/wf-artifact-style` above, which loads this skill
+# on an `Artifact` quickstart and refuses a publish missing the dark-mode floor.
+#
+# IT SHIPS A `references/` DIRECTORY AND IS STILL NOT A CATALOG. `house-style.md` is a
+# RECIPE — the token set, the layout grid, the content order — not a graded catalog of
+# findings, so it carries no `<kind>-ref-version` drift anchor of the sort `wf-catalog`
+# reconciles and it is registered in neither `wf-catalog` nor `wf-conform`. Reading it as a
+# sixth evaluator would make those tools look half-wired when they are correctly wired.
+# Its own `shared-artifact-ref-version` anchor is for this skill's internal use and names a
+# recipe, not a catalog kind.
+#
+# `template.html` is the only non-markdown file shipped into a sibling skill. It is DATA the
+# skill tells its reader to copy, it is not executable, and it declares no flag beyond
+# `sibling` for that reason. `bin/check` runs the shipped hook against it and requires it to
+# satisfy the floor the hook enforces: a template that fails its own gate teaches the defect.
+#
+# Everything here is workforce's own prose and stays under every authoring rule. The
+# provenance headings in the evaluator block above are pinned literals and are deliberately
+# not restated here, for the reason that block's own closing paragraph gives.
+sibling workforce/skills/shared-artifact/SKILL.md
+sibling workforce/skills/shared-artifact/references/house-style.md
+sibling workforce/skills/shared-artifact/references/template.html
 
 # ── Procedures ────────────────────────────────────────────────────────────────
 workforce/references/procedures/audit.md

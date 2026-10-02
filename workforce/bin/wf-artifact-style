@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+"""wf-artifact-style — PreToolUse hook on the `Artifact` tool: the house style for every
+shareable online artifact arrives before the page is written, and a page that would be
+unreadable in one of the two themes is refused before it is published.
+
+WHY A HOOK AND NOT A RULE. User request, 2026-10-02, verbatim: *"I want this skill to
+automatically adjust artifacts, online artifacts, especially online artifacts that are
+shared. Shareable. So when a user asks to create an online artifact or workforce decides to
+generate one, this skill needs to be applied so that it gets formatted correctly."* The
+operative words are *without being prompted*: *"whatever works well with workforce to make
+this happen automatically without being prompted."* A skill that has to be invoked is a
+skill the turn skips, and "workforce decides to generate one" happens inside a spawned
+employee that never saw the user's message. `PreToolUse` fires in subagents too, so the
+rule reaches the main loop and every employee by the same registration.
+
+WHERE THE STYLE CAME FROM. The session that built `efw-orientation-brief.html` published the
+same content twice — once through the Claude Docs connector, once as one HTML page. The user
+on the first: *"okay, the formatting of that shared artifact is a bit hard on the eyes. Can
+we clean it up a bit please? Make each of the headings pop out better and just overall
+appearance layed out a bit more professionally?"* On the second: *"The new layout is
+wonderful."* The skill `shared-artifact` carries that layout as a reusable recipe and a
+neutral template; this hook is the thing that makes it arrive.
+
+WHAT IT DOES, BY CALL. The `Artifact` tool's actions were read out of 66 real calls in this
+machine's own transcripts rather than from memory: `quickstart` (`intent`), `publish`
+(`type_url` + `title`, the connector-typed create), `read`, `list`, `comments`, and the
+implicit publish — no `action` at all, just `file_path` — which is 59 of the 66.
+
+  quickstart         the mandated first call for any new artifact. Emits the style
+                     instruction and the routing rule, so the recipe is in hand BEFORE a
+                     line of the page exists.
+  publish/type_url   a Claude Docs create. Not HTML and not checkable; the Docs viewer owns
+                     its own heading styles, which is exactly why the first attempt could
+                     not make headings pop. Emits the routing rule, never denies.
+  implicit publish   a local file. A `.html` file is checked against the floor below.
+  read/list/comments no page is being written. Silent.
+
+THE FLOOR IS SEVEN ITEMS AND IT IS NOT THE WHOLE RECIPE. It is the subset a reader LOSES
+THE PAGE OVER: dark-mode handling that is absent or unguarded renders dark text on a dark
+background for every viewer whose system is in dark mode, and the author — who published
+from a light session — never sees it. Everything else the recipe asks for (the binder grid,
+the section-number chips, the case-file strips, the pills) is a quality judgement the skill
+makes and this script has no business adjudicating.
+
+A DETECTOR SHIPS WITH ITS FIX (SKILL.md § Directives). The denial reason names each missing
+item and the one action that resolves all of them, so the model never has to guess what
+"apply the house style" means.
+
+ZERO KNOWN WRONG FIRES BEFORE IT BLOCKS, and two of the user's own items are ADVISORY for
+exactly that reason. MEASURED 2026-10-02 against the seven known-good artifact pages on this
+machine, listed in `fixtures/scripts/artifact-style-*/README.md`:
+
+  viewport meta       every artifact-published page in the corpus is a FRAGMENT with no
+                      `<head>` of its own — the publisher supplies the document wrapper.
+                      Requiring the meta unconditionally would have denied the very page the
+                      user called wonderful. Required only where the page declares its own
+                      `<head`, where the wrapper is the author's; 7 of 7 pass.
+  a width media query `krull-makeover.html`, an accepted artifact, has none: it is a
+                      side-by-side of projector slides and a narrow layout is meaningless
+                      for it. ADVISORY, so it is always named and never blocks.
+
+FAIL-OPEN, ALWAYS. Exit 0 on unparseable input, a path it cannot read, a payload shape it
+does not recognise, or any exception — the same contract `wf-code-origin` states one file
+over. A hook bug must never stand between the user and their own publish.
+"""
+import json
+import os
+import re
+import sys
+
+SKILL = "shared-artifact"
+
+# EVERY PATTERN HERE RUNS AGAINST ONE SHORT FRAGMENT — a selector, a declaration block, or
+# an at-rule prelude — never across the document, and that is a ReDoS fix rather than a
+# tidy-up. MEASURED 2026-10-02 on the shapes this file used to carry: `@media[^{]*max-width`
+# over a page with 20,000 `@media` tokens and a 400 KB brace-free tail took 96s, and
+# `:root[^{]*\{` took 12s on the same input. The gap scan is O(n) per anchor and the anchors
+# are O(n), so every one of them was quadratic. `css_blocks` walks the braces once and the
+# patterns below then match inside fragments whose total length is the file's length.
+ROOT_SEL_RX = re.compile(r":root\b")
+TOKEN_DECL_RX = re.compile(r"--[A-Za-z][\w-]*\s*:")
+LIGHT_GUARD_SEL_RX = re.compile(r":root:not\(\s*\[\s*data-theme\s*=\s*[\"']light[\"']\s*\]\s*\)")
+# THE SECOND ACCEPTED FORM, AND IT IS WHY THE LIGHT CHECK HAS TWO. The recipe guards the dark
+# media block with `:not([data-theme="light"])`; a page reaches the identical result by letting
+# the media block set dark and restating the light tokens in a `:root[data-theme="light"]` rule
+# after it. MEASURED 2026-10-02: `image-swap-proposal.html` does exactly that, and the
+# single-form check denied it. A viewer forcing light gets light tokens either way, so denying
+# the second form is a wrong fire on a page that is not broken.
+LIGHT_OVERRIDE_SEL_RX = re.compile(r":root\s*\[\s*data-theme\s*=\s*[\"']light[\"']\s*\]")
+FORCED_DARK_SEL_RX = re.compile(r":root\s*\[\s*data-theme\s*=\s*[\"']dark[\"']\s*\]")
+BODY_SEL_RX = re.compile(r"(?:^|[\s,>+~])body(?:\s|,|:|$)")
+BACKGROUND_RX = re.compile(r"\bbackground(?:-color)?\s*:", re.I)
+DARK_PRELUDE_RX = re.compile(r"prefers-color-scheme\s*:\s*dark", re.I)
+WIDTH_PRELUDE_RX = re.compile(r"(?:max|min)-width", re.I)
+STYLE_OPEN_RX = re.compile(r"<style[^>]*>", re.I)
+STYLE_CLOSE = "</style"
+TITLE_RX = re.compile(r"<title[^>]*>\s*\S[^<]*</title>", re.I)
+HEAD_RX = re.compile(r"<head[\s>]", re.I)
+VIEWPORT_RX = re.compile(r"name\s*=\s*[\"']viewport[\"']", re.I)
+
+# The style instruction, in one place. It names the skill rather than restating the recipe:
+# a second copy of the rules inside a hook is the copy that drifts, and the recipe lives in
+# the skill where it is shipped, versioned and read.
+APPLY = (
+    "This project ships the house style for shareable online artifacts as the `%s` skill. "
+    "Load it now and build the page to it before writing any markup." % SKILL
+)
+# The routing rule, which is the lesson of the two publishes of one brief. HTML can style its
+# own headings; the Docs viewer cannot, because it owns them.
+ROUTING = (
+    "Routing: a polished read-only page people will READ goes to HTML — `quickstart` with "
+    "intent \"other\", then one self-contained `.html` file. Claude Docs is the right "
+    "destination only when co-editing or commenting in the document is the point, because "
+    "the Docs viewer owns its heading styles and a brief published there cannot make its "
+    "headings pop. Keep one source of truth: never a Docs copy and an HTML copy of the same "
+    "content, because they drift."
+)
+
+
+def stylesheets(text):
+    """Every `<style>` block's contents joined, or the whole document when there is none.
+
+    SCOPED TO THE CSS ON PURPOSE. An artifact page carries its images inline, so a `:root`
+    or a `body {` inside a base64 blob or a JavaScript string is not a rule, and reading
+    the whole document also means reading every byte of those blobs.
+    """
+    out = []
+    lowered = text.lower()
+    for m in STYLE_OPEN_RX.finditer(text):
+        end = lowered.find(STYLE_CLOSE, m.end())
+        out.append(text[m.end():end if end != -1 else len(text)])
+    return "\n".join(out) if out else text
+
+
+def css_blocks(css):
+    """(selectors, declarations, preludes) for the whole sheet, walked with `str.find`.
+
+    NOT A REGEX, and the reason is measured. `([^{}]*)\\{([^{}]*)\\}` is quadratic over a
+    brace-free region: on the 456 KB `image-swap-proposal.html` in the corpus, with its
+    inline base64 images, `findall` had not returned after two minutes. This walk is one
+    pass.
+
+    An at-rule wrapper (`@media (…) { .wrap { … } }`) is stepped INTO, so the rule that
+    carries the declarations is the one reported and the wrapper's own text is collected as
+    a PRELUDE. The prelude is where `prefers-color-scheme: dark` and a width query live, and
+    reading them here is what lets those two checks match a short string instead of scanning
+    the document for a brace that may be half a megabyte away.
+    """
+    sels, decls, preludes = [], [], []
+    sel_start = 0
+    i = 0
+    n = len(css)
+    while i < n:
+        o = css.find("{", i)
+        if o < 0:
+            break
+        c = css.find("}", o + 1)
+        nxt = css.find("{", o + 1)
+        if nxt != -1 and (c == -1 or nxt < c):
+            preludes.append(css[sel_start:o])
+            sel_start = o + 1
+            i = nxt
+            continue
+        if c < 0:
+            break
+        sels.append(css[sel_start:o])
+        decls.append(css[o + 1:c])
+        sel_start = i = c + 1
+    return sels, decls, preludes
+
+
+def any_rule(sels, decls, sel_rx, decl_rx=None):
+    """True when some rule's selector matches, and its declarations match too when asked.
+
+    The `decl_rx` half is what separates `:root { --bg: … }` from a bare `:root {}`: a
+    selector with no custom properties under it restates no palette.
+    """
+    for sel, decl in zip(sels, decls):
+        if sel_rx.search(sel) and (decl_rx is None or decl_rx.search(decl)):
+            return True
+    return False
+
+
+def floor_failures(text):
+    """(denials, advisories). Each entry already reads as an instruction."""
+    bad = []
+    sels, decls, preludes = css_blocks(stylesheets(text))
+    if not any_rule(sels, decls, ROOT_SEL_RX, TOKEN_DECL_RX):
+        bad.append("no `:root { --token: … }` custom properties — every colour in the page "
+                   "comes from a token, so one block can restate them all for dark mode")
+    if not any(DARK_PRELUDE_RX.search(_p) for _p in preludes):
+        bad.append("no `@media (prefers-color-scheme: dark)` block — the page renders in the "
+                   "light palette for every viewer whose system is dark")
+    if not (any_rule(sels, decls, LIGHT_GUARD_SEL_RX)
+            or any_rule(sels, decls, LIGHT_OVERRIDE_SEL_RX, TOKEN_DECL_RX)):
+        bad.append("a viewer who forces LIGHT still gets the dark tokens: guard the dark "
+                   "block with `:root:not([data-theme=\"light\"])`, or restate the light "
+                   "tokens in a `:root[data-theme=\"light\"]` rule after it")
+    if not any_rule(sels, decls, FORCED_DARK_SEL_RX, TOKEN_DECL_RX):
+        bad.append("no `:root[data-theme=\"dark\"]` block — a viewer who forces dark outside "
+                   "the system preference gets light tokens")
+    if not any_rule(sels, decls, BODY_SEL_RX, BACKGROUND_RX):
+        bad.append("`body` sets no background — the page inherits the host's, so dark ink "
+                   "lands on a dark surface and the author publishing from a light session "
+                   "never sees it")
+    if not TITLE_RX.search(text):
+        bad.append("no non-empty `<title>` — the title is the artifact's name in the share "
+                   "list, and it should be 2 to 4 words")
+    # CONDITIONAL, and the condition is measured. See the module header.
+    if HEAD_RX.search(text) and not VIEWPORT_RX.search(text):
+        bad.append("the page declares its own `<head` and carries no viewport meta, so it "
+                   "cannot reflow on a phone — add "
+                   "`<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">`")
+    soft = []
+    if not any(WIDTH_PRELUDE_RX.search(_p) for _p in preludes):
+        soft.append("no width media query — check the page at about 390px and collapse the "
+                    "contents rail to a static grid at the top there")
+    return bad, soft
+
+
+# THE REASON IS AN INSTRUCTION CHANNEL, AND ONLY FIXED TEXT GOES INTO IT. A PreToolUse
+# `permissionDecisionReason` is read by the model as its next instruction, so anything echoed
+# there is something the page could tell the model to do. The FLOOR ITEMS ARE ALL CONSTANTS
+# and the PAGE'S CONTENT IS NEVER QUOTED — which matters because a published page legitimately
+# carries text from somewhere else, and "the line that failed" would be a second-order
+# injection straight into the instruction stream. The one value from outside this script that
+# reaches the reason is the file's own name, bounded here.
+NAME_SAFE_RX = re.compile(r"[^\w.\- ]", re.U)
+
+
+def safe_name(path):
+    return NAME_SAFE_RX.sub("", os.path.basename(path))[:80] or "the page"
+
+
+def emit(payload):
+    print(json.dumps(payload))
+
+
+def context(text):
+    emit({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                 "additionalContext": text}})
+
+
+def deny(reason):
+    emit({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                 "permissionDecision": "deny",
+                                 "permissionDecisionReason": reason}})
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    ti = payload.get("tool_input")
+    if not isinstance(ti, dict):
+        return 0
+    action = (ti.get("action") or "").strip().lower()
+
+    # No page is being written by any of these.
+    if action in ("read", "list", "comments", "delete"):
+        return 0
+
+    if action == "quickstart":
+        context(APPLY + " " + ROUTING)
+        return 0
+
+    # A connector-typed create. There is no local file to read and the viewer owns the
+    # heading styles, so the only useful thing to say is where this belongs.
+    if ti.get("type_url") and not ti.get("file_path"):
+        context(ROUTING)
+        return 0
+
+    # An uploaded asset is a file being carried, not a page being styled.
+    if ti.get("asset"):
+        return 0
+
+    path = ti.get("file_path")
+    if not isinstance(path, str) or not path:
+        return 0
+    if not path.lower().endswith((".html", ".htm")):
+        # Markdown, an image, a notebook: not this detector's subject. The style
+        # instruction still goes out, because the recipe routes the choice of format.
+        context(APPLY)
+        return 0
+
+    try:
+        cwd = payload.get("cwd") or os.getcwd()
+        full = path if os.path.isabs(path) else os.path.join(cwd, path)
+        with open(full, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except (OSError, ValueError):
+        return 0
+    if not text.strip():
+        return 0
+
+    bad, soft = floor_failures(text)
+    if bad:
+        deny("This page is about to be published without the house style for shareable "
+             "artifacts, and %d item(s) of its floor are missing:\n%s\n\n%s Then rewrite "
+             "%s so every item above is satisfied and publish again. The floor is the part "
+             "a reader LOSES THE PAGE OVER, not a preference: unguarded dark mode renders "
+             "dark text on a dark background for every viewer in dark mode, and you are "
+             "publishing from a light session and will not see it."
+             % (len(bad), "\n".join("  - " + b for b in bad), APPLY, safe_name(path)))
+        return 0
+    if soft:
+        context("The page meets the shareable-artifact floor. Still open, and worth fixing "
+                "before this is shared:\n%s" % "\n".join("  - " + s for s in soft))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:  # noqa: BLE001 — fail-open is the contract, stated in the header
+        sys.exit(0)

@@ -18205,6 +18205,206 @@ else:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# shared-artifact + wf-artifact-style, landed 2026-10-02
+#
+# USER REQUEST, verbatim: *"I would like to create a brand new skill that gets added to the
+# workforce installation that will go in the user directory ... I want this skill to
+# automatically adjust artifacts, online artifacts, especially online artifacts that are
+# shared. Shareable. So when a user asks to create an online artifact or workforce decides to
+# generate one, this skill needs to be applied so that it gets formatted correctly ...
+# whatever works well with workforce to make this happen automatically without being
+# prompted."*
+#
+# The skill alone satisfies none of that: a skill that has to be invoked is the step a long
+# turn skips, and "workforce decides to generate one" happens inside a spawned employee that
+# never saw the message. The hook is the mechanism and the skill is its content, so the
+# assertions below guard the JOIN between them — a shipped recipe nothing applies, or a hook
+# denying against a floor the shipped template does not itself meet, is the dormancy
+# enforcement.md refuses arriving from either side.
+# ─────────────────────────────────────────────────────────────────────────────
+_sa_skill = read("workforce/skills/shared-artifact/SKILL.md")
+_sa_style = read("workforce/skills/shared-artifact/references/house-style.md")
+_sa_hook = read("workforce/bin/wf-artifact-style")
+_sa_tmpl_path = "workforce/skills/shared-artifact/references/template.html"
+
+# THE USER'S OWN WORDS ON THE TWO PUBLISHES, RETAINED. The whole style exists because one
+# brief was published twice and graded both times, and the grade is the only evidence that
+# the HTML-vs-Docs routing rule is a measurement rather than a preference. Paraphrasing
+# either sentence would leave the rule asserted.
+_sa_words = []
+for _lit, _why in (
+    ("the formatting of that shared artifact is a bit hard on the eyes",
+     "the complaint about the Claude Docs publish, which is what the routing rule answers"),
+    ("The new layout is wonderful",
+     "the grade on the HTML publish of the SAME content, which is the whole evidence"),
+):
+    if _lit not in _sa_style:
+        _sa_words.append(f"house-style.md no longer carries {_lit!r} — {_why}")
+check(
+    "shared-artifact: the user's words on both publishes of one brief are retained",
+    not _sa_words,
+    "; ".join(_sa_words) + ". Retained verbatim under the first directive; a style whose "
+    "evidence has been summarised into the AI's own voice is a style with no evidence",
+)
+
+# THE SKILL IS APPLIED BY SOMETHING, and that something is named here rather than trusted.
+# A recipe with no applier is a file every install carries and no turn reads.
+_sa_join = []
+if '"wf-artifact-style": ("PreToolUse", "Artifact"),' not in read("workforce/bin/wf-settings-apply"):
+    _sa_join.append("wf-artifact-style is not wired on PreToolUse/Artifact in SHIPPED_HOOKS, "
+                    "so the skill reaches a turn only when somebody types its name")
+if "shared-artifact" not in _sa_hook:
+    _sa_join.append("the hook no longer names the skill it exists to load")
+# SUBAGENTS ARE THE POINT, not an extra. The request's second half is a page workforce
+# decides to generate on its own, inside an agent that never saw the user's message.
+if "spawned" not in _sa_hook:
+    _sa_join.append("the hook's header no longer records that PreToolUse is what reaches a "
+                    "spawned employee — the half of the request about workforce deciding "
+                    "to generate a page on its own")
+check(
+    "shared-artifact: the skill is applied by a wired hook, not by being remembered",
+    not _sa_join,
+    "; ".join(_sa_join),
+)
+
+# NOT A CATALOG, and asserted as a NEGATIVE for the reason blueprint's manifest block gives:
+# reading it as another evaluator would make `wf-catalog` and `wf-conform` look half-wired
+# when they are correctly wired. `house-style.md` is a recipe; there is no corpus to drift.
+check(
+    "shared-artifact: it is not registered as a catalog kind, the way blueprint is not",
+    "shared-artifact" not in read("workforce/bin/wf-catalog"),
+    "shared-artifact appears in wf-catalog — it ships a recipe, not a graded corpus, so "
+    "there is no catalog to reconcile and a registration there makes the drift report ask "
+    "for an anchor that does not exist",
+)
+
+# THE SHIPPED TEMPLATE PASSES THE FLOOR THE SHIPPED HOOK ENFORCES, RUN RATHER THAN READ.
+# A starter that fails its own gate teaches the defect to everyone who copies it, and the
+# failure would be invisible here: both files read perfectly well on their own.
+def _sa_probe(_path, _timeout):
+    """Run the SHIPPED hook on one page and hand back its CompletedProcess. One caller
+    checks the template, the other checks a page with an inline image under a clock; the
+    spawn is identical and copying it twice is how two probes drift apart."""
+    return subprocess.run(
+        [sys.executable, os.path.join(ROOT, "workforce", "bin", "wf-artifact-style")],
+        input=json.dumps({"tool_name": "Artifact", "tool_input": {"file_path": _path}}),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+        timeout=_timeout)
+
+
+_sa_run = []
+try:
+    _sa_p = _sa_probe(os.path.join(ROOT, _sa_tmpl_path), 60)
+    if _sa_p.returncode != 0:
+        _sa_run.append(f"the hook exited {_sa_p.returncode} on the shipped template; it is "
+                       "fail-open and must always exit 0")
+    if "permissionDecision" in _sa_p.stdout:
+        _sa_run.append("the shipped template is DENIED by the shipped hook: "
+                       + " ".join(_sa_p.stdout.split())[:300])
+    if _sa_p.stdout.strip():
+        _sa_run.append("the shipped template draws output at all; it must satisfy the "
+                       "advisory as well as the floor: "
+                       + " ".join(_sa_p.stdout.split())[:200])
+except (OSError, subprocess.SubprocessError) as _exc:
+    _sa_run.append(f"the template probe would not run ({_exc})")
+check(
+    "shared-artifact: the shipped template satisfies the floor its own hook enforces",
+    not _sa_run,
+    "; ".join(_sa_run),
+)
+
+# NO QUADRATIC READ, ON THREE SHAPES, AND EVERY ONE OF THEM IS MEASURED. The hook is read
+# before a publish the user is waiting on, so a slow read is a blocked publish.
+#
+#   inline image     the first version read rules with `([^{}]*)\{([^{}]*)\}`, quadratic over
+#                    a brace-free region. `findall` had not returned after TWO MINUTES on the
+#                    456 KB `image-swap-proposal.html`, a real page in the corpus.
+#   many `@media`    the replacement kept `@media[^{]*(?:max|min)-width`. The gap scan is O(n)
+#                    per anchor and the anchors are O(n): 96s on 20,000 `@media` tokens before
+#                    a 400 KB brace-free tail. Found by measuring rather than by reading, in
+#                    the security pass over this same change.
+#   many `:root`     the same shape one line up: 12s on the same input.
+#
+# GENERATED HERE rather than shipped as fixtures, because `bin/script-conformance` sets no
+# subprocess timeout: a regression there would hang the whole suite instead of failing a row.
+# A 2s ceiling, not 10 — the fixed form is 0.06s on all three, so the ceiling is two orders of
+# magnitude of headroom and still catches the first quadratic term to come back.
+_sa_redos = []
+try:
+    import tempfile as _sa_tf
+    import time as _sa_time
+    _sa_tmpl_body = read(os.path.join(ROOT, _sa_tmpl_path))
+    _sa_shapes = (
+        ("a 480 KB inline base64 image",
+         _sa_tmpl_body + '\n<img alt="x" src="data:image/png;base64,'
+         + "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5" * 10000 + '">\n'),
+        ("20,000 `@media` tokens before a 400 KB brace-free tail",
+         "<style>" + ("@media " * 20000) + ("x" * 400000) + "</style>" + _sa_tmpl_body),
+        ("20,000 `:root` tokens before a 400 KB brace-free tail",
+         "<style>" + (":root " * 20000) + ("x" * 400000) + "</style>" + _sa_tmpl_body),
+    )
+    with _sa_tf.TemporaryDirectory(prefix="wf-artifact-redos-") as _sa_td:
+        for _sa_what, _sa_body in _sa_shapes:
+            _sa_page = os.path.join(_sa_td, "page.html")
+            with open(_sa_page, "w", encoding="utf-8") as _fh:
+                _fh.write(_sa_body)
+            _sa_t0 = _sa_time.time()
+            try:
+                _sa_r = _sa_probe(_sa_page, 30)
+            except subprocess.TimeoutExpired:
+                _sa_redos.append(f"{_sa_what}: did not return within 30s — a quadratic scan "
+                                 "is back")
+                continue
+            _sa_dt = _sa_time.time() - _sa_t0
+            if _sa_r.returncode != 0 or "Traceback" in _sa_r.stdout:
+                _sa_redos.append(f"{_sa_what}: exited {_sa_r.returncode} "
+                                 f"{_sa_r.stdout.strip()[-160:]}")
+            # THE PAGE IS STILL JUDGED CORRECTLY, not merely judged fast. Each shape carries
+            # the shipped template, so the floor is met and the hook must stay silent; a
+            # linear rewrite that stopped seeing the CSS would also be fast.
+            if "permissionDecision" in _sa_r.stdout:
+                _sa_redos.append(f"{_sa_what}: turned a passing page into a denial — "
+                                 + " ".join(_sa_r.stdout.split())[:180])
+            if _sa_dt > 2:
+                _sa_redos.append(f"{_sa_what}: took {_sa_dt:.1f}s")
+except (OSError, subprocess.SubprocessError) as _exc:
+    _sa_redos.append(f"the ReDoS probe would not run ({_exc})")
+check(
+    "shared-artifact: the hook reads a half-megabyte page in one pass, on three hostile shapes",
+    not _sa_redos,
+    "; ".join(_sa_redos) + " — a hook that hangs blocks the publish it was written to let "
+    "through. Every pattern in the script matches inside ONE FRAGMENT handed to it by the "
+    "brace walk — a selector, a declaration block, an at-rule prelude — because a gap scan "
+    "across the document is O(n) per anchor over O(n) anchors",
+)
+
+# EVERY FLOOR ITEM FIRES, AND EVERY KNOWN-GOOD SHAPE DOES NOT. Behavioural, through the
+# fixture harness, because every assertion above this point could pass on a hook that denied
+# nothing: the floor is a list of strings until something runs it. The last five rows are the
+# NEGATIVE half — the narrowness is the property most likely to be "tidied" into a blanket
+# check on any html the tool touches.
+_sa_cases = _sc_cases(
+    "artifact-style-no-dark-block", "artifact-style-unguarded-dark",
+    "artifact-style-no-body-background", "artifact-style-head-no-viewport",
+    "artifact-style-floor-met", "artifact-style-light-override",
+    "artifact-style-advisory-only", "artifact-style-quickstart",
+    "artifact-style-docs-create", "artifact-style-read-action",
+    "artifact-style-bad-json", "artifact-style-asset",
+    "artifact-style-missing-file", "artifact-style-not-html",
+)
+check(
+    "shared-artifact: each floor item denies, and every shape that is not broken does not",
+    not _sa_cases,
+    "; ".join(_sa_cases) + " — MEASURED 2026-10-02 against the seven published artifact "
+    "pages on the maintainer's machine: 7 of 7 pass the floor and 0 fire. Two of the "
+    "items the request named are ADVISORY for exactly that reason — the viewport meta, "
+    "because every one of those pages is a fragment whose wrapper the publisher supplies, "
+    "and the width media query, because one accepted page is a side-by-side of projector "
+    "slides. A known wrong fire is not shippable in a hook that blocks",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")
