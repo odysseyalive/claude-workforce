@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.73.0 | 2026-10-02 | update, changes, hooks, scripts, installer | no | Release 1.73.0: shared-artifact, and the hook that applies it unasked |
 | 1.72.1 | 2026-09-25 | changes, scripts, installer | no | Release 1.72.1: wf-upstream --resolve takes the id --list prints, and never closes another project's row |
 | 1.72.0 | 2026-09-25 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.72.0: a local regression corpus measures every release against a real org, and workforce's own deferred rows reach workforce through an upstream inbox |
 | 1.71.1 | 2026-09-25 | audit, changes, scripts, installer | no | Release 1.71.1: a house-rules refresh no longer crashes on a tree that already has a region, and a retired copy is not re-seeded |
