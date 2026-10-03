@@ -7,6 +7,7 @@
     wf-catalog --root <tree> --json              machine-readable, for audit and verify
     wf-catalog --root <tree> --migrate           classify each project copy: residue, or local content
     wf-catalog --root <tree> --migrate --execute remove what it PROVED is residue, and nothing else
+    wf-catalog --root <tree> --migrate --kind code   one kind alone, display or execute
     wf-catalog --root <tree> --house-rules       what the house-rules refresh would propagate
     wf-catalog --root <tree> --house-rules --execute  propagate it (audit Step 4 / Step 6-E)
 
@@ -52,8 +53,11 @@ every entry is make-before-break rather than a content proof:
                                never removed either
   a symlink                    removing files through one writes somewhere nobody named
   an `agents/`, `scripts/` or  capability the shipped evaluator does not also ship; removing
-  `hooks/` file the install    it leaves a named capability reachable by zero paths
-  does not ship
+  `hooks/` file the install    it leaves a named capability reachable by zero paths. A
+  does not ship — or ships     bundled agent is compared SECTION BY SECTION against the
+  under the same name with     shipped file of the same name, because a name match is not a
+  less in it                   capability match and reading it as one nearly retired the only
+                               copy of a required one (`capability_gap`)
   a file a live reader cites   kept where its readers already point, each reader named in
   by any path form             the report, until the citation is moved
 
@@ -1200,6 +1204,41 @@ def install_keys(root, kind):
     return keys
 
 
+def capability_gap(proj, inst, rel):
+    """What this project file carries that the SHIPPED file at the same relative path does not.
+
+    A LIST OF KEYS, OR `None` WHEN THE TWO CARRY THE SAME CAPABILITY. `shipped_agents` answers
+    "does the install ship a file of this name", and `classify` was reading that as "does the
+    install ship this capability". Those are the same question only for a copy nobody edited.
+
+    MEASURED 2026-10-02 on a live host: `--migrate` classed the project's
+    `agents/character-scanner/AGENT.md` as residue because the install ships an agent of that
+    name — and only the project copy emits the *Verification Preamble* that
+    `text-eval/SKILL.md` and `agents/tells-evaluator/AGENT.md` both require, which the
+    install's copy does not mention once. Retiring it would have left that requirement
+    unsatisfiable: directive one's floor, a capability reachable by zero paths, reached by
+    way of a name match. Two more rows on the same tree had the same shape
+    (`code-design-advisor`, `deadcode-gardener`, 4 project-only sections each).
+
+    AND LIFTING IS NOT A SUBSTITUTE HERE, which is why this keeps the file instead. The rows
+    of a removed CORPUS file are lifted into `CATALOG-ANCHOR.md` and the resolver reads them
+    there. Nothing spawns an agent out of an anchor: an agent definition lifted as prose is
+    text about a capability that no longer exists.
+
+    The comparison is `file_keys` — the headings and row keys an evaluator greps — so a reflowed
+    paragraph is not a gap and a missing section is. The house-rules region is stripped from the
+    project side for the reason `project_only_rows` strips it: it is propagated INTO a copy by
+    the audit and is never the copy's own content.
+    """
+    ours = file_keys(HOUSE_RX.sub("", slurp(os.path.join(proj, rel))))
+    shipped = os.path.join(os.path.dirname(inst), rel)
+    if not os.path.isfile(shipped):
+        return ["(the shipped evaluator ships no %s)" % rel]
+    theirs = set(file_keys(slurp(shipped)))
+    gap = sorted(k for k in ours if k not in theirs)
+    return gap or None
+
+
 def project_only_rows(root, kind, proj, rels):
     """`{rel: [(line, text)]}` — the catalog rows a removable file carries and the install
     does not, which are the ones a live grader can still be grading on.
@@ -1600,11 +1639,24 @@ def classify(root, kind):
     # capability reachable by zero paths.
     ship = shipped_agents(root, kind)
     inst_rels = {os.path.relpath(f, os.path.dirname(inst)) for f in all_files(os.path.dirname(inst))}
+    gaps = {}
     for f in all_files(proj):
         rel = os.path.relpath(f, proj)
         parts = rel.split(os.sep)
         if len(parts) >= 3 and parts[0] == "agents" and parts[1] not in ship:
             keep_rel.add(rel)
+        # A NAME MATCH IS NOT A CAPABILITY MATCH, and reading it as one is how this came
+        # within one `--execute` of retiring the only copy of a required capability. The
+        # shipped agent of the same name either carries every section the project's copy
+        # does — then the copy is the old one and goes — or it does not, and the copy is
+        # the only path to what it carries. See `capability_gap` for the measurement.
+        elif len(parts) >= 3 and parts[0] == "agents" and not os.path.islink(f):
+            gap = (capability_gap(proj, inst, rel) if rel.endswith(".md")
+                   else (None if rel in inst_rels else
+                         ["(the shipped evaluator ships no %s)" % rel]))
+            if gap:
+                keep_rel.add(rel)
+                gaps[rel] = gap
         # A SCRIPT OR HOOK THE SHIPPED SKILL DOES NOT ALSO SHIP IS CAPABILITY, NOT RESIDUE.
         # The same make-before-break rule as the agents beside it, and it was missing:
         # `scripts/lint-delta.sh` retired with no replacement on disk and nothing repointed,
@@ -1618,7 +1670,7 @@ def classify(root, kind):
     keep_rel |= set(cited)
     if rels <= keep_rel:
         return {"kind": kind, "verdict": "retired", "path": proj, "removable": [], "kept": sorted(rels),
-                "cited": cited,
+                "cited": cited, "gaps": gaps,
                 "why": "already retired — only the house rules%s remain, and the shipped "
                        "evaluator is what this project reads"
                        % (" and %d project file(s) live readers cite" % len(cited) if cited else "")}
@@ -1640,7 +1692,7 @@ def classify(root, kind):
     house = [(rel, reg) for rel, reg in house if reg]
     return {
         "kind": kind, "verdict": "retire", "path": proj,
-        "removable": sorted(removable), "kept": sorted(kept), "cited": cited,
+        "removable": sorted(removable), "kept": sorted(kept), "cited": cited, "gaps": gaps,
         "house": house, "rows": project_only_rows(root, kind, proj, removable),
         "spans": [(rel, line) for rel, line, _t in spans],
         "why": ("the shipped %s evaluator is installed and current, so this copy is the old "
@@ -2095,8 +2147,18 @@ def orphaned_stamp(root, verdict, stamper):
 
 
 def migrate(root, args):
-    verdicts = [classify(root, k) for k in sorted(CATALOGS)]
-    hooks = hook_registrations(root)
+    # `--kind` SCOPES THE MIGRATION, and until 2026-10-02 it was accepted and ignored here.
+    # The flag already scopes `--path` and `--grep`; `--migrate` classified all five kinds and
+    # `--execute` acted on all five, so a tree with one kind safe to retire and one that must
+    # not be could only run both or neither. MEASURED on a live host: the `code` half was two
+    # duplicate in-skill agents and the `text` half would have retired the only copy of a
+    # required capability, and there was no way to run the safe half alone.
+    kinds = [args.kind] if args.kind else sorted(CATALOGS)
+    verdicts = [classify(root, k) for k in kinds]
+    # A registration for a kind this run is not touching cannot be made dangling by it, so it
+    # is not this run's refusal to report. Scoping the hooks with the verdicts keeps the two
+    # halves of the display describing one act.
+    hooks = [h for h in hook_registrations(root) if h.get("kind") in set(kinds)]
     by_kind = {v["kind"]: v for v in verdicts}
     for h in hooks:
         h["removes"] = registration_removes(h, by_kind.get(h["kind"], {}))
@@ -2153,7 +2215,17 @@ def migrate(root, args):
             print("               STAYS      %s — cited by %s%s"
                   % (f, ", ".join(cited[f][:3]),
                      " (+%d more)" % (len(cited[f]) - 3) if len(cited[f]) > 3 else ""))
-        rest = [f for f in v["kept"] if f not in cited]
+        # A CAPABILITY GAP IS PRINTED IN FULL AND NAMED, for the same reason a cited file is:
+        # it is the STAYS a person may want to act on, by moving the section into the shipped
+        # agent, and a bare `STAYS agents/x/AGENT.md` reads as residue the run was too timid
+        # to remove rather than as the only path to what it carries.
+        gaps = v.get("gaps") or {}
+        for f in sorted(gaps):
+            print("               STAYS      %s — carries %d section(s) the shipped agent "
+                  "does not: %s%s"
+                  % (f, len(gaps[f]), "; ".join(gaps[f][:3]),
+                     " (+%d more)" % (len(gaps[f]) - 3) if len(gaps[f]) > 3 else ""))
+        rest = [f for f in v["kept"] if f not in cited and f not in gaps]
         for f in rest[:4]:
             print("               STAYS      %s" % f)
         if len(rest) > 4:

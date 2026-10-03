@@ -447,7 +447,7 @@ is make-before-break rather than a proof about the file's contents.
 | `retire` | every file not on this list, whatever it contains — **the default** |
 | `STAYS: anchor` | `CATALOG-ANCHOR.md`, and the skill directory itself |
 | `STAYS: cited` | a live reader outside the copy, or a file inside it that stays, names this file **in any path form** — it stays where the reader already points, with every reader printed, until the citation is moved |
-| `STAYS: capability` | an `agents/`, `scripts/` or `hooks/` file the shipped evaluator does not also ship |
+| `STAYS: capability` | an `agents/`, `scripts/` or `hooks/` file the shipped evaluator does not also ship — **or ships under the same name with less in it**: a bundled agent is compared section by section against the shipped file of that name, and every section only the project's copy carries is printed |
 | `keep-symlink` | the copy is a link; removing through it writes somewhere the run never named |
 | `no-install` | workforce ships no catalog for this kind here — nothing to resolve to |
 
@@ -467,6 +467,12 @@ than by a gate that has to recognise each of them.
 a `STAYS` row for "the install ships a different one" — while `classify` had retired unconditionally
 since 2026-09-10. A section that describes a safer command than the one it documents misleads exactly
 the reader who checks before running it.*
+
+**`--kind` scopes the migration, display and execute alike.** A tree can hold one kind that is safe to
+retire and one that must not be; until 2026-10-02 the flag was accepted here and ignored, so the only
+choices were all five kinds or none. *Measured on a live host: the `code` half was two bundled agents
+the install ships identically, and the `text` half would have retired the only copy of a capability
+`SKILL.md` requires — and the safe half could not be run alone.*
 
 *The first design did not work this way, and the record is kept because the failure is instructive.* It
 compared HEADINGS AND TABLE ROWS and removed a whole copy on a pass. An independent code evaluation

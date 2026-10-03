@@ -5802,6 +5802,65 @@
       "copy:image-eval/references/image-tells.md"
     ]
   },
+  "catalog-migrate-keeps-divergent-agent": {
+    "_why": "A NAME MATCH IS NOT A CAPABILITY MATCH, and `--migrate` was reading it as one. MEASURED 2026-10-02 on a live host: the project's `agents/character-scanner/AGENT.md` was classed residue because the install ships an agent of that name, and only the project copy emits the *Verification Preamble* that `text-eval/SKILL.md` and `agents/tells-evaluator/AGENT.md` both require — the install's copy does not mention it once. Retiring it would have left that requirement unsatisfiable, which is the one thing a retirement may never do. Lifting is no substitute: nothing spawns an agent out of CATALOG-ANCHOR.md. `stale-twin` is the falsifying half INSIDE this fixture — byte-identical to its shipped twin, no gap, and it must still retire — so a rule degraded to 'keep every bundled agent' fails here too.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "STAYS      agents/character-scanner/AGENT.md — carries 1 section(s) the shipped agent does not: output — the verification preamble",
+      "retire     agents/stale-twin/AGENT.md",
+      "retire     references/text-tells.md"
+    ],
+    "not": [
+      "retire     agents/character-scanner/AGENT.md",
+      "LIFT       agents/character-scanner/AGENT.md"
+    ]
+  },
+  "catalog-migrate-kind-scopes": {
+    "_why": "`--kind` WAS ACCEPTED AND IGNORED BY `--migrate`. The flag already scopes `--path` and `--grep`; `--migrate` classified all five kinds and `--execute` acted on all five, so a tree with one kind safe to retire and one that must not be could only run both or neither — measured 2026-10-02 on a live host, where the `code` half was two duplicate in-skill agents and the `text` half would have retired the only copy of a required capability. This tree is that shape: `--kind code --execute` must remove the code corpus copy and leave every text file, and the text copy's divergent agent, exactly where they are.",
+    "script": "wf-catalog",
+    "args": [
+      "--migrate",
+      "--kind",
+      "code",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "code      retire",
+      "retire     references/mistake-taxonomy.md",
+      "REMOVED  1 file(s)"
+    ],
+    "not": [
+      "text      ",
+      "no-copy",
+      "agents/character-scanner"
+    ],
+    "after": {
+      ".claude/skills/code-evaluator/references/mistake-taxonomy.md": {
+        "absent": true
+      },
+      ".claude/skills/text-eval/references/text-tells.md": {
+        "want": [
+          "Em dash density"
+        ]
+      },
+      ".claude/skills/text-eval/agents/character-scanner/AGENT.md": {
+        "want": [
+          "Verification Preamble"
+        ]
+      }
+    }
+  },
   "catalog-migrate-retires-seed-pin": {
     "_why": "MEASURED 2026-09-25 on a copy of `university`: the text-eval anchor pins `region-file=references/text-tells.md`, `--migrate` retires that exact file, and `references/ai-patterns.md` STAYS because four live readers cite it. wf-seed's only test for a retired copy was an empty directory, so the next audit fell through the dead pin to ai-patterns.md and seeded workforce's additions straight back into the copy that had just been retired. The retirement is now RECORDED: the pin becomes `method=retired`, and the display names the rewrite before `--execute` makes it. This tree reproduces that shape exactly — one removable file, one cited file that keeps the directory non-empty, and a pin naming the file that goes.",
     "script": "wf-catalog",
