@@ -136,7 +136,20 @@ STATE_COLS = ("state", "status")
 CLOSED_HEADING_RX = re.compile(r"\b(discharged|closed|resolved|reversal)\b", re.I)
 # `path:line` and `path:line,line` citations, backticked or bare. The evidence a maintainer
 # needs to reproduce, carried across with the row rather than left behind in the project.
-CITE_RX = re.compile(r"`?((?:[\w.@+-]+/)*[\w.@+-]+\.(?:md|py|json|sh|ps1|txt|toml|ya?ml))"
+#
+# THE EXTENSION IS NOT ALLOW-LISTED, and it was: `md|py|json|sh|ps1|txt|toml|yaml` — the
+# languages THIS repository is written in. An upstream row is a defect measured in somebody
+# else's tree, so the one thing its evidence is guaranteed not to be is a file type we ship.
+# MEASURED 2026-10-02 against a real inbox: two entries of thirteen carried four `path:line`
+# citations between them — `class-ajf-importer.php:166`, `class-stain-images.php:412`,
+# `class-fabric-images.php:211`, `class-poly-images.php:304` — and both were written to disk
+# reading "The row cites no `path:line`", with `deferred.md`'s malformed-row rule quoted
+# against rows that had cited their evidence correctly. The maintainer who opens that entry to
+# reproduce is told the evidence is not there while it sits in the verbatim block above.
+#
+# Any extension that LOOKS like one is taken: a letter first so a version number
+# (`1.72:30`) is not a path, and a length bound so a sentence does not become one.
+CITE_RX = re.compile(r"`?((?:[\w.@+-]+/)*[\w.@+-]+\.[A-Za-z][A-Za-z0-9]{0,9})"
                      r":(\d+(?:,\d+)*)`?")
 ABS_PATH_RX = re.compile(r"(?<![\w`])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
 # The other-repository signals, weakest last. `deferred.md`'s BLOCKING rule says such a row

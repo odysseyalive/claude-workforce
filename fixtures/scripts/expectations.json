@@ -5713,6 +5713,41 @@
     ],
     "not": ["Traceback", "0 row(s) read"]
   },
+  "upstream-cite-any-language": {
+    "_why": "THE CITATION EXTRACTOR ALLOW-LISTED THE LANGUAGES THIS REPOSITORY IS WRITTEN IN (`md|py|json|sh|ps1|txt|toml|yaml`), and an upstream row is a defect measured in somebody else's tree — so the one thing its evidence is guaranteed not to be is a file type we ship. MEASURED 2026-10-02 against a real inbox: two entries of thirteen carried four `path:line` citations between them, all `.php`, and both were written to disk reading \"The row cites no `path:line`\" with `deferred.md`'s malformed-row rule quoted against rows that had cited their evidence correctly. The maintainer who opens the entry to reproduce is told the evidence is absent while it sits in the verbatim block above it. Both rows here cite evidence in a language this distribution does not ship, and both entries must carry it.",
+    "script": "wf-upstream",
+    "args": [
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/.inbox"
+    },
+    "exit": 0,
+    "want": [
+      "added     row 7",
+      "added     row 8"
+    ],
+    "after": {
+      ".inbox/workforce/upstream/upstream-cite-any-language--7.md": {
+        "want": [
+          "- `class-stain-images.php:412`",
+          "- `class-fabric-images.php:211`",
+          "- `class-poly-images.php:304`"
+        ],
+        "not": [
+          "The row cites no `path:line`"
+        ]
+      },
+      ".inbox/workforce/upstream/upstream-cite-any-language--8.md": {
+        "want": [
+          "- `reference.asp:39`"
+        ],
+        "not": [
+          "The row cites no `path:line`"
+        ]
+      }
+    }
+  },
   "upstream-report-real-shape-execute": {
     "_why": "The same tree with --execute, asserted on disk. The slug in each filename is the PROJECT DIRECTORY's name, which is why these paths carry `-execute`: the harness copies a fixture to a directory named after the case, and the slug is derived from that rather than passed in. The row is carried VERBATIM — a maintainer reading the inbox must not have to trust a paraphrase of somebody else's finding — with its project root, its run id, the installed version, and which signal matched. `status=open` sits in a machine-readable marker so `--list` and `--resolve` read one field rather than parsing prose. The file also states what a fix here does NOT do: `deferred.md` holds that the row closes when the DOWNSTREAM run re-runs its own reproduction and watches it pass, never on an upstream note claiming a release fixed it.",
     "script": "wf-upstream",

@@ -912,7 +912,7 @@ nothing: separate files, deliberately different, each caller naming the one it w
 
 | | Judged against | Verdict |
 |---|---|---|
-| **LIVE** | the resolving locations, both copies in ONE scope | **BLOCKING** — one employee is unreachable |
+| **LIVE** | the resolving locations only, and both copies in ONE of the two scopes | **BLOCKING** — one employee is unreachable |
 | **SHADOWED** | the resolving locations, one copy per scope, bytes differing | **ADVISORY** — the pair this distribution produces, and neither side is the run's to delete |
 | **DUPLICATE** | the resolving locations, bytes identical | **ADVISORY** — same behaviour whichever resolves |
 | **NAMESPACE** | the whole union, including in-skill `AGENT.md` | **ADVISORY** — constrains what workforce may *claim* for a new employee (`data-skills.md` § Naming), and says nothing about whether the target is broken |
