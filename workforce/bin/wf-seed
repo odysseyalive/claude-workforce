@@ -385,6 +385,35 @@ def plan_catalog(root, ev_dir, slot_dir=None):
 
     target_rel, target_path, tried = _resolve_target(ev_path, spec, anchor_text)
     if target_rel is None:
+        # A PIN TO A FILE THAT IS GONE IS A RETIREMENT NOBODY RECORDED, NOT AN ERROR.
+        # `method=region region-file=<X>` is this script's own record that it once wrote a
+        # region into X. If X and every other candidate are absent, this copy no longer
+        # carries a corpus file for the kind at all — which is the end state the retirement
+        # is FOR, and the slot resolved above proves the install carries the additions.
+        #
+        # MEASURED 2026-10-02 on a live host: a `text-eval` copy retired before `--migrate`
+        # learned to rewrite the pin (1.71.0) reported `ERR text-eval: region target not
+        # found` on every audit — `INV-SEED … 1 error`, exit 3 — while `wf-catalog` reported
+        # 0 additions unseeded for the same tree. Nothing could clear it: `--migrate` only
+        # rewrites the pin for a kind it still has files to retire, and this copy had none.
+        #
+        # REPORTED, NEVER REWRITTEN. wf-seed does not write `method=retired` here, because a
+        # file deleted by accident and a file removed by a retirement look identical from
+        # this side, and recording the wrong one of those would stop the additions
+        # propagating forever and say nothing. Restoring the file resumes seeding into it.
+        #
+        # A NEVER-SEEDED COPY IS STILL AN ERROR, which `seed-no-target` pins: with no pin
+        # there is no record that a region ever had a home here, so the additions have
+        # nowhere to go and the resolver refuses to invent one.
+        pinned = _seeded_region_file(anchor_text)
+        if pinned and method == "region":
+            result.update(action="retired",
+                          detail="%s pins region-file=%s and no candidate is on disk (%s), so "
+                                 "this copy carries no corpus file for the kind — the additions "
+                                 "are read from the install and nothing is seeded here. Restore "
+                                 "the file to resume seeding into it"
+                                 % (anchor_rel, pinned, ", ".join(tried)))
+            return result
         result.update(action="error",
                       detail="region target not found: tried " + ", ".join(tried)
                              + "; the evaluator must already read it")

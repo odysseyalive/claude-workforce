@@ -5807,6 +5807,41 @@
       ".claude/skills/text-eval/references/ai-patterns.md": {"want": ["Productive tangent"]}
     }
   },
+  "seed-stale-pin-corpus-gone": {
+    "_why": "A COPY RETIRED BEFORE THE PIN REWRITE EXISTED (1.71.0) REPORTED ITS OWN SUCCESS AS AN ERROR, FOREVER. The anchor still records `method=region region-file=references/text-tells.md`; the retirement removed that file and left the project's own files standing, so no candidate resolves and wf-seed reported `ERR … region target not found`, `1 error`, exit 3 — measured 2026-10-02 on a live host, where `wf-catalog` reported 0 additions unseeded for the same tree and nothing could clear it (`--migrate` rewrites the pin only for a kind it still has files to retire, and this copy had none). The pin is the proof a region once had a home here; with every candidate gone the copy carries no corpus for the kind and the additions are read from the install. `--execute` is deliberate: the tree must be asserted untouched, because wf-seed reports this state and never rewrites the record — a file deleted by accident looks identical from here. `seed-no-target` is the falsifying half and keeps its ERR: no pin, so nothing says a region ever lived there.",
+    "script": "wf-seed",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "ok    text-eval",
+      "pins region-file=references/text-tells.md",
+      "no candidate is on disk",
+      "1 retired"
+    ],
+    "not": [
+      "ERR",
+      "region target not found",
+      "SEED  text-eval",
+      "region written"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "method=region"
+        ],
+        "not": [
+          "method=retired"
+        ]
+      },
+      ".claude/skills/text-eval/references/creative-integrity.md": {
+        "not": [
+          "WF-ADDITIONS"
+        ]
+      }
+    }
+  },
   "seed-retired-pin": {
     "_why": "The reader half. This is `seed-retargeted-text`'s tree — a copy whose resolvable region target is `references/ai-patterns.md` — with the retirement recorded in its anchor. Against a wf-seed that tests only for an empty directory it reports `SEED … into references/ai-patterns.md · region written`, which is workforce's additions written into a copy the migration just retired; the kind is supposed to resolve to the install from here on, and the install already carries them. `--execute` is deliberate: a read-only assertion could not tell a refusal from a write that happened anyway, so the tree itself is asserted untouched.",
     "script": "wf-seed",
