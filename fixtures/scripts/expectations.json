@@ -1357,6 +1357,32 @@
       "0 failed"
     ]
   },
+  "conform-journal-reap-undo": {
+    "_why": "A RUN-DIRECTORY REAP HAS NO SINGLE-FILE UNDO, AND THE JOURNAL CHECK DEMANDED ONE. `audit.md` § Step 5h reaps `.claude/workforce/work/<run-id>/` through the same T-order a skill goes through — T7s stages, T7c marks, Step 6c unlinks — and a run directory holds no `SKILL.md`, so `staging/<name>/tree/` is the whole of its undo. Measured 2026-10-02 on a live host: 23 correctly staged `work-reap-*` rows failed `.orig exists on disk` while the removal-set row passed for all 23 with the tree found on disk, `verify` exited 1, and the only ways to clear it were to invent an `.orig` for a directory that never had one or to edit the journal. This tree is the correct after-state and MUST pass.",
+    "exit": 0,
+    "not": [
+      "`.orig` exists on disk",
+      "staged its whole directory"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ]
+  },
+  "conform-journal-reap-no-undo": {
+    "_why": "The paired negative, and the reason the fix is not a wave-through. Identical journal, and NO staged `tree/` anywhere — so the reap has no undo at all and must still fail, naming the whole-directory undo rather than the `SKILL.md.orig` a run directory never had.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "work-reap-oldrun T7s undo is the whole staged directory",
+      "absent at",
+      "staging/work-reap-oldrun/tree"
+    ],
+    "not": [
+      "`.orig` exists on disk"
+    ]
+  },
   "conform-removal-staged": {
     "_why": "The same tree with Step 6-S having run: T7s writes SKILL.md.orig and tree/, T7c writes the mark, and T2's extraction record exists for the one sacred span the target holds. MUST pass. Paired with conform-removal-unstaged (the mark is missing) and conform-removal-unextracted (the extraction is missing) so each half of Step 6-S has a fixture that fails without it. `tree/` is asserted because the sweep unlinks the WHOLE directory \u2014 references/, scripts/, hooks/, datasets \u2014 and SKILL.md.orig is an undo for the least of that.",
     "exit": 0,

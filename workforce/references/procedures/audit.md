@@ -1900,6 +1900,11 @@ T2   extract every immutable span, byte-exact, read back      ← BLOCKING. Shor
 T7s  staging/<name>/SKILL.md.orig  ← hashed single-file undo, same name and contract as T7's
      staging/<name>/tree/          ← the WHOLE directory, which is what the sweep unlinks
      prior-sha = SKILL.md's digest, 64 hex, never a pointer
+     A TARGET WITH NO `SKILL.md` STAGES ONLY THE TREE. Step 5h reaps a run directory
+     through this same order and `.claude/workforce/work/<run-id>/` holds no `SKILL.md`:
+     there is no single file to copy, so `tree/` is the whole undo, no `.orig` is written,
+     and `prior-sha` is not a file digest and is not compared against one. `wf-conform`
+     checks the tree for such a row — the artifact the sweep actually reverses.
 T7c  write the mark row — action `mark`
 T8   COMMITTED
 ```

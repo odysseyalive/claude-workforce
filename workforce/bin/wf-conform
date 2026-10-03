@@ -1770,6 +1770,24 @@ def _journal_path_shaped(cell):
     return "/" in cell or os.sep in cell or bool(re.search(r"\.[A-Za-z0-9]+$", cell))
 
 
+def _journal_skill_target(cell):
+    """Does this journal `path` cell name a SKILL — the one target whose undo is `SKILL.md`?
+
+    Read off the cell, never off disk, for `_journal_path_shaped`'s reason: whether the
+    target survives is the question, not a precondition of asking it. `.claude/skills/<name>`
+    and `.claude/skills/<name>/SKILL.md` are skills. `.claude/workforce/work/<run-id>` is a
+    RUN DIRECTORY — `audit.md` § Step 5h reaps one through the same T-order, and it holds no
+    `SKILL.md` to copy. A cell under no `.claude/` prefix at all is treated as a skill, so a
+    journal that writes bare `<name>/SKILL.md` keeps the strict single-file check it had.
+    """
+    cell = (cell or "").strip().strip("`").replace("\\", "/")
+    if cell.startswith("./"):
+        cell = cell[2:]
+    if cell.startswith(".claude/skills/"):
+        return True
+    return not cell.startswith(".claude/")
+
+
 def strip_prohibitions(text):
     """`text` with its prohibition CLAUSES removed, rather than the whole lines holding them.
 
@@ -1884,6 +1902,44 @@ def check_journal(root, res):
 
         rows += 1
         orig, tried = undo_orig(root, staging, name, swept.get(name))
+
+        # A TARGET WITH NO `SKILL.md` HAS NO SINGLE-FILE UNDO, AND DEMANDING ONE FAILS THE
+        # CORRECT RUN. `audit.md` § Step 5h reaps a RUN DIRECTORY through this same T-order:
+        # `.claude/workforce/work/<run-id>/` is staged at T7s, marked at T7c and unlinked by
+        # Step 6c exactly as a skill is, and it holds no `SKILL.md`. Step 6-S says so now —
+        # `tree/` is the whole of that undo and no `.orig` is written, so `prior-sha` is not
+        # a file digest here and is not compared against one.
+        #
+        # MEASURED 2026-10-02 on a live host: 23 `work-reap-*` rows (seq 134–156, all T8-swept)
+        # failed `.orig exists on disk` while `check_removal_set` passed for all 23 with the
+        # undo tree found on disk. `verify` exited 1, so INV-VERIFY was NOT UPHELD and every
+        # later sweep refused — and the only ways to clear it were to invent an `.orig` for a
+        # directory that never had one, or to edit the journal. Both falsify the record, which
+        # is what makes this the check's defect rather than the project's.
+        #
+        # THE CELL AND THE STAGED BYTES BOTH HAVE TO SAY "NOT A SKILL". A cell under
+        # `.claude/skills/` is a skill whatever is on disk, and a staged `tree/` holding a
+        # `SKILL.md` is a skill whatever the cell says — so a skill journaled under an
+        # unconventional path still gets the `.orig` + sha check, and only a target that is a
+        # skill by neither reading is answered by its tree.
+        if orig is None and not _journal_skill_target(path_cell):
+            tree, t_tried = undo_tree(root, staging, name, swept.get(name))
+            if tree is None or not os.path.isfile(os.path.join(tree, "SKILL.md")):
+                if tree:
+                    detail = f"undo found at {os.path.relpath(tree, root)}"
+                else:
+                    shown = ", ".join(os.path.relpath(t, root) for t in t_tried[:4])
+                    if len(t_tried) > 4:
+                        shown += f" (+{len(t_tried) - 4} more)"
+                    detail = (f"row stages {name} at {step} with status {status}, its path "
+                              f"cell names no skill, and the staged tree is absent at "
+                              f"{shown}. A target with no `SKILL.md` has no single-file undo, "
+                              "so the tree is the whole of it. Restore it from the pre-run "
+                              "backup before any deletion.")
+                res.add(bool(tree),
+                        f"journal: {name} {step} undo is the whole staged directory", detail)
+                continue
+
         if orig is None:
             shown = ", ".join(os.path.relpath(t, root) for t in tried[:4])
             if len(tried) > 4:
