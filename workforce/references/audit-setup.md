@@ -912,8 +912,27 @@ nothing: separate files, deliberately different, each caller naming the one it w
 
 | | Judged against | Verdict |
 |---|---|---|
-| **LIVE** | the resolving locations only | **BLOCKING** — one employee is unreachable |
+| **LIVE** | the resolving locations, both copies in ONE scope | **BLOCKING** — one employee is unreachable |
+| **SHADOWED** | the resolving locations, one copy per scope, bytes differing | **ADVISORY** — the pair this distribution produces, and neither side is the run's to delete |
+| **DUPLICATE** | the resolving locations, bytes identical | **ADVISORY** — same behaviour whichever resolves |
 | **NAMESPACE** | the whole union, including in-skill `AGENT.md` | **ADVISORY** — constrains what workforce may *claim* for a new employee (`data-skills.md` § Naming), and says nothing about whether the target is broken |
+
+**SHADOWED is advisory because no remedy for it lives inside the tree the run governs.**
+`manifest.txt` carries four `agent` rows, so `install` registers a shipped evaluator's agent —
+`character-scanner`, `code-design-advisor`, `deadcode-gardener`, `image-validator` — into the agents/
+directory of the scope it installed into, and a project keeping its own customized copy of that
+evaluator registers the same name at project scope. `install` says what may be done about the other
+scope — *"REPORTED, NEVER REMOVED. The other scope is not this install's to edit"* — and `scopes.md`
+says everything an audit generates is written under `${CLAUDE_PROJECT_DIR}/.claude/`. A blocking
+precondition whose only remedies are the user's home config or the project copy its own skill
+requires is a report, not a gate.
+
+*Measured 2026-10-02 on a live host: `character-scanner` registered in both scopes with differing
+bytes, `wf-census` exit 2, and the project copy the one `text-eval/SKILL.md` requires — it emits the
+Verification Preamble the install's copy does not mention. The run halted on a state nothing in it was
+allowed to repair. Fourth instance of the class the three below record.* **Which scope the harness
+resolves is NOT part of `platform.md` fact 5 and is unmeasured here, so the row names both copies and
+asserts no winner.**
 
 **Both print, always, including the zeroes.** `wf-census` reports them on separate lines.
 

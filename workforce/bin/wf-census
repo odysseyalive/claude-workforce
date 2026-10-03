@@ -454,8 +454,44 @@ class Census:
         """Same name, resolving locations, BYTE-IDENTICAL. Advisory — see collisions()."""
         return self._by_name(self.agents)[1]
 
+    def shadowed(self):
+        """One copy per SCOPE, differing bytes. Advisory — and the fourth instance of the
+        class `collisions()` records three times: a blocking row on a tree this
+        distribution itself produces.
+
+        `manifest.txt` has four `agent` rows, so `install` REGISTERS a shipped evaluator's
+        agent — `character-scanner`, `code-design-advisor`, `deadcode-gardener`,
+        `image-validator` — into the agents/ directory of the scope it installed into. A
+        project that keeps its own customized copy of that evaluator registers the same name
+        at project scope. The pair is then produced by the install, and the installer already
+        says what may be done about it: *"REPORTED, NEVER REMOVED. The other scope is not
+        this install's to edit; deleting there is exactly the 'overwrite the user's
+        preferences' move the permissions directive refuses."*
+
+        AND THE AUDIT CANNOT CLEAR IT EITHER. `scopes.md`: everything an audit generates for
+        a project "is project state, written under `${CLAUDE_PROJECT_DIR}/.claude/`". So a
+        BLOCKING row here is a precondition of the Atomic-or-Absent gate whose only remedies
+        lie outside the tree the run governs — the user's own home config, or the project
+        copy its own skill requires. MEASURED 2026-10-02 on a live host: one differing
+        cross-scope pair, `character-scanner`, exit 2, and the project copy is the one
+        `text-eval/SKILL.md` requires (it emits the Verification Preamble the install's copy
+        does not mention). The run halted on a state nothing in it was allowed to repair.
+
+        SAME SCOPE IS STILL BLOCKING, and that is the half this does not touch. Two entries
+        in ONE agents/ directory are decided by filesystem read order with nothing documented
+        either way (fact 5), both are the user's to rename, and the audit writes into exactly
+        that directory. Cross-scope precedence is a different question, it is NOT part of
+        fact 5, and nothing in this repository has measured it — which is why this row names
+        both copies and asserts no winner.
+        """
+        return self._by_name(self.agents)[2]
+
     def _by_name(self, rows):
-        """(collisions, duplicates) — split by whether the copies actually differ."""
+        """(collisions, duplicates, shadowed) — split by whether the copies differ, and
+        then by whether a differing pair is one-per-scope (see `shadowed`)."""
+        scope_of = {}
+        for row in rows:
+            scope_of.setdefault(row["path"], row["scope"])
         seen = {}
         for row in rows:
             if not row["name"]:
@@ -481,7 +517,19 @@ class Census:
                     # a copy nobody can read is a copy nobody can prove harmless.
                     digests.add(f"unreadable:{p}")
             (duplicates if len(digests) == 1 else collisions)[name] = found
-        return collisions, duplicates
+
+        # THE CROSS-SCOPE SPLIT RUNS AFTER THE CONTENT SPLIT, never instead of it: a
+        # differing pair is still a disagreement and is still reported by name. What moves is
+        # the VERDICT, and only for a pair of exactly one project copy and one personal copy
+        # — the shape `install` produces and neither it nor an audit may edit away. See
+        # `shadowed` for the measurement and for why same-scope stays blocking.
+        shadowed = {}
+        for name in sorted(collisions):
+            found = collisions[name]
+            scopes = [scope_of.get(p) for p in found]
+            if len(found) == 2 and sorted(s or "" for s in scopes) == ["personal", "project"]:
+                shadowed[name] = collisions.pop(name)
+        return collisions, duplicates, shadowed
 
     def namespace(self):
         """Same-named in-skill templates. ADVISORY — reported, never blocking.
@@ -489,7 +537,7 @@ class Census:
         These constrain what workforce may name a new employee. They do not mean
         anything is wrong with the tree.
         """
-        live = set(self.collisions())
+        live = set(self.collisions()) | set(self.shadowed())
         return {
             n: paths
             for n, paths in self._dedupe_all().items()
@@ -926,6 +974,7 @@ class Census:
             },
             "collisions": col,
             "duplicates": self.duplicates(),
+            "shadowed": self.shadowed(),
             "ignored": {
                 "patterns": list(self.ignore_patterns),
                 "files": self.ignored_files,
@@ -1088,7 +1137,11 @@ def main():
         # every such comparison a diff of noise.
         for name, paths in report_rows(s["duplicates"]):
             print(f"    · {name}: {', '.join(paths)}")
-        print(f"  collisions  {len(s['collisions'])} live (resolving locations only)")
+        print(f"  shadowed    {len(s['shadowed'])} name(s) registered in BOTH scopes and "
+              f"DIFFERING (advisory — one copy per scope; remove the one you do not want)")
+        for name, paths in report_rows(s["shadowed"]):
+            print(f"    · {name}: {', '.join(paths)}")
+        print(f"  collisions  {len(s['collisions'])} live (one scope, resolving locations only)")
         for name, paths in report_rows(s["collisions"]):
             print(f"    ! {name}: {', '.join(paths)}")
         for name, paths in report_rows(s["namespace"]):

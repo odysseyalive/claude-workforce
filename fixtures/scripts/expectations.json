@@ -204,11 +204,29 @@
     ]
   },
   "census-collision": {
+    "_why": "BOTH COPIES ARE IN ONE SCOPE, which is the half that stays BLOCKING. Two entries in the same `.claude/agents/` tree are decided by filesystem read order with nothing documented either way (platform.md fact 5), both are the user's to rename, and the audit writes into exactly that directory. Paired with census-shadowed-cross-scope, which is one copy per scope and advisory.",
     "exit": 2,
     "script": "wf-census",
     "want": [
       "collisions  1 live",
       "dup"
+    ]
+  },
+  "census-shadowed-cross-scope": {
+    "_why": "THE FOURTH INSTANCE OF A CLASS wf-census's own docstring records three times: a BLOCKING row on a tree this distribution itself produces. `manifest.txt` has four `agent` rows, so `install` registers a shipped evaluator's agent into the scope it installed into; a project keeping its own customized copy of that evaluator registers the same name at project scope. MEASURED 2026-10-02 on a live host: `character-scanner` differing across the two scopes, exit 2, and the project copy is the one `text-eval/SKILL.md` requires. Neither side may be edited away — `install` says of the other scope \"REPORTED, NEVER REMOVED … not this install's to edit\", and `scopes.md` says an audit writes only under `${CLAUDE_PROJECT_DIR}/.claude/` — so a precondition of the Atomic-or-Absent gate halted a run on a state nothing in it was allowed to repair. One copy per scope and differing is now SHADOWED: reported by name, with no winner asserted (cross-scope precedence is not part of fact 5 and is unmeasured here), and never blocking.",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/home-claude"
+    },
+    "exit": 0,
+    "script": "wf-census",
+    "want": [
+      "shadowed    1 name(s) registered in BOTH scopes and DIFFERING",
+      "· character-scanner:",
+      "collisions  0 live"
+    ],
+    "not": [
+      "! character-scanner",
+      "may not claim this name"
     ]
   },
   "census-deadhook": {
