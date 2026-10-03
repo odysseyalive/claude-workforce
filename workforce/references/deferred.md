@@ -123,6 +123,16 @@ watches it pass** — never by an upstream report asserting the fix shipped, and
 re-reading last run's wording. A row whose `Measured` evidence cannot be re-executed is malformed for
 the same reason a bare flag is.
 
+**AND THE ROW NAMES THE REPOSITORY, NOT THE CATEGORY — a preamble declaring the carve-out does not say
+WHICH repository.** `wf-upstream` files a row into the workforce maintainer's inbox only when the row's
+own text names a shipped script, an install path, or the category in words; a file-level declaration no
+longer carries a row that names none of them. *Measured 2026-10-02: of thirteen rows filed from one
+project, ten were taken on that sentence alone and not one was workforce's — a plaintext password in the
+project's own ASP sources, missing alt text in a plugin that is its own git repository, a pip package
+absent from a container image, a container that was not running, two stale backup archives. An inbox
+read as "defects in this distribution" was 77% another tree's.* A row owned by some other repository is
+still a legal survivor here; it routes to that repository, which is what naming it is for.
+
 **BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
 a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no
 grant lifts it — but the write is not *unavailable*, it is only unavailable *to the agent*. A human runs

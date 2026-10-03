@@ -263,6 +263,23 @@ def read_rows(root):
     return rows, None
 
 
+def shipped_scripts_named(text):
+    """Scripts THIS distribution ships that `text` names, in the order it names them.
+
+    Read off the directory this file is running from rather than a list: `wf-upstream` lives in
+    the shipped `bin/`, so its siblings ARE the shipped scripts, and a list spelled here would
+    be a second copy that goes stale the day a script is added or renamed.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        names = sorted(n for n in os.listdir(here) if n.startswith("wf-"))
+    except OSError:
+        return []
+    low = (text or "").lower()
+    # Longest first, so `wf-code-eval` is not reported as `wf-code` by a shorter sibling.
+    return [n for n in sorted(names, key=len, reverse=True) if n.lower() in low]
+
+
 def classify(row):
     """`(is_upstream, shape, why)` for one row.
 
@@ -286,9 +303,29 @@ def classify(row):
     if m:
         return True, "loose", ("names the category in words (%r) but no repository path — "
                                "malformed per deferred.md, recorded as found" % m.group(0))
+    # THE ROW'S OWN EVIDENCE, BEFORE THE FILE-LEVEL DECLARATION. A row that names a script
+    # this distribution SHIPS is about this distribution whatever its cells are headed, and
+    # that is the signal `university`'s row 16 had and nothing read: `wf-catalog --migrate
+    # lists files for removal that it should not`, discharge cell `Scan kept files as
+    # readers.`, taken only because the file opened with the carve-out sentence.
+    named = shipped_scripts_named(row["verbatim"])
+    if named:
+        return True, "loose", ("names the shipped script %s but no repository path — "
+                               "malformed per deferred.md, recorded as found" % named[0])
+    # AND THE DECLARATION DOES NOT SAY WHICH REPOSITORY, so it cannot speak for a row that
+    # names nothing of ours. MEASURED 2026-10-02 on a real inbox: of thirteen rows filed from
+    # one project, TEN were taken on this sentence alone and not one of them was this
+    # distribution's — a plaintext password in the project's own ASP sources, missing alt text
+    # in a WordPress plugin that is its own git repository, a pip package absent from a
+    # container image, a dev container that is not running, two stale backup archives. The
+    # maintainer's inbox is read as "defects in this distribution", and it was 77% somebody
+    # else's tree. The same test keeps every row of the two projects that filed real ones: all
+    # 7 from `university` and all 3 real ones from this inbox carry a signal of their own.
     if row["declared"]:
-        return True, "loose", ("the queue declares every surviving row is the "
-                               "another-repository carve-out")
+        return False, None, ("the queue declares the another-repository carve-out, and the "
+                             "declaration does not say WHICH repository: this row names no "
+                             "shipped script, no install path and no upstream signal of its "
+                             "own, so nothing here says the defect is this distribution's")
     return False, None, "neither a repository path nor the category named"
 
 

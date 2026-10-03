@@ -1230,7 +1230,15 @@ def capability_gap(proj, inst, rel):
     project side for the reason `project_only_rows` strips it: it is propagated INTO a copy by
     the audit and is never the copy's own content.
     """
-    ours = file_keys(HOUSE_RX.sub("", slurp(os.path.join(proj, rel))))
+    body = slurp(os.path.join(proj, rel))
+    if not body.strip():
+        # UNREADABLE OR EMPTY FALLS TO THE KEEPING SIDE, the same direction `wf-census` takes
+        # for a copy it cannot read: a file nobody can read is a file nobody can prove
+        # redundant, and `slurp` returns "" for both a failed read and an empty file. Without
+        # this the comparison finds no keys, reports no gap, and the file is retired on the
+        # strength of a read that did not happen.
+        return ["(this copy is empty or could not be read)"]
+    ours = file_keys(HOUSE_RX.sub("", body))
     shipped = os.path.join(os.path.dirname(inst), rel)
     if not os.path.isfile(shipped):
         return ["(the shipped evaluator ships no %s)" % rel]
