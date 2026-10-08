@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.75.0 | 2026-10-08 | chart, audit, changes, hooks | **yes** | (pending — message lands on the next regeneration) |
 | 1.74.0 | 2026-10-02 | audit, changes, scripts, installer, platform | no | Release 1.74.0: the upstream inbox's own defects, and the four it filed |
 | 1.73.0 | 2026-10-02 | update, changes, hooks, scripts, installer | no | Release 1.73.0: shared-artifact, and the hook that applies it unasked |
 | 1.72.1 | 2026-09-25 | changes, scripts, installer | no | Release 1.72.1: wf-upstream --resolve takes the id --list prints, and never closes another project's row |
