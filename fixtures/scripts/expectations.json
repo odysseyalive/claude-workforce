@@ -6911,5 +6911,98 @@
       "cannot be written into a table cell as itself",
       "adopt it again every pass"
     ]
+  },
+  "orgsync-decoy-table": {
+    "_why": "THE ROSTER IS THE TABLE UNDER `## Roster`, NOT THE FIRST ONE HEADED `| Employee |`. MEASURED 2026-10-08 against six real charts: `apps-odyssey-alive` has four `Employee`-header tables and the first, at line 59, is the tier-ceiling evidence table; its real roster is at line 167. Anchoring on the header cell read that project's roster as empty and proposed 23 adoptions for agents already charted. This tree is that shape: both agents sit in `## Roster`, and `not` asserts nothing was appended to the decoy above it.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "not": [
+          "| adopted |",
+          "| — | — | — |"
+        ],
+        "once": [
+          "| `connector` | present | `Read, Write, Edit, Bash` |",
+          "| `connector` | 3 (IC) | engineering | ceo | `claude-opus-5` / high | (none) | released |"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "adopted `"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "`## Skills`"
+    ]
+  },
+  "orgsync-roster-placement": {
+    "_why": "The other half of the decoy shape, and the half that stops the fix from passing by never adopting anything: one genuinely new agent, whose row must land inside the `## Roster` table and nowhere else. `after` asserts the row sits on the line following the last roster row, and that the tier-ceiling table above it still has exactly its two rows.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "once": [
+          "| late-hire |",
+          "| `copy-lead` | present | `Read, Write, Edit, Bash` |"
+        ],
+        "want": [
+          "| `copy-lead` | 2 (Lead) | content | ceo | `claude-opus-4-6` / medium | (none) | released |\n| late-hire | — | — | — | claude-sonnet-5 / low | — | adopted |"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "adopted `connector`",
+      "adopted `copy-lead`"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "adopted `late-hire`"
+    ]
+  },
+  "orgsync-charted-elsewhere": {
+    "_why": "A CHART IS NOT JUST ITS ROSTER. `hither-lands` keeps its 8 adopted agents in a separate `## Adopted specialists` table with several backticked names to a cell — `| `premortem-analyst`, `regression-hunter`, `skeptic` | … |` — and a roster-membership test proposed all 8 as new. Four of the five agents here are charted only in that second table, so zero adoptions is the whole assertion, and the multi-name cell is the shape a word-boundary test has to read.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "not": [
+          "| adopted |"
+        ],
+        "once": [
+          "| `premortem-analyst`, `regression-hunter`, `skeptic` | `awareness-ledger` | `playtest-lead` |"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "adopted `"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "`## Skills`"
+    ]
+  },
+  "orgsync-named-in-prose": {
+    "_why": "`odyssey-alive` names `frontend-design-inspiration-researcher` three times — in `## Orchestrators` and in prose — and never in its roster, because the agent is a symlink into the skill that owns it. The first version of this tool called that \"1 real adoption\" and it was not one. An agent charted anywhere the author chose is charted, so the test is a whole-token search over everything the author wrote, not a roster lookup.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "not": [
+          "| adopted |",
+          "frontend-design-inspiration-researcher | —"
+        ],
+        "once": [
+          "| visual-lead | 2 (Lead) | visual | ceo | claude-opus-5 | high | released |"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "adopted `"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "`## Skills`"
+    ]
   }
 }

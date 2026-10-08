@@ -2497,6 +2497,14 @@ CASES = [
     # in it` then fires too, which is BAD-CASE rather than PROVEN. Measured 2026-10-08.
     ("org sync: a symlink cycle under .claude/agents does not hang the hook",
      "workforce/bin/wf-org-sync", "del", "followlinks=False"),
+    # THE SWEEP. Deleting the whole-chart test drops the tool back to a roster-membership
+    # lookup, which is the state that proposed 33 adoptions across six real charts.
+    ("org sync: an agent charted anywhere in the chart is never proposed as new",
+     "workforce/bin/wf-org-sync", "del", "is_charted"),
+    # And deleting the `## Roster` anchor drops it back to the first `| Employee |` table,
+    # which in one real chart is the tier-ceiling evidence table.
+    ("org sync: an agent charted anywhere in the chart is never proposed as new",
+     "workforce/bin/wf-org-sync", "del", "ROSTER_HEADING_RX"),
     # THE UNWRITABLE NAME. Deleting the gate charts it, and the row the cell splits is the
     # one the next pass cannot match back to the file.
     ("org sync: a name that cannot be written as itself is reported, never charted or escaped",

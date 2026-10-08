@@ -107,6 +107,9 @@ GENERATED_RX = re.compile(r"^<!--\s*Generated:.*-->\s*$")
 CHART_H1_RX = re.compile(r"^#\s+Org Chart\b", re.M)
 CHART_HONESTY = "Chain of command is enforced by prose plus permissions.deny"
 AGENT_SLUG_RX = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+# ROSTER_HEADING_RX — the roster is the table under `## Roster`; only a chart with no such
+# heading falls back to the first `| Employee |` table. See `find_roster` for the measurement.
+ROSTER_HEADING_RX = re.compile(r"^##\s+Roster\b")
 # NAME_RX — WHAT MAY BE WRITTEN INTO A CELL AS ITSELF. Letters, digits, `.`, `_`, `-`,
 # bounded — so a
 # `|` cannot split the row, a newline cannot end it, and `-->` cannot close the `Synced:`
@@ -260,30 +263,76 @@ def is_separator(line):
     return bool(cells) and all(re.match(r"^\s*:?-{2,}:?\s*$", c) for c in cells)
 
 
-def find_roster(lines):
-    """`(header_cells, header_index, last_data_index)` for the roster table, or None.
+def _table_at(lines, start):
+    """`(headers, header_index, last_data_index)` for the first table at or after `start`,
+    stopping at the next `## ` heading. None when there is none."""
+    i = start
+    while i < len(lines) and not lines[i].strip().startswith("|"):
+        if lines[i].strip().startswith("## "):
+            return None
+        i += 1
+    if i >= len(lines):
+        return None
+    header_i, last, j = i, i, i + 1
+    if j < len(lines) and lines[j].strip().startswith("|") and is_separator(lines[j]):
+        last, j = j, j + 1
+    while j < len(lines) and lines[j].strip().startswith("|"):
+        last, j = j, j + 1
+    return [_norm_header(c) for c in split_row(lines[header_i])], header_i, last
 
-    THE ANCHOR IS THE HEADER CELL `Employee`, not a heading: the three charts measured for
-    this tool put that table under three different headings, one of which is not `## Roster`.
-    The first such table wins — a chart with two is one `org index` has to resolve, and
-    picking between them here would be the guess `org-chart-format.md` forbids.
+
+def find_roster(lines):
+    r"""`(header_cells, header_index, last_data_index)` for the ROSTER table, or None.
+
+    THE ANCHOR IS THE `## Roster` HEADING, and the `Employee`-header search is only the
+    fallback for a chart that has no such heading. MEASURED 2026-10-08 against six real
+    charts: `apps-odyssey-alive` has FOUR tables headed `| Employee | …` and the first of
+    them, at line 59, is the tier-ceiling evidence table — `| Employee |
+    `disallowedTools: Agent` | `tools:` allowlist omitting `Agent` |` — while its real
+    roster is at line 167 under `## Roster`. Anchoring on the header cell appended rows to
+    the wrong table in that project and read its roster as empty. The fallback still
+    matters: `playwright-mcp` has no `## Roster` heading at all and keeps its roster in an
+    `| Employee | … | Check |` table under `## Structure`.
+
+    THIS DECIDES WHERE A ROW GOES, NEVER WHETHER ONE IS NEEDED. `is_charted` answers that,
+    over the whole authored chart — the roster is only one of the places an author charts an
+    agent, and reading it as the only one is what proposed 33 adoptions of charted agents.
     """
+    for i, line in enumerate(lines):
+        if ROSTER_HEADING_RX.match(line.strip()):
+            found = _table_at(lines, i + 1)
+            if found:
+                return found
     for i, line in enumerate(lines):
         if not line.strip().startswith("|"):
             continue
-        cells = split_row(line)
-        if _norm_header(cells[0]) != "employee":
+        if _norm_header(split_row(line)[0]) != "employee":
             continue
-        j = i + 1
-        if j >= len(lines) or not lines[j].strip().startswith("|"):
-            continue
-        last = j if is_separator(lines[j]) else i
-        k = last + 1
-        while k < len(lines) and lines[k].strip().startswith("|"):
-            last = k
-            k += 1
-        return [_norm_header(c) for c in cells], i, last
+        found = _table_at(lines, i)
+        if found:
+            return found
     return None
+
+
+def is_charted(text, name):
+    r"""Does `text` already name this agent, as a whole token?
+
+    THE CHART IS NOT JUST ITS ROSTER, and treating it that way proposed 33 adoptions across
+    six real charts of which ZERO were new. `apps-odyssey-alive` lists 23 of them under
+    `## Roster` (found through the wrong table, see find_roster); `hither-lands` keeps its 8
+    adopted agents in a separate `## Adopted specialists` table, several backticked names to
+    a cell — `| `premortem-analyst`, `regression-hunter`, `skeptic` | … |`; and
+    `odyssey-alive` names `frontend-design-inspiration-researcher` three times outside its
+    roster. A chart records an agent wherever its author chose to, so the only honest test
+    is a whole-token search over everything the author wrote.
+
+    Word-boundary on `[0-9A-Za-z_-]`, so backticks, emphasis, pipes, commas and brackets
+    around the name all count as a match. It errs toward "already charted" — a short name
+    can collide with a word in prose — and that is the right direction: a missed adoption
+    costs one `/workforce org index`, while a wrong row is written into somebody's chart.
+    """
+    return re.search(r"(?<![0-9A-Za-z_-])%s(?![0-9A-Za-z_-])" % re.escape(name),
+                     text) is not None
 
 
 def is_org_chart(text):
@@ -487,10 +536,14 @@ def apply_skills(lines, text, nl, root, notes, problems):
     else:
         skills_ok = True
 
-    # The placement lookup must not see the block this tool wrote last run.
-    without = text
-    if block:
-        without = nl.join(lines[:block[0]] + lines[block[1] + 1:])
+    # NEITHER THE PLACEMENT LOOKUP NOR THE ADOPTION TEST MAY SEE WHAT THIS TOOL WROTE. The
+    # generated block names every skill, and the `Synced:` line names every agent adopted
+    # last run — reading either back would place every skill in itself and would keep an
+    # agent "charted" after its roster row was deleted by hand.
+    authored = [l for i, l in enumerate(lines)
+                if not (block and block[0] <= i <= block[1])
+                and not SYNCED_RX.match(l.strip())]
+    without = nl.join(authored)
     # LINES, NOT A JOINED STRING. Comparing a `\n`-joined rendering against a CRLF chart's
     # own bytes differs on every run, so the write would never settle and the second pass
     # would not be a no-op — on Windows only, where nothing here runs.
@@ -506,9 +559,10 @@ def apply_skills(lines, text, nl, root, notes, problems):
                 lines.append("")
             lines += [SKILLS_HEADING, SKILLS_START] + wanted + [SKILLS_END, ""]
             notes.append("added the generated `%s` list" % SKILLS_HEADING)
+    return without
 
 
-def apply_roster(lines, root, notes, problems):
+def apply_roster(lines, authored, root, notes, problems):
     """Adopt what is on disk and not charted; ghost what is charted and gone. In place."""
     agents, unchartable = project_agents(root)
     for rel in unchartable:
@@ -518,12 +572,12 @@ def apply_roster(lines, root, notes, problems):
                         % safe_label(rel))
     roster = find_roster(lines)
     if roster is None:
-        problems.append("no roster table found (no table whose first header cell is "
-                        "`Employee`), so no agent could be adopted or ghosted — "
-                        "`/workforce org index` owns the chart's shape")
+        problems.append("no roster table found (no table under a `## Roster` heading and "
+                        "none whose first header cell is `Employee`), so no agent could be "
+                        "adopted or ghosted — `/workforce org index` owns the chart's shape")
         return
     headers, head_i, last_i = roster
-    name_col = headers.index("employee")
+    name_col = headers.index("employee") if "employee" in headers else 0
     charted = {}
     for i in range(head_i + 1, last_i + 1):
         cells = split_row(lines[i])
@@ -533,7 +587,7 @@ def apply_roster(lines, root, notes, problems):
 
     # EVERY INSERT GOES AFTER THE LAST CHARTED ROW, so the indexes in `charted` — which the
     # ghost pass below still needs — stay valid.
-    for name in sorted(set(agents) - set(charted)):
+    for name in sorted(n for n in agents if not is_charted(authored, n)):
         fm = frontmatter(os.path.join(root, agents[name]))
         row = "| " + " | ".join(cell_value(h, name, fm) for h in headers) + " |"
         last_i += 1
@@ -580,8 +634,8 @@ def sync(root, today):
     nl = "\r\n" if "\r\n" in text else "\n"
     lines = text.split(nl)
     notes, problems = [], []
-    apply_skills(lines, text, nl, root, notes, problems)
-    apply_roster(lines, root, notes, problems)
+    authored = apply_skills(lines, text, nl, root, notes, problems)
+    apply_roster(lines, authored, root, notes, problems)
 
     if not notes:
         return None, notes, problems, target

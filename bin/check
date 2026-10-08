@@ -18614,6 +18614,51 @@ check(
     "when they diverge; wf-census and wf-ledger's shared store address is guarded the same "
     "way, for the same reason",
 )
+# THE SWEEP, AND THE REASON IT IS A SWEEP. MEASURED 2026-10-08 by the operator, `--dry-run`
+# over the six real charts on this workstation: 33 adoptions proposed, ZERO of them new.
+# `apps-odyssey-alive` has four `| Employee |` tables and the roster was read from the wrong
+# one (the tier-ceiling table at line 59, not `## Roster` at line 167), reporting an empty
+# roster and 23 already-charted agents as new; `hither-lands` keeps 8 adopted agents in a
+# separate `## Adopted specialists` table with several backticked names to a cell; and
+# `odyssey-alive` names one agent three times outside its roster. A per-case fixture catches
+# one shape. This runs EVERY orgsync fixture whose agents are all charted and requires zero
+# adoptions from all of them at once — and then requires the ones that SHOULD adopt to
+# adopt, because a tool that never adopts anything would satisfy the first half alone.
+_os_zero = ("orgsync-decoy-table", "orgsync-charted-elsewhere", "orgsync-named-in-prose",
+            "orgsync-settled", "orgsync-ghost")
+_os_one = {"orgsync-new-agent": "data-analyst", "orgsync-roster-placement": "late-hire",
+           "orgsync-symlink": "data-analyst", "orgsync-no-status": "data-analyst",
+           "orgsync-symlink-loop": "data-analyst"}
+_os_sweep = []
+for _case in _os_zero + tuple(sorted(_os_one)):
+    _tree = os.path.join("fixtures", "scripts", _case)
+    if not os.path.isdir(_tree):
+        _os_sweep.append(f"{_case}: fixture tree missing — the sweep cannot read it")
+        continue
+    _r = subprocess.run([sys.executable, "workforce/bin/wf-org-sync", "--root", _tree,
+                         "--dry-run"], capture_output=True, text=True, timeout=60)
+    _said = _r.stdout + _r.stderr
+    _got = re.findall(r"adopted `([^`]+)`", _said)
+    if _r.returncode != 0:
+        _os_sweep.append(f"{_case}: exited {_r.returncode} ({_said.strip()[:120]})")
+    elif _case in _os_zero and _got:
+        _os_sweep.append(f"{_case}: proposed {_got} — every agent in that tree is already "
+                         f"charted somewhere in it")
+    elif _case in _os_one and _got != [_os_one[_case]]:
+        _os_sweep.append(f"{_case}: proposed {_got}, expected ['{_os_one[_case]}']")
+check(
+    "org sync: an agent charted anywhere in the chart is never proposed as new",
+    # Counted pins, for the reason `bin/prove`'s org-sync block records: a single-occurrence
+    # literal cannot be proven here, because breaking the pin removes it and the dead-case
+    # assertion fires on the same run. Each name is written in the code and in the paragraph
+    # recording the measurement behind it.
+    _os_src.count("is_charted") == 3 and _os_src.count("ROSTER_HEADING_RX") == 3
+    and not _os_sweep and len(_os_zero) >= 5 and len(_os_one) >= 5,
+    "; ".join(_os_sweep) + f". {len(_os_zero)} tree(s) must propose nothing and "
+    f"{len(_os_one)} must each propose exactly one; a roster-membership test proposed 33 "
+    "adoptions across six real charts and not one of them was a new agent — and a wrong "
+    "row goes into somebody else's chart, written by a hook they did not type",
+)
 check(
     "org sync: index and the chart format own the same generated block the hook writes",
     not _os_docs,
