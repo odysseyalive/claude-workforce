@@ -2485,20 +2485,22 @@ CASES = [
     # divergence this assertion exists to see.
     ("org sync: both copies of the atomic write keep the hard-link and ownership branch",
      "workforce/bin/wf-org-sync", "del", "st.st_nlink > 1"),
-    # THE HANG, PROVEN ON ITS PIN RATHER THAN ON ITS BEHAVIOUR, and the reason is worth
-    # stating: `os.walk` DEFAULTS to followlinks=False, so deleting the keyword cannot
-    # reintroduce the cycle. What the explicit keyword buys is that nobody tidies it to
-    # `True`, and that is what this case proves. The behavioural half is the timed run
-    # inside the assertion, which fails rather than hanging the suite.
+    # BOTH OF THESE ARE PROVEN ON A COUNTED PIN, and the reason is worth stating once. The
+    # behaviour cannot be broken by a deletion: `os.walk` already defaults to no link
+    # following, and removing the name gate outright breaks the file. So each literal is
+    # written TWICE OR THREE TIMES — in the code and in the paragraph recording the
+    # measurement behind it — and bin/check counts them. Deleting the first mention fails
+    # the count, leaves the file valid, changes no behaviour, and leaves the literal present
+    # for the dead-case check to find. The behavioural halves are the timed run and the
+    # fixtures. A single-occurrence literal CANNOT be proven here: breaking the pin removes
+    # the literal, and `every bin/prove case names a file that ships and a literal that is
+    # in it` then fires too, which is BAD-CASE rather than PROVEN. Measured 2026-10-08.
     ("org sync: a symlink cycle under .claude/agents does not hang the hook",
      "workforce/bin/wf-org-sync", "del", "followlinks=False"),
     # THE UNWRITABLE NAME. Deleting the gate charts it, and the row the cell splits is the
     # one the next pass cannot match back to the file.
     ("org sync: a name that cannot be written as itself is reported, never charted or escaped",
-     "workforce/bin/wf-org-sync", "del",
-     "            if not NAME_RX.match(name):\n"
-     "                unchartable.append(os.path.relpath(path, root))\n"
-     "                continue\n"),
+     "workforce/bin/wf-org-sync", "del", "NAME_RX"),
 ]
 
 

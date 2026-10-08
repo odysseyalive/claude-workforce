@@ -18559,7 +18559,14 @@ def _org_sync_loop():
 _osl_secs, _osl_out = _org_sync_loop()
 check(
     "org sync: a symlink cycle under .claude/agents does not hang the hook",
-    "followlinks=False" in _os_src and "glob.glob" not in _os_src.split("def project_skills")[0]
+    # COUNTED, NOT MERELY PRESENT, and the count is what makes this provable. The flag is
+    # written twice on purpose — once in the walk and once in the paragraph recording the
+    # measurement that put it there — so deleting either is a finding while the literal
+    # still exists for `every bin/prove case names a file that ships and a literal that is
+    # in it` to see. A bare `in` test cannot be broken by a deletion that leaves the file
+    # valid, because `os.walk` already defaults to no link following.
+    _os_src.count("followlinks=False") == 2
+    and "glob.glob" not in _os_src.split("def project_skills")[0]
     and _osl_secs < 20 and "adopted `real`" in _osl_out,
     f"finished in {_osl_secs:.1f}s saying {_osl_out.strip()[:200]!r} — `**` recursion "
     "follows a symlinked directory, so `d/up -> ..` beside `d/self -> .` never terminates; "
@@ -18568,7 +18575,9 @@ check(
 )
 check(
     "org sync: a name that cannot be written as itself is reported, never charted or escaped",
-    "NAME_RX" in _os_src and "safe_label" in _os_src and "def summarize(" in _os_src
+    # Counted for the reason above: three mentions — the paragraph, the pattern, the gate.
+    _os_src.count("NAME_RX") == 3 and "safe_label" in _os_src
+    and "def summarize(" in _os_src
     and 'notes.append("adopted `%s`" % safe_label(name))' in _os_src,
     "a declared `name:` is whoever wrote the tree's text: a `|` in it splits the roster row "
     "and a `-->` closes the `Synced:` comment the name is also named in. Escaping the cell "
