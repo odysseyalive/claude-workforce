@@ -2485,6 +2485,20 @@ CASES = [
     # divergence this assertion exists to see.
     ("org sync: both copies of the atomic write keep the hard-link and ownership branch",
      "workforce/bin/wf-org-sync", "del", "st.st_nlink > 1"),
+    # THE HANG, PROVEN ON ITS PIN RATHER THAN ON ITS BEHAVIOUR, and the reason is worth
+    # stating: `os.walk` DEFAULTS to followlinks=False, so deleting the keyword cannot
+    # reintroduce the cycle. What the explicit keyword buys is that nobody tidies it to
+    # `True`, and that is what this case proves. The behavioural half is the timed run
+    # inside the assertion, which fails rather than hanging the suite.
+    ("org sync: a symlink cycle under .claude/agents does not hang the hook",
+     "workforce/bin/wf-org-sync", "del", "followlinks=False"),
+    # THE UNWRITABLE NAME. Deleting the gate charts it, and the row the cell splits is the
+    # one the next pass cannot match back to the file.
+    ("org sync: a name that cannot be written as itself is reported, never charted or escaped",
+     "workforce/bin/wf-org-sync", "del",
+     "            if not NAME_RX.match(name):\n"
+     "                unchartable.append(os.path.relpath(path, root))\n"
+     "                continue\n"),
 ]
 
 

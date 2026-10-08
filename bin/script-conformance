@@ -144,6 +144,15 @@ def fill_complete_installs(tree):
     return problems
 
 
+# NO CASE RUNS FOREVER. Every invocation here was unbounded, so one fixture tree that
+# made a script loop took the whole suite with it and nothing printed — the state hardest
+# to diagnose, because a hung run and a slow one look identical. MEASURED 2026-10-08
+# while adding `orgsync-symlink-loop`: `.claude/agents/d/up -> ..` beside `d/self -> .`
+# made `glob('**/*.md', recursive=True)` run past 25 seconds without finishing. Generous
+# next to the slowest real case (under a second), and an expiry FAILS that case by name.
+CASE_TIMEOUT = 120
+
+
 def run_case(name, spec):
     src = os.path.join(FIX, name)
     script = os.path.join(BIN, spec["script"])
@@ -168,7 +177,11 @@ def run_case(name, spec):
         problems = fill_complete_installs(tree)
         if problems:
             return False, "; ".join(problems)
-        return _run_in(tree, script, spec)
+        try:
+            return _run_in(tree, script, spec)
+        except subprocess.TimeoutExpired:
+            return False, (f"did not finish in {CASE_TIMEOUT}s — a case that hangs is a "
+                           f"case nobody can read the result of")
     finally:
         # A case may make a directory read-only (`chmod`); give every directory its write
         # bit back first, or the cleanup leaves the tree behind in /tmp.
@@ -251,7 +264,7 @@ def _run_in(tree, script, spec):
         if payload is None:
             payload = json.dumps({"tool_input": {"file_path": os.path.join(tree, spec["stdin_file"])}})
         p = subprocess.run([sys.executable, script], input=payload, text=True,
-                           capture_output=True, env=env, cwd=tree)
+                           capture_output=True, env=env, cwd=tree, timeout=CASE_TIMEOUT)
     else:
         # `${VERSION}` RESOLVES TO THE INSTALLED RELEASE, so a case about "the current
         # version" is not a literal that goes stale on the next bump. MEASURED
@@ -262,7 +275,7 @@ def _run_in(tree, script, spec):
         # reaching the fixture args.
         _args = [_sub_tree(_sub_version(a), tree) for a in spec.get("args", [])]
         p = subprocess.run([sys.executable, script, "--root", tree] + _args,
-                           text=True, capture_output=True, env=env)
+                           text=True, capture_output=True, env=env, timeout=CASE_TIMEOUT)
 
     shutil.rmtree(_home, ignore_errors=True)
 

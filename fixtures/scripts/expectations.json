@@ -6862,5 +6862,54 @@
     "want": [
       "`## Skills`"
     ]
+  },
+  "orgsync-symlink-loop": {
+    "_why": "A SYMLINK LOOP MUST NOT HANG THE HOOK. `.claude/agents/d/up -> ..` beside `d/self -> .` is two ordinary links and a cycle, and MEASURED 2026-10-08 `glob('**/*.md', recursive=True)` ran past 25 seconds on it without finishing while `os.walk(followlinks=False)` returned in 0.000s — `**` descends into a symlinked directory. This hook fires at every session start and on every Bash call, so a cloned repo carrying that layout stalled every session in it. The agent beside the loop is still found, which is the half that proves the walk did not simply stop.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "once": [
+          "| data-analyst |"
+        ],
+        "want": [
+          "| data-analyst | — | — | — | claude-sonnet-5 | medium | — | adopted |"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "adopted `data-analyst`"
+    ]
+  },
+  "orgsync-hostile-name": {
+    "_why": "A DECLARED `name:` IS NOT THIS PROJECT'S TEXT EITHER, and on a clone it is whoever wrote the tree. This one is `bad --> | name`: the pipe splits the roster row it would be written into, and the `-->` closes the `Synced:` HTML comment the name is also named in. It is REPORTED and not charted, which is the only answer that holds — escaping the cell would stop it matching the name read back off disk, so the agent would be adopted again on every pass and the roster would grow forever. `not` asserts no row and no bare terminator reached the file.",
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "not": [
+          "bad - > \\| name",
+          "bad --> | name",
+          "| bad"
+        ],
+        "once": [
+          "<!-- Synced:"
+        ],
+        "want": [
+          "<!-- WF-ORG-SKILLS END -->"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "adopted `bad"
+    ],
+    "script": "wf-org-sync",
+    "want": [
+      "cannot be written into a table cell as itself",
+      "adopt it again every pass"
+    ]
   }
 }

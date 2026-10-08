@@ -107,6 +107,14 @@ GENERATED_RX = re.compile(r"^<!--\s*Generated:.*-->\s*$")
 CHART_H1_RX = re.compile(r"^#\s+Org Chart\b", re.M)
 CHART_HONESTY = "Chain of command is enforced by prose plus permissions.deny"
 AGENT_SLUG_RX = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+# WHAT MAY BE WRITTEN INTO A CELL AS ITSELF. Letters, digits, `.`, `_`, `-`, bounded — so a
+# `|` cannot split the row, a newline cannot end it, and `-->` cannot close the `Synced:`
+# comment the name is also named in. Wider than AGENT_SLUG_RX (which gates GHOSTing and
+# stays lowercase-only, the conservative direction for a destructive-looking mark).
+NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# A note is a sentence in a comment and in the hook's context line, so both are bounded.
+NOTE_LABEL = 60
+MAX_NOTES = 10
 # Frontmatter is read with a line regex rather than a YAML parser: a handbook's `description:`
 # is a long quoted sentence and `tools:` is a list, and the three scalars wanted here are
 # always one line. `wf-conform` reads them the same way.
@@ -151,18 +159,58 @@ def frontmatter(path):
 
 
 def project_agents(root):
-    """`{name: relative path}` for every agent file, by frontmatter `name:` or the stem.
+    """`({name: relative path}, [unchartable])` for every agent file under `.claude/agents`.
 
-    `**/*.md` recursive, matching `org.md` step 1's glob — a project may nest handbooks in
-    subdirectories and an agent charted from one is still an agent on disk."""
-    out = {}
+    Recursive, matching `org.md` step 1's glob — a project may nest handbooks in
+    subdirectories and an agent charted from one is still an agent on disk.
+
+    `os.walk(followlinks=False)` RATHER THAN `glob('**/*.md', recursive=True)`, and the
+    difference is a hang. MEASURED 2026-10-08: `.claude/agents/d/up -> ..` beside
+    `d/self -> .` made that glob run past 20 seconds without finishing, because `**`
+    descends into a symlinked directory. This hook fires at every session start and on
+    every `Bash` call, so a cloned repo carrying that two-link layout stalls every session
+    in it. A symlinked .md FILE is still read — that is how `odyssey-alive` registers an
+    agent that lives inside a skill — only a symlinked DIRECTORY is not descended into.
+
+    A NAME THAT CANNOT BE WRITTEN IN A TABLE CELL IS REPORTED, NEVER CHARTED. Escaping it
+    instead would be the worse bug: the escaped cell no longer matches the name read back
+    off disk, so the agent is adopted again on every pass and the roster grows forever.
+    """
+    out, unchartable = {}, []
     base = os.path.join(root, AGENTS_REL)
-    for path in sorted(glob.glob(os.path.join(base, "**", "*.md"), recursive=True)):
-        if not os.path.isfile(path):
-            continue
-        name = frontmatter(path).get("name") or os.path.splitext(os.path.basename(path))[0]
-        out.setdefault(name.strip(), os.path.relpath(path, root))
-    return out
+    for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+        dirnames.sort()
+        for fn in sorted(filenames):
+            if not fn.endswith(".md"):
+                continue
+            path = os.path.join(dirpath, fn)
+            if not os.path.isfile(path):
+                continue
+            name = (frontmatter(path).get("name")
+                    or os.path.splitext(fn)[0]).strip()
+            if not NAME_RX.match(name):
+                unchartable.append(os.path.relpath(path, root))
+                continue
+            out.setdefault(name, os.path.relpath(path, root))
+    return out, sorted(set(unchartable))
+
+
+def safe_label(name):
+    """A name on its way into a note — and a note goes into the `Synced:` HTML comment and
+    into the hook's own `additionalContext`. Same defang as a cell, because a name carrying
+    `-->` closes the comment it is written into, plus a tighter bound: a note is a sentence,
+    not a cell."""
+    out = escape_cell(name)
+    return out[:NOTE_LABEL - 3] + "..." if len(out) > NOTE_LABEL else out
+
+
+def summarize(notes):
+    """The notes as one clause, bounded. An org gaining fifty agents at once would otherwise
+    write a fifty-clause HTML comment into the chart and the same sentence into the context
+    of every tool call that followed."""
+    if len(notes) <= MAX_NOTES:
+        return "; ".join(notes)
+    return "; ".join(notes[:MAX_NOTES]) + "; and %d more" % (len(notes) - MAX_NOTES)
 
 
 def project_skills(root):
@@ -461,7 +509,12 @@ def apply_skills(lines, text, nl, root, notes, problems):
 
 def apply_roster(lines, root, notes, problems):
     """Adopt what is on disk and not charted; ghost what is charted and gone. In place."""
-    agents = project_agents(root)
+    agents, unchartable = project_agents(root)
+    for rel in unchartable:
+        problems.append("`%s` declares a name that cannot be written into a table cell as "
+                        "itself, so it is reported rather than charted — escaping it would "
+                        "stop the row matching the file and adopt it again every pass"
+                        % safe_label(rel))
     roster = find_roster(lines)
     if roster is None:
         problems.append("no roster table found (no table whose first header cell is "
@@ -484,10 +537,10 @@ def apply_roster(lines, root, notes, problems):
         row = "| " + " | ".join(cell_value(h, name, fm) for h in headers) + " |"
         last_i += 1
         lines.insert(last_i, row)
-        notes.append("adopted `%s`" % name)
+        notes.append("adopted `%s`" % safe_label(name))
         if "status" not in headers:
             problems.append("`%s` was adopted with no `Status` cell: this roster table "
-                            "has no Status column" % name)
+                            "has no Status column" % safe_label(name))
 
     if "status" not in headers:
         return
@@ -508,7 +561,7 @@ def apply_roster(lines, root, notes, problems):
             continue
         cells[status_col] = (" GHOST (was %s) " % was) if was else " GHOST "
         lines[i] = "|" + "|".join(cells) + "|"
-        notes.append("marked `%s` GHOST — its file is gone" % name)
+        notes.append("marked `%s` GHOST — its file is gone" % safe_label(name))
 
 
 def sync(root, today):
@@ -533,7 +586,7 @@ def sync(root, today):
         return None, notes, problems, target
 
     # ── the Synced marker, written ONLY beside a real change, so it cannot churn ──
-    stamp = ("<!-- Synced: %s by wf-org-sync | %s -->" % (today, "; ".join(notes)))
+    stamp = "<!-- Synced: %s by wf-org-sync | %s -->" % (today, summarize(notes))
     at = next((i for i, l in enumerate(lines) if SYNCED_RX.match(l.strip())), None)
     if at is not None:
         lines[at] = stamp
@@ -551,7 +604,7 @@ def emit(event, notes, problems, would=False):
     parts = []
     if notes:
         parts.append("Org chart %s: %s."
-                     % ("would be updated" if would else "updated", "; ".join(notes)))
+                     % ("would be updated" if would else "updated", summarize(notes)))
     for p in problems:
         parts.append("Org chart: %s." % p)
     print(json.dumps({"hookSpecificOutput": {

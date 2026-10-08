@@ -18525,6 +18525,56 @@ for _f, _lits in (
     for _lit in _lits:
         if _lit not in read(_f):
             _os_docs.append(f"{os.path.basename(_f)} no longer carries {_lit!r}")
+# RUN, AND TIMED, because the defect is a hang and a hang has no output to assert on. Two
+# ordinary symlinks in `.claude/agents` make a cycle; `glob('**/*.md', recursive=True)`
+# descends into a symlinked directory and MEASURED 2026-10-08 ran past 25s on this exact
+# layout without finishing, while `os.walk(followlinks=False)` returned in 0.000s. The hook
+# fires at every session start and every Bash call, so a cloned repo carrying it stalled
+# every session. The agent beside the loop is still adopted, which is what proves the walk
+# did not simply stop early.
+def _org_sync_loop():
+    import tempfile
+    import time
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, ".claude/agents/sub"))
+        os.symlink("..", os.path.join(d, ".claude/agents/sub/up"))
+        os.symlink(".", os.path.join(d, ".claude/agents/sub/self"))
+        with open(os.path.join(d, ".claude/agents/real.md"), "w") as fh:
+            fh.write("---\nname: real\n---\n")
+        os.makedirs(os.path.join(d, ".claude/workforce"))
+        with open(os.path.join(d, ".claude/workforce/org-chart.md"), "w") as fh:
+            fh.write("# Org Chart\n\nChain of command is enforced by prose plus "
+                     "permissions.deny.\n\n## Roster\n| Employee | Status |\n|---|---|\n"
+                     "| charted | released |\n")
+        t0 = time.time()
+        try:
+            r = subprocess.run([sys.executable,
+                                os.path.join(ROOT, "workforce/bin/wf-org-sync"),
+                                "--root", d], capture_output=True, text=True, timeout=25)
+            return time.time() - t0, r.stdout + r.stderr
+        except subprocess.TimeoutExpired:
+            return time.time() - t0, "TIMED OUT"
+
+
+_osl_secs, _osl_out = _org_sync_loop()
+check(
+    "org sync: a symlink cycle under .claude/agents does not hang the hook",
+    "followlinks=False" in _os_src and "glob.glob" not in _os_src.split("def project_skills")[0]
+    and _osl_secs < 20 and "adopted `real`" in _osl_out,
+    f"finished in {_osl_secs:.1f}s saying {_osl_out.strip()[:200]!r} — `**` recursion "
+    "follows a symlinked directory, so `d/up -> ..` beside `d/self -> .` never terminates; "
+    "this hook runs at every session start and on every Bash call, so one cloned repo with "
+    "that layout stalls every session in it, with no output to diagnose from",
+)
+check(
+    "org sync: a name that cannot be written as itself is reported, never charted or escaped",
+    "NAME_RX" in _os_src and "safe_label" in _os_src and "def summarize(" in _os_src
+    and 'notes.append("adopted `%s`" % safe_label(name))' in _os_src,
+    "a declared `name:` is whoever wrote the tree's text: a `|` in it splits the roster row "
+    "and a `-->` closes the `Synced:` comment the name is also named in. Escaping the cell "
+    "is the WORSE answer — the escaped row stops matching the name read back off disk, so "
+    "the agent is adopted again every pass and the roster grows without bound",
+)
 check(
     "org sync: a hostile description cannot terminate the block that carries it",
     '.replace("<!--", "<!-").replace("-->", "- >")' in _os_src
