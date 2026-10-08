@@ -46,6 +46,14 @@ to exist, so it never reaches an adopted file. Marker blocks inside handbooks ar
 **The audit path needs no change for this.** Audit runs `org index` unconditionally (`audit.md`
 § Step 6), so an ADOPT disposition reaches the chart through step 1a like any other adopted agent.
 
+**Between two indexes, `wf-org-sync` writes these same rows, and they are ordinary adopted rows.**
+The hook (`procedures/hooks.md` § The org sync) fires on `SessionStart` and on a write-capable tool
+call, and appends an adopted row for exactly the agents this step defines — same cells, same `—`
+columns, same `Status: adopted`. `index` has nothing special to do with them: it re-derives the
+roster from disk and these rows describe files on disk. It never touches the `Generated:` line, so
+the stamp this step writes still says when a full index last ran; a separate `Synced:` line says
+when the hook last changed anything.
+
 Also inventory **orchestrator skills** (`conversion-taxonomy.md`) — they appear in the chart without
 being in the chain.
 
@@ -70,6 +78,14 @@ ask falls through to an agent** — the exact cost the rung exists to avoid, arr
 **Do not put a "skills you can invoke" list here.** That is a different, useful table and it is not
 this one: a reference list has no coverage boundary and no exit code, so nothing in it can satisfy
 rung 2. If the chart wants one, it goes under its own heading.
+
+**That heading is `## Skills`, and `index` owns the same marker-delimited block `wf-org-sync` does.**
+Between `<!-- WF-ORG-SKILLS START … -->` and `<!-- WF-ORG-SKILLS END -->`, one row per project skill
+— name, its own `description:`, and where else this chart already places it (`## Orchestrators`,
+`## Mechanicals`, or `not yet classified`). `index` refreshes the block in place if it is there and
+writes it if it is not; it never writes a second one and it never folds the list into
+`## Mechanicals`. Generated skills are excluded: `workforce` and `org` by the Self-Exclusion Rule,
+and `operating-principles` because `procedures/principles.md` writes it.
 
 *Measured 2026-08-03, first real audit. The generated chart's `## Mechanicals` read
 `| Mechanism | Invoked by | Note |` — a readable list of skills. Meanwhile `pnpm lint`, `pnpm build`,

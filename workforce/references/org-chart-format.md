@@ -267,6 +267,45 @@ An agent with no `ORG-RECORD` marker and no COMMITTED journal row is an adopted 
 drawn into `## Chain of Command` and is never flagged `ORPHAN`. Its first amendment gives it an
 ORG-RECORD, and from then on it is an ordinary governed row.
 
+**`wf-org-sync` writes adopted rows between indexes, and the chart's own header decides the cells.**
+The hook (`procedures/hooks.md` § The org sync) anchors on the roster table's `Employee` header cell
+rather than on a heading or a column position, because real charts differ: measured 2026-10-08, one
+project's roster carries `Model` and `Effort` as separate columns, another carries `Model / Effort`,
+and a third has no `## Roster` heading and no `Status` column at all. Each column is filled by its own
+name — `Status` → `adopted`, a `Release Record` column → `not probed (pre-existing)`, `Model`/`Effort`
+from frontmatter — and **a column the hook cannot fill mechanically is `—`**, which is this section's
+rule applied one artifact further out. A table with no `Status` column gets the row and a report
+saying the status could not be written; the hook never adds a column to somebody's table.
+
+## The generated `## Skills` block
+
+A chart may carry a skills reference list, and it goes under `## Skills` — never inside
+`## Mechanicals`, which `procedures/org.md` reserves for rows with a coverage boundary and an exit
+code. The list is **generated**, delimited by `<!-- WF-ORG-SKILLS START … -->` and
+`<!-- WF-ORG-SKILLS END -->`, and rewritten whole from `.claude/skills/*/SKILL.md` on every pass, so
+a removed skill drops out instead of lingering. One row per skill: its name, its own `description:`,
+and where else this chart already places it.
+
+**A `## Skills` heading with no markers is hand-authored and is left alone**, and one marker without
+its pair is reported and skipped — the same refusal `ORG-CHAIN` makes, for the same reason: a partial
+edit is tampering or an interrupted write, and auto-repairing one destroys whichever half was real.
+
+## `Synced:` — what a hook changed, kept apart from `Generated:`
+
+`Generated:` says when a full `org index` last ran, and **nothing but an index may write it**. A hook
+that restamped it would make the one line `audit` opens to learn whether the org predates the release
+(§ `workforce-version:` on the header) report an index that never happened. So `wf-org-sync` writes
+its own line instead:
+
+```markdown
+<!-- Synced: 2026-10-08 by wf-org-sync | adopted `foo-agent`; refreshed the generated `## Skills` list -->
+```
+
+**It is written only beside a real change.** A pass with nothing to do writes nothing at all — no
+line, no file write, no output — which is what makes the hook idempotent on a tool call that happens
+hundreds of times a session. A `Synced:` line that moved on every run would be a timestamp churning
+in a tracked file, and the second run would not be a no-op.
+
 ---
 
 ## Failure rows — loud, never silent absences

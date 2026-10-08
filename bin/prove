@@ -2458,6 +2458,33 @@ CASES = [
     ("shared-artifact: it is not registered as a catalog kind, the way blueprint is not",
      "workforce/bin/wf-catalog", "append",
      "\n# shared-artifact\n"),
+    # THE ORG SYNC. Four cases, one per property no fixture row can state.
+    # The wiring: `Bash` out of the matcher is the edit a tidier makes, and it silently
+    # drops the commonest route by which an agent file arrives.
+    ("org sync: the chart hook is wired on both events a file arrives on, behind both refusals",
+     WSA, "del", "|Bash"),
+    ("org sync: the chart hook is wired on both events a file arrives on, behind both refusals",
+     WSA, "del", '    "wf-org-sync@sessionstart": ("SessionStart", None),\n'),
+    # THE ABSENT-CHART GUARD. Removing the early return makes the tool fall through to a
+    # read of a file that is not there — it must create nothing and say nothing.
+    ("org sync: no chart means no write and no word, and the second pass changes nothing",
+     "workforce/bin/wf-org-sync", "del",
+     "    return None, None, None                  # never materialize an org nobody built\n"),
+    # THE GHOST GUARD. Deleting the slug-and-person test leaves valid Python and ghosts
+    # every roster row with no file — the operator's included.
+    ("org sync: GHOST is never guessed onto the person running the session",
+     "workforce/bin/wf-org-sync", "del",
+     "        if not AGENT_SLUG_RX.match(name) or name in NOT_AN_AGENT:\n"
+     "            continue\n"),
+    # THE WRITTEN-IN TERMINATOR. Deleting the comment-delimiter defang leaves valid Python
+    # and lets a skill's own `description:` end the block that carries it.
+    ("org sync: a hostile description cannot terminate the block that carries it",
+     "workforce/bin/wf-org-sync", "del",
+     '.replace("<!--", "<!-").replace("-->", "- >")'),
+    # THE RESTATED ATOMIC WRITE. Removing the hard-link branch from the new copy is the
+    # divergence this assertion exists to see.
+    ("org sync: both copies of the atomic write keep the hard-link and ownership branch",
+     "workforce/bin/wf-org-sync", "del", "st.st_nlink > 1"),
 ]
 
 

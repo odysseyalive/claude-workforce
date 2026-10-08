@@ -132,6 +132,17 @@ WRITERS = {
     # written back twice by `disband`. The tree holds every row rule the heal has; the
     # per-session row resolves against whichever account runs this, and the property —
     # the second pass writes nothing — holds whether that row is removed or kept.
+    # wf-org-sync fires on EVERY write-capable tool call and at every session start, so a
+    # second pass that wrote anything would rewrite a tracked file hundreds of times a
+    # session. The `Synced:` line is exactly the shape that does it, which is why it is
+    # written only beside a real change. The tree is the un-synced fixture on purpose: a
+    # tree already settled would be a no-op twice over and measure nothing, the same trap
+    # the `sync` row's seed note records.
+    "org-sync": {
+        "argv": ["workforce/bin/wf-org-sync", "--root",
+                 "fixtures/scripts/orgsync-new-agent"],
+        "watch": "fixtures/scripts/orgsync-new-agent",
+    },
     "settings-heal": {
         "argv": ["workforce/bin/wf-settings-apply", "--root",
                  "fixtures/scripts/sa-heal-execute", "--heal", "--execute"],

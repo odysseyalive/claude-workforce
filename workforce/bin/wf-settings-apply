@@ -174,6 +174,25 @@ SHIPPED_HOOKS = {
     # half done, because the list it checked was written by the head that was tunneling.
     "wf-commitments": ("Stop", None),
     "wf-commitments@sessionstart": ("SessionStart", None),
+    # THE ORG CHART, KEPT CURRENT WITHOUT ANYONE TYPING `org index`. User request
+    # 2026-10-08: "when new skills, agents, etc are added into any project, automatically
+    # the existing project org index needs updated". `org index` is a procedure a model
+    # follows by hand and nothing else writes the chart, so an agent file that lands in
+    # `.claude/agents/` leaves the roster stale until somebody runs one — and `/org`
+    # dispatch rung 8 only notices at dispatch time, then asks the user to run it.
+    #
+    # TWO EVENTS, BECAUSE A FILE ARRIVES TWO WAYS. `PostToolUse` covers a write made in
+    # this session, `Bash` included: a `cp`, a `git pull` or a `mv` adds an agent exactly
+    # as a `Write` does, and the matcher that omitted it would miss the commonest route.
+    # `SessionStart` covers everything that happened while nobody was looking — another
+    # session, a checkout, a sibling clone.
+    #
+    # CHEAP ENOUGH FOR EVERY TOOL CALL because the first thing it does is one `lstat`: no
+    # `.claude/workforce/org-chart.md` means exit 0 and no output, which is every project
+    # with no org. It never creates a chart (`bin/sync`'s rule), and it writes only the
+    # rows it owns.
+    "wf-org-sync": ("PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
+    "wf-org-sync@sessionstart": ("SessionStart", None),
 }
 
 # AGENT-HOOK CONFIG, keyed by the same names SHIPPED_HOOKS uses.

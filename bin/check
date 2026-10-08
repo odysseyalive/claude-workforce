@@ -12580,7 +12580,8 @@ check(
 check(
     "every --root script refuses an empty root",
     all("AN EMPTY --root IS A CALLER ERROR" in read(f"workforce/bin/{_s}")
-        for _s in ("wf-census", "wf-checkrun", "wf-conform", "wf-context", "wf-claude-md")),
+        for _s in ("wf-census", "wf-checkrun", "wf-conform", "wf-context", "wf-claude-md",
+                   "wf-org-sync")),
     "`${CLAUDE_PROJECT_DIR}` is UNSET outside a hook, so every shipped block expands "
     "to `--root \"\"`; abspath('') is the CWD, which passes an is-a-directory guard. "
     "Measured: wf-conform exited 0 reporting `0 governed · 0 failed` on a tree nobody "
@@ -18401,6 +18402,165 @@ check(
     "because every one of those pages is a fragment whose wrapper the publisher supplies, "
     "and the width media query, because one accepted page is a side-by-side of projector "
     "slides. A known wrong fire is not shippable in a hook that blocks",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE ORG CHART IS A DERIVED CACHE AND NOTHING RE-DERIVED IT (wf-org-sync, 2026-10-08)
+#
+# USER REQUEST: "when new skills, agents, etc are added into any project, automatically
+# the existing project org index needs updated". `org index` is a procedure a model
+# follows by hand and nothing else writes `.claude/workforce/org-chart.md`, so an agent
+# file that lands in `.claude/agents/` is invisible to the roster `/org` dispatches from
+# until somebody types the command — and rung 8 only notices at dispatch time.
+#
+# TWELVE `orgsync-*` FIXTURES REPLAY THE TREES. What a fixture cannot see is whether the
+# hook is wired on the events a file actually arrives on, whether the two refusals that
+# make an unasked write safe are both present, and whether the procedures that own the
+# chart describe the block the hook writes. Those are the three below, and the first is
+# RUN rather than read.
+_os_src = read("workforce/bin/wf-org-sync")
+_os_sa = read("workforce/bin/wf-settings-apply")
+_os_problems = []
+# WIRED ON BOTH EVENTS A FILE ARRIVES ON, and `Bash` is the half most likely to be tidied
+# out by symmetry with the other PostToolUse rows. A `cp`, a `mv` or a `git pull` adds an
+# agent exactly as a `Write` does, and it is the commonest route of the two.
+if '"wf-org-sync": ("PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Bash"),' not in _os_sa:
+    _os_problems.append("wf-org-sync is not wired on PostToolUse with Bash in the matcher "
+                        "— a cp or a git pull adds an agent file and would be missed")
+if '"wf-org-sync@sessionstart": ("SessionStart", None),' not in _os_sa:
+    _os_problems.append("wf-org-sync is not wired on SessionStart — a PostToolUse-only "
+                        "registration sees only writes made in front of it, never a "
+                        "checkout, a sibling clone or another session")
+# THE TWO REFUSALS. This hook fires unasked in any tree somebody opens, so the path it
+# writes is chosen by whoever wrote the tree.
+if "os.path.commonpath" not in _os_src:
+    _os_problems.append("the containment refusal is gone — a chart symlinked out of the "
+                        "project would aim this write at a file nobody named")
+if "CHART_HONESTY" not in _os_src or "Chain of command is enforced by prose" not in _os_src:
+    _os_problems.append("the provenance refusal is gone — a regular file planted at the "
+                        "chart path would be appended to and have a roster row written in")
+# NEVER MATERIALIZES AN ORG NOBODY BUILT, and never restamps the index's own line.
+if "never materialize an org nobody built" not in _os_src:
+    _os_problems.append("the absent-chart guard's reason is gone; creating a chart is the "
+                        "defect `bin/sync` already refuses, and that lstat is also what "
+                        "makes this cheap enough to run on every tool call")
+check(
+    "org sync: the chart hook is wired on both events a file arrives on, behind both refusals",
+    not _os_problems,
+    "; ".join(_os_problems),
+)
+
+# RUN, NOT READ. Three properties no fixture row can state: that a tree with agents and no
+# chart is left with no chart AND no output, that a second pass writes nothing at all (the
+# `Synced:` line is exactly the shape that would churn on a hook firing hundreds of times a
+# session), and that a roster row for the person running the session is never ghosted.
+def _org_sync_run():
+    import tempfile
+    tool = os.path.join(ROOT, "workforce/bin/wf-org-sync")
+    got = {}
+    chart_body = (
+        "# Org Chart\n\n"
+        "<!-- Generated: 2026-10-01 | harness: claude-code | workforce-version: 1.74.0 -->\n\n"
+        "Chain of command is enforced by prose plus permissions.deny. Prose is advisory.\n\n"
+        "## Roster\n"
+        "| Employee | Tier | Dept | Reports to | Model | Effort | Status |\n"
+        "|---|---|---|---|---|---|---|\n"
+        "| operator | 1 (CEO) | exec | — | session model | — | n/a |\n"
+        "| gone-away | 3 (IC) | eng | operator | claude-opus-5 | high | released |\n")
+
+    def run(d):
+        r = subprocess.run([sys.executable, tool, "--root", d],
+                           capture_output=True, text=True, timeout=60)
+        return r.returncode, r.stdout + r.stderr
+
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, ".claude/agents"))
+        with open(os.path.join(d, ".claude/agents/new-one.md"), "w") as fh:
+            fh.write("---\nname: new-one\nmodel: claude-sonnet-5\neffort: low\n---\n")
+        got["nochart"] = run(d)
+        got["nochart_made"] = os.path.exists(os.path.join(d, ".claude/workforce/org-chart.md"))
+        os.makedirs(os.path.join(d, ".claude/workforce"))
+        cpath = os.path.join(d, ".claude/workforce/org-chart.md")
+        with open(cpath, "w") as fh:
+            fh.write(chart_body)
+        got["first"] = run(d)
+        first_bytes = open(cpath, "rb").read()
+        got["second"] = run(d)
+        got["settled"] = open(cpath, "rb").read() == first_bytes
+        got["chart"] = first_bytes.decode("utf-8")
+    return got
+
+
+_oss = _org_sync_run()
+check(
+    "org sync: no chart means no write and no word, and the second pass changes nothing",
+    _oss["nochart"] == (0, "") and not _oss["nochart_made"] and _oss["settled"]
+    and _oss["second"][1] == "" and "| new-one | — | — | — | claude-sonnet-5 | low | adopted |"
+    in _oss["chart"],
+    f"no-chart run returned {_oss['nochart']!r} (chart created: {_oss['nochart_made']}), "
+    f"second pass said {_oss['second'][1]!r} and left the bytes identical: "
+    f"{_oss['settled']} — a hook on every write-capable tool call that is not a no-op the "
+    "second time rewrites a tracked file hundreds of times a session, and one that creates "
+    "a chart materializes an org nobody built",
+)
+check(
+    "org sync: GHOST is never guessed onto the person running the session",
+    "GHOST (was released)" in _oss["chart"]
+    and "| operator | 1 (CEO) | exec | — | session model | — | n/a |" in _oss["chart"],
+    "the `gone-away` row must be marked and the `operator` row must not: measured "
+    "2026-10-08, two of the three real charts on this workstation carry a roster row for "
+    "the human — `(main session)` in one — and neither is a file on disk, so a writer that "
+    "ghosted them would report the operator as a dead employee on every run",
+)
+# THE PROCEDURES THAT OWN THE CHART DESCRIBE THE SAME BLOCK, or `org index` and the hook
+# write two different `## Skills` sections into one file.
+_os_docs = []
+for _f, _lits in (
+        ("workforce/references/procedures/hooks.md", ("`wf-org-sync`", "## The org sync")),
+        ("workforce/references/procedures/org.md",
+         ("WF-ORG-SKILLS START", "`wf-org-sync` writes these same rows")),
+        ("workforce/references/org-chart-format.md",
+         ("The generated `## Skills` block", "`Synced:` — what a hook changed"))):
+    for _lit in _lits:
+        if _lit not in read(_f):
+            _os_docs.append(f"{os.path.basename(_f)} no longer carries {_lit!r}")
+check(
+    "org sync: a hostile description cannot terminate the block that carries it",
+    '.replace("<!--", "<!-").replace("-->", "- >")' in _os_src
+    and 're.sub(r"`+", "`", out)' in _os_src and 'escape_cell(name)' in _os_src,
+    "a skill's `description:` and its directory name are whoever wrote the tree's text, not "
+    "this project's. One carrying `-->` closes the generated block's own HTML comment and "
+    "one carrying the END marker's bytes ends the block early — after which the next pass "
+    "reads the markers as unbalanced, calls it tampering, and the sync is dead. A "
+    "written-in terminator is the markdown form of an unescaped quote",
+)
+# THE ATOMIC WRITE IS RESTATED, NOT IMPORTED, and that is only safe while the two agree. A
+# PostToolUse hook cannot import wf-settings-apply — 2,200 lines loaded on every tool call,
+# and a sibling import fails whenever the sibling cannot be read, the trade that file's own
+# `_sibling` docstring records. So the hardlink-and-ownership branch is written twice, and
+# this fails if either copy loses it: a rename over a file with a second hard link splits
+# the links and leaves the other name holding the old bytes.
+_os_aw = []
+for _p, _fn in (("workforce/bin/wf-settings-apply", "_atomic_write"),
+                ("workforce/bin/wf-org-sync", "atomic_write")):
+    _body = read(_p)
+    if "st.st_nlink > 1" not in _body or "st.st_uid != os.getuid()" not in _body:
+        _os_aw.append(f"{_p}.{_fn} no longer writes in place for a hard-linked or "
+                      f"foreign-owned file")
+check(
+    "org sync: both copies of the atomic write keep the hard-link and ownership branch",
+    not _os_aw,
+    "; ".join(_os_aw) + ". Two copies of one concept are safe only while something fails "
+    "when they diverge; wf-census and wf-ledger's shared store address is guarded the same "
+    "way, for the same reason",
+)
+check(
+    "org sync: index and the chart format own the same generated block the hook writes",
+    not _os_docs,
+    "; ".join(_os_docs) + ". A block two writers own and only one documents is how the "
+    "chart ends up with two `## Skills` sections, and `Generated:` ends up restamped by a "
+    "hook that never ran an index",
 )
 
 

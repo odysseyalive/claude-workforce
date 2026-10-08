@@ -46,6 +46,8 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-widen-agent` | `Stop` | *(none)* | **the only hook here that ACTS.** A `type: "agent"` hook, not a command — it spawns a reader with Read and Bash and none of the finishing turn's context, opens the sense `wf-widen` flagged as unopened, and returns what it found as the next instruction. Returns `ok: true` and spends nothing when there is no flag. § The widen below |
 | `wf-commitments` | `Stop` | *(none)* | records what the turn said it would do NEXT — a stated intention is a debt, and this is the one queue nobody was keeping. Records and reports; never blocks, never judges whether an item is done. § The commitment ledger below |
 | `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. It also runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project. |
+| `wf-org-sync` | `PostToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | **keeps an org chart that already EXISTS current with the files on disk, so nobody has to type `org index` to make a new agent dispatchable.** Appends an ADOPTED `## Roster` row for an agent in `.claude/agents/**` the chart does not list (`org.md` step 1a), marks a charted row whose file is gone `GHOST` (`org.md` step 4), and rewrites one marker-delimited `## Skills` list from `.claude/skills/*/SKILL.md`. It is **not an index**: it computes no tier, department, manager, fan-out or stamp, and it never touches the `Generated:` line — a separate `Synced:` line records this pass, and it is written only beside a real change, so a run with nothing to do writes nothing and a second run is byte-for-byte identical. `Bash` is in the matcher because a `cp`, a `mv` or a `git pull` adds an agent exactly as a `Write` does. Never creates a chart (`bin/sync`'s rule — never materialize an org nobody built), and that absent-chart `lstat` is also what makes it cheap enough to run on every call. § The org sync below |
+| `wf-org-sync` | `SessionStart` | *(none)* | the same sync for everything that happened while nobody was looking — another session, a checkout, a sibling clone. A `PostToolUse`-only registration can only see writes made in front of it. |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -510,6 +512,58 @@ in that hand-back is caught at the main turn's own Stop, which is the turn that 
 
 **`stop_hook_active` returns immediately**, before anything is read. A hook that can block forever is
 a wedged session, and a wedged session is worse than the defect it watches.
+
+## The org sync
+
+**The chart is a derived cache and nothing re-derived it.** `org-chart-format.md` opens on the
+rule — *the files are the source of truth; the chart is a derived cache* — and `org index`
+(`org.md` § Mode: `index`) is the only thing that rebuilds one. It is a procedure a model follows
+by hand. So between two audits, every agent file that arrives is invisible to the roster `/org`
+dispatches from: rung 8 notices at dispatch time, says "stale chart", and hands the user a
+command to type. *User request 2026-10-08: "when new skills, agents, etc are added into any
+project, automatically the existing project org index needs updated".*
+
+**It writes only what can be derived without judgment**, which is exactly the set `org.md` already
+defines as needing none:
+
+| On disk | In the chart | What the sync writes |
+|---|---|---|
+| an agent the roster does not list | — | an ADOPTED row, `org.md` step 1a and `org-chart-format.md` § Adopted rows |
+| — | a roster row whose file is gone | `GHOST` in the Status cell, `org.md` step 4; the row is never deleted |
+| the project's skills | the generated `## Skills` block | rewritten whole, so a removed skill drops out |
+
+**Tier, department, manager, fan-out, the canary, the stamp and the `Generated:` line are not
+its business.** Those take judgment or a measurement, and `org index` owns every one of them. The
+separate `Synced:` line is what keeps `Generated:` honest: the stamp still says when the full
+index last ran, and the chart does not start claiming to have been indexed by a hook.
+
+**It reads the roster table's own header rather than a fixed shape.** MEASURED 2026-10-08 against
+the three real charts on one workstation: one heads its roster `| Employee | Tier | Dept |
+Reports to | Model | Effort | Lane | Owns | Status |`, one uses `Model / Effort` plus `Owns
+records` and `Triggers`, and one has no `## Roster` heading at all — its roster is an
+`| Employee | … | Check |` table under `## Structure`, with no `Status` column. A writer keyed on
+column position or on a heading name would have corrupted two of the three. The anchor is the
+header cell `Employee`; every other column is filled by its own name, and a column the sync
+cannot fill mechanically gets `—`, never a guess.
+
+**A GHOST is never guessed onto the person running the session.** Two of those three charts carry
+a row for the operator — `(main session)` in one — and neither is a file on disk. A row is ghosted
+only when its name is a plain agent slug, is not one of the names a chart uses for the human, and
+`.claude/agents/` exists and is not empty. Measured on all three: **0 rows ghosted, 1 real
+adoption found** (an agent registered by symlink and absent from that chart's roster).
+
+**Two refusals stand in front of the write, and they are there because this hook fires unasked.**
+`SessionStart` runs it in any tree somebody opens, a fresh clone included, so the path it writes
+is reachable by whoever wrote the tree. The target must resolve **inside the project root**, and
+the file must **read as a chart** — an `# Org Chart` heading plus the chain-of-command honesty
+line `org-chart-format.md` § Chart layout declares mandatory and verbatim. Either refusal writes
+nothing, exits 0, and says why in context. Write-through for a symlinked chart is kept, because
+that is the gate's rule; what is refused is a target the project does not contain.
+
+*The honesty line is the provenance test rather than the `AUTO-GENERATED by /workforce org index`
+comment, and that is measured too: two of the three charts carry that comment and the third does
+not — it was written by `audit` and says so in prose — so pinning the comment would have refused a
+third of the charts the tool exists for.*
 
 ## The commitment ledger
 
