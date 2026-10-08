@@ -54,6 +54,8 @@ USAGE
     bin/prove                    every case (~30 min; the exact count prints at start)
     bin/prove <substring>        the cases whose CHECK NAME contains it
     bin/prove --since <ref>      the cases whose TARGET FILE changed since <ref>
+    bin/prove --self-test        under a second: the five verdicts this harness hands out,
+                                 asserted against a miniature tree. bin/check runs it.
 
 `--since` is the one to reach for after an edit. The name filter still asks you to know
 which assertion your change touched; `--since HEAD` asks git instead and is exact,
@@ -1855,6 +1857,11 @@ CASES = [
      PRV, "del", "target = work" " / relpath"),
     ("prove: a SIGTERM teardown unwinds the worker temp directories",
      PRV, "del", "signal.SIG" "TERM, signal.SIGHUP"),
+    # bin/check runs `--self-test` and reads the summary line it prints. Break the line and
+    # the row has to notice, or the one check on this harness's own verdicts is a check that
+    # a subprocess exited 0. Split literal for the same reason as the three above.
+    ("prove: its own verdict logic is self-tested, pristine read included",
+     PRV, "del", "verdicts as" " specified"),
     # ── PASS-MARKER-GRAMMAR (2026-08-05) ─────────────────────────────────────
     # Deleting the opening half of SACRED_RX leaves a pattern that still COMPILES
     # and still matches every legal block — it just also matches blocks that are
@@ -2485,16 +2492,13 @@ CASES = [
     # divergence this assertion exists to see.
     ("org sync: both copies of the atomic write keep the hard-link and ownership branch",
      "workforce/bin/wf-org-sync", "del", "st.st_nlink > 1"),
-    # BOTH OF THESE ARE PROVEN ON A COUNTED PIN, and the reason is worth stating once. The
-    # behaviour cannot be broken by a deletion: `os.walk` already defaults to no link
-    # following, and removing the name gate outright breaks the file. So each literal is
-    # written TWICE OR THREE TIMES — in the code and in the paragraph recording the
-    # measurement behind it — and bin/check counts them. Deleting the first mention fails
-    # the count, leaves the file valid, changes no behaviour, and leaves the literal present
-    # for the dead-case check to find. The behavioural halves are the timed run and the
-    # fixtures. A single-occurrence literal CANNOT be proven here: breaking the pin removes
-    # the literal, and `every bin/prove case names a file that ships and a literal that is
-    # in it` then fires too, which is BAD-CASE rather than PROVEN. Measured 2026-10-08.
+    # A PLAIN PRESENCE TEST, and it was briefly a counted pin on a reading that did not
+    # survive being run. a009bda recorded that a single-occurrence literal cannot be proven
+    # here, because deleting it also fires the dead-case scan. MEASURED 2026-10-08 by doing
+    # it: this case returns PROVEN, since `name in fails` is tested before any other failure.
+    # What the artifact really cost was the other verdict — a VACUOUS assertion arriving as
+    # BAD-CASE — and bin/check's pristine read has since taken that away. Its sibling below
+    # keeps its counted pin on its own merits, which are stated there.
     ("org sync: a symlink cycle under .claude/agents does not hang the hook",
      "workforce/bin/wf-org-sync", "del", "followlinks=False"),
     # THE SWEEP. Deleting the whole-chart test drops the tool back to a roster-membership
@@ -2506,19 +2510,28 @@ CASES = [
     ("org sync: an agent charted anywhere in the chart is never proposed as new",
      "workforce/bin/wf-org-sync", "del", "ROSTER_HEADING_RX"),
     # THE UNWRITABLE NAME. Deleting the gate charts it, and the row the cell splits is the
-    # one the next pass cannot match back to the file.
+    # one the next pass cannot match back to the file. PROVEN ON A COUNTED PIN, for a reason
+    # the pristine read does not touch: `NAME_RX` is written three times, so deleting the
+    # first left the other two and a bare presence test stayed GREEN while the file went
+    # invalid — a real BAD-CASE. bin/check counts the mentions instead, so the deletion
+    # fails the count, leaves the file valid, and changes no behaviour.
     ("org sync: a name that cannot be written as itself is reported, never charted or escaped",
      "workforce/bin/wf-org-sync", "del", "NAME_RX"),
 ]
 
 
-def failing_checks(root, mutated=None):
+def failing_checks(root, mutated=None, pristine=None):
     """Names of the checks bin/check reports failing, run against `root`'s own copy.
 
     `mutated` is the one file a case broke. It reaches bin/check as WF_PROVE_MUTATION so
     the conformance row runs only the cases that file can reach, instead of the whole
     ~45 s suite once per case. The baseline and the closing run pass nothing, so both run
     the whole suite.
+
+    `pristine` is that file's PRE-MUTATION bytes, on a path outside the copy, handed over
+    as WF_PROVE_PRISTINE. A check that asks what a file ships — the dead-case scan does,
+    about every literal a case names — must not be answered with the sabotage, or the
+    mutation manufactures a failure and a VACUOUS assertion is labelled BAD-CASE.
 
     A completed bin/check exits 0 (green) or 1 (has FAILS) and always prints its
     `N passed, M failed` summary. Any other outcome means the RUN broke, not that
@@ -2530,8 +2543,11 @@ def failing_checks(root, mutated=None):
     for _ in range(3):
         env = dict(os.environ)
         env.pop("WF_PROVE_MUTATION", None)
+        env.pop("WF_PROVE_PRISTINE", None)
         if mutated:
             env["WF_PROVE_MUTATION"] = mutated
+        if pristine:
+            env["WF_PROVE_PRISTINE"] = str(pristine)
         r = subprocess.run(["./bin/check"], cwd=str(root), capture_output=True, text=True,
                            env=env)
         if r.returncode in (0, 1) and "passed," in r.stdout and "failed," in r.stdout:
@@ -2551,6 +2567,110 @@ def tree_digest(root):
         h.update(str(p.relative_to(root)).encode())
         h.update(p.read_bytes())
     return h.hexdigest()
+
+
+def prove_one(work, name, relpath, mode, payload):
+    """Break ONE case inside the already-copied tree `work`, and label what happened.
+
+    Returns a single (name, status, detail) row. Split out of `run_shard` so the labels
+    it hands out can be read by `bin/prove --self-test` against a miniature tree, which
+    is the only thing in this repository that checks them. A harness that calls every
+    vacuous assertion a bad case reports that to nobody; this function is where that is
+    decided, so this function is what the self-test runs.
+    """
+    target = work / relpath
+    # A CASE NAMING A FILE THAT NO LONGER SHIPS IS A STALE CASE, NOT A CRASH.
+    # `target.read_bytes()` raised FileNotFoundError straight out of the worker
+    # and took the whole run down, so one retired script made every OTHER case
+    # unrunnable — the same defect the expectations parse fixed by failing the
+    # row instead of the run. Measured 2026-09-09: the 1.30.2 strip deleted
+    # eight hook scripts and left their cases here, and prove could not run at
+    # all. Reported per case so the stale ones are named and removed.
+    # TWO REASONS A TARGET IS MISSING, AND THEY WANT OPPOSITE ACTIONS.
+    #
+    # A `.claude/` path is a project's OWN org — the `operating-principles`
+    # skill, an employee's handbook, a grounding file. **Every workforce project
+    # carries those after its first audit.** This repository is the one that does
+    # not, because it is the development kit: it builds the thing rather than
+    # being staffed by it. So the case is correct, the coverage is real
+    # everywhere the distribution is used, and it simply cannot run HERE.
+    # Telling a reader to remove it would delete live coverage for every project
+    # that does have an org — which is why this is N/A and never STALE-CASE.
+    #
+    # Any other missing path is a shipped file that no longer ships, and that
+    # case IS residue: remove it with the rule it proved.
+    if not target.is_file():
+        if relpath.startswith(".claude/"):
+            return (name, "N/A", f"{relpath} is project org state, which this repo does "
+                                 "not carry — the development kit is the one project with "
+                                 "no org. Runs wherever workforce has been audited in. "
+                                 "Do NOT remove.")
+        return (name, "STALE-CASE", f"{relpath} does not ship — remove this case")
+    # A CHECK THAT RUNS install.ps1 IS SKIPPED WHERE NO POWERSHELL EXISTS, so its cases
+    # cannot fire there. Calling that VACUOUS would send a reader after an assertion
+    # that is fine; it is N/A for the same reason an org-state case is.
+    if name in PWSH_CHECKS and not (os.environ.get("WF_PWSH") or shutil.which("pwsh")):
+        return (name, "N/A", "needs PowerShell to run install.ps1 — put `pwsh` on "
+                             "PATH or set WF_PWSH. Do NOT remove.")
+    original = target.read_bytes()              # restore is byte-exact, not text-round-tripped
+    try:
+        text = original.decode()
+        if mode in ("del", "delall"):
+            if payload not in text:
+                return (name, "SETUP-FAIL", f"literal absent from {relpath}")
+            # `del` removes the FIRST occurrence, which is what a hand-written
+            # case wants: it names one site deliberately. `delall` removes EVERY
+            # occurrence, which is what a DERIVED case needs — its assertion is
+            # `'lit' in <whole file>`, so leaving a second copy anywhere in the
+            # file leaves the assertion true and the case reports VACUOUS having
+            # broken nothing. MEASURED 2026-09-09: 39 of 54 vacuous verdicts were
+            # exactly this, including an assertion written the same afternoon.
+            target.write_text(text.replace(payload, "", 1) if mode == "del"
+                              else text.replace(payload, ""))
+        else:
+            target.write_text(text + payload)
+
+        # THE PRE-MUTATION BYTES, PARKED OUTSIDE THE COPY — `work.parent`, never inside
+        # `work`, because a stray file in the tree is a thing the child's own checks can
+        # see. A check that asks what a file SHIPS is answered from here instead of from
+        # the sabotage; see bin/check's pristine read for what that costs when it is not.
+        pristine = work.parent / "prove-pristine"
+        pristine.write_bytes(original)
+        fails = failing_checks(work, relpath, pristine)
+        if name in fails:
+            return (name, "PROVEN", f"fired on mutated {relpath}")
+        # THE CONFORMANCE GATE IS NOT A WRECKED FILE. It fails on any behaviour
+        # change to a shipped script, including a clean one, so counting it here
+        # would relabel a VACUOUS assertion BAD-CASE whenever its target is a script.
+        if fails - {"scripts: the script-conformance suite passes, every case it selects"}:
+            # TWO VERDICTS, NOT ONE, AND THE DIFFERENCE IS WHOSE FAULT IT IS.
+            #
+            # `VACUOUS` is a finding about the ASSERTION: its target was broken
+            # cleanly, check ran, and the assertion still passed. It is testing
+            # nothing and it must be fixed or deleted.
+            #
+            # This is a finding about the CASE. The named check never got to run
+            # because the mutation wrecked the file — a deleted `def` line orphans
+            # its body, a deleted binding leaves a NameError — so check failed on
+            # unrelated assertions and this one reports nothing at all. The
+            # assertion may be perfectly good.
+            #
+            # `len(fails)` knew this the whole time and was spent on a word.
+            # MEASURED 2026-09-10: four cases in one session were labelled VACUOUS
+            # when the mutation was at fault, and each one cost a hand re-derivation
+            # of the same conclusion. Worse, a genuinely vacuous assertion hides
+            # among them — the label that should stop a release reads identically
+            # to the label that means "retarget your case".
+            return (name, "BAD-CASE",
+                    f"the mutation broke {relpath} — check failed on {len(fails)} OTHER "
+                    f"assertion(s) and this one never ran: {sorted(fails)}. Aim at a "
+                    f"literal whose removal changes behaviour and leaves the file valid, "
+                    f"never at a `def` or a binding. The assertion itself is unproven, "
+                    f"not disproven")
+        return (name, "VACUOUS", f"broke {relpath} cleanly and this assertion STILL "
+                                 f"PASSED — it is testing nothing")
+    finally:
+        target.write_bytes(original)
 
 
 def run_shard(shard):
@@ -2573,101 +2693,127 @@ def run_shard(shard):
         for name, relpath, mode, payload in shard:
             if STOP.is_set():
                 break
-            target = work / relpath
-            # A CASE NAMING A FILE THAT NO LONGER SHIPS IS A STALE CASE, NOT A CRASH.
-            # `target.read_bytes()` raised FileNotFoundError straight out of the worker
-            # and took the whole run down, so one retired script made every OTHER case
-            # unrunnable — the same defect the expectations parse fixed by failing the
-            # row instead of the run. Measured 2026-09-09: the 1.30.2 strip deleted
-            # eight hook scripts and left their cases here, and prove could not run at
-            # all. Reported per case so the stale ones are named and removed.
-            # TWO REASONS A TARGET IS MISSING, AND THEY WANT OPPOSITE ACTIONS.
-            #
-            # A `.claude/` path is a project's OWN org — the `operating-principles`
-            # skill, an employee's handbook, a grounding file. **Every workforce project
-            # carries those after its first audit.** This repository is the one that does
-            # not, because it is the development kit: it builds the thing rather than
-            # being staffed by it. So the case is correct, the coverage is real
-            # everywhere the distribution is used, and it simply cannot run HERE.
-            # Telling a reader to remove it would delete live coverage for every project
-            # that does have an org — which is why this is N/A and never STALE-CASE.
-            #
-            # Any other missing path is a shipped file that no longer ships, and that
-            # case IS residue: remove it with the rule it proved.
-            if not target.is_file():
-                if relpath.startswith(".claude/"):
-                    out.append((name, "N/A", f"{relpath} is project org state, which this "
-                                             "repo does not carry — the development kit is "
-                                             "the one project with no org. Runs wherever "
-                                             "workforce has been audited in. Do NOT remove."))
-                else:
-                    out.append((name, "STALE-CASE",
-                                f"{relpath} does not ship — remove this case"))
-                continue
-            # A CHECK THAT RUNS install.ps1 IS SKIPPED WHERE NO POWERSHELL EXISTS, so its cases
-            # cannot fire there. Calling that VACUOUS would send a reader after an assertion
-            # that is fine; it is N/A for the same reason an org-state case is.
-            if name in PWSH_CHECKS and not (os.environ.get("WF_PWSH") or shutil.which("pwsh")):
-                out.append((name, "N/A", "needs PowerShell to run install.ps1 — put `pwsh` on "
-                                         "PATH or set WF_PWSH. Do NOT remove."))
-                continue
-            original = target.read_bytes()          # restore is byte-exact, not text-round-tripped
-            try:
-                text = original.decode()
-                if mode in ("del", "delall"):
-                    if payload not in text:
-                        out.append((name, "SETUP-FAIL", f"literal absent from {relpath}"))
-                        continue
-                    # `del` removes the FIRST occurrence, which is what a hand-written
-                    # case wants: it names one site deliberately. `delall` removes EVERY
-                    # occurrence, which is what a DERIVED case needs — its assertion is
-                    # `'lit' in <whole file>`, so leaving a second copy anywhere in the
-                    # file leaves the assertion true and the case reports VACUOUS having
-                    # broken nothing. MEASURED 2026-09-09: 39 of 54 vacuous verdicts were
-                    # exactly this, including an assertion written the same afternoon.
-                    target.write_text(text.replace(payload, "", 1) if mode == "del"
-                                      else text.replace(payload, ""))
-                else:
-                    target.write_text(text + payload)
-
-                fails = failing_checks(work, relpath)
-                if name in fails:
-                    out.append((name, "PROVEN", f"fired on mutated {relpath}"))
-                # THE CONFORMANCE GATE IS NOT A WRECKED FILE. It fails on any behaviour
-                # change to a shipped script, including a clean one, so counting it here
-                # would relabel a VACUOUS assertion BAD-CASE whenever its target is a script.
-                elif fails - {"scripts: the script-conformance suite passes, every case it selects"}:
-                    # TWO VERDICTS, NOT ONE, AND THE DIFFERENCE IS WHOSE FAULT IT IS.
-                    #
-                    # `VACUOUS` is a finding about the ASSERTION: its target was broken
-                    # cleanly, check ran, and the assertion still passed. It is testing
-                    # nothing and it must be fixed or deleted.
-                    #
-                    # This is a finding about the CASE. The named check never got to run
-                    # because the mutation wrecked the file — a deleted `def` line orphans
-                    # its body, a deleted binding leaves a NameError — so check failed on
-                    # unrelated assertions and this one reports nothing at all. The
-                    # assertion may be perfectly good.
-                    #
-                    # `len(fails)` knew this the whole time and was spent on a word.
-                    # MEASURED 2026-09-10: four cases in one session were labelled VACUOUS
-                    # when the mutation was at fault, and each one cost a hand re-derivation
-                    # of the same conclusion. Worse, a genuinely vacuous assertion hides
-                    # among them — the label that should stop a release reads identically
-                    # to the label that means "retarget your case".
-                    out.append((name, "BAD-CASE",
-                                f"the mutation broke {relpath} — check failed on "
-                                f"{len(fails)} OTHER assertion(s) and this one never ran. "
-                                f"Aim at a literal whose removal changes behaviour and "
-                                f"leaves the file valid, never at a `def` or a binding. "
-                                f"The assertion itself is unproven, not disproven"))
-                else:
-                    out.append((name, "VACUOUS",
-                                f"broke {relpath} cleanly and this assertion STILL PASSED "
-                                f"— it is testing nothing"))
-            finally:
-                target.write_bytes(original)
+            out.append(prove_one(work, name, relpath, mode, payload))
     return out
+
+
+# ── THE SELF-TEST ────────────────────────────────────────────────────────────────────────
+# WHO CHECKS THE CHECKER. Every assertion in bin/check runs INSIDE a prove child, so the
+# label this harness puts on a finding is the one thing in the repository nothing reads. It
+# was wrong for a month: the dead-case scan ran against the mutated copy, so a `del` case
+# whose literal occurs once manufactured a failure, and an assertion that was genuinely
+# VACUOUS came back BAD-CASE — "retarget your case" in place of "this assertion tests
+# nothing". MEASURED 2026-10-08 on the org-sync cycle case, and a009bda read that verdict as
+# a limitation of the harness rather than a defect in it.
+#
+# So the five verdicts below are asserted, on a miniature tree, in well under a second —
+# including the CONTROL that reproduces the old BAD-CASE once the pristine read is taken
+# away. A self-test that passes with and without the fix would be the vacuous green this
+# whole tool exists to find.
+PRISTINE_START = "# ── THE PRISTINE READ"
+PRISTINE_END = "# ── END THE PRISTINE READ"
+
+# Three assertions is the minimum that can express the verdicts: one that the mutation
+# fires, one that it cannot fire, and the dead-case scan the fix is about.
+_MINI_CHECK = '''#!/usr/bin/env python3
+"""A three-assertion stand-in for bin/check, written by `bin/prove --self-test`.
+
+Its dead-case scan reads the file as it SHIPS through a block sliced verbatim out of the
+real bin/check, never a retyped copy of it: deleting that block there has to fail this
+self-test rather than leave it green against a private imitation.
+"""
+import os
+import sys
+
+
+def read(p):
+    return open(p, encoding="utf-8").read() if os.path.isfile(p) else ""
+
+
+@PRISTINE@
+
+_fails = []
+if "PINNED-LITERAL" not in read("probe.txt"):
+    _fails.append("probe: the pin is present")
+if "a line the pin's deletion leaves alone" not in read("probe.txt"):
+    _fails.append("probe: an assertion the pin's deletion cannot break")
+if [r for r in read("cases.tsv").splitlines()
+        if r.strip() and r.split("\\t")[1] not in _as_shipped(r.split("\\t")[0])]:
+    _fails.append("probe: every case names a literal that is in its file")
+for _f in _fails:
+    print("✗ " + _f)
+print("%d passed, %d failed, 0 skipped" % (3 - len(_fails), len(_fails)))
+sys.exit(1 if _fails else 0)
+'''
+
+
+def _self_test():
+    """Run `prove_one` against a miniature tree and check the label it hands back."""
+    src = pathlib.Path(ROOT, "bin/check").read_text()
+    _a, _b = src.find(PRISTINE_START), src.find(PRISTINE_END)
+    if _a < 0 or _b < _a:
+        print(f"SELF-TEST FAIL: bin/check carries no {PRISTINE_START!r} … {PRISTINE_END!r} "
+              f"block. The pristine read these verdicts depend on is gone, and with it the "
+              f"VACUOUS verdict on every single-occurrence `del` case.")
+        return 1
+    shipped = src[_a:_b].rstrip() + "\n"
+    # THE CONTROL: bin/check as it read before 2026-10-08 — every read is of the file as it
+    # stands, sabotage included. Row 3 is the verdict that shape produces.
+    pre_fix = "def _as_shipped(p):\n    return read(p)\n"
+    # Local names, not module constants, so `bin/components`' case parser does not read the
+    # rows below as real prove cases and `bin/check` fail them as naming a file that never
+    # shipped. It resolves a module-level string constant; it cannot resolve a local.
+    # TWO ASSIGNMENTS, NOT ONE, and not for taste: a 4-tuple of string constants anywhere in
+    # this file IS a case to the parser in `bin/components`, which read
+    # `probe, cases, delete, append = ...` as a case deleting "append" from cases.tsv and
+    # had bin/check fail it as a case naming a file that does not ship. Caught by running it.
+    probe, cases = "probe.txt", "cases.tsv"
+    delete, append = "del", "append"
+    pin, gone = "PINNED-LITERAL", "LITERAL-THAT-IS-NOT-THERE"
+    # A CASE LITERAL NO ASSERTION READS is what a vacuous assertion looks like from here,
+    # and rows 2 and 3 need exactly that: deleting it fires nothing of its own, so the only
+    # thing that CAN fire is the dead-case scan, which is the artifact under test.
+    unread = "PIN-NO-ASSERTION-READS"
+    live = f"{probe}\t{pin}\n{probe}\t{unread}\n"
+    fires = "probe: the pin is present"
+    cannot_fire = "probe: an assertion the pin's deletion cannot break"
+    deadscan = "probe: every case names a literal that is in its file"
+    expect = [
+        ("a single-occurrence `del` IS provable — the named assertion fired",
+         live, shipped, (fires, probe, delete, pin), "PROVEN"),
+        ("a clean mutation that fires nothing is VACUOUS: a finding about the ASSERTION",
+         live, shipped, (cannot_fire, probe, delete, unread), "VACUOUS"),
+        ("CONTROL — without the pristine read that same case reads BAD-CASE, the defect",
+         live, pre_fix, (cannot_fire, probe, delete, unread), "BAD-CASE"),
+        ("the dead-case scan still fires on a case naming a literal the file lacks",
+         live, shipped, (deadscan, cases, append, f"{probe}\t{gone}\n"), "PROVEN"),
+        ("a case whose own literal is absent is SETUP-FAIL, never a verdict",
+         live, shipped, (fires, probe, delete, gone), "SETUP-FAIL"),
+    ]
+    wrong = 0
+    for why, rows, pristine_read, case, want in expect:
+        with tempfile.TemporaryDirectory(prefix="wf-prove-self-") as tmp:
+            work = pathlib.Path(tmp) / "tree"
+            (work / "bin").mkdir(parents=True)
+            (work / probe).write_text(
+                f"a line the pin's deletion leaves alone\n{pin}\n{unread}\n")
+            (work / cases).write_text(rows)
+            mini = work / "bin" / "check"
+            mini.write_text(_MINI_CHECK.replace("@PRISTINE@", pristine_read))
+            mini.chmod(0o755)
+            got = prove_one(work, *case)[1]
+        ok = got == want
+        wrong += not ok
+        print(f"{'ok  ' if ok else 'WRONG'} {want:<10} {why}"
+              + ("" if ok else f"   ← got {got}"))
+    print(f"{len(expect) - wrong} of {len(expect)} verdicts as specified")
+    return 1 if wrong else 0
+
+
+# Placed above `tree_digest` and the baseline for the reason `--help` is: a reader asking
+# whether the harness works must not be answered by a thirty-minute run of the harness.
+if "--self-test" in sys.argv[1:]:
+    sys.exit(_self_test())
 
 
 before = tree_digest(ROOT)

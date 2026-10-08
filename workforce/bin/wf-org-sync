@@ -168,8 +168,9 @@ def project_agents(root):
     Recursive, matching `org.md` step 1's glob — a project may nest handbooks in
     subdirectories and an agent charted from one is still an agent on disk.
 
-    `os.walk(followlinks=False)` RATHER THAN `glob('**/*.md', recursive=True)`, and the
-    difference is a hang. MEASURED 2026-10-08: `.claude/agents/d/up -> ..` beside
+    AN `os.walk` THAT DOES NOT FOLLOW LINKS, rather than `glob('**/*.md', recursive=True)`,
+    and the difference is a hang. (The keyword is written once, in the walk below: a second
+    copy in this paragraph would be a second place to satisfy the check that pins it.) MEASURED 2026-10-08: `.claude/agents/d/up -> ..` beside
     `d/self -> .` made that glob run past 20 seconds without finishing, because `**`
     descends into a symlinked directory. This hook fires at every session start and on
     every `Bash` call, so a cloned repo carrying that two-link layout stalls every session
