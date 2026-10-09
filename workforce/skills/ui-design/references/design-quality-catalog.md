@@ -1,4 +1,4 @@
-<!-- ui-design-ref-version: 1 -->
+<!-- ui-design-ref-version: 2 -->
 <!-- CARRIED FORWARD VERBATIM 2026-09-10 from the sibling project apps-odyssey-alive
      (.claude/skills/design-eval/references/design-quality-catalog.md, design-quality-ref-version 1),
      which is the canonical built catalog for this capability (evaluators.md item 3b: where a project
@@ -12,7 +12,7 @@
      run design-critic-hire-20260826 (WebSearch->web_fetch, 20 sources fetched + cited). Growth goes in a
      machine-owned region at the END of this file; existing rows are never reworded. Basis tags: Stated =
      quote-backed from the cited source; Derived = inference/owner house-rule anchored to nearest support. -->
-# Design-Review Standards Catalog — Marketing / Landing / Beta-Signup Pages
+# Design-Review Standards Catalog — Rendered Interfaces (marketing, landing, beta-signup, and app screens)
 
 **Purpose.** A cited, checkable catalog of industry-standard criteria professionals use to
 evaluate and critique front-end visual design quality on marketing, presentation, landing, and
@@ -715,3 +715,33 @@ by the fetched NNG-Homepage source ("Click Here / Learn More" anti-guidance); th
 > **Source:** `.claude/workforce/work/home-rebuild-20260903-03-design/presentation-critic/OUTPUT.md` and
 > `OUTPUT-2.md` (that run) · [Julian Shapiro — Landing Pages](https://www.julian.com/guide/startup/landing-pages) · [Gravity Global — StoryBrand 7-Part Framework (secondary)](https://www.gravityglobal.com/blog/complete-guide-storybrand-framework)
 
+
+<!-- Appended 2026-10-08 (the direction release) at operator direction. Growth region per the header
+     rule; no existing row above is reworded. The title line was broadened from "Marketing / Landing /
+     Beta-Signup Pages" to "Rendered Interfaces" in the same change, because the catalog is now read
+     against app screens too — and the rules that describe an app screen by the JOB it does live in the
+     sibling `ergonomics-catalog.md`, keyed by situation, rather than being restated here. -->
+
+> **BF-02** — *A surface that ships UI has a design record (`.claude/design/direction.md`), and the
+> render matches the references and the choices that record names.* No record on a UI-shipping surface
+> is a FINDING, not a pass: it means the direction step was skipped and the surface was designed from
+> model memory rather than from the case at hand.
+> **Check:** Read `.claude/design/direction.md` for the surface under review BEFORE grading it. Absent
+> → report BF-02 and name `/ui-design direct <surface>` as the remedy; grade the rest of the catalog
+> normally, since a missing record does not excuse any other rule. Present → compare the render against
+> it item by item: the layout skeleton, density, button style, palette roles and type scale it says are
+> borrowed must be recognisable in the render; the things it says are deliberately NOT borrowed must be
+> absent; and the `ERG-` rules it names for that screen's situation must all be graded. A render that
+> matches no chosen reference, or that reproduces something the record refuses, is a FAIL. A pattern
+> the render needs and the record does not cover is reported as a component pass owed
+> (`direct --component <pattern>`), at MINOR.
+> **Severity:** MAJOR — a surface built with no recorded direction is the generic-page failure SLOP-02
+> catches after the fact, reported where it can still be acted on. BLOCK where the record exists and
+> the render contradicts it, which is BF-01's severity for the same reason: a surface that answers the
+> wrong brief wastes the commission regardless of polish.
+> **Basis:** Derived — operator direction 2026-10-08 ("making sure to document the choices for future
+> use"); anchored to BF-01 (grade against the specific brief, never the generic checklist alone) and to
+> § 8 CRIT (a critique with no agreed objective is baseless).
+> **Source:** operator direction 2026-10-08 · `references/direction.md` (the record's template and the
+> step that writes it) · `references/ergonomics-catalog.md` (the situation keys and the `ERG-` rules) ·
+> § 10 BF-01 and § 8 CRIT (this catalog)

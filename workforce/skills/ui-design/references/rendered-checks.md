@@ -1,4 +1,4 @@
-<!-- ui-design-ref-version: 1 -->
+<!-- ui-design-ref-version: 2 -->
 <!-- ui-additions-version: 1 -->
 <!-- SEED CONTRIBUTION. Materialized 2026-09-10 from the workforce distribution's shipped
      ui-design-seed.md (version anchor 1), carrying ONLY what design-quality-catalog.md does not
