@@ -7004,5 +7004,38 @@
     "want": [
       "`## Skills`"
     ]
+  },
+  "ui-direction-record-present": {
+    "_why": "`/ui-design review` reads the project's design record BEFORE it grades anything (`ui-design/SKILL.md` Workflow step 0, rule BF-02), and the resolver is the one call it already makes to find what it grades against \u2014 so the ui row names the record it found. The POSITIVE half: `.claude/design/direction.md` exists and is reported by its project-relative path. CLAUDE_CONFIG_DIR is pinned at a path that does not exist so the case is HERMETIC; without it the four kinds this tree does not carry resolve to whoever ran the suite. Exit 1 is those four unresolved kinds, which is the resolver's own error and not this assertion.",
+    "args": [],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "not": [
+      "NO DESIGN RECORD"
+    ],
+    "script": "wf-catalog",
+    "want": [
+      "ui        install  v2",
+      "+ design record .claude/design/direction.md"
+    ]
+  },
+  "ui-direction-record-absent": {
+    "_why": "The NEGATIVE half, and the reason the positive one cannot be asserted alone: a report that always names a record and a report that never looks are indistinguishable from a tree that happens to have one. This tree is identical except that `.claude/design/direction.md` is absent, so the flag isolates to that one file. `.claude/workforce/.keep.md` is tracked only so a `.claude/` exists \u2014 without it the resolver walks upward and reports the developer's own checkout. BF-02 is a FINDING on a UI-shipping surface with no record, never a pass, so the row says so out loud rather than printing nothing.",
+    "args": [],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 1,
+    "not": [
+      "+ design record"
+    ],
+    "script": "wf-catalog",
+    "want": [
+      "ui        install  v2",
+      "NO DESIGN RECORD (.claude/design/direction.md)",
+      "`ui-design direct` has not run"
+    ]
   }
 }

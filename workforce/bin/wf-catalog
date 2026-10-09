@@ -120,6 +120,25 @@ CATALOGS = {
 # the project's own.
 ANCHOR = "CATALOG-ANCHOR.md"
 
+# The project's DESIGN RECORD, written by `/ui-design direct` and read by `/ui-design review`
+# before it grades anything (`ui-design/SKILL.md` Workflow step 0, rule BF-02). It is a
+# `ui`-only layer and it is never shipped: a file at this path is the project's own.
+#
+# It is reported here, beside the corpus, because the resolver is already the one call a
+# reader makes to find out what it grades against, and "there is no design record" is the
+# BF-02 finding rather than a silence. A reviewer that has to know a second lookup exists
+# will not make it; the kind row says it either way.
+DESIGN_RECORD = os.path.join(".claude", "design", "direction.md")
+DESIGN_RECORD_KINDS = ("ui",)
+
+
+def design_record(root, kind):
+    """The project's design record for `kind`, or None. Only the `ui` kind has one."""
+    if kind not in DESIGN_RECORD_KINDS:
+        return None
+    f = os.path.join(root, DESIGN_RECORD)
+    return f if os.path.isfile(f) else None
+
 # A tell that a copy carries the project's own words and is never removable, whatever else
 # is true of it. BYTE-IDENTICAL to wf-conform's `IMMUTABLE_OPEN_RX` (bin/check § grammar
 # asserts all readers accept the same blocks, and the inventory row for this file must be
@@ -775,6 +794,10 @@ def resolve(root, kind):
     iv, v = info["install_version"], info["version"]
     info["stale"] = bool(source == "project" and iv is not None and v is not None and v < iv)
     info["untracked"] = bool(source == "project" and v is None)
+    # The ui kind's pre-write half: the record `direct` writes and `review` reads first.
+    info["design_record"] = design_record(root, kind)
+    info["design_record_due"] = bool(kind in DESIGN_RECORD_KINDS
+                                     and chosen and not info["design_record"])
     return info
 
 
@@ -2050,6 +2073,11 @@ def report(root, args):
         if r["anchors"]:
             flags.append("+ project rules %s" % ", ".join(
                 os.path.relpath(f, root) for f in r["anchors"]))
+        if r["design_record"]:
+            flags.append("+ design record %s" % os.path.relpath(r["design_record"], root))
+        elif r["design_record_due"]:
+            flags.append("NO DESIGN RECORD (%s) — `ui-design direct` has not run"
+                         % DESIGN_RECORD)
         print("  %-9s %-8s v%-5s %3d file(s) %5d line(s)  %s%s"
               % (r["kind"], r["source"],
                  r["version"] if r["version"] is not None else "?",

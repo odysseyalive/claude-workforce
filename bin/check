@@ -4026,6 +4026,45 @@ check(
     "the anchor is what a re-distillation compares against; a security file without "
     "one silently becomes a dead copy no reconcile can advance",
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# UI ANCHOR PARITY, landed 2026-10-08 with the direction half of `ui-design`.
+#
+# `wf-catalog.anchor_version` returns the anchor of the FIRST file in a sorted walk that
+# carries one, so a corpus whose files disagree reports whichever version sorts first and
+# reports it as the version of the whole kind. The ui corpus went from two files to four
+# in one change; two bumped and two left behind would have resolved as v2 on the install
+# while shipping v1 text, and an audit comparing shipped-against-recorded would have
+# compared the wrong integer. There is no per-file drift check to fall back on, which is
+# what `SKILL.md` § Verification has said since v1.
+#
+# THE SKILL'S OWN FRONTMATTER IS THE OTHER HALF, and it is the half nothing could see. An
+# audit reads `ui_design_ref_version:` off the skill while `wf-catalog` reads the anchor off
+# the corpus, so the two can disagree with every single-sided check still green — the skill
+# claiming v1 over a v2 corpus reads as "references are current" on a project that has
+# neither version intact.
+_ui_refs = sorted(p_ for p_ in declared if "/ui-design/references/" in p_)
+_UI_ANCHOR_RX = re.compile(r"ui-design-ref-version:\s*(\d+)")
+# `[:1] or [""]` rather than `[0]`, for the reason the security row above states: an EMPTY
+# file is a state this is meant to catch, and indexing it raises out of bin/check and takes
+# every later assertion down with it — which is exactly what a bin/prove case does to a file.
+_ui_anchors = {}
+for p_ in _ui_refs:
+    _um = _UI_ANCHOR_RX.search((read(p_).splitlines()[:1] or [""])[0])
+    _ui_anchors[p_] = int(_um.group(1)) if _um else None
+_ui_fm = re.search(r"^ui_design_ref_version:\s*(\d+)\s*$",
+                   read("workforce/skills/ui-design/SKILL.md"), re.M)
+_ui_fm_v = int(_ui_fm.group(1)) if _ui_fm else None
+_ui_off = sorted("%s=%s" % (os.path.basename(p_), v_)
+                 for p_, v_ in _ui_anchors.items() if v_ != _ui_fm_v)
+check(
+    "catalogs: every ui reference carries the anchor version its SKILL.md declares",
+    len(_ui_refs) >= 4 and _ui_fm_v is not None and not _ui_off,
+    f"SKILL.md declares ui_design_ref_version={_ui_fm_v} over {len(_ui_refs)} reference "
+    f"file(s); disagreeing or anchorless: {_ui_off} — `wf-catalog` reports the first anchor "
+    "a sorted walk finds as the version of the whole kind, so a split corpus resolves as "
+    "whichever file sorts first and the staleness comparison an audit makes is against the "
+    "wrong integer",
+)
 _ver = read("workforce/references/verification.md")
 check(
     "security: the standing catalog gate is written where verification is enforced",
