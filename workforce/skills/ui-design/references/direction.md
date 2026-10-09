@@ -93,6 +93,10 @@ you would say it out loud:
 **The CSS package is asked only when step 1 found none.** A project whose files name the stack is never
 asked what its stack is.
 
+**When step 1 found an inherited direction, whether it governs this surface is one of the four.** It is
+a case question — see § Whether the inherited direction governs THIS surface is a case question — and
+the answer decides whether the rest of the run constrains itself to that direction or supersedes it.
+
 Four case questions plus the pick in step 5 is five interruptions on a fresh project, which is the
 ceiling. A question the project's own files answer is over-asking, and the finish-don't-hedge directive
 forbids it.
@@ -118,12 +122,21 @@ is offered as a LINK ONLY, labelled paid or login-walled, and is never captured 
 Plus, Mobbin, Refero and the paid tiers of shadcnblocks and Flowbite are in that set; Refero's terms
 forbid automated extraction outright, so it is linked and never fetched for capture.
 
+**A reference from another stack is shortlisted for its pattern, and never for its markup.** The TRIAGE
+row's "built references" clause allows it — shadcn/ui's Tasks example is the clearest table layout there
+is, whatever the project is built in — so when one is shortlisted, **name a free same-stack source for
+the markup beside it**. For a plain-Tailwind project borrowing that table, HyperUI
+`hyperui.dev/components/application/tables` is the one to pair it with: loaded 2026-10-08, free, MIT, and
+it ships a sticky-header table. In the record, that reference's tier is labelled for what it is —
+"pattern reference, not this project's stack" — and the entry names the dependencies the project does not
+have, so nobody later reads the pick as permission to install Radix.
+
 ### Source list per stack — verified 2026-10-08
 
 | Stack | Free, loadable, capturable | Link only | Notes |
 |---|---|---|---|
-| shadcn/ui | `ui.shadcn.com/blocks` (`/blocks/<category>`), `ui.shadcn.com/examples/<name>` (tasks, mail, dashboard), `ui.shadcn.com/docs/components/<name>`, the registry directory at `/docs/directory` | shadcnblocks Pro (`shadcnblocks.com/blocks/<slug>`; free browse, basic tier needs a login) | shadcn/ui is MIT. shadcnblocks' licence counts an AI-restyled copy as a Derivative, so a Pro block's markup never enters a project the user has not licensed |
-| Tailwind, plain | Preline `preline.co/blocks/<group>/<subgroup>/`, HyperUI `hyperui.dev/components/{application,marketing,neobrutalism}/<category>`, Flowbite's free blocks, `tailwindcss.com/showcase` for real sites | Tailwind Plus (`tailwindcss.com/plus/ui-blocks/...`) | Preline is dual MIT plus a fair-use licence: no competing product, and a derivative template needs attribution. Tailwind Plus redirected every anonymous URL to its login |
+| shadcn/ui | `ui.shadcn.com/blocks` (`/blocks/<category>`), `ui.shadcn.com/examples/<name>` (tasks, dashboard), `ui.shadcn.com/docs/components/<name>`, the registry directory at `/docs/directory` | shadcnblocks Pro (`shadcnblocks.com/blocks/<slug>`; free browse, basic tier needs a login) | shadcn/ui is MIT. shadcnblocks' licence counts an AI-restyled copy as a Derivative, so a Pro block's markup never enters a project the user has not licensed |
+| Tailwind, plain | HyperUI `hyperui.dev/components/{application,marketing,neobrutalism}/<category>`, Flowbite's free blocks, `tailwindcss.com/showcase` for real sites | Tailwind Plus (`tailwindcss.com/plus/ui-blocks/...`), Preline block pages (`preline.co/blocks/<group>/<subgroup>/`) | Preline's block pages are mostly Pro now: measured 2026-10-08, every block on `/blocks/forms/document-and-import-uploads/` and `/blocks/data-display/progress-cards/` carried a Pro label and the page's own "Free" filter button was disabled, and `/blocks/data-display/user-and-contact-tables/` opened on a Pro block. A Pro block is link-only. Capture a Preline block only when that page shows it as free; its library stays dual MIT plus a fair-use licence — no competing product, and a derivative template needs attribution. Tailwind Plus redirected every anonymous URL to its login |
 | daisyUI | `daisyui.com/components/<name>/` | daisyUI Store (`daisyui.com/store/`, paid templates) | Store licence terms were not loaded; treat them as unknown rather than permissive |
 | Flowbite | `flowbite.com/docs/components/<name>/`, the free subset of `flowbite.com/blocks/<area>/<category>/` | Flowbite Pro blocks and the admin preview | Library is MIT with attribution. The Pro EULA forbids standalone redistribution and builders |
 | Headless UI | `headlessui.com/react/<component>` for behaviour; the visual layer comes from the Tailwind sources above | Tailwind Plus Catalyst | Headless UI ships no page-level gallery, so page-scale direction is a Tailwind search |
@@ -161,7 +174,7 @@ Mobbin or Refero goes first.
 |---|---|---|
 | LAND | Land-book `/design/landing-page`, SaaS Landing Page by technology, Lapa Ninja, recent.design, Awwwards for expressive work only | keep the stack filter on, so what comes back is buildable |
 | FORM | SaaSFrame forms and onboarding, Refero "Adding & Creating" and "Signing Up & Onboarding", Page Flows onboarding, UI Patterns `/patterns/Wizard` | search for the domain object: "create invoice", "new project" |
-| TRIAGE | Refero "Table" and "Filter & Sorting", SaaSFrame inbox and table categories, shadcn `/examples/tasks` and `/examples/mail` as built references | inbox, issues list, support tickets, review queue |
+| TRIAGE | Refero "Table" and "Filter & Sorting", SaaSFrame inbox and table categories, shadcn `/examples/tasks` as a built reference | inbox, issues list, support tickets, review queue |
 | JOB | Refero "Uploading & Downloading", Page Flows import and export flows, Component Gallery progress components | import, export, deploy, build log, processing. Real-screen coverage is thin everywhere, so expect to fall back to component scale |
 | DASH | SaaSFrame `/categories/dashboard`, Refero "Dashboard" and "Stats", Dribbble last | distinguish operational from analytical from navigation dashboards |
 | COMPARE | Land-book `/design/pricing-page`, SaaS Landing Page `/pricing/`, shadcnblocks compare blocks, Refero "Billing & Plans" | plan comparison is covered well; side-by-side record comparison is a gap, and daisyUI's `diff` component is the component-scale fallback |
@@ -202,20 +215,24 @@ for this directly: *"so are the suggestions going to include URL's for people to
 for ui direction?"* The URLs were already there; the loop that collects what people say about them is
 this round.
 
-1. **The session artifact holding the candidates IS the review copy.** There is no second page. It is
+1. **Every link opens the candidate itself.** A candidate's link is its own detail page or its
+   full-size image — the screen being discussed. The gallery or category page it was found on is a
+   second, clearly labelled "found on" link, never the primary one. A reviewer who clicks a category
+   page lands on a hundred screens and has to guess which one the round is about.
+2. **The session artifact holding the candidates IS the review copy.** There is no second page. It is
    **private until the user shares it** from the page's own Share menu with whoever should weigh in —
    nothing here can share it on their behalf — and **the reply says so**: the link, who it is for, and
    that commenting happens on the page.
-2. **Read every comment on that artifact before asking for the pick.** That is the `ArtifactComments`
+3. **Read every comment on that artifact before asking for the pick.** That is the `ArtifactComments`
    tool in its `read` action; load it through `ToolSearch` first when it is deferred rather than
    present. Summarise what came back **per candidate**, in the reply and on the page itself, so the
    page carries the discussion beside the thing being discussed.
-3. **The pick question offers two answers, not one.** "Pick now" and "hold for more comments" are both
+4. **The pick question offers two answers, not one.** "Pick now" and "hold for more comments" are both
    valid, and **holding is a real answer** — it ends the round without a decision. The next `direct`
    run on that surface re-reads the comments before it asks again, so a hold costs nothing but time.
-4. **Comments are evidence and are quoted, never paraphrased.** They land in the design record's
+5. **Comments are evidence and are quoted, never paraphrased.** They land in the design record's
    Review comments section, each verbatim with its author, beside the pick they informed.
-5. **An employee that reaches this step returns `QUESTION:` with the comments as well as the
+6. **An employee that reaches this step returns `QUESTION:` with the comments as well as the
    shortlist** — the candidate names, their URLs, what each offers, and what anyone has already said
    about them. A shortlist handed up without the comments asks the user to re-read a discussion they
    have already had.
@@ -263,15 +280,21 @@ earlier entry, and never overwrite a direction the project already had.
 <CSS package and component library, and the file each was read from.>
 <Existing tokens, palette, or house rules this surface inherits — and whose they are.>
 
+### What this direction supersedes
+<"(nothing — this surface inherits its direction unchanged)" when the answers kept it.>
+| Inherited rule | Where | What it requires | What replaces it, for which surfaces |
+|---|---|---|---|
+| <rule ID or name> | <path:line> | <the requirement, as written there> | <the user's answer, and the surfaces it now governs> |
+
 ## Screens and their situations
 | Screen | Primary situation | Secondary | ERG rules that apply |
 |---|---|---|---|
-| <route> | <LAND/FORM/TRIAGE/JOB/DASH/COMPARE/READ/SET> | <or none> | <ERG-…-NN, …> |
+| <route> | <LAND/FORM/TRIAGE/JOB/DASH/COMPARE/READ/SET> | <or none> | <ERG-SET-01, ERG-SET-05 — individual IDs> |
 
 ## Chosen references
 | # | URL | Captured | Reviewed by | Source tier |
 |---|---|---|---|---|
-| 1 | <url> | <capture date, or "linked only — <reason>"> | <who commented, or "not circulated"> | <official package source / block library / gallery> |
+| 1 | <url> | <capture date, or "linked only — <reason>"> | <who commented, or "not circulated"> | <official package source / block library / gallery / "pattern reference, not this project's stack" + the deps the project lacks> |
 
 ## Review comments
 <Each comment verbatim with its author, grouped by the candidate it is about. "(none — the page was
@@ -298,6 +321,9 @@ reference the project is not licensed for.>
 **The user's answers are quoted verbatim.** A paraphrase in this file is a second author's reading of
 the brief, and `BF-01` and `BF-02` both grade the render against it.
 
+**The rules column lists individual IDs.** `ERG-SET-01, ERG-SET-05`, never `ERG-SET rules`. A family
+name tells the build to go and re-derive the set, which is the derivation this step exists to do once.
+
 ## Step 7 — The component pass
 
 When a later build needs a pattern the record does not cover — a data table, an upload flow, a step bar,
@@ -313,10 +339,10 @@ button style, the palette roles and the type scale — described in the record i
 the project's own stack. What is never taken is markup, CSS or assets from a source the project is not
 licensed for, and never a real product's branding or copy from a gallery screenshot.
 
-Open-source sources — shadcn/ui, the Flowbite library, Preline's free blocks under its fair-use terms,
-MUI core and its free templates, Bootstrap's examples, Bulma, HTML5 UP with its credit kept — may be
-adapted directly. Everything in the link-only column may be looked at and nothing more, unless the user
-says they hold the licence.
+Open-source sources — shadcn/ui, the Flowbite library, the Preline blocks a page still shows as free
+under its fair-use terms, MUI core and its free templates, Bootstrap's examples, Bulma, HTML5 UP with
+its credit kept — may be adapted directly. Everything in the link-only column may be looked at and
+nothing more, unless the user says they hold the licence.
 
 ## An existing project direction is input
 
@@ -325,3 +351,31 @@ rule, a graphic system, a brand guide: each is read in step 1, recorded in the r
 as inherited and whose it is, and **constrains** the search rather than being replaced by it. A
 candidate that cannot live with the inherited palette is not shortlisted. `direct` writes a new entry;
 it never edits one the project's own people wrote.
+
+### Whether the inherited direction governs THIS surface is a case question
+
+**Ask it.** An inherited direction is a decision about some surface, taken at some date; whether it
+covers the one being designed now is a fact about the case, so it belongs in the step 2 call alongside
+"what is this surface for". It is not a style question, and the no-style-questions rule does not reach
+it. Measured on the FetchMLS trial: the project held a ratified navy-only palette and a house rule
+demanding a navy primary, the user answered "Own working palette", and nothing in this file said what
+to do with the gap.
+
+**A departing answer is recorded, not reconciled away.** The newer answer wins — it is the user's, and
+it is later — and the record's **What this direction supersedes** table is where it says so: the
+inherited rule, its `path:line`, what that rule requires as written, and what replaces it for which
+surfaces. A direction that quietly contradicts a ratified rule leaves the next reader with two
+authorities and no date between them.
+
+**Then wire it, so `review` grades the new direction instead of reporting drift.** When the record
+lands, each supersession row goes into the register in the project's own evaluator anchor — its
+`CATALOG-ANCHOR.md`, whose format and rules are `evaluators.md` § The supersession register — citing
+the design record as its source. That is an append to the register, which is the one place built to
+hold such a row; the inherited rule's own text is still never edited. An evaluator reads the register
+rather than the prose, so a supersession that never reaches it comes back as a finding against the
+surface the user just approved.
+
+**A shared shell widens the departure.** When the inherited rule governs one shell that several modules
+render inside, a change to it reaches every surface that shell covers, not just this one. Say which
+surfaces in the table's last column, and say it in the reply before the pick is taken, so the user is
+deciding for the set they are actually deciding for.
