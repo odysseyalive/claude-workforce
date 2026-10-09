@@ -1430,6 +1430,32 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    catalog" — an earlier draft specified a count no tool produced, which is the overclaim
    `references/enforcement.md` exists to catch.*
 
+2d. **Heal a DESIGN or FRONT-END handbook to the direction contract, on the citation and not on the
+   stamp.** `ui-design` gained a step that runs BEFORE the work it reviews (`evaluators.md` § Wiring
+   into the org), and an org staffed before that release has design employees whose only design
+   instruction is a post-write grade. Nothing re-authors them: item 2 runs on the version stamp, and a
+   handbook Step 5c already amended in this same run reads `equal` when item 1 sees it — the same two
+   reachable states 2c carries. **So read the handbook, never the stamp**: a governed handbook whose
+   role includes producing UI is refresh-due here when either half is missing.
+
+   Add both halves, and only these two:
+
+   - **`## Sources` gains the project's design record**, `.claude/design/direction.md`, named beside
+     the catalog the handbook already greps, exactly as the Sources heal above names the ledger.
+   - **`## Procedure` gains `/ui-design direct <surface>` before the step that first builds UI on a
+     surface**, and `direct --component <pattern>` before a pattern the record does not cover. An
+     employee cannot take the user's pick — `AskUserQuestion` reaches the user in the main session only
+     — so the step it carries ends in `QUESTION:` with the shortlist, never in a choice.
+
+   **That second half adds a step to `## Procedure`, so this item is not finished until `## Probe`
+   counts it** — the clause item 2 states for the ledger consult governs here unchanged, for the same
+   reason and with the same remedy: extend the arm range and add the step's row to the substitution
+   table, then re-probe under item 3. **Role-specific judgment is NEVER rewritten here**; this adds a
+   named step and a named source and touches nothing else in the section.
+
+   A handbook that already carries both is reported healed-zero rather than re-amended, and a project
+   with no design or front-end employee reports `0 of 0` — a measurement, not a skip.
+
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
    `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens
    (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked

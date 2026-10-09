@@ -796,6 +796,25 @@ tier-3 gate, and its Lead names the design evaluator as tier-4** — symmetric t
 web work. An employee that neither self-checks nor is reviewed is unverified for quality regardless of
 whether its tests pass.
 
+**`ui-design` is the one evaluator with a step BEFORE the work, and a design or front-end employee runs
+it there.** Its `direct` command reads the project's CSS stack, asks the case questions, researches
+references for the job each screen does, and writes the project's design record at
+`.claude/design/direction.md`. So two things are authored into such an employee's handbook, not one:
+
+- **`## Procedure` carries `/ui-design direct <surface>` before the first UI build on a surface**, and
+  `direct --component <pattern>` before building a pattern the record does not cover. Running it later
+  is running it too late: the review half can only ask for a reskin, and `SLOP-02` is what a page built
+  from model memory earns. The pick inside `direct` belongs to the user and `AskUserQuestion` reaches
+  the user only in the main session, so **an employee that reaches that step returns `QUESTION:` with
+  the shortlist** up the chain rather than choosing — which is also why the employee's handbook names
+  the step and not the choice.
+- **`## Sources` names the project's design record**, `.claude/design/direction.md`, beside the catalog
+  it greps. It is the brief `BF-01` grades against and the source of the situation keys the `ERG-` rules
+  are selected by; an employee that cannot cite it is building to whatever the work order happened to
+  say, which is the state BF-02 exists to report.
+
 **`review`** — reports any employee producing catalog-relevant work with no evaluator path — a
 web-working employee with no `security-evaluator` path, a visual/UI employee with no `ui-design` path —
-and any catalog whose version is behind the shipped one.
+and any catalog whose version is behind the shipped one. A visual/UI employee whose handbook names no
+design record, or whose `## Procedure` reaches a UI build with no `direct` step before it, is reported
+on the same footing: half a path is not a path.

@@ -362,6 +362,12 @@ information as missing.
 Name a **root or glob** (`<dir>/**`), not a file list, so material added later is in scope without a
 rewrite; name a running surface as a route.
 
+**A design or front-end role additionally names the project's design record**,
+`.claude/design/direction.md` — the surface's chosen references, what is borrowed from each, and the
+situation keys for every screen, written by `/ui-design direct` (`evaluators.md` § Wiring into the org).
+It is an authoritative source here for the same reason the catalog is: without it the role designs to
+whatever the work order happened to say, and `BF-02` reports the surface rather than passing it.
+
 **Before you report anything as missing, unrecoverable, or deleted — or act on an assumption about
 context you do not have — search every source above.** If it is still unresolved, that is a QUESTION,
 not a finding: return `QUESTION: <the question>` to whoever dispatched you (§ Escalation). Never
