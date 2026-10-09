@@ -10013,6 +10013,9 @@ _inv_restated = {}
 for _p in declared:
     if not _p.endswith(".md"):
         continue
+    # The change record is history quoted verbatim, not a live restatement (§ The change record).
+    if _p.startswith("workforce/changes/"):
+        continue
     for _m in _INV_COUNT_RX.finditer(read(_p)):
         # invariants.md owns the count; its declaration is the one legal statement.
         if _p.endswith("invariants.md") and _inv_decl and _m.start() >= _inv_decl.start():
@@ -10484,6 +10487,31 @@ if os.path.isdir(_fx):
             "dangling in a fresh clone, where the copy bin/prove takes fails before any case "
             "runs and the case asserting through the link measures nothing: "
             + ", ".join(_dangling) + ". FIX: track a placeholder (`.keep`) in the target",
+        )
+        # AN EMPTY FIXTURE TREE IS NOT A FIXTURE. git stores no directory, so a case
+        # whose tree holds no file exists on the author's disk and nowhere else: a
+        # fresh clone, a worktree, and `git archive HEAD` all get "fixture tree
+        # missing" from bin/script-conformance, and the case asserts nothing anywhere
+        # but here. MEASURED 2026-10-08: `tasktag-closeout-operator` and
+        # `tasktag-closeout-employee` were both empty, so the close-out rule they
+        # pin was unasserted in every clone since it landed. The tracked-ness check
+        # above cannot see this — it compares files on disk against git, and an empty
+        # tree has no file to compare. `_dirs` carries every directory git holds a
+        # file under, at any depth, which is exactly the condition.
+        _hollow = sorted(n for n in _fix_cases if f"fixtures/scripts/{n}" not in _dirs)
+        check(
+            "fixtures: every expectations.json case has a tree with a tracked file",
+            # `_fix_cases` is NOT redundant with `not _hollow`. An absent expectations.json
+            # resolves it to {} (line 3837), the census then has nothing to walk, and this
+            # reports a clean result about a scan it never ran — the same vacuous pass the
+            # ceiling assertion above carries its own guard against.
+            bool(_fix_cases) and not _hollow,
+            ("expectations.json names no case at all, so this scan walked an empty set and "
+             "its result is about nothing" if not _fix_cases else
+             "git carries no file under these case trees, so bin/script-conformance reports "
+             "`fixture tree missing` in every clone and the case is asserted only on the "
+             "author's disk: " + ", ".join(_hollow[:5]) + (" …" if len(_hollow) > 5 else "")
+             + ". FIX: track a `.claude/workforce/.keep.md` marker, as the sibling cases do"),
         )
     except Exception as _e:  # no git, no assertion — never a false pass
         warn("fixtures: tracked-ness not asserted", f"git unavailable ({_e})")
