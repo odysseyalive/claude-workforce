@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.76.1 | 2026-10-10 | audit, verify, changes, scripts | no | Release 1.76.1: heal the retired pin-guard git hook on projects that installed it |
 | 1.76.0 | 2026-10-08 | handbook, audit, changes, scripts, installer | **yes** | Release 1.76.0: ui-design designs a surface before it grades one |
 | 1.75.0 | 2026-10-08 | chart, audit, changes, hooks, scripts, installer | **yes** | Release 1.75.0: an org chart keeps up with the agents and skills added to its project |
 | 1.74.0 | 2026-10-02 | audit, changes, scripts, installer, platform | no | Release 1.74.0: the upstream inbox's own defects, and the four it filed |
