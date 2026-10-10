@@ -52,7 +52,7 @@ ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurre
             "subst", "hardlink", "git",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
-GIT_KEYS = {"init", "hooks_from", "commit", "config"}
+GIT_KEYS = {"init", "hooks_from", "commit", "config", "links"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -157,12 +157,19 @@ CASE_TIMEOUT = 120
 def _git_fixture(tree, g, env):
     """Build the case's git repository inside the COPY. Returns a problem string, or "".
 
-    FOUR STEPS, IN THIS ORDER, and the order is the assertion:
+    FIVE STEPS, IN THIS ORDER, and the order is the assertion:
       `init`        — `git init` the copy.
       `hooks_from`  — a directory in the fixture whose files are MOVED into the repo's own
                       hooks directory, resolved with `git rev-parse --git-path hooks`. The
                       fixture cannot spell `.git/hooks` any more than the script under test
                       may, so neither does.
+      `links`       — symlinks CREATED at run time, path -> target, both tree-relative, and
+                      `${HOOKS}` in either resolves to that same hooks directory. A
+                      DANGLING link cannot be checked in: `bin/check` requires every
+                      tracked fixture link to resolve to something git carries, because one
+                      that does not is dangling in every fresh clone. A link whose target
+                      is deliberately absent is exactly what a write-through-a-symlink case
+                      needs, so it is made here instead.
       `commit`      — one commit of everything, which is the only way a case can see the
                       tracked-vs-untracked half of a report. `--no-verify`: the fixture's
                       own `pre-commit` is the retired guard the heal exists to remove, and
@@ -208,6 +215,20 @@ def _git_fixture(tree, g, env):
             shutil.move(os.path.join(src, n), dst)
             os.chmod(dst, 0o755)
         os.rmdir(src)
+    if g.get("links"):
+        p = run("rev-parse", "--git-path", "hooks")
+        if p.returncode:
+            return fail("rev-parse --git-path hooks", p)
+        hooks = p.stdout.strip()
+        hooks = hooks if os.path.isabs(hooks) else os.path.join(tree, hooks)
+
+        def _hp(x):
+            return x.replace("${HOOKS}", hooks)
+        for _lnk, _tgt in g["links"].items():
+            _at = _hp(_lnk)
+            _at = _at if os.path.isabs(_at) else os.path.join(tree, _at)
+            os.makedirs(os.path.dirname(_at), exist_ok=True)
+            os.symlink(_hp(_tgt), _at)
     if g.get("commit"):
         p = run("add", "-A")
         if p.returncode:

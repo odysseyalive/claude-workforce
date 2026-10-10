@@ -1891,7 +1891,7 @@ def _hooks_target(root, top, prior):
     return os.path.normpath(os.path.join(gitdir, "hooks"))
 
 
-def _git_heal_plan(root, top, guard_dir, target, prior, owned):
+def _git_heal_plan(root, top, guard_dir, target, prior, owned, recorded=None, refused=None):
     """What the heal will do, in the order it does it: `(actions, kept)`.
 
     THE ORDER IS PART OF THE PLAN, because a crash has to re-run cleanly. Every copy is
@@ -1919,7 +1919,17 @@ def _git_heal_plan(root, top, guard_dir, target, prior, owned):
         if n == PIN_CHAIN_NAME:
             deletes.append((src, "the chain record the guard wrote"))
             continue
-        if not os.path.isfile(src) or os.path.islink(src):
+        # A SYMLINK HERE IS NEVER COPIED AND NEVER FOLLOWED (CWE-59). `shutil.copy2` reads
+        # the LINK'S TARGET and writes those bytes into the directory git runs hooks out
+        # of, with the source's mode — so a tracked link named `post-merge` pointing at any
+        # tracked file in the repository installs that file as an executable git hook. It
+        # is left where it is and reported; `os.remove` on a link would be safe, but
+        # deleting a thing this heal cannot identify is not the same question.
+        if os.path.islink(src):
+            kept.append((rel(src), "it is a symlink; its target is never copied into the "
+                                   "hooks directory, and the link is left alone"))
+            continue
+        if not os.path.isfile(src):
             kept.append((rel(src), "not a regular file; nothing is copied or deleted"))
             continue
         # `read` is this file's own reader and it answers "" for a file that does not decode
@@ -1935,7 +1945,17 @@ def _git_heal_plan(root, top, guard_dir, target, prior, owned):
                                    f"inside this project, so nothing is copied into it"))
             continue
         dst = os.path.join(target, n)
-        if not os.path.exists(dst):
+        # `lexists`, NEVER `exists` (CWE-59, and the same mistake one step further on).
+        # `os.path.exists` answers False for a DANGLING link, so a link waiting at the
+        # target name reads as a free name and `shutil.copy2` then FOLLOWS it and writes an
+        # executable wherever it points — outside the hooks directory, and outside the
+        # project if the link says so. MEASURED by `githook-dangling-target` before this
+        # line existed: the copy followed the link, failed on the absent parent, and the
+        # guard copy was deleted anyway, so the hook was lost as well as misplaced.
+        if os.path.islink(dst):
+            kept.append((rel(src), f"there is a symlink at {rel(dst)}; nothing is written "
+                                   f"through one, so this copy stays where it is"))
+        elif not os.path.lexists(dst):
             copies.append((src, dst, f"{rel(src)} -> {rel(dst)}"))
             deletes.append((src, f"copied to {rel(dst)}"))
         elif _same_bytes(src, dst):
@@ -1948,8 +1968,13 @@ def _git_heal_plan(root, top, guard_dir, target, prior, owned):
 
     actions = [("copy", s, d, t) for s, d, t in copies]
     shown = prior if prior else "unset"
-    actions.append(("restore", prior, None,
-                    f"core.hooksPath -> {shown}  (recorded prior: {shown})"))
+    # THE REFUSED VALUE IS STILL REPORTED. A heal that silently unset a recorded prior
+    # would look exactly like a heal that found none, and the user is the one who can tell
+    # whether that directory mattered — so the recorded value and the reason it was not
+    # applied are both in the line.
+    note = (f"(recorded prior: {recorded}, {refused})" if refused
+            else f"(recorded prior: {shown})")
+    actions.append(("restore", prior, None, f"core.hooksPath -> {shown}  {note}"))
     actions += [("delete", s, None, f"{rel(s)}  ({why})") for s, why in deletes]
     # The directory goes only when this run empties it (residue directive, SKILL.md
     # 2026-07-30: what does not need to be there is removed, and only that).
@@ -1960,6 +1985,43 @@ def _git_heal_plan(root, top, guard_dir, target, prior, owned):
         actions.append(("sidecar", None, None, 'git_config["core.hooksPath"] from '
                                                + OWNED_REL.replace(os.sep, "/")))
     return actions, kept
+
+
+def _copy_no_follow(src, dst):
+    """Copy `src` to `dst`, preserving its mode, and REFUSE to write through a link.
+
+    `O_NOFOLLOW | O_EXCL | O_CREAT` is the whole point, and it is not the same test as the
+    `islink` the plan already made: the plan reads the directory and the write happens
+    afterwards, so between the two a link can appear at that name — and this is a heal that
+    may be running in two sessions at once. The kernel decides here instead, and an
+    existing name or a link at it raises rather than being followed. `shutil.copy2` has no
+    such option (CWE-59/CWE-367, review of 73c5908).
+    """
+    import stat
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    # BOTH ENDS, and the mode off the LINK rather than its target (`lstat`). A `git
+    # checkout` landing a tracked symlink at the source name between the plan and this read
+    # would otherwise hand the link's target's bytes to the write.
+    sfd = os.open(src, os.O_RDONLY | nofollow)
+    try:
+        mode = stat.S_IMODE(os.fstat(sfd).st_mode)
+        body = b""
+        while True:
+            chunk = os.read(sfd, 1 << 20)
+            if not chunk:
+                break
+            body += chunk
+    finally:
+        os.close(sfd)
+    fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow, mode)
+    try:
+        os.write(fd, body)
+        # `fchmod` ON THE OPEN DESCRIPTOR, never `chmod` on the path: `os.open` applies the
+        # umask, so the mode has to be set a second time, and a path lookup here is one
+        # more chance to be pointed somewhere else.
+        os.fchmod(fd, mode)
+    finally:
+        os.close(fd)
 
 
 def _drop_hooks_path_record(root, owned_path):
@@ -1988,22 +2050,41 @@ def _drop_hooks_path_record(root, owned_path):
     return None
 
 
-def _usable_prior(prior):
-    """The recorded prior hooks path, or None when it is not one.
+def _usable_prior(prior, root, top, owned_path):
+    """`(effective, why_refused)` — the prior hooks path to APPLY, and why it was not.
 
-    `.settings-owned.json` IS TRACKED IN TWO OF THE FOUR PROJECTS, so on a clone its
-    contents are whoever wrote the tree's — and this value is handed to `git config
-    --local core.hooksPath <prior>`, where it sits in an OPTION position. There is no shell
-    (the argv is a list, so CWE-78 does not apply), but a value beginning with `-` is an
-    argument injection into git's own parser, and a NUL or a newline is not a path at all.
-    None of those is a path a `--install-hook` ever recorded, so each reads as "no recorded
-    prior" and the config is unset, which is what the four measured projects record anyway.
+    A TRACKED RECORD MUST NOT CHOOSE WHERE GIT LOOKS FOR EXECUTABLE HOOKS, which is the
+    finding against 73c5908 and the rule this encodes. `.settings-owned.json` is tracked in
+    nsayka-wawa and odyssey-alive (measured 2026-10-10), so on a clone its `prior` is
+    whatever the tree's author wrote — and this value goes to `git config --local
+    core.hooksPath`, after which every commit in that clone runs whatever executable sits
+    in the named directory. A tracked `prior` plus a tracked `pre-commit` under it is a
+    committed file arranging to run its own script, installed by a heal the user never
+    typed, at a session start.
+    
+    PROVENANCE IS THE ONLY TEST THAT SEPARATES THE TWO CASES, and that is why it is the
+    test. Every shape rule passes here: the path is relative, inside the project, and names
+    a real directory — which is exactly what the attack looks like. An UNTRACKED record is
+    local-only: it was written by the `--install-hook` that actually ran in this working
+    tree, it arrives in no clone, and it is the only kind whose `prior` is evidence about
+    this machine. A tracked one is reported and NOT applied; core.hooksPath is then unset,
+    which is the state every measured project records anyway (`prior: null` in all four).
+
+    The shape checks stay, for the untracked case: a value beginning with `-` is an
+    argument injection into git's own option parser (no shell is involved — the argv is a
+    list, so CWE-78 does not apply), and a NUL or a newline is not a path at all. Neither
+    is a value `--install-hook` could have recorded.
     """
     if not isinstance(prior, str) or not prior.strip():
-        return None
+        return None, None
     if prior.startswith("-") or any(c in prior for c in "\0\n\r"):
-        return None
-    return prior
+        return None, (f"the recorded prior is not a path ({prior!r}); core.hooksPath is "
+                      f"unset instead")
+    if _tracked(top, [owned_path]):
+        return None, (f"NOT applied: {os.path.relpath(owned_path, top)} is tracked by git, "
+                      f"so on a clone that value is whatever the tree carries, and a "
+                      f"committed file does not get to choose where git looks for hooks")
+    return prior, None
 
 
 def _new_git_result():
@@ -2063,12 +2144,17 @@ def heal_git_hooks(root, execute, quiet=False, progress=None):
     # core.hooksPath to a value nothing here measured. apps-odyssey-alive shows a third
     # shape exists (`{"restored": "unset by audit-…"}`), and that is not a dict with a
     # `prior` either — it reads as "no recorded prior", which is the safe answer.
-    prior = None
+    prior, recorded, refused = None, None, None
     if isinstance(record, dict) and record.get("set_to") in (None, PIN_HOOKS_DIR_REL):
-        prior = _usable_prior(record.get("prior"))
+        recorded = record.get("prior")
+        prior, refused = _usable_prior(recorded, root, top, owned_path)
     out["shown"] = prior if prior else "unset"
+    # THE EFFECTIVE PRIOR IS ALSO THE COPY TARGET, and that is why a refusal cannot stop at
+    # not applying the value: with core.hooksPath unset, git reads the common dir's `hooks`,
+    # so that is where a hook living only in the guard directory has to land.
     target = _hooks_target(root, top, prior)
-    out["plan"], out["kept"] = _git_heal_plan(root, top, guard_dir, target, prior, owned)
+    out["plan"], out["kept"] = _git_heal_plan(root, top, guard_dir, target, prior, owned,
+                                              recorded if refused else None, refused)
     if not execute:
         return _git_print(out, execute, quiet)
 
@@ -2096,7 +2182,6 @@ def _git_apply(out, root, owned_path, progress):
     """Perform `out["plan"]`, in order, under the caller's lock. Never raises: every
     failure is recorded, and a restore that did not land stops the run before anything is
     deleted."""
-    import shutil
     for kind, src, dst, _text in out["plan"]:
         # WHAT THIS ACTION WROTE, not what any earlier one did: a bare
         # `progress["wrote"].append(out["changed"][-1])` re-appended the previous path on
@@ -2106,7 +2191,7 @@ def _git_apply(out, root, owned_path, progress):
         try:
             if kind == "copy":
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
-                shutil.copy2(src, dst)
+                _copy_no_follow(src, dst)
                 out["changed"].append(dst)
             elif kind == "restore":
                 if not _restore_hooks_path(root, src, out):

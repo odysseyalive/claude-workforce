@@ -2542,13 +2542,37 @@ CASES = [
     # import the classifier and shell out, which is the cost that gate exists to avoid.
     ("pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
      "workforce/bin/wf-commitments", "del", '"hooksPath" not in fh.read()'),
-    # BEHAVIOUR, not presence. `copy2` is the one call that carries a hook which lived ONLY
-    # in the guard directory across before the config is restored; without it the run-based
-    # case finds `post-merge` gone from a repository that still has to run it. It is one
-    # statement among several, so the file stays valid and the deletion changes behaviour —
-    # which is what the BAD-CASE verdict exists to distinguish.
+    # BEHAVIOUR, not presence. `_copy_no_follow` is the one call that carries a hook which
+    # lived ONLY in the guard directory across before the config is restored; without it the
+    # run-based case finds `post-merge` gone from a repository that still has to run it. It
+    # is one statement among several, so the file stays valid and the deletion changes
+    # behaviour — which is what the BAD-CASE verdict exists to distinguish.
     ("pin guard: the stranded guard is unwired, what lived only in it survives, twice",
-     WSA, "del", "                shutil.copy2(src, dst)\n"),
+     WSA, "del", "                _copy_no_follow(src, dst)\n"),
+    # NEITHER SYMLINK WRITE IS PINNED BY A LITERAL ALONE. `lexists` is one character away
+    # from the `exists` that was there, and the fixtures are what notice: with `exists`
+    # back, a dangling link at the target name is read as a free name and the copy follows
+    # it. The conformance suite is a bin/check assertion, so this fires by name.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WSA, "del", "        elif not os.path.lexists(dst):"),
+    # The src-symlink refusal is aimed at its REPORTED REASON rather than its `if`: a `del`
+    # of the condition line orphans the two-line body and reports BAD-CASE. The message is
+    # what `githook-link-in-guard` asserts, and the branch exists only to produce it.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WSA, "del", "it is a symlink; its target is never copied into the "),
+    # THE PROVENANCE RULE, aimed at the argument rather than the `if` for the same reason.
+    # `_tracked(top, [])` returns [] by its own first guard, so the rule never fires, every
+    # recorded prior is applied again — including one out of a committed file — and
+    # `githook-prior-tracked` is the case that notices.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WSA, "del", "[owned_path]"),
+    # THE KERNEL-LEVEL HALF, which no fixture can reach: it only matters in the window
+    # between the plan's islink test and the write. `delall`, because the first occurrence
+    # is in the comment above the call and a `del` of that one changes nothing (the
+    # VACUOUS trap this suite records 39 times); with both gone, `getattr(os, "", 0)`
+    # quietly returns 0 and the flag is absent.
+    ("pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
+     WSA, "delall", "O_NOFOLLOW"),
     # THE CWE-59 REFUSAL. Dropping the containment test from the condition leaves
     # `if os.path.lexists(guard_dir):` — valid, and it refuses every project instead of only
     # the one whose `.claude` is a link out of the tree, so the run-based case's first

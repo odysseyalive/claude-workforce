@@ -152,14 +152,89 @@
       }
     }
   },
-  "githook-prior-restored": {
-    "_why": "A RECORDED NON-NULL PRIOR. `--install-hook` recorded the EXACT value core.hooksPath held before it took it, and the heal restores that rather than unsetting: a repository that ran its hooks out of scripts/hooks before the guard arrived must run them out of scripts/hooks afterwards. It also moves the target the guard copies are compared against, which is why the hooks directory is resolved and never a literal .git/hooks. All four measured projects recorded `prior: null`, so nothing but a fixture can reach this branch.",
+  "githook-prior-tracked": {
+    "_why": "A TRACKED RECORD MUST NOT CHOOSE WHERE GIT LOOKS FOR EXECUTABLE HOOKS. `.settings-owned.json` is tracked in nsayka-wawa and odyssey-alive (measured 2026-10-10), so on a clone its `prior` is whatever the tree's author wrote, and the heal hands that value to `git config --local core.hooksPath`. A tracked `prior` pointing at a tracked directory with a tracked `pre-commit` in it would be a committed file arranging for its own script to run on the next commit. Provenance is the only test that separates this from the legitimate case, because every shape test passes: the record here is identical to githook-prior-restored's and the only difference is that this one is committed. The recorded value is REPORTED and not applied, and core.hooksPath is unset instead -- so the guard still goes and the hook that lived only in the guard directory still lands in the directory git will actually read.",
     "script": "wf-settings-apply",
     "args": ["--heal", "--execute"],
     "exit": 0,
     "git": {
       "init": true,
       "commit": true,
+      "config": {"core.hooksPath": ".claude/workforce/git-hooks"}
+    },
+    "want": [
+      "restored core.hooksPath -> unset",
+      "recorded prior: scripts/hooks",
+      "NOT applied",
+      "is tracked by git",
+      "copied .claude/workforce/git-hooks/post-merge -> .git/hooks/post-merge",
+      "verified on disk: core.hooksPath unset"
+    ],
+    "not": ["Traceback", "core.hooksPath -> scripts/hooks"],
+    "after": {
+      ".claude/workforce/git-hooks": {"absent": true},
+      ".git/hooks/post-merge": {"want": ["git lfs post-merge"]},
+      "scripts/hooks/post-merge": {"absent": true},
+      "scripts/hooks/pre-commit": {"want": ["repository own pre-commit"]},
+      ".git/config": {"not": ["hooksPath"]}
+    }
+  },
+  "githook-link-in-guard": {
+    "_why": "A SYMLINK IN THE GUARD DIRECTORY IS NEVER COPIED. Copying it would read the link's target and write those bytes into the directory git runs hooks out of, with the source file's mode -- so a tracked link named `post-merge` pointing at any tracked file in the repository installs that file as an executable git hook (CWE-59, flagged on 73c5908). The link is left exactly where it is, reported, and the directory therefore stays. `.git/hooks/post-merge` staying ABSENT is the whole assertion: nothing was carried across.",
+    "script": "wf-settings-apply",
+    "args": ["--heal", "--execute"],
+    "exit": 0,
+    "git": {
+      "init": true,
+      "commit": true,
+      "config": {"core.hooksPath": ".claude/workforce/git-hooks"}
+    },
+    "want": [
+      "kept .claude/workforce/git-hooks/post-merge",
+      "symlink",
+      "deleted .claude/workforce/git-hooks/pre-commit",
+      "restored core.hooksPath -> unset"
+    ],
+    "not": ["Traceback", "(now empty)", "copied .claude/workforce/git-hooks/post-merge"],
+    "after": {
+      ".git/hooks/post-merge": {"absent": true},
+      ".claude/workforce/git-hooks/pre-commit": {"absent": true},
+      "payload.sh": {"want": ["echo payload"]},
+      ".git/config": {"not": ["hooksPath"]}
+    }
+  },
+  "githook-dangling-target": {
+    "_why": "A DANGLING SYMLINK AT THE TARGET NAME. `os.path.exists` answers False for a link whose target is absent, so a missing-file test reads the name as free and `shutil.copy2` then FOLLOWS the link and writes an executable wherever it points -- outside the hooks directory, outside the project if the link says so (CWE-59, flagged on 73c5908). `lexists` is the test, a link at that name is refused and reported, and the guard copy stays. The link is made at run time because a dangling one cannot be checked in: bin/check requires every tracked fixture link to resolve to something git carries.",
+    "script": "wf-settings-apply",
+    "args": ["--heal", "--execute"],
+    "exit": 0,
+    "git": {
+      "init": true,
+      "commit": true,
+      "links": {"${HOOKS}/post-merge": "../../outside-nowhere/evil"},
+      "config": {"core.hooksPath": ".claude/workforce/git-hooks"}
+    },
+    "want": [
+      "kept .claude/workforce/git-hooks/post-merge",
+      "symlink",
+      "deleted .claude/workforce/git-hooks/pre-commit",
+      "restored core.hooksPath -> unset"
+    ],
+    "not": ["Traceback", "(now empty)", "copied .claude/workforce/git-hooks/post-merge"],
+    "after": {
+      "outside-nowhere/evil": {"absent": true},
+      ".claude/workforce/git-hooks/post-merge": {"want": ["lives ONLY in the guard directory"]},
+      ".claude/workforce/git-hooks/pre-commit": {"absent": true},
+      ".git/config": {"not": ["hooksPath"]}
+    }
+  },
+  "githook-prior-restored": {
+    "_why": "A RECORDED NON-NULL PRIOR, IN AN UNTRACKED RECORD. `--install-hook` recorded the EXACT value core.hooksPath held before it took it, and the heal restores that rather than unsetting: a repository that ran its hooks out of scripts/hooks before the guard arrived must run them out of scripts/hooks afterwards. It also moves the target the guard copies are compared against, which is why the hooks directory is resolved and never a literal .git/hooks. NOTHING IS COMMITTED HERE, and that is now load-bearing rather than incidental: an untracked `.settings-owned.json` is a local-only record, written by the install that actually ran in this working tree, and only such a record is allowed to choose a hooks path (githook-prior-tracked is the same tree committed, and does not restore). All four measured projects recorded `prior: null`, so nothing but a fixture can reach this branch.",
+    "script": "wf-settings-apply",
+    "args": ["--heal", "--execute"],
+    "exit": 0,
+    "git": {
+      "init": true,
       "config": {"core.hooksPath": ".claude/workforce/git-hooks"}
     },
     "want": [
