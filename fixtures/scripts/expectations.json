@@ -228,6 +228,38 @@
       ".git/config": {"not": ["hooksPath"]}
     }
   },
+  "githook-prior-unknown": {
+    "_why": "THE PROVENANCE CHECK MUST FAIL CLOSED. `_tracked` answers by running `git ls-files`, and a nonzero exit means the question could not be ASKED -- a corrupt or unreadable index, no git on PATH, a timeout -- which is not the same as `no, nothing is tracked`. Reading it as untracked applies a hooks path out of a file whose provenance was never established, which is the whole of the rule githook-prior-tracked pins (review of 862da37; before the fix this tree set core.hooksPath to scripts/hooks). The tree is githook-prior-restored byte for byte, with one broken index on top, so the opposite decision is isolated to that one difference. The report line says the same thing about the deletion rather than asserting `unstaged` about files nothing could classify.",
+    "script": "wf-settings-apply",
+    "args": ["--heal", "--execute"],
+    "exit": 0,
+    "git": {
+      "init": true,
+      "commit": true,
+      "corrupt_index": true,
+      "config": {"core.hooksPath": ".claude/workforce/git-hooks"}
+    },
+    "want": [
+      "restored core.hooksPath -> unset",
+      "recorded prior: scripts/hooks",
+      "NOT applied",
+      "git could not say whether it is tracked",
+      "copied .claude/workforce/git-hooks/post-merge -> .git/hooks/post-merge",
+      "verified on disk: core.hooksPath unset",
+      "git could not say which of these are tracked here"
+    ],
+    "not": [
+      "Traceback",
+      "core.hooksPath -> scripts/hooks",
+      "These changes are unstaged"
+    ],
+    "after": {
+      ".claude/workforce/git-hooks": {"absent": true},
+      ".git/hooks/post-merge": {"want": ["git lfs post-merge"]},
+      "scripts/hooks/post-merge": {"absent": true},
+      ".git/config": {"not": ["hooksPath"]}
+    }
+  },
   "githook-prior-restored": {
     "_why": "A RECORDED NON-NULL PRIOR, IN AN UNTRACKED RECORD. `--install-hook` recorded the EXACT value core.hooksPath held before it took it, and the heal restores that rather than unsetting: a repository that ran its hooks out of scripts/hooks before the guard arrived must run them out of scripts/hooks afterwards. It also moves the target the guard copies are compared against, which is why the hooks directory is resolved and never a literal .git/hooks. NOTHING IS COMMITTED HERE, and that is now load-bearing rather than incidental: an untracked `.settings-owned.json` is a local-only record, written by the install that actually ran in this working tree, and only such a record is allowed to choose a hooks path (githook-prior-tracked is the same tree committed, and does not restore). All four measured projects recorded `prior: null`, so nothing but a fixture can reach this branch.",
     "script": "wf-settings-apply",

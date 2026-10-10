@@ -52,7 +52,7 @@ ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurre
             "subst", "hardlink", "git",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
-GIT_KEYS = {"init", "hooks_from", "commit", "config", "links"}
+GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -175,6 +175,12 @@ def _git_fixture(tree, g, env):
                       own `pre-commit` is the retired guard the heal exists to remove, and
                       a fixture that executed it would be testing the 1.31.0 script.
       `config`      — set LAST, after the commit, for that same reason.
+      `corrupt_index` — overwrite `.git/index` with bytes git refuses to read, AFTER the
+                      commit. A plumbing command that consults the index then exits
+                      nonzero, which is the only way a case can see what a script does
+                      when git cannot ANSWER a question — as opposed to answering no.
+                      `chmod` cannot express it: the index does not exist until `init`
+                      runs, and a mode of 000 still lets root read the file.
 
     IDENTITY AND CONFIG ARE PINNED, never inherited. `-c user.*` on the commit and
     GIT_CONFIG_GLOBAL/SYSTEM at /dev/null, so a maintainer whose own `~/.gitconfig` sets
@@ -237,6 +243,14 @@ def _git_fixture(tree, g, env):
                 "commit", "-q", "--no-verify", "-m", "fixture")
         if p.returncode:
             return fail("commit", p)
+    if g.get("corrupt_index"):
+        p = run("rev-parse", "--git-path", "index")
+        if p.returncode:
+            return fail("rev-parse --git-path index", p)
+        idx = p.stdout.strip()
+        idx = idx if os.path.isabs(idx) else os.path.join(tree, idx)
+        with open(idx, "wb") as _fh:
+            _fh.write(b"NOT-AN-INDEX")
     for k, v in (g.get("config") or {}).items():
         p = run("config", "--local", k, _sub_tree(v, tree))
         if p.returncode:

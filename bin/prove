@@ -2566,6 +2566,13 @@ CASES = [
     # `githook-prior-tracked` is the case that notices.
     ("scripts: the script-conformance suite passes, every case it selects",
      WSA, "del", "[owned_path]"),
+    # FAILING OPEN, which is what the rule did before this: `_tracked` answers None when
+    # git could not be asked at all, and `del`eting that half of the condition leaves
+    # `if tracked:` — a definite "no" and an unanswerable question read the same again, so
+    # a prior out of an unverifiable record is applied. `githook-prior-unknown` is the case
+    # that notices, and it is `githook-prior-restored` with one corrupt index on top.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WSA, "del", "tracked is None or "),
     # THE KERNEL-LEVEL HALF, which no fixture can reach: it only matters in the window
     # between the plan's islink test and the write. `delall`, because the first occurrence
     # is in the comment above the call and a `del` of that one changes nothing (the

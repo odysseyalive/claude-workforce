@@ -2080,10 +2080,18 @@ def _usable_prior(prior, root, top, owned_path):
     if prior.startswith("-") or any(c in prior for c in "\0\n\r"):
         return None, (f"the recorded prior is not a path ({prior!r}); core.hooksPath is "
                       f"unset instead")
-    if _tracked(top, [owned_path]):
-        return None, (f"NOT applied: {os.path.relpath(owned_path, top)} is tracked by git, "
-                      f"so on a clone that value is whatever the tree carries, and a "
-                      f"committed file does not get to choose where git looks for hooks")
+    # THE DECISION FAILS CLOSED, which is the finding against 862da37. `_tracked` answers
+    # None when git could not be asked at all — no git on PATH, a corrupt or unreadable
+    # index, a timeout — and reading that as "untracked" applies a value out of a file
+    # whose provenance was never established. "I could not check" is not evidence of
+    # local-only, so both answers but a definite NO refuse.
+    tracked = _tracked(top, [owned_path])
+    if tracked is None or tracked:
+        why = ("git could not say whether it is tracked" if tracked is None
+               else "it is tracked by git")
+        return None, (f"NOT applied: {os.path.relpath(owned_path, top)} — {why}, so that "
+                      f"value may be whatever a clone carries, and a committed file does "
+                      f"not get to choose where git looks for hooks")
     return prior, None
 
 
@@ -2247,15 +2255,22 @@ def _restore_hooks_path(root, prior, out):
 
 
 def _tracked(root, paths):
-    """Which of `paths` git tracks. Asked ONCE, and only when something changed, because
-    the answer decides a sentence rather than a write. A deleted path is still listed by
-    `ls-files` while the index holds it, which is exactly the state being reported."""
+    """Which of `paths` git tracks, or **None when git could not be asked**. A deleted path
+    is still listed by `ls-files` while the index holds it, which is exactly the state being
+    reported.
+
+    NONE IS NOT THE EMPTY LIST, and conflating them is the finding against 862da37: this
+    returned `[]` when `ls-files` exited nonzero — no git on PATH, a corrupt or unreadable
+    index, a timeout — and `_usable_prior` read that as "untracked, so local-only" and
+    applied a hooks path out of a file whose provenance had never been established. Every
+    caller now decides what an unanswerable question means for it, and both of them refuse
+    to guess."""
     rels = [os.path.relpath(p, root).replace(os.sep, "/") for p in paths]
     if not rels:
         return []
     code, out = _git(root, "ls-files", "--", *rels)
     if code != 0:
-        return []
+        return None
     have = {l.strip() for l in out.splitlines() if l.strip()}
     return [p for p, r in zip(paths, rels) if r in have]
 
@@ -2287,8 +2302,15 @@ def _git_print(out, execute, quiet):
                 f"core.hooksPath -> {out['shown']}, and {names}.")
         # THE DELETION HAS TO BE COMMITTED OR IT ONLY HEALS THIS CLONE. Tracked in
         # nsayka-wawa and odyssey-alive, measured 2026-10-10; untracked (gitignored) in
-        # hither-lands and playwright-mcp, where there is nothing to say.
-        if _tracked(out["top"], out["changed"]):
+        # hither-lands and playwright-mcp, where there is nothing to say. `None` is the
+        # third answer and it is said rather than guessed either way: asserting "unstaged"
+        # about files nothing could classify would be a claim this run did not measure, and
+        # silence would hide a commit the other clones need (review of 862da37).
+        _trk = _tracked(out["top"], out["changed"])
+        if _trk is None:
+            line += (" git could not say which of these are tracked here; if any are, "
+                     "commit them so the other clones heal and stop carrying the hook.")
+        elif _trk:
             line += (" These changes are unstaged; commit them so the other clones heal "
                      "and stop carrying the hook.")
         out["lines"].append(line)
