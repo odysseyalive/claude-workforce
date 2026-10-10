@@ -37,9 +37,15 @@ hooks:
 *The commit-time git **pin guard** is GONE, and this paragraph used to say it was live. It was a
 `core.hooksPath` pre-commit hook keeping dependencies pinned and `dependabot.yml` present; it was
 removed with its script `wf-pin-check` on the user's explicit marks, and `references/invariants.md`
-row 21 has recorded that as RETIRED ever since. `hooks` never wired it, `audit` Step 6-G is retired,
-and nothing prints `INV-PINS`. *Corrected 2026-09-10: the entry page and the invariant register
-disagreed, and this page is the one every reader loads first.**
+row 21 has recorded that as RETIRED ever since. `hooks` never wired it, and nothing prints `INV-PINS`.
+**An install from before 1.31.0 is HEALED at the next session start**, not merely declared retired:
+removing the script stopped new installs and removed the guard from no project that already had one, so
+four repositories on one workstation were still running a frozen copy on every commit when this was
+measured on 2026-10-10. `wf-settings-apply`'s `heal_git_hooks` restores `core.hooksPath`, carries across
+any hook that lived only in the guard directory, and deletes the copy — through the SessionStart heal
+every default install already has, and through `audit` Step 6-G and `verify` § Hook wiring. It never
+commits, so the deletion is reported as unstaged. *Corrected 2026-09-10: the entry page and the
+invariant register disagreed, and this page is the one every reader loads first.**
 <!-- /origin -->
 
 ---

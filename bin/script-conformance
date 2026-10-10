@@ -49,9 +49,10 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 # be invented, but it can no longer be ignored. Measured 2026-09-13.
 NEGATIVE_KEYS = ("not", "must_not", "reject")
 ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent",
-            "subst", "hardlink",
+            "subst", "hardlink", "git",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
+GIT_KEYS = {"init", "hooks_from", "commit", "config"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -153,6 +154,75 @@ def fill_complete_installs(tree):
 CASE_TIMEOUT = 120
 
 
+def _git_fixture(tree, g, env):
+    """Build the case's git repository inside the COPY. Returns a problem string, or "".
+
+    FOUR STEPS, IN THIS ORDER, and the order is the assertion:
+      `init`        — `git init` the copy.
+      `hooks_from`  — a directory in the fixture whose files are MOVED into the repo's own
+                      hooks directory, resolved with `git rev-parse --git-path hooks`. The
+                      fixture cannot spell `.git/hooks` any more than the script under test
+                      may, so neither does.
+      `commit`      — one commit of everything, which is the only way a case can see the
+                      tracked-vs-untracked half of a report. `--no-verify`: the fixture's
+                      own `pre-commit` is the retired guard the heal exists to remove, and
+                      a fixture that executed it would be testing the 1.31.0 script.
+      `config`      — set LAST, after the commit, for that same reason.
+
+    IDENTITY AND CONFIG ARE PINNED, never inherited. `-c user.*` on the commit and
+    GIT_CONFIG_GLOBAL/SYSTEM at /dev/null, so a maintainer whose own `~/.gitconfig` sets
+    `core.hooksPath` or a commit template cannot change what a case measures — the same
+    argument the empty HOME above makes for the harness.
+    """
+    bad = sorted(k for k in g if k not in GIT_KEYS)
+    if bad:
+        return f"git: unrecognized key(s) {bad} — no step here reads them"
+    if not shutil.which("git"):
+        return "git: not on PATH, so this case cannot build the repository it asserts on"
+    genv = dict(env, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
+                GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0")
+
+    def run(*args):
+        return subprocess.run(["git", "-C", tree, *args], capture_output=True, text=True,
+                              env=genv, timeout=CASE_TIMEOUT)
+
+    def fail(what, p):
+        return f"git {what} failed ({p.returncode}): {(p.stderr or p.stdout).strip()[:160]}"
+
+    if g.get("init"):
+        p = run("-c", "init.defaultBranch=main", "init", "-q")
+        if p.returncode:
+            return fail("init", p)
+    if g.get("hooks_from"):
+        p = run("rev-parse", "--git-path", "hooks")
+        if p.returncode:
+            return fail("rev-parse --git-path hooks", p)
+        hooks = p.stdout.strip()
+        hooks = hooks if os.path.isabs(hooks) else os.path.join(tree, hooks)
+        os.makedirs(hooks, exist_ok=True)
+        src = os.path.join(tree, g["hooks_from"])
+        if not os.path.isdir(src):
+            return f"git hooks_from: {g['hooks_from']} is not a directory in this fixture"
+        for n in sorted(os.listdir(src)):
+            dst = os.path.join(hooks, n)
+            shutil.move(os.path.join(src, n), dst)
+            os.chmod(dst, 0o755)
+        os.rmdir(src)
+    if g.get("commit"):
+        p = run("add", "-A")
+        if p.returncode:
+            return fail("add -A", p)
+        p = run("-c", "user.email=fixture@local", "-c", "user.name=Fixture",
+                "commit", "-q", "--no-verify", "-m", "fixture")
+        if p.returncode:
+            return fail("commit", p)
+    for k, v in (g.get("config") or {}).items():
+        p = run("config", "--local", k, _sub_tree(v, tree))
+        if p.returncode:
+            return fail(f"config {k}", p)
+    return ""
+
+
 def run_case(name, spec):
     src = os.path.join(FIX, name)
     script = os.path.join(BIN, spec["script"])
@@ -246,6 +316,17 @@ def _run_in(tree, script, spec):
     # can make a file the script must NOT be able to write. Octal strings, e.g. "0444".
     for _rel, _mode in (spec.get("chmod") or {}).items():
         os.chmod(os.path.join(tree, _rel), int(_mode, 8))
+
+    # `git` BUILDS A REAL REPOSITORY INSIDE THE COPY, because a checked-in fixture cannot
+    # carry one: git records a nested `.git` as mode 160000 and its contents do not survive
+    # a clone, so the tree would arrive empty on every checkout but the author's
+    # (`fixtures/init-git.sh` records the same finding for f6, and `bin/idempotence` builds
+    # its repo the same way). Added 2026-10-10 for the stranded git-hook heal, whose entire
+    # subject is `core.hooksPath` and a directory git resolves.
+    if spec.get("git"):
+        _gp = _git_fixture(tree, spec["git"], env)
+        if _gp:
+            return False, _gp
 
     # `concurrent: N` starts N copies at once against the same tree and asserts on the
     # FIRST one's output; `after` then sees what all N left behind. It exists for a

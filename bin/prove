@@ -2528,6 +2528,46 @@ CASES = [
     # fails the count, leaves the file valid, and changes no behaviour.
     ("org sync: a name that cannot be written as itself is reported, never charted or escaped",
      "workforce/bin/wf-org-sync", "del", "NAME_RX"),
+    # ── THE STRANDED PIN GUARD (2026-10-10) ──────────────────────────────────────
+    # RECOGNITION. Deleting the recognised value leaves the file valid and takes the whole
+    # of the recognition with it; the named read-based check is what reports it.
+    ("pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
+     WSA, "del", 'PIN_HOOKS_DIR_REL = ".claude/workforce/git-hooks"'),
+    # THE CARRIER. The SessionStart call is the only thing that reaches a project with no
+    # audit and no settings write, and nothing else in either file names it.
+    ("pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
+     "workforce/bin/wf-commitments", "del",
+     "heal_git_hooks(root, True, quiet=True, progress=progress)"),
+    # THE CHEAP GATE. Deleting it makes every session start in every project on the machine
+    # import the classifier and shell out, which is the cost that gate exists to avoid.
+    ("pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
+     "workforce/bin/wf-commitments", "del", '"hooksPath" not in fh.read()'),
+    # BEHAVIOUR, not presence. `copy2` is the one call that carries a hook which lived ONLY
+    # in the guard directory across before the config is restored; without it the run-based
+    # case finds `post-merge` gone from a repository that still has to run it. It is one
+    # statement among several, so the file stays valid and the deletion changes behaviour —
+    # which is what the BAD-CASE verdict exists to distinguish.
+    ("pin guard: the stranded guard is unwired, what lived only in it survives, twice",
+     WSA, "del", "                shutil.copy2(src, dst)\n"),
+    # THE CWE-59 REFUSAL. Dropping the containment test from the condition leaves
+    # `if os.path.lexists(guard_dir):` — valid, and it refuses every project instead of only
+    # the one whose `.claude` is a link out of the tree, so the run-based case's first
+    # repository stops healing. The same deletion in the other direction cannot be written:
+    # a `del` of the whole `if` line would orphan its body and report BAD-CASE.
+    ("pin guard: the stranded guard is unwired, what lived only in it survives, twice",
+     WSA, "del", " and not _inside_project(root, guard_dir)"),
+    # THE EXACTNESS, aimed at the run-based case's negative half: with the comparison
+    # loosened to a prefix, a repository whose core.hooksPath is its OWN
+    # maintainers/git-hooks is unwired, and that is the half a fixture cannot state as
+    # loudly as a run can.
+    ("pin guard: the stranded guard is unwired, what lived only in it survives, twice",
+     WSA, "del", " or current != PIN_HOOKS_DIR_REL"),
+    # THE RECORD. audit Step 6-G said "Nothing runs here" while four projects ran the guard
+    # on every commit; the heal command is what makes the step perform its own retirement.
+    ("pin guard: the records that retired it name the heal that removes it",
+     AUD, "del", "`wf-settings-apply --root <project> --heal`"),
+    ("pin guard: the records that retired it name the heal that removes it",
+     "workforce/references/procedures/verify.md", "delall", "heal_git_hooks"),
 ]
 
 

@@ -33,27 +33,46 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# `wf-pin-check --install-hook --execute` is the one writer here that needs a REAL git
+# `wf-settings-apply --heal`'s GIT half is the one writer here that needs a REAL git
 # repository, and a fixture tree cannot carry one: git refuses to track any path under
 # a nested `.git`, so a committed fixture would arrive empty on every clone but the one
 # that made it (`fixtures/init-git.sh` records the same finding for f6). The repo is
-# therefore built inside the throwaway copy, on the first pass only — `git init` is
+# therefore built inside the throwaway copy, on the first pass only — the build is
 # skipped on the second so that pass writes nothing but what the script writes.
 #
-# WHAT THE SECOND PASS PROVES, and it is not obvious: the writer touches THREE things
-# that must each settle — the copied hook (byte-identical, so no rewrite), the
-# `.settings-owned.json` sidecar (whose `prior` must still record the ORIGINAL value,
-# not the value we ourselves set on pass 1 — recording our own path as the prior is how
-# an uninstall becomes a no-op that leaves the guard wired forever), and `.git/config`,
-# which is watched here and would show a duplicated `core.hooksPath` line.
-PIN_HOOK_SETUP = """
+# *Replaces the `wf-pin-check --install-hook` setup that stood here. That script was
+# retired in 1.31.0 and the writer row that read this constant went with it, so the
+# constant had been scaffolding with no reader. What replaces it REMOVES the hook that
+# one installed, and needs the same real repository to do it in.*
+#
+# WHAT THE SECOND PASS PROVES is the fast path. Pass 1 unsets `core.hooksPath`, so pass 2
+# must find the literal absent from `.git/config` and leave everything alone: no
+# re-created guard directory, no re-written sidecar, and no duplicated `hooksPath` line
+# in `.git/config`, which is inside the watched subtree.
+#
+# `Q` and `NL` ARE BUILT RATHER THAN WRITTEN: the guard copy is recognised by a docstring
+# opener, and a literal triple quote in here would end this very string.
+GIT_HOOK_SETUP = """
 import os, subprocess, sys
-root = os.path.abspath(os.path.join('.idempotence-scratch', 'pin-hook-repo'))
-os.makedirs(root, exist_ok=True)
+NL, Q = chr(10), chr(34) * 3
+root = os.path.abspath(os.path.join('.idempotence-scratch', 'git-hook-repo'))
+guard = os.path.join(root, '.claude', 'workforce', 'git-hooks')
 if not os.path.isdir(os.path.join(root, '.git')):
+    os.makedirs(guard)
+    open(os.path.join(guard, 'pre-commit'), 'w', encoding='utf-8').write(
+        '#!/usr/bin/env python3' + NL + Q
+        + 'wf-pin-check \\u2014 pin every dependency spec that can be pinned.' + NL + Q + NL)
+    open(os.path.join(guard, 'post-merge'), 'w').write(
+        '#!/bin/sh' + NL + 'exec git lfs post-merge "$@"' + NL)
+    open(os.path.join(root, '.claude', 'workforce', '.settings-owned.json'), 'w').write(
+        ('{|  "git_config": {|    "core.hooksPath": {|'
+         '      "set_to": ".claude/workforce/git-hooks",|      "prior": null|'
+         '    }|  }|}|').replace('|', NL))
     subprocess.run(['git', 'init', '-q', root], check=True)
-sys.exit(subprocess.run([sys.executable, 'workforce/bin/wf-pin-check', '--root', root,
-                         '--install-hook', '--execute']).returncode)
+    subprocess.run(['git', '-C', root, 'config', '--local', 'core.hooksPath',
+                    '.claude/workforce/git-hooks'], check=True)
+sys.exit(subprocess.run([sys.executable, 'workforce/bin/wf-settings-apply', '--root', root,
+                         '--heal', '--execute']).returncode)
 """
 
 # Each writer: how to invoke it, and which subtree it is allowed to touch.
@@ -147,6 +166,11 @@ WRITERS = {
         "argv": ["workforce/bin/wf-settings-apply", "--root",
                  "fixtures/scripts/sa-heal-execute", "--heal", "--execute"],
         "watch": "fixtures/scripts/sa-heal-execute",
+    },
+    # The git half of that same heal, against the real repository GIT_HOOK_SETUP builds.
+    "git-hook-heal": {
+        "argv": ["-c", GIT_HOOK_SETUP],
+        "watch": ".idempotence-scratch",
     },
 }
 

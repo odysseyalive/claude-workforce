@@ -32,7 +32,10 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
                         (`RETIRED_HOOKS`) and whose install is present and whole. Never a
                         live row, never a user-scope file (see `heal`). The same function
                         runs at SessionStart from `wf-commitments`, so a project heals on
-                        first use without anybody typing this.
+                        first use without anybody typing this. It also runs the GIT half
+                        (`heal_git_hooks`): the retired pin guard wired `core.hooksPath`
+                        at a directory in the repository rather than a settings row, and
+                        nothing removed it from a project that already had it.
     --automode          write autoMode.environment/allow into ~/.claude/settings.json
                         so the classifier stops refusing routine workforce maintenance.
                         User scope is deliberate: the classifier reads autoMode ONLY
@@ -1752,6 +1755,463 @@ def heal(root, execute, quiet=False, progress=None):
     return out
 
 
+# ──────────────────────────────────────────── the GIT half of the same heal (2026-10-10)
+#
+# THE RETIRED PIN GUARD HAD TWO HALVES AND THIS FILE HEALED ONE. `wf-pin-check` was deleted
+# from the distribution in 1.31.0 (90fb341) and `RETIRED_HOOKS` above removes its SETTINGS
+# registration — but the guard's other half was never a settings row at all.
+# `--install-hook` pointed `core.hooksPath` at a directory INSIDE the repository and copied
+# the 48 KB script into it, so every commit in every project that ever ran it still
+# executes a frozen copy of a script this distribution no longer ships. No current path
+# reached it: `update` never walks a project (`update.md`), and audit Step 6-G was a
+# placeholder that ran nothing.
+#
+# MEASURED 2026-10-10 on this workstation, read-only, across ~/lab/*: four repositories
+# with `core.hooksPath = .claude/workforce/git-hooks` and the copy on disk. In one of them
+# the stranded copy was walking gitignored directories on every commit and adding an npm
+# entry to `.github/dependabot.yml`, re-adding it each time the user removed it. Retiring a
+# mechanism has to reach the projects that already have it — user directive 2026-09-07,
+# "the next use of workforce will heal the situation".
+#
+# IT RIDES THE EXISTING HEAL: no new hook, no settings write. `wf-commitments` already
+# hosts the per-project retired-mechanism heal at SessionStart and its docstring says why
+# ("a new hook would also need a settings write before it ran anywhere"), so this is a
+# second half of one classifier rather than a second carrier. `--heal` runs both halves,
+# `verify` and `audit` get it through the `--heal` they already run, and every machine
+# picks it up on the next `update` or `bin/sync`.
+
+# THE EXACT VALUE `--install-hook` SET, AND THE WHOLE OF THE RECOGNITION. Compared `==`
+# against `git config --local --get core.hooksPath`, never as a prefix, a suffix or a
+# substring: ~/lab/apps-odyssey-alive points core.hooksPath at
+# `.claude/workforce/maintainers/git-hooks`, that project's OWN hook directory holding its
+# own pre-commit and commit-msg, and any looser test reaches it.
+#
+# THE SIDECAR RECORD AND THE PRESENCE OF THE COPY ARE DELIBERATELY NOT REQUIRED.
+# `.settings-owned.json` is tracked in two of the four projects, so the moment one clone
+# heals and commits, every other clone has a record with no `git_config` and a tree with no
+# `pre-commit` while its own LOCAL config still points at a directory that is no longer
+# there — which silently disables the git-lfs hooks that used to live in it.
+PIN_HOOKS_DIR_REL = ".claude/workforce/git-hooks"
+# The first line of the retired script, and the only thing that authorises deleting a file
+# named `pre-commit`. A `pre-commit` WITHOUT it is somebody else's script that happens to
+# sit in that directory: it is carried across to the real hooks directory instead, because
+# unsetting core.hooksPath on top of it would stop running it with no message anywhere.
+PIN_GUARD_HEADER = '"""wf-pin-check — pin every dependency spec'
+# Written by `--install-hook` beside the copy: PLAIN TEXT naming the prior `pre-commit` it
+# chained to. Inert to git, and residue once the copy is gone.
+PIN_CHAIN_NAME = "prior-pre-commit"
+PIN_ENTRY_NAME = "pre-commit"
+# Display and execute wording for one planned action — one classifier, two faces, which is
+# the consent model the rest of this file uses. A `--heal` run and a `--heal --execute` run
+# cannot disagree about what happens, because both read the same plan.
+GIT_VERBS = {"copy": ("would copy", "copied", "+"),
+             "restore": ("would restore", "restored", "-"),
+             "delete": ("would delete", "deleted", "-"),
+             "rmdir": ("would remove", "removed", "-"),
+             "sidecar": ("would drop", "dropped", "-")}
+
+
+def _git(root, *args):
+    """`(returncode, stdout)`. NEVER RAISES: git may be absent, and this runs from the
+    SessionStart hook that must go on regardless (`wf-commitments.heal_settings`)."""
+    import shutil
+    import subprocess
+    if not shutil.which("git"):
+        return 127, ""
+    try:
+        # NOT `capture_output=`/`text=`: both are 3.7+, and PYTHON-FLOOR here is 3.6
+        # (RHEL 8's python3 — customer DEF-Q-001).
+        p = subprocess.run(["git", "-C", root] + list(args), stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, universal_newlines=True,
+                           stdin=subprocess.DEVNULL, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return 127, ""
+    return p.returncode, (p.stdout or "").strip()
+
+
+def _pin_guard_possible(root):
+    """Could this repository carry the stranded guard? TEXT ONLY, NO SUBPROCESS.
+
+    This is the gate every session start in every project pays, so the common answer has to
+    cost one small read and nothing else. `.git/config` is read directly when `.git` is a
+    directory; `git rev-parse --git-path config` is the fallback for the `.git`-is-a-file
+    case — a linked worktree or a submodule — which is the one shape where the path cannot
+    be derived. The LITERAL, not the key: a repository that points core.hooksPath anywhere
+    else is answered no without git ever running.
+    """
+    dot = os.path.join(root, ".git")
+    if os.path.isdir(dot):
+        cfg = os.path.join(dot, "config")
+    elif os.path.isfile(dot):
+        code, out = _git(root, "rev-parse", "--git-path", "config")
+        if code != 0 or not out:
+            return False
+        cfg = out if os.path.isabs(out) else os.path.join(root, out)
+    else:
+        return False
+    try:
+        with open(cfg, encoding="utf-8", errors="replace") as fh:
+            return PIN_HOOKS_DIR_REL in fh.read()
+    except OSError:
+        return False
+
+
+def _same_bytes(a, b):
+    """Content-identical? `filecmp` and not a hand-rolled read (`bin/idempotence` uses the
+    same call); `shallow=False` because size-and-mtime is exactly what is not being asked.
+    Unreadable means NOT identical, which is the answer that deletes nothing."""
+    import filecmp
+    try:
+        return filecmp.cmp(a, b, shallow=False)
+    except OSError:
+        return False
+
+
+def _hooks_target(root, top, prior):
+    """Where this repository's hooks live once core.hooksPath is gone: the recorded
+    non-null `prior`, else the hooks directory of the repository's COMMON git dir.
+
+    NEVER THE LITERAL `.git/hooks`, which is wrong in a linked worktree, wrong in a
+    submodule, and wrong whenever `$GIT_DIR` is set. And NOT `rev-parse --git-path hooks`
+    either, which is the obvious call and the wrong one here: it HONOURS the very setting
+    being removed. MEASURED 2026-10-10, git 2.55.0 — in a repository with
+    `core.hooksPath = .claude/workforce/git-hooks`, `--git-path hooks` answers
+    `.claude/workforce/git-hooks`, so a heal built on it compares every guard copy against
+    itself, calls each one byte-identical, and deletes the directory it was supposed to be
+    emptying into. `--git-common-dir` is what git itself falls back to when no hooksPath is
+    set, and it is the common dir rather than the per-worktree one, which is where hooks
+    live for every worktree of a repository.
+    """
+    if prior:
+        return os.path.normpath(prior if os.path.isabs(prior) else os.path.join(top, prior))
+    code, out = _git(root, "rev-parse", "--git-common-dir")
+    if code != 0 or not out:
+        return None
+    gitdir = out if os.path.isabs(out) else os.path.join(root, out)
+    return os.path.normpath(os.path.join(gitdir, "hooks"))
+
+
+def _git_heal_plan(root, top, guard_dir, target, prior, owned):
+    """What the heal will do, in the order it does it: `(actions, kept)`.
+
+    THE ORDER IS PART OF THE PLAN, because a crash has to re-run cleanly. Every copy is
+    made BEFORE core.hooksPath is restored — git silently runs no hook from a directory
+    that holds none, so a restore made first would leave a window where a hook that lived
+    only in the guard directory does not run — and the ownership record is dropped LAST,
+    since it is only ever read for `prior`.
+
+    EVERY NAME IN THE DIRECTORY ENDS UP IN EXACTLY ONE OF `actions` OR `kept`, which is
+    what makes the final `rmdir` decidable: the directory goes when nothing was kept.
+    """
+    def rel(p):
+        return os.path.relpath(p, top).replace(os.sep, "/")
+
+    names = []
+    if os.path.isdir(guard_dir) and not os.path.islink(guard_dir):
+        names = sorted(os.listdir(guard_dir))
+    # A TARGET OUTSIDE THE PROJECT IS NEVER WRITTEN INTO. A recorded `prior` is whatever
+    # the user's config said, and copying a hook into another tree is a write nobody asked
+    # for. The config is still restored; the guard copies then stay, and are reported.
+    copy_ok = bool(target) and _inside_project(root, target) and not os.path.islink(target)
+    copies, deletes, kept = [], [], []
+    for n in names:
+        src = os.path.join(guard_dir, n)
+        if n == PIN_CHAIN_NAME:
+            deletes.append((src, "the chain record the guard wrote"))
+            continue
+        if not os.path.isfile(src) or os.path.islink(src):
+            kept.append((rel(src), "not a regular file; nothing is copied or deleted"))
+            continue
+        # `read` is this file's own reader and it answers "" for a file that does not decode
+        # (it catches ValueError, which UnicodeDecodeError is), so a binary planted at that
+        # name reads as "not the guard" and is carried across rather than deleted.
+        if n == PIN_ENTRY_NAME and PIN_GUARD_HEADER in read(src):
+            deletes.append((src, "the wf-pin-check header"))
+            continue
+        # ANYTHING ELSE IN THERE IS A HOOK THE REPOSITORY MAY STILL NEED — the git-lfs set
+        # in nsayka-wawa, or a `pre-commit` somebody wrote themselves.
+        if not copy_ok:
+            kept.append((rel(src), f"{target or 'the hooks directory'} is not a directory "
+                                   f"inside this project, so nothing is copied into it"))
+            continue
+        dst = os.path.join(target, n)
+        if not os.path.exists(dst):
+            copies.append((src, dst, f"{rel(src)} -> {rel(dst)}"))
+            deletes.append((src, f"copied to {rel(dst)}"))
+        elif _same_bytes(src, dst):
+            deletes.append((src, f"byte-identical to {rel(dst)}"))
+        else:
+            # NEITHER COPY IS THE OBVIOUS ONE, so both stay and the difference is reported.
+            # Measured 2026-10-10 in nsayka-wawa, all four git-lfs copies were identical to
+            # the ones in `.git/hooks` — which is the only reason a directory can ever go.
+            kept.append((rel(src), f"it differs from {rel(dst)}, so both are left in place"))
+
+    actions = [("copy", s, d, t) for s, d, t in copies]
+    shown = prior if prior else "unset"
+    actions.append(("restore", prior, None,
+                    f"core.hooksPath -> {shown}  (recorded prior: {shown})"))
+    actions += [("delete", s, None, f"{rel(s)}  ({why})") for s, why in deletes]
+    # The directory goes only when this run empties it (residue directive, SKILL.md
+    # 2026-07-30: what does not need to be there is removed, and only that).
+    if names and not kept:
+        actions.append(("rmdir", guard_dir, None, f"{rel(guard_dir)}  (now empty)"))
+    section = owned.get("git_config") if isinstance(owned.get("git_config"), dict) else None
+    if isinstance(section, dict) and "core.hooksPath" in section:
+        actions.append(("sidecar", None, None, 'git_config["core.hooksPath"] from '
+                                               + OWNED_REL.replace(os.sep, "/")))
+    return actions, kept
+
+
+def _drop_hooks_path_record(root, owned_path):
+    """Drop `git_config["core.hooksPath"]` from the sidecar whatever shape it is in, and
+    drop `git_config` when that empties it. Returns a refusal, or None.
+
+    WRITTEN THROUGH `_render`, never a plain `json.dumps`: the file keeps its own
+    indentation, and it is TRACKED in two of the four measured projects, so a reformat
+    would land in somebody's commit as a diff they did not make. `write_refusal` is the
+    same CWE-59 test every other shipped writer here uses — a symlinked, hard-linked or
+    outside-the-project record is refused rather than written through.
+    """
+    why = write_refusal(root, owned_path)
+    if why:
+        return why
+    data, text, err = _load_strict(owned_path)
+    if err or not isinstance(data, dict):
+        return (f"{owned_path} is not a JSON object ({err or 'wrong type'}); rewriting it "
+                f"would destroy the record disband replays, so it is left alone")
+    section = data.get("git_config")
+    if isinstance(section, dict):
+        section.pop("core.hooksPath", None)
+        if not section:
+            data.pop("git_config", None)
+    _atomic_write(os.path.realpath(owned_path), _render(data, text), text)
+    return None
+
+
+def _usable_prior(prior):
+    """The recorded prior hooks path, or None when it is not one.
+
+    `.settings-owned.json` IS TRACKED IN TWO OF THE FOUR PROJECTS, so on a clone its
+    contents are whoever wrote the tree's — and this value is handed to `git config
+    --local core.hooksPath <prior>`, where it sits in an OPTION position. There is no shell
+    (the argv is a list, so CWE-78 does not apply), but a value beginning with `-` is an
+    argument injection into git's own parser, and a NUL or a newline is not a path at all.
+    None of those is a path a `--install-hook` ever recorded, so each reads as "no recorded
+    prior" and the config is unset, which is what the four measured projects record anyway.
+    """
+    if not isinstance(prior, str) or not prior.strip():
+        return None
+    if prior.startswith("-") or any(c in prior for c in "\0\n\r"):
+        return None
+    return prior
+
+
+def _new_git_result():
+    return {"rc": 0, "changed": [], "kept": [], "lines": [], "failures": [], "plan": [],
+            "top": "", "landed": None, "shown": "unset", "gone": False}
+
+
+def heal_git_hooks(root, execute, quiet=False, progress=None):
+    """Unwire the retired wf-pin-check git hook from this project, carrying across whatever
+    lived only in its directory. The git half of `heal`; the block above says why it exists.
+
+    WHAT IT NEVER DOES, each of them pinned by a `githook-*` fixture:
+      - touch any other `core.hooksPath` — the value is compared `==` to PIN_HOOKS_DIR_REL;
+      - run a subprocess at all when the literal is absent from the config text;
+      - delete a `pre-commit` that does not carry the wf-pin-check header, or any other
+        copy that is not byte-identical to the one in the real hooks directory;
+      - disable a hook that lived only in the guard directory: every such file is copied
+        across BEFORE core.hooksPath is restored, and nothing is deleted until it is;
+      - resolve the hooks directory as a literal `.git/hooks` (`_hooks_target`);
+      - reformat `.settings-owned.json`, or write it through a link (`write_refusal`);
+      - COMMIT anything. A commit made from a SessionStart hook is a write the user never
+        made, so the report names what is unstaged and stops there;
+      - raise. Every failure is reported into the result, for the reason `heal` gives.
+    """
+    out = _new_git_result()
+    if not _pin_guard_possible(root):
+        return out
+    code, current = _git(root, "config", "--local", "--get", "core.hooksPath")
+    if code != 0 or current != PIN_HOOKS_DIR_REL:
+        return out
+    code, top = _git(root, "rev-parse", "--show-toplevel")
+    if code != 0 or not top:
+        out["rc"] = 1
+        out["failures"].append("core.hooksPath names the retired wf-pin-check guard, but "
+                               "the repository top level could not be read (git exited "
+                               f"{code}); nothing was changed")
+        return _git_print(out, execute, quiet)
+    out["top"] = top = os.path.normpath(top)
+    guard_dir = os.path.join(top, *PIN_HOOKS_DIR_REL.split("/"))
+    # NOTHING IS DELETED THROUGH A LINK OUT OF THE PROJECT (CWE-59, the refusal
+    # `_project_refusal` makes for the settings half). A `.claude` — or a
+    # `.claude/workforce` — symlinked out of the tree would otherwise aim `os.remove` at
+    # files in the link's target, chosen by whoever wrote the tree rather than by this
+    # heal. The guard directory NAME is a constant, so the only way it can point outside is
+    # a link on the way to it, and that is what this resolves.
+    if os.path.lexists(guard_dir) and not _inside_project(root, guard_dir):
+        out["rc"] = 1
+        out["failures"].append(f"{guard_dir} resolves outside the project "
+                               f"({os.path.realpath(guard_dir)}); nothing is deleted "
+                               f"through a link and core.hooksPath is left alone")
+        return _git_print(out, execute, quiet)
+    owned_path, owned = load_owned(root)
+    record = ((owned.get("git_config") or {}).get("core.hooksPath")
+              if isinstance(owned.get("git_config"), dict) else None)
+    # `prior` IS TRUSTED ONLY WHEN THE RECORD IS ABOUT THIS VALUE. A record whose `set_to`
+    # is something else describes a different config, and restoring ITS `prior` would set
+    # core.hooksPath to a value nothing here measured. apps-odyssey-alive shows a third
+    # shape exists (`{"restored": "unset by audit-…"}`), and that is not a dict with a
+    # `prior` either — it reads as "no recorded prior", which is the safe answer.
+    prior = None
+    if isinstance(record, dict) and record.get("set_to") in (None, PIN_HOOKS_DIR_REL):
+        prior = _usable_prior(record.get("prior"))
+    out["shown"] = prior if prior else "unset"
+    target = _hooks_target(root, top, prior)
+    out["plan"], out["kept"] = _git_heal_plan(root, top, guard_dir, target, prior, owned)
+    if not execute:
+        return _git_print(out, execute, quiet)
+
+    # ONE HEAL AT A TIME IN ONE REPOSITORY, the same lock the settings half takes and for
+    # the same measured reason: SessionStart fires in every session, and two sessions
+    # opening a project at once is ordinary. Both would compute the same plan, and the
+    # second would find the files the first had already deleted. The lock is on the
+    # repository directory, which always exists — a project may have no `.claude` left at
+    # all. Where the filesystem cannot give one, the run goes ahead and SAYS so: every step
+    # is idempotent and the deletions tolerate an already-gone file.
+    try:
+        with _Lock(top) as lk:
+            if lk.unlocked:
+                out["kept"].append(("this repository",
+                                    f"healed without a lock: {lk.unlocked}"))
+            _git_apply(out, root, owned_path, progress)
+    except (OSError, TimeoutError) as exc:
+        out["rc"] = 1
+        out["failures"].append(f"left for another session — {exc.__class__.__name__}: "
+                               f"{exc}; the guard is still wired")
+    return _git_print(out, execute, quiet)
+
+
+def _git_apply(out, root, owned_path, progress):
+    """Perform `out["plan"]`, in order, under the caller's lock. Never raises: every
+    failure is recorded, and a restore that did not land stops the run before anything is
+    deleted."""
+    import shutil
+    for kind, src, dst, _text in out["plan"]:
+        # WHAT THIS ACTION WROTE, not what any earlier one did: a bare
+        # `progress["wrote"].append(out["changed"][-1])` re-appended the previous path on
+        # every action that writes no file (the config restore), and `wf-commitments`'
+        # HEAL INTERRUPTED line reads that list back to the user.
+        before = len(out["changed"])
+        try:
+            if kind == "copy":
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
+                out["changed"].append(dst)
+            elif kind == "restore":
+                if not _restore_hooks_path(root, src, out):
+                    return
+            elif kind == "delete":
+                # ALREADY GONE IS THE OUTCOME ASKED FOR, not a failure: a crashed earlier
+                # run, or a peer session that healed between the plan and this line.
+                if os.path.lexists(src):
+                    os.remove(src)
+                    out["changed"].append(src)
+            elif kind == "rmdir":
+                if os.path.isdir(src):
+                    os.rmdir(src)
+                    out["changed"].append(src)
+                out["gone"] = not os.path.exists(src)
+            elif kind == "sidecar":
+                why = _drop_hooks_path_record(root, owned_path)
+                if why:
+                    out["rc"] = 1
+                    out["failures"].append(why)
+                    continue
+                out["changed"].append(owned_path)
+            if progress is not None:
+                progress["wrote"] += out["changed"][before:]
+        except OSError as exc:
+            out["rc"] = 1
+            out["failures"].append(f"{kind} {src}: {exc.__class__.__name__}: {exc}")
+
+
+def _restore_hooks_path(root, prior, out):
+    """Set core.hooksPath back to `prior`, or unset it, and RE-READ it. False stops the
+    run: a restore that did not land must not be followed by deletions, because the
+    repository would then be pointing at a directory this run had emptied."""
+    if prior:
+        rc, _o = _git(root, "config", "--local", "core.hooksPath", prior)
+    else:
+        rc, _o = _git(root, "config", "--local", "--unset", "core.hooksPath")
+        rc = 0 if rc == 5 else rc            # 5 = the key was already absent (old :1062)
+    if rc != 0:
+        out["rc"] = 1
+        out["failures"].append(f"git exited {rc} restoring core.hooksPath; it still names "
+                               f"{PIN_HOOKS_DIR_REL} and nothing was deleted")
+        return False
+    code, landed = _git(root, "config", "--local", "--get", "core.hooksPath")
+    landed = landed if code == 0 else ""
+    if landed != (prior or ""):
+        out["rc"] = 1
+        out["failures"].append(f"re-read core.hooksPath as {landed or 'unset'!r}, expected "
+                               f"{out['shown']!r}; nothing was deleted")
+        return False
+    out["landed"] = landed
+    return True
+
+
+def _tracked(root, paths):
+    """Which of `paths` git tracks. Asked ONCE, and only when something changed, because
+    the answer decides a sentence rather than a write. A deleted path is still listed by
+    `ls-files` while the index holds it, which is exactly the state being reported."""
+    rels = [os.path.relpath(p, root).replace(os.sep, "/") for p in paths]
+    if not rels:
+        return []
+    code, out = _git(root, "ls-files", "--", *rels)
+    if code != 0:
+        return []
+    have = {l.strip() for l in out.splitlines() if l.strip()}
+    return [p for p, r in zip(paths, rels) if r in have]
+
+
+def _git_print(out, execute, quiet):
+    """The planned or performed actions, then ONE line for the user naming every file."""
+    def rel(p):
+        return os.path.relpath(p, out["top"]).replace(os.sep, "/") if out["top"] else p
+
+    if out["plan"] or out["failures"]:
+        if not quiet:
+            print(f"GIT HOOK  core.hooksPath = {PIN_HOOKS_DIR_REL} — the guard "
+                  f"wf-pin-check installed, retired in 1.31.0")
+            for kind, _src, _dst, text in out["plan"]:
+                would, did, sign = GIT_VERBS[kind]
+                print(f"  {sign if execute else '~'} {did if execute else would} {text}")
+            for path, why in out["kept"]:
+                print(f"  . kept {path}: {why}")
+            for f in out["failures"]:
+                print(f"  NOT HEALED — {f}")
+    if execute and out["changed"]:
+        if not quiet:
+            print(f"  verified on disk: core.hooksPath "
+                  + (f"= {out['landed']}" if out["landed"] else "unset")
+                  + (f" · {rel(os.path.join(out['top'], *PIN_HOOKS_DIR_REL.split('/')))} "
+                     f"gone" if out["gone"] else ""))
+        names = ", ".join(sorted({rel(p) for p in out["changed"]}))
+        line = (f"HEALED  unwired the retired wf-pin-check git hook from this project: "
+                f"core.hooksPath -> {out['shown']}, and {names}.")
+        # THE DELETION HAS TO BE COMMITTED OR IT ONLY HEALS THIS CLONE. Tracked in
+        # nsayka-wawa and odyssey-alive, measured 2026-10-10; untracked (gitignored) in
+        # hither-lands and playwright-mcp, where there is nothing to say.
+        if _tracked(out["top"], out["changed"]):
+            line += (" These changes are unstaged; commit them so the other clones heal "
+                     "and stop carrying the hook.")
+        out["lines"].append(line)
+        if not quiet:
+            print(line)
+    return out
+
+
 def failure_state(root, rel):
     """A key for one settings file's CURRENT state — path, bytes and mode — so a failure
     that nothing has changed is announced once, not at every session start (second
@@ -1814,12 +2274,23 @@ def clear_notice(root):
 
 
 def do_heal(root, execute):
-    """`--heal`: the CLI face of `heal`, printing every count including the zeroes."""
+    """`--heal`: the CLI face of BOTH halves, printing every count including the zeroes.
+
+    The settings half removes retired hook REGISTRATIONS; the git half unwires the retired
+    pin guard's `core.hooksPath` and its copy on disk. One flag runs both, because they are
+    two halves of one question — what did a retirement leave behind in this project — and a
+    caller that had to know to ask twice is a caller that heals half of it. `verify` § Hook
+    wiring and `audit` Step 6-G both reach the git half through this.
+    """
     if not os.path.isdir(os.path.join(root, ".claude")):
         print(f"HEAL   {os.path.join(root, '.claude')} is absent — nothing to heal")
-        return 0
+        # NOT A RETURN. The git guard lives in `git config` and in a directory that a
+        # project can carry with no `.claude` left at all — a `disband` removes the one
+        # and not the other — so the git half still runs here.
+        return heal_git_hooks(root, execute)["rc"]
     print(f"HEAL   {os.path.join(root, '.claude')}          <- resolved, not assumed")
     rc = heal(root, execute)["rc"]
+    rc = heal_git_hooks(root, execute)["rc"] or rc
     if not execute:
         print("  apply with: --execute")
     return rc

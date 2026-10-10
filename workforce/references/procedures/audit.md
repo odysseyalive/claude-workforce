@@ -1744,7 +1744,7 @@ the same.
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
 principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
-`wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sat between `checksums` and `verify` and is RETIRED — its script was removed on the user's marks; the step number is held as a placeholder so nothing else shifts.)*
+`wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sits between `checksums` and `verify`. The install is RETIRED — its script was removed on the user's marks — and the step now REMOVES a stranded guard instead of installing one, through the `--heal` this audit already runs. Measured 2026-10-10: four repositories on one workstation were still running the retired copy on every commit.)*
 
 **`org index` runs UNCONDITIONALLY here — every audit, every mode.** It maintains the project-local
 `/org` receptionist at `${CLAUDE_PROJECT_DIR}/.claude/skills/org/SKILL.md` (`procedures/org.md` step 2,
@@ -2191,16 +2191,46 @@ the single `!` command at Step 0.05 exactly as § Step 6 requires, and never as 
 **Under `--review`: print what would be wired and what the output style would become, and write
 nothing.**
 
-### Step 6-G — RETIRED (the git pre-commit pin guard went with its script)
+### Step 6-G — RETIRED, and the retirement is now PERFORMED (the git pre-commit pin guard)
 
-**Nothing runs here.** This step wired a commit-time pin-and-dependabot guard by registering
-`core.hooksPath`, and it did that by running `wf-pin-check --install-hook`. That script was removed on
-the user's explicit marks in the simplification release (`changes/1.31.0.md`), and `hooks.md` no longer
-carries the § The git pre-commit pin guard section this step and `invariants.md` row 21 both pointed at.
+**This step no longer installs anything, and it is no longer a no-op.** It wired a commit-time
+pin-and-dependabot guard by registering `core.hooksPath`, and it did that by running `wf-pin-check
+--install-hook`. That script was removed on the user's explicit marks in the simplification release
+(`changes/1.31.0.md`), and `hooks.md` no longer carries the § The git pre-commit pin guard section this
+step and `invariants.md` row 21 both pointed at.
 
-**The step is kept as a numbered placeholder rather than deleted** so that Step 6-H and Step 6a keep the
+**Removing the script stopped new installs and removed the guard from no project that already had
+one.** MEASURED 2026-10-10 across one workstation's projects: four repositories still had
+`core.hooksPath = .claude/workforce/git-hooks` and a frozen 48 KB copy of the retired script running on
+every commit — in one of them rewriting manifests inside gitignored directories and re-adding an npm
+entry to `.github/dependabot.yml` each time the user removed it. A retirement nothing performs is a
+record of an intention.
+
+**What runs here now is the removal, through the heal this audit already runs** —
+`wf-settings-apply --root <project> --heal`, display first and `--execute` on consent:
+
+```bash
+wf-settings-apply --root <project> --heal            # DISPLAY: names what it would unwire
+wf-settings-apply --root <project> --heal --execute   # the consent
+```
+
+`--heal`'s git half (`heal_git_hooks`) acts only when `core.hooksPath` is EXACTLY
+`.claude/workforce/git-hooks`, which is the only value `--install-hook` ever set. A project pointing it
+anywhere else — including a `.claude/workforce/maintainers/git-hooks` the project itself owns — is
+never touched. Every hook that lived only in the guard directory is copied into the repository's real
+hooks directory BEFORE the config is restored, so nothing stops running; the guard copy goes only when
+it carries the header the removed `wf-pin-check` wrote, and any other copy goes only when it is
+byte-identical to the one already in place. **It never commits.** Report the unstaged deletion to the user: until it is committed,
+only this clone is healed.
+
+**Nothing here needs typing in the ordinary case.** The same function runs at SessionStart from
+`wf-commitments`, so a project heals the first time anybody opens it after the scripts land (the
+2026-09-07 directive, "the next use of workforce will heal the situation"). This step is where an audit
+confirms it happened and reports what is still unstaged.
+
+**The step is kept at its number rather than renumbered** so that Step 6-H and Step 6a keep the
 positions every other file cites, and so a reader who finds the guard described in an older org's
-records can see here what happened to it rather than concluding the audit skipped a step.
+records can see here what happened to it.
 
 *Found 2026-09-09 by `wf-live`, which reads the tree and reports where a live procedure names something
 that is not there. The simplification release reported healing 171 dangling references across 31 files

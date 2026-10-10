@@ -18793,6 +18793,213 @@ check(
     "hook that never ran an index",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# A RETIREMENT THAT REACHED NO PROJECT THAT ALREADY HAD IT (pin guard, 2026-10-10)
+#
+# `wf-pin-check` was deleted in 1.31.0 (90fb341) and `RETIRED_HOOKS` removes its SETTINGS
+# row. Its other half was never a settings row: `--install-hook` pointed `core.hooksPath`
+# at `.claude/workforce/git-hooks` inside the repository and copied the 48 KB script there,
+# so every commit in every project that ever ran it still executes a frozen copy. MEASURED
+# 2026-10-10 across ~/lab/*: four repositories in that state, one of them re-adding an npm
+# entry to `.github/dependabot.yml` on every commit from a walker that ignored .gitignore.
+#
+# TEN `githook-*` FIXTURES REPLAY THE TREES. What a fixture cannot see is whether the
+# recognition is still the EXACT value (a looser test reaches apps-odyssey-alive's own
+# maintainers/git-hooks), whether the carrier still carries it, and whether the documents
+# that promise the heal still describe it. The run below is RUN rather than read, because
+# the two properties that matter most — a hook that lived only in the guard directory
+# survives, and the second pass is silent — are properties of a real repository.
+_pg_sa = read("workforce/bin/wf-settings-apply")
+_pg_cm = read("workforce/bin/wf-commitments")
+_pg = []
+if 'PIN_HOOKS_DIR_REL = ".claude/workforce/git-hooks"' not in _pg_sa:
+    _pg.append("the recognised hooksPath value is gone from wf-settings-apply — it is the "
+               "whole of the recognition, and the four measured projects are identified by "
+               "nothing else")
+if 'current != PIN_HOOKS_DIR_REL' not in _pg_sa:
+    _pg.append("the exact comparison is gone: apps-odyssey-alive points core.hooksPath at "
+               ".claude/workforce/maintainers/git-hooks, its OWN pre-commit and commit-msg, "
+               "and any prefix or substring test unwires it")
+if '"""wf-pin-check — pin every dependency spec' not in _pg_sa:
+    _pg.append("the wf-pin-check header is gone, so nothing authorises deleting a file "
+               "called pre-commit and the guard copy would be left behind or, worse, a "
+               "project's own pre-commit deleted")
+if "--git-common-dir" not in _pg_sa or "--git-path hooks" not in _pg_sa:
+    _pg.append("the hooks directory is no longer resolved through git: `--git-path hooks` "
+               "HONOURS core.hooksPath (measured, git 2.55.0, it answers "
+               ".claude/workforce/git-hooks), so the heal would compare every guard copy "
+               "against itself and delete the directory it was emptying into — and a "
+               "literal .git/hooks is wrong in a worktree and in a submodule")
+if "heal_git_hooks(root, execute)" not in _pg_sa:
+    _pg.append("--heal no longer runs the git half, so `verify` § Hook wiring and audit "
+               "Step 6-G report on half of what a retirement left behind")
+if "heal_git_hooks(root, True, quiet=True, progress=progress)" not in _pg_cm:
+    _pg.append("wf-commitments' SessionStart heal no longer calls the git half — and that "
+               "registration is the only carrier that reaches a project with no audit and "
+               "no settings write (its own docstring, 2026-09-07 directive)")
+if '"hooksPath" not in fh.read()' not in _pg_cm:
+    _pg.append("the SessionStart gate no longer ends on one read of .git/config: this hook "
+               "fires in every project on every machine, so a subprocess on the no-hit path "
+               "is paid by every session everywhere")
+check(
+    "pin guard: the git half is recognised by the exact hooksPath and rides the existing carrier",
+    not _pg,
+    "; ".join(_pg),
+)
+
+# RUN, NOT READ. Four properties no fixture row states: that a hook living ONLY in the
+# guard directory is still runnable afterwards, that the second pass says and writes
+# nothing, that a repository pointing core.hooksPath somewhere else is byte-identical after
+# an --execute run, and that the sidecar keeps its own indentation (it is TRACKED in two of
+# the four projects, so a reformat lands in somebody's commit as a diff they did not make).
+def _pin_guard_run():
+    import tempfile
+    tool = os.path.join(ROOT, "workforce/bin/wf-settings-apply")
+    env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
+               GIT_CONFIG_NOSYSTEM="1")
+    sidecar = ('{\n    "git_config": {\n        "core.hooksPath": {\n'
+               '            "set_to": ".claude/workforce/git-hooks",\n'
+               '            "prior": null\n        }\n    },\n    "hooks_added": []\n}\n')
+    got = {}
+
+    def git(d, *a):
+        return subprocess.run(["git", "-C", d] + list(a), capture_output=True, text=True,
+                              env=env, timeout=60)
+
+    def heal(d):
+        r = subprocess.run([sys.executable, tool, "--root", d, "--heal", "--execute"],
+                           capture_output=True, text=True, env=env, timeout=120)
+        return r.returncode, r.stdout + r.stderr
+
+    def build(d, hooks_rel):
+        hd = os.path.join(d, *hooks_rel.split("/"))
+        os.makedirs(hd)
+        with open(os.path.join(hd, "pre-commit"), "w") as fh:
+            fh.write('#!/usr/bin/env python3\n"""wf-pin-check — pin every dependency spec '
+                     'that can be pinned.\n"""\n')
+        with open(os.path.join(hd, "post-merge"), "w") as fh:
+            fh.write("#!/bin/sh\nexec git lfs post-merge \"$@\"\n")
+        os.makedirs(os.path.join(d, ".claude", "workforce"), exist_ok=True)
+        with open(os.path.join(d, ".claude/workforce/.settings-owned.json"), "w") as fh:
+            fh.write(sidecar)
+        git(d, "init", "-q")
+        git(d, "config", "--local", "core.hooksPath", hooks_rel)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ours = os.path.join(tmp, "ours")
+        os.makedirs(ours)
+        build(ours, ".claude/workforce/git-hooks")
+        got["first"] = heal(ours)
+        got["hooks_path"] = git(ours, "config", "--local", "--get", "core.hooksPath").stdout.strip()
+        got["dir_gone"] = not os.path.exists(os.path.join(ours, ".claude/workforce/git-hooks"))
+        _hd = git(ours, "rev-parse", "--git-common-dir").stdout.strip()
+        _hd = _hd if os.path.isabs(_hd) else os.path.join(ours, _hd)
+        got["carried"] = os.path.isfile(os.path.join(_hd, "hooks", "post-merge"))
+        got["sidecar"] = read(os.path.join(ours, ".claude/workforce/.settings-owned.json"))
+        got["second"] = heal(ours)
+        got["settled"] = read(os.path.join(ours, ".claude/workforce/.settings-owned.json")) \
+            == got["sidecar"]
+        # A `.claude` LINKED OUT OF THE PROJECT (CWE-59). The guard directory's name is a
+        # constant, so the only way it can point outside is a link on the way to it — and
+        # then `os.remove` would be aimed at files in the link's target, chosen by whoever
+        # wrote the tree. The settings half refuses the same shape (`_project_refusal`).
+        linked, outside = os.path.join(tmp, "linked"), os.path.join(tmp, "outside")
+        os.makedirs(linked)
+        build(outside, ".claude/workforce/git-hooks")
+        os.symlink(os.path.join(outside, ".claude"), os.path.join(linked, ".claude"))
+        git(linked, "init", "-q")
+        git(linked, "config", "--local", "core.hooksPath", ".claude/workforce/git-hooks")
+        got["linked"] = heal(linked)
+        got["linked_kept"] = (
+            os.path.isfile(os.path.join(outside, ".claude/workforce/git-hooks/pre-commit"))
+            and git(linked, "config", "--local", "--get", "core.hooksPath").stdout.strip()
+            == ".claude/workforce/git-hooks")
+        # THE SHAPE THE FAST PATH CANNOT REFUSE, which is what makes the `==` load-bearing:
+        # `.claude/workforce/git-hooks-custom` CONTAINS the recognised value, so the
+        # config-text gate opens and only the exact comparison stops the heal. FOUND BY
+        # bin/prove 2026-10-10: with the comparison deleted, `theirs` below was still
+        # refused by the gate's literal and the case reported BAD-CASE — the exactness was
+        # pinned by a read-based assertion and by nothing that RAN.
+        sibling = os.path.join(tmp, "sibling")
+        os.makedirs(sibling)
+        build(sibling, ".claude/workforce/git-hooks-custom")
+        got["sibling"] = heal(sibling)
+        got["sibling_kept"] = (
+            os.path.isfile(os.path.join(sibling,
+                                        ".claude/workforce/git-hooks-custom/pre-commit"))
+            and git(sibling, "config", "--local", "--get",
+                    "core.hooksPath").stdout.strip() == ".claude/workforce/git-hooks-custom")
+        theirs = os.path.join(tmp, "theirs")
+        os.makedirs(theirs)
+        build(theirs, ".claude/workforce/maintainers/git-hooks")
+        before = sorted((p, open(os.path.join(dp, f), "rb").read())
+                        for dp, _dn, fns in os.walk(theirs) if ".git/" not in dp + "/"
+                        for f in fns for p in [os.path.join(dp, f)])
+        got["theirs"] = heal(theirs)
+        got["theirs_same"] = (sorted((p, open(p, "rb").read()) for p, _b in before) == before
+                              and git(theirs, "config", "--local", "--get",
+                                      "core.hooksPath").stdout.strip()
+                              == ".claude/workforce/maintainers/git-hooks")
+    return got
+
+
+import shutil as _pg_sh                        # a run-based case needs the real git
+
+if not _pg_sh.which("git"):
+    skip("pin guard: the stranded guard is unwired, what lived only in it survives, twice",
+         "no git on this host, so the heal cannot be run against a real repository")
+else:
+    _pgr = _pin_guard_run()
+    check(
+        "pin guard: the stranded guard is unwired, what lived only in it survives, twice",
+        _pgr["first"][0] == 0 and _pgr["hooks_path"] == "" and _pgr["dir_gone"]
+        and _pgr["carried"] and "git_config" not in _pgr["sidecar"]
+        and '    "hooks_added"' in _pgr["sidecar"]
+        and _pgr["second"][0] == 0 and "GIT HOOK" not in _pgr["second"][1]
+        and "HEALED" not in _pgr["second"][1] and _pgr["settled"]
+        and _pgr["theirs"][0] == 0 and "GIT HOOK" not in _pgr["theirs"][1]
+        and _pgr["theirs_same"]
+        and "resolves outside the project" in _pgr["linked"][1] and _pgr["linked_kept"]
+        and _pgr["sibling"][0] == 0 and "GIT HOOK" not in _pgr["sibling"][1]
+        and _pgr["sibling_kept"],
+        f"first run {_pgr['first']!r}; core.hooksPath now {_pgr['hooks_path']!r}; guard dir "
+        f"gone: {_pgr['dir_gone']}; post-merge carried into the real hooks dir: "
+        f"{_pgr['carried']}; sidecar now {_pgr['sidecar']!r}; second run "
+        f"{_pgr['second']!r} and settled: {_pgr['settled']}; a repository whose "
+        f"core.hooksPath is its OWN maintainers/git-hooks: {_pgr['theirs']!r}, untouched: "
+        f"{_pgr['theirs_same']}; a project whose hooksPath CONTAINS the recognised value "
+        f"(.claude/workforce/git-hooks-custom): {_pgr['sibling']!r}, untouched: "
+        f"{_pgr['sibling_kept']}; a project whose `.claude` is a link OUT of the tree: "
+        f"{_pgr['linked']!r}, left alone: {_pgr['linked_kept']}. "
+        f"Unsetting core.hooksPath turns off every hook that lived "
+        f"only in that directory, which is how a heal breaks git-lfs; a second pass that "
+        f"writes runs at every session start in every project; and a reformatted sidecar "
+        f"lands in somebody's commit as a diff they did not make",
+    )
+
+# THE DOCUMENTS THAT PROMISE THE HEAL DESCRIBE THE ONE THAT EXISTS. Step 6-G was a
+# placeholder reading "RETIRED … Nothing runs here" while four projects still ran the guard
+# on every commit, which is the gap this closes: a retired mechanism whose removal nothing
+# performs is a record of an intention.
+_pg_docs = []
+for _f, _lits in (
+        ("workforce/references/procedures/audit.md",
+         ("`wf-settings-apply --root <project> --heal`", "stranded")),
+        ("workforce/references/procedures/verify.md", ("heal_git_hooks", "core.hooksPath")),
+        ("workforce/SKILL.md", ("core.hooksPath",)),
+        ("workforce/references/invariants.md", ("core.hooksPath",))):
+    for _lit in _lits:
+        if _lit not in read(_f):
+            _pg_docs.append(f"{os.path.basename(_f)} no longer carries {_lit!r}")
+check(
+    "pin guard: the records that retired it name the heal that removes it",
+    not _pg_docs,
+    "; ".join(_pg_docs) + ". audit Step 6-G said `RETIRED … Nothing runs here` for the "
+    "whole time four projects on this workstation were still running the guard on every "
+    "commit — a retirement nothing performs is an intention, and the record is where that "
+    "becomes visible",
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report

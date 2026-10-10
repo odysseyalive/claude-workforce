@@ -3,7 +3,7 @@
 <!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 36 assertion(s) in bin/check name this file; 72 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Headless-safe, executes
 immediately, and read-only with TWO narrow exceptions: § Hook wiring removes this project's workforce hook rows
-whose script the distribution retired, before it counts, because a row that fails on every event is not a finding anybody
+whose script the distribution retired — and the retired pin guard's `core.hooksPath` git hook with them — before it counts, because a row that fails on every event is not a finding anybody
 should have to act on; and § Deferred tier canary records a canary PASS it measured this run into
 `.claude/workforce/platform-local.md` and nothing else, because a measurement is data about the host, not
 a change to the project (§ Output says why these are the only writes).
@@ -184,6 +184,16 @@ then records the removal in `.settings-owned.json` § `hooks_removed`. It is `he
 `wf-settings-apply`, the same function `--wire-defaults` and every session start (`wf-commitments` at
 `SessionStart`) run, so this step usually finds nothing: the session it runs in already healed the
 project when it opened.
+
+**The same command also unwires the retired pin guard's GIT hook** (`heal_git_hooks`, the git half of
+the same heal). `wf-pin-check --install-hook` registered its guard in `git config` and in a directory
+inside the repository rather than in a settings row, so retiring the script in 1.31.0 left it running
+on every commit in every project that already had it — MEASURED 2026-10-10, four repositories on one
+workstation. It acts only when `core.hooksPath` is EXACTLY `.claude/workforce/git-hooks`, carries every
+hook that lived only in that directory into the repository's real hooks directory before restoring the
+config, and **never commits**: report the unstaged deletion, because until it is committed only this
+clone is healed. A `core.hooksPath` with any other value — a project's own
+`.claude/workforce/maintainers/git-hooks` included — is never touched and is not a finding.
 
 **Then report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
 --execute`. `DEAD WIRING` left after the heal is one it does not own: a foreign script → `wf-apply
