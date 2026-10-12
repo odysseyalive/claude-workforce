@@ -178,6 +178,30 @@ it fires on any running task. In a subagent it seems to fire every time. That is
 - K4. Measure false fires against the 1,269 subagent transcripts already used at `wf-widen:755–760`, before shipping,
   against the same 1.5% budget.
 
+**Added after oa-work's history** (`/home/francis/lab/odyssey-alive/.claude/workforce/work/turnlimit-analysis-20261012/HISTORY.md`,
+384 lines, sourced, 7 items marked UNSOURCED): **45 cut-offs in 269 capped-IC dispatches (16%), none of which
+delivered a report.** `engineering-site` was cut on 14 of 24 dispatches. 11 of the 43 cut agents were on daily lookup
+orders, so this is not a build-order problem only. The 2026-09-25 incremental-OUTPUT clause did not lower the weekly
+rate: W40 16/66 came after it. Two more defects are at the shipped level, and both are fixed in hooks, not by audit:
+
+- K5. **A cap hit files its own PERF record.** `ledger.md:42` has required a PERF on every cap hit since 2026-07-29.
+  The project filed 0 against 45 cuts, because the rule has a reader and no producer. The `SubagentStop` path already
+  sees the stop, so it writes the PERF mechanically when the agent stopped at its cap without an OUTPUT.md
+  (HISTORY.md §4, "8 to 0 by 09-15").
+- K6. **The directive check moves to spawn time.** Every handbook makes the agent hash its directive files itself, and
+  STOP on a mismatch (`handbook-templates.md:346–352`). That costs calls on every order. One audit-written wrong sha
+  also halted every `business-analyst` order from 08-06 to 09-04, through 13 audits
+  (HISTORY.md:235, :338; `DEF-2026-09-04-business-analyst-directive-sha-drift.md`). `wf-task-tag`'s `SubagentStart`
+  branch already injects into every spawn (`workforce/bin/wf-task-tag:588`). It computes the shas there, compares
+  them to the handbook's declared values, and injects one line: verified, so skip the check, or DRIFT naming the
+  file, declared sha and actual sha. A drift therefore surfaces on the first spawn after it is written, in every
+  project, without an audit.
+
+**Recorded, not built here:** the incremental-OUTPUT clause contradicting "write once" (HISTORY.md:339), and
+`wf-conform`'s advisory row that only tests for a word (HISTORY.md:353). Both are audit-authored text. With the turn
+boundary and K3 in place, the runtime guarantees a written OUTPUT.md at hand-back, so the incremental clause is no
+longer needed. Removing it is a cleanup for the next release that touches the template.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
