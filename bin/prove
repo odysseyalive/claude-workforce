@@ -705,6 +705,30 @@ CASES = [
      WDN, "append", '\n_SECOND = (lambda payload: payload.get("background_tasks"))\n'),
     ("widen: background_tasks is read once, for the promise trigger, and nothing else",
      WDN, "del", "    if declared_hold(payload, reply):\n        return None\n"),
+    # ── K2b: several widened events at once, one slot each (2026-10-12) ──
+    # THE KEY, THE SLOT AND THE READER, each broken on its own. The first is the whole
+    # defect in one expression: with the agent dropped from the name, the main session and
+    # every live agent share one tag, so `SubagentStart` erases the user's ask and the last
+    # agent to stop owns the file. The `else sid` branch stays, so the module still parses
+    # and the main session's own name is unchanged — the mutation is exactly the pre-K2b
+    # behaviour rather than a broken file.
+    ("widen: concurrent judgments are keyed per agent, and each is judged against its own order",
+     TTAG, "del", 'f"{sid}.{aid}" if aid else '),
+    # THE SLOT. `SubagentStart` is the only event that knows an agent started, so with the
+    # open removed no stop has state of its own and no agent is judged against its order.
+    ("widen: concurrent judgments are keyed per agent, and each is judged against its own order",
+     TTAG, "del", "        open_agent_tag(payload)\n"),
+    # THE READER'S RULE, measured in fact 22b (d). Without `isSidechain` the first `user`
+    # row of any kind is taken, which in the fixture is the parent's narration — a dropped
+    # guard, not a syntax error, and the ask it yields is somebody else's.
+    ("widen: concurrent judgments are keyed per agent, and each is judged against its own order",
+     WDN, "del", ' or not d.get("isSidechain")'),
+    # THE BAIL-OUT THAT REPLACED THE EVENT-NAME ONE. Deleting it leaves the `stop_hook_active`
+    # guard and the confirmed-reply guard in place and the expression valid, so a stop with no
+    # `agent_id` reaches the hand-off and spends the main turn's checklist — which is what the
+    # old `SubagentStop` test was there to stop and what `own_tag` now stops by whose-state.
+    ("widen: a stop with no state of its own never consumes the main session's checklist",
+     WDN, "del", "own_tag(payload) is None\n            or "),
     # ONE PROVEN CASE, NOT TWO WITH A VACUOUS ONE. A case deleting
     # `def read_targets(name, inp):` orphans its body, so bin/check fails on syntax and
     # the NAMED check never runs — `did NOT fire — 2 other failures`. A case that cannot

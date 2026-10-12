@@ -366,8 +366,12 @@ def asks_expected(payload):
     `Stop` in a session that started mid-flight — and asserting a shape against a count
     nobody took is the vacuous-pass shape this project refuses everywhere.
     """
+    # THE KEY IS THE SIBLING'S, the file name is this hook's own. `state_component` keys by
+    # session AND agent since 2026-10-12 (fact 22b c); this hook runs on the main `Stop`,
+    # where that resolves to the session alone, which is exactly how a drift in the key would
+    # go unnoticed here.
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = TT.session_component(payload)
+    sid = TT.state_component(payload)
     try:
         with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
             tag = json.load(fh)

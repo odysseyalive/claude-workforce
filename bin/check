@@ -15561,6 +15561,17 @@ def _cl_escape():
                  _CL_NOBLIND, sid=sid)
         _cl_hook(d, "wf-commitments", {"hook_event_name": "Stop",
                                        "last_assistant_message": "ok"}, sid=sid)
+        # `agent_id` IS THE SAME SINK, added 2026-10-12 when the state became keyed by agent
+        # too. It reaches `os.path.join` through the same `state_component`, so it is walked
+        # with the same payload — a sanitiser that covers one field and not the other is the
+        # measured escape arriving through the newer one.
+        for n in ("wf-task-tag.a", "wf-asks.a"):
+            os.makedirs(os.path.join(d, n), exist_ok=True)
+        _cl_hook(d, "wf-task-tag", {"hook_event_name": "SubagentStart",
+                                    "agent_id": "a/../../escaped", "agent_type": "x"})
+        _cl_hook(d, "wf-widen", {"hook_event_name": "SubagentStop",
+                                 "agent_id": "a/../../escaped",
+                                 "last_assistant_message": "ok"}, _CL_NOBLIND)
         try:
             with open(os.path.join(root, "escaped.json")) as fh:
                 kept = fh.read() == "sentinel"
@@ -15944,6 +15955,173 @@ check(
     "widen: background_tasks is read once, for the promise trigger, and nothing else",
     not _wd_bg,
     "; ".join(_wd_bg),
+)
+
+
+# ── SEVERAL WIDENED EVENTS AT ONCE, 2026-10-12 ───────────────────────────────────────────
+# The user: *"we may have multiple widened events that are being tracked at any one time, and
+# so is that also being taken into effect?"* They were not. Every piece of widen state was
+# keyed by `session_id` alone, and MEASURED (platform.md fact 22b c) a subagent's payloads
+# carry the PARENT's `session_id` on `SubagentStart`, every `PostToolUse` and `SubagentStop`.
+# So the main session and every concurrent agent shared ONE tag and ONE checklist file. While
+# agents were never judged that cost nothing; K2 (034b5d6) made them judged, and from that
+# commit on every agent would have been scored against the USER's message instead of its own
+# work order, with two agents finishing at once writing the same file.
+#
+# THE RUN BELOW IS THE CASE: the main session and two agents, each with a differently-tagged
+# ask, stopping while all three are live in one scratchpad. Every assertion RUNS the hooks.
+_WDK_MAIN = ("why was the asks checklist keyed by the session alone, and was that "
+             "deliberate? 1. read the record 2. tell me what it says")      # history/hearing
+_WDK_A1 = "list every hook wired into the settings file and say how many there are"  # taste
+_WDK_A2 = "verify that the turn budget hook still fires, and prove it runs"          # touch
+_WDK_MR = "The record says it was keyed that way from the start.\n\nBoth items are answered."
+_WDK_R1 = "Nine hooks are wired into the settings file."
+_WDK_R2 = "The hook fires on every tool call."
+_WDK_ITEMS = [{"ask": "read the record", "status": "done"},
+              {"ask": "tell me what it says", "status": "done"}]
+
+
+def _wdk_transcript(d, name, ask, reply, stray=False, tool_result=False):
+    """An agent's own transcript: its spawn prompt as the first `isSidechain` `user` row, one
+    Read, then its reply. `stray` puts a NON-sidechain row ahead of the order, and
+    `tool_result` adds the later, textless `user` row a real tool call leaves behind."""
+    p = os.path.join(d, name)
+    with open(p, "w") as fh:
+        if stray:
+            fh.write(json.dumps({"type": "user",
+                                 "message": {"content": "parent narration"}}) + "\n")
+        fh.write(json.dumps({"type": "user", "isSidechain": True,
+                             "message": {"content": ask}}) + "\n")
+        fh.write(json.dumps({"type": "assistant", "isSidechain": True, "message": {"content": [
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "/a/hooks.md"}}]}})
+            + "\n")
+        if tool_result:
+            fh.write(json.dumps({"type": "user", "isSidechain": True, "message": {"content": [
+                {"type": "tool_result", "content": "ok"}]}}) + "\n")
+        fh.write(json.dumps({"type": "assistant", "isSidechain": True, "message": {"content": [
+            {"type": "text", "text": reply}]}}) + "\n")
+    return p
+
+
+def _wdk_items(cl):
+    """The asks on a checklist file, read the way the shipped definition reads them."""
+    return [i.get("ask") for i in (cl.get("items") or []) if isinstance(i, dict)]
+
+
+def _wdk_tag(d, name):
+    try:
+        with open(os.path.join(d, name)) as fh:
+            tag = json.load(fh)
+        return tag if isinstance(tag, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _wdk_concurrent():
+    """Main + two agents, all three live, stopping one after another in one scratchpad."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": _WDK_MAIN})
+        _cl_put(d, "wf-asks.c1.json", {"prompt": _WDK_MAIN, "items": _WDK_ITEMS})
+        for aid in ("a1", "a2"):
+            _cl_hook(d, "wf-task-tag", {"hook_event_name": "SubagentStart", "agent_id": aid,
+                                        "agent_type": "engineering-coder"})
+        main_t = _rc_transcript(d, _WDK_MR, "main.jsonl")
+        t1 = _wdk_transcript(d, "t1.jsonl", _WDK_A1, _WDK_R1, stray=True)
+        t2 = _wdk_transcript(d, "t2.jsonl", _WDK_A2, _WDK_R2, tool_result=True)
+        notes = {}
+        for aid, t, said in (("a1", t1, _WDK_R1), ("a2", t2, _WDK_R2)):
+            out = _cl_hook(d, "wf-widen", {
+                "hook_event_name": "SubagentStop", "agent_id": aid, "transcript_path": main_t,
+                "agent_transcript_path": t, "last_assistant_message": said}, _CL_NOBLIND)[1]
+            notes[aid] = out.get("systemMessage") or ""
+        # THE MAIN TURN'S OWN STATE, read AFTER both agents have stopped and BEFORE its own
+        # Stop runs: whatever an agent did to it, it did here.
+        mid = {"ended": (_wdk_tag(d, "wf-task-tag.c1.json").get("checklist") or {}).get("ended"),
+               "items": _wdk_items(_wdk_tag(d, "wf-asks.c1.json")),
+               "agent_flags": sorted(n for n in os.listdir(d)
+                                     if n.startswith("wf-widen-flag.c1."))}
+        notes["main"] = (_cl_hook(d, "wf-widen", {
+            "hook_event_name": "Stop", "transcript_path": main_t,
+            "last_assistant_message": _WDK_MR}, _CL_NOBLIND)[1].get("systemMessage") or "")
+        flag = _wdk_tag(d, "wf-widen-flag.c1.json").get("ask") or {}
+        return {"notes": notes, "mid": mid,
+                "asks": {n: _wdk_tag(d, f"wf-task-tag.c1{n}.json").get("prompt")
+                         for n in ("", ".a1", ".a2")},
+                "flag_prompt": flag.get("prompt") or "",
+                "flag_items": [i.get("ask") for i in (flag.get("checklist") or [])]}
+
+
+_wdk = _wdk_concurrent()
+_wdk_bad = []
+if _wdk["asks"] != {"": _WDK_MAIN, ".a1": _WDK_A1, ".a2": _WDK_A2}:
+    _wdk_bad.append(f"the three tags do not hold three asks: {_wdk['asks']}")
+if "existence claim" not in _wdk["notes"]["a1"] or "taste NOT OPENED" not in _wdk["notes"]["a1"]:
+    _wdk_bad.append(f"agent a1 was not judged on ITS order (enumerate a set, so taste): "
+                    f"{_wdk['notes']['a1']!r}")
+if "behaviour claim" not in _wdk["notes"]["a2"] or "touch NOT OPENED" not in _wdk["notes"]["a2"]:
+    _wdk_bad.append(f"agent a2 was not judged on ITS order (prove it runs, so touch): "
+                    f"{_wdk['notes']['a2']!r}")
+if "hearing" in _wdk["notes"]["a1"] or "hearing" in _wdk["notes"]["a2"]:
+    _wdk_bad.append("an agent was judged on the MAIN session's `history` ask — the user's "
+                    "message handed to an agent as its work order, which is the whole defect")
+if "history claim" not in _wdk["notes"]["main"] or "hearing NOT OPENED" not in _wdk["notes"]["main"]:
+    _wdk_bad.append(f"the main turn lost its own verdict to the agents: "
+                    f"{_wdk['notes']['main']!r}")
+# NO FILE CROSSING, stated as the files themselves rather than as an outcome.
+if _wdk["mid"]["agent_flags"]:
+    _wdk_bad.append(f"an agent raised a widen flag: {_wdk['mid']['agent_flags']}. Only the "
+                    "main turn has a reader for one (`wf-widen-agent` is on `Stop` alone)")
+if _wdk["mid"]["ended"] or _wdk["mid"]["items"] != [i["ask"] for i in _WDK_ITEMS]:
+    _wdk_bad.append(f"an agent's stop consumed the main session's checklist: {_wdk['mid']}")
+if _wdk["flag_prompt"] != _WDK_MAIN or _wdk["flag_items"] != [i["ask"] for i in _WDK_ITEMS]:
+    _wdk_bad.append(f"the main jury was handed the wrong ask or the wrong list: "
+                    f"{_wdk['flag_prompt']!r}, {_wdk['flag_items']}")
+check(
+    "widen: concurrent judgments are keyed per agent, and each is judged against its own order",
+    not _wdk_bad,
+    "; ".join(_wdk_bad) + f". (notes, mid-run main state)={_wdk['notes']}, {_wdk['mid']}. "
+    "Fact 22b (c): a subagent carries its PARENT's `session_id`, so state keyed by session "
+    "alone is ONE slot for the main turn and every live agent. Fact 22b (d): `SubagentStart` "
+    "has no `prompt` and no transcript yet, so the slot is OPENED there and the ask is "
+    "resolved at `SubagentStop` from the first `isSidechain` `user` row of "
+    "`agent_transcript_path`",
+)
+
+
+def _wdk_unkeyed():
+    """A `SubagentStop` carrying NO `agent_id` — fact 22b records that shape as unmeasured —
+    then the main Stop. Returns the main turn's checklist state after each."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": _WDK_MAIN})
+        _cl_put(d, "wf-asks.c1.json", {"prompt": _WDK_MAIN, "items": _WDK_ITEMS})
+        main_t = _rc_transcript(d, _WDK_MR, "main.jsonl")
+        t1 = _wdk_transcript(d, "t1.jsonl", _WDK_A1, _WDK_R1)
+        _cl_hook(d, "wf-widen", {"hook_event_name": "SubagentStop", "transcript_path": main_t,
+                                 "agent_transcript_path": t1,
+                                 "last_assistant_message": _WDK_R1}, _CL_NOBLIND)
+        after_agent = (_wdk_tag(d, "wf-task-tag.c1.json").get("checklist") or {}).get("ended")
+        _cl_hook(d, "wf-widen", {"hook_event_name": "Stop", "transcript_path": main_t,
+                                 "last_assistant_message": _WDK_MR}, _CL_NOBLIND)
+        flag = _wdk_tag(d, "wf-widen-flag.c1.json").get("ask") or {}
+        return (after_agent,
+                (_wdk_tag(d, "wf-task-tag.c1.json").get("checklist") or {}).get("ended"),
+                [i.get("ask") for i in (flag.get("checklist") or [])],
+                flag.get("prompt") or "")
+
+
+_wdk_un = _wdk_unkeyed()
+check(
+    "widen: a stop with no state of its own never consumes the main session's checklist",
+    _wdk_un == (False, True, [i["ask"] for i in _WDK_ITEMS], _WDK_MAIN),
+    f"(ended after the agent, ended after the main Stop, list handed over, prompt)={_wdk_un}. "
+    "The `SubagentStop` bail-out in `with_checklist` was removed on 2026-10-12 because the "
+    "state is keyed per agent now — but keying needs an `agent_id`, and a stop without one "
+    "resolves to the SESSION's files. Such a stop reaching the hand-off marks the main turn "
+    "ended and writes its own reply into the main jury's flag, so the real Stop arrives to "
+    "find its checklist already spent. What gates this is whose state it is (`own_tag`), "
+    "never the event name",
 )
 
 check(

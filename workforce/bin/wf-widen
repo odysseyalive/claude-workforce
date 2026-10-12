@@ -126,6 +126,11 @@ def widen_flag(payload):
 
     Cleared at the START of every turn by `wf-task-tag` on `UserPromptSubmit`, so a flag
     can never outlive the turn that raised it and drive a widening nobody asked for.
+
+    SESSION-KEYED, AND DELIBERATELY NOT PER AGENT, while the tag and the checklist beside it
+    became both on 2026-10-12. This file has exactly one reader — `wf-widen-agent`, registered
+    on `Stop` and nothing else — so a flag under an agent's name would be read by nothing. No
+    agent writes here either: `raise_flag` is reached only when `not subagent`.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = TT.session_component(payload)
@@ -221,9 +226,114 @@ def task_tag(payload):
 
 
 def tag_file(payload):
-    """Path to the tag `wf-task-tag` writes for this session."""
+    """Path to the tag `wf-task-tag` writes for this stop: keyed by session AND agent, since
+    a subagent carries its parent's `session_id` (fact 22b c). The KEY is the sibling's
+    `state_component` — a restated key is the one that drifts — and only the file name is
+    spelled out, for the pairing reason given in `checklist` below."""
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    return os.path.join(d, f"wf-task-tag.{TT.session_component(payload)}.json")
+    return os.path.join(d, f"wf-task-tag.{TT.state_component(payload)}.json")
+
+
+def own_tag(payload):
+    """The tag belonging to the thing that is STOPPING, or None when it has none.
+
+    Main `Stop`: the session's tag, as it always was. A `SubagentStop` carrying an
+    `agent_id`: the agent's own file, opened at `SubagentStart` and keyed by session and
+    agent, with its ask resolved by `resolve_agent_ask` below.
+
+    None IN TWO CASES, and each is a file that is not this stop's to read:
+
+      no `agent_id` on a `SubagentStop`   `state_component` then falls back to the session's
+                                          name, which is the MAIN turn's tag — the user's
+                                          message, not this agent's order. Fact 22b records
+                                          a `type: "agent"` hook's stop as outside what was
+                                          measured, so the field is not assumed present.
+      no slot opened                      an agent this installation never saw start, so
+                                          nobody recorded its ask. It is judged on its reply
+                                          alone — claims and the promise trigger still run —
+                                          rather than against an ask reconstructed here.
+
+    This is the whole reason the tag is safe to consult on a subagent at all. Until
+    2026-10-12 it was skipped there, and the skip was correct: the file was the session's.
+    """
+    if payload.get("hook_event_name") == "SubagentStop" and not TT.agent_component(payload):
+        return None
+    return task_tag(payload)
+
+
+def spawn_prompt(payload):
+    """The stopping agent's own work order, verbatim, or "".
+
+    MEASURED 2026-10-12 on 2.1.296 (platform.md fact 22b d): the first `isSidechain` `user`
+    row of `agent_transcript_path` IS the spawn prompt, read back verbatim. This is the first
+    event where it can be read at all — `SubagentStart` carries no `prompt` and the file does
+    not exist yet — so it is read here or the agent has no recorded ask.
+
+    THE FIRST SUCH ROW, NEVER THE LAST. An agent's transcript fills with later `user` rows:
+    tool results carry no text at all, and an injected notification is whatever interrupted
+    it most recently. The newest is the one thing that is certainly not the order.
+
+    `isSidechain` IS PART OF THE RULE, not decoration: it is what marks a row as belonging to
+    the spawned side of the conversation rather than to the session that spawned it.
+    """
+    for line in TL._read_lines(payload.get("agent_transcript_path")) or []:
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(d, dict) or d.get("type") != "user" or not d.get("isSidechain"):
+            continue
+        m = d.get("message")
+        c = m.get("content") if isinstance(m, dict) else None
+        if isinstance(c, str):
+            return c
+        # THE LEDGER'S OWN DEFINITION OF A ROW'S TEXT (`_texts`), not a second copy of it.
+        # It assumes dict blocks, as its own caller pre-filters for, so the filter is here.
+        texts = TL._texts([b for b in c if isinstance(b, dict)]) if isinstance(c, list) else []
+        # THE FIRST ROW IS THE ASK OR THERE IS NONE. Falling through to the next row on an
+        # unreadable one is how the ask becomes a tool result three calls later.
+        return "\n".join(texts) if texts else ""
+    return ""
+
+
+def resolve_agent_ask(payload):
+    """Write the stopping agent's own work order onto the tag opened for it, and return it.
+
+    THE ASK IS CLASSIFIED BY THE SAME `classify` THE USER'S MESSAGES GO THROUGH, so an
+    agent's order gets the same docket a human's would: an order to enumerate a set needs
+    taste, an order to prove something runs needs touch. That is what "judged against its own
+    order" means mechanically, and it is the whole of K2b's point — before this, a judged
+    agent was handed the user's message as its ask.
+
+    IT NEVER CREATES THE FILE, AND NEVER WRITES WITHOUT AN `agent_id`. The slot is opened at
+    `SubagentStart` (`open_agent_tag`), the event that knows an agent started in this session;
+    see `own_tag` for what a missing slot means. Both guards are the same guard, and the
+    second one is measured: with only the first, a `SubagentStop` carrying no `agent_id`
+    resolved to the SESSION's tag and overwrote the user's ask and its checklist record with
+    the agent's spawn prompt mid-turn — caught by `bin/check`'s unkeyed-stop assertion on the
+    first run of this function.
+    """
+    if not TT.agent_component(payload):
+        return None
+    tag = task_tag(payload)
+    if tag is None:
+        return None
+    ask = spawn_prompt(payload)
+    hits = TT.classify(ask)
+    n, how = TT.count_asks(ask)
+    tag.update({"hits": hits, "prompt": ask[:2000],
+                "senses": sorted({h["sense"] for h in hits}),
+                "asks": n, "asks_why": how,
+                # AN AGENT KEEPS NO ASKS CHECKLIST. It is given one order and has no user to
+                # re-read it with; the list is the main session's artifact. Stated rather
+                # than left absent, so `checklist()` reads a decision instead of a gap.
+                "checklist": None})
+    try:
+        with open(tag_file(payload), "w", encoding="utf-8") as fh:
+            json.dump(tag, fh)
+    except OSError:
+        pass
+    return tag
 
 
 def instruments(cwd):
@@ -381,8 +491,12 @@ def just_finished(payload):
 
     The tag `wf-task-tag` wrote carries the message that started the turn, so this reads
     the same text the classifier read rather than re-deriving it from the transcript.
+
+    `own_tag`, SO IT IS THIS TURN'S NOTIFICATION. A notification never opens an agent's turn
+    — a spawn prompt does — and reading the session's tag on a subagent stop would spare an
+    agent the promise trigger because the MAIN turn happened to start on one.
     """
-    return bool(TT.NOTIFICATION.match((task_tag(payload) or {}).get("prompt") or ""))
+    return bool(TT.NOTIFICATION.match((own_tag(payload) or {}).get("prompt") or ""))
 
 
 def declared_hold(payload, reply):
@@ -1042,6 +1156,12 @@ def widen(payload):
     # transcript the reply came from, the session's tag is not its ask, and it never raises
     # the flag, because there is no reader for one but the turn that did not do the work.
     subagent = payload.get("hook_event_name") == "SubagentStop"
+    # AND ITS ASK IS ITS OWN WORK ORDER, resolved before anything reads a tag. The ask used
+    # to be dropped entirely on a subagent, because the only tag there was belonged to the
+    # session; now the agent has a tag of its own and the order it was actually given goes
+    # onto it (K2b, on the user's ask of 2026-10-12 about several widened events at once).
+    if subagent:
+        resolve_agent_ask(payload)
     # THE EVIDENCE AND THE CONCLUSION COME FROM ONE FILE. `reply_transcript` is the ledger's
     # own rule for where this stop's reply lives — the agent's transcript on `SubagentStop`,
     # the session's otherwise — and pointing the walk at it makes the pair inseparable: no
@@ -1137,11 +1257,12 @@ def widen(payload):
     # THE TAG IS ADDITIVE, never a replacement. A turn can trip a claim trigger AND
     # answer a tagged ask, and both senses are then required — taking one would drop
     # the other silently, which is the narrowing every mechanism here is built against.
-    # THE TAG IS THE SESSION'S ASK, so it is the main turn's and a subagent never inherits
-    # it: the spawned agent was given a different job by a different message, and scoring
-    # its reply against the user's tagged ask is the cross-turn case above in miniature.
+    # EACH STOP READS THE TAG THAT IS ITS OWN, and `own_tag` is where that is decided. A
+    # subagent never inherits the SESSION's ask — scoring its reply against the user's
+    # tagged message is the cross-turn case above in miniature — but since 2026-10-12 it has
+    # a tag under its own name holding its own work order, and that one is its ask.
     incident = False
-    for h in ([] if subagent else (task_tag(payload) or {}).get("hits") or []):
+    for h in (own_tag(payload) or {}).get("hits") or []:
         applicable.add(h["sense"])
         why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
         incident = incident or h["kind"] == "incident"
@@ -1179,7 +1300,7 @@ def widen(payload):
             blind = int(os.environ.get("WF_BLIND_SAMPLE") or 20)
         except ValueError:
             blind = 20
-        tag = task_tag(payload) or {}
+        tag = own_tag(payload) or {}
         ask = (tag.get("prompt") or "").strip()
         # WEIGHTED BY WHAT THE TURN DID, not by how the ask was worded — the one idea
         # worth keeping from the retired `diagnose` command, whose own critique was that
@@ -1343,9 +1464,15 @@ def checklist(payload):
     prompt, in the tag it writes. The checklist file is the session's. No record means no
     checklist this turn, whatever file is on disk. A record whose file is missing, unreadable
     or not an object is an EMPTY checklist, never a missing one.
+
+    THE KEY IS `wf-task-tag`'s — `state_component`, the session AND the agent — so a
+    concurrent agent's stop reads its own name and finds no list, where before the key was
+    the session's alone and every agent read the main turn's file. The FILE NAME is spelled
+    out here as it always was: `wf-live` pairs a hand-off's writer with its reader by that
+    literal, and a reader that resolves the name through a helper reads as no reader at all.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = TT.session_component(payload)
+    sid = TT.state_component(payload)
     p = os.path.join(d, f"wf-asks.{sid}.json")
     record = (task_tag(payload) or {}).get("checklist")
     if not isinstance(record, dict):
@@ -1422,6 +1549,15 @@ def with_checklist(payload):
     whose reply the transcript does not hold, since that is a side query and the list's turn
     is still going.
 
+    NOR DOES THE EVENT NAME, SINCE 2026-10-12. The bail-out on `SubagentStop` was the right
+    guard while every stop shared one tag and one checklist file: an agent reaching here read
+    the MAIN turn's record, handed the main turn's list to the jury with its own reply as the
+    conclusion, and marked the main turn ended so the real Stop got nothing. With the state
+    keyed by agent (K2b) the agent reads its own name instead and finds no list, because an
+    agent keeps no checklist. So what gates this is WHOSE STATE IT IS — `own_tag` — and a
+    stop with no state of its own is the one case that must still bail, which is a
+    `SubagentStop` carrying no `agent_id` (fact 22b records that shape as unmeasured).
+
     A RUNNING BACKGROUND TASK NO LONGER BAILS OUT HERE either (user rule, 2026-10-12). It
     was the same exemption as the one `widen` carried, arriving a second time: in an
     orchestrated run the array is non-empty on nearly every Stop, so the juror never saw a
@@ -1434,7 +1570,7 @@ def with_checklist(payload):
     TWO WAYS IN, so an unwritten or erased file cannot mute the juror: the tag counted two or
     more asks in the message, or the file holds two or more items.
     """
-    if (payload.get("stop_hook_active") or payload.get("hook_event_name") == "SubagentStop"
+    if (payload.get("stop_hook_active") or own_tag(payload) is None
             or TL.confirmed_reply(payload)[0] is None):
         return
     cl, record = checklist(payload)
@@ -1442,7 +1578,7 @@ def with_checklist(payload):
         return
     items = TT.checklist_items(cl)
     mark_ended(payload)
-    asks = (task_tag(payload) or {}).get("asks")
+    asks = (own_tag(payload) or {}).get("asks")
     if len(items) >= 2 or (isinstance(asks, int) and asks >= 2):
         hand_checklist_to_jury(payload, record, items)
 

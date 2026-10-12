@@ -470,11 +470,74 @@ def session_component(payload):
     return sid[:64] or "nosession"
 
 
-def tag_path(payload):
-    """Where the tag waits for `Stop`. Session-scoped, so two sessions never cross."""
-    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+def agent_component(payload):
+    """The subagent's id as ONE filename component, or "" when there is no subagent.
+
+    MEASURED 2026-10-12 on 2.1.296 (platform.md fact 22b): `agent_id` is present only in a
+    subagent's payloads — `SubagentStart`, its `PostToolUse` calls and `SubagentStop` — and
+    absent from the main thread's, even in an `--agent` session. It is therefore the ONLY
+    field that tells an agent apart from the session that spawned it.
+    """
+    aid = _UNSAFE_SID.sub("_", str(payload.get("agent_id") or ""))
+    return aid[:64]
+
+
+def state_component(payload):
+    """The filename component EVERY per-turn hook file is keyed by: the session, and the
+    agent too when one is stopping.
+
+    WHY THE AGENT HAS TO BE IN THE NAME. Fact 22b (c): a subagent's payloads carry the
+    PARENT session's `session_id`, identical on `SubagentStart`, `PostToolUse` and
+    `SubagentStop`. So a file keyed by `session_id` alone is ONE slot shared by the main
+    session and every concurrent agent. While agents were never judged that was harmless;
+    once they are (K2, 034b5d6), it means each agent reads the tag the USER's message wrote
+    and is judged against that message instead of its own work order, and two agents
+    finishing at once read and write the same file. The user's ask of 2026-10-12: *"we may
+    have multiple widened events that are being tracked at any one time, and so is that also
+    being taken into effect?"*
+
+    THE MAIN SESSION KEEPS TODAY'S NAMES, so a tag or checklist written before this change
+    still reads, and nothing already on disk is orphaned.
+    """
+    aid = agent_component(payload)
     sid = session_component(payload)
+    return f"{sid}.{aid}" if aid else sid
+
+
+def tag_path(payload):
+    """Where the tag waits for `Stop`. Keyed by session AND agent, so two sessions never
+    cross and neither do two concurrent judgments inside one session."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    sid = state_component(payload)
     return os.path.join(d, f"wf-task-tag.{sid}.json")
+
+
+def open_agent_tag(payload):
+    """Open the starting agent's OWN tag, under its own name, and record nothing else.
+
+    THE ASK IS EMPTY HERE AND IS NOT GUESSABLE. Fact 22b (d), measured: `SubagentStart`
+    carries no `prompt`, and the agent's transcript does not exist yet at that event
+    (`derived_exists: False`), so the order the agent was given cannot be read. `wf-widen`
+    fills it in at `SubagentStop` from the first `isSidechain` `user` row of
+    `agent_transcript_path`, the first event where that file exists.
+
+    SO THIS EVENT'S WHOLE JOB IS TO CLAIM THE SLOT. An opened slot is what says the state
+    under that name belongs to the agent: a stop with no slot is an agent this installation
+    never saw start, and `wf-widen` judges it on its reply alone rather than against an ask
+    reconstructed from whatever file happened to be under the session's name.
+
+    Never without an `agent_id`: that would resolve to the session's own tag and erase the
+    user's ask mid-turn.
+    """
+    if not agent_component(payload):
+        return
+    try:
+        with open(tag_path(payload), "w", encoding="utf-8") as fh:
+            json.dump({"hits": [], "prompt": "", "senses": [], "asks": None,
+                       "asks_why": "", "checklist": None,
+                       "agent": str(payload.get("agent_type") or "")}, fh)
+    except OSError:
+        pass
 
 
 # WHAT AN ITEM IS, defined beside the list it belongs to. `wf-widen` counts these toward the
@@ -508,9 +571,10 @@ CHECKLIST_MIN_WORDS = 12
 
 
 def checklist_path(payload):
-    """Where this turn's asks checklist lives. Session-scoped, like the tag."""
+    """Where this turn's asks checklist lives. Keyed exactly like the tag, so a concurrent
+    agent's stop can never read or rewrite the main session's list."""
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = session_component(payload)
+    sid = state_component(payload)
     return os.path.join(d, f"wf-asks.{sid}.json")
 
 
@@ -585,7 +649,13 @@ def main():
     # and no `AskUserQuestion`. `CLEANUP_RULE` is the opposite case — the employee is
     # exactly where the shell hangs and the missing-tool workaround happen, and it is the
     # only text that reaches it, because a subagent runs its own system prompt.
+    #
+    # IT ALSO GETS ITS OWN SLOT, which is the one thing this event can do that no later one
+    # can: see `open_agent_tag`. The main session's tag is NOT touched here — this branch
+    # returns before the widen flag is cleared and before `start_checklist`, because a
+    # subagent starting mid-turn is not the head of a turn.
     if payload.get("hook_event_name") == "SubagentStart":
+        open_agent_tag(payload)
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "SubagentStart",
             "additionalContext": USER_WORDS + "\n\n" + CLEANUP_RULE,
