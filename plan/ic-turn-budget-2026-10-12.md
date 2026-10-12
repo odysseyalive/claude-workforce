@@ -202,6 +202,21 @@ it fires on any running task. In a subagent it seems to fire every time. That is
   - An issue closes when all its items are done and all its agents have returned.
   Fixtures cover two issues open at once, each with two agents, interleaved hand-backs, and a third message
   arriving mid-run. Each issue must keep its items, and each agent's result must land on its own issue.
+- K2d. **Where the ledger lives.** The user, 2026-10-12: *"if the issue tracker is going to be installed with the
+  workforce, that's perfect, but the actual indexing of the issue tracker should be within the project that it's
+  running from"*. The code ships in the install, and the data lives in the project:
+  `<project>/.claude/workforce/issues/<session_id>.json`, one file per session, so two sessions in one project never
+  share a file, plus an `index.json` listing open issues across sessions. **It is kept out of git by the hook
+  itself**: on first create, the hook writes `.claude/workforce/issues/.gitignore` containing `*`. No audit adds the
+  rule. The ledger holds the user's prompts, which do not belong in a repository. The precedent shows what goes
+  wrong otherwise: the commitments ledger, `.claude/workforce/commitments.json` (`workforce/bin/wf-commitments:271–297`),
+  is git-tracked in nsayka-wawa and odyssey-alive (`git ls-files`). On 2026-10-10 a local edit to it on nsayka-wawa's
+  live server would have made a `git pull --ff-only` conflict (skul-dev's report). Its writes are found through
+  `CLAUDE_PROJECT_DIR`, then the payload's `cwd`, never `os.getcwd()`, which is wf-commitments' `path()` rule.
+- K7. **The commitments ledger gets the same treatment.** Its hook writes a `.claude/workforce/.gitignore` rule for
+  `commitments.json` on its next write. For the two projects where it is already tracked, the `SessionStart` line
+  names the one-time `git rm --cached .claude/workforce/commitments.json` the project should commit. A hook does not
+  stage that change in someone's repository.
 - K3. On `SubagentStop`, check the controlled expectation the org already sets: the order's `OUTPUT.md` exists with
   every exit criterion marked MET or UNMET. A stop without it is kicked back once to write it. This uses the same
   block mechanism and `stop_hook_active` guard as today, so it cannot loop.
