@@ -140,6 +140,44 @@ existing org on `update`, with no audit at all. That half is what removes the si
    (recipes, cleanup script, helper extraction, its own preflight bundling), and the line that a re-audit
    raises its producer ICs' caps.
 
+## Revision 2026-10-12 (user direction): fix the shipped system, not the audit
+
+The user's words: *"we don't need a fancy system for turn cap adjustments. This change needs to live at the level
+that we are executing agents and the session alike or the parameters we are using for the kickback that is keeping
+the job opened due to not meeting the controlled expectations (which is also an important part of the system to
+review)"*, and *"it's more important that we fix the system and not continuously making adjustments in the audit.
+The system gets shipped and just works without having to run audits each time."*
+
+**Dropped:** step 5 (cap constants, template change), step 6 (audit Step 5d heal, verify row), and the audit
+silent-return counter. None of them may be built. Caps stay as they are on disk.
+
+**Kept:** `wf-turn-budget` (steps 1–4, 7–8). It ships at user scope, reads `maxTurns` at runtime, and reaches every
+existing org on `update`.
+
+**Added: the kickback is skipped in nearly every orchestrated run.** `wf-widen` returns `not judged` whenever the
+payload's `background_tasks` is non-empty (`workforce/bin/wf-widen:377`). The asks juror bails on the same field and on
+every `SubagentStop` (`:1400`). Measured:
+- Session `52aabcb1-…` (odyssey-alive): 28 of 30 main-session `WIDEN` verdicts were `not judged — a background task is
+  still running`, and so was every one of the 22 subagent stops. No IC's hand-back was checked against its order.
+- Every transcript on this machine (`rg -o 'WIDEN  not judged — [^"\\]{0,50}' ~/.claude/projects`): 1,879
+  `not judged — a background task is still running` against 546 `not scored` and 115 sampled.
+
+The exemption was added for one case: a turn that says it is holding for a batch (comment at `:337–343`). As written,
+it fires on any running task. In a subagent it seems to fire every time. That is unverified: the field's contents in a
+`SubagentStop` payload have not been recorded, so the first step measures it.
+
+**Steps (a second coder order, after Part A lands):**
+- K1. Record what `background_tasks` holds in a `Stop` payload and in a `SubagentStop` payload while siblings run, by
+  logging real payloads in a `bin/dev-sandbox` session. Stamp the result in platform.md.
+- K2. Narrow the exemption to the case it was written for. A main-session `Stop` is exempt only when tasks are running
+  AND the reply says it is waiting on them (the existing `WAITING` pattern). A `SubagentStop` is never exempted by
+  tasks it did not start.
+- K3. On `SubagentStop`, check the controlled expectation the org already sets: the order's `OUTPUT.md` exists with
+  every exit criterion marked MET or UNMET. A stop without it is kicked back once to write it. This uses the same
+  block mechanism and `stop_hook_active` guard as today, so it cannot loop.
+- K4. Measure false fires against the 1,269 subagent transcripts already used at `wf-widen:755–760`, before shipping,
+  against the same 1.5% budget.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
