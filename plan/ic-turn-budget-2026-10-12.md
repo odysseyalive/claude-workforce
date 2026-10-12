@@ -208,7 +208,10 @@ it fires on any running task. In a subagent it seems to fire every time. That is
   `<project>/.claude/workforce/issues/<session_id>.json`, one file per session, so two sessions in one project never
   share a file, plus an `index.json` listing that project's open issues across its sessions. *The user, 2026-10-12: "each project should have their own Issue Tracking Index"*, and this holds when workforce is installed at user scope. The install holds code only. There is never a user-level or machine-wide index, and a project's index never lists another project's issues. **It is kept out of git by the hook
   itself**: on first create, the hook writes `.claude/workforce/issues/.gitignore` containing `*`. No audit adds the
-  rule. The ledger holds the user's prompts, which do not belong in a repository. The precedent shows what goes
+  rule. *The user, 2026-10-12: "some projects actually do ship their Claude directory with the repository. I think
+  as long as the index [widen] uses is in the [Claude] directory on the project we're good."* So the ignore rule
+  covers `issues/` only, never `.claude/` or `.claude/workforce/`: a project that commits its `.claude` keeps
+  committing everything else in it. The ledger holds the user's prompts, which do not belong in a repository. The precedent shows what goes
   wrong otherwise: the commitments ledger, `.claude/workforce/commitments.json` (`workforce/bin/wf-commitments:271–297`),
   is git-tracked in nsayka-wawa and odyssey-alive (`git ls-files`). On 2026-10-10 a local edit to it on nsayka-wawa's
   live server would have made a `git pull --ff-only` conflict (skul-dev's report). Its writes are found through
