@@ -18925,6 +18925,29 @@ check(
     "canary before any gate rested on it. A gate resting on an unrecorded measurement is "
     "the shape that put a falsified claim into a blocking check on 2026-07-29",
 )
+# THE SECOND MEASUREMENT, AND IT IS THE ONE THAT REMOVED A SHIPPED GATE. `wf-widen`
+# returned `not judged — a background task is still running` on 1,879 stops across this
+# machine, and the plan recorded the field's contents in a `SubagentStop` payload as
+# UNVERIFIED. Fact 22b is that measurement: the field is the SESSION's task list on every
+# stop, so it can never describe the stopping agent's own state, and a subagent carries
+# its parent's `session_id`, so state keyed by session alone is one slot for all of them.
+# Pinned here because three separate mechanisms now rest on it — the removed gate, the
+# per-agent keying, and the ask resolved from the agent's own transcript.
+_kb_plat = read("workforce/references/platform.md")
+_kb_facts = [_l for _l in (
+    "`background_tasks` is the WHOLE SESSION's task list on every stop",
+    "carries `background_tasks` holding tasks the stopping agent never started",
+    "parent session's `session_id`",
+    "**`SubagentStart` carries no `prompt`**",
+    "first `isSidechain` `user` row",
+) if _l not in _kb_plat]
+check(
+    "kickback: the facts the background_tasks gate was removed on are measured and recorded",
+    not _kb_facts,
+    f"platform.md is missing {_kb_facts} — a shipped exemption was deleted and a state "
+    "key was changed on these measurements, and the plan carried both as unverified. "
+    "Without the record the next reader cannot tell a measured removal from a guess",
+)
 
 
 # RUN, NOT READ, AND AT A CAP NO FIXTURE USES. Every `turn-budget-*` fixture pins
