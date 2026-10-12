@@ -169,7 +169,7 @@ it fires on any running task. In a subagent it seems to fire every time. That is
 **Steps (a second coder order, after Part A lands):**
 - K1. Record what `background_tasks` holds in a `Stop` payload and in a `SubagentStop` payload while siblings run, by
   logging real payloads in a `bin/dev-sandbox` session. Stamp the result in platform.md.
-- K2. Narrow the exemption to the case it was written for. A main-session `Stop` is exempt only when tasks are running
+- K2. **The user's rule, 2026-10-12: *"Agents and their work should not interrupt the widened technology."*** So the `background_tasks` gate at `wf-widen:377` is removed, not narrowed: a running agent never stops a judgment. A turn that genuinely holds for a batch is still judged, as a hold: it claims nothing done, so the existing claim/evidence scoring has nothing to block, and its stated next step is recorded like any other. The asks juror drops its `background_tasks` and `SubagentStop` bail-outs (`:1400`) on the same rule, judging an agent's reply against its own work order. Superseded wording kept for the record: Narrow the exemption to the case it was written for. A main-session `Stop` is exempt only when tasks are running
   AND the reply says it is waiting on them (the existing `WAITING` pattern). A `SubagentStop` is never exempted by
   tasks it did not start.
 - K3. On `SubagentStop`, check the controlled expectation the org already sets: the order's `OUTPUT.md` exists with
