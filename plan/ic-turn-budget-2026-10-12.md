@@ -172,6 +172,17 @@ it fires on any running task. In a subagent it seems to fire every time. That is
 - K2. **The user's rule, 2026-10-12: *"Agents and their work should not interrupt the widened technology."*** So the `background_tasks` gate at `wf-widen:377` is removed, not narrowed: a running agent never stops a judgment. A turn that genuinely holds for a batch is still judged, as a hold: it claims nothing done, so the existing claim/evidence scoring has nothing to block, and its stated next step is recorded like any other. The asks juror drops its `background_tasks` and `SubagentStop` bail-outs (`:1400`) on the same rule, judging an agent's reply against its own work order. Superseded wording kept for the record: Narrow the exemption to the case it was written for. A main-session `Stop` is exempt only when tasks are running
   AND the reply says it is waiting on them (the existing `WAITING` pattern). A `SubagentStop` is never exempted by
   tasks it did not start.
+- K2b. **Several judgments run at once, and today they share one slot.** The user asked on 2026-10-12, *"we may
+  have multiple widened events that are being tracked at any one time, and so is that also being taken into
+  effect?"* Today they are not. Every piece of widen state is keyed by `session_id` alone: the task tag
+  (`wf-task-tag:473` `tag_path`), the asks checklist (`wf-task-tag:510`, `wf-widen:1308`). Subagents carry their
+  parent's `session_id` (unverified: K1 records it), so this was harmless only because agents were never judged.
+  Once K2 removes the gate, every agent would be judged against the MAIN session's tag and checklist, meaning the
+  user's message instead of its own work order, and concurrent agents would read and write the same files. So:
+  key every widen state file by `session_id` plus `agent_id` when present (the main session keeps today's names),
+  capture each agent's own ask (its spawn prompt) at `SubagentStart` into its own tag, and judge each stop against
+  its own tag only. Fixtures run two agents and the main session concurrently, and each must be judged against its
+  own ask with no file crossing.
 - K3. On `SubagentStop`, check the controlled expectation the org already sets: the order's `OUTPUT.md` exists with
   every exit criterion marked MET or UNMET. A stop without it is kicked back once to write it. This uses the same
   block mechanism and `stop_hook_active` guard as today, so it cannot loop.
