@@ -240,6 +240,7 @@ TTAG = "workforce/bin/wf-task-tag"
 ASTY = "workforce/bin/wf-artifact-style"
 ASTYS = "workforce/skills/shared-artifact/references/house-style.md"
 ASTYT = "workforce/skills/shared-artifact/references/template.html"
+TBG = "workforce/bin/wf-turn-budget"
 
 # The bin/check assertions that run install.ps1 under PowerShell and are skipped without it.
 PWSH_CHECKS = {
@@ -251,6 +252,67 @@ PWSH_CHECKS = {
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── THE TURN BOUNDARY (wf-turn-budget, 2026-10-12) ──────────────────────────
+    # Four assertions, and every literal each one pins gets a case. The two about the
+    # thresholds are the ones that decide whether the hook is a feature or noise, and the
+    # four about the counter directory are a security control, which this project does not
+    # ship untested.
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", "if not bare(agent_id) or not bare(agent_type):"),
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", "(max_turns * 4 + 4) // 5"),
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", "return max_turns - 2"),
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", "fd = _open_nofollow(os.path.join(path, marker),"),
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", 'tempfile.gettempdir(), "wf-turn-budget"'),
+    ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+     "payload the host actually sends",
+     TBG, "del", "THE FAST PATH: no file is touched in the main thread"),
+    # THE COUNTER DIRECTORY, WHICH LIVES WHERE OTHER ACCOUNTS CAN WRITE (CWE-59).
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", 'payload.get("scratchpad_dir")'),
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", "st = os.lstat(path)"),
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", "st.st_mode & 0o022"),
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", "st.st_uid == getuid()"),
+    # COUNTED, NOT `in`: the check requires EXACTLY ONE `O_NOFOLLOW` call site, so the
+    # read and the write cannot drift apart by one of them growing its own open(). A bare
+    # `in` would survive deleting the helper's body.
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "append", '\n_SECOND = getattr(os, "O_NOFOLLOW", 0)\n'),
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)"),
+    ("turn budget: nothing is written or read through a name another account can plant",
+     TBG, "del", "counted, _ignored, spent = count_turns(tpath, 0,"),
+    # THE BRIEF'S SHAPE, pinned in BOTH files: the hook injects the section lines and
+    # org.md rung 12b verifies them, so a case per side.
+    ("turn budget: the continuation brief has one shape, named by its producer and its "
+     "consumer",
+     TBG, "del", "5. What must not be redone, named file by file"),
+    ("turn budget: the continuation brief has one shape, named by its producer and its "
+     "consumer",
+     ORGP, "del", "5. What must not be redone, named file by file"),
+    ("turn budget: the continuation brief has one shape, named by its producer and its "
+     "consumer",
+     ORGP, "del", "`wf-turn-budget` is the producer"),
+    # THE MEASUREMENT, which fact 22 demanded before any gate rested on it.
+    ("turn budget: the host facts the boundary rests on are measured and recorded",
+     PL, "del", "no `agent_transcript_path` on `PostToolUse`"),
+    ("turn budget: the host facts the boundary rests on are measured and recorded",
+     PL, "del", "hook_additional_context"),
+    # RUN, NOT READ: the thresholds must scale with the cap. Hard-coding the 40-turn
+    # numbers passes every fixture and then stops a producer IC half-way through.
+    ("turn budget: the thresholds scale with the employee's own cap",
+     TBG, "del", "return (max_turns * 4 + 4) // 5"),
     # ── NOTHING IS LEFT RUNNING WHEN THE ORDER IS DONE (2026-09-24) ──────────────
     # One assertion over six files, so every file it reads gets a case: a check that
     # reads six surfaces and is proven against one is proven on one sixth of itself.

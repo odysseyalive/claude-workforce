@@ -505,17 +505,22 @@ someone can read instead of re-derive.
 
    **The brief has seven sections, and this is where they are defined.** `wf-turn-budget` is the
    producer: it names these same seven lines in the instruction it injects at 80% of an employee's
-   `maxTurns`, and `bin/check` requires the two copies to agree.
+   `maxTurns`, and this release's own gates require the two copies to agree.
 
-   ```
-   1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
-   2. Exit criteria, each MET or UNMET, with its evidence
-   3. What is done, and the file or command that shows it
-   4. What is left, as the next concrete action
-   5. What must not be redone, named file by file
-   6. The commands to re-run, and what each returned last
-   7. What went wrong or blocked, and what to try instead
-   ```
+   <!-- INDENTED FOUR SPACES ON PURPOSE. Two rung counters — this release's dispatch-ladder
+        gate and `wf-companion`'s region count — both read `^\s{0,3}(\d+)\.\s`, so a
+        numbered list indented three spaces inside this file is counted as a dispatch rung.
+        At three spaces these seven lines read as rungs 1-7 and broke the gapless ladder. -->
+
+    ```
+    1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
+    2. Exit criteria, each MET or UNMET, with its evidence
+    3. What is done, and the file or command that shows it
+    4. What is left, as the next concrete action
+    5. What must not be redone, named file by file
+    6. The commands to re-run, and what each returned last
+    7. What went wrong or blocked, and what to try instead
+    ```
 
    Verify it the way rung 12 verifies any other return: **sections 3-7 filled, and section 1
    reproduced verbatim rather than summarized.** Section 5 is the one that saves the next agent's

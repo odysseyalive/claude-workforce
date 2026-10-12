@@ -7625,5 +7625,82 @@
     ],
     "script": "wf-turn-budget",
     "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
+  },
+  "turn-budget-counter-symlink-not-followed": {
+    "_why": "THE SAME ATTACK ONE LEVEL IN: the directories are ours, and a symlink is planted at `count.json` aiming at a file outside them. Both halves of the refusal are asserted here. The READ is `O_NOFOLLOW`, so the link is refused rather than followed -- without it this is an arbitrary-file read aimed by whoever planted the link. The WRITE creates its temporary name `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMES over `count.json`: rename acts on the name, so the link is replaced and its target is never opened. `victim.txt` unchanged is the proof; a real counter in its place is the proof the refusal did not also break the feature.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 32"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-warn": {
+        "want": []
+      },
+      "victim.json": {
+        "want": [
+          "DO NOT READ.",
+          "999999"
+        ]
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "tmp/wf-turn-budget/s1/a1/count.json": "../../../../victim.json"
+      }
+    },
+    "not": [
+      "Traceback",
+      "RETURN NOW",
+      "999",
+      "1031"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "32 of 40"
+    ]
+  },
+  "turn-budget-state-dir-symlink-refused": {
+    "_why": "ANOTHER ACCOUNT GOT TO THE NAME FIRST (CWE-59). The system temp dir is world-writable with the sticky bit, so `<tmp>/wf-turn-budget` is a name any local user can create -- as a symlink aimed wherever they like. Here it points at `planted/`, and the whole assertion is that NOTHING is written through it: no session directory, no counter. `os.lstat` asks what the name IS rather than what it points at, so the link fails the directory test and no `mkdir` or `open` is ever aimed at the target. The run still gets its boundary -- 32 of 40 is announced from the transcript with no state at all, because refusing the directory must not cost the run its hand-back.",
+    "after": {
+      "planted/.keep": {
+        "want": [
+          "Nothing may be written here."
+        ]
+      },
+      "planted/count.json": {
+        "absent": true
+      },
+      "planted/s1": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "tmp/wf-turn-budget": "../planted"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "32 of 40",
+      "HANDOFF"
+    ]
   }
 }

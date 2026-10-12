@@ -25,6 +25,7 @@ Usage
 """
 
 import filecmp
+import json
 import os
 import shutil
 import subprocess
@@ -172,7 +173,43 @@ WRITERS = {
         "argv": ["-c", GIT_HOOK_SETUP],
         "watch": ".idempotence-scratch",
     },
+    # THE PER-CALL COUNTER MUST ADD NO CHURN TO THE PROJECT, and this is the row that
+    # says so. `wf-turn-budget` fires on every tool call of every session on the machine,
+    # so a counter written anywhere inside the tree would appear in `git status` on every
+    # host that installed it and in `git add -A` on some of them. It is deliberately in
+    # scratch under `$TMPDIR`; the watched tree is the project the payload POINTS AT, and
+    # the assertion is that two passes leave it byte-identical. Pass 2 also announces its
+    # boundary from the counter pass 1 wrote, so this covers the stateful path rather than
+    # a cold start twice.
+    "turn-budget": {
+        "argv": ["workforce/bin/wf-turn-budget"],
+        "stdin": json.dumps({
+            "hook_event_name": "PostToolUse", "session_id": "s1",
+            "agent_id": "a1", "agent_type": "eng-coder", "tool_name": "Bash",
+            "tool_input": {"command": "echo hi"},
+            "cwd": "${WORK}/fixtures/scripts/turn-budget-eighty-percent-warns",
+            "transcript_path":
+                "${WORK}/fixtures/scripts/turn-budget-eighty-percent-warns/s1.jsonl",
+        }),
+        "env": {"TMPDIR": "${WORK}/.idempotence-scratch"},
+        "seed_dirs": [".idempotence-scratch"],
+        "watch": "fixtures/scripts/turn-budget-eighty-percent-warns",
+    },
 }
+
+# WHAT THE `turn-budget` ROW DOES NOT ASSERT, stated here because an unstated limit reads
+# as a covered one. **The counter file itself is deliberately NOT watched.** A per-call
+# counter is monotonic — `calls` advances on every call and `off` advances with the
+# transcript — so demanding byte equality of it across two passes asserts something a
+# counter cannot have, and a row that cannot pass is not a check. MEASURED while writing
+# this: such a row failed on the unmutated script, for exactly that reason.
+#
+# The property this file owns is the one in the plan: *the counter adds no churn to
+# tracked state*. That is the row above. The neighbouring property — that no state is
+# written into the project AT ALL — is a presence claim rather than a churn claim, and it
+# is asserted where presence can be seen: `bin/check` pins the temp-dir path with a
+# `bin/prove` case, and three `turn-budget-*` fixtures assert `tmp/wf-turn-budget` absent
+# on every silent path.
 
 
 def snapshot(base, rel):
@@ -204,9 +241,18 @@ def run_writer(name, spec):
         for d in spec.get("seed_dirs") or []:
             os.makedirs(os.path.join(work, d), exist_ok=True)
 
+        # A HOOK IS A WRITER TOO, and it takes its instructions on stdin rather than in
+        # argv. `stdin` is the payload; `env` is the child environment. `${WORK}` in
+        # either resolves to the copy's own path, which is the only way a payload can
+        # name an absolute path inside a directory made at run time — a hook payload
+        # carries `cwd` and `transcript_path`, and both are absolute in the real thing.
+        _sub = (lambda v: v.replace("${WORK}", work))
+        _stdin = _sub(spec["stdin"]) if "stdin" in spec else None
+        _env = dict(os.environ, **{k: _sub(v) for k, v in (spec.get("env") or {}).items()})
+
         for pass_no in (1, 2):
-            p = subprocess.run([sys.executable] + spec["argv"], cwd=work,
-                               capture_output=True, text=True)
+            p = subprocess.run([sys.executable] + spec["argv"], cwd=work, env=_env,
+                               input=_stdin, capture_output=True, text=True)
             if p.returncode not in (0,):
                 return False, f"pass {pass_no} exited {p.returncode}: {(p.stderr or p.stdout).strip()[:160]}"
             if pass_no == 1:

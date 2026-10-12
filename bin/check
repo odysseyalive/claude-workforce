@@ -18825,7 +18825,10 @@ if "(max_turns * 4 + 4) // 5" not in _tb_src or "return max_turns - 2" not in _t
     _tb_problems.append("a threshold is no longer derived from maxTurns — the cap is read "
                         "per employee, so a fixed turn number stops being 80% of anything")
 # ONCE, AND THE CLAIM IS ATOMIC. Parallel calls in one turn run this hook concurrently.
-if "os.O_CREAT | os.O_EXCL" not in _tb_src:
+# Pinned at the CLAIM's own call site rather than on the flag constants, which appear
+# twice in the file — the writer uses the same three — and a pin that matches two places
+# cannot be proven: deleting one occurrence leaves the assertion passing.
+if "fd = _open_nofollow(os.path.join(path, marker)," not in _tb_src:
     _tb_problems.append("the once-only claim is no longer an exclusive file creation — "
                         "two concurrent calls doing read-modify-write on one JSON flag "
                         "both see it unset and both inject")
@@ -18843,6 +18846,41 @@ check(
     "payload the host actually sends",
     not _tb_problems,
     "; ".join(_tb_problems),
+)
+# THE COUNTER LIVES IN A DIRECTORY OTHER PEOPLE CAN WRITE TO (CWE-59, flagged by a
+# security review of the first commit). The system temp dir is world-writable with the
+# sticky bit, so every name under it is a name another local account can reach first —
+# as a directory it owns, or as a symlink aimed at any file of ours. A hook that runs on
+# every tool call must not be the lever that writes through one. Two fixtures plant the
+# links (`turn-budget-state-dir-symlink-refused`, `turn-budget-counter-symlink-not-followed`)
+# and both fail with any of these four removed; this pins the controls by name, because a
+# fixture cannot say WHY it passed.
+_tb_sec = []
+if 'payload.get("scratchpad_dir")' not in _tb_src:
+    _tb_sec.append("the session's own scratchpad is no longer preferred over the shared "
+                   "temp dir, which is the only one of the two nobody else can write")
+if "st = os.lstat(path)" not in _tb_src or "_stat.S_ISDIR(st.st_mode)" not in _tb_src:
+    _tb_sec.append("the directory is no longer checked with lstat — `os.path.isdir` "
+                   "FOLLOWS a planted link and reports the target, which is how the write "
+                   "lands outside")
+if "st.st_mode & 0o022" not in _tb_src or "st.st_uid == getuid()" not in _tb_src:
+    _tb_sec.append("the ownership or the group/other-writable check is gone, so a "
+                   "directory another account pre-created is accepted as ours")
+if _tb_src.count('getattr(os, "O_NOFOLLOW", 0)') != 1 or "_open_nofollow" not in _tb_src:
+    _tb_sec.append("state files are no longer opened O_NOFOLLOW — the READ through a "
+                   "planted link is an arbitrary-file read aimed by whoever planted it, "
+                   "and the measured symptom is a counter claiming 999 turns")
+if "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)" not in _tb_src:
+    _tb_sec.append("the temporary counter name is no longer created exclusively, so it "
+                   "can be a link somebody put there first")
+if "counted, _ignored, spent = count_turns(tpath, 0," not in _tb_src:
+    _tb_sec.append("the refusal no longer falls back to counting from the transcript — a "
+                   "squatted directory would then cost the run its hand-back, which hands "
+                   "a denial of service the outcome this hook exists to prevent")
+check(
+    "turn budget: nothing is written or read through a name another account can plant",
+    not _tb_sec,
+    "; ".join(_tb_sec),
 )
 # THE BRIEF'S SHAPE HAS A PRODUCER AND A CONSUMER AND THEY MUST AGREE. Rung 12b verified
 # "sections 3-7" of a format defined in no file on disk — `wf-handoff`, the producer, was

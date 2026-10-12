@@ -136,6 +136,13 @@ Two turns left. Write nothing new and verify nothing more. Write what you have i
 `OUTPUT.md` with each exit criterion MET or UNMET, and return `HANDOFF <that path>`.
 A partial account handed back beats a complete one the limit cuts off."""
 
+# WHAT A DELIVERED INJECTION LOOKS LIKE IN THE TRANSCRIPT, which is how the once-only rule
+# survives with no counter directory. DERIVED FROM THE TEXTS rather than restated beside
+# them: a second copy of the opening line is a literal that drifts the first time the
+# wording is improved, and the symptom would be the paragraph repeating on every call.
+WARN_MARK = WARN_TEXT.split("{turns}")[0]
+FINAL_MARK = FINAL_TEXT.split("{turns}")[0]
+
 
 # `agent_type` ARRIVES IN A PAYLOAD AND BECOMES A PATH, so it is validated as a bare
 # name and never sanitised into one. Same shape as `wf-org-sync`'s AGENT_SLUG_RX, plus an
@@ -209,8 +216,8 @@ def agent_transcript(payload, session_id, agent_id):
                         "agent-" + agent_id + ".jsonl")
 
 
-def count_turns(path, offset):
-    """(turns in the bytes after `offset`, new offset) — or (None, offset) if unreadable.
+def count_turns(path, offset, needles=()):
+    """(turns after `offset`, new offset, needles seen) — or (None, offset, set()).
 
     A TURN IS AN ASSISTANT MESSAGE CARRYING A `tool_use`. An assistant row holding only
     `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
@@ -219,16 +226,23 @@ def count_turns(path, offset):
     ONLY WHOLE LINES ARE CONSUMED. The host batches transcript appends on a 100 ms timer,
     so the tail can be a half-written line; the offset advances to the last newline and
     the partial line is re-read next call rather than parsed once and lost.
+
+    `needles` IS HOW THE ONCE-ONLY RULE SURVIVES WITH NO STATE FILE. A delivered injection
+    is recorded in the subagent's own transcript as a `hook_additional_context` attachment
+    (measured 2026-10-12), so the transcript can answer "did I already say this" when the
+    counter directory had to be refused. Only used on that path, where the read starts at
+    offset 0 and therefore covers the whole run.
     """
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
             chunk = fh.read()
     except (OSError, ValueError):
-        return None, offset
+        return None, offset, set()
+    seen = set(n for n in needles if n.encode("utf-8") in chunk)
     cut = chunk.rfind(b"\n")
     if cut < 0:
-        return 0, offset
+        return 0, offset, seen
     turns = 0
     for raw in chunk[:cut + 1].splitlines():
         if b'"tool_use"' not in raw:          # cheap reject before any parse
@@ -244,31 +258,84 @@ def count_turns(path, offset):
             continue
         if any(isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
             turns += 1
-    return turns, offset + cut + 1
+    return turns, offset + cut + 1, seen
 
 
-def state_dir(session_id, agent_id):
-    """`$TMPDIR/wf-turn-budget/<session>/<agent>`, created 0700, or "" if it cannot be.
+# ── the counter directory, which lives in a place other people can write ─────
+# THE WHOLE TEMP-FILE CLASS, AND WHY A FALLBACK IS SAFE. On a shared host the system temp
+# dir is world-writable with the sticky bit, so every name under it is a name another
+# account can get to first: a directory it owns, a symlink aimed at a file of ours, a
+# symlink aimed at a file of theirs. This hook runs on every tool call and must not
+# become the lever that writes through any of them. So:
+#
+#   1. `scratchpad_dir` FIRST, when the payload carries one — the session's own private
+#      directory, which is what `wf-task-tag`'s `tag_path` already uses. MEASURED
+#      2026-10-12: a `PostToolUse` payload on 2.1.296 does NOT carry that key (the keys
+#      are agent_id, agent_type, cwd, duration_ms, effort, hook_event_name,
+#      permission_mode, prompt_id, session_id, tool_input, tool_name, tool_response,
+#      tool_use_id, transcript_path). It is preferred anyway because other events do
+#      carry it and because a host that starts sending it should be used, not ignored.
+#   2. Otherwise the temp dir, and every directory level is VERIFIED rather than trusted:
+#      not a symlink, a real directory, owned by this uid, and not group- or
+#      other-writable. Verified by `lstat` on the handle we are about to use.
+#   3. Any refusal returns "" and the caller counts from the transcript with no state at
+#      all. It never raises and never falls back to a path it could not verify.
+#
+# THE NAME IS FIXED RATHER THAN SALTED WITH THE UID, and that is a deliberate trade. A
+# hostile local account can squat `<tmp>/wf-turn-budget` and keep the check refusing
+# forever — a denial of service against the counter, which degrades to the transcript-only
+# path and still produces the right boundary at a little more cost per call. The
+# alternative, a uid in the name, is a path no fixture can spell, and this project does not
+# ship an untested security control. The attack this refuses is the one that matters:
+# writing through somebody else's link.
+STATE_MODE = 0o700
 
-    REFUSES A SYMLINK AT ANY LEVEL IT OWNS. The temp dir is world-writable on a shared
-    host, so another account can plant a link at a name this is about to write through.
-    `0o700` on the directories this creates, and an `lstat` refusal on anything that is
-    already a link.
-    """
-    import tempfile
-    base = os.path.join(tempfile.gettempdir(), "wf-turn-budget")
+
+def _safe_dir(path):
+    """Create or accept `path` as a private directory of ours. True when it is one."""
+    import stat as _stat
+    try:
+        os.mkdir(path, STATE_MODE)
+    except OSError:
+        pass                                    # already there, or cannot be made
+    try:
+        # `lstat`, NEVER `stat`: the question is what this NAME is, not what it points at.
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if not _stat.S_ISDIR(st.st_mode):           # a symlink fails here, as does a file
+        return False
+    if st.st_mode & 0o022:                      # group- or other-writable
+        return False
+    getuid = getattr(os, "getuid", None)
+    return getuid is None or st.st_uid == getuid()
+
+
+def state_dir(payload, session_id, agent_id):
+    """The verified counter directory for this agent, or "" when none can be had."""
+    scratch = payload.get("scratchpad_dir")
+    if isinstance(scratch, str) and scratch and os.path.isdir(scratch):
+        base = os.path.join(scratch, "wf-turn-budget")
+    else:
+        import tempfile
+        base = os.path.join(tempfile.gettempdir(), "wf-turn-budget")
     path = base
+    if not _safe_dir(path):
+        return ""
     for part in (session_id, agent_id):
         path = os.path.join(path, part)
-    for d in (base, os.path.dirname(path), path):
-        if os.path.islink(d):
+        if not _safe_dir(path):
             return ""
-        try:
-            os.makedirs(d, 0o700)
-        except OSError:
-            if not os.path.isdir(d) or os.path.islink(d):
-                return ""
     return path
+
+
+def _open_nofollow(path, flags, mode=0o600):
+    """`os.open` with `O_NOFOLLOW` added, so a planted symlink at `path` is refused.
+
+    The flag is absent on some platforms; `getattr` keeps this importable there, and on
+    such a platform the directory ownership check above is the control that remains.
+    """
+    return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
 
 
 def read_state(path):
@@ -277,9 +344,17 @@ def read_state(path):
     The transcript is the source of truth and this file is a cache, so throwing it away
     costs one full re-read and never a wrong answer. A hook that raised on scratch
     somebody else can write would print a traceback on every tool call afterwards.
+
+    `O_NOFOLLOW`, so a symlink planted at `count.json` is refused rather than read
+    through — the read would otherwise be an arbitrary-file read aimed by whoever got to
+    the name first.
     """
     try:
-        with open(os.path.join(path, "count.json"), encoding="utf-8") as fh:
+        fd = _open_nofollow(os.path.join(path, "count.json"), os.O_RDONLY)
+    except OSError:
+        return 0, 0, 0
+    try:
+        with os.fdopen(fd, encoding="utf-8") as fh:
             d = json.load(fh)
     except (OSError, ValueError):
         return 0, 0, 0
@@ -293,10 +368,21 @@ def read_state(path):
 
 
 def write_state(path, off, turns, calls):
-    """Replace the counter atomically. A torn cache would be discarded, never acted on."""
+    """Replace the counter atomically, and never through a link.
+
+    THE TEMPORARY NAME IS CREATED `O_CREAT | O_EXCL | O_NOFOLLOW`, so it cannot be a
+    symlink somebody planted and cannot clobber a file that is already there. `os.replace`
+    then renames over `count.json`: rename acts on the NAME, so a symlink sitting at that
+    name is replaced rather than written through. Those two together are why no file
+    outside this directory can be reached by writing here.
+    """
     tmp = os.path.join(path, "count.json.%d" % os.getpid())
     try:
-        with open(tmp, "w", encoding="utf-8") as fh:
+        fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except OSError:
+        return
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump({"off": off, "turns": turns, "calls": calls}, fh)
         os.replace(tmp, os.path.join(path, "count.json"))
     except OSError:
@@ -312,11 +398,14 @@ def claim(path, marker):
     `O_CREAT | O_EXCL` RATHER THAN A FLAG IN THE COUNTER, and the difference is a real
     race: parallel tool calls inside one turn fire this hook concurrently, and two
     processes doing read-modify-write on one JSON file can both see the flag unset and
-    both inject. Creating a file is atomic, so exactly one of them speaks.
+    both inject. Creating a file is atomic, so exactly one of them speaks. `O_NOFOLLOW`
+    for the same reason the writer has it — a planted link at this name must be refused,
+    not followed, and a refusal here reads as "already claimed", which is the silent
+    direction.
     """
     try:
-        fd = os.open(os.path.join(path, marker), os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                     0o600)
+        fd = _open_nofollow(os.path.join(path, marker),
+                            os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except OSError:
         return False
     os.close(fd)
@@ -355,31 +444,46 @@ def main():
     session_id = payload.get("session_id")
     if not bare(session_id):
         session_id = "no-session"
-    path = state_dir(session_id, agent_id)
-    if not path:
-        return 0
+    tpath = agent_transcript(payload, session_id, agent_id)
+    path = state_dir(payload, session_id, agent_id)
 
-    off, turns, calls = read_state(path)
-    calls += 1
-    counted, new_off = count_turns(
-        agent_transcript(payload, session_id, agent_id), off)
-    if counted is None:
-        # THE FALLBACK ERRS TOWARD AN EARLY HANDOFF. Calls >= turns always, so a call
-        # count crosses the boundary no later than the true turn count would. An early
-        # written hand-back costs one extra order; a silent cut-off costs the run.
-        turns, new_off = calls, off
+    if path:
+        off, turns, calls = read_state(path)
+        calls += 1
+        counted, new_off, _ = count_turns(tpath, off)
+        if counted is None:
+            # THE FALLBACK ERRS TOWARD AN EARLY HANDOFF. Calls >= turns always, so a call
+            # count crosses the boundary no later than the true turn count would. An early
+            # written hand-back costs one extra order; a silent cut-off costs the run.
+            turns, new_off = calls, off
+        else:
+            turns += counted
+        write_state(path, new_off, turns, calls)
+        spent = set()
     else:
-        turns += counted
-    write_state(path, new_off, turns, calls)
+        # NO DIRECTORY COULD BE VERIFIED, SO THERE IS NO STATE AND THE RUN STILL GETS ITS
+        # BOUNDARY. The count is taken from the whole transcript rather than a tail, and
+        # the once-only rule is answered by the transcript too: a delivered injection is
+        # recorded there as a `hook_additional_context` attachment (measured 2026-10-12),
+        # so what was already said can be read back. No transcript AND no state leaves
+        # nothing to count, and a number nothing measured is not worth stopping a run on.
+        counted, _ignored, spent = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
+        if counted is None:
+            return 0
+        turns = counted
+
+    def once(marker, mark):
+        """True for the one call that gets to say this. Marker file, or the transcript."""
+        return claim(path, marker) if path else mark not in spent
 
     # BOTH DUE AT ONCE MEANS THE STRONGER ONE SPEAKS. For a small cap the two thresholds
     # coincide (`maxTurns: 10` puts both at 8), and emitting two paragraphs on one call
     # would spend the budget it is trying to protect.
     if turns >= final_at(cap):
-        claim(path, "fired-warn")
-        if claim(path, "fired-final"):
+        once("fired-warn", WARN_MARK)              # spend the quieter one unspoken
+        if once("fired-final", FINAL_MARK):
             emit(FINAL_TEXT.format(turns=turns, cap=cap))
-    elif turns >= warn_at(cap) and claim(path, "fired-warn"):
+    elif turns >= warn_at(cap) and once("fired-warn", WARN_MARK):
         emit(WARN_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
     return 0
 
