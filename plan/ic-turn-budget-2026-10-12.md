@@ -271,6 +271,22 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
   - Fixtures: a cut agent with UNMET items leads to a kickback naming a resume of that agent_id. A second hand-off
     with no change leads to an escalation, not a third resume. An agent that finished all MET leads to no kickback.
 
+- K8b. **Rung 12b contradicts K8 and must change with it.** `org.md:494` says a returned `HANDOFF` means "SPAWN
+  A SUCCESSOR — never ask the returning agent to continue". That was written for a context boundary. For a turn
+  cap the agent's context is intact, and a successor starts over. The user, 2026-10-12: *"are we waking up the
+  existing agent within its previous context, so that we're not starting all over again?"* So: a turn-cap hand-off
+  means resume the same agent; a successor only when the agent reports its context is exhausted.
+
+- K9. **The `/org` rules reach a project with no audit.** The user, 2026-10-12: *"I don't have to run an audit after
+  this update, correct?"* Measured: new hooks arrive on `update` through `--wire-defaults` (`update.md:219`), but a
+  project's dispatch rungs are a byte-canonical region copied into its `/org` SKILL.md (`org.md:240–248`), and
+  the only producer is `wf-companion --execute` (`workforce/bin/wf-companion:1–40`), run by `audit` Step 4. So
+  12b, 12c and the build/verify split reach no project until it is audited. Fix: the `SessionStart` heal carrier
+  (`wf-commitments` `heal_settings`) also refreshes machine-owned regions when their bytes differ from shipped
+  source, with the same near-zero cost on no-op that it already has. It replaces only the marked regions and
+  never a customized span, which are `wf-companion`'s existing rules. A fixture covers a stale region refreshed
+  at session start, a current one left untouched, and user text around it kept byte-for-byte.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
