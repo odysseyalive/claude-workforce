@@ -308,6 +308,14 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
     regression once at the end", whatever the handbook says. New hires get the two-line template.
   - Fixture: a handbook with both lines passes, one with only `Check:` is reported.
 
+- K11. **Independent orders run in parallel, each in its own git worktree.** The user chose this on 2026-10-12,
+  after asking *"I want to know why"* this work took all day. Measured: every order today ran one at a time on the
+  shared checkout. The orders touching different files (`wf-turn-budget`, `wf-widen`, `wf-commitments`, the
+  templates) waited in line for one another. The `/org` dispatch checkpoint gains one rule: orders that do not
+  touch the same files are dispatched together, each in its own worktree. The manager merges them, then runs
+  `Regression:` once (K10). Orders that touch the same file run in sequence. The shared-checkout hazard
+  (two coders on one tree) is what the worktree removes, so the rule never sends two orders to one checkout.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
