@@ -206,7 +206,7 @@ it fires on any running task. In a subagent it seems to fire every time. That is
   workforce, that's perfect, but the actual indexing of the issue tracker should be within the project that it's
   running from"*. The code ships in the install, and the data lives in the project:
   `<project>/.claude/workforce/issues/<session_id>.json`, one file per session, so two sessions in one project never
-  share a file, plus an `index.json` listing open issues across sessions. **It is kept out of git by the hook
+  share a file, plus an `index.json` listing that project's open issues across its sessions. *The user, 2026-10-12: "each project should have their own Issue Tracking Index"*, and this holds when workforce is installed at user scope. The install holds code only. There is never a user-level or machine-wide index, and a project's index never lists another project's issues. **It is kept out of git by the hook
   itself**: on first create, the hook writes `.claude/workforce/issues/.gitignore` containing `*`. No audit adds the
   rule. The ledger holds the user's prompts, which do not belong in a repository. The precedent shows what goes
   wrong otherwise: the commitments ledger, `.claude/workforce/commitments.json` (`workforce/bin/wf-commitments:271–297`),
