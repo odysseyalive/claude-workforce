@@ -302,8 +302,10 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
     the work order, never per edit. `verification.md` § The rule states the two and why.
   - The `/org` dispatch checkpoint gains one rule: across a batch of orders, each order runs its `Check:` and the
     manager runs `Regression:` once, after the last order and before release.
-  - `wf-conform` reports a code-role handbook whose `## Verification` has no `Regression:` line. That handbook is
-    refreshed by the same machine-owned-region path as K9, so existing orgs pick it up with no audit.
+  - Existing handbooks are authored text, not a machine-owned region, so nothing refreshes them without an audit
+    (unverified: whether `wf-companion` covers handbooks; the coder confirms). The `/org` rule above is what
+    reaches existing orgs, through K9 at session start: every order a manager writes says "targeted per item,
+    regression once at the end", whatever the handbook says. New hires get the two-line template.
   - Fixture: a handbook with both lines passes, one with only `Check:` is reported.
 
 ## Files touched
