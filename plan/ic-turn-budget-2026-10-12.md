@@ -183,6 +183,25 @@ it fires on any running task. In a subagent it seems to fire every time. That is
   capture each agent's own ask (its spawn prompt) at `SubagentStart` into its own tag, and judge each stop against
   its own tag only. Fixtures run two agents and the main session concurrently, and each must be judged against its
   own ask with no file crossing.
+- K2c. **A session works several issues at once, each with its own agents, and the checklist forgets all but the
+  newest.** The user, 2026-10-12: *"the reason why we need to track multiple widening events is because you may
+  actually be dealing with multiple issues at the same time, and you might have different sets of agents working on
+  those different issues."* Today `start_checklist` (`workforce/bin/wf-task-tag:530`) deletes the previous message's
+  checklist and starts an empty one on every user message ("Replace last turn's checklist"). Measured in this session:
+  the skul-dev fix and the turn-limit work were open at the same time, and each new message erased the other's
+  items. Agents dispatched for an issue also hand back after the turn that sent them has ended, so their results
+  arrive with nothing left to judge them against.
+  Replace the per-turn checklist with a per-session **issue ledger**:
+  - Each user message that opens work adds an issue holding its asks. Earlier open issues stay.
+  - An item stays open until it is marked done.
+  - Every agent spawned while an issue is being worked is linked to it at `SubagentStart`, as `issue → agent_ids`,
+    with the agent's own ask from K2b.
+  - A hand-back is judged against its own order (K2b), and the result is recorded on its issue.
+  - The main `Stop` judges every open issue, not just the current message. An issue whose agents are still running
+    is a hold, not a failure. An issue whose agents have all returned and whose items are unaddressed is kicked back.
+  - An issue closes when all its items are done and all its agents have returned.
+  Fixtures cover two issues open at once, each with two agents, interleaved hand-backs, and a third message
+  arriving mid-run. Each issue must keep its items, and each agent's result must land on its own issue.
 - K3. On `SubagentStop`, check the controlled expectation the org already sets: the order's `OUTPUT.md` exists with
   every exit criterion marked MET or UNMET. A stop without it is kicked back once to write it. This uses the same
   block mechanism and `stop_hook_active` guard as today, so it cannot loop.
