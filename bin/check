@@ -18794,6 +18794,160 @@ check(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# THE TURN LIMIT ARRIVED UNANNOUNCED AND THE RUN ENDED WITH NO REPORT
+# (wf-turn-budget, 2026-10-12)
+#
+# MEASURED, odyssey-alive session `52aabcb1`: 18 dispatches, the 2 that hit `maxTurns`
+# were both build orders, both had already finished and verified their main work, and
+# both returned NO REPORT AT ALL. An agent cannot count its own turns, so the limit
+# always arrived mid-sentence and the manager got nothing to read back.
+#
+# THIRTEEN `turn-budget-*` FIXTURES REPLAY THE PAYLOADS. What a fixture row cannot see is
+# whether the thresholds are DERIVED from the cap or hard-coded at the one cap the
+# fixtures use, whether the identity test is the one the host actually measured, whether
+# the brief's seven sections still agree with the rung that consumes them, and whether
+# the measurement itself is on record. Those are the four below, and the first is RUN.
+_tb_src = read("workforce/bin/wf-turn-budget")
+_tb_org = read("workforce/references/procedures/org.md")
+_tb_problems = []
+# BOTH KEYS, AND THE REASON IS A MEASURED PAYLOAD NOBODY PREDICTED. `agent_id` alone
+# selects an agent-hook's own agent too (`hook-agent-<uuid>`, no `agent_type`), and
+# `agent_type` alone fires on a `--agent` main thread. Either half on its own is wrong in
+# a different direction.
+if "if not bare(agent_id) or not bare(agent_type):" not in _tb_src:
+    _tb_problems.append("the identity test is no longer BOTH agent_id and agent_type — "
+                        "agent_id alone matches an agent hook's own agent, which has no "
+                        "handbook, and agent_type alone fires on a --agent main thread")
+# DERIVED FROM THE CAP, NEVER A NUMBER. The cap differs per employee and is read from the
+# handbook; a literal 32 here would be a second statement of a constant (Core Principle
+# 9a) and would stop meaning 80% the moment any cap changed.
+if "(max_turns * 4 + 4) // 5" not in _tb_src or "return max_turns - 2" not in _tb_src:
+    _tb_problems.append("a threshold is no longer derived from maxTurns — the cap is read "
+                        "per employee, so a fixed turn number stops being 80% of anything")
+# ONCE, AND THE CLAIM IS ATOMIC. Parallel calls in one turn run this hook concurrently.
+if "os.O_CREAT | os.O_EXCL" not in _tb_src:
+    _tb_problems.append("the once-only claim is no longer an exclusive file creation — "
+                        "two concurrent calls doing read-modify-write on one JSON flag "
+                        "both see it unset and both inject")
+# SCRATCH, NOT THE PROJECT. `.claude/workforce/work/` is gitignored only by projects whose
+# own audit added the entry, and nothing workforce ships writes it.
+if 'tempfile.gettempdir(), "wf-turn-budget"' not in _tb_src:
+    _tb_problems.append("the counter is no longer under the system temp dir — a per-call "
+                        "counter inside the project shows up in git status on every host")
+# THE MAIN THREAD TOUCHES NO FILE, which is the whole licence for a hook on every call.
+if "THE FAST PATH: no file is touched in the main thread" not in _tb_src:
+    _tb_problems.append("the main-thread fast path's reason is gone; PostToolUse fires on "
+                        "every call of every session on the machine")
+check(
+    "turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
+    "payload the host actually sends",
+    not _tb_problems,
+    "; ".join(_tb_problems),
+)
+# THE BRIEF'S SHAPE HAS A PRODUCER AND A CONSUMER AND THEY MUST AGREE. Rung 12b verified
+# "sections 3-7" of a format defined in no file on disk — `wf-handoff`, the producer, was
+# retired in the simplification release — so an agent could satisfy every word of the
+# clause and nothing downstream could check it. Each line is pinned in both files.
+_tb_brief = [
+    "1. The work order, verbatim",
+    "2. Exit criteria, each MET or UNMET, with its evidence",
+    "3. What is done, and the file or command that shows it",
+    "4. What is left, as the next concrete action",
+    "5. What must not be redone, named file by file",
+    "6. The commands to re-run, and what each returned last",
+    "7. What went wrong or blocked, and what to try instead",
+]
+_tb_drift = [f"{_l!r} is missing from " + ("the hook" if _l not in _tb_src else "org.md")
+             for _l in _tb_brief if _l not in _tb_src or _l not in _tb_org]
+if "`wf-turn-budget` is the producer" not in _tb_org:
+    _tb_drift.append("org.md rung 12b no longer names its producer, which is how HANDOFF "
+                     "came to have a consumer and nothing that could satisfy it")
+check(
+    "turn budget: the continuation brief has one shape, named by its producer and its consumer",
+    not _tb_drift,
+    "; ".join(_tb_drift) + ". The hook injects these section lines and `org.md` rung 12b "
+    "verifies them; two copies that drift mean a successor is spawned from a brief whose "
+    "sections nobody checked",
+)
+# THE MEASUREMENT IS ON RECORD, with the harness it was taken on. platform.md fact 22 had
+# the `additionalContext` half as DOCUMENTED and said it earned a canary before any gate
+# rested on it; three documented claims in that file have already lost to measurement.
+_tb_plat = read("workforce/references/platform.md")
+_tb_facts = [_l for _l in (
+    "`agent_id` is present on a `PostToolUse` payload fired from inside a subagent",
+    "no `agent_transcript_path` on `PostToolUse`",
+    "subagents/agent-<agent_id>.jsonl",
+    "hook_additional_context",
+) if _l not in _tb_plat]
+check(
+    "turn budget: the host facts the boundary rests on are measured and recorded",
+    not _tb_facts and "2.1.296" in _tb_plat,
+    f"platform.md is missing {_tb_facts} — the boundary rests on four properties of the "
+    "hook payload, and fact 22 recorded the load-bearing one as DOCUMENTED and demanded a "
+    "canary before any gate rested on it. A gate resting on an unrecorded measurement is "
+    "the shape that put a falsified claim into a blocking check on 2026-07-29",
+)
+
+
+# RUN, NOT READ, AND AT A CAP NO FIXTURE USES. Every `turn-budget-*` fixture pins
+# `maxTurns: 40` or `10`, so a hook that hard-coded 32 and 38 would pass all thirteen.
+# This drives a `maxTurns: 80` handbook — the producer cap the sizing work proposes — and
+# requires the boundary to land at 64 and 78, which is only true if it is a fraction of
+# the cap. Four short runs; the whole block is well under a second.
+def _turn_budget_scales():
+    import tempfile
+    tool = os.path.join(ROOT, "workforce/bin/wf-turn-budget")
+    out = {}
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, ".claude/agents"))
+        # THE TMPDIR HAS TO EXIST BEFORE THE FIRST RUN. `tempfile.gettempdir()` falls
+        # through to the real /tmp when TMPDIR names nothing, and under that fallback the
+        # counter escapes this directory and the three runs start sharing state.
+        os.makedirs(os.path.join(d, "state"))
+        with open(os.path.join(d, ".claude/agents/eng-coder.md"), "w") as fh:
+            fh.write("---\nname: eng-coder\ntools: Read, Edit, Write\n"
+                     "disallowedTools: Agent\nmaxTurns: 80\n---\n\n# Coder\n")
+        for turns in (63, 64, 78):
+            # A fresh session id per run, so each one starts with no claim marker.
+            sid = "s%d" % turns
+            tdir = os.path.join(d, sid, "subagents")
+            os.makedirs(tdir)
+            with open(os.path.join(tdir, "agent-a1.jsonl"), "w") as fh:
+                for i in range(turns):
+                    fh.write('{"type": "assistant", "isSidechain": true, "agentId": "a1",'
+                             ' "message": {"content": [{"type": "tool_use", "name": '
+                             '"Bash", "id": "t%d"}]}}\n' % i)
+            payload = json.dumps({
+                "hook_event_name": "PostToolUse", "session_id": sid, "cwd": d,
+                "transcript_path": os.path.join(d, sid + ".jsonl"),
+                "agent_id": "a1", "agent_type": "eng-coder", "tool_name": "Bash"})
+            r = subprocess.run([sys.executable, tool], input=payload, capture_output=True,
+                               text=True, timeout=60,
+                               env=dict(os.environ, TMPDIR=os.path.join(d, "state")))
+            out[turns] = (r.returncode, r.stdout + r.stderr)
+    return out
+
+
+_tbs = _turn_budget_scales()
+_tbs_problems = [f"turn {_t}: exited {_tbs[_t][0]}" for _t in _tbs if _tbs[_t][0] != 0]
+if "additionalContext" in _tbs[63][1]:
+    _tbs_problems.append("turn 63 of 80 fired: 63 is under 80% of the cap, so a hook with "
+                         "a hard-coded 32 would announce the boundary 32 turns early")
+if "64 of 80" not in _tbs[64][1]:
+    _tbs_problems.append(f"turn 64 of 80 did not announce the 80% boundary: "
+                         f"{_tbs[64][1].strip()[:160]!r}")
+if "RETURN NOW" not in _tbs[78][1]:
+    _tbs_problems.append(f"turn 78 of 80 did not say to return now: "
+                         f"{_tbs[78][1].strip()[:160]!r}")
+check(
+    "turn budget: the thresholds scale with the employee's own cap",
+    not _tbs_problems,
+    "; ".join(_tbs_problems) + ". Every fixture pins maxTurns 40 or 10, so a boundary "
+    "hard-coded at 32 and 38 passes all thirteen of them and then stops a producer IC "
+    "half-way through its budget",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # A RETIREMENT THAT REACHED NO PROJECT THAT ALREADY HAD IT (pin guard, 2026-10-10)
 #
 # `wf-pin-check` was deleted in 1.31.0 (90fb341) and `RETIRED_HOOKS` removes its SETTINGS

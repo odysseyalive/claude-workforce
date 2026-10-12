@@ -7371,5 +7371,259 @@
       "NO DESIGN RECORD (.claude/design/direction.md)",
       "`ui-design direct` has not run"
     ]
+  },
+  "turn-budget-agent-hook-silent": {
+    "_why": "MEASURED, NOT IMAGINED. The 2026-10-12 canary caught a payload nothing in the plan predicted: a `type: \"agent\"` hook's own agent fires PostToolUse with `agent_id: hook-agent-<uuid>` and NO `agent_type` at all. So `agent_id` alone cannot select the branch that reads a handbook -- both keys are required, or this payload sends the hook looking for `.claude/agents/None.md` on every call of every agent hook on the machine.",
+    "after": {
+      "tmp/wf-turn-budget": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"hook-agent-1068b635-fa0d-431d-a393-7a5fc049fe39\"}"
+  },
+  "turn-budget-bad-stdin": {
+    "_why": "NOT JSON AT ALL. Every hook here takes this row (`hook-badstdin`, `ledger-badstdin-is-silent`): a hook that exits nonzero or prints a traceback on a payload it cannot parse turns a harness hiccup into noise in front of the model on every call.",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "not json at all"
+  },
+  "turn-budget-between-thresholds-quiet": {
+    "_why": "THE SILENCE BETWEEN THE TWO INJECTIONS. 35 of 40 is past the 80% boundary and short of `maxTurns - 2`, so the warn has already been spent and the final is not yet due. Without this row the suite could not tell a correct second threshold from one that fires the moment the first has.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/fired-final": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
+  },
+  "turn-budget-eighty-percent-warns": {
+    "_why": "32 OF 40 IS THE 80% BOUNDARY, and this is the whole point of the hook: a cut-off that arrives unannounced delivers nothing to read back (REPORT.md 5), and an agent cannot count its own turns. The injected text must name all three artefacts the successor needs -- an OUTPUT.md with every exit criterion MET or UNMET, a HANDOFF.md continuation brief in the section shape `org.md` rung 12b verifies, and the `HANDOFF` verdict that makes rung 12b fire. `fired-warn` is the once-only marker.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/fired-final": {
+        "absent": true
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-warn": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"hookSpecificOutput\"",
+      "\"hookEventName\": \"PostToolUse\"",
+      "TURN BUDGET",
+      "32 of 40",
+      "HANDOFF",
+      "OUTPUT.md",
+      "HANDOFF.md",
+      "MET or UNMET",
+      "7. What went wrong"
+    ]
+  },
+  "turn-budget-final-returns-now": {
+    "_why": "`maxTurns - 2` = 38 OF 40, AND THE NUMBER IS CHOSEN TO LEAVE ROOM TO OBEY IT. The second injection says return now with what exists, and an instruction read on turn 39 has turns 39 and 40 to write a file and hand back; one that waited until turn 39 had been taken would leave a single turn for both. Shorter than the 80% text on purpose -- an agent two turns from the cap cannot spend one reading a procedure.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/fired-final": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "TURN BUDGET",
+      "38 of 40",
+      "RETURN NOW",
+      "HANDOFF"
+    ]
+  },
+  "turn-budget-hostile-agent-type": {
+    "_why": "`agent_type` ARRIVES IN A PAYLOAD AND BECOMES A PATH. The value here is `../evil`, which resolves to a real `maxTurns: 40` handbook one directory above `.claude/agents/` -- so a hook that joined the name unvalidated would read it, and the same shape reaches any file on the host by lengthening the prefix. It must be refused as a name, not sanitised into one: silent, no read, no state. Same rule as `wf-org-sync`'s AGENT_SLUG_RX.",
+    "after": {
+      "tmp/wf-turn-budget": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"../evil\"}"
+  },
+  "turn-budget-main-session-silent": {
+    "_why": "THE FAST PATH THAT LICENSES RUNNING THIS ON EVERY TOOL CALL. MEASURED on Claude Code 2.1.296 (platform.md fact 22a): a PostToolUse payload from the main thread carries NO `agent_id`, and one from inside a subagent always does -- so `agent_id` is the test and `agent_type` is not, because a `--agent` main thread carries that. The tree holds a 40-turn transcript and a `maxTurns: 40` handbook, so every threshold is passed; the only reason nothing fires is the identity branch. `after` asserts NO state directory was created, which is the half that proves no file I/O happened at all.",
+    "after": {
+      "tmp/wf-turn-budget": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback",
+      "HANDOFF"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}}"
+  },
+  "turn-budget-malformed-state-recovers": {
+    "_why": "THE STATE FILE IS SCRATCH IN A WORLD-WRITABLE DIRECTORY, so it can hold anything. A hook that raised on it would print a traceback into the transcript of every tool call for the rest of the run. Unparsable state is discarded and the count re-derived from the transcript, which is the whole reason the transcript is the source of truth and the file is only a cache.",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "32 of 40"
+    ]
+  },
+  "turn-budget-no-maxturns-silent": {
+    "_why": "A LEAD HAS NO CAP, SO IT GETS NO BOUNDARY. `handbook-templates.md` gives `maxTurns` to the IC template and to no other tier, so a handbook without the key is the ordinary shape of every Lead and CEO on every host. The boundary is derived from the cap and from nothing else: with no cap there is no 80% of anything, and a hook that guessed one would stop an uncapped employee at a number no file states.",
+    "after": {
+      "tmp/wf-turn-budget": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-lead\"}"
+  },
+  "turn-budget-under-threshold-silent": {
+    "_why": "31 TURNS OF 40 IS BELOW 80%, so the boundary must not fire. The row is the negative half of the pair below and the whole reason the count is of TURNS rather than calls: measured in REPORT.md 2, report orders ran 42 and 44 CALLS inside a 40-turn cap and both finished, so a per-call boundary would have stopped two runs that were fine. State IS written here -- the offset and running count are what keep the next call cheap.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 31"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-warn": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
+  },
+  "turn-budget-unknown-agent-silent": {
+    "_why": "WIRED AT USER SCOPE, RUNNING IN EVERY PROJECT ON THE MACHINE -- most of which have no org at all. An `agent_type` with no handbook under `.claude/agents/` has no cap to read, so there is no boundary to announce and nothing may be invented from a default. Silent, and no state written.",
+    "after": {
+      "tmp/wf-turn-budget": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"data-analyst\"}"
+  },
+  "turn-budget-unreadable-transcript-counts-calls": {
+    "_why": "NO TRANSCRIPT ON DISK, SO IT COUNTS CALLS, WHICH ERRS TOWARD AN EARLY HANDOFF. There is no transcript file in this tree at all. Calls >= turns always, so a call count crosses the boundary no later than the true turn count -- the conservative direction, because an early written hand-back costs one order and a silent cut-off costs the whole run. The stored count is 7, this call makes 8, and 8 is 80% of 10.",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "8 of 10",
+      "HANDOFF"
+    ]
+  },
+  "turn-budget-warn-fires-once": {
+    "_why": "ONE INSTRUCTION, ONCE. PostToolUse fires on every tool call, so a boundary that re-announced itself would repeat the same paragraph eight times between 32 and 40 and teach its reader it is noise -- the failure that retired the speech guards (changes/1.30.1.md). The marker is a separate `O_EXCL` file rather than a flag inside the counter, because parallel tool calls in one turn fire this hook concurrently and a read-modify-write of one JSON file can lose the flag and inject twice.",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
   }
 }

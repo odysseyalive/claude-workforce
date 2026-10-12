@@ -48,6 +48,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. It also runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project. |
 | `wf-org-sync` | `PostToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | **keeps an org chart that already EXISTS current with the files on disk, so nobody has to type `org index` to make a new agent dispatchable.** Appends an ADOPTED `## Roster` row for an agent in `.claude/agents/**` the chart does not list (`org.md` step 1a), marks a charted row whose file is gone `GHOST` (`org.md` step 4), and rewrites one marker-delimited `## Skills` list from `.claude/skills/*/SKILL.md`. It is **not an index**: it computes no tier, department, manager, fan-out or stamp, and it never touches the `Generated:` line — a separate `Synced:` line records this pass, and it is written only beside a real change, so a run with nothing to do writes nothing and a second run is byte-for-byte identical. `Bash` is in the matcher because a `cp`, a `mv` or a `git pull` adds an agent exactly as a `Write` does. Never creates a chart (`bin/sync`'s rule — never materialize an org nobody built), and that absent-chart `lstat` is also what makes it cheap enough to run on every call. § The org sync below |
 | `wf-org-sync` | `SessionStart` | *(none)* | the same sync for everything that happened while nobody was looking — another session, a checkout, a sibling clone. A `PostToolUse`-only registration can only see writes made in front of it. |
+| `wf-turn-budget` | `PostToolUse` | `*` | **tells a capped employee it is near its turn limit, once, while it still has turns to write with.** MEASURED in odyssey-alive session `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both build orders, both had already finished and verified their main work, and both returned **no report at all** — the run ends mid-sentence and the manager gets nothing to read. At 80% of the agent's `maxTurns` it injects one instruction: start no new work, write `OUTPUT.md` with every exit criterion MET or UNMET, write the seven-section continuation brief at `HANDOFF.md`, return `HANDOFF <path>` — which is the verdict `org.md` rung 12b acts on. A second, shorter injection at `maxTurns − 2` says return now with what exists. Each fires at most once, claimed with `O_CREAT\|O_EXCL` because parallel calls in one turn run this hook concurrently. It counts **TURNS, not calls** — assistant messages carrying a `tool_use`, read from the subagent's own transcript at `<session>/subagents/agent-<agent_id>.jsonl` from a stored byte offset — because parallel calls share a turn and two measured report orders ran 42 and 44 calls inside a 40-turn cap and both finished. Silent for the main thread (no `agent_id`), for an agent hook's own agent (`agent_id`, no `agent_type`), for an agent with no handbook, and for one with no `maxTurns` (every Lead). The counter is scratch under `$TMPDIR`, never in the project. § The turn budget below |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -564,6 +565,83 @@ that is the gate's rule; what is refused is a target the project does not contai
 comment, and that is measured too: two of the three charts carry that comment and the third does
 not — it was written by `audit` and says so in prose — so pinning the comment would have refused a
 third of the charts the tool exists for.*
+
+## The turn budget
+
+**A cut-off delivers nothing to read back.** MEASURED in odyssey-alive session `52aabcb1`
+(2026-10-12, 18 dispatches): the 2 that hit `maxTurns` were both **build** orders — code,
+selftests, live rebuild, verify, `OUTPUT.md`. Each had already finished and verified its main
+work. Each returned **no report**. One was cut at about call 42, in the middle of cleanup and
+verification. *The user's words, relayed: "see if there is anything we can do to fix this without
+degrading the current performance. In fact, this may be a performance booster. And by performance,
+I'm talking about quality of work, not how quick it's done."* The quality gain is that every
+cut-off becomes a written hand-back instead of a silence.
+
+**It is a hook because an agent cannot count its own turns.** Nothing in an employee's context
+says which turn it is on, so a handbook sentence asking it to watch the number is the advisory
+shape that stops firing (SKILL.md § Directives, 2026-08-05 — a rule nobody re-reads). The hook
+counts; the agent only has to act on what it is told.
+
+**Turns, not calls, and the difference is whether this is noise.** Parallel tool calls share one
+turn, so calls ≥ turns always. Measured in the same session: an Invest-watch report order ran
+**42 calls** and the hour-goals producer ran **44**, both under a **40-turn** cap, and both
+finished. A per-call boundary would have stopped two healthy runs on their 33rd call. A turn is a
+distinct assistant message carrying a `tool_use`; an assistant message holding only `thinking` is
+not one, and one holding three `tool_use` blocks is still one.
+
+| Threshold | For `maxTurns: 40` | What it injects |
+|---|---|---|
+| 80% of `maxTurns` | turn 32 | start no new work; write `OUTPUT.md` with every exit criterion MET or UNMET and its evidence; write the seven-section continuation brief at `HANDOFF.md` beside it; return `HANDOFF <OUTPUT.md path>`. If the work is already complete, finish normally. |
+| `maxTurns − 2` | turn 38 | return now with what exists. |
+
+**`maxTurns − 2` rather than `maxTurns − 1`, because the 2 is the room to obey it.** An
+instruction read on turn 39 of 40 has turns 39 and 40 — one to write the file, one to hand back.
+Fire it a turn later and there is one turn for both, which is a silent cut-off wearing a warning.
+
+**Each fires at most once, claimed with `O_CREAT|O_EXCL`.** `PostToolUse` fires on every call, so a
+boundary that re-announced itself would repeat the same paragraph eight times between turn 32 and
+the cap and teach its reader it is noise — the failure that retired the speech guards
+(`changes/1.30.1.md`). The marker is a file creation rather than a flag inside the counter because
+parallel calls in one turn run this hook concurrently, and two processes doing read-modify-write on
+one JSON file can both see the flag unset and both inject.
+
+**Four silences, and each one is a measured payload shape** (Claude Code 2.1.296, `platform.md`
+§ MEASURED fact 22a):
+
+| Payload | Why it is silent |
+|---|---|
+| no `agent_id` | the main thread. `agent_id` is present only inside a subagent, so it is the identity test — `agent_type` is not, because a `--agent` main thread carries that. **This branch exits before any filesystem access at all**, which is what licenses a hook on every tool call of every session on the machine. |
+| `agent_id`, no `agent_type` | a `type: "agent"` hook's own agent (`hook-agent-<uuid>`). Not predicted by the design and found by the canary; without this branch every agent-hook call would send the hook looking for `.claude/agents/None.md`. |
+| no handbook at `.claude/agents/<agent_type>.md` or `<config root>/agents/` | wired at user scope, running in every project on the machine, most of which have no org. One `lstat`. |
+| a handbook with no `maxTurns` | every Lead and CEO: `handbook-templates.md` gives the key to the IC template and no other tier. No cap means no 80% of anything, and a guessed one would stop an uncapped employee at a number no file states. |
+
+**The counter is scratch under `$TMPDIR`, never in the project.**
+`$TMPDIR/wf-turn-budget/<session_id>/<agent_id>/` holds a byte offset and running count, so each
+call reads only the transcript's new tail. It is never written under `.claude/workforce/work/`:
+that path is gitignored only by projects whose own audit added the entry, and nothing workforce
+ships writes it — a counter there would appear in `git status` on every host that installed this.
+The transcript is the source of truth and the file is a cache, so state that will not parse is
+discarded and the count re-derived.
+
+**The agent's own transcript is derived, because the payload does not name it.** Measured: there is
+no `agent_transcript_path` on `PostToolUse` — that key is on `SubagentStop` only — and
+`transcript_path` names the **parent** session. The subagent's file sits at
+`<dir of transcript_path>/<session_id>/subagents/agent-<agent_id>.jsonl`, every row carrying
+`isSidechain: true` and `agentId`. When it cannot be read the hook counts **calls** instead, which
+errs toward an early hand-off: calls ≥ turns, so the boundary arrives no later than it should. An
+early written hand-back costs one extra order; a silent cut-off costs the run.
+
+**`additionalContext` from this event does reach the subagent, and that was measured rather than
+assumed.** `platform.md` fact 22 carried the line as DOCUMENTED and said it earned a canary before
+any gate rested on it — three documented claims in that file have already lost to measurement. The
+canary on 2026-10-12 injected on a subagent's second call and the subagent obeyed it on its third;
+the text arrives as a `hook_additional_context` attachment in the subagent's own transcript.
+
+**`HANDOFF` has a consumer: `org.md` rung 12b.** The brief's seven sections are defined there, and
+this hook's text names them. Before 2026-10-12 rung 12b verified "sections 3–7" of a format defined
+in no file on disk — `wf-handoff`, the producer, was retired in the simplification release, so the
+verdict had a consumer and nothing that could satisfy it. `bin/check` requires the seven section
+lines to appear in both the script and `org.md`.
 
 ## The commitment ledger
 

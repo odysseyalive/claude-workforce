@@ -501,14 +501,57 @@ someone can read instead of re-derive.
    the originating `REQUEST (verbatim):` block unchanged, and the `UNMET` rows from the predecessor's
    `OUTPUT.md` as its work order. Never re-dispatch the agent that handed the brief back — its
    context is the reason the brief exists, and asking it to carry on is the failure the boundary
-   check was built to prevent. Verify the brief the way rung 12 verifies any other return: sections
-   3-7 filled, the work order in section 1 reproduced verbatim rather than summarized.
+   check was built to prevent.
+
+   **The brief has seven sections, and this is where they are defined.** `wf-turn-budget` is the
+   producer: it names these same seven lines in the instruction it injects at 80% of an employee's
+   `maxTurns`, and `bin/check` requires the two copies to agree.
+
+   ```
+   1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
+   2. Exit criteria, each MET or UNMET, with its evidence
+   3. What is done, and the file or command that shows it
+   4. What is left, as the next concrete action
+   5. What must not be redone, named file by file
+   6. The commands to re-run, and what each returned last
+   7. What went wrong or blocked, and what to try instead
+   ```
+
+   Verify it the way rung 12 verifies any other return: **sections 3-7 filled, and section 1
+   reproduced verbatim rather than summarized.** Section 5 is the one that saves the next agent's
+   budget, and section 1 is the one a summary destroys — a successor handed a paraphrase of the ask
+   solves the paraphrase.
 
    **A `HANDOFF` you leave unread is worse than a stalled run**, because the predecessor already
    stopped and reported success at stopping. *Added 2026-09-08: `wf-handoff` shipped, five Lead
    handbooks carried the clause, and `HANDOFF` had no consumer anywhere in `.claude/` — an agent
    could complete every step the clause asks and nothing downstream was instructed to do anything
    with the result. Found by a cold read of the deployed org, not by any check here.*
+
+   *Corrected 2026-10-12. This rung asked for "sections 3-7" of a format that existed in no file on
+   disk: `wf-handoff` had been retired in the simplification release, so the clause pointed at a
+   producer that no longer shipped and at a section list nothing defined. The sections above are
+   that definition, and `wf-turn-budget` is the producer — a hook rather than a script an agent has
+   to remember to run, because an agent cannot count its own turns and the limit always arrived
+   unannounced.*
+
+12c. **Never add scope to a running IC by message.** Queue a follow-up order for after the
+   hand-back, or make the small correction yourself once you have read it. **Measured cost**
+   (odyssey-alive session `52aabcb1`, 2026-10-12): two mid-run scope additions re-opened work the
+   agent had already finished and verified, and both of those runs were among the ones the turn
+   limit then cut off with no report. A message mid-run spends the budget twice — once on the new
+   work, once on re-verifying the old.
+
+12d. **Split a build order that also carries live rebuild, design review or fixtures.** Order A
+   implements and unit-tests; order B — a verifier or a second IC — runs the live checks.
+   Verification is the step most likely to be cut, because it is last: in the measured session both
+   cut agents were cut during cleanup and verification, after the build was done. Splitting it also
+   buys the quality gain of an independent check, under the 2026-09-09 directive that *evaluations
+   are always done by the independent agent*.
+
+12e. **Before a parallel fan-out, put the data contract in code**, not in plan prose — the types, the
+   schema, or the function signature the parallel orders both write against. Two ICs working from a
+   prose description of the same interface produce two interfaces.
 
 13. **Whatever reaches the user is written the way you would say it.** Answer first, one idea per
    sentence, no explanation nobody asked for, and no word from this file's own vocabulary — a reader

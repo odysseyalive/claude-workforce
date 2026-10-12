@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""wf-turn-budget — tell a capped employee it is near its turn limit, once, in time to write.
+
+THE DEFECT, MEASURED. Session `52aabcb1` in odyssey-alive dispatched 18 orders; the 2 that
+hit `maxTurns` were both BUILD orders, both had already finished and verified their main
+work, and both returned **no report at all**. One was cut at about call 42, during cleanup
+and verification. A cut-off is not a failure the orchestrator can read: the run simply
+stops, the manager sees nothing, and the finished work is unrecoverable because nobody
+wrote down what it was. The user's words, relayed 2026-10-12: *"see if there is anything we
+can do to fix this without degrading the current performance … this may be a performance
+booster. And by performance, I'm talking about quality of work, not how quick it's done."*
+
+WHY A HOOK AND NOT A SENTENCE IN A HANDBOOK. An agent cannot count its own turns — nothing
+in its context says which turn it is on — so a handbook clause asking it to watch the
+number is advisory in the shape this project has already measured as not firing (SKILL.md
+§ Directives, 2026-08-05: a rule nobody re-reads stops firing). A hook counts. The agent
+only has to act on what it is told.
+
+TURNS, NOT CALLS, AND THE DIFFERENCE DECIDES WHETHER THIS IS NOISE. Parallel tool calls
+share one turn, so calls >= turns always. MEASURED in the same session: an Invest-watch
+report order ran 42 CALLS and the hour-goals producer ran 44, both under a 40-TURN cap,
+and both finished. A per-call boundary would have stopped two runs that were fine, on
+their 33rd call. The count here is of distinct assistant messages carrying a `tool_use`,
+read from the subagent's own transcript.
+
+MEASURED ON CLAUDE CODE 2.1.296, 2026-10-12 (platform.md § MEASURED, fact 22a), and three
+of those facts contradict what the design was written from:
+
+  * `agent_id` is present on a PostToolUse payload from inside a subagent and ABSENT on
+    the main thread. That is the identity test, and `agent_type` is not: the docs record
+    `agent_type` on a `--agent` main thread too.
+  * `agent_type` is absent from a `type: "agent"` HOOK's own agent, which still carries
+    `agent_id` (`hook-agent-<uuid>`). So both keys are required before anything is read.
+  * There is NO `agent_transcript_path` on PostToolUse — that key exists on SubagentStop
+    only. `transcript_path` names the PARENT session's transcript. The subagent's own
+    transcript sits beside it at
+    `<dir of transcript_path>/<session_id>/subagents/agent-<agent_id>.jsonl`,
+    every row carrying `isSidechain: true` and `agentId`.
+  * `additionalContext` returned from this event DOES reach the subagent: it arrives as a
+    `hook_additional_context` attachment in the subagent's transcript, and the canary
+    subagent obeyed it on its next call.
+
+CHEAP ENOUGH FOR EVERY TOOL CALL IN EVERY SESSION, which is the licence it has to be in
+the default set. `PostToolUse` fires on every call the machine makes, most of them in the
+main thread of projects with no org at all. The main-thread branch exits before any
+filesystem access whatsoever — one dict lookup. An agent with no handbook costs one
+`lstat`, and an uncapped one (every Lead and CEO, which have no `maxTurns`) costs that
+plus a 4 KB read. Only a capped IC reaches the counter, and the counter reads the tail of
+the transcript from a stored byte offset rather than the file.
+
+THE STATE IS SCRATCH AND LIVES UNDER THE SYSTEM TEMP DIR, NEVER IN THE PROJECT.
+`.claude/workforce/work/` is gitignored only by projects whose own audit added the entry,
+and nothing workforce ships writes that entry — so a counter file there would show up in
+`git status` on every host that installed this and in `git add -A` on some of them. The
+state is a cache in both directions: the transcript is the source of truth, and state
+that cannot be read is discarded rather than trusted.
+
+NEVER RAISES, EXITS 0 FROM EVERY PATH. A hook that prints a traceback does it in front of
+the model on every tool call for the rest of the session, which is worse than the
+boundary it was trying to announce.
+
+Exit codes
+    0  always, from every path, including a payload it could not parse
+
+Usage
+    wf-turn-budget            # a PostToolUse hook; the payload arrives on stdin
+"""
+import json
+import os
+import re
+import sys
+
+
+# ── the two thresholds ───────────────────────────────────────────────────────
+# WARN is 80% of the cap. It is the one that matters: it arrives with a fifth of the
+# budget still unspent, which is enough turns to write an OUTPUT.md and a continuation
+# brief and still hand back. For the measured IC cap of 40 that is turn 32.
+#
+# FINAL is `maxTurns - 2`, and the 2 is the room to obey it. An instruction read on turn
+# 39 of 40 has turns 39 and 40 — one to write the file, one to return. Fire it a turn
+# later and there is one turn for both, which is the silent cut-off wearing a warning.
+#
+# EXPRESSED AS A FRACTION OF THE CAP, NOT AS A NUMBER OF TURNS, because the cap is read
+# from the handbook and differs per employee. `(n * 4 + 4) // 5` is ceil(0.8n) without
+# importing math: 40 -> 32, 80 -> 64, 10 -> 8.
+def warn_at(max_turns):
+    return (max_turns * 4 + 4) // 5
+
+
+def final_at(max_turns):
+    return max_turns - 2
+
+
+# ── the continuation brief's shape ───────────────────────────────────────────
+# THESE SEVEN HEADINGS ARE A CONTRACT WITH `org.md` RUNG 12b, which is the consumer that
+# reads the brief and spawns the successor. Rung 12b verifies "sections 3-7 filled, the
+# work order in section 1 reproduced verbatim", and before 2026-10-12 that sentence
+# pointed at a format defined in no file on disk — `wf-handoff`, the producer, had been
+# retired in the simplification release, so `HANDOFF` had a consumer and nothing that
+# could satisfy it. `bin/check` requires these exact lines to appear in both files.
+BRIEF_SECTIONS = """1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
+2. Exit criteria, each MET or UNMET, with its evidence
+3. What is done, and the file or command that shows it
+4. What is left, as the next concrete action
+5. What must not be redone, named file by file
+6. The commands to re-run, and what each returned last
+7. What went wrong or blocked, and what to try instead"""
+
+# THE INSTRUCTION LIVES HERE AND NOWHERE ELSE. A second copy in a handbook template or in
+# settings.json is the copy that drifts, and it is the one no check on a stranger's
+# machine can reach.
+WARN_TEXT = """TURN BUDGET — you are at turn {turns} of {cap}, which is 80% of your limit.
+
+The limit is enforced by the harness: when it arrives your run ENDS mid-sentence, your
+manager receives no report, and every verified thing you have not written down is lost.
+This is the only notice you get, and you cannot count your own turns.
+
+IF YOUR WORK IS ALREADY COMPLETE: finish normally, as your handbook says. Ignore the rest.
+
+OTHERWISE, START NO NEW WORK and do these three things now, in this order:
+
+1. Write your `OUTPUT.md` at the path your handbook names, with every exit criterion
+   marked MET or UNMET and the evidence for each. State UNMET rather than omitting it.
+2. Write a continuation brief at `HANDOFF.md` beside that `OUTPUT.md`, with these seven
+   sections, all of them filled:
+{sections}
+3. Return `HANDOFF <path to your OUTPUT.md>` as your verdict.
+
+Your manager reads `HANDOFF` as an instruction to spawn a fresh employee of your role
+from that brief (`org.md` rung 12b). You are forbidden to continue yourself, so a brief
+you do not write is work that simply stops."""
+
+FINAL_TEXT = """TURN BUDGET — turn {turns} of {cap}. RETURN NOW, with whatever exists.
+
+Two turns left. Write nothing new and verify nothing more. Write what you have into
+`OUTPUT.md` with each exit criterion MET or UNMET, and return `HANDOFF <that path>`.
+A partial account handed back beats a complete one the limit cuts off."""
+
+
+# `agent_type` ARRIVES IN A PAYLOAD AND BECOMES A PATH, so it is validated as a bare
+# name and never sanitised into one. Same shape as `wf-org-sync`'s AGENT_SLUG_RX, plus an
+# explicit `..` refusal: the leading-character class already blocks a bare `..`, and this
+# blocks `a..b` shapes too rather than reasoning about which of them are reachable.
+BARE_NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+MAX_TURNS_RX = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.M)
+# The frontmatter is at the head of the file and a handbook is tens of kilobytes. Reading
+# 4 KB answers the only question asked of it.
+FRONTMATTER_BYTES = 4096
+
+
+def bare(name):
+    """True when `name` is safe to join into a path as one component."""
+    return (isinstance(name, str) and ".." not in name
+            and bool(BARE_NAME_RX.match(name)))
+
+
+def config_root():
+    """The personal config root, which is where a user-scope agent registration lands."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(
+        os.path.expanduser("~"), ".claude")
+
+
+def read_cap(root, agent_type):
+    """The `maxTurns` in this agent's handbook, or None.
+
+    PROJECT SCOPE FIRST, THEN PERSONAL. An employee is registered at
+    `.claude/agents/<name>.md` by `/workforce hire`, and the personal root is where
+    `install --personal` puts an `agent` row. A name that resolves in neither has no cap
+    and gets no boundary — which is most agents on most hosts, `general-purpose`
+    included.
+    """
+    for base in (os.path.join(root, ".claude", "agents"),
+                 os.path.join(config_root(), "agents")):
+        path = os.path.join(base, agent_type + ".md")
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "rb") as fh:
+                head = fh.read(FRONTMATTER_BYTES).decode("utf-8", "replace")
+        except OSError:
+            continue
+        if not head.startswith("---"):
+            continue
+        end = head.find("\n---", 3)
+        m = MAX_TURNS_RX.search(head[:end] if end > 0 else head)
+        if m:
+            try:
+                cap = int(m.group(1))
+            except ValueError:
+                continue
+            # A cap of 2 or less has no room between the two thresholds and nothing
+            # useful to say; a negative one is a typo. Left alone rather than clamped.
+            if cap > 2:
+                return cap
+    return None
+
+
+def agent_transcript(payload, session_id, agent_id):
+    """Where this subagent's own transcript sits, derived from the parent's path.
+
+    MEASURED 2026-10-12: PostToolUse carries no `agent_transcript_path` — that key is on
+    SubagentStop only — and `transcript_path` names the PARENT session. The subagent's
+    file is a sibling directory of it, keyed by session then by agent.
+    """
+    parent = payload.get("transcript_path")
+    if not isinstance(parent, str) or not parent:
+        return ""
+    return os.path.join(os.path.dirname(parent), session_id, "subagents",
+                        "agent-" + agent_id + ".jsonl")
+
+
+def count_turns(path, offset):
+    """(turns in the bytes after `offset`, new offset) — or (None, offset) if unreadable.
+
+    A TURN IS AN ASSISTANT MESSAGE CARRYING A `tool_use`. An assistant row holding only
+    `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
+    is the whole reason this counts rows instead of calls.
+
+    ONLY WHOLE LINES ARE CONSUMED. The host batches transcript appends on a 100 ms timer,
+    so the tail can be a half-written line; the offset advances to the last newline and
+    the partial line is re-read next call rather than parsed once and lost.
+    """
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(offset)
+            chunk = fh.read()
+    except (OSError, ValueError):
+        return None, offset
+    cut = chunk.rfind(b"\n")
+    if cut < 0:
+        return 0, offset
+    turns = 0
+    for raw in chunk[:cut + 1].splitlines():
+        if b'"tool_use"' not in raw:          # cheap reject before any parse
+            continue
+        try:
+            row = json.loads(raw.decode("utf-8", "replace"))
+        except ValueError:
+            continue
+        if row.get("type") != "assistant":
+            continue
+        content = (row.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        if any(isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
+            turns += 1
+    return turns, offset + cut + 1
+
+
+def state_dir(session_id, agent_id):
+    """`$TMPDIR/wf-turn-budget/<session>/<agent>`, created 0700, or "" if it cannot be.
+
+    REFUSES A SYMLINK AT ANY LEVEL IT OWNS. The temp dir is world-writable on a shared
+    host, so another account can plant a link at a name this is about to write through.
+    `0o700` on the directories this creates, and an `lstat` refusal on anything that is
+    already a link.
+    """
+    import tempfile
+    base = os.path.join(tempfile.gettempdir(), "wf-turn-budget")
+    path = base
+    for part in (session_id, agent_id):
+        path = os.path.join(path, part)
+    for d in (base, os.path.dirname(path), path):
+        if os.path.islink(d):
+            return ""
+        try:
+            os.makedirs(d, 0o700)
+        except OSError:
+            if not os.path.isdir(d) or os.path.islink(d):
+                return ""
+    return path
+
+
+def read_state(path):
+    """The stored offset and counts, or zeros. Unparsable state is DISCARDED.
+
+    The transcript is the source of truth and this file is a cache, so throwing it away
+    costs one full re-read and never a wrong answer. A hook that raised on scratch
+    somebody else can write would print a traceback on every tool call afterwards.
+    """
+    try:
+        with open(os.path.join(path, "count.json"), encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return 0, 0, 0
+    if not isinstance(d, dict):
+        return 0, 0, 0
+    out = []
+    for key in ("off", "turns", "calls"):
+        v = d.get(key)
+        out.append(v if isinstance(v, int) and v >= 0 else 0)
+    return out[0], out[1], out[2]
+
+
+def write_state(path, off, turns, calls):
+    """Replace the counter atomically. A torn cache would be discarded, never acted on."""
+    tmp = os.path.join(path, "count.json.%d" % os.getpid())
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"off": off, "turns": turns, "calls": calls}, fh)
+        os.replace(tmp, os.path.join(path, "count.json"))
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def claim(path, marker):
+    """True for the ONE caller that creates `marker`. False for every later one.
+
+    `O_CREAT | O_EXCL` RATHER THAN A FLAG IN THE COUNTER, and the difference is a real
+    race: parallel tool calls inside one turn fire this hook concurrently, and two
+    processes doing read-modify-write on one JSON file can both see the flag unset and
+    both inject. Creating a file is atomic, so exactly one of them speaks.
+    """
+    try:
+        fd = os.open(os.path.join(path, marker), os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                     0o600)
+    except OSError:
+        return False
+    os.close(fd)
+    return True
+
+
+def emit(text):
+    sys.stdout.write(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PostToolUse", "additionalContext": text}}) + "\n")
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+
+    # ── THE FAST PATH: no file is touched in the main thread ─────────────────
+    # `agent_id` absent means the main thread (MEASURED 2026-10-12). `agent_type` absent
+    # with `agent_id` present means a `type: "agent"` hook's own agent, which has no
+    # handbook and no cap — also measured, and not predicted by the design.
+    agent_id = payload.get("agent_id")
+    agent_type = payload.get("agent_type")
+    if not bare(agent_id) or not bare(agent_type):
+        return 0
+
+    root = payload.get("cwd")
+    if not isinstance(root, str) or not os.path.isdir(root):
+        root = os.getcwd()
+    cap = read_cap(root, agent_type)
+    if cap is None:
+        return 0
+
+    session_id = payload.get("session_id")
+    if not bare(session_id):
+        session_id = "no-session"
+    path = state_dir(session_id, agent_id)
+    if not path:
+        return 0
+
+    off, turns, calls = read_state(path)
+    calls += 1
+    counted, new_off = count_turns(
+        agent_transcript(payload, session_id, agent_id), off)
+    if counted is None:
+        # THE FALLBACK ERRS TOWARD AN EARLY HANDOFF. Calls >= turns always, so a call
+        # count crosses the boundary no later than the true turn count would. An early
+        # written hand-back costs one extra order; a silent cut-off costs the run.
+        turns, new_off = calls, off
+    else:
+        turns += counted
+    write_state(path, new_off, turns, calls)
+
+    # BOTH DUE AT ONCE MEANS THE STRONGER ONE SPEAKS. For a small cap the two thresholds
+    # coincide (`maxTurns: 10` puts both at 8), and emitting two paragraphs on one call
+    # would spend the budget it is trying to protect.
+    if turns >= final_at(cap):
+        claim(path, "fired-warn")
+        if claim(path, "fired-final"):
+            emit(FINAL_TEXT.format(turns=turns, cap=cap))
+    elif turns >= warn_at(cap) and claim(path, "fired-warn"):
+        emit(WARN_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
+    return 0
+
+
+if __name__ == "__main__":
+    # NEVER RAISES. Anything unforeseen is silence, because the alternative is a
+    # traceback in front of the model on every tool call for the rest of the session.
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)

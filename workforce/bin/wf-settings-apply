@@ -196,6 +196,25 @@ SHIPPED_HOOKS = {
     # rows it owns.
     "wf-org-sync": ("PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
     "wf-org-sync@sessionstart": ("SessionStart", None),
+    # THE TURN LIMIT, ANNOUNCED BEFORE IT ARRIVES. Measured in odyssey-alive session
+    # `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both
+    # build orders, both had finished and verified their main work, and both returned
+    # NO REPORT — the run ends mid-sentence and the manager sees nothing. An agent
+    # cannot count its own turns, so a handbook sentence asking it to watch the number
+    # is the advisory shape that stops firing; this counts and tells it once.
+    #
+    # `*`, THE WHOLE TOOL SET, because the budget is spent by every call and a matcher
+    # would miss the turns that spend it. That is affordable only because the main-thread
+    # branch exits on one dict lookup with no filesystem access at all: `agent_id` is
+    # absent outside a subagent (measured on 2.1.296, platform.md fact 22a), and an agent
+    # with no `maxTurns` — every Lead and CEO — costs one lstat more.
+    #
+    # NO SubagentStop ROW. By then the budget is spent and the account is what was never
+    # written. This event is the only one that can reach the agent while it still has
+    # turns to spend, and `additionalContext` returned from it does reach a subagent —
+    # measured, not assumed, because platform.md fact 22 had that line as DOCUMENTED and
+    # three documented claims in that file have already lost to measurement.
+    "wf-turn-budget": ("PostToolUse", "*"),
 }
 
 # AGENT-HOOK CONFIG, keyed by the same names SHIPPED_HOOKS uses.
