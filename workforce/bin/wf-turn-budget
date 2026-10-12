@@ -148,6 +148,21 @@ FINAL_MARK = FINAL_TEXT.split("{turns}")[0]
 # name and never sanitised into one. Same shape as `wf-org-sync`'s AGENT_SLUG_RX, plus an
 # explicit `..` refusal: the leading-character class already blocks a bare `..`, and this
 # blocks `a..b` shapes too rather than reasoning about which of them are reachable.
+#
+# IT REJECTS WHERE `wf-task-tag`'s `session_component` SANITISES, and it is a separate
+# function rather than an import of that one. Both halves are deliberate:
+#
+#   * REJECTING is right here because every name this validates — `agent_id`,
+#     `agent_type`, `session_id` — decides whether anything is read or written AT ALL.
+#     `agent_type` becomes `.claude/agents/<name>.md`; a name this cannot vouch for means
+#     no cap, which means no boundary, which is the silent direction. `wf-task-tag` has to
+#     produce a usable filename for a tag it must store, so substitution is right there.
+#   * NOT IMPORTING, because loading that sibling to borrow one function costs a MEASURED
+#     +35 ms at best and +115 ms under load, per call, on a hook that fires on every tool
+#     call of every session. The hook's own total cost is in that range, so the import
+#     would more than double it. A local validator defined per script is also the house
+#     pattern for exactly this reason — `config_root()` is defined privately in eight
+#     other shipped scripts rather than shared.
 BARE_NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 MAX_TURNS_RX = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.M)
 # The frontmatter is at the head of the file and a handbook is tens of kilobytes. Reading
@@ -233,6 +248,15 @@ def count_turns(path, offset, needles=()):
     counter directory had to be refused. Only used on that path, where the read starts at
     offset 0 and therefore covers the whole run.
     """
+    # A REGULAR FILE, OR NOTHING. `os.path.isfile` is false for a FIFO, and the open below
+    # would otherwise BLOCK on one until a writer appeared — on every tool call, inside a
+    # hook the harness is waiting on. The directory part of this path comes from the
+    # payload's `transcript_path` and is not validated as a path (only the session and
+    # agent components are), so the name is reachable by anything that can set `cwd` or
+    # that path. `read_cap` takes the same guard, and it is the one `wf-turn-ledger`'s
+    # `_read_lines` has carried since it shipped.
+    if not path or not os.path.isfile(path):
+        return None, offset, set()
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
