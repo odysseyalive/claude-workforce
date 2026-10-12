@@ -334,20 +334,38 @@ HANDOFF = re.compile(
 # paragraphs later is not this defect; the last words are where the stop happens.
 TAIL = 400
 
-# ── A TURN WAITING ON BACKGROUND WORK HAS NOT CONCLUDED ──────────────────────────
-# `background_tasks` settles the case while a task is RUNNING, and it was read in one
-# place only: `unfinished`. REPORTED 2026-09-13 by the session driving four background
-# agent batches: between one batch finishing and the next being dispatched the array is
-# momentarily EMPTY, the main turn says out loud that it is holding for the next batch,
-# and the Stop that lands in that gap is judged as though the work had ended. It had
-# not — the turn's next action is triggered by a completion it has not received.
+# ── A HOLD IS JUDGED AS A HOLD, AND A RUNNING AGENT BUYS NOTHING ─────────────────
+# THE RULE, user directive 2026-10-12: *"Agents and their work should not interrupt the
+# widened technology."* So the whole-decision exemption this file carried is GONE. It read
+# `background_tasks` and returned `not judged — a background task is still running` for the
+# entire Stop: no promise check, no claim scan, no tag sense, no sample, no flag, and no
+# checklist handed to the juror. MEASURED across every transcript on this machine: 1,879
+# stops took that line, against 546 `not scored` and 115 sampled. In one orchestrated
+# odyssey-alive session it was 28 of 30 main-session verdicts AND all 22 subagent stops —
+# so in a run driven by agents, nothing was ever judged at all.
 #
-# TWO FACTS, NOT ONE PHRASE. The gap is recognised only when BOTH hold: a task
-# notification opened this turn (so a batch really did just finish — `wf-task-tag`
-# records the prompt, and `NOTIFICATION` is its own definition of that shape), and the
-# reply says it is waiting. Either alone is far too wide: notifications open a large
-# share of turns in an agent-driven run, and "waiting on" appears in plenty of replies
-# that then genuinely stop mid-work.
+# AND IT COULD NOT BE NARROWED INTO CORRECTNESS ON THE SUBAGENT SIDE, which is what fact 22b
+# settles rather than argues. MEASURED 2026-10-12 on 2.1.296: the `background_tasks` on a
+# `SubagentStop` payload is the SESSION's task list, carrying tasks the stopping agent never
+# started, `status: "running"`. The field can never describe the stopping agent's own state,
+# so every agent hand-back was exempted by a shell its parent had opened.
+#
+# WHAT SURVIVES IS NARROW AND IT IS NOT A GATE. A turn is a DECLARED HOLD when its own reply
+# says it is waiting and one outside fact agrees: a task really is running, or a completion
+# notification opened this turn. A declared hold is judged like every other turn — the
+# claims, the senses, the sample, the flag, and the checklist all run, which is how its
+# stated next step gets recorded. The ONE thing it is spared is the promise trigger, because
+# for a hold the promise is true: the turn said it was waiting and it is waiting.
+#
+# THAT IS WHERE THE READ LIVED BEFORE 2026-09-13 and it is where it belongs: `unfinished` is
+# the single trigger the fact bears on. Both measured false positives are in that class and
+# neither survives the move — "Nothing to do but let it finish. Continuing to wait" with a
+# task running, and the between-batches gap where the array is momentarily EMPTY, a
+# notification opened the turn and the tail reads "Continuing."
+#
+# TWO FACTS, NOT ONE PHRASE, for each half. "waiting on" appears in plenty of replies that
+# then genuinely stop mid-work, and notifications open a large share of turns in an
+# agent-driven run, so neither the words nor the notification alone can buy silence.
 WAITING = re.compile(
     r"\b(?:holding|hold)\b[^.\n]{0,40}\b(?:for|until|on)\b"
     r"|\bwaiting (?:on|for)\b"
@@ -367,17 +385,31 @@ def just_finished(payload):
     return bool(TT.NOTIFICATION.match((task_tag(payload) or {}).get("prompt") or ""))
 
 
-def waiting_on_background(payload, reply):
-    """Why this Stop is a WAIT rather than the end of the work, or None.
+def declared_hold(payload, reply):
+    """Why this turn is a declared HOLD rather than a stop mid-work, or None.
 
-    THE WHOLE REPLY, not the tail, and that is safe only because of the precondition
-    above: the sentence that says what the turn is waiting on is usually the first one
-    ("I'm blocked on four background agents"), with the tail two paragraphs later.
+    THE REPLY HAS TO SAY SO, in both halves. A task running is not a hold on its own: a
+    turn can abandon its own work while something unrelated ticks over in the background,
+    and that is the defect `unfinished` exists for.
+
+    THE WHOLE REPLY, not the tail, and that is safe only because the reply's words are
+    one of two required facts: the sentence that says what the turn is waiting on is
+    usually the first one ("I'm blocked on four background agents"), with the tail two
+    paragraphs later.
+
+    MAIN `Stop` ONLY for the running-task half. On a `SubagentStop` that array is the
+    SESSION's (fact 22b, measured 2026-10-12), so it says nothing about the agent that is
+    stopping, and a subagent does not hold for a batch its parent dispatched.
     """
-    if payload.get("background_tasks"):
-        return "a background task is still running"
-    if just_finished(payload) and WAITING.search(reply or ""):
-        return "a background batch finished and the turn says it is waiting on the next"
+    if not WAITING.search(reply or ""):
+        return None
+    running = payload.get("background_tasks")
+    if payload.get("hook_event_name") == "SubagentStop":
+        running = None
+    if running:
+        return "a task it named is still running"
+    if just_finished(payload):
+        return "a batch finished and the turn says it is waiting on the next"
     return None
 
 
@@ -387,13 +419,15 @@ def unfinished(reply, payload):
     Returns the promise it made, so the block can quote the turn its own words back.
     Silent when the turn asked the user something.
 
-    THE WAIT IS NOT CHECKED HERE ANY MORE, and the copy that used to be here is gone
-    rather than kept as a second layer. `widen` gates the whole decision on
-    `waiting_on_background` before this is called — a turn holding for a batch is not
-    judged at all — so a second call could never return anything but None, and an
-    unreachable guard is a guard nothing can prove. It also cost a re-read of the tag
-    file on every Stop.
+    THE HOLD IS CHECKED HERE AND NOWHERE ELSE, which is where it was before 2026-09-13 and
+    where it belongs. It moved out to gate the whole decision, and that gate is what took
+    1,879 stops out of judgment entirely; see § A HOLD IS JUDGED AS A HOLD. This is the one
+    trigger a hold bears on, because for a hold the promise is TRUE — the turn said it was
+    waiting and it is waiting — while every other judgement in this file is as applicable
+    to a holding turn as to any other.
     """
+    if declared_hold(payload, reply):
+        return None
     tail = (reply or "")[-TAIL:]
     if HANDOFF.search(tail) or CONDITIONAL.search(tail):
         return None
@@ -737,13 +771,13 @@ def closeout(payload):
 # 21:37:18, and the status notification arrived at 06:31:58 — the block below lands in that
 # six-minute window instead of nine hours later.
 #
-# IT RUNS BEFORE THE `background_tasks` WAIT GATE, and that placement is the whole fix
-# rather than an ordering preference. `wf-widen`'s own `SubagentStop` on that agent returned
-# `WIDEN  not judged — a background task is still running`: the exemption is what let it
-# hand back with a live shell. The exemption is still right for every other judgement here —
-# a turn holding for a batch has run nothing and must not be scored — but "you are stopping
-# with a background task running" is exactly the fact this check is about, so it is the one
-# thing the exemption must not silence.
+# IT USED TO RUN BEFORE THE `background_tasks` WAIT GATE, and that placement was the whole
+# fix: `wf-widen`'s own `SubagentStop` on that agent returned `WIDEN  not judged — a
+# background task is still running`, so the exemption is what let it hand back with a live
+# shell. THE GATE IS GONE (2026-10-12, § A HOLD IS JUDGED AS A HOLD), so this no longer
+# needs to outrank anything. It still runs first, above the claim scan, because it is a
+# fact in the transcript rather than a judgement and a fact that can be checked for free
+# is checked before anything is spawned.
 #
 # ONLY SHELLS THE STOPPING AGENT STARTED ITSELF, read from its own transcript
 # (`TL.reply_transcript`, the ledger's own rule for which file this stop's evidence is in).
@@ -1044,15 +1078,11 @@ def widen(payload):
         if left_open:
             return left_open
 
-    # THE WAIT IS GATED ONCE, FOR THE WHOLE DECISION. The exemption used to live inside
-    # `unfinished` alone, so a turn holding for a background batch was spared the promise
-    # block and still sent to the jury — which found every channel shut, because a turn
-    # that is waiting has run nothing, and blocked it into another turn to do work it was
-    # already waiting on. Nothing below this line runs: no promise check, no claim scan, no
-    # tag sense, no sample, and no flag, so the agent hook spends nothing on it either.
-    waiting = waiting_on_background(payload, reply)
-    if waiting:
-        return {"systemMessage": f"WIDEN  not judged — {waiting}"}
+    # NOTHING IS GATED ON A BACKGROUND TASK ANY MORE. The whole-decision exemption that
+    # stood here is removed on the user's rule of 2026-10-12, *"Agents and their work should
+    # not interrupt the widened technology"* — see § A HOLD IS JUDGED AS A HOLD for the two
+    # measurements and for what survives. A declared hold is judged here like any other
+    # turn and is spared one trigger, inside `unfinished`, where the fact bears.
 
     # SMELL SELECTS; IT NEVER SCORES. The two triggers below decide which sense is
     # applicable to this turn, and a turn that trips neither is scored against nothing
@@ -1388,9 +1418,16 @@ def with_checklist(payload):
     The Stop-time block on an empty list or an open item was removed 2026-09-13 as more than
     the ask needed. The session keeps the list, and the check on it is the juror's.
 
-    Only the Stop that ends the turn: not a subagent, not a turn waiting on background work,
-    not a continuation, and not a Stop whose reply the transcript does not hold, since that
-    is a side query and the list's turn is still going.
+    Only the Stop that ends the turn: not a subagent, not a continuation, and not a Stop
+    whose reply the transcript does not hold, since that is a side query and the list's turn
+    is still going.
+
+    A RUNNING BACKGROUND TASK NO LONGER BAILS OUT HERE either (user rule, 2026-10-12). It
+    was the same exemption as the one `widen` carried, arriving a second time: in an
+    orchestrated run the array is non-empty on nearly every Stop, so the juror never saw a
+    checklist, and the asks of the one turn that dispatched the agents were the asks least
+    likely to be checked. A turn holding for a batch has a checklist worth reading — its
+    items are exactly what the batch was sent to do.
 
     ONCE PER CHECKLIST: the tag's record says whether a Stop has ended the list's turn.
 
@@ -1398,7 +1435,7 @@ def with_checklist(payload):
     more asks in the message, or the file holds two or more items.
     """
     if (payload.get("stop_hook_active") or payload.get("hook_event_name") == "SubagentStop"
-            or payload.get("background_tasks") or TL.confirmed_reply(payload)[0] is None):
+            or TL.confirmed_reply(payload)[0] is None):
         return
     cl, record = checklist(payload)
     if record is None or record.get("ended"):

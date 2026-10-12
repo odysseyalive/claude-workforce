@@ -677,17 +677,34 @@ CASES = [
      WDN, "del", "not subagent and "),
     ("widen: a subagent's stop is judged on its own turn, and never flags the main turn's jury",
      WDN, "del", ", transcript_path=TL.reply_transcript(payload)"),
-    # THE GATE MOVED, AND BOTH HALVES ARE BROKEN SEPARATELY. The first puts the exemption
-    # back inside `unfinished` alone, where the senses jury blocked the turn the promise
-    # trigger had just spared; the second drops the between-batches half, where the array
-    # that settles a wait is momentarily empty.
-    ("widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
-     WDN, "del", "    waiting = waiting_on_background(payload, reply)\n    if waiting:\n"
-                 '        return {"systemMessage": f"WIDEN  not judged — {waiting}"}\n'),
-    ("widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
-     WDN, "del", '    if just_finished(payload) and WAITING.search(reply or ""):\n'
-                 '        return "a background batch finished and the turn says it is waiting '
-                 'on the next"\n'),
+    # THE TWO HALVES THAT CAN BE BROKEN CLEANLY. The subagent guard is the one fact 22b
+    # settles — that array is the SESSION's, so an agent would be excused by its parent's
+    # shell — and the between-batches half is where the array is momentarily EMPTY.
+    #
+    # THE OTHER TWO HALVES HAVE NO CLEAN MUTATION and are deliberately not cased, rather
+    # than cased and left BAD-CASE. Deleting the `if running:` block leaves `running` bound
+    # and unread, and deleting the `WAITING` guard leaves the function's first statement a
+    # read of the payload: both trip `script-conformance` and the corpus citation row, so
+    # bin/check fails on OTHER assertions and the named one never runs. A case that cannot
+    # reach its assertion proves nothing and hides in a 40-minute suite. Both halves are
+    # asserted instead by the RUN in bin/check — `_wd_running` for the first and
+    # `_wd_words` for the second, each with its own payload.
+    ("widen: a running task never takes a Stop out of judgment, and a declared hold is "
+     "spared only the promise trigger",
+     WDN, "del", '    if payload.get("hook_event_name") == "SubagentStop":\n'
+                 "        running = None\n"),
+    ("widen: a running task never takes a Stop out of judgment, and a declared hold is "
+     "spared only the promise trigger",
+     WDN, "del", "    if just_finished(payload):\n"
+                 '        return "a batch finished and the turn says it is waiting on the next"\n'),
+    # THE REMOVAL ITSELF. Either gate coming back takes an orchestrated run out of
+    # judgment on its own, so each is a case. The append has to be a VALID module-level
+    # expression: a bare `payload.get(...)` at import time raises NameError, and a hook
+    # that exits 1 fails every other assertion instead of the named one.
+    ("widen: background_tasks is read once, for the promise trigger, and nothing else",
+     WDN, "append", '\n_SECOND = (lambda payload: payload.get("background_tasks"))\n'),
+    ("widen: background_tasks is read once, for the promise trigger, and nothing else",
+     WDN, "del", "    if declared_hold(payload, reply):\n        return None\n"),
     # ONE PROVEN CASE, NOT TWO WITH A VACUOUS ONE. A case deleting
     # `def read_targets(name, inp):` orphans its body, so bin/check fails on syntax and
     # the NAMED check never runs — `did NOT fire — 2 other failures`. A case that cannot

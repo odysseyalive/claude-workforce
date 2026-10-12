@@ -1015,20 +1015,21 @@ _sc_problems = []
 # than the check it was guarding, which is the reasoning the manifest parser above already
 # carries. Found 2026-09-25 by bin/prove, which mutates exactly these literals.
 _sc_call = _wd_inc.find("left_open = closeout_subagent(payload)")
-_sc_gate = _wd_inc.find("waiting = waiting_on_background(payload, reply)")
+_sc_gate = _wd_inc.find("promise = unfinished(reply, payload)")
 if "def closeout_subagent(" not in _wd_inc or _sc_call < 0:
     _sc_problems.append("the close-out is gone from the SubagentStop path, so a shell an "
                         "agent abandons is only noticed on the parent's next turn — the "
                         "measured one was noticed nine hours later")
 # THE ORDER IS THE FIX, not a preference, and it is asserted as an order rather than as a
-# pair of `in` tests because both literals survive a move. `wf-widen`'s SubagentStop on the
-# measured agent returned `not judged — a background task is still running`: the
-# `background_tasks` exemption is exactly what let it hand back with a live shell.
+# pair of `in` tests because both literals survive a move. It used to be anchored on the
+# `background_tasks` wait gate, which is exactly what let the measured agent hand back with
+# a live shell; that gate was removed on 2026-10-12, so the anchor moved to the first
+# judgement below it. A fact free to read is still read before anything is judged.
 elif _sc_gate < 0 or _sc_call > _sc_gate:
-    _sc_problems.append("the subagent close-out no longer runs ABOVE the background_tasks "
-                        "wait gate, which is the exemption that let the measured agent hand "
-                        "back with a live shell. `you are stopping with a background task "
-                        "running` is the one fact that exemption must not silence")
+    _sc_problems.append("the subagent close-out no longer runs ABOVE the turn's first "
+                        "judgement. `you are stopping with a background task running` is a "
+                        "fact in the transcript, free to read, and the one thing a stopping "
+                        "agent is the only node able to act on")
 if "closeout_facts(slines)[\"closed\"]" not in _wd_inc:
     _sc_problems.append("the subagent half no longer reads the SESSION's closed set. Once a "
                         "shell's command finishes the harness delivers the notification to "
@@ -15862,8 +15863,13 @@ def _wd_wait(said, prompt, **extra):
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         _cl_hook(d, "wf-task-tag", {"prompt": prompt})
+        _tp = _rc_transcript(d, said)
+        # A `SubagentStop` reads its reply from `agent_transcript_path`, never from the
+        # parent's, so the same file has to be named twice or the stop is a side query and
+        # nothing is judged at all. One tree, two keys, exactly as the host sends it.
         out = _cl_hook(d, "wf-widen", {"hook_event_name": "Stop", "last_assistant_message": said,
-                                       "transcript_path": _rc_transcript(d, said), **extra},
+                                       "transcript_path": _tp,
+                                       "agent_transcript_path": _tp, **extra},
                        _CL_NOBLIND)[1]
         return (out.get("decision"), out.get("systemMessage") or "",
                 os.path.exists(os.path.join(d, "wf-widen-flag.c1.json")))
@@ -15878,18 +15884,66 @@ _wd_running = _wd_wait("It was removed on purpose. The agents are still running;
                        "on them.", _WD_HIST, background_tasks=[{"id": "x"}])
 _wd_gap = _wd_wait(_WD_GAP, "<task-notification>\n<status>completed</status>\nAgent finished")
 _wd_words = _wd_wait(_WD_GAP, "fold in what the agents found and give me one report")
+# A SUBAGENT STOPS WHILE ITS PARENT'S SHELL RUNS, which is the measured case the removal is
+# for: fact 22b says that array is the SESSION's, so it can never describe this agent, and
+# the words-plus-running-task hold must not reach it.
+_wd_sub = _wd_wait("The agents are still running; I am waiting on them. Continuing.",
+                   _WD_HIST, background_tasks=[{"id": "x"}],
+                   hook_event_name="SubagentStop")
+_wd_hold = []
+# THE EXEMPTION IS GONE AND THE JUDGEMENT HAPPENS. `not judged` was 1,879 stops on this
+# machine; a `history` ask with zero outside calls is a case the jury has something to say
+# about, and saying nothing because a shell was ticking over is the defect.
+if "not judged" in _wd_running[1]:
+    _wd_hold.append(f"a running task still takes the whole Stop out of judgment: "
+                    f"{_wd_running[1]!r}")
+if _wd_running[0] != "block" or "NOT OPENED" not in _wd_running[1]:
+    _wd_hold.append(f"a history ask answered with zero outside calls was not judged on its "
+                    f"channels while a task ran: {_wd_running}")
+# AND THE HOLD IS STILL SPARED THE ONE TRIGGER THE FACT BEARS ON. Both measured false
+# positives are here: the reply says it is waiting and a task is running, and the
+# between-batches gap where the array is EMPTY and a notification opened the turn.
+if "stopped mid-work" in _wd_running[1]:
+    _wd_hold.append("a declared hold with a task actually running was blocked as a turn "
+                    "that announced work and stopped — the measured 2026-09-13 false fire")
+if _wd_gap[0] is not None or "stopped mid-work" in _wd_gap[1]:
+    _wd_hold.append(f"the between-batches gap was blocked: {_wd_gap}")
+# WORDS ALONE BUY NOTHING, which is what keeps the hold from being a phrase match.
+if _wd_words[0] != "block" or "stopped mid-work" not in _wd_words[1]:
+    _wd_hold.append(f"waiting words with neither fact bought silence: {_wd_words}")
+if "not judged" in _wd_sub[1] or "stopped mid-work" not in _wd_sub[1]:
+    _wd_hold.append(f"a subagent was spared by its PARENT's task list: {_wd_sub[1]!r}. The "
+                    "reply ends on `Continuing.` and the agent started nothing, so the "
+                    "promise trigger is the correct verdict; the array that would excuse it "
+                    "describes the session (fact 22b), never the agent that is stopping")
 check(
-    "widen: a turn waiting on background work is not judged, and waiting words alone are not a wait",
-    _wd_running == (None, "WIDEN  not judged — a background task is still running", False)
-    and _wd_gap[0] is None and "waiting on the next" in _wd_gap[1] and _wd_gap[2] is False
-    and _wd_words[0] == "block" and "stopped mid-work" in _wd_words[1],
-    f"(running, between batches, neither)={_wd_running}, {_wd_gap}, {_wd_words}. "
-    "`background_tasks` was read inside `unfinished` alone, so a turn waiting on a running "
-    "agent was spared the promise block and handed to the jury anyway — where it fails by "
-    "construction, because a turn that is waiting has run nothing. REPORTED 2026-09-13 by the "
-    "session driving four agent batches: in the "
-    "gap between one batch finishing and the next being dispatched the array is momentarily "
-    "EMPTY, and a legitimate wait read as a turn that announced work and stopped",
+    "widen: a running task never takes a Stop out of judgment, and a declared hold is "
+    "spared only the promise trigger",
+    not _wd_hold,
+    "; ".join(_wd_hold) + f". (running, gap, neither, subagent)={_wd_running}, {_wd_gap}, "
+    f"{_wd_words}, {_wd_sub}",
+)
+# THE READ IS ALLOWED IN EXACTLY ONE PLACE, and that is what keeps the removal from being
+# quietly undone. `background_tasks` had two whole-decision gates on it — one in `widen` and
+# a second in `with_checklist` — and either is enough to take an orchestrated run out of
+# judgment on its own, because in such a run the array is non-empty on nearly every Stop.
+_wd_bg = []
+if _wd_inc.count('payload.get("background_tasks")') != 1:
+    _wd_bg.append(f"`background_tasks` is read {_wd_inc.count(chr(34) + 'background_tasks' + chr(34))} "
+                  "times; exactly one read is allowed, inside `declared_hold`, where the "
+                  "fact bears on the promise trigger alone")
+if "def declared_hold(" not in _wd_inc or "if declared_hold(payload, reply):" not in _wd_inc:
+    _wd_bg.append("the hold is no longer consumed inside `unfinished` — moved back out it "
+                  "becomes a gate on the whole decision again, which is the 1,879 stops")
+# THE EMIT, NOT THE WORDS. The removal's own record quotes the retired line, so the literal
+# pinned here is the interpolation only a `return` can carry.
+if "not judged — {" in _wd_inc:
+    _wd_bg.append("`not judged` is being emitted again: a Stop this hook declines to judge "
+                  "is the outcome the user's 2026-10-12 rule removed")
+check(
+    "widen: background_tasks is read once, for the promise trigger, and nothing else",
+    not _wd_bg,
+    "; ".join(_wd_bg),
 )
 
 check(

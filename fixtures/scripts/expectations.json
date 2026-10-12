@@ -4263,17 +4263,20 @@
     ]
   },
   "widen-background-is-silent": {
-    "_why": "THE ONE FALSE POSITIVE IN THE MEASUREMENT, closed with data rather than a word list. \"Nothing to do but let it finish. Continuing to wait\" is a correct stop, and the Stop payload carries `background_tasks` to say so, so the fixture proves the array is read rather than the phrase guessed. The note it must carry changed on 2026-09-13 with the gate that moved: the turn is not judged BECAUSE it is waiting, which is a different fact from \"no claim this turn that evidence settles\" and was reported with that wording while the jury was still free to block the same turn.",
+    "_why": "THE MEASURED FALSE POSITIVE, AND IT IS NOW A HOLD RATHER THAN AN EXEMPTION. \"Nothing to do but let it finish. Continuing to wait\" is a correct stop, and the payload's `background_tasks` is the second fact that says so, so this still proves the array is read rather than the phrase guessed. What changed on 2026-10-12 (user rule: agents and their work do not interrupt the widened technology) is the SCOPE: the turn is JUDGED and only the promise trigger is spared. With no claim in the reply the verdict is `not scored`, which is a judgement. `not judged` is the line that took 1,879 stops on this machine out of judgment and it must never come back.",
     "exit": 0,
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"last_assistant_message\": \"Nothing to do but let it finish. Continuing to wait.\", \"background_tasks\": [{\"id\": \"x\"}]}",
     "want": [
+      "not scored"
+    ],
+    "not": [
       "not judged",
-      "a background task is still running"
+      "stopped mid-work"
     ]
   },
   "widen-background-jury-is-silent": {
-    "_why": "THE GATE WAS ON ONE TRIGGER, NOT ON THE DECISION. `background_tasks` was read inside `unfinished` alone, so a turn waiting on a running agent was spared the promise block and handed to the senses jury anyway - where it fails by construction, because a turn that is waiting has run nothing. This tree tags the ask `history`, whose juror is hearing, and records zero outside calls: before the fix it blocked with `hearing NOT OPENED` and told a turn to open a channel it was already waiting on.",
+    "_why": "A RUNNING TASK NO LONGER BUYS SILENCE FROM THE JURY, and this is the row that was inverted on 2026-10-12. The tree tags the ask `history`, whose juror is hearing, and records zero outside calls, and the reply states an INTENT - \"it was removed on purpose\" - which is exactly a claim the record settles and this turn never opened. Before the removal this Stop returned `not judged - a background task is still running` and said nothing at all; measured across this machine that line took 1,879 stops, and in one orchestrated session 28 of 30 main verdicts plus all 22 subagent stops. The hold spares the promise trigger and nothing else, so `stopped mid-work` must still be absent.",
     "exit": 0,
     "script": "wf-widen",
     "env": {
@@ -4281,16 +4284,15 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"It was removed on purpose. The agents are still running; I am waiting on them.\", \"background_tasks\": [{\"id\": \"x\"}]}",
     "want": [
-      "not judged",
-      "a background task is still running"
+      "NOT OPENED"
     ],
     "not": [
-      "NOT OPENED",
+      "not judged",
       "stopped mid-work"
     ]
   },
   "widen-between-batches-is-silent": {
-    "_why": "THE GAP BETWEEN BATCHES, REPORTED 2026-09-13 by the session driving four agent batches. `background_tasks` is momentarily EMPTY between one batch finishing and the next being dispatched, and the Stop that lands in that window read a legitimate wait as a turn that announced work and stopped: the tail says \"Continuing.\" and the array that used to settle it says nothing. TWO FACTS make it a wait - a task notification opened the turn, which the tag records, and the reply says what it is waiting on - so the words alone never buy silence (see widen-waiting-words-alone-still-block, the same reply with neither fact).",
+    "_why": "THE GAP BETWEEN BATCHES, REPORTED 2026-09-13 by the session driving four agent batches. `background_tasks` is momentarily EMPTY between one batch finishing and the next being dispatched, and the Stop that lands in that window read a legitimate wait as a turn that announced work and stopped: the tail says \"Continuing.\" and the array that would settle it says nothing. TWO FACTS make it a hold - a task notification opened the turn, which the tag records, and the reply says what it is waiting on - so the words alone never buy silence (see widen-waiting-words-alone-still-block, the same reply with neither fact). Since 2026-10-12 the hold is scoped to the promise trigger, so the turn IS judged and reaches the no-claim verdict instead of being skipped.",
     "exit": 0,
     "script": "wf-widen",
     "env": {
@@ -4298,11 +4300,23 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}",
     "want": [
-      "not judged",
-      "waiting on the next"
+      "not scored"
     ],
     "not": [
+      "not judged",
       "stopped mid-work"
+    ]
+  },
+  "widen-subagent-not-exempt-by-parents-task": {
+    "_why": "THE MEASURED 22-OF-22, AND THE ROW THIS REMOVAL EXISTS FOR. Every subagent stop in the odyssey-alive session returned `not judged - a background task is still running`, so no IC's hand-back was ever checked against its order. MEASURED 2026-10-12 (platform.md fact 22b): a `SubagentStop` payload's `background_tasks` is the SESSION's list and carries tasks the stopping agent never started, so the field cannot be narrowed into correctness here - it had to go. The reply makes a project-scoped absence claim with zero reads, which is the 0.5% trigger, and the agent must now be told so.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"There is no such hook anywhere in this repository and no file defines one.\", \"background_tasks\": [{\"id\": \"x\", \"type\": \"shell\", \"status\": \"running\", \"command\": \"sleep 90\"}]}",
+    "not": [
+      "not judged"
     ]
   },
   "widen-waiting-words-alone-still-block": {
