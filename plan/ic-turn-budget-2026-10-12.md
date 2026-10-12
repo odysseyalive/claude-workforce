@@ -250,6 +250,27 @@ rate: W40 16/66 came after it. Two more defects are at the shipped level, and bo
 boundary and K3 in place, the runtime guarantees a written OUTPUT.md at hand-back, so the incremental clause is no
 longer needed. Removing it is a cleanup for the next release that touches the template.
 
+**Added 2026-10-12 (user): the cut agent's work must be FINISHED, not just recorded.** The user: *"We started this
+whole conversation with the fact that the agents are reaching their turn limits with the task uncompleted. It's
+happening very often which is also causing normal tasks to take forever because we're waiting on work that's never
+gonna get completed before it hands back over to the session. How do we deal with that?"* The turn boundary makes a
+cut readable. It does not complete the work. The fix is continuation of the SAME agent:
+
+- K8. **A cap is a checkpoint, and the session must continue the agent.** Measured today: resuming a cut
+  engineering-coder with SendMessage kept its full context and gave it a fresh turn allowance. Part A's coder
+  stopped at 80 tool uses and finished at 129. Part B's coder stopped at 81 and continued to 87. The continue path
+  exists, but nothing makes the session take it. So:
+  - `wf-turn-budget`, at the final threshold, marks the agent `handoff` on its issue in the ledger (K2c). It knows
+    `agent_id` and the count, so this does not depend on whether `SubagentStop` fires at a cap (unmeasured).
+  - The main `Stop` judges each issue. An issue holding an agent marked `handoff` with UNMET items is not finished.
+    The kickback names the agent and the one action: resume it with SendMessage, telling it to continue from its
+    `HANDOFF.md`. It never says to re-dispatch, because a fresh agent starts over.
+  - The guard against a loop is progress, not a count. If a resumed agent hands off again with the same UNMET set
+    (OUTPUT.md unchanged), the issue is escalated to the user with the agent's own HANDOFF section 1, instead of
+    being resumed again.
+  - Fixtures: a cut agent with UNMET items leads to a kickback naming a resume of that agent_id. A second hand-off
+    with no change leads to an escalation, not a third resume. An agent that finished all MET leads to no kickback.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
