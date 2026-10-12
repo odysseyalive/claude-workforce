@@ -287,6 +287,25 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
   never a customized span, which are `wf-companion`'s existing rules. A fixture covers a stale region refreshed
   at session start, a current one left untouched, and user text around it kept byte-for-byte.
 
+- K10. **Targeted checks per item, the regression suite once at the end — shipped in workforce.** The user,
+  2026-10-12: *"This system needs to be smart enough to wait to the very end of the implementation of all items
+  before running the regression test last. And if this issue was if how we are dealing with tests, then we need to
+  work that into the workforce module itself ... this needs to be a workforce item that's shipped with the
+  workforce code."* Measured today from the three coders' own transcripts (time from each tool call to its
+  result): Part A, 124 min wall, of which `bin/check` ~51 min (62 calls) and `bin/prove` ~10 min. Part B K1+K2,
+  103 min wall: `bin/prove` ~47 min, `bin/check` ~27 min. K2b, 39 min: check+prove ~23 min. The live end-to-end
+  runs cost 3–4 min each. The time went to the full regression suite rerun after every edit and every failure,
+  because the shipped template has one `Check:` line (`handbook-templates.md:385–387`), and a handbook generated
+  from it runs that one command at every step, and the order said to keep every commit green. So:
+  - The shipped `## Verification` template gains a second line. `Check:` is the TARGETED proof of this change:
+    the fixture or case by name, run while building. `Regression:` is the full suite, run ONCE, at the end of
+    the work order, never per edit. `verification.md` § The rule states the two and why.
+  - The `/org` dispatch checkpoint gains one rule: across a batch of orders, each order runs its `Check:` and the
+    manager runs `Regression:` once, after the last order and before release.
+  - `wf-conform` reports a code-role handbook whose `## Verification` has no `Regression:` line. That handbook is
+    refreshed by the same machine-owned-region path as K9, so existing orgs pick it up with no audit.
+  - Fixture: a handbook with both lines passes, one with only `Check:` is reported.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
