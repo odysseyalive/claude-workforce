@@ -2903,10 +2903,54 @@ CASES = [
     # which is the state both measured projects were committed in.
     ("ledger hygiene: the ignore rule rides the write and covers that one file",
      "workforce/bin/wf-commitments", "del", "ensure_ignored(p)"),
-    # THE INDEX GATE. Without it every session start in every git project shells out to
-    # `git ls-files`, the cost the one read exists to avoid.
+    # THE DIRECTORY REFUSAL, aimed at the two lines together: a `del` of the `if` alone
+    # would orphan its `return` and report BAD-CASE. With both gone, a `.claude/workforce`
+    # that is a link has this note and this rule appended through it — the guarded open
+    # below only covers the name's LAST component.
+    ("ledger hygiene: the ignore rule rides the write and covers that one file",
+     "workforce/bin/wf-commitments", "del",
+     "    if os.path.islink(os.path.dirname(ledger)):\n        return\n"),
+    # ── the index is parsed, not asked (2026-10-12, security review of 86c175e) ───────
+    # THE UNKNOWN ANSWER. Deleting the version gate leaves the file valid and makes an
+    # index this parser cannot read be walked as if it were version 2 — a confident answer
+    # about bytes whose layout nobody established. The named check pins the line.
     ("ledger hygiene: a tracked ledger is named for the user to untrack, never staged",
-     "workforce/bin/wf-commitments", "del", 'LEDGER_REL.encode("utf-8") not in idx'),
+     "workforce/bin/wf-commitments", "del",
+     "    if version not in (2, 3, 4):\n        return None\n"),
+    # THE ANSWER ITSELF, and the fixtures are what notice: with the match gone the walk
+    # runs to the end of a tracked ledger's own entry and reports "not tracked", so both
+    # `commitments-ledger-tracked` and `commitments-fsmonitor-never-run` lose the line they
+    # assert. Two lines together, because a `del` of the `if` orphans its `return`.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     "workforce/bin/wf-commitments", "del",
+     "        if name == target:\n            return True\n"),
+    # THE KERNEL-LEVEL HALF, which no fixture can reach on its own: it only matters in the
+    # window between a test and the open. `delall`, because the first occurrences are in
+    # the docstrings that explain the flag and a `del` of one of those changes nothing (the
+    # VACUOUS trap this suite records 39 times); with every copy gone,
+    # `getattr(os, "", 0)` quietly returns 0 and the flag is absent from all seven sites.
+    ("ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
+     "workforce/bin/wf-commitments", "delall", "O_NOFOLLOW"),
+    # THE CLASS, NOT THE INSTANCE (security review of caf77da). A plain `open` on a
+    # `.claude` path makes the guarded sibling beside it decorative, because the name is
+    # the attacker's to pick. `append`, because the defect is a line that must NOT be
+    # there: a function definition parses, never runs, and the AST row sees it.
+    ("ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
+     "workforce/bin/wf-commitments", "append",
+     '\n\ndef _plain_open_regression(root):\n'
+     '    return open(os.path.join(root, ".claude", "settings.json"))\n'),
+    # ── the two shared helpers (security review of 849eb74) ──────────────────────────
+    # THE PREDICTABLE TEMPORARY NAME. `<path>.<pid>` is five digits anybody can enumerate;
+    # the child-process row squats it and the save has to land anyway.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     "workforce/bin/wf-task-tag", "delall", "tempfile.mkstemp("),
+    # THE OWNER CHECK. Deleting the comparison leaves the fstat and the S_ISREG test, so
+    # the file still parses and a file another account planted in TMPDIR is read again —
+    # which the child-process row sees by replacing `os.getuid` in its own interpreter.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     "workforce/bin/wf-task-tag", "delall", " or (uid is not None and st.st_uid != uid())"),
 ]
 
 

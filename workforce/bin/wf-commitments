@@ -93,12 +93,37 @@ IGNORE_NOTE = (
     "# else in this directory is still yours to commit.\n")
 # Where `_heal_regions` records the state it last refreshed against. See its docstring.
 REGION_STAMP_REL = ".claude/workforce/.regions-refreshed"
+# HOW MUCH OF `.git/index` IS READ to answer one question about one path. Entries are
+# sorted by path bytes and `.claude/…` sorts ahead of almost everything a project carries,
+# so the answer sits in the first handful of entries of any real repository; 1 MiB is some
+# 15 000 of them. A read that stops before the answer says UNKNOWN, never "not tracked"
+# (`_index_tracks`), so the cap can only cost a line nobody needed — never print a wrong one.
+INDEX_READ_CAP = 1 << 20
 
 
 def project_root(payload):
     """The project this hook fired for, as the harness names it, or None. See `path`."""
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
     return root if root and str(root).strip() else None
+
+
+def _open_nofollow(path, flags, mode=0o600):
+    """`os.open` with `O_NOFOLLOW` added, so a planted symlink at `path` is refused.
+
+    EVERY FILE THIS HOOK TOUCHES LIVES IN SOMEBODY'S REPOSITORY, at a path anyone who has
+    seen one workforce project can predict, and the hook opens them unattended on every
+    turn. A link left at `commitments.json` or at `.claude/workforce/.gitignore` would
+    otherwise aim this hook's write at whatever it points to, and its read at a file it
+    was never given. The pattern is `wf-turn-budget`'s (3c7431c), shared with
+    `wf-task-tag`, and is deliberately not a third design.
+
+    IT IS THE OPEN THAT REFUSES, not a test before it. `os.path.islink(p)` followed by
+    `open(p)` is two separate resolutions of the same name, and the link can be planted
+    between them (CWE-59); the flag is checked by the kernel in the same call that opens.
+
+    The flag is absent on some platforms; `getattr` keeps this importable there.
+    """
+    return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
 
 
 def heal_settings(root):
@@ -201,8 +226,16 @@ def _heal_settings(root, progress):
     except OSError:
         names = []
     for n in names:
+        # NOT THROUGH A LINK, like every other path under this project's `.claude`. A
+        # settings file IS legitimately a link in some installs, which is why this one was
+        # the last plain `open` here — but what the gate does with the text is decide
+        # whether to run the classifier over this project's settings, so a link planted at
+        # the name hands that decision a file the project never wrote. Refusing reads it as
+        # "no workforce row", which is the same answer an unreadable settings file already
+        # gets one line below.
         try:
-            with open(os.path.join(root, ".claude", n), encoding="utf-8", errors="replace") as fh:
+            with os.fdopen(_open_nofollow(os.path.join(root, ".claude", n), os.O_RDONLY),
+                           encoding="utf-8", errors="replace") as fh:
                 texts[os.path.join(".claude", n)] = fh.read()
         except OSError:
             continue
@@ -394,8 +427,11 @@ def _heal_regions(root, progress):
     want = _region_digest(root, wf)
     stamp = os.path.join(root, *REGION_STAMP_REL.split("/"))
     if want is not None:
+        # NOT THROUGH A LINK. The stamp sits beside the ledger in a shared checkout, and a
+        # link planted at its name hands this gate a file somebody else chose — which
+        # decides whether the refresh below runs at all.
         try:
-            with open(stamp, encoding="utf-8") as fh:
+            with os.fdopen(_open_nofollow(stamp, os.O_RDONLY), encoding="utf-8") as fh:
                 if fh.read().strip() == want:
                     return ""
         except OSError:
@@ -429,6 +465,120 @@ def _heal_regions(root, progress):
     return "\n".join(lines)
 
 
+def _git_varint(buf, pos):
+    """git's offset-encoded varint at `pos` — `(value, next_pos)`, or `(None, pos)` when
+    the buffer ends inside it.
+
+    NOT LEB128, and the difference is one addition. git's own `decode_varint` adds one to
+    the accumulator before each shift, so every value has exactly one spelling; reading it
+    as LEB128 gives a number that is too small by a growing amount, which in a version-4
+    index means a path built from the wrong prefix. Index version 4 is the only reader of
+    this encoding here.
+
+    TEN BYTES AND NO MORE, WHICH IS A RESOURCE GUARD RATHER THAN A FORMAT DETAIL. These
+    bytes come out of somebody's repository and this runs at session start. Unbounded, the
+    accumulator grows seven bits per continuation byte while each shift costs the whole
+    integer — quadratic. MEASURED 2026-10-12 on the unbounded version: 65 536 continuation
+    bytes took 1.70 s and 262 144 took 28.1 s, so one crafted `.git/index` inside the read
+    cap could have held a session open for minutes in every project. Ten bytes carries
+    every value a 64-bit git can write (`ceil(64/7)`); an eleventh is not a number this
+    reader will produce, it is UNKNOWN, which prints nothing.
+    """
+    val, first = 0, True
+    for _ in range(10):
+        if pos >= len(buf):
+            return None, pos
+        c = buf[pos]
+        pos += 1
+        val = (c & 0x7F) if first else (((val + 1) << 7) | (c & 0x7F))
+        first = False
+        if not c & 0x80:
+            return val, pos
+    return None, pos
+
+
+def _index_scan(idx, version, hashlen, target):
+    """True when `target` is an entry in these index bytes, False when it provably is not,
+    None when they do not parse as a version-`version` index of `hashlen`-byte ids.
+
+    THE FORMAT, as `Documentation/gitformat-index.txt` states it. Each entry is 40 bytes
+    of stat data, the object id, then 2 bytes of flags whose low 12 bits hold the path
+    length (`0xFFF` meaning "longer than that, find the NUL") and whose `0x4000` bit adds
+    two more flag bytes in version 3 and up. In versions 2 and 3 the path is NUL-padded so
+    the entry length is a multiple of eight; in version 4 there is no padding and the path
+    is prefix-compressed — a varint saying how many bytes to strip from the PREVIOUS path,
+    then the suffix — which is why this walks every entry in order instead of seeking.
+
+    IT VALIDATES AS IT GOES, and that is what makes the hash length safe to infer: a
+    declared path length that disagrees with the NUL, a pad byte that is not a NUL, or a
+    read past the end all return None. Parsing a 32-byte-id index as if the ids were 20
+    bytes reads the flags out of the middle of an object id, so it fails one of those
+    within the first entry rather than answering confidently about the wrong bytes.
+
+    THE FIRST NAME PAST THE TARGET SETTLES IT. Entries are sorted by path bytes, which is
+    Python's own order for `bytes`, so a project with 300 000 files costs the same handful
+    of entries as a project with ten — `.claude/…` sorts ahead of almost every name a
+    repository carries. If an index somehow were not sorted the early exit would answer
+    "not tracked", which is a line not printed rather than a wrong line printed.
+    """
+    n = len(idx)
+    pos, prev = 12, b""
+    for _ in range(int.from_bytes(idx[8:12], "big")):
+        base = pos + 40 + hashlen + 2
+        if base > n:
+            return None
+        flags = int.from_bytes(idx[base - 2:base], "big")
+        if flags & 0x4000:
+            if version < 3:
+                return None
+            base += 2
+        if version >= 4:
+            strip, base = _git_varint(idx, base)
+            if strip is None or strip > len(prev):
+                return None
+        end = idx.find(b"\0", base)
+        if end < 0:
+            return None
+        name = idx[base:end] if version < 4 else prev[:len(prev) - strip] + idx[base:end]
+        namelen = flags & 0xFFF
+        if namelen != 0xFFF and len(name) != namelen:
+            return None
+        if version < 4:
+            nxt = pos + (((base - pos) + len(name) + 8) & ~7)
+            if nxt <= end or nxt > n or any(idx[end:nxt]):
+                return None
+        else:
+            nxt = end + 1
+        if name == target:
+            return True
+        if name > target:
+            return False
+        prev, pos = name, nxt
+    return False
+
+
+def _index_tracks(idx, target):
+    """Is `target` an entry in `.git/index`? True, False, or None for "these bytes do not
+    say" — and None is answered by printing nothing, never by guessing either way.
+
+    THE HASH LENGTH IS NOT IN THE HEADER. A repository created with
+    `--object-format=sha256` writes the same version number with 32-byte ids, so the only
+    honest way to read the entries is to try a length and require the result to validate
+    (`_index_scan`). A version this cannot read — 1, or a 5 that does not exist yet — is
+    UNKNOWN rather than parsed as the nearest one it knows.
+    """
+    if len(idx) < 12 or idx[:4] != b"DIRC":
+        return None
+    version = int.from_bytes(idx[4:8], "big")
+    if version not in (2, 3, 4):
+        return None
+    for hashlen in (20, 32):
+        answer = _index_scan(idx, version, hashlen, target)
+        if answer is not None:
+            return answer
+    return None
+
+
 def _untracked_ledger(root):
     """The one-time `git rm --cached` line for a project whose ledger git already tracks,
     or "".
@@ -445,45 +595,40 @@ def _untracked_ledger(root):
     `git rm`, never stages and never commits. It also clears itself: once the command has
     been run, `git ls-files` stops answering and the line stops appearing.
 
-    ONE READ IS THE WHOLE GATE for the projects with nothing to say, which is nearly all
-    of them — the same shape `_heal_git_hooks` uses on `.git/config`. The ledger's own
-    path bytes absent from `.git/index` means it cannot be an entry, and that ends it with
-    no subprocess run. The bytes being PRESENT proves nothing (in this repository every
-    `fixtures/scripts/*/.claude/workforce/` path carries them as a substring), so the
-    answer itself is always `git ls-files`, which is authoritative. An index written in
-    VERSION 4 prefix-compresses its paths, so the gate cannot read it and asks git
-    instead; a `.git` that is a FILE — a linked worktree, a submodule — keeps its index
-    where only git can name it, and does the same.
+    IT RUNS NO COMMAND, AND THAT IS A SECURITY PROPERTY, NOT A SAVING. Asking
+    `git ls-files` meant running git inside a directory whose own `.git/config` git then
+    reads, and several config keys name an executable git will run for it. MEASURED here
+    on 2026-10-12, git 2.55.0: with `core.fsmonitor` set to a command in a repository's
+    LOCAL config, `git ls-files --error-unmatch -- <path>` executed that command. This
+    hook fires at the start of every session in every project on the machine with nobody
+    watching, so opening a repository somebody else prepared would have run their command.
+    Reading `.git/index` and deciding the question here takes that whole class away: the
+    only thing opened is one file, and nothing in it is executed, interpreted or echoed.
 
-    IT ASKS GIT HERE RATHER THAN THROUGH `wf-settings-apply._tracked`, deliberately: that
-    helper always shells out, and reaching it would import the classifier on every session
-    start in every git project — the 37-to-89 ms regression `heal_settings` records. Its
-    own docstring states the rule this follows: "Every caller now decides what an
-    unanswerable question means for it." For a NAG LINE the answer is silence, because a
-    line printed on a question nobody could answer is one every reader learns to skip.
+    ONE READ IS THE WHOLE ANSWER, and it is the same shape `_heal_git_hooks` uses on
+    `.git/config`. `_index_tracks` parses the entries (versions 2, 3 and 4) and says True,
+    False or "these bytes do not say" — and the last of those prints nothing, because a
+    line put up on a question nobody could answer is one every reader learns to skip. That
+    rule is `wf-settings-apply._tracked`'s, whose own docstring states it: "Every caller
+    now decides what an unanswerable question means for it."
+
+    A `.git` THAT IS A FILE IS SKIPPED — a linked worktree, a submodule — and so is a
+    project with no `.git` of its own. Both keep their index somewhere only git can name,
+    and following a path out of a file inside the repository, to read it, is the thing this
+    function just stopped doing. The cost is one nag line unsaid in a worktree whose main
+    checkout says it anyway; the alternative is the class back again.
     """
     if not os.path.lexists(os.path.join(root, *LEDGER_REL.split("/"))):
         return ""
-    dot = os.path.join(root, ".git")
-    if os.path.isdir(dot):
-        try:
-            with open(os.path.join(dot, "index"), "rb") as fh:
-                idx = fh.read()
-        except OSError:
-            return ""
-        if (idx[:4] == b"DIRC" and int.from_bytes(idx[4:8], "big") < 4
-                and LEDGER_REL.encode("utf-8") not in idx):
-            return ""
-    elif not os.path.isfile(dot):
+    if not os.path.isdir(os.path.join(root, ".git")):
         return ""
-    import subprocess
     try:
-        p = subprocess.run(["git", "ls-files", "--error-unmatch", "--", LEDGER_REL],
-                           cwd=root, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                           timeout=20)
-    except (OSError, subprocess.SubprocessError):
+        with os.fdopen(_open_nofollow(os.path.join(root, ".git", "index"),
+                                      os.O_RDONLY), "rb") as fh:
+            idx = fh.read(INDEX_READ_CAP)
+    except OSError:
         return ""
-    if p.returncode or not p.stdout.strip():
+    if _index_tracks(idx, LEDGER_REL.encode("utf-8")) is not True:
         return ""
     return (f"LEDGER TRACKED  git is tracking {LEDGER_REL}, which records what turns in "
             f"this project said they would do. It is written on every turn that states "
@@ -511,17 +656,22 @@ def ensure_ignored(ledger):
     SILENT ON FAILURE. A read-only `.claude/workforce/` is a project that has told us
     something, and the ledger write above it has already dealt with the same OSError.
 
-    NEVER THROUGH A SYMLINK. An append follows one, so a link left in `.claude/workforce/`
-    would put this note and this rule wherever it pointed — a file outside the project,
-    written by a hook that runs on every turn with nobody watching. A `.gitignore` that is
-    a link is not ours to append to, and the ledger's own writer refuses the same shape
-    one directory up (`wf-ledger.atomic_write`, containment).
+    NEVER THROUGH A SYMLINK, AND THE KERNEL IS WHAT REFUSES IT (CWE-59). An append
+    follows a link, so one left in `.claude/workforce/` would put this note and this rule
+    wherever it pointed — a file outside the project, appended to by a hook that runs on
+    every turn with nobody watching. `os.path.islink(p)` and then `open(p, "a")` resolve
+    that name TWICE and a link planted between the two calls is followed, so both the read
+    and the append go through `_open_nofollow` instead and fail in the open itself. The
+    DIRECTORY is refused the same way, by name: `.claude/workforce` being a link means
+    every path under it belongs to a tree this project did not name, and the ledger's own
+    writer refuses the same shape (`wf-ledger.atomic_write`, containment).
     """
-    p = os.path.join(os.path.dirname(ledger), ".gitignore")
-    if os.path.islink(p):
+    if os.path.islink(os.path.dirname(ledger)):
         return
+    p = os.path.join(os.path.dirname(ledger), ".gitignore")
     try:
-        with open(p, encoding="utf-8", errors="replace") as fh:
+        with os.fdopen(_open_nofollow(p, os.O_RDONLY),
+                       encoding="utf-8", errors="replace") as fh:
             body = fh.read()
     except OSError:
         body = None
@@ -530,7 +680,8 @@ def ensure_ignored(ledger):
             "*" in lines and not any(ln.startswith("!") for ln in lines)):
         return
     try:
-        with open(p, "a", encoding="utf-8") as fh:
+        with os.fdopen(_open_nofollow(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT),
+                       "a", encoding="utf-8") as fh:
             fh.write(("" if not body or body.endswith("\n") else "\n")
                      + ("\n" if body else "") + IGNORE_NOTE + IGNORE_RULE + "\n")
     except OSError:
@@ -569,12 +720,17 @@ def path(payload):
 
 
 def load(p):
-    try:
-        with open(p, encoding="utf-8") as fh:
-            d = json.load(fh)
-        return d if isinstance(d, dict) else {"open": []}
-    except (OSError, ValueError):
-        return {"open": []}
+    """The ledger, or an empty one — THROUGH THE SIBLING'S OWN GUARDED READER.
+
+    This file's contents are read back to the operator at session start, so a link planted
+    at its name is a file somebody else chose being quoted into the next session's context.
+    `wf-task-tag.read_json_nofollow` already refuses that, and since 2026-10-12 refuses a
+    file that is not a regular file this account owns as well — a local copy of those three
+    rules is a copy that learns the fourth one late. `TT` is already imported at module
+    scope for `state_component`, so this costs no import, and the shape is the same one it
+    reads for the issue ledger: a dict or the default.
+    """
+    return TT.read_json_nofollow(p, {"open": []})
 
 
 def capture(reply):
@@ -723,10 +879,14 @@ def main():
         if t not in seen:
             book.setdefault("open", []).append({"text": t, "at": stamp[:10]})
     book["open"] = (book.get("open") or [])[-MAX_OPEN:]
-    try:
-        with open(p, "w", encoding="utf-8") as fh:
-            json.dump(book, fh, indent=2)
-    except OSError:
+    # THE SIBLING'S OWN ATOMIC WRITER, for the write that matters most: the operator's own
+    # sentences, at a predictable path in a shared checkout, written unattended on every
+    # turn that states one. It creates its temporary name random and `O_EXCL` so there is
+    # no name to squat, renames over the real one so a link at that name is REPLACED rather
+    # than written through, and never half-writes — which a plain truncating open did on
+    # every failure after the first byte. `indent=2` keeps the bytes a person opening this
+    # file reads; the issue ledger beside it is machine-read and stays compact.
+    if not TT.write_json_atomic(p, book, indent=2):
         return 0
     # THE IGNORE RULE RIDES THE WRITE, never a session start: the file exists from this
     # moment on, and the rule has to be there before the project's next `git add -A`.

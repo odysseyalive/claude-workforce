@@ -1568,7 +1568,7 @@
     }
   },
   "commitments-ledger-untracked": {
-    "_why": "The clean half, and the one that keeps the gate honest. Same ledger, same kind of repository, never committed: the path's bytes are not in .git/index, so the check ends there with no `git ls-files` run and nothing said. A line that appears in a healthy project is a line every reader learns to skip, which is the whole value of the one above. The read-back line is asserted to prove the hook did its ordinary job here rather than bailing out early.",
+    "_why": "The clean half, and the one that keeps the answer honest. Same ledger, same kind of repository, never committed: the path is not an entry in .git/index, which the hook parses itself, so nothing is said. A line that appears in a healthy project is a line every reader learns to skip, which is the whole value of the one above. The read-back line is asserted to prove the hook did its ordinary job here rather than bailing out early.",
     "script": "wf-commitments",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
@@ -1583,6 +1583,67 @@
       "git rm --cached",
       "Traceback"
     ]
+  },
+  "commitments-fsmonitor-never-run": {
+    "_why": "A SECURITY FINDING, MEASURED. Asking `git ls-files` meant running git inside a directory whose own .git/config git then reads, and several config keys name an executable git runs for it. Measured 2026-10-12 on git 2.55.0: with core.fsmonitor set to a command in a repository's LOCAL config, `git ls-files --error-unmatch -- <path>` executed that command. This hook fires at the start of every session in every project with nobody watching, so opening a repository somebody else prepared ran their command. The marker that command would create is asserted ABSENT, and the tracked-ledger line is asserted PRESENT in the same case, because a fix that answered the question by saying nothing would pass the first half and lose the feature. The answer now comes out of .git/index, which the hook parses itself.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "git": {
+      "init": true,
+      "commit": true,
+      "config": {
+        "core.fsmonitor": "touch '${TREE}/FSMONITOR-RAN' ; false"
+      }
+    },
+    "want": [
+      "LEDGER TRACKED",
+      "git rm --cached .claude/workforce/commitments.json",
+      "1 thing(s) a previous turn in this project said it would"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "FSMONITOR-RAN": {
+        "absent": true
+      }
+    }
+  },
+  "commitments-gitignore-link-unchanged": {
+    "_why": "CWE-59, the TOCTOU half. The ignore rule rides the ledger write, so it is appended by a hook that runs on every turn with nobody watching, at a path anyone who has seen one workforce project can predict. An append follows a symlink, so a link planted at `.claude/workforce/.gitignore` sends the note and the rule wherever it points. `os.path.islink(p)` and then `open(p, \"a\")` resolve that name twice and a link planted between the two calls is followed; the open itself has to refuse, which is what O_NOFOLLOW does. The link's target is asserted byte-unchanged, and the LEDGER is asserted written in the same case: refusing the rule is not refusing the turn.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"last_assistant_message\": \"Next, I will parse the index instead of asking git, and then run the suite.\"}",
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        ".claude/workforce/.gitignore": "../../decoy.md"
+      }
+    },
+    "want": [
+      "COMMITMENTS",
+      "stated this turn"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "decoy.md": {
+        "want": [
+          "DECOY TARGET"
+        ],
+        "not": [
+          "Written by the workforce commitments hook",
+          "commitments.json\n"
+        ]
+      },
+      ".claude/workforce/commitments.json": {
+        "want": [
+          "parse the index instead of asking git"
+        ]
+      }
+    }
   },
   "commitments-records-a-list": {
     "_why": "THE MEASURED CASE, verbatim in shape. A goal was set, the next turn answered with this list, every item shipped, all four suites went green, the goal cleared - and the work was half done, because the list omitted the acting half. The ledger cannot make a list complete; it stops an incomplete one from evaporating.",
