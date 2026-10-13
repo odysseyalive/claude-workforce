@@ -20019,23 +20019,76 @@ check(
     "points to, and the hook's read at a file it was never given",
 )
 
-# FOUR. THE THIRD AGENT STATE IS DECLARED BEFORE IT IS SET. `handoff` is K8's to write, and
-# K8 is not built here. Declaring it now is what stops the schema changing under the ledger
-# later, and `judge_issue` already HOLDS on it rather than treating it as finished — which
-# is the behaviour that matters, because an unknown state read as "returned" would kick back
-# an agent that is waiting to be resumed.
+# FOUR. A CUT AGENT IS RESUMED, NOT REPLACED (K8, 2026-10-12). The user's words: *"the
+# agents are reaching their turn limits with the task uncompleted … we're waiting on work
+# that's never gonna get completed."* The injection `wf-turn-budget` sends is read by the
+# AGENT; nothing in it reaches the session, so the cut was readable and the work still
+# stopped. The fix is one state written at one end and acted on at the other, and the three
+# fixtures (`turn-budget-final-marks-the-agent-handoff`, `widen-handoff-cut-agent-is-
+# resumed`, `widen-handoff-stalled-escalates`) prove the behaviour. What a fixture cannot
+# see is WHY each half is right:
+#
+#   * holding on a `handoff` agent waits forever for a run the harness has already ended,
+#     which is the silence above. It was correct to hold while NOBODY set the state.
+#   * the mark is written where the `agent_id` and the count are known. Whether
+#     `SubagentStop` fires when the harness cuts a run at `maxTurns` is UNMEASURED, and a
+#     mark that waits on an unmeasured event is the same silence one layer in.
+#   * the guard is PROGRESS, never a count of resumes: `handoff_stalled` is set only when a
+#     second hand-off carries the UNMET digest the first one left, so no agent is escalated
+#     before it has actually been resumed once.
 _il_st = []
 if 'AGENT_STATES = ("running", "returned", "handoff")' not in _il:
     _il_st.append("AGENT_STATES does not declare the three states")
-if 'waiting = [a for a in agents if a.get("state") in ("running", "handoff")]' not in _il:
-    _il_st.append("judge_issue does not hold on a `handoff` agent, so a capped agent "
-                  "waiting for K8's resume reads as an issue to kick back")
+if 'waiting = [a for a in agents if a.get("state") == "running"]' not in _il:
+    _il_st.append("judge_issue holds on more than a RUNNING agent — a `handoff` agent has "
+                  "STOPPED at its turn cap, and holding on it waits forever for a run the "
+                  "harness already ended")
+if "def agent_handoff(payload, led):" not in _il or 'a["state"] = "handoff"' not in _il:
+    _il_st.append("nothing writes the `handoff` state through the ledger's own API, so the "
+                  "state is declared and set by nobody again")
+# COUNTED, NOT `in`: the definition contains the call's own text, so a bare `in` passes on
+# a file where the function is defined and never called — which is exactly the shape a
+# later edit leaves behind. Two sites: the def, and the one call at the final threshold.
+if _tb_src.count("mark_handoff(payload)") != 2:
+    _il_st.append(f"wf-turn-budget names mark_handoff at "
+                  f"{_tb_src.count('mark_handoff(payload)')} sites, expected 2 — its own "
+                  "def and the call at the final threshold. Without the call the session "
+                  "is never told which agent to resume")
+if "handoff_stalled" not in _il or "handoff_stalled" not in _il_w:
+    _il_st.append("the loop guard is gone from the writer or the reader: a resumed agent "
+                  "that hands off again with the same unmet set is resumed forever")
+if "RESUME {who} with SendMessage" not in _il_w:
+    _il_st.append("the kickback no longer names a resume as its one action — a fresh agent "
+                  "of the same role starts the work over, which is the measured defect")
+if "handoff_action(payload, iss, verdict)" not in _il_w:
+    _il_st.append("the action line is not rendered, so the verdict reaches the user as a "
+                  "status with no instruction in it")
+# THE ESCALATION READS A FILE AND QUOTES AN AGENT, and both halves are attack surface
+# (security review of 6b49140). Two fixtures walk through them —
+# `widen-handoff-linked-run-dir-is-not-read` and `widen-handoff-brief-is-quoted-not-obeyed`
+# — and what they cannot say is why each control is the one that works.
+if ("if not base.startswith(root + os.sep):" not in _il_w
+        or "p = os.path.realpath(os.path.join(base, run, employee" not in _il_w):
+    _il_st.append("the HANDOFF lookup does not resolve its path and contain it under the "
+                  "work tree — `work/`, the run directory and the employee directory can "
+                  "EACH be a link, and `os.path.isfile` follows all three, so a leaf-only "
+                  "link test reads whatever the outermost one points at")
+if ("_INERT_RX.sub" not in _il_w or "QUOTED AS DATA" not in _il_w
+        or "section.translate(_QUOTE_TRANS)" not in _il_w):
+    _il_st.append("section 1 is not carried as framed, stripped data — it is text an AGENT "
+                  "wrote, and an unstripped escape sequence or a bare `\"` in it closes the "
+                  "frame's own quotation and continues as if the hook were speaking")
+if 'decided["systemMessage"] = (prior + "\\n\\n" if prior else "") + _quoted' not in _il_w:
+    _il_st.append("the quoted brief no longer goes to the user's channel alone — on a "
+                  "BLOCKED stop the verdict line lands in `reason`, which is the model's "
+                  "context, and a stuck agent's own words have no business there")
 check(
-    "issues: the agent state K8 will set is declared and already held on",
+    "issues: an agent cut at its turn cap is marked, and the Stop asks for it to be resumed",
     not _il_st,
-    "; ".join(_il_st) + ". K8 teaches wf-turn-budget to mark a capped agent `handoff`; "
-    "the state is named here so that order changes no schema, and held on here so a "
-    "capped agent is never judged as a failure in the meantime",
+    "; ".join(_il_st) + ". A cap is a checkpoint: resuming the SAME agent keeps the context "
+    "it has already paid for (measured 2026-10-12 — a coder cut at 80 tool uses finished at "
+    "129), and starting over with a fresh one is the behaviour the user measured as never "
+    "finishing",
 )
 
 # FIVE. THE PER-TURN STATE BESIDE THE LEDGER GETS THE SAME REFUSAL (CWE-59, security review

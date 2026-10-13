@@ -329,11 +329,50 @@ CASES = [
     ("issues: nothing in the ledger is written or read through a name another account can "
      "plant",
      WDN, "delall", "TT.agent_returned(payload, led"),
-    ("issues: the agent state K8 will set is declared and already held on",
+    # THE CUT AGENT'S CONTINUATION (K8). Each mutation removes one half of the two-ended
+    # mechanism and leaves valid Python, so the named assertion is what notices rather than
+    # an import error: the state's declaration, the hold that must NOT cover it, the writer
+    # in `wf-turn-budget`, the loop guard, and the one action the kickback names.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
      TAG, "delall", 'AGENT_STATES = ("running", "returned", "handoff")'),
-    ("issues: the agent state K8 will set is declared and already held on",
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
      TAG, "delall",
-     'waiting = [a for a in agents if a.get("state") in ("running", "handoff")]'),
+     'waiting = [a for a in agents if a.get("state") == "running"]'),
+    # THE WRITER'S OWN STATEMENT, not its `def`: `bin/check` EXECUTES wf-task-tag, so an
+    # orphaned body would fail the import assertion and prove nothing about this one.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", 'a["state"] = "handoff"'),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", "handoff_stalled"),
+    # THE CALL, NOT THE DEF, for the same reason and one more: the def's text CONTAINS the
+    # call's, so the assertion counts the two sites and this removes exactly one of them.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TBG, "delall", "            mark_handoff(payload)"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "RESUME {who} with SendMessage"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "handoff_action(payload, iss, verdict)"),
+    # THE ESCALATION'S TWO SECURITY HALVES (security review of 6b49140). The containment
+    # test, the data framing, and the channel the agent's own words travel on.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "if not base.startswith(root + os.sep):"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "_INERT_RX.sub"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "section.translate(_QUOTE_TRANS)"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", 'decided["systemMessage"] = (prior + "\\n\\n" if prior else "")'),
 
     # ── THE PER-TURN STATE BESIDE IT (CWE-59, security review 2026-10-12) ───────
     # THE FORBIDDEN FORMS ARE PROVED BY APPENDING THEM, for the reason the os.getcwd() case
