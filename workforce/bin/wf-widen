@@ -604,6 +604,49 @@ SPAWN_OK = "Spawned successfully"
 HANDBACK_MARK = "[Subagent hand-back]"
 # Both frames the host has used to deliver one, so a rename of either does not mute this.
 FROM_ID = re.compile(r'(?:from|teammate_id)="([^"]+)"')
+# THE HARNESS'S OWN SENTENCE FOR A REPORT THAT ARRIVED, and the whole positive sentence
+# rather than the name of the tool. The first draft read a notification as a hand-back when
+# its body mentioned `SubagentHandback` anywhere, and the harness mentions it to say the
+# OPPOSITE: "it is waiting on its own background work and will deliver its report through
+# SubagentHandback when that finishes". MEASURED over 7,300 task-notifications on this
+# machine: 3,706 mention the tool, and only 3,364 say the report was delivered. Of the 342
+# difference, 85 are an agent that had not reported yet and 257 carry the NEGATION "so no
+# report was delivered" — which is also why the literal is the long form and not the phrase
+# `report was delivered`, since that phrase is inside the negation too.
+HANDBACK_DELIVERED = "report was delivered to you as a message from"
+# STOPPED, BUT NOT DONE WITH ITS SHELLS. These are the two wordings the harness uses for a
+# stop it expects to continue from, and they are read because the STATUS does not say it:
+# all 136 notifications carrying the live-children note report `<status>completed</status>`.
+#   · an agent that stopped holding its own background work — "This agent stopped with
+#     background work of its own still running. It may resume on its own when that work
+#     completes or reports, and the same task-id notifies again if it does"
+#   · an agent that stopped at its turn cap, which `SendMessage` resumes
+# Either way the agent is the one node that will read those shells next, so the shells are
+# not orphaned and killing them destroys the work they are for. MEASURED 2026-10-13 against
+# the record: this hook blocked a session for two shells started by `ac2a298ca61bfa912`
+# after that agent stopped at its 80-turn cap holding them; it then resumed on its own, read
+# both, and handed back. 136 notifications on this machine are in that class.
+# THIS IS NOT THE GENUINE CASE AND MUST NOT SILENCE IT: 52 of those 136 also say the report
+# was delivered, which is an agent that reported AND left a shell running — the measured
+# nine-hour leak this check exists for. So the delivered sentence outranks this, below.
+#
+# WHY THE HARNESS'S WORDING AND NOT THE TURN COUNTER. `at_cap` answers this question for the
+# agent whose stop is being handled, off `payload["agent_id"]` and `agent_type`; the main
+# `Stop` is the PARENT's stop and judges agents it has no payload for, so there is no id to
+# read a cap or a counter for — and it would be one guarded filesystem walk per agent on
+# every stop, against a fact that is already in the transcript this function is walking.
+# The issue ledger's `running`/`handoff` state answers it only in a project that keeps a
+# ledger with an issue open, which most sessions do not. This signal costs a substring test.
+#
+# READ ANYWHERE IN THE BODY, ON `STOPPED`'s RULE. The harness writes both of these in the
+# `<summary>` and `<note>` it authors, and the agent's own report text is quoted into the
+# same body under `<result>` — so an agent could in principle write one of these sentences
+# into its report and silence this for itself. It is read unscoped anyway, because like
+# `STOPPED` it can only SILENCE this check and never fire it: the cost of a forged phrase is
+# one unreported shell, and the cost of scoping it to an element the harness may rename is
+# this false fire back again, on every stop.
+MAY_RESUME = re.compile(r"background work of its own still running"
+                        r"|stopped at its \d+-turn limit")
 # ANCHORED AT POSITION ZERO, and that anchor is a measured fix rather than tidiness. The
 # host writes each of these as the WHOLE tool result, so the phrase can only be the first
 # thing in it. Unanchored, the first run of this check reported two shells that did not
@@ -714,8 +757,10 @@ def closeout_facts(lines):
 
       teammates  name -> what it was spawned for, for spawns that carried a `name` AND
                  whose tool result says the spawn took
-      handed     every agent id or teammate name whose hand-back is in this transcript
-      finished   agent ids whose task-notification reports a terminal status
+      handed     every agent id or teammate name whose hand-back is in this transcript —
+                 the hand-back MESSAGE, or a notification saying the report was delivered
+      finished   agent ids whose task-notification reports a terminal status AND is not a
+                 stop the agent can be resumed from (`MAY_RESUME`)
       shutdown   every name a `shutdown_request` was addressed to
       shells     background shell id -> the command that made it
       closed     shell and task ids closed by a terminal notification or an explicit stop
@@ -771,11 +816,17 @@ def closeout_facts(lines):
             for who in FROM_ID.findall(text):
                 f["handed"].add(_norm_agent(who))
         for tid, body in NOTIFICATION_ROW.findall(text):
-            if "SubagentHandback" in body:
+            # ONLY THE DELIVERED SENTENCE IS A HAND-BACK. See `HANDBACK_DELIVERED`.
+            delivered = HANDBACK_DELIVERED in body
+            if delivered:
                 f["handed"].add(_norm_agent(tid))
             # A `running` notification is progress, not a close, and is the reason this is
-            # gated on the status rather than on the notification arriving at all.
-            if TERMINAL.search(body):
+            # gated on the status rather than on the notification arriving at all. A STOP THE
+            # AGENT CAN BE RESUMED FROM IS PROGRESS FOR THE SAME REASON, and the harness says
+            # which those are in words while still calling them `completed` — see
+            # `MAY_RESUME`. The delivered sentence outranks it, so the one notification that
+            # says both (reported, and still holding a shell) still closes and still fires.
+            if TERMINAL.search(body) and (delivered or not MAY_RESUME.search(body)):
                 f["closed"].add(tid)
                 f["finished"].add(_norm_agent(tid))
     return f

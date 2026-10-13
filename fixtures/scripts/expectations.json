@@ -4945,6 +4945,47 @@
       "Traceback"
     ]
   },
+  "widen-closeout-capped-agent-still-owns-its-shells": {
+    "_why": "THE REPORTED FALSE FIRE, reproduced from the record. MEASURED 2026-10-13: this hook blocked a session for two shells (`b2bpv9sg8`, `bzcnob7u2`) started by `ac2a298ca61bfa912` AFTER that agent stopped at its 80-turn cap still holding them. It had not handed back, and the harness said so in words - \u201cThis agent stopped with background work of its own still running. It may resume on its own when that work completes\u201d - while still stamping `<status>completed</status>`. The first draft read `SubagentHandback` ANYWHERE in the body as a hand-back, and that body carries the tool's name inside the sentence saying the report has NOT arrived yet. The agent did resume, read both shells and delivered its report; killing them would have destroyed the work they were for. 136 of the 7,300 task-notifications on this machine are in this class, every one of them `completed`.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The docs agent stopped at its turn limit; it is still reading its own shells.\"}",
+    "not": [
+      "close-out",
+      "buqyin1sk"
+    ]
+  },
+  "widen-closeout-no-report-delivered-is-not-a-handback": {
+    "_why": "THE NEGATION, and it is why the hand-back literal is the whole positive sentence rather than a phrase of it. A turn-cap stop with no live children reports \u201cThe subagent ended without delivering a report through SubagentHandback, so no report was delivered\u201d - so the tool's name AND the phrase `report was delivered` both appear in a body stating the opposite. MEASURED: 257 of the 7,300 task-notifications on this machine are this shape. This row pins both halves of the rule at once: reading the tool name or the short phrase puts the agent in `handed`, and dropping the resumable-stop gate puts it in `finished` - either way the check fires on a shell the agent will read as soon as it is resumed.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The docs agent stopped at its turn limit; it is still reading its own shells.\"}",
+    "not": [
+      "close-out",
+      "buqyin1sk"
+    ]
+  },
+  "widen-closeout-resumed-agent-that-reported-blocks": {
+    "_why": "THE GENUINE CASE, REACHED THROUGH THE NOTIFICATION rather than the hand-back message. The same capped agent, resumed: its second notification says \u201cThis agent's report was delivered to you as a message from \u2026 (its SubagentHandback call)\u201d and the shell it opened is still open. The interim notification is read first and must not silence what the delivered one states. MEASURED: 52 of the 136 live-children notifications on this machine also carry the delivered sentence - an agent that reported AND left a shell running, which is the nine-hour leak this check exists for.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \"no-such-dir\", \"session_id\": \"fx\", \"last_assistant_message\": \"The Node upgrade section is in.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "close-out",
+      "buqyin1sk",
+      "a2cd0001"
+    ]
+  },
   "widen-subagent-template-path-is-not-a-report": {
     "_why": "AN UNRESOLVED PLACEHOLDER IS NOT A MISSING FILE. Every handbook's reporting section spells the artifact as `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`, and an order that quotes that line back carries a TEMPLATE. Resolved against the project it would name a directory called `<run-id>` that nothing will ever write, so a check that accepted it would kick back every agent whose order quotes its own handbook - a false fire on the most common order shape there is. The gate is a path with no `<`, `>`, `$`, `{`, `}`, `*` or `?` in it.",
     "exit": 0,
