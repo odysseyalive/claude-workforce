@@ -1184,6 +1184,12 @@ _DECLARED_RX = re.compile(r"^-\s+`([^`\n]+)`[^`\n]*`(?:sha256:)?([0-9a-fA-F]{64}
 MAX_HANDBOOK_BYTES = 256 * 1024
 MAX_DIRECTIVE_BYTES = 1024 * 1024
 MAX_DIRECTIVES = 8
+# AND THE DECLARED PATH IS BOUNDED BEFORE IT IS ECHOED, because the drift line quotes it
+# back into the spawn context: the path is text out of a repository file, and a 10,000-
+# character one would be a spawn-context flood written by editing a handbook. A real one is
+# ~45 characters, and a truncated one stops resolving — which reports as a drift, the
+# correct direction for a pointer nobody can follow (security review 2026-10-12).
+MAX_PATH_CHARS = 200
 
 # THE TWO LINES. `directives verified` is the literal the handbook template names, so the
 # employee can match on it; keep the two in step or the template's skip clause stops
@@ -1262,7 +1268,8 @@ def declared_directives(body):
         return []
     j = body.find("\n## ", i + 1)
     seg = body[i:j if j > 0 else len(body)]
-    return [(p.strip(), s.lower()) for p, s in _DECLARED_RX.findall(seg)][:MAX_DIRECTIVES]
+    return [(p.strip()[:MAX_PATH_CHARS], s.lower())
+            for p, s in _DECLARED_RX.findall(seg)][:MAX_DIRECTIVES]
 
 
 def directive_line(payload):
