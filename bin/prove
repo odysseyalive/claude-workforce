@@ -343,6 +343,68 @@ CASES = [
     ("tag: no per-turn state is written or read through a name another account can plant",
      "workforce/bin/wf-commitments", "delall", "TT.read_json_nofollow("),
 
+    # ── THE DIRECTIVE CHECK AT SPAWN TIME (K6, 2026-10-12) ──────────────────────
+    # EVERY MUTATION HERE KEEPS THE HOOK IMPORTABLE *AND* NON-RAISING, which is a tighter
+    # constraint than importable alone: `bin/check` RUNS this hook on `SubagentStart` with a
+    # real `agent_type` in two other assertions, so a deletion that left a NameError would
+    # fail those instead of the named one and come back BAD-CASE. So no case deletes a
+    # constant the new code dereferences; each removes a whole statement, a trailing
+    # conditional, or a string fragment, and the residue runs.
+    ("spawn: an employee's declared directive shas are hashed at the spawn, and a drift "
+     "names both values",
+     TAG, "delall",
+     '    "sha matched: directives verified — the `## Directives` self-check is already '
+     'done, "\n'),
+    # THE DRIFT LINE'S OWN HALF. Deleting the first fragment of the return leaves the two
+    # following string literals concatenated — valid Python, and a drift report with the
+    # file and both shas stripped out of it.
+    ("spawn: an employee's declared directive shas are hashed at the spawn, and a drift "
+     "names both values",
+     TAG, "delall",
+     '" ".join(drift) + " — the declared sha is not what this spawn found, which is the "\n'),
+    # THE COMPARISON ITSELF. `if got:` is always true, so a matching sha reports a drift —
+    # the direction that halted `business-analyst` for 29 days.
+    ("spawn: an employee's declared directive shas are hashed at the spawn, and a drift "
+     "names both values",
+     TAG, "delall", " != want"),
+    # THE GUARDS. `and bool(...)` and `and ".." not in name` are each deletable as a whole
+    # conjunct, leaving a one-test predicate that still refuses this fixture tree — the
+    # SAFE direction, which is why the assertion rather than a fixture is what fires.
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", ' and ".." not in name'),
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", "\n            and bool(_AGENT_TYPE_OK.match(name))"),
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", " if _inside(root, p) else None"),
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", "[:MAX_DIRECTIVES]"),
+    # THE TWO LABELS THAT TELL A REFUSAL FROM AN ABSENCE. Each is a string fragment inside
+    # an f-string, so removing it leaves the line valid and the distinction gone.
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", " (outside project)"),
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "delall", " (missing)"),
+    # THE FORBIDDEN FORM IS PROVED BY APPENDING IT, for the reason the per-turn-state cases
+    # above give: an absence rule passes on a file nobody reopened the door in.
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     TAG, "append", '\ndef _plain_handbook_read(path):\n'
+                    '    with open(path, encoding="utf-8") as fh:\n'
+                    '        return fh.read()\n'),
+    # THE TEMPLATE HALF, and it is a COUNT: both blocks carry the clause, so deleting one
+    # occurrence is the edit that leaves half the handbooks this distribution writes telling
+    # their employee to hash files a spawn already hashed.
+    ("spawn: the spawn-time directive check reads one named file inside the project, and "
+     "the template skips on it",
+     "workforce/references/handbook-templates.md", "del",
+     "When your spawn context already says\n`directives verified`, that hashing is done"),
+
     # ── THE TURN BOUNDARY (wf-turn-budget, 2026-10-12) ──────────────────────────
     # Four assertions, and every literal each one pins gets a case. The two about the
     # thresholds are the ones that decide whether the hook is a feature or noise, and the
@@ -422,7 +484,10 @@ CASES = [
     # The last two are the NEGATIVE half — the rules are narrow on purpose, and a
     # future edit that widens one back into a blanket ban has to fail the same check.
     ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
-     TTAG, "del", 'USER_WORDS + "\\n\\n" + CLEANUP_RULE'),
+     # THE SPAWN'S CARRIER, now a join over the rules that reach an employee (K6 added the
+     # directive verdict to it). Deleting the two rule names leaves a valid generator over
+     # `_dir_line` alone, so the module still imports and the injection goes quiet.
+     TTAG, "del", "USER_WORDS, CLEANUP_RULE, "),
     ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",
      TTAG, "del", "never guessed from a tool's or a project's "),
     ("closeout: nothing a dispatch starts is left running, and every rule names its own defect",

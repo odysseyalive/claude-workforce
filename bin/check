@@ -19764,10 +19764,11 @@ check(
 _il_lnk = []
 if 'flags | getattr(os, "O_NOFOLLOW", 0)' not in _il:
     _il_lnk.append("no O_NOFOLLOW helper in wf-task-tag")
-if _il.count("_open_nofollow(") != 4:
-    _il_lnk.append(f"_open_nofollow names {_il.count('_open_nofollow(')} sites, expected 4 "
-                   "— its own def, the read, the atomic write, the ignore rule, and no "
-                   "fifth door into the same directory")
+if _il.count("_open_nofollow(") != 5:
+    _il_lnk.append(f"_open_nofollow names {_il.count('_open_nofollow(')} sites, expected 5 "
+                   "— its own def, the read, the atomic write, the ignore rule, the capped "
+                   "read a spawn hashes a handbook and its directives through (K6), and no "
+                   "sixth door into the same directory")
 if "os.replace(tmp, path)" not in _il:
     _il_lnk.append("the ledger write does not rename over the name, so a link at that "
                    "name would be written THROUGH rather than replaced")
@@ -19878,6 +19879,118 @@ check(
     "record fall back to /tmp when the harness names no scratchpad, under names derived "
     "from a session id. A planted symlink there is an arbitrary-file write aimed by "
     "whoever planted it, and an arbitrary-file read handed to the hook (CWE-59)",
+)
+
+# SIX. THE DIRECTIVE CHECK IS DONE AT THE SPAWN, NOT BY EVERY EMPLOYEE ON EVERY ORDER (K6).
+# `handbook-templates.md` makes the employee hash its own bound directive files and STOP on a
+# mismatch. The answer is the same on every order until somebody edits the file, so the reads
+# and the hash are paid for again and again — and when an audit wrote a WRONG sha into
+# `business-analyst`'s handbook, every order that employee was given from 2026-08-06 to
+# 2026-09-04 stopped on arrival, through 13 audits, because a self-check can only report the
+# drift to the one agent already halted by it
+# (DEF-2026-09-04-business-analyst-directive-sha-drift.md).
+#
+# RUN, NOT READ, and it has to be: a constant in the source proves nothing about whether a
+# spawn receives it. Two trees, one whose declared sha matches and one whose does not, both
+# through the real hook with the project named the way the harness names it.
+_dv = {}
+with _ch_tf.TemporaryDirectory(prefix="wf-check-directives-") as _dv_dir:
+    _dv_body = "The README names the file that proves each claim.\n"
+    _dv_sha = hashlib.sha256(_dv_body.encode("utf-8")).hexdigest()
+    for _dv_case, _dv_decl in (("match", _dv_sha), ("wrong", "0" * 64)):
+        _dv_root = os.path.join(_dv_dir, _dv_case)
+        os.makedirs(os.path.join(_dv_root, ".claude", "agents"))
+        os.makedirs(os.path.join(_dv_root, ".claude", "workforce", "directives"))
+        with open(os.path.join(_dv_root, ".claude", "workforce", "directives",
+                               "content-writer.md"), "w", encoding="utf-8") as _fh:
+            _fh.write(_dv_body)
+        with open(os.path.join(_dv_root, ".claude", "agents", "content-writer.md"),
+                  "w", encoding="utf-8") as _fh:
+            _fh.write("# Content Writer\n\n## Directives\n"
+                      "- `.claude/workforce/directives/content-writer.md` — sha "
+                      f"`{_dv_decl}` — 7 criteria\n\n## Sources\n- the tree\n")
+        _dv[_dv_case] = subprocess.run(
+            [sys.executable, "workforce/bin/wf-task-tag"],
+            input=json.dumps({"hook_event_name": "SubagentStart", "agent_id": "a1",
+                              "session_id": "check-directives", "scratchpad_dir": _dv_root,
+                              "agent_type": "content-writer"}),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            timeout=30, env=dict(os.environ, CLAUDE_PROJECT_DIR=_dv_root)).stdout
+
+_dv_bad = []
+if "directives verified" not in _dv["match"]:
+    _dv_bad.append(f"a spawn whose declared shas all match is not told so: {_dv['match'][-300:]!r}"
+                   " — without that line the employee re-reads and re-hashes the same files "
+                   "on every order, which is the cost this moves")
+if "DRIFT" in _dv["match"]:
+    _dv_bad.append("a spawn whose declared shas match is told there is a drift")
+_dv_want = (f"DRIFT: .claude/workforce/directives/content-writer.md declared {'0' * 64} "
+            f"actual {_dv_sha}")
+if _dv_want not in _dv["wrong"]:
+    _dv_bad.append(f"a wrong declared sha does not name the file, the declared value and the "
+                   f"actual one: {_dv['wrong'][-400:]!r} — a `DRIFT` without the two values it "
+                   "compares sends the reader back to compute them")
+if "DIRECTIVE-DRIFT: <path>" not in _dv["wrong"]:
+    _dv_bad.append("the drift line does not name the STOP the handbook's `## Directives` "
+                   "section calls for, so a handbook written before this change reads a "
+                   "finding with no verdict")
+if "directives verified" in _dv["wrong"]:
+    _dv_bad.append("a drifted spawn is ALSO told its directives are verified")
+check(
+    "spawn: an employee's declared directive shas are hashed at the spawn, and a drift names both values",
+    not _dv_bad,
+    "; ".join(_dv_bad) + ". `SubagentStart` is the only user-scope carrier that reaches an "
+    "employee and it fires before the agent's first turn, so a verdict stated there arrives "
+    "in time to save the reads rather than grade them — and a drift surfaces on the FIRST "
+    "spawn in any project instead of waiting for the next audit",
+)
+
+# AND THE INPUTS ARE REFUSED WHERE THEY COME FROM. `agent_type` is harness-supplied text that
+# NAMES A FILE (CWE-22/59), and the directive path is the HANDBOOK's own text — the one input
+# here an edit to a repository file can aim anywhere on the filesystem. Five fixtures walk the
+# behaviour (`tasktag-directives-verified`, `-one-wrong-sha`, `-missing-file`, `-none-bound`,
+# `-outside-project`, `-agent-type-is-one-name`); this pins the guards themselves, and the
+# TEMPLATE CLAUSE that makes the line worth injecting, because the two are a pair: the hook
+# says `directives verified` and the handbook is what tells the employee to skip on it.
+_dv_g = []
+if '".." not in name' not in _il or "bool(_AGENT_TYPE_OK.match(name))" not in _il:
+    _dv_g.append("the agent type is not narrowed to one bare filename component before it is "
+                 "joined into the handbook path — `wf-turn-budget.bare`'s rule, and this is "
+                 "the same field out of the same kind of payload")
+if "return p if _inside(root, p) else None" not in _il:
+    _dv_g.append("the resolved handbook path is not required to land inside the project, so "
+                 "a linked intermediate directory reaches a file the harness never named")
+if "[:MAX_DIRECTIVES]" not in _il:
+    _dv_g.append("the number of declared directives hashed per spawn is uncapped, and this "
+                 "runs on EVERY spawn")
+for _dv_lbl, _dv_why in (
+        ("(outside project)", "a declared directive that resolves out of the project is not "
+                              "refused by name, so the hook would publish a sha of a file "
+                              "outside the tree into the spawn context"),
+        ("(missing)", "a declared directive that is not there reads as something other than "
+                      "a drift, and a pointer to a file nobody shipped is authority that "
+                      "does not exist")):
+    if _dv_lbl not in _il:
+        _dv_g.append(_dv_why)
+if "with open(" in _il or "= open(" in _il:
+    _dv_g.append("wf-task-tag opens a file with a plain open(); every read here goes through "
+                 "`_read_capped`, which opens `O_NOFOLLOW`, and a handbook is exactly the "
+                 "kind of predictable path a link gets planted at")
+_dv_tpl = read("workforce/references/handbook-templates.md")
+if _dv_tpl.count("directives verified") != 2:
+    _dv_g.append(f"the handbook template names the spawn's verdict {_dv_tpl.count('directives verified')} "
+                 "times, expected 2 (the Lead block and the IC block) — the employee is told "
+                 "to hash its own directives and never told that a spawn already did")
+if "STOP and report `DIRECTIVE-DRIFT: <path>`" not in _dv_tpl:
+    _dv_g.append("the template no longer makes a mismatch a STOP; the spawn line reports a "
+                 "drift and the handbook is what says what to do about one")
+check(
+    "spawn: the spawn-time directive check reads one named file inside the project, and the template skips on it",
+    not _dv_g,
+    "; ".join(_dv_g) + ". The handbook path is built from `agent_type` in the payload and the "
+    "directive paths are read out of the handbook, so both are attacker-shaped inputs to a "
+    "hook that runs on every spawn (CWE-22, CWE-59). The template clause is half of the "
+    "saving: a verified line nobody is told to act on changes no agent's behaviour",
 )
 
 

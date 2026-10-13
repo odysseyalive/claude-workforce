@@ -123,7 +123,9 @@ These bind you and outrank every step below. Read them before acting.
 - `.claude/workforce/directives/<skill>.md` — sha `<directives-sha>` — <N> block(s)
 
 If the file is absent or its sha does not match, STOP and report `DIRECTIVE-DRIFT: <path>`.
-Never proceed on a directive you could not read.
+Never proceed on a directive you could not read. When your spawn context already says
+`directives verified`, that hashing is done — skip it and do not re-run it; a `DRIFT:` line
+there is the mismatch, and the STOP above is what it calls for.
 <!-- When no directive binds this employee, this section reads exactly: (none bound).
      An absent section is silence; "(none bound)" is a measurement.
      POINTER ONLY — never paste the block here (procedure-for-procedures.md § Directives).
@@ -348,7 +350,9 @@ These bind you and outrank every step below. Read them before acting.
 - `.claude/workforce/directives/<skill>.md` — sha `<directives-sha>` — <N> block(s)
 
 If the file is absent or its sha does not match, STOP and report `DIRECTIVE-DRIFT: <path>`.
-Never proceed on a directive you could not read.
+Never proceed on a directive you could not read. When your spawn context already says
+`directives verified`, that hashing is done — skip it and do not re-run it; a `DRIFT:` line
+there is the mismatch, and the STOP above is what it calls for.
 <!-- (none bound) when nothing binds this employee. POINTER ONLY — never paste the block. -->
 
 ## Sources
