@@ -1239,6 +1239,205 @@ def start_checklist(payload, prev=None):
                "recorded there." if issue_id else "")), record
 
 
+# ─────────────────────────────────────────────────────────────────────────────────
+# THE DIRECTIVE CHECK, MOVED OFF THE AGENT AND ONTO THIS EVENT (K6).
+#
+# Every handbook this distribution writes makes the EMPLOYEE hash its own bound directive
+# files and STOP on a mismatch (`handbook-templates.md`, `## Directives`). That is a
+# correct rule paid for on every order: the agent spends calls reading a file and running
+# a hash before it can begin, and it spends them again on the next order, and the answer
+# is the same every time until somebody edits the file.
+#
+# IT ALSO FAILED IN THE DIRECTION THAT COSTS MOST. An audit wrote a WRONG sha into
+# `business-analyst`'s handbook and every order that employee was given from 2026-08-06 to
+# 2026-09-04 stopped on arrival — through 13 audits, because a self-check can only report
+# the drift to the one agent that is already halted by it
+# (`DEF-2026-09-04-business-analyst-directive-sha-drift.md`).
+#
+# SO THE HASH HAPPENS HERE, ONCE PER SPAWN, AND THE ANSWER IS INJECTED. `SubagentStart` is
+# the only user-scope carrier that reaches an employee (a subagent runs its own system
+# prompt), and it fires before the agent's first turn, so a verdict stated here arrives in
+# time to save the reads rather than grade them. A drift therefore surfaces on the FIRST
+# spawn in any project, in the context of whoever reads the spawn, without an audit.
+#
+# IT NEVER BLOCKS AND IT NEVER GUESSES. No handbook, no readable handbook, no declared
+# directive, or a file too large to hash under the caps below → NOTHING is injected and the
+# employee's own self-check runs exactly as it does today. That is the whole compatibility
+# story for projects whose handbooks predate this: the line makes the check cheap, never
+# wrong.
+
+# THE AGENT TYPE IS HARNESS-SUPPLIED TEXT AND IT NAMES A FILE, so it is narrowed to ONE
+# filename component by ALLOWLIST rather than by stripping what looks dangerous —
+# `session_component`'s rule one directory over. `..`, `a/b`, `/etc/passwd` and a leading
+# dot all fail to match, and a real agent type (`engineering-coder`) passes unchanged.
+_AGENT_TYPE_OK = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
+
+
+def bare_name(name):
+    """True when `name` is safe to join into a path as ONE component.
+
+    `wf-turn-budget.bare`'s rule, which also takes an `agent_type` out of a hook payload
+    and also builds a path from it. It is restated here rather than imported because these
+    two hooks are separate programs with no import edge between them, and the one edge in
+    this family (`wf-widen` importing this file) exists because the two halves share STATE.
+    The `..` test is redundant against the pattern and is kept for the reason it is kept
+    there: a path component is the one input where two independent refusals are cheaper
+    than one subtle argument about whether the pattern covers every spelling.
+    """
+    return (isinstance(name, str) and ".." not in name
+            and bool(_AGENT_TYPE_OK.match(name)))
+
+# THE DECLARED FORM, as `handbook-templates.md` writes it into `## Directives`:
+#
+#     - `.claude/workforce/directives/<skill>.md` — sha `<64 hex>` — <N> block(s)
+#
+# The sha is accepted bare or `sha256:`-prefixed, because the ORG-RECORD comment carries
+# the prefix and the section bullet does not. A handbook that says `(none bound)`, or the
+# TEMPLATE itself with its `<directives-sha>` placeholder, matches nothing — which is the
+# correct reading of both: there is no declared sha to verify.
+_DECLARED_RX = re.compile(r"^-\s+`([^`\n]+)`[^`\n]*`(?:sha256:)?([0-9a-fA-F]{64})`", re.M)
+
+# CAPS, because this runs on EVERY spawn. Only the files the handbook DECLARES are hashed,
+# at most MAX_DIRECTIVES of them, and a file over its cap is not read at all rather than
+# read in part — a partial read would hash to a mismatch and report a drift that is not
+# there. A handbook is ~12 KB and a directive file ~2 KB; both caps are far above the real
+# sizes and exist to bound the worst case, not to classify the normal one.
+MAX_HANDBOOK_BYTES = 256 * 1024
+MAX_DIRECTIVE_BYTES = 1024 * 1024
+MAX_DIRECTIVES = 8
+# AND THE DECLARED PATH IS BOUNDED BEFORE IT IS ECHOED, because the drift line quotes it
+# back into the spawn context: the path is text out of a repository file, and a 10,000-
+# character one would be a spawn-context flood written by editing a handbook. A real one is
+# ~45 characters, and a truncated one stops resolving — which reports as a drift, the
+# correct direction for a pointer nobody can follow (security review 2026-10-12).
+MAX_PATH_CHARS = 200
+
+# THE TWO LINES. `directives verified` is the literal the handbook template names, so the
+# employee can match on it; keep the two in step or the template's skip clause stops
+# resolving.
+DIRECTIVES_VERIFIED = (
+    "Your handbook's bound directive files were hashed at this spawn and every declared "
+    "sha matched: directives verified — the `## Directives` self-check is already done, "
+    "so skip it rather than re-reading and re-hashing those files."
+)
+
+
+def _read_capped(path, cap):
+    """The bytes at `path`, never through a symlink, or None.
+
+    None covers every refusal there is — absent, unreadable, a planted link, or larger
+    than `cap` — because the caller treats them identically: it does not know the file's
+    content, so it does not claim to. `_open_nofollow` is the ledger's helper and the
+    reason a link planted AT the name is refused instead of followed (CWE-59).
+    """
+    try:
+        fd = _open_nofollow(path, os.O_RDONLY)
+    except OSError:
+        return None
+    try:
+        with os.fdopen(fd, "rb") as fh:
+            data = fh.read(cap + 1)
+    except OSError:
+        return None
+    return None if len(data) > cap else data
+
+
+def _inside(root, path):
+    """True when `path` RESOLVES inside `root`. Both sides are resolved, never compared as
+    text.
+
+    This is the half `O_NOFOLLOW` cannot do. The flag refuses a link at the final
+    component; it says nothing about a link at an intermediate directory, and nothing at
+    all about a handbook that spells `../../../etc/shadow` as its directive path. A
+    declared directive is the HANDBOOK's text, so it is the one input here that an edit to
+    a repository file can aim anywhere on the filesystem — and a hook that hashed whatever
+    it was pointed at would report the contents of files outside the project through the
+    sha it printed.
+    """
+    try:
+        r = os.path.realpath(root)
+        p = os.path.realpath(path)
+    except OSError:
+        return False
+    return p == r or p.startswith(r + os.sep)
+
+
+def handbook_path(root, payload):
+    """`<root>/.claude/agents/<agent_type>.md`, or None when that is not one safe name.
+
+    THE MAPPING IS THE HARNESS'S, not this file's invention: a subagent definition lives at
+    `.claude/agents/<name>.md` and its frontmatter `name:` is the `agent_type` the payload
+    carries, which is how `engineering-coder` resolves to
+    `.claude/agents/engineering-coder.md`.
+    """
+    at = str(payload.get("agent_type") or "").strip()
+    if not bare_name(at):
+        return None
+    p = os.path.join(root, ".claude", "agents", at + ".md")
+    return p if _inside(root, p) else None
+
+
+def declared_directives(body):
+    """The `(path, declared-sha)` pairs the handbook's `## Directives` section declares.
+
+    Scoped to that section rather than to the whole file, so a sha quoted in a procedure
+    table or in a cold-read probe elsewhere in the handbook is not verified as though the
+    role were bound by it.
+    """
+    i = body.find("\n## Directives")
+    if i < 0:
+        return []
+    j = body.find("\n## ", i + 1)
+    seg = body[i:j if j > 0 else len(body)]
+    return [(p.strip()[:MAX_PATH_CHARS], s.lower())
+            for p, s in _DECLARED_RX.findall(seg)][:MAX_DIRECTIVES]
+
+
+def directive_line(payload):
+    """ONE line for the starting employee about its bound directives, or "" for silence.
+
+    Verified, or `DRIFT:` naming the file, the declared sha and the actual one. Silence is
+    the answer whenever this event cannot KNOW — see the section note above — and silence
+    leaves the employee's own self-check in charge.
+    """
+    root = project_root(payload)
+    if not root:
+        return ""
+    hb = handbook_path(root, payload)
+    if not hb:
+        return ""
+    body = _read_capped(hb, MAX_HANDBOOK_BYTES)
+    if body is None:
+        return ""
+    declared = declared_directives(body.decode("utf-8", "replace"))
+    if not declared:
+        return ""
+
+    drift = []
+    for rel, want in declared:
+        path = os.path.join(root, rel)
+        if not _inside(root, path):
+            # REFUSED, AND REPORTED AS A DRIFT RATHER THAN AS SILENCE. A handbook pointing
+            # its directive outside the project is not a file this hook failed to read; it
+            # is a handbook nobody should act on.
+            drift.append(f"DRIFT: {rel} declared {want} actual (outside project)")
+            continue
+        data = _read_capped(path, MAX_DIRECTIVE_BYTES)
+        if data is None:
+            drift.append(f"DRIFT: {rel} declared {want} actual (missing)")
+            continue
+        got = hashlib.sha256(data).hexdigest()
+        if got != want:
+            drift.append(f"DRIFT: {rel} declared {want} actual {got}")
+    if not drift:
+        return DIRECTIVES_VERIFIED
+    # STATED AS A FACT ABOUT THE FILES, with the STOP named as the handbook's own rule —
+    # which is what makes this line work in a project whose handbooks predate it.
+    return (" ".join(drift) + " — the declared sha is not what this spawn found, which is the "
+            "`## Directives` STOP: report `DIRECTIVE-DRIFT: <path>` and act on no directive "
+            "until the operator settles which of the two is wrong.")
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -1272,9 +1471,17 @@ def main():
                 save_ledger(payload, _led)
         except OSError:
             pass
+        # AND ITS DIRECTIVES ARE HASHED HERE RATHER THAN BY THE AGENT (K6). Never fatal:
+        # a raising verdict would be a hook that erases a spawn over a file it could not
+        # read, and silence already means "the employee's own self-check stands".
+        try:
+            _dir_line = directive_line(payload)
+        except OSError:
+            _dir_line = ""
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "SubagentStart",
-            "additionalContext": USER_WORDS + "\n\n" + CLEANUP_RULE,
+            "additionalContext": "\n\n".join(
+                x for x in (USER_WORDS, CLEANUP_RULE, _dir_line) if x),
         }}))
         return 0
 

@@ -8449,6 +8449,106 @@
       "Asks checklist for this message"
     ]
   },
+  "tasktag-directives-verified": {
+    "_why": "THE DIRECTIVE CHECK, MOVED OFF THE AGENT AND ONTO THE SPAWN (K6). Every handbook this distribution writes makes the EMPLOYEE hash its bound directive files and STOP on a mismatch, which costs reads and a hash on every order and returns the same answer every time until somebody edits the file. `SubagentStart` already injects into every spawn and is the only user-scope carrier that reaches an employee, so the hash happens there once and the verdict is stated. The literal `directives verified` is the one `handbook-templates.md` names in its skip clause: the two are a pair, and a change to either without the other leaves the employee re-hashing files somebody already hashed for it.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "DRIFT",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "directives verified",
+      "skip it rather than re-reading"
+    ]
+  },
+  "tasktag-directives-one-wrong-sha": {
+    "_why": "THE MEASURED FAILURE THIS WHOLE MOVE EXISTS FOR. An audit wrote a WRONG sha into `business-analyst`'s handbook and every order that employee was given from 2026-08-06 to 2026-09-04 stopped on arrival, through 13 audits, because a self-check can only report the drift to the one agent already halted by it (DEF-2026-09-04-business-analyst-directive-sha-drift.md). Hashed at the spawn instead, the same drift names the file, the declared sha and the actual one in the context of whoever reads the spawn, on the FIRST spawn in any project and with no audit. Both shas are pinned in full: a line that says `DRIFT` without the two values it is comparing sends the reader back to compute them, which is the cost this removes.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "directives verified",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "DRIFT: .claude/workforce/directives/engineering-coder.md declared 0000000000000000000000000000000000000000000000000000000000000000 actual 071d443e412d759f07496290af485fb66000b84dab8a2a0df66594973525b12b",
+      "DIRECTIVE-DRIFT: <path>"
+    ]
+  },
+  "tasktag-directives-missing-file": {
+    "_why": "A DECLARED DIRECTIVE THAT IS NOT THERE IS A DRIFT, NOT A SILENCE. The handbook's `## Directives` section covers absent and mismatched with one STOP, and this half is the one an employee cannot work around: a pointer to a file nobody shipped means the order was written against authority that does not exist. `actual (missing)` says which of the two it is, so the operator fixes the file or the pointer rather than guessing.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "directives verified",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "DRIFT: .claude/workforce/directives/engineering-coder.md declared 071d443e412d759f07496290af485fb66000b84dab8a2a0df66594973525b12b actual (missing)"
+    ]
+  },
+  "tasktag-directives-none-bound": {
+    "_why": "SILENCE IS THE ANSWER WHEN NOTHING BINDS THE EMPLOYEE, and it is load-bearing rather than merely tidy. Most handbooks read `(none bound)`; a line that said `verified` about a role with no directives would be a verdict about nothing, and the spawn context is the most expensive place in this distribution to put a sentence nobody needs. The `want` row is the rest of the spawn context still arriving, which is what separates `this employee has no directives` from `this hook broke`.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "directives verified",
+      "DRIFT",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "shutdown_request once its report has been read"
+    ]
+  },
+  "tasktag-directives-outside-project": {
+    "_why": "THE DIRECTIVE PATH IS THE HANDBOOK'S OWN TEXT, so it is the one input here that an edit to a repository file can aim anywhere on the filesystem (CWE-22). `O_NOFOLLOW` cannot refuse it -- the path is not a link, it is simply somewhere else -- so containment is checked on the RESOLVED path before the file is opened, and a hook that hashed whatever it was pointed at would publish a sha of a file outside the project into the spawn context. Refused as a DRIFT rather than as silence: a handbook pointing its directive out of the project is not a file this hook failed to read, it is a handbook nobody should act on.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "directives verified",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "DRIFT: ../../escaped-directive.md declared 071d443e412d759f07496290af485fb66000b84dab8a2a0df66594973525b12b actual (outside project)"
+    ]
+  },
+  "tasktag-directives-agent-type-is-one-name": {
+    "_why": "`agent_type` IS HARNESS-SUPPLIED TEXT AND IT NAMES A FILE, so it is narrowed to one filename component by allowlist -- `session_component`'s rule one directory over, applied to the handbook path. THE TREE IS BUILT SO THAT CONTAINMENT CANNOT BE WHAT REFUSES IT: `.claude/agents/../../outside/evil.md` resolves INSIDE the project, and the handbook planted there declares a directive whose sha MATCHES, so a hook that joined the raw type into the path would read it and inject `directives verified` about a handbook the harness never named. Neither line appearing is the refusal; the rest of the spawn context still arriving is the proof the refusal did not break the event.",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "exit": 0,
+    "not": [
+      "directives verified",
+      "DRIFT",
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a1\", \"session_id\": \"s1\", \"scratchpad_dir\": \".\", \"agent_type\": \"../../outside/evil\"}",
+    "want": [
+      "shutdown_request once its report has been read"
+    ]
+  },
   "widen-tag-refuses-a-planted-link": {
     "_why": "THE READ SIDE, AT THE EVENT THAT ONLY READS. Same tree as `widen-subagent-with-no-slot-is-not-given-the-session-ask`, with a SYMLINK where the agent's slot would be: `wf-task-tag.nosession.a1.json` aims at `victim.json`, which is itself shaped like a slot file so that following the link would succeed rather than merely fail differently. Through the link this stop would find a slot, resolve the agent's ask onto it, and WRITE IT BACK through the same link -- clobbering a file the hook was never given. `TT.read_json_nofollow` refuses the link instead, so the stop reads as an agent this installation never saw start and is judged on its reply alone (`not scored`), and the session's own tag beside it is still not borrowed as the agent's order (`history claim` forbidden, as in the sibling case). `victim.json` byte-unchanged is the write half of the same refusal.",
     "after": {
