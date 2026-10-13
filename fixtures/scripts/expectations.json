@@ -4766,6 +4766,104 @@
       "\"decision\": \"block\""
     ]
   },
+  "widen-subagent-bare-output-name-is-not-a-path": {
+    "_why": "K4, THE LARGEST MEASURED WRONG-FIRE SHAPE: 210 of 1,272 real subagent stops on this machine blocked on `<project root>/OUTPUT.md`, a path no order ever named. The templates ask for the report INCREMENTALLY, so orders say `write your OUTPUT.md incrementally` before they give the path - and a first-match-wins read of the order took the artifact's bare NAME in that sentence and resolved it against the project root. The report here is exactly where the order said, and the stop must hear nothing. A candidate with no directory component is a mention of the name.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "OUTPUT.md"
+    ]
+  },
+  "widen-subagent-a-siblings-report-is-not-its-own": {
+    "_why": "K4: 41 measured fires were a SIBLING's report. An order routinely quotes the upstream deliverable this agent must READ - a design-evaluator is pointed at engineering-site's OUTPUT.md - and the quoted path comes first in the text. Blocking this agent because another agent's report is missing is a block it cannot satisfy. The parent directory of the candidate must be the stopping agent's own employee name; here its own report is present and marked, and the sibling's does not exist.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"design-evaluator\", \"last_assistant_message\": \"FIX | two slides collide at 1280.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "engineering-site"
+    ]
+  },
+  "widen-subagent-run-dir-relative-path-is-not-the-project-root": {
+    "_why": "K4: 11 measured fires on a path the order gave relative to the RUN DIRECTORY. A Lead writing orders for its own team names deliverables as `content-lead/OUTPUT.md`, meaning `<run dir>/content-lead/OUTPUT.md`; resolved against the project root, as every path a hook reads must be, that is `<root>/content-lead/OUTPUT.md` - a phantom nothing will ever write. `org.md` clause 6's artifact sits under `.claude/workforce/work/<run-id>/<employee>/`, so a candidate carrying no `workforce/work/` segment is not the artifact the contract names and is never asked for.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"content-lead\", \"last_assistant_message\": \"PASS | the slide is out and the jurors are named.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\""
+    ]
+  },
+  "widen-subagent-quoted-in-progress-is-not-an-open-row": {
+    "_why": "K4: 5 of 8 `unfinished` fires were not an open row at all. `IN-PROGRESS` read loose matches the GUARDRAIL the order states (`never leave an IN-PROGRESS stub`), which every report that quotes its order verbatim echoes back; it matches the sentence that says the opposite (`no IN-PROGRESS rows remain`); and it matches a row about ANOTHER agent's report. All three are in this report and every one of its own rows reads MET. An open row is the token OPENING a status cell.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"business-analyst\", \"last_assistant_message\": \"All rows closed. Handing back.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "IN-PROGRESS"
+    ]
+  },
+  "widen-subagent-criterion-table-without-the-token-is-marked": {
+    "_why": "K4: 154 measured fires on COMPLETE reports. `handbook-templates.md` asks for `UNMET` stated rather than omitted, so the mark was the upper-case token - and replayed over every report on this machine, a finished criterion table almost never carries it: the status column reads PASS or DONE, the heading reads `## Exit Criteria`, the verdict reads `## Verdict`. This report states both criteria and their evidence and closes both. Kicking it back asks for a vocabulary, not for work.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"cw-translator\", \"last_assistant_message\": \"Done. Every token has a ledger row.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "marks no exit criterion"
+    ]
+  },
+  "widen-subagent-order-asking-no-criteria-takes-the-report-as-written": {
+    "_why": "K4: the gate enforces the expectation the ORDER set, never one it did not. This order names an artifact and asks for tiered findings - a code-evaluator review, the shape half the evaluators in this distribution are dispatched in - and says nothing about exit criteria. The measured fire was a complete 14k review report kicked back for carrying no criterion table nobody had asked for. With no criteria asked, the file being there is the whole answer; the absent-report half is unchanged, because an order that names a path and gets nothing is the defect this gate exists for.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"deadcode-gardener\", \"last_assistant_message\": \"The report is complete and durable. Handing back.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "marks no exit criterion"
+    ]
+  },
+  "widen-closeout-image-in-a-queued-command-is-not-a-crash": {
+    "_why": "MEASURED 2026-10-12 replaying every Stop on this machine: ONE row in 2,630 carries an `attachment.prompt` that is a CONTENT BLOCK LIST rather than a string, because the user pasted an image with a queued command. Returned raw it reached `.lstrip()` in `closeout_facts` and the hook exited 1 printing nothing - for that stop and for every later stop in that session, since each one re-reads the whole transcript. The path is newly reachable: until 2026-10-12 the `background_tasks` exemption returned above the close-out, so 1,879 stops never walked a row. The tree carries a background shell as well, so the walk reaches the rows that follow the bad one instead of stopping at it.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \"no-such-dir\", \"hook_event_name\": \"Stop\", \"session_id\": \"fx\", \"last_assistant_message\": \"The payload is pasted.\"}",
+    "want": [
+      "WIDEN  not scored"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
   "widen-subagent-template-path-is-not-a-report": {
     "_why": "AN UNRESOLVED PLACEHOLDER IS NOT A MISSING FILE. Every handbook's reporting section spells the artifact as `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`, and an order that quotes that line back carries a TEMPLATE. Resolved against the project it would name a directory called `<run-id>` that nothing will ever write, so a check that accepted it would kick back every agent whose order quotes its own handbook - a false fire on the most common order shape there is. The gate is a path with no `<`, `>`, `$`, `{`, `}`, `*` or `?` in it.",
     "exit": 0,
