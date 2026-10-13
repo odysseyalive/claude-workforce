@@ -9397,6 +9397,173 @@
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"The boundary is shipped and the fixture passes.\"}",
     "want": []
   },
+  "issues-answered-closes-its-item": {
+    "_why": "A QUESTION THE SESSION ANSWERED IS FINISHED WORK, and until 2026-10-13 `item_done` had no word for it. MEASURED in odyssey-alive's session `37f162e1`: i4 carried three items the session had marked `answered`, the status was outside the done set, so the issue could never close and every Stop printed the same kickback -- six issues deep and growing. Both items here are `answered` and nothing else is open, so the issue closes. `KICKBACK` is forbidden, because a verdict that merely stopped naming the issue would pass a test that only looked for CLOSED.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK",
+      "HOLD"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both questions are answered in the reply above.\"}",
+    "want": [
+      "ISSUES",
+      "i1  CLOSED"
+    ]
+  },
+  "issues-dropped-or-withdrawn-closes-its-item": {
+    "_why": "AN ASK THE USER TOOK BACK HAS NO `done` TO REACH. Before 2026-10-13 the done set held six words, all of them meaning the work shipped, so a question sent by mistake, called off, or overtaken by a later ask stayed open for the life of the session -- the second half of the pile measured in odyssey-alive's `37f162e1`. Every word a session actually writes for a withdrawn ask is on one item here, including the two spellings of `cancelled` and one written with a trailing full stop, which is a status a reader would call identical and a comparison would not.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK",
+      "HOLD"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Those asks were all withdrawn before anyone started them.\"}",
+    "want": [
+      "ISSUES",
+      "i1  CLOSED"
+    ]
+  },
+  "issues-carried-item-done-closes-its-earlier-issue": {
+    "_why": "THE DEFECT THAT MADE THE PILE GROW: an item could only be updated during the turn that wrote it. `start_checklist` replaces the per-turn checklist on every message and `absorb_items` copies the outgoing list onto ITS OWN issue alone, so once a turn ended its open items were frozen and no path let the session finish an earlier issue's item. MEASURED in odyssey-alive's `37f162e1`, where i3 (\"order the picks in that order on the agenda\") was done -- the agenda was republished in that order -- and stayed open forever. Here the turn's checklist CARRIES i3's ancestor as `{\"issue\": \"i1\", ...}` marked done, and the Stop absorbs it onto i1 and closes i1 in the same breath. i2's own open item is kicked back in the same run, which is what proves the write-back landed on the issue the row NAMED rather than on the newest one.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"ask\": \"order the picks in that order on the agenda\", \"status\": \"done\"",
+          "\"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "i1  KICKBACK"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The agenda is republished in that order.\"}",
+    "want": [
+      "ISSUES",
+      "i1  CLOSED",
+      "i2  KICKBACK"
+    ]
+  },
+  "issues-carried-never-edits-another-issues-items": {
+    "_why": "THE CARRIED LIST IS THE ONE WRITE THAT REACHES AN ISSUE THIS TURN DID NOT OPEN, so it is the one write that could corrupt another issue's record -- and the checklist file is the SESSION's to rewrite, which makes every row in it untrusted input. Four rows arrive: one legitimate status change on i1, one naming an ask that was never on i1, one naming an issue nobody opened, and one whose issue id is a path (`../../../etc/passwd`). Only the first lands. i1's item list is asserted WHOLE and in order, because an assertion that only looked for the status change would pass on a list that had grown a planted item beside it.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "a planted ask",
+          "an issue nobody opened",
+          "etc/passwd",
+          "\"id\": \"i9\""
+        ],
+        "want": [
+          "\"items\": [{\"ask\": \"fix the deploy\", \"status\": \"done\"}, {\"ask\": \"explain the migration error\", \"status\": \"open\"}]"
+        ]
+      },
+      "wf-asks.s1.json": {
+        "want": [
+          "\"carried\": [{\"issue\": \"i1\", \"ask\": \"explain the migration error\", \"status\": \"open\"}]"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Third thing, and it is separate from both of those: the issue ledger itself needs to keep every open issue when a new message arrives\"}",
+    "want": [
+      "issue i3"
+    ]
+  },
+  "issues-carried-list-is-capped": {
+    "_why": "A CARRY WITH NO BOUND IS A FILE THAT GROWS FOR THE LIFE OF A SESSION. The rows ride in the checklist FILE rather than in the prompt, so the cost is the session's read and rewrite of that file on every turn, and a session twenty messages deep would be handed every item it ever left open. The newest open issue here holds exactly twenty items and the older one holds five more: the twenty land, newest issue first, and not one row of the older issue is carried. Both halves are asserted -- the ceiling and the ORDER -- because a cap that took the oldest twenty would pass a test that only counted.",
+    "after": {
+      "wf-asks.s1.json": {
+        "not": [
+          "\"issue\": \"i1\"",
+          "ask21"
+        ],
+        "want": [
+          "\"issue\": \"i2\", \"ask\": \"ask01\"",
+          "\"ask\": \"ask20\", \"status\": \"open\""
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Now pick this up again and work through whatever is still open from the earlier messages in this session\"}",
+    "want": [
+      "holds 20 still-open item(s)"
+    ]
+  },
+  "issues-oa-work-ledger-heals": {
+    "_why": "THE REAL LEDGER, REPLAYED. This tree is odyssey-alive's `37f162e1` as it stood on 2026-10-13: i1 closed, i2 through i7 open, i4 carrying three items the session had marked `answered`, and a Stop that printed `ISSUES  6 open issue(s) judged` with a KICKBACK row for each of the six, every message, forever. The checklist here is what the NEXT message leaves behind -- the eleven still-open items carried with the issue each belongs to, given the statuses the work actually reached -- and no migration step is involved: the carry is written by the hook on that message and read back by the Stop that ends it. All six issues close in one turn. The three `answered` items are not carried at all, because the widened `item_done` already reads them as finished, which is the other half of the same fix.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "not": [
+          "\"i3\"",
+          "\"i4\""
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"ask\": \"order the picks in that order on the agenda\", \"status\": \"done\"",
+          "\"ask\": \"Widen tech + food to top 40 each\", \"status\": \"dropped\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK",
+      "HOLD"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Every open issue is closed out above.\"}",
+    "want": [
+      "ISSUES  6 open issue(s) judged",
+      "i2  CLOSED",
+      "i3  CLOSED",
+      "i4  CLOSED",
+      "i5  CLOSED",
+      "i6  CLOSED",
+      "i7  CLOSED"
+    ]
+  },
   "spawn-guard-cut-agent-of-the-same-role-is-denied": {
       "_why": "THE WRONG ACTION, REFUSED WHERE IT IS TAKEN. Trial e2e3 (session `bb8a3e53`, 2026-10-13): a cap-10 filer was cut, and in the SAME main turn the session spawned a second filer with the `Agent` tool and then a third. Both cut agents stayed `handoff` in the ledger for the rest of the session and neither was ever resumed. The K8 kickback that names the resume is on the main `Stop`, and that session never stopped between the three dispatches, so the one line that would have corrected it had no event to fire on. This is the same session shape and the same tool call, and the answer is a DENY that names the agent_id to message instead. The spawn is from the MAIN thread, which is what `agent_id` being absent means (platform.md fact 22a).",
       "script": "wf-turn-budget",

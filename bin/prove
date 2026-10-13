@@ -491,6 +491,49 @@ CASES = [
      "resumed",
      WDN, "delall", 'decided["systemMessage"] = (prior + "\\n\\n" if prior else "")'),
 
+    # ── THE FINISHED ASK AND THE CARRY (2026-10-13, odyssey-alive `37f162e1`) ───
+    # THE STATUS SET IS CUT, NOT EMPTIED, and the words removed are exactly the ones the
+    # measured ledger needed: a tuple that loses five of its entries is still a tuple, so
+    # the file imports and `item_done` answers the pre-2026-10-13 answer — which is the
+    # defect, not a crash.
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     TAG, "delall", '"answered", "dropped", "withdrawn", "cancelled", "canceled",\n'),
+    # THE CAP AND THE TWO HALVES OF THE CARRY ARE PROVED BY SHADOWING, not by deleting: a
+    # second module-level binding wins for every caller at call time, so the hook runs and
+    # does the wrong thing. Deleting `MAX_CARRIED` or either `def` would leave a NameError
+    # or an orphaned body and come back BAD-CASE having proved nothing.
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     TAG, "append", "\nMAX_CARRIED = 500\n"),
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     TAG, "append", "\ndef carry_forward(led, skip=None):\n    return []\n"),
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     TAG, "append", "\ndef absorb_carried(led, rows):\n    return 0\n"),
+    # AND THE WRITE-BACK DOING MORE THAN IT MAY, which is the property no deletion can
+    # reach: an absence rule passes on a function that never grew the extra power. The
+    # shadow APPENDS what a carried row names, so an ask that was never on that issue — a
+    # row out of the session's own checklist file — lands on it.
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     TAG, "append",
+     "\ndef absorb_carried(led, rows):\n"
+     "    for row in rows:\n"
+     "        for iss in led.get(\"issues\", []):\n"
+     "            if iss.get(\"id\") == row.get(\"issue\"):\n"
+     "                iss.setdefault(\"items\", []).append(\n"
+     "                    {\"ask\": row.get(\"ask\"), \"status\": row.get(\"status\")})\n"
+     "    return 1\n"),
+    # THE STOP'S OWN END OF IT. Removing the whole statement leaves valid Python and the
+    # measured behaviour: the statuses the session wrote this turn are not read until the
+    # NEXT message, so the issue it finished is kicked back one more time first.
+    ("issues: a finished or withdrawn ask closes its item, and an earlier issue's open "
+     "items are carried into this turn",
+     WDN, "delall",
+     "    TT.absorb_carried(led, TT.carried_items(checklist(payload)[0] or {}))\n"),
+
     # ── THE PER-TURN STATE BESIDE IT (CWE-59, security review 2026-10-12) ───────
     # THE FORBIDDEN FORMS ARE PROVED BY APPENDING THEM, for the reason the os.getcwd() case
     # above gives: an absence rule passes on a file nobody ever reopened the door in, so the

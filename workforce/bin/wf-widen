@@ -2630,6 +2630,14 @@ def ledger_verdict(payload, decided):
         if TT.agent_returned(payload, led, judgment, delivered, cut=stopped != ()):
             TT.save_ledger(payload, led)
         return "", ""
+    # THE CARRIED STATUSES LAND BEFORE THE JUDGMENT. This turn's checklist carries the still-
+    # open items of this session's EARLIER issues (`TT.carry_forward`), and the session marks
+    # the ones it finished or the user withdrew. Reading them here means an earlier issue
+    # finished during THIS turn closes on THIS Stop, rather than surviving one more kickback
+    # until the next message's absorb — which is the pile the user was looking at on
+    # 2026-10-13. STATUS ONLY, onto the issue each row names: `TT.absorb_carried` cannot add,
+    # reorder or resurrect an item on an issue this turn did not open.
+    TT.absorb_carried(led, TT.carried_items(checklist(payload)[0] or {}))
     rows = TT.judge_ledger(payload, led)
     if not rows:
         return "", ""

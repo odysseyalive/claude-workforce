@@ -20393,7 +20393,7 @@ if "read_json_nofollow(tag_path(payload))" not in _il:
     _tag_lnk.append("previous_checklist does not read the tag through the guarded reader, "
                     "so last turn's checklist record is taken from whatever the name points "
                     "at")
-if 'write_json_atomic(p, {"prompt": prompt[:2000], "items": []})' not in _il:
+if 'write_json_atomic(p, {"prompt": prompt[:2000], "items": [],' not in _il:
     _tag_lnk.append("the asks checklist is not written atomically, and it sits in the same "
                     "directory under an equally predictable name")
 if _il_w.count("TT.write_json_atomic(") != 5:
@@ -20539,6 +20539,118 @@ check(
     "directive paths are read out of the handbook, so both are attacker-shaped inputs to a "
     "hook that runs on every spawn (CWE-22, CWE-59). The template clause is half of the "
     "saving: a verified line nobody is told to act on changes no agent's behaviour",
+)
+
+
+# SEVEN. AN ASK THAT IS FINISHED OR WITHDRAWN CLOSES, AND AN EARLIER TURN'S ITEM CAN STILL
+# BE FINISHED (2026-10-13). The user, looking at odyssey-alive's session `37f162e1`: *"has
+# this problem already been resolved? There's a bunch of unresolved items."* Every Stop in
+# that session printed `ISSUES  6 open issue(s) judged` with a KICKBACK row for each of i2-i7
+# and the list only grew, while several of them were plainly handled — i3 asked for the picks
+# to be ordered on the agenda and the agenda had been republished in that order.
+#
+# TWO CAUSES, MEASURED IN THAT LEDGER, and this is the one assertion over both:
+#
+#   * `item_done` read six words, all of them meaning the work shipped. A question the
+#     session ANSWERED was never done — i4 carried three `answered` items — and an ask the
+#     user withdrew or sent by mistake had no word to reach at all.
+#   * an item could only be updated during the turn that wrote it. `start_checklist` replaces
+#     the per-turn checklist on every message and `absorb_items` copies the outgoing list
+#     onto ITS OWN issue, so once a turn ended its open items were frozen and no path let the
+#     session finish an earlier issue's item. That is why the pile could only grow.
+#
+# SIX FIXTURES REPLAY THE BEHAVIOUR, the last of them the real ledger. WHAT A FIXTURE CANNOT
+# SEE is the set itself and the three properties of the write-back, so both halves are RUN:
+# the status words against `item_done`, and `carry_forward`/`absorb_carried` against a ledger
+# built in the child. The write-back is the one write that reaches an issue THIS TURN DID NOT
+# OPEN, so what it must never do — append, reorder, or reach a closed or unknown issue — is
+# asserted on a list compared WHOLE rather than searched.
+_il_cf = []
+if '"carried": carried}' not in _il:
+    _il_cf.append("the checklist is written without a `carried` field, so the turn is handed "
+                  "nothing of this session's earlier open issues")
+if "still-open item(s) from this session" not in _il:
+    _il_cf.append("the context line does not name the carried list, so the one reader that "
+                  "can mark a carried item done is never told it is there")
+if "TT.absorb_carried(led, TT.carried_items(checklist(payload)[0] or {}))" not in _il_w:
+    _il_cf.append("the main Stop does not absorb the carried statuses before it judges, so "
+                  "an issue the session finished THIS turn is kicked back once more and "
+                  "closes only on the next message")
+_il_cf_beh = r'''
+import importlib.machinery as m, importlib.util as u, sys
+sys.dont_write_bytecode = True
+s = u.spec_from_loader("_tt", m.SourceFileLoader("_tt", sys.argv[1]))
+tt = u.module_from_spec(s); s.loader.exec_module(tt)
+bad = []
+for w in ("done", "complete", "completed", "closed", "fixed", "shipped", "answered",
+          "dropped", "withdrawn", "cancelled", "canceled", "n/a", "not needed",
+          "superseded", "Answered", " dropped."):
+    if not tt.item_done({"status": w}):
+        bad.append("%r does not finish an item" % w)
+for w in ("open", "in progress", "blocked", "pending", "", "doner"):
+    if tt.item_done({"status": w}):
+        bad.append("%r closed an item, where an unrecognised status must stay open" % w)
+if tt.item_done({}):
+    bad.append("an item with no status at all reads as done")
+led = {"issues": [
+    {"id": "i1", "state": "open", "items": [{"ask": "old", "status": "open"},
+                                            {"ask": "finished", "status": "answered"}],
+     "agents": []},
+    {"id": "i2", "state": "closed", "items": [{"ask": "shut", "status": "open"}],
+     "agents": []},
+    {"id": "i3", "state": "open", "items": [{"ask": "a%d" % n, "status": "open"}
+                                            for n in range(30)], "agents": []}]}
+if [r["issue"] for r in tt.carry_forward(led, skip="i3")] != ["i1"]:
+    bad.append("carry_forward does not carry the earlier OPEN issues alone, skipping this "
+               "message's own: %r" % tt.carry_forward(led, skip="i3"))
+if [r["ask"] for r in tt.carry_forward(led, skip="i3")] != ["old"]:
+    bad.append("an item already finished is handed back to the turn")
+rows = tt.carry_forward(led)
+if len(rows) != tt.MAX_CARRIED:
+    bad.append("carry_forward carried %d rows against a cap of %d"
+               % (len(rows), tt.MAX_CARRIED))
+if rows[:1] and rows[0]["issue"] != "i3":
+    bad.append("the cap is not filled newest issue first: %r" % rows[:1])
+if any(r["issue"] == "i2" for r in rows):
+    bad.append("a CLOSED issue's items are carried")
+tt.absorb_carried(led, tt.carried_items({"carried": [
+    {"issue": "i1", "ask": "old", "status": "done"},
+    {"issue": "i1", "ask": "an ask that was never on i1", "status": "done"},
+    {"issue": "i2", "ask": "shut", "status": "done"},
+    {"issue": "i9", "ask": "old", "status": "done"},
+    {"issue": "../../../etc/passwd", "ask": "old", "status": "done"}]}))
+if led["issues"][0]["items"] != [{"ask": "old", "status": "done"},
+                                 {"ask": "finished", "status": "answered"}]:
+    bad.append("i1's item list is not its own two items with the named one marked done: %r"
+               % led["issues"][0]["items"])
+if led["issues"][1]["items"] != [{"ask": "shut", "status": "open"}]:
+    bad.append("a CLOSED issue was written through the carry, which is a resurrection")
+if len(led["issues"]) != 3:
+    bad.append("the carry created an issue nobody opened")
+print("; ".join(bad) if bad else "OK")
+'''
+try:
+    _il_cfp = subprocess.run([sys.executable, "-c", _il_cf_beh, "workforce/bin/wf-task-tag"],
+                             cwd=ROOT, capture_output=True, text=True, timeout=20)
+    _il_cfs = (_il_cfp.stdout or "").strip().splitlines()[-1:] or [""]
+    if _il_cfs[0] != "OK":
+        _il_cf.append("the carry run said: "
+                      + (_il_cfs[0] or (_il_cfp.stderr or "").strip()[-200:]))
+except subprocess.TimeoutExpired:
+    _il_cf.append("the carry run did not finish in 20s")
+_il_cf += _sc_cases("issues-answered-closes-its-item",
+                    "issues-dropped-or-withdrawn-closes-its-item",
+                    "issues-carried-item-done-closes-its-earlier-issue",
+                    "issues-carried-never-edits-another-issues-items",
+                    "issues-carried-list-is-capped",
+                    "issues-oa-work-ledger-heals")
+check(
+    "issues: a finished or withdrawn ask closes its item, and an earlier issue's open items "
+    "are carried into this turn",
+    not _il_cf,
+    "; ".join(_il_cf) + ". An issue that cannot be finished after the turn that opened it is "
+    "an issue that is never finished: six were reported open on every Stop of odyssey-alive's "
+    "session 37f162e1 with the list only growing, and the session had no path to say so",
 )
 
 
