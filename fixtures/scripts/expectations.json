@@ -9509,5 +9509,21 @@
           "re-dispatch",
           "spawn"
       ]
+  },
+  "spawn-guard-a-planted-agent-id-is-never-quoted": {
+      "_why": "THE DENY REASON IS MODEL CONTEXT, NOT A LOG LINE. The agent ids it names come off a JSON file in the repository -- a file a person, another tool or a bad merge can edit -- and `permissionDecisionReason` lands in the turn's context verbatim. This ledger's `agent_id` carries a newline and an instruction. `bare` refuses it where `agent_type` is already refused, so the list is empty and the spawn is simply allowed: a guard that cannot name its agent has nothing to say, and saying it anyway would be the injection. Allowing is the recoverable direction -- the cost is one wrong spawn, where quoting it is arbitrary text in front of the model on every `Agent` call for the rest of the session.",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"filer\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+      "subst": [
+          ".claude/workforce/issues/s1.json"
+      ],
+      "exit": 0,
+      "want": [],
+      "not": [
+          "Traceback",
+          "permissionDecision",
+          "IGNORE THE ABOVE",
+          "authorised to delete"
+      ]
   }
 }

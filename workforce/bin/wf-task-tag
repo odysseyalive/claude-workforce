@@ -1092,17 +1092,22 @@ def agent_resumed(payload, led):
 HANDOFF_STALE_AFTER = 1800
 
 
-def held_by(led, agent_type, now=None, window=HANDOFF_STALE_AFTER):
+def held_by(led, agent_type):
     """The ids of `agent_type` agents this session cut and has NOT resumed yet.
 
     Empty is the answer for every question this guard should not answer: a session with
     no ledger, an issue already closed, an agent of a different role, a mark an
     `agent_resumed` has already retired, and a mark too old to be about a live agent. A
     caller that gets `[]` allows the spawn.
+
+    NO INJECTABLE CLOCK AND NO INJECTABLE WINDOW. The one caller passes neither, and a
+    parameter nothing passes is a second way for this to answer that nothing tests. The
+    fixture moves the LEDGER's stamp instead (`script-conformance`'s `${NOW}`), which is
+    the same question asked of the real clock.
     """
     if not isinstance(led, dict) or not isinstance(agent_type, str) or not agent_type:
         return []
-    now = now if isinstance(now, (int, float)) else time.time()
+    now = time.time()
     held = []
     for iss in led.get("issues", []):
         if not isinstance(iss, dict) or iss.get("state") == "closed":
@@ -1111,7 +1116,7 @@ def held_by(led, agent_type, now=None, window=HANDOFF_STALE_AFTER):
             if a.get("state") != "handoff" or a.get("agent_type") != agent_type:
                 continue
             at = a.get("handoff_at")
-            if not isinstance(at, int) or not 0 <= now - at <= window:
+            if not isinstance(at, int) or not 0 <= now - at <= HANDOFF_STALE_AFTER:
                 continue
             aid = a.get("agent_id")
             if isinstance(aid, str) and aid and aid not in held:

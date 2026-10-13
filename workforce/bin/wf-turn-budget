@@ -910,13 +910,21 @@ def guard_spawn(payload):
     name, a project with no ledger, a role nobody was cut on, and a mark `held_by` reads
     as stale.
     """
-    if payload.get("tool_name") != "Agent" or payload.get("agent_id") is not None:
+    # TRUTHINESS, NOT `is not None`: the main thread is the payload with NO usable
+    # `agent_id`, and an empty string is no more an agent than an absent key is.
+    if payload.get("tool_name") != "Agent" or payload.get("agent_id"):
         return 0
     tool_input = payload.get("tool_input")
     want = tool_input.get("subagent_type") if isinstance(tool_input, dict) else None
     if not bare(want):
         return 0
-    held = _ledger_read(payload, lambda mod, led: mod.held_by(led, want))
+    # EVERY ID IS VALIDATED BEFORE IT BECOMES TEXT IN FRONT OF THE MODEL. These come off
+    # a JSON file in the repository, which a person or another tool can edit, and this
+    # hook's output is a `permissionDecisionReason` — model context, not a log line. An
+    # unvalidated string from that file would be arbitrary text injected into the turn.
+    # `bare` is the same refusal `agent_type` takes two lines up.
+    held = [a for a in (_ledger_read(payload, lambda mod, led: mod.held_by(led, want))
+                        or []) if bare(a)]
     if not held:
         return 0
     sys.stdout.write(json.dumps({"hookSpecificOutput": {
