@@ -42,6 +42,23 @@ dispatches the evaluator employee for independent review (tier 4), because ICs c
 result, the retry budget, and what to do on exhaustion. Two attempts, then STOP and report FAIL with
 the exact output — never a third silent retry, never a downgraded claim.
 
+**Two lines, not one: `Check:` is the targeted proof, `Regression:` is the full suite run ONCE.**
+`Check:` names the fixture, case or assertion that proves THIS change — by name, so it selects the
+smallest thing that can fail — and it runs while the work is being built, as often as it takes.
+`Regression:` names the project's whole suite, and it runs once, at the end of the work order, never
+per edit and never per order inside a batch (`procedures/org.md` dispatch rungs 12f and 12g). Both
+lines are in the shipped `## Verification` template (`handbook-templates.md` § IC).
+
+**MEASURED 2026-10-12**, from three coders' own transcripts, timed call-to-result: one order spent 51
+of its 124 wall-clock minutes in `bin/check` across 62 calls plus ~10 more in `bin/prove`; a second
+spent 47 of its 103 in `bin/prove` and 27 in `bin/check`; a third spent 23 of its 39 in the two. The
+live end-to-end runs those orders existed to prove cost 3-4 minutes each. **The time went to the full
+suite, rerun after every edit and every failure**, because the template named ONE command, so a
+handbook generated from it had one proof available at every step and ran that. A targeted check is
+not a weaker check — it is the one that can tell the author something the suite's other 1,200
+assertions cannot, and running the suite between edits buys a green line about work that is not
+finished.
+
 ---
 
 ## Judgment roles — the calibration tier
@@ -239,11 +256,16 @@ execute garbage. So the commands are declared, the same way `## Probe` declares 
 the shape of a correct result:
 
 ```markdown
-- Check: `npx stylelint "src/**/*.css"` — expect exit 0
+- Check: `npx stylelint src/components/Button.css` — expect exit 0
+- Regression: `npx stylelint "src/**/*.css"` — expect exit 0
 - Negative: `npx stylelint .claude/workforce/negatives/<employee>.css` — expect nonzero
 ```
 
-**Both lines are TOP-LEVEL list items — column 0, with a list marker** (`-`, `*`, `+`, `1.` or `1)`). Not indented, not inside a fence,
+`Check:` is the file this order touched; `Regression:` is every file, once at the end (§ The rule).
+`wf-checkrun` executes the `Check:`/`Negative:` pair — the `Regression:` line is declared for the
+employee and its manager to run at the end of the order, and no shipped tool executes it.
+
+**These lines are TOP-LEVEL list items — column 0, with a list marker** (`-`, `*`, `+`, `1.` or `1)`). Not indented, not inside a fence,
 not a prose sentence beginning "Check:". That is a contract, and it is what lets a script tell an
 *instruction* from an *illustration* without having to parse markdown correctly — which four rounds
 of cold reads showed a hand-rolled scanner will not do. An indented or fenced `Check:` is read as an

@@ -384,7 +384,11 @@ returned nothing.
 
 ## Verification
 - Check: `<exact command>` — expect <exit 0 | the exact expected result>
+- Regression: `<the project's full suite>` — expect <exit 0 | the exact expected result>
 - Negative: `<the same command against an input that MUST be rejected>` — expect nonzero
+*`Check:` is the TARGETED proof of this change — the fixture, case or assertion by name — and it runs
+while you build. `Regression:` is the full suite and it runs ONCE, at the end of the work order,
+never per edit (`references/verification.md` § The rule).*
 *The negative's input file belongs outside this employee's scope — `references/verification.md`
 § Where the negative input lives — and it must fail because the RULE was violated, not because the
 command got a bad argument (§ The negative must fail for the RIGHT REASON).*
