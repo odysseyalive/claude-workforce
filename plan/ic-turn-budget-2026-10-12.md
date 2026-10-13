@@ -316,6 +316,25 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
   `Regression:` once (K10). Orders that touch the same file run in sequence. The shared-checkout hazard
   (two coders on one tree) is what the worktree removes, so the rule never sends two orders to one checkout.
 
+- K12. **A generated code-and-test map, shipped in workforce.** The user, 2026-10-12: *"if the bin check is taking a
+  long time and the coder is running out of turns trying to find data, it seems to me that both of these would be
+  helped by some kind of an index system to help direct where in the code to go for specific things."* They chose
+  to ship it. Measured from the four coders' transcripts: running tests took 30–43% of their tool calls, searching
+  and reading code took 21–42%, and editing took 14–21%. Designed so that nobody maintains it: it is generated
+  from the code on every call and never stored, because a hand-kept index goes stale silently (the lab CLAUDE.md
+  roster had 12 of about 30 projects missing from disk).
+  - A shipped data skill and script. For a file, it prints the file's sections and functions with line numbers and
+    each one's first docstring line. For a topic, it prints the files and lines that match. It runs in under a
+    second on a 20k-line file.
+  - A test map: for a changed file, it lists the checks, fixtures and prove cases that cover it, reusing
+    `bin/prove`'s existing target selection rather than a second list. In this repository, `bin/check --for <file>`
+    runs only those checks. In a project, the map lists the handbook `Check:` commands that touch the file.
+  - Measure before shipping: one coder order run with the map and one without, on the same task, comparing turns.
+- K13. **Faster `bin/check` (this repository only).** Profiled 2026-10-12, one run took 146 s. Of that, 44 s went
+  to 27 re-runs of `script-conformance` and 43 s to 3 runs of the corpus suite, all on one of 4 cores. Run each
+  nested suite once and reuse its result, then spread the independent assertions across cores. Target: under
+  30 s, reported as a measured number.
+
 ## Files touched
 
 - `workforce/bin/wf-turn-budget` (new); `workforce/bin/wf-settings-apply` (SHIPPED_HOOKS); `manifest.txt`
