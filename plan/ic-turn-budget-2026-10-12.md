@@ -374,6 +374,9 @@ cut readable. It does not complete the work. The fix is continuation of the SAME
   to 27 re-runs of `script-conformance` and 43 s to 3 runs of the corpus suite, all on one of 4 cores. Run each
   nested suite once and reuse its result, then spread the independent assertions across cores. Target: under
   30 s, reported as a measured number.
+  **Dropped 2026-10-12 (user: "let's drop the bin/check speedup").** Built as c7e4851 and not merged: it measured
+  165 s → 119 s with identical counts, short of the 30 s target, and the rest needed a rewrite of the whole gate.
+  The branch was deleted; the commit stays reachable by its sha until git collects it.
 
 ## Files touched
 
