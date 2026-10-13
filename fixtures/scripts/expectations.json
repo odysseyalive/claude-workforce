@@ -1,4 +1,81 @@
 {
+  "map-outline-python": {
+    "_why": "THE OUTLINE, ON THE LANGUAGE MOST OF THIS PROJECT IS WRITTEN IN. Every row an employee reads is asserted here: the header's language and counts, a SECTION declared by a comment banner (the house style in bin/check, and the thing a def regex alone cannot see), a def and a class with their first docstring line, a nested method at its own depth, and a def whose summary is the comment ABOVE it. The negatives are the point of the outline: no body line and no import is ever printed, because a map that reproduces the file saves nobody a read.",
+    "script": "wf-map",
+    "args": ["sample.py"],
+    "exit": 0,
+    "want": [
+      "sample.py  ·  python · 25 lines · 4 def(s) · 1 section(s)",
+      "4  § GREETINGS, the section this banner declares",
+      "9  def greet Say hello to NAME, once.",
+      "14  class Counter Counts the things nobody else counts.",
+      "bump Add N and return the running total.",
+      "24  def farewell a plain comment above a def is read as its first line"
+    ],
+    "not": ["Traceback", "return f\"hello", "self.total += n"]
+  },
+  "map-outline-markdown": {
+    "_why": "MARKDOWN IS CODE HERE. Half this distribution's shipped surfaces are references an agent reads, so the map has to answer `where in this file` for them too: every heading with its line number, its depth, and the first real sentence under it. The html comment under `## Installing a widget` is an enforcement marker in this project's own references and must never be mistaken for that sentence -- it was, in the first version.",
+    "script": "wf-map",
+    "args": ["guide.md"],
+    "exit": 0,
+    "want": [
+      "guide.md  ·  markdown · 16 lines · 0 def(s) · 4 section(s)",
+      "1  § Widget guide What a widget is, in one sentence nobody has to re-derive.",
+      "5  § Installing a widget Run the installer and answer two questions.",
+      "§ The slot a widget lands in It lands beside the others",
+      "14  § Removing a widget The removal is reported, never silent."
+    ],
+    "not": ["Traceback", "an html comment is never the summary line"]
+  },
+  "map-topic-walk-ranks": {
+    "_why": "THE TOPIC QUERY WITH NO GIT, which is the harness's own condition (the tree is copied to a temp directory) and a user's condition in any directory that is not a repository. Two assertions: the fallback walk runs and SAYS it walked, and the RANK is by how many of the query's words a file carries -- the file matching both sorts above the file matching one. A file matching neither is absent, so `unrelated.md` is the negative. One matching LINE is one hit however many words it holds, which an earlier version got wrong by printing the same line twice.",
+    "script": "wf-map",
+    "args": ["--topic", "widget", "slot"],
+    "exit": 0,
+    "want": [
+      "topic: widget slot  ·  2 file(s) matched (walk, 2 word(s))",
+      "widget.md  ·  2 hit(s) · 2/2 word(s)",
+      "mentions-one-word.md  ·  1 hit(s) · 1/2 word(s)",
+      "The widget registry holds one widget per slot"
+    ],
+    "not": ["Traceback", "unrelated.md"]
+  },
+  "map-topic-git-skips-ignored": {
+    "_why": "IN A REPOSITORY IT ASKS GIT, AND THAT IS WHAT KEEPS AN IGNORED FILE OUT OF THE REPORT. `git grep --untracked` searches what is tracked and what is new, and NOT what .gitignore excludes -- so a project's secrets, caches and vendored trees cannot be surfaced by a topic query even though the script can read them. The walk fallback has its own skip list; this case proves the git path, which is the one that runs in every real checkout.",
+    "script": "wf-map",
+    "args": ["--topic", "widget"],
+    "exit": 0,
+    "git": {"init": true, "commit": true},
+    "want": [
+      "(git grep, 1 word(s))",
+      "tracked.md  ·  1 hit(s) · 1/1 word(s)",
+      "The widget lives here, tracked and committed."
+    ],
+    "not": ["Traceback", "ignored/secret.md", "inside an ignored directory"]
+  },
+  "map-tests-handbook-check": {
+    "_why": "THE PROJECT PATH OF `--tests`, and the common one: a staffed project has no bin/prove and no conformance suite, so the test map is the employees' own runnable proofs. `handbook-templates.md` Verification is the shape -- `Check:` targeted, `Regression:` the full suite -- and only the lines that NAME the file or its directory are reported, which is why the bare `Regression: pytest` line here must be absent from the output. A fixture with no bin/prove also proves the identity gate: a project's own scripts are not run to answer this.",
+    "script": "wf-map",
+    "args": ["--tests", "src/widget.py"],
+    "exit": 0,
+    "want": [
+      "tests covering src/widget.py",
+      "handbook checks · 2",
+      ".claude/agents/widget-coder.md:9 Check: `pytest tests/test_widget.py -k build`",
+      "Negative: `pytest tests/test_widget_rejects.py`"
+    ],
+    "not": ["Traceback", "bin/check assertions", "Regression: `pytest` "]
+  },
+  "map-escape-symlink": {
+    "_why": "THE SECURITY FLOOR, FAILING FIRST. This script is handed arbitrary paths out of a work order, so a symlink pointing out of the tree must be REFUSED by name rather than followed: `escape.py` resolves to a path above the root and the run exits 2 having read nothing. The link is created at run time because a dangling or escaping link cannot be committed. `kept.py` is beside it and is never read either -- the refusal is per path, and a run that mapped nothing exits 2 rather than reporting an empty map as a map.",
+    "script": "wf-map",
+    "args": ["escape.py"],
+    "exit": 2,
+    "git": {"init": true, "links": {"escape.py": "../escape.py"}},
+    "want": ["resolves outside the root", "escape.py"],
+    "not": ["Traceback", "def kept", "· python ·"]
+  },
   "commitments-heals-git-hook": {
     "_why": "THE CARRIER FOR THE GIT HALF. The SessionStart registration every default install already has reaches a stranded repository with no audit, no typed command and no settings write -- the 2026-09-07 directive, the next use of workforce heals it. This tree has NO settings file at all, which is the point: the settings half's own gate ends on the first read here, so a git half placed behind it would never fire. The hook still exits 0 and still speaks JSON.",
     "script": "wf-commitments",
