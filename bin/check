@@ -19464,6 +19464,127 @@ check(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# THE ISSUE LEDGER (K2c, K2d — user direction 2026-10-12)
+#
+# Eight `issues-*` fixtures replay the trees: two issues open at once with two agents each,
+# interleaved hand-backs, a third message arriving mid-run, the three Stop verdicts, the
+# ignore rule, and a planted link. WHAT A FIXTURE CANNOT SEE is the three properties below,
+# and each one is a property of WHERE the ledger writes rather than of what it decides —
+# which is exactly the class a passing fixture is blind to, because a fixture runs inside a
+# tree the harness already pointed `CLAUDE_PROJECT_DIR` at.
+_il = read("workforce/bin/wf-task-tag")
+_il_w = read("workforce/bin/wf-widen")
+
+# ONE. THE ROOT IS THE HARNESS'S TO NAME, NEVER THE PROCESS'S TO GUESS. This is
+# `wf-commitments`' `path()` rule, and the ledger has to carry it because the data lives in
+# somebody's repository: `os.getcwd()` names wherever the process happens to be, so a
+# fallback to it turns a hand-run from an unrelated directory into a confident
+# `<cwd>/.claude/workforce/issues/` nobody named. A fixture can never catch this — the
+# runner sets `CLAUDE_PROJECT_DIR` on every case, so the first source always resolves and
+# the fallback is dead code in every test that exists.
+_il_root = []
+if 'os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")' not in _il:
+    _il_root.append("wf-task-tag does not resolve the project through CLAUDE_PROJECT_DIR "
+                    "then the payload's cwd")
+# THE FORBIDDEN FORM IS THE CALL IN CODE, NOT THE NAME IN PROSE. `project_root`'s own
+# docstring explains why the fallback is absent and has to name it twice to do so, so a bare
+# `"os.getcwd()" in _il` fires on the comment that documents the rule — a check that cannot
+# be satisfied by any correct file. The two shapes a fallback actually takes are a chained
+# `or` and an assignment, which is what is forbidden.
+for _form in (" or os.getcwd()", "= os.getcwd()"):
+    if _form in _il:
+        _il_root.append(f"wf-task-tag falls back to os.getcwd() ({_form.strip()}), which "
+                        "names no project the harness fired this hook for")
+check(
+    "issues: the ledger's project is the one the harness named, never os.getcwd()",
+    not _il_root,
+    "; ".join(_il_root) + ". The ledger holds the user's prompts and is written INSIDE a "
+    "repository, so a guessed root is a write into a tree nobody asked for. Every fixture "
+    "runs with CLAUDE_PROJECT_DIR set by the harness, so no fixture can observe this",
+)
+
+# TWO. THE IGNORE RULE COVERS `issues/` AND NOTHING ABOVE IT. The user, 2026-10-12: *"some
+# projects actually do ship their Claude directory with the repository."* A rule written at
+# `.claude/` or `.claude/workforce/` would silently un-commit a tree somebody chose to ship,
+# and the sibling precedent is measured in the other direction — the commitments ledger is
+# git-TRACKED in nsayka-wawa and odyssey-alive. The `issues-ignore-rule-covers-issues-only`
+# fixture asserts both wider paths absent; this pins that the hook, not an audit, is what
+# writes the rule, because a rule only an audit adds reaches no project until one is run.
+_il_ign = []
+if 'ignore = os.path.join(d, ".gitignore")' not in _il:
+    _il_ign.append("the ignore rule is not written inside the issues directory itself — "
+                   "`d` IS the issues directory, and `os.path.dirname(d)` would reach the "
+                   "`.claude/workforce` a project may have chosen to ship")
+if 'IGNORE_RULE = "*\\n"' not in _il:
+    _il_ign.append("the rule's body is not `*` and nothing else")
+if 'ISSUES = "issues"' not in _il:
+    _il_ign.append("the issues directory name is not declared in one place")
+check(
+    "issues: the hook writes its own ignore rule, over issues/ alone",
+    not _il_ign,
+    "; ".join(_il_ign) + ". A rule an audit adds reaches no project until somebody "
+    "re-audits it, and a rule one level up un-commits a `.claude` tree a project chose to "
+    "ship",
+)
+
+# THREE. NO FILE IS WRITTEN OR READ THROUGH A NAME SOMEBODY CAN PLANT (CWE-59), and the
+# ledger needs it more than the turn counter does: its path is predictable, its directory is
+# shared through a checkout, and it is the user's own prompts that would be written through
+# the link. The pattern is `wf-turn-budget`'s (3c7431c) and the CALL SITES ARE COUNTED, not
+# merely present, so the read and the write cannot drift apart by one of them growing a
+# plain `open()`. `issues-ledger-refuses-a-planted-link` proves the behaviour; this proves
+# there is no second, unguarded door into the same file.
+_il_lnk = []
+if 'flags | getattr(os, "O_NOFOLLOW", 0)' not in _il:
+    _il_lnk.append("no O_NOFOLLOW helper in wf-task-tag")
+if _il.count("_open_nofollow(") != 4:
+    _il_lnk.append(f"_open_nofollow names {_il.count('_open_nofollow(')} sites, expected 4 "
+                   "— its own def, the read, the atomic write, the ignore rule, and no "
+                   "fifth door into the same directory")
+if "os.replace(tmp, path)" not in _il:
+    _il_lnk.append("the ledger write does not rename over the name, so a link at that "
+                   "name would be written THROUGH rather than replaced")
+if "os.O_CREAT | os.O_EXCL | os.O_WRONLY" not in _il:
+    _il_lnk.append("the temporary name is not created O_CREAT|O_EXCL, so it can be a "
+                   "planted link or clobber a file already there")
+for _lit, _why in (
+        ('read_json_nofollow(', "wf-widen reads the ledger through its sibling's guarded "
+                                "reader"),
+        ("TT.agent_returned(payload, led", "wf-widen marks the stopping agent on its own "
+                                           "issue"),
+        ("TT.judge_ledger(payload, led)", "the main Stop judges every open issue")):
+    if _lit not in (_il if _lit.startswith("read_json") else _il_w):
+        _il_lnk.append(f"missing {_lit!r} — {_why}")
+check(
+    "issues: nothing in the ledger is written or read through a name another account can "
+    "plant",
+    not _il_lnk,
+    "; ".join(_il_lnk) + ". This file lives in a repository at a predictable path, so a "
+    "symlink planted at `issues/<session>.json` aims the hook's write at whatever it "
+    "points to, and the hook's read at a file it was never given",
+)
+
+# FOUR. THE THIRD AGENT STATE IS DECLARED BEFORE IT IS SET. `handoff` is K8's to write, and
+# K8 is not built here. Declaring it now is what stops the schema changing under the ledger
+# later, and `judge_issue` already HOLDS on it rather than treating it as finished — which
+# is the behaviour that matters, because an unknown state read as "returned" would kick back
+# an agent that is waiting to be resumed.
+_il_st = []
+if 'AGENT_STATES = ("running", "returned", "handoff")' not in _il:
+    _il_st.append("AGENT_STATES does not declare the three states")
+if 'waiting = [a for a in agents if a.get("state") in ("running", "handoff")]' not in _il:
+    _il_st.append("judge_issue does not hold on a `handoff` agent, so a capped agent "
+                  "waiting for K8's resume reads as an issue to kick back")
+check(
+    "issues: the agent state K8 will set is declared and already held on",
+    not _il_st,
+    "; ".join(_il_st) + ". K8 teaches wf-turn-budget to mark a capped agent `handoff`; "
+    "the state is named here so that order changes no schema, and held on here so a "
+    "capped agent is never judged as a failure in the meantime",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")

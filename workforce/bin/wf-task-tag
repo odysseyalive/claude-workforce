@@ -553,6 +553,443 @@ def checklist_items(cl):
             if isinstance(i, dict) and isinstance(i.get("ask"), str) and i["ask"].strip()]
 
 
+# ─────────────────────────────────────────────────────────────────────────────────
+# THE ISSUE LEDGER (K2c, K2d — user direction 2026-10-12).
+#
+# WHY IT EXISTS, in the user's words: *"the reason why we need to track multiple widening
+# events is because you may actually be dealing with multiple issues at the same time, and
+# you might have different sets of agents working on those different issues."*
+#
+# THE DEFECT IT REPLACES. `start_checklist` below removes last turn's checklist on every
+# user message. That is correct for a per-TURN artifact and wrong for the work: MEASURED in
+# this project's own session of 2026-10-12, the skul-dev fix and the turn-limit work were
+# open at the same time and each new message erased the other's items. Worse, an agent
+# dispatched for an issue hands back AFTER the turn that sent it has ended, so its result
+# arrived with nothing left to judge it against.
+#
+# SO THE WIPE IS NO LONGER A LOSS, which is the whole of the fix. The outgoing checklist's
+# items are ABSORBED onto their issue before the file is removed (`absorb_items`), and the
+# issue stays open across every later message until its items are done and its agents are
+# back. The per-turn checklist keeps its per-turn life; the ledger is what remembers.
+#
+# WHERE IT LIVES, and the user decided this too: *"if the issue tracker is going to be
+# installed with the workforce, that's perfect, but the actual indexing of the issue tracker
+# should be within the project that it's running from"*, and *"each project should have their
+# own Issue Tracking Index"*. The code ships in the install; the DATA lives in the project,
+# at `<project>/.claude/workforce/issues/`. One file per session, so two sessions in one
+# project never share a file, plus `index.json` listing that project's open issues across
+# its sessions. There is NEVER a user-level or machine-wide index, and a project's index
+# never lists another project's issues: the only root this module will write under is the
+# one the harness named.
+ISSUES = "issues"
+
+# THE IGNORE RULE'S WHOLE BODY: every file in the issues directory, and no path outside it.
+# Named here rather than spelled at the write, so the one thing a reader has to check about
+# it — that it is `*` and not a broader pattern aimed a level up — is checkable in one
+# place. `bin/check` pins this constant; `issues_dir` is the only writer.
+IGNORE_RULE = "*\n"
+
+# THE THREE STATES AN AGENT ENTRY CAN BE IN, declared here because the ledger is the only
+# file that carries them and a reader needs the set.
+#
+#   running    linked at `SubagentStart`; the issue holding one is a HOLD, never a failure
+#   returned   it handed back, and `wf-widen` recorded its judgment on the issue
+#   handoff    it stopped at its turn cap with work left. DEFINED HERE AND SET BY NOBODY
+#              YET: K8 is the order that teaches `wf-turn-budget` to set it at the final
+#              threshold, and K8 is not built. It is named now so the schema does not
+#              change under the ledger later, and so a reader of this file is not left
+#              guessing what a third state would mean.
+AGENT_STATES = ("running", "returned", "handoff")
+
+# A LEDGER NOBODY CAN READ IS A LEDGER NOBODY READS, and the same bound `wf-widen` puts on
+# its open-commitment list. A session that genuinely opened 200 issues has a different
+# problem than this file can fix.
+MAX_ISSUES = 40
+
+
+def project_root(payload):
+    """The project this hook fired for, as the HARNESS names it, or None.
+
+    `${CLAUDE_PROJECT_DIR}` first, the payload's `cwd` second, and NO `os.getcwd()`
+    fallback — which is `wf-commitments`' `path()` rule, restated here for the reason that
+    rule exists. Both sources above are supplied by the harness and name the project this
+    hook was fired for. `os.getcwd()` names wherever the process happens to be, so falling
+    back to it turns a hand-run or a test from an unrelated directory into a confident
+    write at `<cwd>/.claude/workforce/issues/`, a path nobody named. An unresolved root is
+    not a root to guess at: None is the honest answer and every caller treats it as
+    "record nothing".
+    """
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    return root if root and str(root).strip() else None
+
+
+def _open_nofollow(path, flags, mode=0o600):
+    """`os.open` with `O_NOFOLLOW` added, so a planted symlink at `path` is refused.
+
+    THIS LEDGER LIVES IN A REPOSITORY, which is what makes the flag load-bearing rather
+    than decorative: the path is predictable, a checkout is shared, and a link planted at
+    `issues/<session>.json` would otherwise aim this hook's write at whatever it points to.
+    The pattern is `wf-turn-budget`'s (3c7431c) and is deliberately not a second design.
+
+    The flag is absent on some platforms; `getattr` keeps this importable there.
+    """
+    return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
+
+
+def read_json_nofollow(path, default=None):
+    """Parse a JSON object at `path`, never through a link. `default` on anything else.
+
+    Unparsable state is DISCARDED rather than raised on. A hook that raised on a file
+    somebody else can write would print a traceback on every message afterwards, and the
+    cost of discarding is one forgotten issue against a hook that never runs again.
+    """
+    try:
+        fd = _open_nofollow(path, os.O_RDONLY)
+    except OSError:
+        return default
+    try:
+        with os.fdopen(fd, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return default
+    return d if isinstance(d, dict) else default
+
+
+def write_json_atomic(path, obj):
+    """Replace `path` atomically, and never through a link. True when it landed.
+
+    THE TEMPORARY NAME IS CREATED `O_CREAT | O_EXCL | O_NOFOLLOW`, so it cannot be a
+    symlink somebody planted and cannot clobber a file already there. `os.replace` then
+    renames over the real name: rename acts on the NAME, so a symlink sitting at that name
+    is REPLACED rather than written through, and its target is never opened. Those two
+    together are why no file outside this directory can be reached by writing here.
+
+    ATOMIC ALSO MEANS NO HALF-LEDGER. Two concurrent agents stop at once; a plain
+    open-and-write would let one read a file the other had truncated.
+    """
+    tmp = "%s.%d" % (path, os.getpid())
+    try:
+        fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except OSError:
+        return False
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(obj, fh)
+        os.replace(tmp, path)
+        return True
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return False
+
+
+def issues_dir(payload, create=False):
+    """`<project>/.claude/workforce/issues`, or None when the harness named no project.
+
+    ON FIRST CREATE IT WRITES ITS OWN `.gitignore` HOLDING `*`, and the hook does that
+    rather than an audit: the ledger holds the user's prompts, which do not belong in a
+    repository, and a rule only an audit adds reaches no project until somebody re-audits
+    it. The precedent is measured — the commitments ledger at
+    `.claude/workforce/commitments.json` is git-TRACKED in nsayka-wawa and odyssey-alive,
+    and on 2026-10-10 a local edit to it on a live server would have made a
+    `git pull --ff-only` conflict.
+
+    THE RULE COVERS `issues/` ONLY, never `.claude/` and never `.claude/workforce/`. The
+    user, 2026-10-12: *"some projects actually do ship their Claude directory with the
+    repository. I think as long as the index [widen] uses is in the [Claude] directory on
+    the project we're good."* A project that commits its `.claude` keeps committing
+    everything else in it; an ignore rule one level up would silently un-commit a tree
+    somebody chose to ship.
+    """
+    root = project_root(payload)
+    if not root:
+        return None
+    d = os.path.join(root, ".claude", "workforce", ISSUES)
+    if not create:
+        return d if os.path.isdir(d) else None
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        return None
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        try:
+            fd = _open_nofollow(ignore, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except OSError:
+            return d
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(IGNORE_RULE)
+        except OSError:
+            pass
+    return d
+
+
+def ledger_path(payload, create=False):
+    """This SESSION's ledger file inside the project's issues directory, or None.
+
+    Keyed by `session_component`, so the id arrives as ONE filename component: a raw id of
+    `x/../../escaped` would otherwise walk out of the project directory, and this is a path
+    the hook creates and writes.
+    """
+    d = issues_dir(payload, create=create)
+    if not d:
+        return None
+    return os.path.join(d, f"{session_component(payload)}.json")
+
+
+def load_ledger(payload):
+    """This session's ledger, or an empty one. Never None, so no caller branches on it."""
+    p = ledger_path(payload)
+    led = read_json_nofollow(p) if p else None
+    if not isinstance(led, dict) or not isinstance(led.get("issues"), list):
+        return {"session": session_component(payload), "issues": []}
+    return led
+
+
+def save_ledger(payload, led):
+    """Write this session's ledger and refresh the project's index. True when it landed."""
+    p = ledger_path(payload, create=True)
+    if not p:
+        return False
+    led["issues"] = [i for i in led.get("issues", []) if isinstance(i, dict)][-MAX_ISSUES:]
+    if not write_json_atomic(p, led):
+        return False
+    refresh_index(payload, led)
+    return True
+
+
+def refresh_index(payload, led):
+    """Rewrite THIS PROJECT's `index.json` row for this session.
+
+    PER PROJECT AND PER SESSION, which is the user's rule made mechanical: the index is a
+    map from session id to that session's open issues, it is written inside the project
+    whose work those issues are, and it is only ever reached through `project_root`. No
+    other project's sessions are read and none are written, so there is nothing here that
+    could become a machine-wide list.
+    """
+    d = issues_dir(payload, create=True)
+    if not d:
+        return
+    p = os.path.join(d, "index.json")
+    idx = read_json_nofollow(p) or {}
+    sessions = idx.get("sessions")
+    if not isinstance(sessions, dict):
+        sessions = {}
+    sid = session_component(payload)
+    rows = []
+    for iss in open_issues(led):
+        rows.append({"id": iss.get("id"),
+                     # THE ASK IN SHORT, so the index is readable without opening the
+                     # ledger. The full prompt stays in the session's own file.
+                     "ask": (iss.get("prompt") or "")[:120],
+                     "items_open": len([x for x in issue_items(iss)
+                                        if not item_done(x)]),
+                     "agents_running": len([a for a in issue_agents(iss)
+                                            if a.get("state") == "running"])})
+    if rows:
+        sessions[sid] = {"file": f"{sid}.json", "open": rows}
+    else:
+        sessions.pop(sid, None)
+    write_json_atomic(p, {"sessions": sessions})
+
+
+def issue_items(iss):
+    """The items on an issue: objects with a non-empty string `ask`. Same definition as
+    `checklist_items`, applied to the issue the checklist was absorbed onto."""
+    items = iss.get("items") if isinstance(iss, dict) else None
+    if not isinstance(items, list):
+        return []
+    return [i for i in items
+            if isinstance(i, dict) and isinstance(i.get("ask"), str) and i["ask"].strip()]
+
+
+def item_done(item):
+    """Whether an item is finished. The STATUS IS THE SESSION'S TO WORD, so this reads the
+    words a session actually writes rather than demanding one token; anything else is open.
+    An item with no status at all is open, which is the direction that keeps work visible.
+    """
+    s = item.get("status")
+    return isinstance(s, str) and s.strip().lower() in (
+        "done", "complete", "completed", "closed", "fixed", "shipped")
+
+
+def issue_agents(iss):
+    """The agent entries on an issue: objects carrying a non-empty string `agent_id`."""
+    ags = iss.get("agents") if isinstance(iss, dict) else None
+    if not isinstance(ags, list):
+        return []
+    return [a for a in ags
+            if isinstance(a, dict) and isinstance(a.get("agent_id"), str)
+            and a["agent_id"].strip()]
+
+
+def open_issues(led):
+    """Every issue not yet closed, oldest first. An issue with no `state` is open."""
+    return [i for i in led.get("issues", [])
+            if isinstance(i, dict) and i.get("state") != "closed"]
+
+
+def current_issue(led):
+    """The issue a newly spawned agent belongs to: the NEWEST open one.
+
+    NEWEST, because an agent is dispatched by the turn that is running now, and that turn
+    is working the issue its own message opened. Oldest-first would link a coder to work
+    the user raised yesterday. When nothing is open there is no issue to link to, and
+    `link_agent` records nothing rather than inventing one.
+    """
+    opened = open_issues(led)
+    return opened[-1] if opened else None
+
+
+def add_issue(payload, led):
+    """Append an issue for THIS user message and return it, or None when the message opens
+    no work.
+
+    THE GATE IS `start_checklist`'S, deliberately the same one: injected text is not the
+    user's ask, and under a dozen words a message is almost always one ask and not a new
+    issue ("commit it", "yes"). Reusing the gate means a message either opens an issue AND
+    a checklist or neither, so the two can never disagree about whether work started.
+
+    EARLIER OPEN ISSUES STAY. That is the whole point of the file.
+    """
+    prompt = payload.get("prompt") or ""
+    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+        return None
+    n = 1
+    for iss in led.get("issues", []):
+        if isinstance(iss, dict) and isinstance(iss.get("id"), str):
+            try:
+                n = max(n, int(str(iss["id"]).lstrip("i") or 0) + 1)
+            except ValueError:
+                pass
+    iss = {"id": "i%d" % n, "prompt": prompt[:2000], "state": "open",
+           "items": [], "agents": []}
+    led.setdefault("issues", []).append(iss)
+    return iss
+
+
+def absorb_items(led, issue_id, items):
+    """Copy a finished checklist's items onto their issue, replacing what is there.
+
+    THIS IS WHAT MAKES THE WIPE SAFE. `start_checklist` removes the checklist file on every
+    message, which is right for a per-turn artifact; absorbing first means the items the
+    session wrote survive on the issue and the next message cannot erase them. Replacing
+    rather than appending is correct because the checklist is the live view of that one
+    issue's items, statuses included: a merge would resurrect an item the session struck.
+    """
+    if not issue_id:
+        return
+    for iss in led.get("issues", []):
+        if isinstance(iss, dict) and iss.get("id") == issue_id:
+            iss["items"] = [{"ask": i["ask"],
+                             "status": i["status"] if isinstance(i.get("status"), str)
+                             else "open"}
+                            for i in items]
+            return
+
+
+def link_agent(payload, led):
+    """Link the starting agent to the issue being worked, as `running`. The issue id, or None.
+
+    `issue → agent_ids` with a state, which is K2c's shape. NEVER WITHOUT AN `agent_id`:
+    that is the only field that tells an agent apart from the session that spawned it
+    (fact 22b), so without one there is nothing to key an entry by and a guessed key would
+    attach one agent's result to another's name.
+    """
+    aid = agent_component(payload)
+    if not aid:
+        return None
+    iss = current_issue(led)
+    if iss is None:
+        return None
+    for a in issue_agents(iss):
+        if a.get("agent_id") == aid:
+            a["state"] = "running"
+            return iss.get("id")
+    iss.setdefault("agents", []).append(
+        {"agent_id": aid, "agent_type": str(payload.get("agent_type") or ""),
+         "state": "running", "judgment": None})
+    return iss.get("id")
+
+
+def agent_returned(payload, led, judgment):
+    """Mark the stopping agent `returned` and record its judgment ON ITS OWN ISSUE.
+
+    THE ISSUE IS FOUND BY THE AGENT'S ID, never by which issue is newest. That is the
+    no-cross-talk rule: two issues are open, each has two agents, and the hand-backs
+    interleave, so "the current issue" is the wrong answer for every stop but the luckiest.
+    An agent whose id appears on no issue is an agent this session never linked, and
+    nothing is recorded for it — a stop with no `agent_id` is NOT KEYABLE and is never
+    given a guessed one.
+
+    Returns the issue id it landed on, or None.
+    """
+    aid = agent_component(payload)
+    if not aid:
+        return None
+    for iss in led.get("issues", []):
+        for a in issue_agents(iss):
+            if a.get("agent_id") == aid:
+                a["state"] = "returned"
+                a["judgment"] = str(judgment or "")[:500]
+                return iss.get("id")
+    return None
+
+
+def judge_issue(iss):
+    """One issue's verdict at the main `Stop`: ("hold"|"kickback"|"closed"|"open", why).
+
+    THE THREE THE USER NAMED, in the order they are decided:
+
+      hold      an agent is still RUNNING. Not a failure and never a kickback: the work is
+                in flight, and judging it unfinished would be judging an agent that has not
+                spoken. A `handoff` agent holds too — it stopped at a cap with work left,
+                and K8 is the order that resumes it.
+      kickback  every agent is back and ITEMS THE SESSION ITSELF RECORDED ARE STILL OPEN.
+      closed    every item done and every agent returned.
+      open      an issue with no recorded items and no agent is nothing to judge. It is the
+                shape a one-line message leaves behind, and a hook that kicked back on it
+                would fire on almost every turn.
+
+    IT NEVER INFERS AN UNDONE ITEM. The only evidence it will act on is an item the session
+    wrote with a status it did not mark done — this project's rule that a blocking surface
+    ships with no known wrong fire, applied to the one new verdict that can block.
+    """
+    agents = issue_agents(iss)
+    waiting = [a for a in agents if a.get("state") in ("running", "handoff")]
+    if waiting:
+        return "hold", "%d of %d agents still out: %s" % (
+            len(waiting), len(agents),
+            ", ".join("%s (%s)" % (a["agent_id"], a.get("state")) for a in waiting))
+    items = issue_items(iss)
+    undone = [i for i in items if not item_done(i)]
+    if undone:
+        return "kickback", "%d of %d items unaddressed: %s" % (
+            len(undone), len(items), "; ".join(i["ask"][:80] for i in undone))
+    if items or agents:
+        return "closed", "%d items done, %d agents returned" % (len(items), len(agents))
+    return "open", "nothing recorded against it"
+
+
+def judge_ledger(payload, led):
+    """Judge EVERY open issue, close the finished ones, and return the verdict rows.
+
+    EVERY OPEN ISSUE, NOT JUST THIS MESSAGE'S, which is K2c's correction: an agent
+    dispatched three messages ago hands back after that turn ended, so the only Stop that
+    can judge its issue is one that looks at all of them.
+    """
+    rows = []
+    for iss in open_issues(led):
+        verdict, why = judge_issue(iss)
+        if verdict == "closed":
+            iss["state"] = "closed"
+        rows.append((iss.get("id"), verdict, why, (iss.get("prompt") or "")[:120]))
+    return rows
+
+
 # THE ASKS CHECKLIST. `count_asks` stays regex-only and numbered-only, for the reason given
 # above it: splitting free prose into requests is a judgment task. So the split is not done
 # here. The operating session is already a model reading the message, and it writes the
@@ -611,6 +1048,26 @@ def start_checklist(payload, prev=None):
     if (NOTIFICATION.search(prompt) and prev is not None and not prev.get("ended")
             and os.path.exists(p)):
         return "", prev
+    # THE LEDGER TURN, AND IT HAPPENS BEFORE THE REMOVE BELOW (K2c). The outgoing list's
+    # items are absorbed onto their issue first, so the wipe forgets nothing, and then this
+    # message's own issue is opened. It is one block in one place because it is gated on the
+    # SAME condition as the wipe: a second copy of that condition is the copy that drifts.
+    #
+    # THE ABSORB RUNS EVEN WHEN THIS MESSAGE OPENS NO ISSUE. "yes" after a long turn is
+    # short and injected text is not an ask, so neither opens one — but both end the turn
+    # whose items are still on disk, and losing them there is the defect this replaces.
+    issue_id = None
+    try:
+        led = load_ledger(payload)
+        if prev is not None:
+            absorb_items(led, prev.get("issue"), checklist_items(
+                read_json_nofollow(p) or {}))
+        iss = add_issue(payload, led)
+        issue_id = iss.get("id") if iss else None
+        if iss is not None or prev is not None:
+            save_ledger(payload, led)
+    except OSError:
+        pass
     try:
         os.remove(p)
     except OSError:
@@ -623,7 +1080,9 @@ def start_checklist(payload, prev=None):
             json.dump({"prompt": prompt[:2000], "items": []}, fh)
     except OSError:
         return "", None
-    record = {"prompt": prompt[:2000], "ended": False}
+    # `issue` PAIRS THE LIST WITH THE ISSUE IT BELONGS TO, and it is what the next
+    # message's absorb reads. Without it the items would have no issue to land on.
+    record = {"prompt": prompt[:2000], "ended": False, "issue": issue_id}
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
     return (f"Asks checklist for this message: {p}. It holds {{\"prompt\", \"items\"}} and "
@@ -631,7 +1090,11 @@ def start_checklist(payload, prev=None):
             "\"status\": \"open\"}, written before the work starts; statuses are updated as the "
             "work goes, and an ask found along the way is added. The reply gives each item its "
             "own section. At Stop the widening agent checks the list and the reply against the "
-            "message."), record
+            "message."
+            + (f" These items belong to issue {issue_id} in this project's issue ledger, "
+               "which keeps them after this turn ends and keeps every earlier open issue "
+               "beside them; an agent spawned now is linked to that issue and its result is "
+               "recorded there." if issue_id else "")), record
 
 
 def main():
@@ -656,6 +1119,17 @@ def main():
     # subagent starting mid-turn is not the head of a turn.
     if payload.get("hook_event_name") == "SubagentStart":
         open_agent_tag(payload)
+        # AND IT IS LINKED TO THE ISSUE BEING WORKED (K2c), under its own `agent_id`, with
+        # state `running`. This is the one event that knows an agent started in this
+        # session, so it is the only place the link can be made before the agent's
+        # hand-back needs somewhere to land. A failure here is silent: the ledger is a
+        # record, and no record is worth erasing a spawn over.
+        try:
+            _led = load_ledger(payload)
+            if link_agent(payload, _led):
+                save_ledger(payload, _led)
+        except OSError:
+            pass
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "SubagentStart",
             "additionalContext": USER_WORDS + "\n\n" + CLEANUP_RULE,
