@@ -25,6 +25,8 @@ Usage
     bin/script-conformance census     # run cases whose name contains "census"
     bin/script-conformance --touching workforce/bin/wf-census
                                       # the cases a change to that file can reach
+    bin/script-conformance --list --touching workforce/bin/wf-census
+                                      # print that selection, run nothing
 """
 
 import json
@@ -506,9 +508,17 @@ def main():
         print(f"no expectations at {spec_path}", file=sys.stderr)
         return 2
     cases = json.load(open(spec_path))
+    # `--list` PRINTS THE SELECTION AND RUNS NOTHING. `touching()` already decides which
+    # fixtures a change to a file can reach, and `wf-map --tests` needs that answer to
+    # point an employee at them — in well under the ~45 s the suite itself costs. Listing
+    # through this flag is what keeps the decision in `touching()` and out of a second
+    # mapping somebody updates by hand.
+    listing = "--list" in argv
+    argv = [a for a in argv if a != "--list"]
     if argv[:1] == ["--touching"]:
         if len(argv) != 2:
-            print("usage: bin/script-conformance --touching <repo-relative path>", file=sys.stderr)
+            print("usage: bin/script-conformance [--list] --touching <repo-relative path>",
+                  file=sys.stderr)
             return 2
         names = touching(argv[1], cases) or []
         filt = f"--touching {argv[1]}"
@@ -522,6 +532,11 @@ def main():
     if not names:
         print(f"no fixture matched {filt!r} — refusing to report success", file=sys.stderr)
         return 2
+
+    if listing:
+        for n in names:
+            print(n)
+        return 0
 
     fails = []
     for n in names:

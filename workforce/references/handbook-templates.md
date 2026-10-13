@@ -362,6 +362,9 @@ information as missing.
 Name a **root or glob** (`<dir>/**`), not a file list, so material added later is in scope without a
 rewrite; name a running surface as a route.
 
+- `Skill(records-code-map)` — **map before you search**: `wf-map --topic <words>` names the files and
+  lines, `wf-map <file>` its sections and defs by line number, `wf-map --tests <file>` what covers it.
+
 **A design or front-end role additionally names the project's design record**,
 `.claude/design/direction.md` — the surface's chosen references, what is borrowed from each, and the
 situation keys for every screen, written by `/ui-design direct` (`evaluators.md` § Wiring into the org).
