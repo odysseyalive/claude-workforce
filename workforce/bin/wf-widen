@@ -72,6 +72,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1012,12 +1013,18 @@ def order_output(payload, ask):
         # above are supplied BY THE HARNESS and name the project this hook fired for,
         # while `getcwd()` names wherever the process happens to be.
         return None
-    root = os.path.abspath(root)
+    # `realpath`, NOT `normpath`. The containment test below is the only thing standing
+    # between a path read out of model-written text and a stat of whatever it names, and
+    # `normpath` resolves `..` textually while leaving every symlink in the path intact —
+    # so `<root>/work/OUTPUT.md` with a link at `work` passes a prefix test and reads
+    # outside the project anyway. Both sides are resolved, because a project reached
+    # through a link (a worktree, a `/tmp` that is one) would otherwise never match.
+    root = os.path.realpath(root)
     for cand in OUTPUT_IN_ORDER_RX.findall(ask or ""):
         cand = cand.lstrip("*_([:>")
         if not cand or set(cand) & OUTPUT_PLACEHOLDER:
             continue
-        path = os.path.normpath(cand if os.path.isabs(cand)
+        path = os.path.realpath(cand if os.path.isabs(cand)
                                 else os.path.join(root, cand))
         if path != root and path.startswith(root + os.sep):
             return path
@@ -1033,7 +1040,9 @@ def in_project(payload, path):
     """
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
     try:
-        return os.path.relpath(path, os.path.abspath(root))
+        # `realpath`, to match what `order_output` resolved the path against; against
+        # `abspath` a project reached through a link would come back as `../../…`.
+        return os.path.relpath(path, os.path.realpath(root))
     except ValueError:                       # different drives on Windows
         return path
 
@@ -1116,12 +1125,102 @@ def at_cap(payload):
     bases.append(os.path.join(tempfile.gettempdir(), "wf-turn-budget"))
     turns = 0
     for base in bases:
-        turns = max(turns, TB.read_state(os.path.join(base, session, agent_id))[1])
+        turns = max(turns, counter_turns(base, session, agent_id))
     return (turns, cap) if turns >= cap else None
 
 
+def _ours(path, want):
+    """True when `path` IS a `want` (`stat.S_ISDIR` or `S_ISREG`) that belongs to us.
+
+    `lstat`, so the question is what the NAME is rather than what it points at: a symlink
+    answers `S_ISLNK` and fails both tests. The uid test is the one that matters under a
+    shared temp dir, and group- or other-writable is refused on a directory for the same
+    reason `wf-turn-budget._safe_dir` refuses it on the one it creates — a directory
+    anybody can write is a directory anybody can put a counter in.
+    """
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if not want(st.st_mode):
+        return False
+    if want is stat.S_ISDIR and st.st_mode & 0o022:
+        return False
+    getuid = getattr(os, "getuid", None)
+    return getuid is None or st.st_uid == getuid()
+
+
+def counter_turns(base, session, agent_id):
+    """`wf-turn-budget`'s recorded turn count for this agent, or 0 when it is not OURS.
+
+    THE COUNTER CAN SIT IN A SHARED DIRECTORY, which makes this a trust question rather
+    than a parse. `wf-turn-budget` prefers the session's private scratchpad but falls back
+    to the system temp dir on the events that carry no `scratchpad_dir` — a world-writable
+    name another local account can reach first. Its WRITER verifies the directory it
+    creates (`_safe_dir`); nothing verified what a READER found, and the consequence here
+    is not a wrong number in a hint but a performance record filed in somebody's
+    repository against an agent that stopped on turn two. So EVERY LEVEL is checked, from
+    the base down — a link or a foreign directory anywhere on the way is the same attack
+    one step out — and the file is checked ON THE HANDLE: `_open_nofollow` refuses a link
+    at the name and `fstat` then asks what was actually opened, which is the pair that
+    cannot be raced.
+
+    0 IS THE SAFE ANSWER for every refusal, because `at_cap` compares it against the cap:
+    an unverifiable counter means no cap hit, which costs an unfiled record and never
+    files a wrong one.
+    """
+    d = os.path.join(base, session, agent_id)
+    if not all(_ours(p, stat.S_ISDIR)
+               for p in (base, os.path.join(base, session), d)):
+        return 0
+    try:
+        fd = TT._open_nofollow(os.path.join(d, "count.json"), os.O_RDONLY)
+    except OSError:
+        return 0
+    try:
+        with os.fdopen(fd, encoding="utf-8") as fh:
+            st = os.fstat(fh.fileno())
+            getuid = getattr(os, "getuid", None)
+            if not stat.S_ISREG(st.st_mode) or (getuid and st.st_uid != getuid()):
+                return 0
+            state = json.load(fh)
+    except (OSError, ValueError):
+        return 0
+    turns = state.get("turns") if isinstance(state, dict) else None
+    return turns if isinstance(turns, int) and turns >= 0 else 0
+
+
 PERF_STORE = os.path.join(".claude", "workforce", "personnel")
+PERF_STORE_PARTS = (".claude", "workforce", "personnel")
 PERF_SLUG_RX = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def perf_store(root):
+    """The personnel store under `root`, created if need be, or "" when a LINK is on the
+    way to it.
+
+    `O_NOFOLLOW` ON THE RECORD CANNOT SEE A LINKED DIRECTORY, which is the hole
+    `wf-task-tag`'s `issues_dir` closed on 2026-10-12 (849eb74) and the same one here:
+    `os.makedirs(…, exist_ok=True)` SUCCEEDS on a symlink that points at a directory, and
+    the record's own name is then not a link, so no flag on the open can object. A link
+    planted at `.claude/workforce` or at `personnel` would land a performance record in a
+    directory nobody named. Every level is `lstat`ed before anything is created, and a
+    link anywhere refuses the write outright — one unrecorded cap hit, said out loud in
+    the stop line, against a write outside the project.
+    """
+    path = root
+    for part in PERF_STORE_PARTS:
+        path = os.path.join(path, part)
+        try:
+            if stat.S_ISLNK(os.lstat(path).st_mode):
+                return ""
+        except OSError:
+            pass                    # not there yet, and `makedirs` below creates it
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        return ""
+    return path
 
 
 def cap_perf(payload, path, ask, capped):
@@ -1145,28 +1244,40 @@ def cap_perf(payload, path, ask, capped):
     ledger's append-only invariant is kept by never reopening a record that exists.
     """
     turns, cap = capped
-    agent = payload.get("agent_type") or "unknown"
+    # SANITIZED HERE RATHER THAN TRUSTED FROM THE CALLER. `at_cap` only reaches this with
+    # an `agent_type` that passed `wf-turn-budget.bare`, and this name is joined into two
+    # paths — the record's and the handbook's — so the guard lives where the join is. A
+    # validation that is one caller away from the sink is a validation a later caller skips.
+    agent = PERF_SLUG_RX.sub("-", str(payload.get("agent_type") or ""))[:64] or "unknown"
     run = PERF_SLUG_RX.sub("-", os.path.basename(os.path.dirname(
         os.path.dirname(path))))[:64] or "unknown-run"
     rel = os.path.join(PERF_STORE, f"PERF-{run}-{agent}-turn-cap.md")
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
-    full = os.path.join(root, rel)
     owed = in_project(payload, path)
     note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} with no report "
             f"at {owed}. PERF filed at {rel}")
+    store = perf_store(root)
+    if not store:
+        return {"systemMessage": note.replace("PERF filed at", "no PERF written to")}
     try:
-        os.makedirs(os.path.dirname(full), exist_ok=True)
-        fd = TT._open_nofollow(full, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        fd = TT._open_nofollow(os.path.join(store, os.path.basename(rel)),
+                               os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except OSError:
         # Already filed for this order, or a store that cannot be written. Either way the
         # record is not this stop's to add to, and the line still says what happened.
         return {"systemMessage": note}
     handbook = os.path.join(".claude", "agents", f"{agent}.md")
+    sha = "unread"
     try:
-        with open(os.path.join(root, handbook), "rb") as fh:
-            sha = hashlib.sha256(fh.read()).hexdigest()[:12]
+        hfd = TT._open_nofollow(os.path.join(root, handbook), os.O_RDONLY)
     except OSError:
-        sha = "unread"
+        hfd = None
+    if hfd is not None:
+        try:
+            with os.fdopen(hfd, "rb") as fh:
+                sha = hashlib.sha256(fh.read()).hexdigest()[:12]
+        except OSError:
+            sha = "unread"
     quoted = "\n".join("> " + ln for ln in (ask or "").strip().splitlines()[:12]) \
         or "> (the order was not recorded)"
     try:
