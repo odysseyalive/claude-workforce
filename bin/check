@@ -19463,6 +19463,147 @@ check(
 )
 
 
+# ── the session-start region refresh, and the ledger's own ignore rule (2026-10-12) ──
+# K9. A project's `/org` dispatch rungs are a byte-canonical region copied into its own
+# SKILL.md, and the only producer that refreshed one was `wf-companion --execute`, run by
+# `audit` Step 4 alone. New hooks reach a project on `update`; a changed RUNG reached
+# nobody who did not audit. The user asked, 2026-10-12, "I don't have to run an audit
+# after this update, correct?" — and the honest answer was that they did.
+_rh_cm = read("workforce/bin/wf-commitments")
+_rh_wc = read("workforce/bin/wf-companion")
+check(
+    "session heal: the region refresh is wf-companion's own decision, carried by SessionStart",
+    "def refresh_drifted" in _rh_wc and "def write_and_prove" in _rh_wc
+    and "_wsc().refresh_drifted(root, wf)" in _rh_cm
+    and "_heal_regions(root, progress)" in _rh_cm
+    # AND NOT A SECOND COPY OF THE REGION RULES. The marker pair, the span finder and the
+    # CORE list stay in the producer: a hook that learned to find a region itself is a
+    # second definition of what "machine-owned" means, and the cheaper one would win.
+    and "ORG-DISPATCH-CHECKPOINT" not in _rh_cm and "def span" not in _rh_cm,
+    "the SessionStart carrier must refresh machine-owned regions through wf-companion's "
+    "own refresh_drifted/write_and_prove, or a release's dispatch rungs reach only the "
+    "projects somebody audits — and a second copy of the region rules inside the hook is "
+    "how the audit's refresh and the session's come apart",
+)
+
+# BOTH WRITERS PROVE THE WRITE THE SAME WAY, because the audit's refresh and the session
+# start's must be the same event. One definition, two callers, asserted by the call.
+check(
+    "session heal: the audit and the session start share one write-and-prove",
+    _rh_wc.count("def write_and_prove") == 1
+    and _rh_wc.count("ok, back_state = write_and_prove(") == 2
+    and "fm_ok, why = frontmatter_ok" in _rh_wc,
+    "wf-companion must carry exactly one write_and_prove and both callers must use it; a "
+    "second copy of the write, the symlink rule or the read-back drifts from the first, "
+    "and the path that runs unattended at every session start is the copy nobody reads",
+)
+
+# THE GATE IS THE WHOLE DESIGN. `PostToolUse`-grade cost discipline applies to a hook that
+# fires at every session start in every project: measured 2026-10-12, 0.45-0.56 ms when
+# the stamp matches, with wf-companion NOT imported, against the settings half's 37 ms
+# baseline. A refresh that read three SKILL.md files and three shipped sources every time
+# would be 238 ms, which is what the first pass after an update costs, once.
+check(
+    "session heal: the region refresh costs a stamp comparison when there is nothing to do",
+    "REGION_STAMP_REL" in _rh_cm and "def _region_digest" in _rh_cm
+    and 'os.path.isdir(os.path.join(root, ".claude", "skills"))' in _rh_cm
+    and "if fh.read().strip() == want:" in _rh_cm,
+    "the heal must compare one stamp against two directory listings before importing "
+    "anything. Without the stamp every session start in every project pays the full "
+    "evaluate of every Core region — the defect review 3 L8 already measured once, when "
+    "an unconditional import took session start from 37 ms to 89-98 ms",
+)
+
+# A CURRENT REGION IS READ AND NOT REWRITTEN, measured on the file's own mtime. A refresh
+# that rewrote identical bytes would churn every project's SKILL.md at every session start
+# and make `git status` dirty in a repository that ships its `.claude/`.
+_rh_bad = []
+try:
+    import shutil as _rh_sh, tempfile as _rh_tf
+    _rh_d = _rh_tf.mkdtemp(prefix="wf-regionheal-")
+    os.makedirs(os.path.join(_rh_d, ".claude", "workforce"))
+    for _rh_e in _wc_mod.CORE:
+        _rh_sk = os.path.join(_rh_d, ".claude", "skills", _rh_e["name"])
+        os.makedirs(_rh_sk)
+        _rh_src = read("workforce/" + "/".join(_rh_e["source"]))
+        _rh_sp = _wc_mod.span(_rh_src, _rh_e["region"])
+        # THE CANONICAL SPAN IS COPIED AT RUN TIME, never pinned here: a fixture holding
+        # 26 KB of shipped rungs would go stale on the next release and fail for the one
+        # reason this case is not about.
+        open(os.path.join(_rh_sk, "SKILL.md"), "w", encoding="utf-8").write(
+            f"---\nname: {_rh_e['name']}\ndescription: \"x\"\n---\n\n# x\n\n"
+            "User preamble this project owns.\n\n"
+            + _rh_src[_rh_sp[0]:_rh_sp[1]] + "\n\nUser trailer this project owns.\n")
+    _rh_paths = {e["name"]: os.path.join(_rh_d, ".claude", "skills", e["name"], "SKILL.md")
+                 for e in _wc_mod.CORE}
+    _rh_before = {n: (os.stat(p).st_mtime_ns, read(p)) for n, p in _rh_paths.items()}
+    _rh_stamp = os.path.join(_rh_d, ".claude", "workforce", ".regions-refreshed")
+    for _rh_pass in (1, 2):
+        _rh_p = subprocess.run(
+            [sys.executable, "workforce/bin/wf-commitments"],
+            input=json.dumps({"cwd": _rh_d, "hook_event_name": "SessionStart",
+                              "source": "startup"}),
+            text=True, capture_output=True, timeout=120,
+            env={**os.environ, "CLAUDE_PROJECT_DIR": _rh_d, "HOME": _rh_d})
+        if _rh_p.returncode or _rh_p.stderr.strip():
+            _rh_bad.append(f"pass {_rh_pass} exited {_rh_p.returncode}: "
+                           f"{_rh_p.stderr.strip()[:160]}")
+        if "REFRESH" in _rh_p.stdout:
+            _rh_bad.append(f"pass {_rh_pass} reported a refresh on a current region")
+        for _rh_n, _rh_pth in _rh_paths.items():
+            if os.stat(_rh_pth).st_mtime_ns != _rh_before[_rh_n][0]:
+                _rh_bad.append(f"pass {_rh_pass} rewrote {_rh_n}/SKILL.md (mtime moved)")
+            if read(_rh_pth) != _rh_before[_rh_n][1]:
+                _rh_bad.append(f"pass {_rh_pass} changed {_rh_n}/SKILL.md's bytes")
+        if not os.path.exists(_rh_stamp):
+            _rh_bad.append(f"pass {_rh_pass} left no stamp, so the next one re-evaluates")
+    _rh_sh.rmtree(_rh_d, ignore_errors=True)
+except Exception as _exc:                                # noqa: BLE001
+    _rh_bad.append(f"the run raised {_exc!r}")
+check(
+    "session heal: a current region is left byte-for-byte, mtime included, and stamped",
+    not _rh_bad,
+    "; ".join(_rh_bad) + ". A session start that rewrites identical bytes churns every "
+    "project's SKILL.md on every open, and a project that ships its .claude/ sees it as "
+    "a dirty working tree it did not make",
+)
+
+# K7. The ledger holds the operator's own sentences and is written by a hook that runs long
+# before anybody types a workforce command, so the ignore rule rides the WRITE. MEASURED
+# 2026-10-12: it is git-tracked in nsayka-wawa and odyssey-alive, and on 2026-10-10 a local
+# edit to the copy on nsayka-wawa's live server would have made `git pull --ff-only`
+# conflict. The rule covers that one file: the user ships `.claude` with some repositories.
+check(
+    "ledger hygiene: the ignore rule rides the write and covers that one file",
+    'IGNORE_RULE = "commitments.json"' in _rh_cm and "ensure_ignored(p)" in _rh_cm
+    and "def ensure_ignored" in _rh_cm
+    # APPEND, NEVER REWRITE — a project's own rules in that file survive, and the rule is
+    # added once however many turns state a commitment.
+    and 'open(p, "a", encoding="utf-8")' in _rh_cm
+    and 'ln.lstrip("/") == IGNORE_RULE' in _rh_cm,
+    "the commitments hook must write a `.gitignore` rule for commitments.json as it writes "
+    "the ledger, by appending. A widened rule takes `.claude/workforce/` out of the "
+    "projects that commit it; a rule written by an audit arrives after the file is already "
+    "committed, which is how both measured projects got there",
+)
+
+# IT NAMES THE COMMAND AND STOPS. Untracking belongs in a commit the project's author
+# makes, so the hook runs no git command that writes — asserted on the argv, because a
+# comment promising it is not a constraint.
+_rh_git = re.findall(r'\[\s*"git",\s*"([a-z-]+)"', _rh_cm)
+check(
+    "ledger hygiene: a tracked ledger is named for the user to untrack, never staged",
+    "LEDGER TRACKED" in _rh_cm and "git rm --cached" in _rh_cm
+    and "_untracked_ledger(root)" in _rh_cm and _rh_git == ["ls-files"]
+    # THE GATE: one read of `.git/index`, the shape `_heal_git_hooks` uses on `.git/config`.
+    and 'LEDGER_REL.encode("utf-8") not in idx' in _rh_cm,
+    f"wf-commitments runs git {_rh_git!r}. A SessionStart line must name the one-time "
+    "`git rm --cached` and nothing else: a hook that stages or commits in somebody else's "
+    "repository writes history they did not ask for, and one that asks git on every "
+    "session start pays a subprocess in every healthy project",
+)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
