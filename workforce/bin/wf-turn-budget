@@ -171,6 +171,23 @@ def keyed(marker, round_):
     return marker if round_ <= 0 else "%s-%d" % (marker, round_)
 
 
+def final_pending(home, state, cap):
+    """True when THIS round's final notice has already gone out.
+
+    IT IS WHAT LICENSES A PROMPT ROW TO BE READ AS A NEW ALLOWANCE (`count_turns`'s
+    `pending`), so both readers of the transcript have to answer it the same way: the
+    `PostToolUse` writer before it folds its tail, and `wf-widen`'s stop before it folds
+    the one the writer never got to. A second spelling of the marker name here is how a
+    resumed agent's round boundary lands in one hook and not in the other.
+
+    `home` IS THE VERIFIED COUNTER DIRECTORY or "", and "" is False: with no directory
+    there is no marker to ask, and the cap-multiple backstop in `turn_round` answers
+    instead — the direction this hook has already chosen everywhere else.
+    """
+    return bool(home) and os.path.exists(
+        os.path.join(home, keyed("fired-final", turn_round(state, cap)[1] - 1)))
+
+
 # ── the continuation brief's shape ───────────────────────────────────────────
 # THESE SEVEN HEADINGS ARE A CONTRACT WITH `org.md` RUNG 12b, which is the consumer that
 # reads the brief and RESUMES THE SAME AGENT from it (e06d730; a fresh agent of the role
@@ -501,6 +518,46 @@ def count_turns(path, offset, needles=(), pending=False):
             "rounds": rounds, "round_start": start}
 
 
+def fold_tail(state, tail):
+    """Apply one `count_turns` read to the stored counters, in place. Returns `state`.
+
+    TWO HOOKS NOW FOLD THE SAME READ, which is why this is a function and not five lines
+    inside `main`. The `PostToolUse` writer folds a tail on every call; `wf-widen`'s
+    `SubagentStop` folds one more at the stop, because THE STORED COUNTER IS ALWAYS ONE
+    TURN SHORT THERE. MEASURED 2026-10-13, session `83ab658c`: `count.json` read
+    `{"turns": 23, "writes": 23}` against a subagent transcript holding 24 tool-call rows
+    and 24 `Write` calls, and exactly one unread assistant row sat past the stored `off`.
+    The host appends transcript rows on a 100 ms timer and a `Write` returns well inside
+    that window, so the row carrying the call this hook was fired FOR is not in the file
+    when it reads — the deficit is one at every moment, and the next call's read clears
+    it. A stop has no next call. The record filed off that counter said the agent stopped
+    at turn 3 of a round it had spent four turns in.
+
+    THE COUNTERS ARE NORMALISED FIRST, through `counted`, because one of the two callers
+    reads this state out of a world-writable directory: a string or a negative on `turns`
+    must become 0 rather than a `TypeError` inside a hook. After that one pass the
+    arithmetic below is plain, which is how the anchor line stays the same text in the one
+    place that writes it.
+
+    A TAIL THAT COULD NOT BE READ CHANGES NOTHING HERE, and the caller that has a fallback
+    applies its own: `main` books the call count, which errs toward an early hand-off,
+    while a stop has no call to book and keeps the number it was given.
+    """
+    for key in ("turns", "writes", "round", "round_start", "off"):
+        state[key] = counted(state, key)
+    if tail["turns"] is None:
+        return state
+    if tail["rounds"]:
+        # THE NEW ALLOWANCE STARTS WHERE THE PROMPT ROW STOOD, which is the turn count as
+        # of the previous read plus whatever this one counted before it.
+        state["round"] += tail["rounds"]
+        state["round_start"] = state["turns"] + tail["round_start"]
+    state["turns"] += tail["turns"]
+    state["writes"] += tail["writes"]
+    state["off"] = tail["off"]
+    return state
+
+
 # ── the counter directory, which lives in a place other people can write ─────
 # THE WHOLE TEMP-FILE CLASS, AND WHY A FALLBACK IS SAFE. On a shared host the system temp
 # dir is world-writable with the sticky bit, so every name under it is a name another
@@ -810,8 +867,7 @@ def main():
         # it reads, because that is what licenses it to read a prompt row in the tail as
         # the start of a new allowance. One `os.path.exists` on the ordinary call of an
         # agent that has never been cut, which is almost every call.
-        pending = os.path.exists(os.path.join(
-            path, keyed("fired-final", turn_round(state, cap)[1] - 1)))
+        pending = final_pending(path, state, cap)
         state["calls"] += 1
         tail = count_turns(tpath, state["off"], pending=pending)
         if tail["turns"] is None:
@@ -820,14 +876,7 @@ def main():
             # written hand-back costs one extra order; a silent cut-off costs the run.
             state["turns"] = state["calls"]
         else:
-            if tail["rounds"]:
-                # THE NEW ALLOWANCE STARTS WHERE THE PROMPT ROW STOOD, which is the turn
-                # count as of the previous call plus whatever this read counted before it.
-                state["round"] += tail["rounds"]
-                state["round_start"] = state["turns"] + tail["round_start"]
-            state["turns"] += tail["turns"]
-            state["writes"] += tail["writes"]
-            state["off"] = tail["off"]
+            fold_tail(state, tail)
         write_state(path, state)
         spent = {}
     else:

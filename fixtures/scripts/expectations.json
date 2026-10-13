@@ -9188,8 +9188,78 @@
       "RESUME a9 with SendMessage"
     ]
   },
+  "widen-cap-under-the-threshold-returns-the-agent": {
+    "_why": "THE TRIAL'S THIRD ROUND, WHICH IS THE STOP THAT IS NOT A CUT (measured 2026-10-13, session `83ab658c`). A cap-10 filer was cut in round 1 and again in round 2, was resumed by `SendMessage`, and in round 3 made four tool calls, wrote its four remaining files and returned -- the harness emitted no cut notice for that round and the hook fired no final notice in it. The counter here is the trial's own, key for key: 23 turns against a round anchored at 20, one row short of the four the agent actually spent. Read CUMULATIVELY, 23 is over a cap of 10 -- and so is every count after the first cut, forever -- so the stop filed `turn cap -- filer stopped at turn 3 of 10 (round 3)`, left the entry `handoff`, and the next main `Stop` would have demanded a RESUME of an agent that had finished. Read inside the allowance, with the missed row folded in, it is turn 4 of a round whose final threshold is 7: no cap, no PERF, no mark, and the `handoff` round 2 left on this agent is RETIRED, because an agent that came back is not holding the round it came back from. What it still owes is its report, which is the ordinary K3 kickback and has nothing to do with turns. `(round 3)` is forbidden in the output because the round-relative line is only printed for a cap hit.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"returned\""
+        ],
+        "not": [
+          "\"state\": \"handoff\"",
+          "handoff_stalled"
+        ]
+      },
+      ".claude/workforce/personnel": {
+        "absent": true
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "turn cap",
+      "PERF filed",
+      "RESUME",
+      "(round 3)"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "There is no report at .claude/workforce/work/perf-run/eng-coder/OUTPUT.md",
+      "WIDEN  no report"
+    ]
+  },
+  "widen-cap-the-missed-row-crosses-the-threshold": {
+    "_why": "THE ROW THE COUNTER NEVER SAW IS THE ROW THAT REACHES THE THRESHOLD, which is why the stop recounts instead of trusting. MEASURED 2026-10-13 in session `83ab658c`: `count.json` read 23 turns and 23 writes while the subagent transcript held 24 tool-call rows and 24 `Write` calls, with exactly one unread assistant row past the stored `off`. The host appends transcript rows on a 100 ms timer, a `Write` returns well inside it, so the row carrying the call that fired the writer's last `PostToolUse` is never in the file that call reads -- and a stop has no next call to clear the deficit. Here the stored count is 26 against a round anchored at 20, which is turn 6 and silence; the unread row makes it turn 7, which is the round's final threshold and a cap hit. One turn decides whether a cut is recorded at all, so `turn 6 of 10` is the negative that pins it.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"handoff\""
+        ],
+        "not": [
+          "\"state\": \"returned\""
+        ]
+      },
+      ".claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md": {
+        "want": [
+          "**Attribution:** **ENVIRONMENT**",
+          "turn 7 of its cap of 10",
+          "allowance 3"
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "turn 6 of 10",
+      "\"decision\": \"block\""
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "want": [
+      "stopped at turn 7 of 10 (round 3)",
+      "PERF filed at .claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md"
+    ]
+  },
   "widen-handoff-capped-stop-keeps-the-mark": {
-    "_why": "THE STOP THAT FOLLOWS THE CUT DOES NOT UNDO IT, which is the defect a real end-to-end run measured on 2026-10-13 (session `68b82f98`). `a1` is `handoff` on its issue, its counter says 23 turns against a cap of 10, and the report its order named is not there -- so this stop delivered nothing, and the mark that tells the main `Stop` to RESUME it has to survive. It did not: `agent_returned` overwrote it on every one of three cuts in that run, the main Stop judged `every agent back, items open`, and the K8 resume line never appeared at all. The `PERF` line in the same breath is the cosmetic half: the counter is cumulative across a resume, so `turn 23 of 10` is turn 3 of the THIRD allowance and now says so. `handoff_stalled` must be absent -- this is one cut seen twice, by the hook and then by this stop, not two cuts.",
+    "_why": "THE STOP THAT FOLLOWS A REAL CUT DOES NOT UNDO IT, which is the defect a real end-to-end run measured on 2026-10-13 (session `68b82f98`). `a1` is `handoff` on its issue and its counter puts round 3 at turn 9 of a cap of 10 -- at the round's own final threshold, which is exactly where `wf-turn-budget` fired its notice and wrote that mark -- and the report its order named is not there. So this stop delivered nothing, it WAS a cut, and the mark that tells the main `Stop` to RESUME it has to survive; `widen-handoff-cut-agent-is-resumed` is the main `Stop` that reads it. It did not survive: `agent_returned` overwrote it on every one of three cuts in that run, the main Stop judged `every agent back, items open`, and the K8 resume line never appeared at all. THE TURN NUMBER IS THE SECOND HALF. The stored count reads 28 and stops one row short of the transcript, because the writer's last `PostToolUse` fires inside the host's 100 ms write batch and no later call exists to pick that row up, so this stop folds the tail in itself and the record says turn 9 rather than turn 8. `handoff_stalled` must be absent -- this is one cut seen twice, by the hook and then by this stop, not two cuts.",
     "after": {
       ".claude/workforce/issues/s1.json": {
         "want": [
@@ -9208,12 +9278,13 @@
     "exit": 0,
     "not": [
       "Traceback",
-      "turn 23 of 10"
+      "turn 23 of 10",
+      "turn 8 of 10 (round 3)"
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
     "want": [
-      "stopped at turn 3 of 10 (round 3)"
+      "stopped at turn 9 of 10 (round 3)"
     ]
   },
   "widen-handoff-delivered-all-met-returns": {

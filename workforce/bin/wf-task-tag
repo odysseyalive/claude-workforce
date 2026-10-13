@@ -991,7 +991,7 @@ def link_agent(payload, led):
     return iss.get("id")
 
 
-def agent_returned(payload, led, judgment, delivered=False):
+def agent_returned(payload, led, judgment, delivered=False, cut=True):
     """Record the stopping agent's judgment ON ITS OWN ISSUE, and settle its state.
 
     THE ISSUE IS FOUND BY THE AGENT'S ID, never by which issue is newest. That is the
@@ -1010,13 +1010,23 @@ def agent_returned(payload, led, judgment, delivered=False):
     print — resume THIS agent with `SendMessage` — never appeared in that session at all.
     The harness's own cut notice is what got the run resumed, which is luck, not a product.
 
-    So the state a cut agent stops in is the state it keeps. `delivered` is the ONLY thing
-    that retires the mark here: the caller says whether this stop left the report its order
-    asked for with nothing still UNMET in it (`wf-widen.report_delivered`). The other
-    retirement is the issue closing (`judge_ledger`), which is the half that holds when the
-    cut lands before this event fires at all. It DEFAULTS TO FALSE because that is the
-    recoverable direction: a `handoff` kept one stop too long asks for one resume too many,
-    where a `handoff` dropped once is a run nobody is ever told to continue.
+    So the state a cut agent stops in is the state it keeps, and TWO THINGS RETIRE THE
+    MARK HERE. `delivered` says this stop left the report its order asked for with nothing
+    still UNMET in it (`wf-widen.report_delivered`). `cut` says this stop ended a round at
+    or past its turn budget; `cut=False` is an agent that CAME BACK ON ITS OWN, and an
+    agent that came back is finished with the round a previous cut marked it for, report or
+    no report. The second half was missing until 2026-10-13: in session `83ab658c` a filer
+    cut in rounds 1 and 2 returned normally in round 3, and the mark from round 2 survived
+    its return, so the issue stayed `handoff` and the next main `Stop` would have demanded
+    a resume of an agent that had finished. The third retirement is the issue closing
+    (`judge_ledger`), which is the half that holds when the cut lands before this event
+    fires at all.
+
+    THE DEFAULTS ARE THE RECOVERABLE DIRECTION, which is why they are not symmetrical:
+    `delivered=False` and `cut=True` both KEEP the mark, because a `handoff` kept one stop
+    too long asks for one resume too many, where a `handoff` dropped once is a run nobody
+    is ever told to continue. A caller that cannot tell whether the stop was a cut — a
+    counter it could not verify — passes nothing and keeps the mark.
 
     A RESUMED AGENT IS PUT BACK TO `running` BY `agent_resumed`, at its next tool call, so
     the round logic downstream still sees `running` → `handoff` → `running` and never a
@@ -1031,7 +1041,7 @@ def agent_returned(payload, led, judgment, delivered=False):
         for a in issue_agents(iss):
             if a.get("agent_id") == aid:
                 a["judgment"] = str(judgment or "")[:500]
-                if a.get("state") != "handoff" or delivered:
+                if a.get("state") != "handoff" or delivered or not cut:
                     a["state"] = "returned"
                 return iss.get("id")
     return None

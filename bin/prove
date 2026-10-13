@@ -404,6 +404,36 @@ CASES = [
      "resumed",
      TBG, "delall",
      '            writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)'),
+    # THE ROUND-RELATIVE CAP TEST (2026-10-13, session `83ab658c`). THE CONDITION, NOT THE
+    # `if` HEADER: `if in_round:` is valid Python and reads every stop as under its
+    # threshold, so nothing is ever a cap hit — where deleting the header would orphan its
+    # `return ()` and come back BAD-CASE having proved nothing.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", " < TB.final_at(cap)"),
+    # AND THE RETIRED MODEL IS PROVED BY WRITING IT BACK, for the reason the os.getcwd()
+    # case above gives. A COMMENT IS ENOUGH: the assertion is deliberately blunt, because
+    # the cumulative test is true at every stop after the first cut and a reviewer cannot
+    # tell a safe spelling of it from the one that shipped the defect.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "append", "\n# if turns < cap:\n"),
+    # THE OTHER HALF OF THE SAME FACT: the argument that tells the ledger this stop was a
+    # cut. Removing it leaves `agent_returned(payload, led, judgment, delivered, )`, which
+    # is valid, defaults `cut` to True, and never retires the mark on an UN-CUT return —
+    # the measured round-3 stop that stayed `handoff` after the agent had finished.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "cut=stopped != ()"),
+    # And its two ends in the ledger. The CONDITION, then the PARAMETER: the first leaves
+    # the pre-2026-10-13 rule, the second leaves a def the one caller now calls with an
+    # argument it does not take, so the write fails inside the hook's own try/except.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", " or not cut"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", ", cut=True"),
     # THE ROUND-RELATIVE CAP LINE. `rounds` is still bound by the `return` below it, so the
     # file runs and prints the cumulative count — "turn 23 of 10", the measured line.
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
@@ -605,6 +635,27 @@ CASES = [
     ("turn budget: every round is anchored to where the last one ended, by one shared "
      "function",
      TBG, "del", "os.path.commonprefix([WARN_MARK, FINAL_MARK])"),
+    # THE ONE FOLD, READ BY BOTH HOOKS. A SECOND definition silently wins for every caller
+    # and leaves the name every reader imports, exactly as the `turn_round` case above: the
+    # appended `fold_tail` advances nothing, so the counter never moves, and the appended
+    # `final_pending` says a notice is always still pending, so any prompt row in a tail
+    # anchors a new allowance.
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "append", "\ndef fold_tail(state, tail):\n    return state\n"),
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "append",
+     "\ndef final_pending(home, state, cap):\n    return False\n"),
+    # AND THE READER'S TWO CALLS, as NAMES rather than whole statements: `state =
+    # (dict(state), tail)` and `pending = (home, state, cap)` both parse, so wf-widen runs
+    # and stops folding the row the writer never saw — the measured one-turn deficit.
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     WDN, "delall", "TB.fold_tail"),
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     WDN, "delall", "TB.final_pending"),
     # AND THE SAME MECHANISM AS BEHAVIOUR. The conformance suite is a `bin/check`
     # assertion, so the three `turn-budget-*` round fixtures and `widen-cap-hit-round-
     # agrees-with-the-budget` fire by name. Each of these four leaves a file that runs and

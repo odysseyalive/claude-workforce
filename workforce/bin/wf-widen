@@ -1303,31 +1303,50 @@ def _turn_budget():
     return _TB[0]
 
 
-def at_cap(payload):
-    """`(turn within this allowance, cap, which allowance)` at a cap stop, else None.
+_CAP_STOP = []
 
-    THE TURN IS REPORTED ROUND-RELATIVE, which is `wf-turn-budget`'s own rule for the
-    text it injects and was not this file's until 2026-10-13. The counter is CUMULATIVE
-    across a `SendMessage` resume, so a thrice-resumed `maxTurns: 10` IC stopped with the
-    counter reading 23 and the record this file filed said "stopped at turn 23 of 10" —
-    a number that reads as a bug in the hook rather than as a cap hit, in a performance
-    record about a person. 23 of a cap of 10 is turn 3 of the third allowance, and that
-    is what it now says.
 
-    AND IT IS `wf-turn-budget.turn_round` THAT SAYS IT, not arithmetic of this file's own.
-    This file used to divide by the cap and that hook used to multiply by it, and both
-    assumed a round ENDS on an exact multiple of the cap — which the harness does not
-    guarantee and did not do: measured 2026-10-13, a cap-10 IC was cut on turn 8 of round
-    1, so the two models disagreed about which allowance turn 15 was in and the one that
-    schedules the notices put round 2's final threshold past the cut. Two numbers derived
+def cap_stop(payload):
+    """What this stop's own turn counter says, read once per process:
+
+      `(turn within this allowance, cap, which allowance)`  the round ran into its budget
+      `()`                                                  the round ended under it
+      `None`                                                nothing measurable was found
+
+    THREE ANSWERS AND NOT TWO, because the callers do different things with the middle
+    one. A round that ended under its budget is an agent that CAME BACK ON ITS OWN, which
+    both files no performance record and retires the `handoff` mark an earlier round left
+    on it; a counter that could not be read says neither of those things, and an unknown
+    has to keep the mark. MEASURED 2026-10-13, session `83ab658c`: a cap-10 filer was cut
+    in round 1 and in round 2, resumed, and in round 3 wrote four files and returned —
+    and this stop recorded `turn cap — filer stopped at turn 3 of 10 (round 3)` and left
+    the entry `handoff`, so the next main `Stop` would have demanded a RESUME of an agent
+    that had finished.
+
+    THE TEST IS ROUND-RELATIVE, AND IT IS THE ROUND'S OWN FINAL THRESHOLD. It used to be
+    `turns >= cap` on the CUMULATIVE count, which is true of every stop after the first
+    cut forever: the counter never goes back to zero across a `SendMessage` resume, so
+    round 3 of a cap-10 agent reads 23 and 23 is over 10 whatever the agent did in that
+    round. `final_at(cap)` is the line because it is the one `wf-turn-budget` schedules
+    the notice on — an agent at or past it was told RETURN NOW and stopped because its
+    budget said so, and an agent under it stopped because it was finished. The cap itself
+    is NOT the line: the harness does not cut on an exact multiple of the cap, and the
+    second cut measured in session `68b82f98` landed on turn 8 of a round of 10.
+
+    AND IT IS `wf-turn-budget.turn_round` THAT SAYS WHICH ROUND, not arithmetic of this
+    file's own. This file used to divide by the cap and that hook used to multiply by it,
+    and both assumed a round ENDS on an exact multiple of the cap. Two numbers derived
     from one function cannot disagree; two derivations of the same number did.
 
-    THE COUNT IS `wf-turn-budget`'s OWN AND IS NOT RECOUNTED HERE. That hook already
-    counts this agent's turns on every one of its tool calls and stores them beside the
-    cap it read from the handbook (`read_cap`, `read_state`), so the number exists by the
-    time the agent stops. A second counter in this file would be a second thing to keep
-    in step with the harness's own idea of a turn, and the copy that drifts is the one
-    that files a performance record against an agent that stopped early.
+    THE TAIL IS FOLDED IN BEFORE ANYTHING IS DECIDED, and that is not a second counter —
+    it is the same one, brought up to date through `wf-turn-budget.fold_tail` from the
+    same transcript the writer reads. That hook's last `PostToolUse` fires inside the
+    host's 100 ms transcript batch, so the row carrying the call it fired for is never in
+    the file it reads and no later call exists to pick it up: measured in the same
+    session, `turns` read 23 against 24 tool-call rows, and the record said turn 3 of a
+    round the agent spent four turns in. At a stop the file is complete, so the stop is
+    where the deficit is closed. `off` is the writer's own resume point, so nothing is
+    counted twice.
 
     BOTH COUNTER LOCATIONS ARE TRIED, and that is measured rather than defensive:
     `PostToolUse` carries no `scratchpad_dir` on 2.1.296 (platform.md fact 22b), so the
@@ -1336,9 +1355,17 @@ def at_cap(payload):
     stop. Nothing is created: the writer owns that directory, and a reader that makes
     directories in `/tmp` on every subagent stop litters the host it runs on.
 
-    `>= cap`, NEVER `cap - 1`. A record filed against an agent that returned on its own
-    is a wrong record about a person, and a missed one costs a line in a ledger.
+    A COUNTER NOBODY COULD READ IS `None`, never a cap hit. A record filed against an
+    agent that returned on its own is a wrong record about a person, and a missed one
+    costs a line in a ledger.
     """
+    if not _CAP_STOP:
+        _CAP_STOP.append(_cap_stop(payload))
+    return _CAP_STOP[0]
+
+
+def _cap_stop(payload):
+    """`cap_stop`'s one reading of the counter, the transcript and the handbook."""
     TB = _turn_budget()
     agent_type = payload.get("agent_type")
     agent_id = payload.get("agent_id")
@@ -1358,18 +1385,43 @@ def at_cap(payload):
         bases.append(os.path.join(scratch, "wf-turn-budget"))
     import tempfile
     bases.append(os.path.join(tempfile.gettempdir(), "wf-turn-budget"))
-    # THE COUNTER THAT COUNTED MOST IS THE ONE READ, whole. The round anchor only means
-    # anything beside the count it was recorded with, so the two locations are compared on
-    # the count and the winner's state is taken intact rather than its keys picked apart.
-    turns, state = 0, {}
+    # THE COUNTER THAT COUNTED MOST IS THE ONE READ, whole, AND ITS DIRECTORY WITH IT. The
+    # round anchor only means anything beside the count it was recorded with, so the two
+    # locations are compared on the count and the winner's state is taken intact rather
+    # than its keys picked apart — and the marker that says whether this round's notice
+    # has gone out lives in that same winning directory.
+    turns, state, home = 0, {}, ""
     for base in bases:
-        found = counter_state(base, session, agent_id)
+        found, where = counter_state(base, session, agent_id)
         if TB.counted(found, "turns") > turns:
-            turns, state = TB.counted(found, "turns"), found
-    if turns < cap:
+            turns, state, home = TB.counted(found, "turns"), found, where
+    if not turns:
         return None
+    # THE TRANSCRIPT KEY THIS EVENT CARRIES, falling back to the one the writer derives.
+    # `agent_transcript_path` is on `SubagentStop` only (platform.md), and it is the same
+    # file `wf-turn-budget.agent_transcript` builds out of the parent's path — so the
+    # stored `off` indexes it either way.
+    tpath = payload.get("agent_transcript_path")
+    if not isinstance(tpath, str) or not tpath:
+        tpath = TB.agent_transcript(payload, session, agent_id)
+    pending = TB.final_pending(home, state, cap)
+    tail = TB.count_turns(tpath, TB.counted(state, "off"), pending=pending)
+    state = TB.fold_tail(dict(state), tail)
     in_round, rounds, _start = TB.turn_round(state, cap)
+    if in_round < TB.final_at(cap):
+        return ()
     return in_round, cap, rounds
+
+
+def at_cap(payload):
+    """`cap_stop`'s triple at a cap stop, else None — the half most callers want.
+
+    A round that ended under its budget and a counter nobody could read are the same
+    answer to "file a performance record?", and different answers to "is this agent still
+    holding work?". Only the ledger asks the second question, so only the ledger reads
+    `cap_stop` directly.
+    """
+    return cap_stop(payload) or None
 
 
 def _ours(path, want):
@@ -1394,7 +1446,13 @@ def _ours(path, want):
 
 
 def counter_state(base, session, agent_id):
-    """`wf-turn-budget`'s stored counters for this agent, or `{}` when they are not OURS.
+    """`({stored counters}, directory)` for this agent, or `({}, "")` when not OURS.
+
+    THE DIRECTORY COMES BACK WITH THE STATE because the counter is not the only thing in
+    it: `wf-turn-budget` writes its `fired-final-<round>` marker there, and the caller
+    has to ask that directory — the one these numbers came from — whether this round's
+    notice has gone out. Rebuilding the name at the call site would be a second join of
+    the same three untrusted components, past every check below.
 
     THE COUNTER CAN SIT IN A SHARED DIRECTORY, which makes this a trust question rather
     than a parse. `wf-turn-budget` prefers the session's private scratchpad but falls back
@@ -1408,31 +1466,32 @@ def counter_state(base, session, agent_id):
     at the name and `fstat` then asks what was actually opened, which is the pair that
     cannot be raced.
 
-    AN EMPTY MAP IS THE SAFE ANSWER for every refusal, because every number taken off it
-    goes through `wf-turn-budget.counted`, where a missing key is 0 — and `at_cap` compares
-    the turn count against the cap, so an unverifiable counter means no cap hit, which
-    costs an unfiled record and never files a wrong one. The keys are NOT validated here:
-    the hook that writes them validates on the way in and on the way out, and `counted` is
-    the one reader both files share, so a second idea of what a count is cannot grow here.
+    AN EMPTY MAP IS THE SAFE ANSWER for every refusal, and the directory is withheld with
+    it, because every number taken off it goes through `wf-turn-budget.counted`, where a
+    missing key is 0 — and `cap_stop` reads an empty counter as nothing measurable, which
+    costs an unfiled record and never files a wrong one. A name that failed these checks
+    must not be handed back for a marker read either. The keys are NOT validated here: the
+    hook that writes them validates on the way in and on the way out, and `counted` is the
+    one reader both files share, so a second idea of what a count is cannot grow here.
     """
     d = os.path.join(base, session, agent_id)
     if not all(_ours(p, stat.S_ISDIR)
                for p in (base, os.path.join(base, session), d)):
-        return {}
+        return {}, ""
     try:
         fd = TT._open_nofollow(os.path.join(d, "count.json"), os.O_RDONLY)
     except OSError:
-        return {}
+        return {}, ""
     try:
         with os.fdopen(fd, encoding="utf-8") as fh:
             st = os.fstat(fh.fileno())
             getuid = getattr(os, "getuid", None)
             if not stat.S_ISREG(st.st_mode) or (getuid and st.st_uid != getuid()):
-                return {}
+                return {}, ""
             state = json.load(fh)
     except (OSError, ValueError):
-        return {}
-    return state if isinstance(state, dict) else {}
+        return {}, ""
+    return (state, d) if isinstance(state, dict) else ({}, "")
 
 
 PERF_STORE_PARTS = (".claude", "workforce", "personnel")
@@ -2542,11 +2601,22 @@ def ledger_verdict(payload, decided):
         # round arithmetic is cumulative, so a run cut on a LATER allowance can end with no
         # injection fired and no mark written — measured in the same session, where the
         # second cut came at count 16 against a round-2 threshold of 17. Here the cap hit is
-        # a fact about the counter, read from `at_cap`, and an agent that stopped at the cap
-        # without delivering is by definition one with work left.
-        if not delivered and at_cap(payload):
+        # a fact about the counter, read from `cap_stop`, and an agent that stopped at the
+        # cap without delivering is by definition one with work left.
+        #
+        # AND THE OTHER DIRECTION, WHICH IS THE OTHER HALF OF THE SAME FACT. `cap_stop`
+        # answers `()` for a round that ended UNDER its budget: that agent came back on its
+        # own, so a `handoff` an earlier round left on it is retired here whether or not
+        # this stop delivered a report. Without it the mark written at round 2's cut
+        # survived round 3's ordinary return — measured 2026-10-13, session `83ab658c` —
+        # and the next main `Stop` would have asked the user to RESUME an agent that had
+        # finished. `None` is NOT that answer: a counter nobody could read says nothing
+        # about whether the agent was cut, and an unknown keeps the mark, which is the
+        # recoverable direction (`agent_returned`).
+        stopped = cap_stop(payload)
+        if not delivered and stopped:
             TT.agent_handoff(payload, led)
-        if TT.agent_returned(payload, led, judgment, delivered):
+        if TT.agent_returned(payload, led, judgment, delivered, cut=stopped != ()):
             TT.save_ledger(payload, led)
         return "", ""
     rows = TT.judge_ledger(payload, led)

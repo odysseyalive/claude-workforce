@@ -20128,14 +20128,36 @@ if _tb_src.count("mark_handoff(payload, ") != 2:
 # because the HARNESS's own cut notice prompted a resume, which is luck. Three literals:
 # the parameter that carries the only thing allowed to retire the mark, the guard that
 # reads it, and the caller that answers it.
-if "def agent_returned(payload, led, judgment, delivered=False):" not in _il:
-    _il_st.append("agent_returned takes no `delivered` argument, so every stop is a "
+if "def agent_returned(payload, led, judgment, delivered=False, cut=True):" not in _il:
+    _il_st.append("agent_returned takes no `delivered`/`cut` pair, so every stop is a "
                   "delivery and a cut agent's `handoff` is cleared by the stop the cut "
-                  "itself caused")
-if 'if a.get("state") != "handoff" or delivered:' not in _il:
-    _il_st.append("the stop overwrites a `handoff` state unconditionally — the measured "
-                  "defect of 2026-10-13, where the mark was written at the final "
-                  "threshold and gone again seconds later")
+                  "itself caused — or, with only one of the two, an agent that came back "
+                  "on its own keeps a mark that asks the user to resume it")
+if 'if a.get("state") != "handoff" or delivered or not cut:' not in _il:
+    _il_st.append("the stop overwrites a `handoff` state unconditionally, or never "
+                  "retires it on an UN-CUT return — the two measured defects of "
+                  "2026-10-13: the mark written at the final threshold and gone again "
+                  "seconds later (`68b82f98`), and the mark from round 2 still sitting on "
+                  "an agent that finished round 3 and returned (`83ab658c`)")
+# THE CAP TEST IS ROUND-RELATIVE, AND THE CUMULATIVE ONE IS FORBIDDEN BY NAME. The counter
+# never returns to zero across a `SendMessage` resume, so `turns >= cap` is true of every
+# stop after the first cut forever: the measured round-3 stop of session `83ab658c` made
+# four tool calls, wrote four files, returned — and was recorded as a turn-cap stop that
+# left the agent marked for a resume it did not need. The line is the round's own final
+# threshold, which is the one `wf-turn-budget` schedules the notice on.
+if "if in_round < TB.final_at(cap):" not in _il_w:
+    _il_st.append("the cap test does not read the round's own final threshold, so a stop "
+                  "is judged against a count that spans every allowance the agent has "
+                  "ever been given")
+if "if turns < cap:" in _il_w:
+    _il_st.append("the CUMULATIVE cap test is back in wf-widen — after one resume it is "
+                  "true at every stop, so an agent that returned on its own is filed as "
+                  "cut and left marked for a resume")
+if "cut=stopped != ()" not in _il_w:
+    _il_st.append("the SubagentStop does not tell the ledger whether this stop was a cut, "
+                  "so the only thing that can retire a `handoff` is a delivered report — "
+                  "and an agent that came back with its report still owed stays marked "
+                  "for a resume forever")
 if _il_w.count("report_delivered(payload)") != 2:
     _il_st.append(f"wf-widen names report_delivered at "
                   f"{_il_w.count('report_delivered(payload)')} sites, expected 2 — its own "
@@ -20266,6 +20288,29 @@ if ("if BUDGET_MARK in raw:" not in _tb_src
                "comes back in the agent's transcript as a `hook_additional_context` "
                "attachment carrying text, so it would anchor the next round at the notice "
                "instead of at the cut, three turns early")
+# AND THE SAME ANCHOR IS FOLDED BY BOTH HOOKS FROM ONE FUNCTION. `wf-widen` has to bring
+# the counter up to date at the stop, because the writer's last `PostToolUse` fires inside
+# the host's 100 ms transcript batch and the row carrying the call it fired for is not in
+# the file yet — measured 2026-10-13, session `83ab658c`: `turns` read 23 and 24 tool-call
+# rows were on disk, so the record said turn 3 of a round the agent spent four turns in,
+# and no later call exists after a stop to close the deficit. A second fold written out at
+# the reader is a second idea of where a round starts.
+for _n, _why in (("fold_tail", "the tail fold — a reader that re-implements it has a "
+                               "second idea of where a round starts"),
+                 ("final_pending", "the test for whether this round's notice has gone "
+                                   "out, which is what licenses a prompt row to be read "
+                                   "as a new allowance")):
+    if _tb_src.count("def %s(" % _n) != 1:
+        _ar.append(f"wf-turn-budget defines {_n} at {_tb_src.count('def %s(' % _n)} "
+                   f"sites, expected 1 — it is the one definition of {_why}")
+    if "TB.%s(" % _n not in _il_w:
+        _ar.append(f"wf-widen does not read {_n} from wf-turn-budget, so the stop folds "
+                   f"the transcript by rules of its own")
+if "state = TB.fold_tail(dict(state), tail)" not in _il_w:
+    _ar.append("the stop does not fold the transcript tail into the counter it read, so "
+               "it reports the count the last PostToolUse managed to see — one turn "
+               "short, on every stop, because that call's own row was still in the host's "
+               "write batch")
 check(
     "turn budget: every round is anchored to where the last one ended, by one shared "
     "function",
