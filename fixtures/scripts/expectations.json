@@ -4727,6 +4727,26 @@
       "not judged"
     ]
   },
+  "widen-subagent-report-is-asked-once-per-artifact": {
+    "_why": "K4: THE TEXT SAID `This is asked once` AND NOTHING ENFORCED IT. An agent hands back several times on one order - holding for a build, resumed by its parent - and writes the report on the last of those turns. MEASURED 2026-10-12 over 1,272 recorded subagent stops: 59 were an intermediate hand-back whose report did not exist yet and was written later in the same run, across 33 agents, and ONE agent would have been asked eleven times for the same file. That is repetition reaching a false-positive rate without a bad detector, which is what retired this distribution's last speech guard. Same tree and same payload as the kickback row, plus the close-out record naming this artifact: the question has been asked, so it is not asked again.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\""
+    ],
+    "after": {
+      "wf-closeout.s1.json": {
+        "once": [
+          "r:.claude/workforce/work/r1/eng-coder/OUTPUT.md"
+        ]
+      }
+    }
+  },
   "widen-subagent-no-report-asked-once": {
     "_why": "THE LOOP BOUND, on this block as on the close-out beside it. The kickback's own continuation arrives with `stop_hook_active`, and a block that judged the same missing file again would block the continuation it just caused - forever, on an agent whose next act is to write the file. Same tree, same payload, one extra key.",
     "exit": 0,

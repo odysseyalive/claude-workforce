@@ -1019,13 +1019,20 @@ def closeout_subagent(payload):
 #                      the upper-case `MET` token, 5 on `IN-PROGRESS` inside a quoted order
 #                      or a sentence saying no row is open. (The shapes overlap; the four
 #                      narrowings below are what each one needed.)
-#   as it now stands   8 stops fire, 0.63%, against the 1.5% budget that retired this
-#                      distribution's last speech guard. ALL EIGHT HAND-READ FROM THE
-#                      TRANSCRIPT and all eight correct: 4 agents stopped with nothing at
-#                      the path their order named (one had its dispatcher's directory sitting
-#                      empty beside its own spawn file), and 4 left a report whose every
+#   as it now stands   6 stops fire, 0.47%, against the 1.5% budget that retired this
+#                      distribution's last speech guard. ALL SIX HAND-READ FROM THE
+#                      TRANSCRIPT and all six correct: 3 agents stopped with nothing at the
+#                      path their order named (one had its dispatcher's directory sitting
+#                      empty beside its own spawn file), and 3 left a report whose every
 #                      status cell still read `IN-PROGRESS` while the reply said the next
 #                      step out loud.
+#
+# WHAT THE REPLAY CANNOT SEE, stated because it is the one bound on that rate: the file is
+# stat'd as it is TODAY, so a stop that happened BEFORE the agent's first write to that path
+# reads a report the stop could not have seen. 59 of the 1,272 are that — an intermediate
+# hand-back, 33 agents, the report written later in the same run. They are fires the rule
+# means to make, and the "asked once" record in `order_expectation` is what keeps them from
+# being made repeatedly: without it one of those agents is asked eleven times for one file.
 #
 # THE MISSES ARE THE PRICE AND THEY ARE NAMED. An order that spells the artifact only as a
 # bare `OUTPUT.md`, or as a path outside `workforce/work/`, or that reaches a stop carrying
@@ -1449,9 +1456,18 @@ def order_expectation(payload):
 
     THE LOOP BOUND IS THE ONE ALREADY THERE. `widen` returns before this on
     `stop_hook_active`, so the continuation this block causes cannot reach it, exactly as
-    the close-out above relies on. Nothing is remembered between stops: an agent kicked
-    back once and resumed later is asked again only if the report is still missing, which
-    is the answer the kickback asked for.
+    the close-out above relies on.
+
+    AND IT IS ASKED ONCE PER ARTIFACT, in the close-out's own record, which is measured
+    rather than tidy. The text has always said "This is asked once" and nothing enforced
+    it: an agent hands back several times on one order — holding for a build, resumed by
+    its parent — and the report is written on the LAST of those turns. MEASURED 2026-10-12
+    over 1,272 recorded stops: 59 of them were an intermediate hand-back whose report did
+    not exist yet and was written later in the same run, across 33 agents, and ONE agent
+    would have been asked eleven times for the same file. That is the shape the close-out
+    beside this one already refuses — "a guard that repeats an answered question is the
+    7.0% false-positive rate that retired this distribution's last speech guard, reached
+    by repetition instead of by a bad detector".
     """
     ask = spawn_prompt(payload)
     path = order_output(payload, ask)
@@ -1467,6 +1483,15 @@ def order_expectation(payload):
         # The measured defect is the stop that left NOTHING.
         return cap_perf(payload, path, ask, capped) if state == "absent" else None
     owed = in_project(payload, path)
+    # ASKED ONCE, in the record the close-out above writes and reads. The key is the
+    # ARTIFACT, not the agent: two agents on one order each owe their own file, and one
+    # agent handing back four times on one order is owed one question. It is keyed by the
+    # path AS THE PROJECT NAMES IT, which is the spelling the block's own text uses — an
+    # absolute key would make the record unreadable to anyone who moved the checkout, and
+    # the record is per session, so the project it belongs to is never in doubt.
+    if ("r:" + owed) in closeout_reported(payload):
+        return None
+    closeout_record(payload, {"r:" + owed})
     if state == "absent":
         said = f"There is no report at {owed}, which your work order named."
     elif state == "unfinished":
