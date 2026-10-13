@@ -19748,10 +19748,28 @@ check(
 _rh_lnk = []
 if 'flags | getattr(os, "O_NOFOLLOW", 0)' not in _rh_cm:
     _rh_lnk.append("no O_NOFOLLOW helper in wf-commitments")
-if _rh_cm.count("_open_nofollow(") != 7:
+if _rh_cm.count("_open_nofollow(") != 6:
     _rh_lnk.append(f"_open_nofollow names {_rh_cm.count('_open_nofollow(')} sites, expected "
-                   "7 — its own def, the region stamp, the git index, the ignore rule's "
-                   "read and append, and the ledger's own read and write")
+                   "6 — its own def, the settings gate, the region stamp, the git index, "
+                   "and the ignore rule's read and append. The LEDGER itself is read and "
+                   "written through wf-task-tag's own guarded pair instead of a seventh "
+                   "site here")
+# NO PLAIN `open()` ON A PATH UNDER THIS PROJECT'S `.claude`, WHICH IS THE CLASS RATHER
+# THAN THE INSTANCE. The guarded `.gitignore` sat one line from a plain `open` on the
+# ledger beside it (security review of caf77da), and a sibling path left unguarded makes
+# the guarded one decorative — the attacker picks the name. Asked of the AST, because
+# `open(` appears in prose in this file a dozen times and a grep cannot tell a call from a
+# sentence about one. The two plain reads this leaves alone name no `.claude` path: the
+# shipped source beside the script, and `.git/config`.
+try:
+    for _rh_n in _ast.walk(_ast.parse(_rh_cm)):
+        if (isinstance(_rh_n, _ast.Call) and isinstance(_rh_n.func, _ast.Name)
+                and _rh_n.func.id == "open" and _rh_n.args
+                and ".claude" in (_ast.get_source_segment(_rh_cm, _rh_n) or "")):
+            _rh_lnk.append(f"line {_rh_n.lineno} opens a `.claude` path with a plain "
+                           "open(), so a link planted at that name is followed")
+except SyntaxError as _exc:
+    _rh_lnk.append(f"wf-commitments will not parse ({_exc})")
 check(
     "ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
     not _rh_lnk,
@@ -19903,16 +19921,41 @@ check(
 _il_lnk = []
 if 'flags | getattr(os, "O_NOFOLLOW", 0)' not in _il:
     _il_lnk.append("no O_NOFOLLOW helper in wf-task-tag")
-if _il.count("_open_nofollow(") != 4:
-    _il_lnk.append(f"_open_nofollow names {_il.count('_open_nofollow(')} sites, expected 4 "
-                   "— its own def, the read, the atomic write, the ignore rule, and no "
-                   "fifth door into the same directory")
+if _il.count("_open_nofollow(") != 3:
+    _il_lnk.append(f"_open_nofollow names {_il.count('_open_nofollow(')} sites, expected 3 "
+                   "— its own def, the guarded read, and the ignore rule. The atomic "
+                   "write's temporary name comes from `tempfile.mkstemp` since 2026-10-12, "
+                   "which carries O_EXCL itself and needs no name to guard")
 if "os.replace(tmp, path)" not in _il:
     _il_lnk.append("the ledger write does not rename over the name, so a link at that "
                    "name would be written THROUGH rather than replaced")
-if "os.O_CREAT | os.O_EXCL | os.O_WRONLY" not in _il:
-    _il_lnk.append("the temporary name is not created O_CREAT|O_EXCL, so it can be a "
-                   "planted link or clobber a file already there")
+# A PREDICTABLE TEMPORARY NAME IS A SQUATTABLE ONE. `<path>.<pid>` was the name until
+# 2026-10-12: a pid is five digits anybody can enumerate, one file sitting there made every
+# save return False with the ledger silently not recording, and in a directory other
+# accounts can write it is a name somebody else can own first. `mkstemp` is random plus
+# O_EXCL, which is also what `wf-ledger.atomic_write` uses — one design, not two.
+if "tempfile.mkstemp(" not in _il:
+    _il_lnk.append("the temporary name is not from tempfile.mkstemp, so it is predictable "
+                   "or not created O_EXCL")
+if "os.getpid()" in _il:
+    _il_lnk.append("a temporary name is still derived from the pid, which is a name "
+                   "another account can create first")
+# THE OPEN FD IS WHAT IS ASKED, NOT THE NAME. O_NOFOLLOW refuses a LINK and clears nothing
+# else, and this reader is pointed at the scratchpad fallback under TMPDIR, which every
+# account on the host can write: a plausible REGULAR file planted there becomes this
+# session's own ask count, and the OWNER check is the half that stops it. S_ISREG is pinned
+# beside it as defence in depth and is claimed as no more — a fifo blocks inside `os.open`
+# where no later test can reach it, a directory fails in `os.fdopen` anyway, and a device
+# needs root to create and is caught by the owner check. MEASURED by deleting it.
+for _lit, _why in (("os.fstat(fh.fileno())", "the guarded read does not stat the fd it "
+                                             "actually opened"),
+                   ("stat.S_ISREG(st.st_mode)", "the regular-file test beside the owner "
+                                                "check is gone"),
+                   ('getattr(os, "getuid", None)', "the owner check is not written to "
+                                                   "survive a platform without getuid"),
+                   ("st.st_uid != uid()", "a file another account planted is still read")):
+    if _lit not in _il:
+        _il_lnk.append(f"missing {_lit!r} — {_why}")
 for _lit, _why in (
         ('read_json_nofollow(', "wf-widen reads the ledger through its sibling's guarded "
                                 "reader"),
@@ -19921,6 +19964,52 @@ for _lit, _why in (
         ("TT.judge_ledger(payload, led)", "the main Stop judges every open issue")):
     if _lit not in (_il if _lit.startswith("read_json") else _il_w):
         _il_lnk.append(f"missing {_lit!r} — {_why}")
+
+# AND THE TWO HELPERS ARE RUN, not only read. No fixture can reach either property: the
+# squatter's name is `<path>.<pid>` and only the writing process knows its own pid, and a
+# foreign-owned file cannot be created without root. A CHILD process can do both — it knows
+# its pid, and it can replace `os.getuid` in its own interpreter without touching this one.
+# The device case needs neither: `/dev/zero` is not a regular file and never ends.
+_il_beh = r'''
+import importlib.machinery as m, importlib.util as u, os, sys, tempfile
+sys.dont_write_bytecode = True
+s = u.spec_from_loader("_tt", m.SourceFileLoader("_tt", sys.argv[1]))
+tt = u.module_from_spec(s); s.loader.exec_module(tt)
+bad = []
+p = os.path.join(tempfile.mkdtemp(), "led.json")
+open("%s.%d" % (p, os.getpid()), "w").write("squatter")
+if not tt.write_json_atomic(p, {"a": 1}):
+    bad.append("the save was refused by a squatter sitting on <path>.<pid>")
+elif tt.read_json_nofollow(p) != {"a": 1}:
+    bad.append("the saved ledger did not read back")
+else:
+    tt.write_json_atomic(p, {"a": 1}, indent=2)
+    if "\n" not in open(p).read():
+        bad.append("indent=2 did not reach the file")
+    tt.write_json_atomic(p, {"a": 1})
+    if "\n" in open(p).read().strip():
+        bad.append("the default write is not compact")
+    _real = os.getuid
+    os.getuid = lambda: _real() + 1
+    try:
+        if tt.read_json_nofollow(p, "REFUSED") != "REFUSED":
+            bad.append("a file owned by another account was read")
+    finally:
+        os.getuid = _real
+    if tt.read_json_nofollow(p, "REFUSED") != {"a": 1}:
+        bad.append("the owner check refuses this account's own file")
+print("; ".join(bad) if bad else "OK")
+'''
+try:
+    _il_p = subprocess.run([sys.executable, "-c", _il_beh, "workforce/bin/wf-task-tag"],
+                           cwd=ROOT, capture_output=True, text=True, timeout=20)
+    _il_said = (_il_p.stdout or "").strip().splitlines()[-1:] or [""]
+    if _il_said[0] != "OK":
+        _il_lnk.append("the helper run said: "
+                       + (_il_said[0] or (_il_p.stderr or "").strip()[-200:]))
+except subprocess.TimeoutExpired:
+    _il_lnk.append("the helper run did not finish in 20s — a non-regular file is being "
+                   "read as JSON, which is the hang S_ISREG exists to stop")
 check(
     "issues: nothing in the ledger is written or read through a name another account can "
     "plant",

@@ -226,8 +226,16 @@ def _heal_settings(root, progress):
     except OSError:
         names = []
     for n in names:
+        # NOT THROUGH A LINK, like every other path under this project's `.claude`. A
+        # settings file IS legitimately a link in some installs, which is why this one was
+        # the last plain `open` here — but what the gate does with the text is decide
+        # whether to run the classifier over this project's settings, so a link planted at
+        # the name hands that decision a file the project never wrote. Refusing reads it as
+        # "no workforce row", which is the same answer an unreadable settings file already
+        # gets one line below.
         try:
-            with open(os.path.join(root, ".claude", n), encoding="utf-8", errors="replace") as fh:
+            with os.fdopen(_open_nofollow(os.path.join(root, ".claude", n), os.O_RDONLY),
+                           encoding="utf-8", errors="replace") as fh:
                 texts[os.path.join(".claude", n)] = fh.read()
         except OSError:
             continue
@@ -712,16 +720,17 @@ def path(payload):
 
 
 def load(p):
-    """The ledger, or an empty one. NEVER THROUGH A LINK, for the same reason the write
-    below is not: this file's contents are read back to the operator at session start, so
-    a link planted at its name is a file somebody else chose being quoted into the next
-    session's context. `_open_nofollow` is the one door, counted by bin/check."""
-    try:
-        with os.fdopen(_open_nofollow(p, os.O_RDONLY), encoding="utf-8") as fh:
-            d = json.load(fh)
-        return d if isinstance(d, dict) else {"open": []}
-    except (OSError, ValueError):
-        return {"open": []}
+    """The ledger, or an empty one — THROUGH THE SIBLING'S OWN GUARDED READER.
+
+    This file's contents are read back to the operator at session start, so a link planted
+    at its name is a file somebody else chose being quoted into the next session's context.
+    `wf-task-tag.read_json_nofollow` already refuses that, and since 2026-10-12 refuses a
+    file that is not a regular file this account owns as well — a local copy of those three
+    rules is a copy that learns the fourth one late. `TT` is already imported at module
+    scope for `state_component`, so this costs no import, and the shape is the same one it
+    reads for the issue ledger: a dict or the default.
+    """
+    return TT.read_json_nofollow(p, {"open": []})
 
 
 def capture(reply):
@@ -870,14 +879,14 @@ def main():
         if t not in seen:
             book.setdefault("open", []).append({"text": t, "at": stamp[:10]})
     book["open"] = (book.get("open") or [])[-MAX_OPEN:]
-    # NOT THROUGH A LINK EITHER, and this is the write that matters most: the operator's
-    # own sentences, at a predictable path in a shared checkout, written unattended on
-    # every turn that states one. A new ledger is created 0600 for the same reason.
-    try:
-        with os.fdopen(_open_nofollow(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC),
-                       "w", encoding="utf-8") as fh:
-            json.dump(book, fh, indent=2)
-    except OSError:
+    # THE SIBLING'S OWN ATOMIC WRITER, for the write that matters most: the operator's own
+    # sentences, at a predictable path in a shared checkout, written unattended on every
+    # turn that states one. It creates its temporary name random and `O_EXCL` so there is
+    # no name to squat, renames over the real one so a link at that name is REPLACED rather
+    # than written through, and never half-writes — which a plain truncating open did on
+    # every failure after the first byte. `indent=2` keeps the bytes a person opening this
+    # file reads; the issue ledger beside it is machine-read and stays compact.
+    if not TT.write_json_atomic(p, book, indent=2):
         return 0
     # THE IGNORE RULE RIDES THE WRITE, never a session start: the file exists from this
     # moment on, and the rule has to be there before the project's next `git add -A`.

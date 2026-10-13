@@ -2895,6 +2895,26 @@ CASES = [
     # `getattr(os, "", 0)` quietly returns 0 and the flag is absent from all seven sites.
     ("ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
      "workforce/bin/wf-commitments", "delall", "O_NOFOLLOW"),
+    # THE CLASS, NOT THE INSTANCE (security review of caf77da). A plain `open` on a
+    # `.claude` path makes the guarded sibling beside it decorative, because the name is
+    # the attacker's to pick. `append`, because the defect is a line that must NOT be
+    # there: a function definition parses, never runs, and the AST row sees it.
+    ("ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
+     "workforce/bin/wf-commitments", "append",
+     '\n\ndef _plain_open_regression(root):\n'
+     '    return open(os.path.join(root, ".claude", "settings.json"))\n'),
+    # ── the two shared helpers (security review of 849eb74) ──────────────────────────
+    # THE PREDICTABLE TEMPORARY NAME. `<path>.<pid>` is five digits anybody can enumerate;
+    # the child-process row squats it and the save has to land anyway.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     "workforce/bin/wf-task-tag", "delall", "tempfile.mkstemp("),
+    # THE OWNER CHECK. Deleting the comparison leaves the fstat and the S_ISREG test, so
+    # the file still parses and a file another account planted in TMPDIR is read again —
+    # which the child-process row sees by replacing `os.getuid` in its own interpreter.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     "workforce/bin/wf-task-tag", "delall", " or (uid is not None and st.st_uid != uid())"),
 ]
 
 
