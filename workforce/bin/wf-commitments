@@ -639,13 +639,14 @@ def asks_expected(payload):
     # session AND agent since 2026-10-12 (fact 22b c); this hook runs on the main `Stop`,
     # where that resolves to the session alone, which is exactly how a drift in the key would
     # go unnoticed here.
+    #
+    # AND THE READ IS THE SIBLING'S GUARDED ONE, never a plain `open()`. The last fallback
+    # above is `/tmp` and this name is predictable, so a link planted at it would hand this
+    # hook a file it was never given and print its contents to the user as the turn's ask
+    # count (CWE-59). `wf-task-tag.tag_path` carries the rule; this is one of its readers.
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = TT.state_component(payload)
-    try:
-        with open(os.path.join(d, f"wf-task-tag.{sid}.json"), encoding="utf-8") as fh:
-            tag = json.load(fh)
-    except (OSError, ValueError):
-        return None, ""
+    tag = TT.read_json_nofollow(os.path.join(d, f"wf-task-tag.{sid}.json"))
     if not isinstance(tag, dict):
         return None, ""
     n = tag.get("asks")

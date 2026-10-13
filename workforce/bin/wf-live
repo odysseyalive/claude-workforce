@@ -374,16 +374,28 @@ def code_chunks(src):
     return chunks + [ast.unparse(ast.Module(body=rest, type_ignores=[]))]
 
 
+# THE VERBS A ROLE IS READ FROM, and `write_json_atomic` / `read_json_nofollow` are in the
+# lists because of the symlink fix of 2026-10-12 (CWE-59): every hand-off in `wf-task-tag`,
+# `wf-widen` and `wf-commitments` now goes through those two guarded helpers instead of a
+# plain `open()`, and a detector that only knows `open(` read every one of those functions as
+# doing nothing. That is the vacuous direction — `wf-widen.checklist` would have stopped
+# counting as the reader of `wf-asks`, and the orphan-hand-off check would have reported
+# NOTHING rather than a false row, which is worse because it reports a property nobody has.
+WRITE_VERBS = ("json.dump(", "write_json_atomic(")
+READ_VERBS = ("open(", "read_json_nofollow(")
+
+
 def function_roles(src, art):
     """{function name, or "" for module code: {"writer", "reader", "clearer"}} for one file.
 
-    A path helper (names the artifact, joins a path, opens nothing) is transparent: a call to
-    it is a mention of the artifact in the calling function. Deleting is not acting, so a
+    A path helper (names the artifact, joins a path, acts on nothing) is transparent: a call
+    to it is a mention of the artifact in the calling function. Deleting is not acting, so a
     clearer is never a reader.
     """
     funcs = code_chunks(src)
     helpers = [m.group(1) for f in funcs
-               if art in f and "os.path.join" in f and "open(" not in f
+               if art in f and "os.path.join" in f
+               and not any(v in f for v in WRITE_VERBS + READ_VERBS)
                for m in [re.match(r"def (\w+)\(", f)] if m]
     out = {}
     for f in funcs:
@@ -392,12 +404,13 @@ def function_roles(src, art):
             continue
         if not (art in f or any(f"{h}(" in f for h in helpers)):
             continue
+        wrote = any(v in f for v in WRITE_VERBS)
         roles = set()
-        if "json.dump(" in f:
+        if wrote:
             roles.add("writer")
         if "os.remove(" in f:
             roles.add("clearer")
-        if "json.dump(" not in f and "os.remove(" not in f and "open(" in f:
+        if not wrote and "os.remove(" not in f and any(v in f for v in READ_VERBS):
             roles.add("reader")
         if roles:
             out[m.group(1) if m else ""] = roles
