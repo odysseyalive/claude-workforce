@@ -222,12 +222,15 @@ OTHERWISE, START NO NEW WORK and do these three things now, in this order:
 2. Write a continuation brief named `HANDOFF.md` in THE SAME DIRECTORY as that
    `OUTPUT.md` — not at the root of the project — with these seven sections, all filled:
 {sections}
-3. Return `HANDOFF <path to your OUTPUT.md>` as your verdict.
+3. Return `HANDOFF <path to your OUTPUT.md>` as your verdict, and in that same reply say
+   in plain words: RESUME ME with SendMessage — do not start this over with a new agent.
 
-Your manager reads `HANDOFF` as an instruction to RESUME YOU — `SendMessage`, continue
-from that brief, with a fresh turn allowance and the context you have already paid for
-still in place (`org.md` rung 12b). A turn cap is a checkpoint, not an ending, and a
-fresh employee of your role is spawned only if you report your context exhausted. What
+`HANDOFF` ASKS YOUR MANAGER TO RESUME YOU. It hands your work to nobody, and your brief
+is not an order for a replacement. Your manager answers it with `SendMessage` to YOU, and
+you continue from that brief with a fresh turn allowance and the context you have already
+paid for still in place (`org.md` rung 12b). A turn cap is a checkpoint, not an ending. A
+fresh employee of your role is spawned only if you report your context exhausted, and the
+work starts over when that happens — which is why your reply has to name the resume. What
 you cannot do is give yourself more turns, so a brief you do not write is work that
 simply stops."""
 
@@ -243,8 +246,10 @@ file per turn is how this run ends a sentence short of handing anything back:
   project — with these seven sections, all filled:
 {sections}
 
-THEN REPLY `HANDOFF <path to your OUTPUT.md>` and nothing else. That reply is the only
-part your manager receives: files you wrote and never named are files nobody reads. A
+THEN REPLY `HANDOFF <path to your OUTPUT.md>`, then one line: RESUME ME with SendMessage,
+do not start this over with a new agent. Nothing else. That reply is the only part your
+manager receives — files you wrote and never named are files nobody reads, and a manager
+told only that you stopped spawns somebody else to redo the work you already did. A
 partial account replied beats a complete one the limit cuts off."""
 
 # WHAT A DELIVERED INJECTION LOOKS LIKE IN THE TRANSCRIPT, which is how the once-only rule
@@ -746,6 +751,27 @@ def emit(text):
 # a handful of times in a whole session, so the cost lands where the run is ending anyway.
 # The alternative is a second writer of the ledger, which the order forbids and which would
 # be the copy that drifts.
+def _task_tag():
+    """`wf-task-tag` as a module, loaded from beside this file.
+
+    ONE LOADER FOR THE THREE CALLERS — the two ledger writers and the spawn guard's
+    reader — because a second copy of these six lines is a second idea of where the
+    sibling is and of whether bytecode may be written beside it.
+    """
+    import importlib.machinery
+    import importlib.util
+    # NEVER WRITE BYTECODE: a `__pycache__/` beside a shipped script is an undeclared
+    # shipped file, which `bin/check` fails on. `wf-widen`'s `_sibling` carries the
+    # same line for the same reason.
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-task-tag")
+    loader = importlib.machinery.SourceFileLoader("wf_task_tag", path)
+    mod = importlib.util.module_from_spec(
+        importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
 def _ledger_write(payload, call):
     """Run one of `wf-task-tag`'s ledger writers and save when it recorded something.
 
@@ -759,22 +785,27 @@ def _ledger_write(payload, call):
     front of the model instead.
     """
     try:
-        import importlib.machinery
-        import importlib.util
-        # NEVER WRITE BYTECODE: a `__pycache__/` beside a shipped script is an undeclared
-        # shipped file, which `bin/check` fails on. `wf-widen`'s `_sibling` carries the
-        # same line for the same reason.
-        sys.dont_write_bytecode = True
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-task-tag")
-        loader = importlib.machinery.SourceFileLoader("wf_task_tag", path)
-        mod = importlib.util.module_from_spec(
-            importlib.util.spec_from_loader(loader.name, loader))
-        loader.exec_module(mod)
+        mod = _task_tag()
         led = mod.load_ledger(payload)
         issue = call(mod, led)
         if issue:
             mod.save_ledger(payload, led)
         return issue
+    except Exception:
+        return None
+
+
+def _ledger_read(payload, call):
+    """Run one of `wf-task-tag`'s ledger READERS. Its answer, or None.
+
+    NOTHING IS SAVED HERE and that is the whole difference from `_ledger_write`: the
+    spawn guard runs on a `PreToolUse` in the MAIN session, where this hook has never
+    written a byte, and a guard that rewrites the ledger it is only consulting would put
+    this hook's name on every issue file in every project that has one.
+    """
+    try:
+        mod = _task_tag()
+        return call(mod, mod.load_ledger(payload))
     except Exception:
         return None
 
@@ -807,9 +838,11 @@ def last_claim(path, marker, rounds):
 
     NEWEST FIRST, because the question is "has this agent been cut, and by which claim" —
     and the claim that decides is the last one, so each cut gets exactly one resume flip
-    keyed to it. `rounds` bounds the walk at the round the counter is in, which makes it
-    ONE `os.path.exists` for an agent that was never cut: almost every agent, on every
-    call.
+    keyed to it. `rounds` bounds the walk, and the caller passes the round BEFORE the one
+    it is in: a cut claimed by the current allowance is not a cut this allowance can be
+    the resume of. That bound makes it ONE `os.path.exists` for an agent that was never
+    cut — almost every agent, on every call — and no walk at all inside a first allowance,
+    where `rounds` is -1 and the range is empty.
 
     KEYED TO THE CUT RATHER THAN TO THE ROUND, and that is measured. In session `68b82f98`
     a `maxTurns: 10` IC was cut at turn 8 and resumed at turn 9, and the cap-multiple
@@ -831,6 +864,69 @@ def mark_running(payload):
     return _ledger_write(payload, lambda mod, led: mod.agent_resumed(payload, led))
 
 
+# ── the wrong action, refused where it is taken (K8, 2026-10-13) ─────────────
+# A CUT AGENT IS RESUMED, NOT REPLACED, AND UNTIL NOW NOTHING STOPPED THE REPLACEMENT.
+# MEASURED in trial e2e3, session `bb8a3e53`: a cap-10 filer was cut, and in the SAME main
+# turn the session spawned a second filer with the `Agent` tool and then a third. The two
+# cut agents stayed `handoff` in the ledger for the rest of the session. The kickback that
+# names the resume is on the main `Stop`, and a session that never stops between
+# dispatches never reaches it — so the correction arrived after all three runs were over.
+#
+# `PreToolUse` IS THE EVENT, BECAUSE IT IS THE ONLY ONE THAT CAN SAY NO. Every other hook
+# in this mechanism reports after the fact. A deny here reaches the model as the reason it
+# could not do the thing, in the turn it tried, with the agent_id it should have messaged
+# instead — which is the one piece of information a `Stop` three dispatches later cannot
+# deliver in time.
+#
+# THE MAIN SESSION ONLY. `agent_id` is absent on a main-thread payload and present inside
+# a subagent (MEASURED 2026-10-12, platform.md fact 22a), and it is the manager that holds
+# the resume: an employee spawning a helper of its own is not the measured defect and is
+# not refused here.
+#
+# AND IT NEVER WEDGES A SESSION. Four separate things make the deny lift by itself: the
+# issue closing, `agent_resumed` retiring the mark at the resumed agent's next tool call,
+# the mark ageing out of `held_by`'s window, and a spawn of any OTHER role, which is never
+# touched. A project with no ledger reads `[]` and is never guarded at all.
+DENY_TEXT = """A cut agent of this role is still holding this work, so a fresh one would start it over.
+
+{who} ({atype}) hit its turn cap in this session and is marked `handoff` on this
+session's issue ledger. Its context is already loaded, and a `SendMessage` resume gives it
+a fresh turn allowance — measured 2026-10-12: a coder cut at 80 tool calls finished at 129.
+
+→ RESUME {first} with SendMessage: tell it to continue from its own HANDOFF.md, at the
+  exit criteria still UNMET (`org.md` rung 12b). Do not start this work over with anyone
+  else.
+
+`HANDOFF` from an employee is a request to resume THAT agent. It is never a brief for a
+replacement. Spawn a fresh {atype} only after the resumed agent reports its context
+exhausted, and say so to the user before you do."""
+
+
+def guard_spawn(payload):
+    """Refuse an `Agent` spawn of a role this session has a cut agent of. Always 0.
+
+    SILENT FOR EVERYTHING ELSE, and each exit is one of the conditions the order named:
+    another tool, a spawn from inside a subagent, a `subagent_type` that is not a bare
+    name, a project with no ledger, a role nobody was cut on, and a mark `held_by` reads
+    as stale.
+    """
+    if payload.get("tool_name") != "Agent" or payload.get("agent_id") is not None:
+        return 0
+    tool_input = payload.get("tool_input")
+    want = tool_input.get("subagent_type") if isinstance(tool_input, dict) else None
+    if not bare(want):
+        return 0
+    held = _ledger_read(payload, lambda mod, led: mod.held_by(led, want))
+    if not held:
+        return 0
+    sys.stdout.write(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": DENY_TEXT.format(
+            who=", ".join(held), first=held[0], atype=want)}}) + "\n")
+    return 0
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -838,6 +934,12 @@ def main():
         return 0
     if not isinstance(payload, dict):
         return 0
+
+    # ── THE OTHER EVENT: a spawn about to replace an agent that should be resumed ──
+    # Tested first because the fast path below reads the ABSENCE of `agent_id` as "main
+    # thread, nothing to do", and the main thread is exactly where this guard runs.
+    if payload.get("hook_event_name") == "PreToolUse":
+        return guard_spawn(payload)
 
     # ── THE FAST PATH: no file is touched in the main thread ─────────────────
     # `agent_id` absent means the main thread (MEASURED 2026-10-12). `agent_type` absent
@@ -942,15 +1044,23 @@ def main():
     elif in_round >= warn_at(cap) and once("fired-warn", WARN_MARK, round_):
         emit(WARN_TEXT.format(turns=in_round, cap=cap, sections=BRIEF_SECTIONS))
     # AND THE OTHER END: THIS CALL IS A CUT AGENT WORKING AGAIN. Not on the call that just
-    # told it to hand off, which would flip the mark it had this moment written. No state
+    # told it to resume, which would flip the mark it had this moment written. No state
     # directory means no claim and no flip: the transcript records an injection but not a
     # resume, so such an agent keeps its `handoff` mark until it delivers — one resume asked
     # for twice, which is the recoverable direction against a hold that never ends.
+    #
+    # A LATER ROUND, NEVER A LATER CALL, AND THE EVIDENCE IS TRIAL e2e3. The notice fires
+    # at `cap - 3`, which leaves the agent THREE MORE TURNS in the same allowance — so a
+    # bound of `round_` found the cut this round had just claimed and read the agent's own
+    # next tool call as a resume. Filer `a26b1c41eecfb3119` was flipped back to `running`
+    # that way after each of its two notices, the harness cut it for real at the end, and
+    # `agent_returned` recorded `returned` on an agent that was holding work. A resume is
+    # a NEW ALLOWANCE: `turn_round` only reports one after `count_turns` saw the prompt row
+    # that opened it, so the cut being answered has to belong to an EARLIER round than the
+    # one this call is in. `round_ - 1` is that test, and at `round_ == 0` the walk is
+    # empty and no agent still inside its first allowance is ever called resumed.
     if path and not cut_now:
-        # NO `max()` ON THE BOUND: `turn_round` returns a 1-based allowance, so the round
-        # index it yields is never negative — where the arithmetic it replaced could read
-        # -1 for an agent under its first threshold.
-        cut = last_claim(path, "fired-final", round_)
+        cut = last_claim(path, "fired-final", round_ - 1)
         if cut and claim(path, RESUME_MARK + cut):
             mark_running(payload)
     return 0

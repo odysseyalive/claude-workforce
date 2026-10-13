@@ -9396,5 +9396,118 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"The boundary is shipped and the fixture passes.\"}",
     "want": []
+  },
+  "spawn-guard-cut-agent-of-the-same-role-is-denied": {
+      "_why": "THE WRONG ACTION, REFUSED WHERE IT IS TAKEN. Trial e2e3 (session `bb8a3e53`, 2026-10-13): a cap-10 filer was cut, and in the SAME main turn the session spawned a second filer with the `Agent` tool and then a third. Both cut agents stayed `handoff` in the ledger for the rest of the session and neither was ever resumed. The K8 kickback that names the resume is on the main `Stop`, and that session never stopped between the three dispatches, so the one line that would have corrected it had no event to fire on. This is the same session shape and the same tool call, and the answer is a DENY that names the agent_id to message instead. The spawn is from the MAIN thread, which is what `agent_id` being absent means (platform.md fact 22a).",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"filer\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+      "subst": [
+          ".claude/workforce/issues/s1.json"
+      ],
+      "exit": 0,
+      "want": [
+          "\"permissionDecision\": \"deny\"",
+          "a1 (filer)",
+          "RESUME a1 with SendMessage",
+          "is a request to resume THAT agent"
+      ],
+      "not": [
+          "Traceback",
+          "\"allow\""
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"state\": \"handoff\""
+              ],
+              "not": [
+                  "\"state\": \"running\""
+              ]
+          }
+      }
+  },
+  "spawn-guard-another-role-is-allowed": {
+      "_why": "THE GUARD IS ABOUT ONE ROLE, NEVER ABOUT SPAWNING. The ledger carries the same live `handoff` filer as the denied case; the tool call asks for a `scribe`, which no cut agent of this session is holding. A guard that refused every spawn while any agent was cut would stop a manager dispatching unrelated work, which is a worse session than the one it is fixing.",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"scribe\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+      "subst": [
+          ".claude/workforce/issues/s1.json"
+      ],
+      "exit": 0,
+      "want": [],
+      "not": [
+          "Traceback",
+          "permissionDecision",
+          "deny",
+          "a1"
+      ]
+  },
+  "spawn-guard-no-cut-agent-is-allowed": {
+      "_why": "NOTHING IS HELD, SO NOTHING IS REFUSED. The one filer on this issue is `running` -- it was never cut, or it was cut and `agent_resumed` retired the mark at its next tool call. A manager dispatching a second filer alongside a working one is ordinary parallel work and is not the measured defect. This is also the shape of every project that has an issue ledger and has never hit a turn cap.",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"filer\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+      "exit": 0,
+      "want": [],
+      "not": [
+          "Traceback",
+          "permissionDecision",
+          "deny"
+      ]
+  },
+  "spawn-guard-stale-mark-is-allowed": {
+      "_why": "A DENY THAT CANNOT EXPIRE IS A WEDGED SESSION, which is worse than the spawn it refuses. This mark is stamped 2023-11-14 and the agent it names has been gone for years, so `held_by` reads it as stale and the spawn goes through. The same branch covers every mark written before `handoff_at` existed: no stamp, no block. The four ways the deny lifts are this one, the issue closing, the resumed agent's own next tool call, and a spawn of another role.",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"filer\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+      "exit": 0,
+      "want": [],
+      "not": [
+          "Traceback",
+          "permissionDecision",
+          "deny"
+      ]
+  },
+  "turn-budget-same-allowance-call-is-not-a-resume": {
+      "_why": "THE NOTICE LEAVES THREE TURNS, AND THE AGENT SPENDS THEM. The final notice fires at `cap - 3`, so the agent's own next tool call arrives in the SAME allowance -- and a resume test bounded at the current round read that call as a `SendMessage` resume and flipped the entry back to `running`. MEASURED in trial e2e3: filer `a26b1c41eecfb3119` was flipped that way after each of its two notices, the harness cut it for real at the end, and `agent_returned` then recorded `returned` on an agent that was still holding work -- so the main Stop never asked for it. Here `fired-final` is claimed for round 0 and the counter is at turn 38 of 40, still inside allowance 1: the mark must survive. A resume is a NEW ALLOWANCE and nothing in this transcript opens one.",
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+      "env": {
+          "TMPDIR": "${TREE}/tmp"
+      },
+      "exit": 0,
+      "want": [],
+      "not": [
+          "Traceback",
+          "\"state\": \"running\""
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"handoff\""
+              ],
+              "not": [
+                  "\"state\": \"running\""
+              ]
+          }
+      }
+  },
+  "widen-handoff-two-cut-agents-are-both-resumed": {
+      "_why": "TRIAL e2e3's OWN FINAL LEDGER: two filers cut in one session, both still `handoff`, no items recorded. The verdict names BOTH agent ids in the status line and BOTH in the action, because a kickback that named one of them would leave the other holding work nobody is ever told about. `CLOSED` is forbidden here for the reason `widen-handoff-no-items-still-resumes` gives, and `spawn` is forbidden because a fresh filer is the action this whole mechanism exists to stop.",
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "want": [
+          "i1  HANDOFF  a2f36ec5bd3897c7e (filer), a05452b6f336572cc (filer) stopped at its turn cap",
+          "RESUME a2f36ec5bd3897c7e, a05452b6f336572cc with SendMessage"
+      ],
+      "not": [
+          "Traceback",
+          "CLOSED",
+          "successor",
+          "re-dispatch",
+          "spawn"
+      ]
   }
 }

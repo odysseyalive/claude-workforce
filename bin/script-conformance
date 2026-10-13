@@ -340,12 +340,19 @@ def _run_in(tree, script, spec):
     # so a case can hold a real ABSOLUTE path — the shape a personal install's row takes,
     # and one a fixture could only fake before. `hardlink` makes `new` a second name for
     # `existing` (git stores neither). Both added 2026-09-14 for the settings heal.
+    # `${NOW}` IS THE SAME PROBLEM IN THE OTHER DIMENSION, added 2026-10-13 for the spawn
+    # guard. A `handoff` mark expires, so "this mark is live" is a fact about the clock
+    # and a checked-in epoch is stale the day after it is written. The STALE half of the
+    # pair still spells a literal, because a number that must be old is the one thing a
+    # fixture CAN write down and never have to maintain.
+    import time as _sc_time
+    _now = str(int(_sc_time.time()))
     for _rel in spec.get("subst") or []:
         _fp = os.path.join(tree, _rel)
         with open(_fp, encoding="utf-8") as _fh:
             _body = _fh.read()
         with open(_fp, "w", encoding="utf-8") as _fh:
-            _fh.write(_body.replace("${TREE}", tree))
+            _fh.write(_body.replace("${TREE}", tree).replace("${NOW}", _now))
     for _new, _old in (spec.get("hardlink") or {}).items():
         os.link(os.path.join(tree, _old), os.path.join(tree, _new))
 

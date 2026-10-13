@@ -45,6 +45,7 @@ import json
 import os
 import re
 import sys
+import time
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # TASK KINDS. Each row is (name, pattern, sense, why that sense and not another).
@@ -1070,6 +1071,54 @@ def agent_resumed(payload, led):
     return None
 
 
+# ── and the guard's reader: who is still holding work of this role ──────────
+# THE WRONG ACTION HAS A NAME NOW. MEASURED 2026-10-13, session `bb8a3e53` (trial e2e3): a
+# `maxTurns: 10` filer was cut, and in the SAME main turn the session spawned a SECOND
+# filer with the `Agent` tool ("Filer continues notes 09-20") and then a THIRD. Both cut
+# agents sat at `handoff` in the ledger for the rest of the session and neither was ever
+# resumed. The K8 kickback that names the resume lives on the main `Stop`, and that
+# session never stopped between the three dispatches, so the one line that would have
+# corrected it had no event to fire on. Reading the hand-off wording as "start a fresh run
+# from the brief" is the measured failure, and it is a wrong ACTION, which means it can be
+# refused where it is taken rather than argued with afterwards.
+#
+# WHY THE AGE AND NOT ONLY THE STATE. This list denies a tool call. A `handoff` mark that
+# outlives its agent would deny that call forever, and a session with no way to spawn is
+# worse than one that spawns the wrong thing. So the mark expires: `agent_handoff` stamps
+# `handoff_at`, and a mark with no stamp — every mark written by a release before this one
+# — reads as stale and refuses nothing. The window is wider than any measured gap by three
+# orders of magnitude (the whole of trial e2e3, all three filers, ran 194 s) and short
+# enough that a session picked up the next day is never held by it.
+HANDOFF_STALE_AFTER = 1800
+
+
+def held_by(led, agent_type, now=None, window=HANDOFF_STALE_AFTER):
+    """The ids of `agent_type` agents this session cut and has NOT resumed yet.
+
+    Empty is the answer for every question this guard should not answer: a session with
+    no ledger, an issue already closed, an agent of a different role, a mark an
+    `agent_resumed` has already retired, and a mark too old to be about a live agent. A
+    caller that gets `[]` allows the spawn.
+    """
+    if not isinstance(led, dict) or not isinstance(agent_type, str) or not agent_type:
+        return []
+    now = now if isinstance(now, (int, float)) else time.time()
+    held = []
+    for iss in led.get("issues", []):
+        if not isinstance(iss, dict) or iss.get("state") == "closed":
+            continue
+        for a in issue_agents(iss):
+            if a.get("state") != "handoff" or a.get("agent_type") != agent_type:
+                continue
+            at = a.get("handoff_at")
+            if not isinstance(at, int) or not 0 <= now - at <= window:
+                continue
+            aid = a.get("agent_id")
+            if isinstance(aid, str) and aid and aid not in held:
+                held.append(aid)
+    return held
+
+
 def unmet_asks(iss):
     """ONE issue's UNMET set — the asks the session itself has not marked done."""
     return [i["ask"] for i in issue_items(iss) if not item_done(i)]
@@ -1145,6 +1194,12 @@ def agent_handoff(payload, led, writes=None):
                         and a.get("handoff_digest") == digest):
                     a["handoff_stalled"] = True
                 a["state"] = "handoff"
+                # WHEN, BECAUSE A MARK WITH NO AGE CANNOT BE REFUSED. `held_by` is the
+                # spawn guard's reader and it DENIES a tool call, so the one thing it
+                # must never do is wedge a session against an agent that is long gone.
+                # The stamp is what makes the refusal expire by itself; a mark written
+                # by a release that did not record one reads as stale and blocks nothing.
+                a["handoff_at"] = int(time.time())
                 a["handoff_digest"] = digest
                 if writes is not None:
                     a["handoff_writes"] = writes

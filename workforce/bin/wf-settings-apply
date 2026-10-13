@@ -215,6 +215,19 @@ SHIPPED_HOOKS = {
     # measured, not assumed, because platform.md fact 22 had that line as DOCUMENTED and
     # three documented claims in that file have already lost to measurement.
     "wf-turn-budget": ("PostToolUse", "*"),
+    # THE SAME MECHANISM'S OTHER END, AND THE ONLY EVENT THAT CAN SAY NO. Measured in
+    # trial e2e3, session `bb8a3e53` (2026-10-13): a cap-10 filer was cut, and in the SAME
+    # main turn the session spawned a second filer with the `Agent` tool and then a third.
+    # Both cut agents stayed `handoff` in the ledger forever. The K8 kickback that names
+    # the resume is on the main `Stop`, and that session never stopped between the three
+    # dispatches — so the correction had no event to fire on until the work was over.
+    # `PreToolUse` reaches the model in the turn it takes the wrong action, with the
+    # agent_id it should have messaged instead.
+    #
+    # `Agent` ALONE, which is the cheapest matcher in this table: the hook is not run at
+    # all for any other tool, and on an `Agent` call in a project with no issue ledger it
+    # exits on one failed read.
+    "wf-turn-budget@agentspawn": ("PreToolUse", "Agent"),
 }
 
 # AGENT-HOOK CONFIG, keyed by the same names SHIPPED_HOOKS uses.
