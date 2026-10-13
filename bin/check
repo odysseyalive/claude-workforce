@@ -16897,15 +16897,94 @@ check("platform: fact 23b records that single-hit self-identification does not g
       "calling agent, so exact identification is impossible in the general case and a "
       "tool returning a single confident hit claims what the platform does not offer. "
       "The fact that a design rests on has to carry the limit of its own measurement")
-check("org: a returned HANDOFF has a consumer, and it spawns rather than re-dispatches",
-      "A returned `HANDOFF` means SPAWN A SUCCESSOR" in _o6
-      and "Never re-dispatch the agent that handed the brief back" in _o6,
+check("org: a returned HANDOFF resumes THAT agent, and a successor is the exhausted-context case",
+      "A returned `HANDOFF` means RESUME THAT AGENT" in _o6
+      and "resume the SAME agent with `SendMessage`" in _o6
+      and "only when the agent reports its context is exhausted" in _o6
+      and "do not resume it a third time" in _o6
+      and "SPAWN A SUCCESSOR and \"never ask the returning agent to" in _o6,
       "`wf-handoff` shipped, five Lead handbooks carried the clause, and `HANDOFF` had no "
       "consumer anywhere: an agent could complete every step the clause asks and nothing "
-      "downstream was instructed to do anything with it. The clause forbids an agent from "
-      "replacing itself, so with no rung here the work simply stops — and the predecessor "
-      "has already reported success at stopping, which makes an unread HANDOFF worse than "
-      "a stalled run. Found by a cold read of a deployed org, not by any check here")
+      "downstream was instructed to do anything with it. An agent cannot give itself more "
+      "turns, so with no rung here the work simply stops — and the predecessor has already "
+      "reported success at stopping, which makes an unread HANDOFF worse than a stalled "
+      "run. CHANGED 2026-10-12: this row used to require SPAWN A SUCCESSOR, which was "
+      "written for a CONTEXT boundary and is wrong for a TURN cap — at a cap the context "
+      "is intact and only the allowance is spent, so a successor discards the one thing "
+      "still good and re-reads everything. Measured: 45 of 269 capped IC dispatches were "
+      "cut with no report, and three agents resumed with SendMessage that day all "
+      "finished. The superseded wording must stay in the rung as its dated note, which "
+      "the last literal here pins, so the next reader cannot take the reversal for drift")
+
+# ── THE TARGETED CHECK, AND THE REGRESSION SUITE RUN ONCE (2026-10-12) ───────────────
+# MEASURED from three coders' own transcripts that day, timed call-to-result: 51 of one
+# order's 124 wall-clock minutes went to `bin/check` across 62 calls plus ~10 more to
+# `bin/prove`; a second spent 47 of its 103 in `bin/prove` and 27 in `bin/check`; a third
+# spent 23 of its 39 in the two. The live end-to-end runs those orders existed to prove
+# cost 3-4 minutes each. THE CAUSE WAS THE SHIPPED TEMPLATE, not the agents: one `Check:`
+# line is one proof, so the full suite was the only thing a handbook generated from it
+# could run, and the order said to keep every step green.
+#
+# FOUR SURFACES, PINNED TOGETHER, because a detector ships with its fix and because each
+# one alone reaches a different population: the template is what a NEW hire is written
+# from, `verification.md` § The rule is where the two lines are defined, the dispatch
+# rungs are the ONLY carrier that reaches an org that already exists (handbooks are
+# authored text, so nothing refreshes them without an audit, while the `/org` region is
+# machine-owned and healed at session start), and the `wf-conform` row is what reports a
+# code role still running on one line between audits.
+_k10_vfy = read("workforce/references/verification.md")
+_k10 = []
+if "- Regression: `<the project's full suite>`" not in tpl:
+    _k10.append("the IC `## Verification` template ships no `Regression:` line, so every "
+                "new hire is written with one proof available and reruns the suite")
+if "`Check:` is the TARGETED proof of this change" not in tpl:
+    _k10.append("the template no longer says which of the two lines is the targeted one; "
+                "an author reading it writes the suite into both")
+if "`Check:` is the targeted proof, `Regression:` is the full suite run ONCE" not in _k10_vfy:
+    _k10.append("verification.md § The rule does not state the two lines — the template "
+                "would then be the only statement of a contract it only illustrates")
+if "MEASURED 2026-10-12" not in _k10_vfy or "62 calls" not in _k10_vfy:
+    _k10.append("the measurement the two-line rule rests on is not recorded beside it, so "
+                "the next reader cannot tell a measured cost from a preference")
+if "the batch runs `Regression:` ONCE, after the last order" not in _org_block:
+    _k10.append("the dispatch CHECKPOINT carries no batch rule, which is the one surface "
+                "that reaches an org already staffed: every order a manager writes would "
+                "go on saying run the suite, whatever the handbook says")
+if "Verification names no Regression: line" not in _n6:
+    _k10.append("wf-conform no longer reports a code role whose Verification has only a "
+                "`Check:` line — the row that makes the contract visible between audits")
+check(
+    "verification: the targeted Check: and the one-time Regression: have a template, a "
+    "rule, a dispatch rung and a detector",
+    not _k10,
+    "; ".join(_k10) + ". The full suite rerun per edit cost 51 of 124 minutes in one "
+    "measured order and 47 of 103 in another, and the fix is only as reachable as its "
+    "least-reachable surface",
+)
+
+# ── INDEPENDENT ORDERS RUN IN PARALLEL WORKTREES (2026-10-12) ───────────────────────
+# The user asked why one day's work took all day. Measured: every order ran one at a time
+# on the shared checkout, and the orders touching different files — four scripts and two
+# reference files — waited in line for one another. The rung is in the CHECKPOINT because
+# that region is the copy a project's `/org` carries; a rule stated anywhere else in this
+# procedure reaches no dispatch.
+_k11 = []
+if "each in its own git worktree" not in _org_block:
+    _k11.append("the CHECKPOINT does not dispatch independent orders in parallel, so they "
+                "keep queueing behind one another for nothing")
+if "Orders that touch the same file run in\n   sequence" not in _org_block:
+    _k11.append("the sequential case is not stated — parallelism without it sends two "
+                "orders at one file and the second overwrites the first")
+if "never two orders on one checkout" not in _org_block:
+    _k11.append("the shared-checkout refusal is gone: two agents on one working tree race "
+                "on `git add`, on the gates and on each other's edits, which is the "
+                "hazard the worktree REMOVES rather than manages")
+check(
+    "dispatch ladder: independent orders are dispatched in parallel worktrees, same-file "
+    "orders in sequence, never two on one checkout",
+    not _k11,
+    "; ".join(_k11) + ". Measured 2026-10-12 on this distribution's own batch",
+)
 # `.index()` RAISES; `.find()` RETURNS -1. The first version of this row used `.index()`
 # and a clause rewrite turned one missing phrase into a traceback that took the WHOLE run
 # down — 1,200 other assertions unreported because one string moved. An ordering check

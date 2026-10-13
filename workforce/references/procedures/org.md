@@ -491,17 +491,29 @@ someone can read instead of re-derive.
    resolve it from the documents first; ask the user only when the sources genuinely conflict or
    none answers, and then with receipts.
 
-12b. **A returned `HANDOFF` means SPAWN A SUCCESSOR — never ask the returning agent to continue.**
-   An agent that reached its context boundary writes a continuation brief, names its path in its
+12b. **A returned `HANDOFF` means RESUME THAT AGENT — a turn cap is a checkpoint, not an ending.**
+   An agent stopped by its turn budget writes a continuation brief, names its path in its
    `OUTPUT.md` under `## Exceptions`, and returns `HANDOFF` with the `OUTPUT.md` path. You are the
-   manager that verdict is addressed to, and the whole mechanism ends here: **the boundary clause
-   forbids an agent from replacing itself, so if you do nothing the work simply stops.**
+   manager that verdict is addressed to, and the whole mechanism ends here: **an agent cannot give
+   itself more turns, so if you do nothing the work simply stops.**
 
-   Read the brief. Spawn a **fresh** employee of the same role, and hand it three things: the brief,
-   the originating `REQUEST (verbatim):` block unchanged, and the `UNMET` rows from the predecessor's
-   `OUTPUT.md` as its work order. Never re-dispatch the agent that handed the brief back — its
-   context is the reason the brief exists, and asking it to carry on is the failure the boundary
-   check was built to prevent.
+   Read the brief, then **resume the SAME agent with `SendMessage`**, telling it to continue from its
+   `HANDOFF.md`. Resuming keeps the context it has already paid for and the harness gives it a fresh
+   turn allowance. **Measured 2026-10-12**: three coders cut at their caps were resumed this way and
+   every one of them finished — one stopped at 80 tool calls and finished at 129, another stopped at
+   81 and continued to 87.
+
+   **Spawn a fresh employee of the same role only when the agent reports its context is exhausted.**
+   Then hand it three things: the brief, the originating `REQUEST (verbatim):` block unchanged, and
+   the `UNMET` rows from the predecessor's `OUTPUT.md` as its work order. A successor starts from a
+   brief rather than from the work, so it pays the whole read-in again — which is why it is the
+   exception and not the rule.
+
+   **The guard is progress, not a count.** If a resumed agent hands off again with the SAME `UNMET`
+   set, do not resume it a third time: escalate to the user with that agent's `HANDOFF.md` section
+   1 — the work order verbatim — and say which criteria have not moved. A second identical hand-off
+   is evidence the order cannot be finished as written, and a third resume only buys another copy
+   of it.
 
    **The brief has seven sections, and this is where they are defined.** `wf-turn-budget` is the
    producer: it names these same seven lines in the instruction it injects at 80% of an employee's
@@ -524,7 +536,7 @@ someone can read instead of re-derive.
 
    Verify it the way rung 12 verifies any other return: **sections 3-7 filled, and section 1
    reproduced verbatim rather than summarized.** Section 5 is the one that saves the next agent's
-   budget, and section 1 is the one a summary destroys — a successor handed a paraphrase of the ask
+   budget, and section 1 is the one a summary destroys — an agent handed a paraphrase of the ask
    solves the paraphrase.
 
    **A `HANDOFF` you leave unread is worse than a stalled run**, because the predecessor already
@@ -539,6 +551,14 @@ someone can read instead of re-derive.
    that definition, and `wf-turn-budget` is the producer — a hook rather than a script an agent has
    to remember to run, because an agent cannot count its own turns and the limit always arrived
    unannounced.*
+
+   *Changed 2026-10-12. This rung said SPAWN A SUCCESSOR and "never ask the returning agent to
+   continue", which was written for a CONTEXT boundary and is wrong for a TURN cap — the two arrive
+   by the same verdict and are not the same state. At a cap the agent's context is intact and only
+   its turn allowance is spent, so a successor throws away the one thing that was still good. The
+   user, that day: "are we waking up the existing agent within its previous context, so that we're
+   not starting all over again?" Measured against 269 capped IC dispatches: 45 were cut (16%) and
+   none delivered a report, while three resumed agents that same day all finished.*
 
 12c. **Never add scope to a running IC by message.** Queue a follow-up order for after the
    hand-back, or make the small correction yourself once you have read it. **Measured cost**
@@ -557,6 +577,25 @@ someone can read instead of re-derive.
 12e. **Before a parallel fan-out, put the data contract in code**, not in plan prose — the types, the
    schema, or the function signature the parallel orders both write against. Two ICs working from a
    prose description of the same interface produce two interfaces.
+
+12f. **Each order runs its own `Check:`; the batch runs `Regression:` ONCE, after the last order.**
+   Every order you write says both: the targeted check — the fixture, case or assertion by name —
+   runs while that order is being built, and the full suite runs once the last order in the batch is
+   in, before anything is released. Never per edit and never per order. **Measured cost** (three
+   coders, 2026-10-12): the suite rerun after every edit and every failure took 51 of one order's
+   124 wall-clock minutes across 62 calls, 47 of another's 103 in one gate alone, and 23 of a
+   third's 39 — while the live end-to-end checks they were proving cost 3-4 minutes each. A batch
+   that reruns the whole suite per order pays that for every order and learns nothing the last run
+   would not have told it.
+
+12g. **Orders that touch different files are dispatched TOGETHER, each in its own git worktree.**
+   Give every independent order its own worktree, run them at once, merge them yourself, and then
+   run `Regression:` once over the merged tree (rung 12f). **Orders that touch the same file run in
+   sequence**, and **never two orders on one checkout** whatever their files: two agents on one
+   working tree race on `git add`, on the gates, and on each other's edits, which is the hazard the
+   worktree removes rather than manages. Measured 2026-10-12: every order of that day's batch ran
+   one at a time on the shared checkout, and the ones touching different files waited in line for
+   nothing.
 
 13. **Whatever reaches the user is written the way you would say it.** Answer first, one idea per
    sentence, no explanation nobody asked for, and no word from this file's own vocabulary — a reader

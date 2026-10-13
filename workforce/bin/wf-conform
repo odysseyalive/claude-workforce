@@ -191,6 +191,18 @@ PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't
 # handbooks that absorbed the mechanism BY HAND and say nothing about escalating it.
 # A handbook using this vocabulary about a skill has documented that it routes it up.
 ROUTING_RX = re.compile(r"\bESCALATE\b|\bis run by\b|\bnot yours to run\b|\bescalates?\b", re.I)
+# A CODE ROLE IS ONE WIRED TO THE `code` CATALOG, read from the handbook's own text and
+# never from its title or its department: `references/evaluators.md` makes that gate the
+# thing a code deliverable passes, so a handbook that routes it has said its deliverable
+# is code. Both spellings this distribution ships are matched — the resolver call and the
+# evaluator's own name — because a handbook healed by `audit` carries the first and one
+# authored before 2026-09-10 carries the second. Used by the `Regression:` row only, which
+# is advisory, so a role this misses loses a report and no role is failed by it.
+# THE RESOLVER HALF NAMES NO FLAG. Spelling it with `wf-catalog`'s kind flag put a flag
+# string in THIS script that this script's own parser does not accept, and the shipped-flag
+# check reads that as a tool printing a flag it does not have. The call is matched by its
+# command and its kind instead, which is the same evidence without the false claim.
+CODE_ROLE_RX = re.compile(r"\bcode-evaluator\b|\bwf-catalog\b[^\n]*\bcode\b")
 # Harness slash-commands: real invocations that are not project files and never will
 # be. Naming one is correct, so an unresolved-command check that does not know them
 # reports every handbook that says `/compact` as broken.
@@ -406,7 +418,12 @@ def _ic_floor(body):
     # `## Verification` the `Check:` and `Negative:` lines as the file actually carries
     # them — Core Principle 3 puts the runnable check IN the handbook, so it is the one
     # content that cannot relocate anywhere.
-    _CHECK_RESIDUE_RX = re.compile(r"^\s*(?:\*\*)?(?:Check|Negative)\b\s*:", re.I)
+    # `Regression` joined the pair on 2026-10-12 with the two-line template. It is a
+    # declared runnable form like the other two, so it cannot relocate either, and a
+    # residue that misses it UNDERSTATES the floor — the failure direction the comment
+    # above records, where an author trims toward a number the handbook cannot reach.
+    _CHECK_RESIDUE_RX = re.compile(
+        r"^\s*(?:\*\*)?(?:Check|Regression|Negative)\b\s*:", re.I)
     relocatable = 0
     for _h, _c in blocks:
         if not any(_h == s or _h.startswith(s + " ") for s in RELOCATABLE_SECTIONS):
@@ -971,6 +988,38 @@ def check_handbook(path, body, res, ceiling, floors=None):
         # handbook authored before this contract is in this state, and failing them
         # all at once reproduces the 9-false-failures run that taught this script
         # "a check that always fails stops being read."
+        # THE TARGETED CHECK AND THE ONE-TIME REGRESSION (2026-10-12). `verification.md`
+        # § The rule: `Check:` is the targeted proof of the change, named by fixture or
+        # case and run while building; `Regression:` is the full suite, run ONCE at the
+        # end of the work order. MEASURED that day from three coders' transcripts: 51 of
+        # one order's 124 wall-clock minutes went to the full suite over 62 calls, 47 of
+        # another's 103 to one gate alone, 23 of a third's 39 to the two — against live
+        # checks costing 3-4 minutes each. The cause was in the template, not in the
+        # agents: one `Check:` line is one proof, so it is the proof they ran at every
+        # step.
+        #
+        # SCOPED TO A CODE ROLE, by the gate the handbook already routes rather than by
+        # its title. A role wired to the `code` catalog produces code, which is the
+        # deliverable with a regression suite behind it; a reviewer or a prose role has
+        # nothing to run twice and must not be asked for a second line it cannot fill.
+        #
+        # ADVISORY, for the reason its neighbours above are: every handbook authored
+        # before the two-line template is in this state, and failing them all at once
+        # reproduces the run that taught this script "a check that always fails stops
+        # being read."
+        if CODE_ROLE_RX.search(body) and "Regression:" not in seg:
+            res.advise(
+                f"{n}: Verification names no Regression: line",
+                "a code role with only a `Check:` line has ONE proof available, so the "
+                "full suite is what it reruns after every edit — measured 2026-10-12 at "
+                "51 of 124 minutes in one order and 47 of 103 in another. Add a "
+                "`Regression:` line naming the full suite, run ONCE at the end of the "
+                "work order, and keep `Check:` as the targeted proof of the change "
+                "named by its fixture or case (verification.md § The rule; "
+                "procedures/org.md dispatch rungs 12f and 12g are what put it in the "
+                "order). ADVISORY: this row blocks nothing",
+            )
+
         if "Negative:" not in seg:
             res.advise(
                 f"{n}: Verification declares no negative case",
