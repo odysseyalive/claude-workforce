@@ -1044,11 +1044,19 @@ def carry_forward(led, skip=None):
 def carried_items(cl):
     """The carried rows on a checklist: objects naming an `issue`, an `ask` and a `status`.
     `checklist_items`' rule for the other list, with the issue id validated as the one name
-    it will be used as. A `carried` that is not a list carries nothing."""
+    it will be used as. A `carried` that is not a list carries nothing.
+
+    CAPPED ON THE WAY IN AS WELL AS ON THE WAY OUT. The hook writes at most `MAX_CARRIED`
+    rows, but the file is the SESSION's to rewrite and the read is a plain `json.load`, so a
+    list this reader trusts is a list whose length somebody else chose — and every row costs
+    a walk of the ledger's issues and their items, on every message and every Stop. Reading
+    the same number back that `carry_forward` wrote is the bound, and it drops nothing the
+    hook put there.
+    """
     rows = cl.get("carried") if isinstance(cl, dict) else None
     if not isinstance(rows, list):
         return []
-    return [r for r in rows
+    return [r for r in rows[:MAX_CARRIED]
             if isinstance(r, dict) and bare_name(r.get("issue"))
             and isinstance(r.get("ask"), str) and r["ask"].strip()]
 
