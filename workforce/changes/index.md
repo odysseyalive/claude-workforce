@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.77.3 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.3: an agent that stops on its own after a resume is returned, not re-marked as cut |
 | 1.77.2 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.2: a cut agent stays marked for resume, and every round gets its final notice |
 | 1.77.1 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.1: an agent stopped at its turn limit still owns its running jobs |
 | 1.77.0 | 2026-10-12 | handbook, chart, changes, hooks, scripts, installer, platform | **yes** | Release 1.77.0: a capped agent is resumed, not abandoned, and every judgment is per agent and per issue |
