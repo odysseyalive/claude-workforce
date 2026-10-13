@@ -1248,27 +1248,39 @@ def in_project(payload, path):
         return path
 
 
-def order_report(path, marks=True):
-    """What is at `path`: "ok", "unmarked", "unfinished" or "absent".
+def read_report(path):
+    """The head of the report at `path`, or None when there is nothing readable there.
 
     READ THROUGH `_open_nofollow`, the sibling's guarded open, so a link planted at a
     predictable path inside a checkout cannot aim this read somewhere else (CWE-59). A
-    name this hook cannot open without following something is reported "absent", which
-    is the safe direction: the kickback asks for a report, and a report nobody can read
-    is not one.
+    name this hook cannot open without following something reads as nothing, which is
+    the safe direction: the kickback asks for a report, and a report nobody can read is
+    not one.
+
+    ONE READER FOR TWO QUESTIONS. `order_report` classifies this text and
+    `report_delivered` looks in it for an UNMET row; a second open would be a second
+    guarded path to keep in step with this one.
+    """
+    try:
+        fd = TT._open_nofollow(path, os.O_RDONLY)
+    except OSError:
+        return None
+    try:
+        with os.fdopen(fd, encoding="utf-8", errors="replace") as fh:
+            return fh.read(OUTPUT_READ_BYTES)
+    except OSError:
+        return None
+
+
+def order_report(path, marks=True):
+    """What is at `path`: "ok", "unmarked", "unfinished" or "absent".
 
     `marks=False` FOR AN ORDER THAT ASKED FOR NONE, and then the file being there is the
     whole answer. See `OUTPUT_CRITERIA_ASKED_RX`: the gate enforces the expectation the
     order set, never one it did not.
     """
-    try:
-        fd = TT._open_nofollow(path, os.O_RDONLY)
-    except OSError:
-        return "absent"
-    try:
-        with os.fdopen(fd, encoding="utf-8", errors="replace") as fh:
-            body = fh.read(OUTPUT_READ_BYTES)
-    except OSError:
+    body = read_report(path)
+    if body is None:
         return "absent"
     if not marks:
         return "ok"
@@ -1292,7 +1304,15 @@ def _turn_budget():
 
 
 def at_cap(payload):
-    """`(turns, cap)` when this agent stopped AT its turn cap, else None.
+    """`(turn within this allowance, cap, which allowance)` at a cap stop, else None.
+
+    THE TURN IS REPORTED ROUND-RELATIVE, which is `wf-turn-budget`'s own rule for the
+    text it injects and was not this file's until 2026-10-13. The counter is CUMULATIVE
+    across a `SendMessage` resume, so a thrice-resumed `maxTurns: 10` IC stopped with the
+    counter reading 23 and the record this file filed said "stopped at turn 23 of 10" —
+    a number that reads as a bug in the hook rather than as a cap hit, in a performance
+    record about a person. 23 of a cap of 10 is turn 3 of the third allowance, and that
+    is what it now says.
 
     THE COUNT IS `wf-turn-budget`'s OWN AND IS NOT RECOUNTED HERE. That hook already
     counts this agent's turns on every one of its tool calls and stores them beside the
@@ -1333,7 +1353,14 @@ def at_cap(payload):
     turns = 0
     for base in bases:
         turns = max(turns, counter_turns(base, session, agent_id))
-    return (turns, cap) if turns >= cap else None
+    if turns < cap:
+        return None
+    # CEILING DIVISION, 1-BASED. `turns >= cap > 0` here, so the allowance this count lands
+    # in is `ceil(turns / cap)` and the turn inside it is never 0 and never past the cap.
+    # Derived from the two numbers rather than read from the counter: the counter stores one
+    # cumulative total, and a second stored number would be a second thing to keep in step.
+    rounds = (turns + cap - 1) // cap
+    return turns - (rounds - 1) * cap, cap, rounds
 
 
 def _ours(path, want):
@@ -1449,7 +1476,7 @@ def cap_perf(payload, path, ask, capped):
     write, a link planted at the name is refused rather than written through, and the
     ledger's append-only invariant is kept by never reopening a record that exists.
     """
-    turns, cap = capped
+    turns, cap, rounds = capped
     # SANITIZED HERE RATHER THAN TRUSTED FROM THE CALLER. `at_cap` only reaches this with
     # an `agent_type` that passed `wf-turn-budget.bare`, and this name is joined into two
     # paths — the record's and the handbook's — so the guard lives where the join is. A
@@ -1464,8 +1491,8 @@ def cap_perf(payload, path, ask, capped):
     # THE LINE SAYS WHICH OF THE TWO HAPPENED. A stop that reports a record it could not
     # write is worse than one that reports nothing: the next reader goes looking for a
     # file that is not there and concludes the cap hit was never seen.
-    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} with no report "
-            f"at {owed}. "
+    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} (round {rounds}) "
+            f"with no report at {owed}. "
             + (f"PERF filed at {os.path.join(PERF_STORE, name)}" if store
                else f"no PERF written to {PERF_STORE} — a link is on the way to it"))
     if not store:
@@ -1507,8 +1534,9 @@ A report at `{owed}`, carrying the `REQUEST (verbatim):` block, a criterion → 
 table with every exit criterion marked MET or UNMET, and an `## Exceptions` list.
 
 ## What Was Produced
-Nothing at that path. The agent stopped at turn {turns} of its cap of {cap}, so the run
-ended without the artifact and the work it did is not recoverable from the file.
+Nothing at that path. The agent stopped at turn {turns} of its cap of {cap}, on turn
+allowance {rounds}, so the run ended without the artifact and the work it did is not
+recoverable from the file.
 
 ## The Instruction That Produced It
 {quoted}
@@ -1532,6 +1560,64 @@ given and still be cut before the report exists — which is what happened here.
     except OSError:
         pass
     return {"systemMessage": note}
+
+
+_STOP_REPORT = []
+# AN UNMET VERDICT IS A TABLE ROW, which is `OUTPUT_UNFINISHED_RX`'s rule applied to the
+# other token and for the reason measured there. Every reporting contract in this
+# distribution says "every exit criterion marked MET or UNMET — `UNMET` stated rather than
+# omitted", so every report that quotes its own order carries the word in PROSE: read
+# loose, the token calls the most complete report in the tree unfinished. The verdict
+# itself is always in the criterion → evidence table, because that is where the contract
+# puts verdicts, so the line carrying it carries a pipe. Anchored per line rather than
+# cell-exact: the row says `| nobody proofread it — UNMET |`, with the verdict at the end
+# of the cell's own sentence, which a cell-opening pattern walks straight past.
+OUTPUT_UNMET_RX = re.compile(r"^[^\n]*\|[^\n]*\bUNMET\b", re.I | re.M)
+
+
+def stop_report(payload):
+    """`(ask, marks, path, state)` for the report THIS stop's order named — read once.
+
+    TWO READERS NOW ASK THE SAME QUESTION OF THE SAME STOP: `order_expectation`, which
+    decides whether a report is owed, and `report_delivered`, which decides whether a
+    capped agent is finished with its issue. Both answers have to come from one reading,
+    or the gate can kick a stop back for a missing report while the ledger records it as
+    delivered. A list is the cache because the whole process handles exactly one stop.
+    """
+    if not _STOP_REPORT:
+        ask = spawn_prompt(payload)
+        # ONE READING OF THE ORDER, HANDED TO BOTH. `order_output`'s tie-break asks the
+        # same question this does, and a tie-break holding the file to a stricter rule than
+        # the caller walks past the report the agent wrote.
+        marks = bool(OUTPUT_CRITERIA_ASKED_RX.search(ask or ""))
+        path = order_output(payload, ask, marks)
+        _STOP_REPORT.append((ask, marks, path,
+                             order_report(path, marks) if path else None))
+    return _STOP_REPORT[0]
+
+
+def report_delivered(payload):
+    """True when this stop left the report its own order named, with nothing left UNMET.
+
+    THIS IS WHAT RETIRES A `handoff` MARK, and it is the only thing at this event that
+    can. An agent cut at its turn cap keeps that mark through its stop (K8, and the
+    measured defect of 2026-10-13 is that it did not), so the question this answers is
+    "has it finished?" — not "did the hook have anything to say?". Those differ on exactly
+    the run that matters: a cut agent's stop is silent here when its order named no
+    artifact, and treating silence as delivery is how the resume line goes missing.
+
+    AN ORDER THAT NAMED NO REPORT IS NOT DELIVERY, because nothing says the work is done.
+    Such an agent keeps the mark until the issue closes, which `judge_ledger` does on the
+    session's own item statuses. An order that asked for no criteria is answered by the
+    file being there, which is `order_report`'s rule, not a second one.
+    """
+    _ask, marks, path, state = stop_report(payload)
+    if not path or state != "ok":
+        return False
+    if not marks:
+        return True
+    body = read_report(path)
+    return body is not None and not OUTPUT_UNMET_RX.search(body)
 
 
 def order_expectation(payload):
@@ -1558,15 +1644,9 @@ def order_expectation(payload):
     7.0% false-positive rate that retired this distribution's last speech guard, reached
     by repetition instead of by a bad detector".
     """
-    ask = spawn_prompt(payload)
-    # ONE READING OF THE ORDER, HANDED TO BOTH. `order_output`'s tie-break asks the same
-    # question this does, and a tie-break holding the file to a stricter rule than the
-    # caller walks past the report the agent wrote.
-    marks = bool(OUTPUT_CRITERIA_ASKED_RX.search(ask or ""))
-    path = order_output(payload, ask, marks)
+    ask, marks, path, state = stop_report(payload)
     if not path:
         return None
-    state = order_report(path, marks)
     if state == "ok":
         return None
     capped = at_cap(payload)
@@ -2440,7 +2520,22 @@ def ledger_verdict(payload, decided):
         if isinstance(decided, dict):
             judgment = (decided.get("reason") or decided.get("systemMessage")
                         or "returned")
-        if TT.agent_returned(payload, led, judgment):
+        # A CUT AGENT'S STOP DOES NOT RETIRE ITS `handoff` MARK unless the stop DELIVERED.
+        # MEASURED 2026-10-13 in session `68b82f98`: it did, three times in one run, so the
+        # main `Stop` saw every agent back and printed a kickback where the K8 resume line
+        # belonged. `wf-task-tag.agent_returned` carries the rule; this is the one caller
+        # that can answer the question it asks.
+        delivered = report_delivered(payload)
+        # AND A STOP AT THE CAP MARKS ITSELF, which is the half `wf-turn-budget` cannot
+        # always write. Its final threshold is `cap - 3` of the FIRST allowance and its
+        # round arithmetic is cumulative, so a run cut on a LATER allowance can end with no
+        # injection fired and no mark written — measured in the same session, where the
+        # second cut came at count 16 against a round-2 threshold of 17. Here the cap hit is
+        # a fact about the counter, read from `at_cap`, and an agent that stopped at the cap
+        # without delivering is by definition one with work left.
+        if not delivered and at_cap(payload):
+            TT.agent_handoff(payload, led)
+        if TT.agent_returned(payload, led, judgment, delivered):
             TT.save_ledger(payload, led)
         return "", ""
     rows = TT.judge_ledger(payload, led)

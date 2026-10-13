@@ -352,10 +352,57 @@ CASES = [
     # call's, so the assertion counts the two sites and this removes exactly one of them.
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
-     TBG, "delall", "            mark_handoff(payload)"),
+     TBG, "delall", "            mark_handoff(payload, writes)"),
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
      WDN, "delall", "RESUME {who} with SendMessage"),
+    # THE MARK SURVIVING ITS OWN CUT (2026-10-13). NO CASE HERE DELETES A `def` LINE OR AN
+    # `if` HEADER, and both halves of that are the constraint `bin/check` imposes by
+    # EXECUTING wf-task-tag: a deleted `def` orphans its body at module level and a deleted
+    # `if` leaves its block over-indented, and either way the file stops importing and the
+    # case comes back BAD-CASE having proved nothing. So each mutation removes a PARAMETER
+    # or a CONDITION and leaves code that runs and does the wrong thing — which is the only
+    # residue an assertion can be observed failing on.
+    #
+    # The parameter: `agent_returned(payload, led, judgment)` still imports, and the one
+    # caller passes four arguments, so the overwrite happens at run time inside the hook's
+    # own try/except — exactly the silent clearing this assertion is about.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", ", delivered=False"),
+    # The condition: `if a.get("state"):` is truthy for every linked agent, so every stop
+    # overwrites the mark again.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", ' != "handoff" or delivered'),
+    # And the resume's own guard: without it the loop flips the FIRST agent on the issue to
+    # `running` whatever state it was in, which is a worse answer than the one it replaces.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", 'if a.get("agent_id") == aid and a.get("state") == "handoff":'),
+    # THE CALL, NOT THE DEF, and counted for the reason the mark_handoff case above gives.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TBG, "delall", "            mark_running(payload)"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "        delivered = report_delivered(payload)"),
+    # THE STALL GUARD'S TWO HALVES. The write count the ledger stores, and the gate that
+    # requires a MEASURED round with a non-empty unmet set before anything is called
+    # stalled. Removing the gate's first line leaves the remaining conditions as a valid
+    # `if` — and a false escalation, which is the measured defect.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", "handoff_writes"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TBG, "delall",
+     '            writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)'),
+    # THE ROUND-RELATIVE CAP LINE. `rounds` is still bound by the `return` below it, so the
+    # file runs and prints the cumulative count — "turn 23 of 10", the measured line.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", " (round {rounds})"),
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
      WDN, "delall", "handoff_action(payload, iss, verdict)"),
@@ -522,7 +569,7 @@ CASES = [
     ("turn budget: nothing is written or read through a name another account can plant",
      TBG, "del", "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)"),
     ("turn budget: nothing is written or read through a name another account can plant",
-     TBG, "del", "counted, _ignored, spent = count_turns(tpath, 0,"),
+     TBG, "del", "counted, _ignored, spent, writes = count_turns(tpath, 0,"),
     # THE BRIEF'S SHAPE, pinned in BOTH files: the hook injects the section lines and
     # org.md rung 12b verifies them, so a case per side.
     ("turn budget: the continuation brief has one shape, named by its producer and its "

@@ -5009,7 +5009,7 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
     "want": [
-      "stopped at turn 10 of 10",
+      "stopped at turn 10 of 10 (round 1)",
       "PERF filed at .claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md"
     ],
     "not": [
@@ -8286,11 +8286,44 @@
     ]
   },
   "turn-budget-resumed-cap-stalls": {
-    "_why": "THE SECOND CUT IS THE ONE THE LOOP GUARD IS FOR, and the guard is PROGRESS, never a count of resumes. This agent was already cut once (`fired-final` is claimed, its entry carries the digest of the one open item) and has been resumed: the transcript is 77 turns because the count is cumulative across a `SendMessage` resume, so the marker had to become round-keyed or the resumed run would hit its new cap in total silence -- the defect this hook exists for, one layer out. The new digest equals the stored one, so nothing moved, and the entry is flagged `handoff_stalled` for the main `Stop` to escalate instead of asking for a third resume. The turn is reported WITHIN the current allowance (37 of 40, not 77 of 40), because a number past the cap reads as a bug to the agent being told it.",
+    "_why": "THE SECOND CUT IS THE ONE THE LOOP GUARD IS FOR, and the guard is PROGRESS, never a count of resumes. This agent was already cut once (`fired-final` is claimed, its entry carries the digest of the one open item) and has been resumed: the transcript is 77 turns because the count is cumulative across a `SendMessage` resume, so the marker had to become round-keyed or the resumed run would hit its new cap in total silence -- the defect this hook exists for, one layer out. BOTH progress signals are unmoved here, which is what stalled now requires: the new digest equals the stored one, AND the three `Write` calls in the transcript are the same three the first cut recorded in `handoff_writes`, so the agent produced nothing new in the round it just spent. The entry is flagged `handoff_stalled` for the main `Stop` to escalate instead of asking for a third resume. The turn is reported WITHIN the current allowance (37 of 40, not 77 of 40), because a number past the cap reads as a bug to the agent being told it.",
     "after": {
       ".claude/workforce/issues/s1.json": {
         "want": [
-          "\"handoff_stalled\": true"
+          "\"handoff_stalled\": true",
+          "\"handoff_writes\": 3"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-final-1": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "77 of 40"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "37 of 40",
+      "RETURN NOW"
+    ]
+  },
+  "turn-budget-resumed-cap-with-new-writes-resumes": {
+    "_why": "AN AGENT THAT WROTE SOMETHING IS NOT A STALLED AGENT, and this is the row the real end-to-end run of 2026-10-13 needed and did not have. Same second cut as `turn-budget-resumed-cap-stalls` -- same cumulative 77 turns, same unmet set, same digest -- with one thing different: the transcript carries FIVE `Write` calls against the three the first cut stored, so the round produced new work. The measured defect was the opposite reading: a `maxTurns: 10` IC wrote eight files in round one and eight more in round two and was called `handoff_stalled`, because the only signal was the session's checklist and the session had written none, so both marks carried the digest of the EMPTY set. An escalation hands the issue to the USER instead of finishing it, so it is never raised on a round the agent visibly worked. `handoff_writes` is updated to 5, which is what the THIRD cut will be measured against.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"handoff_writes\": 5",
+          "\"state\": \"handoff\""
+        ],
+        "not": [
+          "handoff_stalled"
         ]
       },
       "tmp/wf-turn-budget/s1/a1/fired-final-1": {
@@ -8994,6 +9027,59 @@
       "ISSUES  1 open issue(s) judged",
       "i1  CLOSED  2 items done, 1 agents returned"
     ]
+  },
+  "widen-handoff-capped-stop-keeps-the-mark": {
+    "_why": "THE STOP THAT FOLLOWS THE CUT DOES NOT UNDO IT, which is the defect a real end-to-end run measured on 2026-10-13 (session `68b82f98`). `a1` is `handoff` on its issue, its counter says 23 turns against a cap of 10, and the report its order named is not there -- so this stop delivered nothing, and the mark that tells the main `Stop` to RESUME it has to survive. It did not: `agent_returned` overwrote it on every one of three cuts in that run, the main Stop judged `every agent back, items open`, and the K8 resume line never appeared at all. The `PERF` line in the same breath is the cosmetic half: the counter is cumulative across a resume, so `turn 23 of 10` is turn 3 of the THIRD allowance and now says so. `handoff_stalled` must be absent -- this is one cut seen twice, by the hook and then by this stop, not two cuts.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"handoff\"",
+          "\"handoff_writes\": 8"
+        ],
+        "not": [
+          "\"state\": \"returned\"",
+          "handoff_stalled"
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "turn 23 of 10"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "want": [
+      "stopped at turn 3 of 10 (round 3)"
+    ]
+  },
+  "widen-handoff-delivered-all-met-returns": {
+    "_why": "AND THE OTHER DIRECTION, because a mark that is never retired is a session asked to resume an agent that is finished. Same cut agent and the same counter at 23 of 10, with the report its order named present at the path the order gave and every criterion row reading MET. That is the one thing this event accepts as delivery: not the hook's silence, which a cut agent's stop also produces when its order named no artifact. So the entry goes to `returned`, and the issue is judged on its items at the next main Stop like any other hand-back.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"returned\""
+        ],
+        "not": [
+          "\"state\": \"handoff\"",
+          "handoff_stalled"
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "no report",
+      "turn cap"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}"
   },
   "issues-all-returned-with-open-items-is-kicked-back": {
     "_why": "THE OTHER HALF OF THE SAME JUDGMENT, and the only new verdict that can reach the user as a kickback. Every agent on i2 is back and an item the SESSION ITSELF wrote is still open, so the issue is not finished and the Stop says which item. The evidence is deliberately never inferred -- only an item the session recorded and did not mark done counts -- because this project's rule is that a blocking surface ships with no known wrong fire. i1 is `CLOSED` in the same run, which is what proves the two verdicts are decided per issue and not for the session as a whole.",

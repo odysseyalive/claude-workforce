@@ -255,8 +255,35 @@ def agent_transcript(payload, session_id, agent_id):
                         "agent-" + agent_id + ".jsonl")
 
 
+#
+# WHAT COUNTS AS WORK THE AGENT PRODUCED, which is the progress signal the stall guard
+# needs and the reason this hook counts anything besides turns. MEASURED 2026-10-13
+# (session `68b82f98`): an IC wrote eight files in its first round and eight more in its
+# second and was flagged stalled at the second cut, because the only progress signal was
+# the issue's UNMET set — and the session had recorded no checklist, so both marks carried
+# the digest of the empty set. A report is not measurable either: it is named in a
+# handbook, this hook is told an `agent_id`, and in that run the report was never written
+# at all. What DOES exist at every cut is the agent's own transcript, so the files it wrote
+# are counted from the same read that counts its turns. NO SECOND OPEN: a new transcript
+# read here would be a second, unguarded door into a path assembled from payload text.
+#
+# THE WRITE TOOLS BY NAME, and the exact names rather than a pattern. A substring test
+# (`"Write" in name`) matches `TodoWrite`, which every agent calls and which produces
+# nothing; the opposite shortcut — "anything that is not a read" — counts `Bash`, where
+# `ls` and `rm -rf` are the same call. `MultiEdit` is kept although the host no longer
+# sends it, because a transcript recorded under an older harness is still read by this one.
+#
+# A COUNT OF CALLS, NOT OF DISTINCT PATHS, and the direction of the error is the reason.
+# This number decides whether an agent is called STALLED and handed to the user instead of
+# resumed, so the cheap mistake is to under-count progress: an agent that spent its round
+# re-editing three files it had already touched did work, and a distinct-path set would
+# call that round empty. One write in the round is progress; no write at all, with the
+# session's own UNMET set unmoved, is the stall the guard is for.
+WRITE_TOOLS = frozenset(("Write", "Edit", "MultiEdit", "NotebookEdit"))
+
+
 def count_turns(path, offset, needles=()):
-    """(turns after `offset`, new offset, needles seen) — or (None, offset, set()).
+    """(turns, new offset, needles seen, writes) — or (None, offset, {}, 0).
 
     A TURN IS AN ASSISTANT MESSAGE CARRYING A `tool_use`. An assistant row holding only
     `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
@@ -276,6 +303,10 @@ def count_turns(path, offset, needles=()):
     to be told again (K8): one delivery per round, and the round is what the count is
     compared against. A set could only ever answer "at least once", which would leave a
     resumed run silent at its second cap — the run the user is waiting on.
+
+    `writes` RIDES ALONG ON THE SAME PARSE. It is the number of `WRITE_TOOLS` calls in the
+    rows just read, which is the progress signal `agent_handoff` needs and is free here:
+    the row is already decoded and its blocks already walked for the turn test.
     """
     # A REGULAR FILE, OR NOTHING. `os.path.isfile` is false for a FIFO, and the open below
     # would otherwise BLOCK on one until a writer appeared — on every tool call, inside a
@@ -285,18 +316,18 @@ def count_turns(path, offset, needles=()):
     # that path. `read_cap` takes the same guard, and it is the one `wf-turn-ledger`'s
     # `_read_lines` has carried since it shipped.
     if not path or not os.path.isfile(path):
-        return None, offset, {}
+        return None, offset, {}, 0
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
             chunk = fh.read()
     except (OSError, ValueError):
-        return None, offset, {}
+        return None, offset, {}, 0
     seen = dict((n, chunk.count(n.encode("utf-8"))) for n in needles)
     cut = chunk.rfind(b"\n")
     if cut < 0:
-        return 0, offset, seen
-    turns = 0
+        return 0, offset, seen, 0
+    turns = writes = 0
     for raw in chunk[:cut + 1].splitlines():
         if b'"tool_use"' not in raw:          # cheap reject before any parse
             continue
@@ -309,9 +340,12 @@ def count_turns(path, offset, needles=()):
         content = (row.get("message") or {}).get("content")
         if not isinstance(content, list):
             continue
-        if any(isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
+        calls = [b for b in content
+                 if isinstance(b, dict) and b.get("type") == "tool_use"]
+        if calls:
             turns += 1
-    return turns, offset + cut + 1, seen
+            writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
+    return turns, offset + cut + 1, seen, writes
 
 
 # ── the counter directory, which lives in a place other people can write ─────
@@ -392,7 +426,8 @@ def _open_nofollow(path, flags, mode=0o600):
 
 
 def read_state(path):
-    """The stored offset and counts, or zeros. Unparsable state is DISCARDED.
+    """The stored offset and counts — `(off, turns, calls, writes)` — or zeros.
+    Unparsable state is DISCARDED.
 
     The transcript is the source of truth and this file is a cache, so throwing it away
     costs one full re-read and never a wrong answer. A hook that raised on scratch
@@ -402,25 +437,30 @@ def read_state(path):
     through — the read would otherwise be an arbitrary-file read aimed by whoever got to
     the name first.
     """
+    zero = (0, 0, 0, 0)
     try:
         fd = _open_nofollow(os.path.join(path, "count.json"), os.O_RDONLY)
     except OSError:
-        return 0, 0, 0
+        return zero
     try:
         with os.fdopen(fd, encoding="utf-8") as fh:
             d = json.load(fh)
     except (OSError, ValueError):
-        return 0, 0, 0
+        return zero
     if not isinstance(d, dict):
-        return 0, 0, 0
+        return zero
     out = []
-    for key in ("off", "turns", "calls"):
+    # `writes` ARRIVES ON STATE THAT NEVER HELD IT. A counter written before 2026-10-13
+    # has three keys, and a missing one reads as 0 — which is the honest answer: nothing
+    # was counted, so no progress is claimed, and the first mark after the upgrade stores
+    # the real number.
+    for key in ("off", "turns", "calls", "writes"):
         v = d.get(key)
         out.append(v if isinstance(v, int) and v >= 0 else 0)
-    return out[0], out[1], out[2]
+    return out[0], out[1], out[2], out[3]
 
 
-def write_state(path, off, turns, calls):
+def write_state(path, off, turns, calls, writes):
     """Replace the counter atomically, and never through a link.
 
     THE TEMPORARY NAME IS CREATED `O_CREAT | O_EXCL | O_NOFOLLOW`, so it cannot be a
@@ -436,7 +476,8 @@ def write_state(path, off, turns, calls):
         return
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump({"off": off, "turns": turns, "calls": calls}, fh)
+            json.dump({"off": off, "turns": turns, "calls": calls,
+                       "writes": writes}, fh)
         os.replace(tmp, os.path.join(path, "count.json"))
     except OSError:
         try:
@@ -491,13 +532,17 @@ def emit(text):
 # a handful of times in a whole session, so the cost lands where the run is ending anyway.
 # The alternative is a second writer of the ledger, which the order forbids and which would
 # be the copy that drifts.
-def mark_handoff(payload):
-    """Mark this agent `handoff` on its issue, through `wf-task-tag`'s own ledger API.
+def _ledger_write(payload, call):
+    """Run one of `wf-task-tag`'s ledger writers and save when it recorded something.
 
-    Returns the issue id it landed on, or None — including when this project has no ledger,
-    which is every project that has not run a turn with an issue in it. NEVER RAISES: the
-    boundary injection is the part the run cannot do without, and a traceback here would
-    print in front of the model instead.
+    `call(mod, led)` returns the issue id it landed on, or None for "nothing to record" —
+    and None means NOT SAVED, so the ordinary tool call of an already-`running` agent
+    rewrites no file.
+
+    Returns that issue id, or None — including when this project has no ledger, which is
+    every project that has not run a turn with an issue in it. NEVER RAISES: the boundary
+    injection is the part the run cannot do without, and a traceback here would print in
+    front of the model instead.
     """
     try:
         import importlib.machinery
@@ -512,12 +557,63 @@ def mark_handoff(payload):
             importlib.util.spec_from_loader(loader.name, loader))
         loader.exec_module(mod)
         led = mod.load_ledger(payload)
-        issue = mod.agent_handoff(payload, led)
+        issue = call(mod, led)
         if issue:
             mod.save_ledger(payload, led)
         return issue
     except Exception:
         return None
+
+
+def mark_handoff(payload, writes):
+    """Mark this agent `handoff` on its issue, with the work it produced this round.
+
+    `writes` is its cumulative `WRITE_TOOLS` count; `agent_handoff` compares it against
+    the number the previous mark stored and calls the agent stalled only when nothing
+    moved on either measure.
+    """
+    return _ledger_write(payload, lambda mod, led: mod.agent_handoff(payload, led, writes))
+
+
+# ── and the other end of it: a resumed agent is working again ────────────────
+# A `SendMessage` RESUME FIRES NO `SubagentStart`, so nothing else in this distribution
+# ever sees it. Without this, a resumed agent's entry sits at `handoff` for the whole
+# second round and the main `Stop` of the turn in the middle of it asks the session to
+# resume an agent that is already resumed. This hook is the only thing that observes the
+# cut agent making a tool call again, so it is the one that can say so.
+#
+# ONCE PER ROUND, THROUGH THE SAME CLAIM FILE MECHANISM the injections use, and gated on a
+# final marker already being claimed — so the cost on every ordinary capped agent is ONE
+# `os.path.exists`, and the ledger is loaded only on the first call after a cut.
+RESUME_MARK = "resumed-after-"
+
+
+def last_claim(path, marker, rounds):
+    """The newest round-keyed `marker` claimed under `path`, or "" when none was.
+
+    NEWEST FIRST, because the question is "has this agent been cut, and by which claim" —
+    and the claim that decides is the last one, so each cut gets exactly one resume flip
+    keyed to it. `rounds` bounds the walk at the round the counter is in, which makes it
+    ONE `os.path.exists` for an agent that was never cut: almost every agent, on every
+    call.
+
+    KEYED TO THE CUT RATHER THAN TO THE ROUND, and that is measured. In session `68b82f98`
+    a `maxTurns: 10` IC was cut at turn 8 and resumed at turn 9, and `(turns - final_at) //
+    cap` reads 0 for both — one round by the arithmetic, two allowances in fact. A resume
+    claim keyed by round number would therefore have been spent by the cut itself for
+    small caps. The marker that the cut actually claimed is the one thing that cannot
+    disagree with how many times this agent has been told to hand off.
+    """
+    for k in range(rounds, -1, -1):
+        name = marker if k == 0 else "%s-%d" % (marker, k)
+        if os.path.exists(os.path.join(path, name)):
+            return name
+    return ""
+
+
+def mark_running(payload):
+    """Put this agent back to `running` on its issue after a resume."""
+    return _ledger_write(payload, lambda mod, led: mod.agent_resumed(payload, led))
 
 
 def main():
@@ -551,9 +647,9 @@ def main():
     path = state_dir(payload, session_id, agent_id)
 
     if path:
-        off, turns, calls = read_state(path)
+        off, turns, calls, writes = read_state(path)
         calls += 1
-        counted, new_off, _ = count_turns(tpath, off)
+        counted, new_off, _, wrote = count_turns(tpath, off)
         if counted is None:
             # THE FALLBACK ERRS TOWARD AN EARLY HANDOFF. Calls >= turns always, so a call
             # count crosses the boundary no later than the true turn count would. An early
@@ -561,7 +657,8 @@ def main():
             turns, new_off = calls, off
         else:
             turns += counted
-        write_state(path, new_off, turns, calls)
+            writes += wrote
+        write_state(path, new_off, turns, calls, writes)
         spent = set()
     else:
         # NO DIRECTORY COULD BE VERIFIED, SO THERE IS NO STATE AND THE RUN STILL GETS ITS
@@ -570,7 +667,7 @@ def main():
         # recorded there as a `hook_additional_context` attachment (measured 2026-10-12),
         # so what was already said can be read back. No transcript AND no state leaves
         # nothing to count, and a number nothing measured is not worth stopping a run on.
-        counted, _ignored, spent = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
+        counted, _ignored, spent, writes = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
         if counted is None:
             return 0
         turns = counted
@@ -604,17 +701,28 @@ def main():
     # the mark, and early costs one extra written hand-back, which is the direction this
     # hook already errs in on purpose.
     round_ = (turns - final_at(cap)) // cap
+    cut_now = False
     if turns >= final_at(cap):
         once("fired-warn", WARN_MARK)              # spend the quieter one unspoken
         if once("fired-final", FINAL_MARK, round_):
             # THE MARK BEFORE THE TEXT. The injection is what the agent acts on, and the
             # mark is what the session acts on; if only one of them can land, the one that
             # survives a crash in the other is the one the user is waiting on.
-            mark_handoff(payload)
+            cut_now = True
+            mark_handoff(payload, writes)
             emit(FINAL_TEXT.format(turns=turns - round_ * cap, cap=cap,
                                    sections=BRIEF_SECTIONS))
     elif turns >= warn_at(cap) and once("fired-warn", WARN_MARK):
         emit(WARN_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
+    # AND THE OTHER END: THIS CALL IS A CUT AGENT WORKING AGAIN. Not on the call that just
+    # told it to hand off, which would flip the mark it had this moment written. No state
+    # directory means no claim and no flip: the transcript records an injection but not a
+    # resume, so such an agent keeps its `handoff` mark until it delivers — one resume asked
+    # for twice, which is the recoverable direction against a hold that never ends.
+    if path and not cut_now:
+        cut = last_claim(path, "fired-final", max(round_, 0))
+        if cut and claim(path, RESUME_MARK + cut):
+            mark_running(payload)
     return 0
 
 

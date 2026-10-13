@@ -601,13 +601,24 @@ IGNORE_RULE = "*\n"
 # THE THREE STATES AN AGENT ENTRY CAN BE IN, declared here because the ledger is the only
 # file that carries them and a reader needs the set.
 #
-#   running    linked at `SubagentStart`; the issue holding one is a HOLD, never a failure
-#   returned   it handed back, and `wf-widen` recorded its judgment on the issue
+#   running    linked at `SubagentStart`; the issue holding one is a HOLD, never a failure.
+#              A RESUMED agent returns to it at its next tool call (`agent_resumed`), which
+#              is the only moment anything sees a `SendMessage` resume: a resume fires no
+#              `SubagentStart`.
+#   returned   it handed back HAVING DELIVERED, and `wf-widen` recorded its judgment on the
+#              issue. The only two ways in are a stop that delivered the report its order
+#              asked for with nothing UNMET in it, and the issue closing.
 #   handoff    it stopped at its TURN CAP with work left. SET BY `wf-turn-budget` at the
 #              final threshold (K8), through `agent_handoff` below — the hook knows the
 #              `agent_id` and the count, so the mark does not wait on `SubagentStop`
 #              firing at a cap, which is unmeasured. An agent in this state has STOPPED:
-#              the main `Stop` asks for it to be RESUMED, never replaced.
+#              the main `Stop` asks for it to be RESUMED, never replaced. THE STOP THAT
+#              FOLLOWS THE CUT DOES NOT CLEAR IT (`agent_returned`, measured 2026-10-13):
+#              it did, and the resume line never reached one real session.
+#
+# SO THE CYCLE IS `running` → `handoff` → `running` → … → `returned`, and every arrow is
+# written by one event: the final threshold, the first tool call after a resume, and a stop
+# that delivered.
 AGENT_STATES = ("running", "returned", "handoff")
 
 # A LEDGER NOBODY CAN READ IS A LEDGER NOBODY READS, and the same bound `wf-widen` puts on
@@ -980,8 +991,8 @@ def link_agent(payload, led):
     return iss.get("id")
 
 
-def agent_returned(payload, led, judgment):
-    """Mark the stopping agent `returned` and record its judgment ON ITS OWN ISSUE.
+def agent_returned(payload, led, judgment, delivered=False):
+    """Record the stopping agent's judgment ON ITS OWN ISSUE, and settle its state.
 
     THE ISSUE IS FOUND BY THE AGENT'S ID, never by which issue is newest. That is the
     no-cross-talk rule: two issues are open, each has two agents, and the hand-backs
@@ -989,6 +1000,27 @@ def agent_returned(payload, led, judgment):
     An agent whose id appears on no issue is an agent this session never linked, and
     nothing is recorded for it — a stop with no `agent_id` is NOT KEYABLE and is never
     given a guessed one.
+
+    A STOP DOES NOT UNDO A `handoff`, AND THAT IS THE DEFECT A REAL END-TO-END RUN FOUND
+    (2026-10-13, session `68b82f98`). A `maxTurns: 10` IC was cut at its cap three times
+    and finished on the third. `wf-turn-budget` marked it `handoff` at every cut — and this
+    function, called from `wf-widen`'s `SubagentStop` moments later, overwrote the mark
+    with `returned` every time. The main `Stop` therefore judged the issue as "all agents
+    back, items open" and printed a KICKBACK; the one line the whole K8 mechanism exists to
+    print — resume THIS agent with `SendMessage` — never appeared in that session at all.
+    The harness's own cut notice is what got the run resumed, which is luck, not a product.
+
+    So the state a cut agent stops in is the state it keeps. `delivered` is the ONLY thing
+    that retires the mark here: the caller says whether this stop left the report its order
+    asked for with nothing still UNMET in it (`wf-widen.report_delivered`). The other
+    retirement is the issue closing (`judge_ledger`), which is the half that holds when the
+    cut lands before this event fires at all. It DEFAULTS TO FALSE because that is the
+    recoverable direction: a `handoff` kept one stop too long asks for one resume too many,
+    where a `handoff` dropped once is a run nobody is ever told to continue.
+
+    A RESUMED AGENT IS PUT BACK TO `running` BY `agent_resumed`, at its next tool call, so
+    the round logic downstream still sees `running` → `handoff` → `running` and never a
+    `handoff` agent that is secretly working.
 
     Returns the issue id it landed on, or None.
     """
@@ -998,31 +1030,64 @@ def agent_returned(payload, led, judgment):
     for iss in led.get("issues", []):
         for a in issue_agents(iss):
             if a.get("agent_id") == aid:
-                a["state"] = "returned"
                 a["judgment"] = str(judgment or "")[:500]
+                if a.get("state") != "handoff" or delivered:
+                    a["state"] = "returned"
                 return iss.get("id")
     return None
+
+
+def agent_resumed(payload, led):
+    """Put a RESUMED agent back to `running` on its own issue. Issue id, or None.
+
+    `wf-turn-budget` calls this on the first tool call after a cut, which is the only
+    moment anything observes that a `SendMessage` resume happened: a resume fires no
+    `SubagentStart`, so `link_agent` never runs for it and the entry would sit at
+    `handoff` while the agent is working. `judge_issue` would then ask the user to resume
+    an agent that is already resumed.
+
+    ONLY FROM `handoff`, and None otherwise, so the caller writes nothing on an ordinary
+    call. An agent already `running` is the common case and must cost no ledger write.
+    """
+    aid = agent_component(payload)
+    if not aid:
+        return None
+    for iss in led.get("issues", []):
+        for a in issue_agents(iss):
+            if a.get("agent_id") == aid and a.get("state") == "handoff":
+                a["state"] = "running"
+                return iss.get("id")
+    return None
+
+
+def unmet_asks(iss):
+    """ONE issue's UNMET set — the asks the session itself has not marked done."""
+    return [i["ask"] for i in issue_items(iss) if not item_done(i)]
 
 
 def unmet_digest(iss):
     """A fingerprint of ONE issue's UNMET set — what is still open, in the session's words.
 
-    EQUAL DIGESTS AT TWO HAND-OFFS MEANS NOTHING MOVED BETWEEN THEM, which is the whole
+    EQUAL DIGESTS AT TWO HAND-OFFS MEANS NOTHING MOVED BETWEEN THEM, which is HALF of the
     loop guard: the guard is progress, never a count of resumes, because a count would
     escalate an agent that is finishing something large and let a stuck one be resumed
-    twice first.
+    twice first. The other half is the agent's own writes — see `agent_handoff`, and see
+    why this one cannot carry the case alone.
 
     THE ITEM STATUSES ARE THE EVIDENCE THIS FILE HOLDS. The plan words the test as
     "OUTPUT.md unchanged"; that path is named in a HANDBOOK and reaches no hook — the hook
     is told an `agent_id`, not a deliverable path — so hashing the file would mean guessing
     where it is. The asks the session has not marked done are the same evidence
     `judge_issue` already kicks back on, and the only kind this project acts on.
+
+    AN EMPTY UNMET SET DIGESTS TO sha256("") AND IS NOT EVIDENCE OF ANYTHING. Every issue
+    whose checklist the session has not written yet produces that same value, which is how
+    the measured false stall happened: see `agent_handoff`.
     """
-    asks = [i["ask"] for i in issue_items(iss) if not item_done(i)]
-    return hashlib.sha256("\n".join(asks).encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256("\n".join(unmet_asks(iss)).encode("utf-8")).hexdigest()[:16]
 
 
-def agent_handoff(payload, led):
+def agent_handoff(payload, led, writes=None):
     """Mark the agent that hit its TURN CAP `handoff` ON ITS OWN ISSUE. Issue id, or None.
 
     `wf-turn-budget` calls this at its final threshold, which is the moment the run is
@@ -1031,12 +1096,24 @@ def agent_handoff(payload, led):
     wrong answer for every mark but the luckiest. An agent whose id appears on no issue is
     one this session never linked, and nothing is recorded rather than guessed.
 
-    THE SECOND MARK IS THE ONE THAT MATTERS. `handoff_digest` is the UNMET set as it stood
-    at the previous mark; when this mark carries the same digest, the resumed agent handed
-    off again with nothing moved and the entry is flagged `handoff_stalled`. The main
-    `Stop` then escalates to the user instead of asking for a third resume. A first mark
-    can never be stalled, so no agent is ever escalated before it has actually been
-    resumed once.
+    THE SECOND MARK IS THE ONE THAT MATTERS, AND STALLED IS NOW MEASURED FROM TWO THINGS.
+    `handoff_digest` is the issue's UNMET set and `handoff_writes` is how many files the
+    agent had written or edited, counted from its own transcript by the caller. A mark is
+    `handoff_stalled` only when ALL THREE hold:
+
+      * there IS an unmet set — a session that has not written its checklist yet digests
+        to sha256(""), and two of those in a row say nothing about the agent;
+      * that set is the one the previous mark left, so nothing the session tracks moved;
+      * and the agent wrote NOTHING new in the round it just spent.
+
+    MEASURED 2026-10-13, which is why the third test exists. In session `68b82f98` a
+    `maxTurns: 10` IC wrote eight files in its first round and eight more in its second,
+    and was flagged `handoff_stalled` at the second cut — because the issue had no items
+    recorded yet, so both marks carried the digest of the empty set, and the agent's actual
+    output was measured by nothing. An absent report is not an unchanged one, and an issue
+    with no checklist is not a stalled issue. `writes=None` means the caller could not
+    count (no readable transcript), and then the digest decides alone, which is the
+    behaviour that shipped before — never worse than it, and gated on a non-empty set.
     """
     aid = agent_component(payload)
     if not aid:
@@ -1045,10 +1122,15 @@ def agent_handoff(payload, led):
         for a in issue_agents(iss):
             if a.get("agent_id") == aid:
                 digest = unmet_digest(iss)
-                if a.get("handoff_digest") == digest:
+                measured = writes is not None
+                moved = measured and writes > (a.get("handoff_writes") or 0)
+                if (measured and unmet_asks(iss) and not moved
+                        and a.get("handoff_digest") == digest):
                     a["handoff_stalled"] = True
                 a["state"] = "handoff"
                 a["handoff_digest"] = digest
+                if writes is not None:
+                    a["handoff_writes"] = writes
                 return iss.get("id")
     return None
 
@@ -1068,8 +1150,9 @@ def judge_issue(iss):
                 This was a `hold` until K8, because nothing set the state; holding on it now
                 would wait forever for a run the harness has already ended, which is the
                 silence the whole turn-budget line of work exists to remove.
-      escalate  that agent was marked `handoff` a SECOND time with the same unmet set
-                (`handoff_stalled`), so resuming it again is not progress. The user decides.
+      escalate  that agent was marked `handoff` a SECOND time with the same unmet set AND
+                nothing newly written (`handoff_stalled`), so resuming it again is not
+                progress. The user decides.
       kickback  every agent is back and ITEMS THE SESSION ITSELF RECORDED ARE STILL OPEN.
       closed    every item done. A `handoff` agent does not block this: an agent that
                 stopped at a cap having finished the work has nothing left to be resumed
@@ -1121,8 +1204,9 @@ def judge_ledger(payload, led):
     everything MET has nothing left to be resumed for, so it is `returned` like any other
     hand-back — and leaving the mark behind would make the NEXT message's Stop ask for a
     resume of an agent whose work is done. `SubagentStop` does this too, through
-    `agent_returned`; this is the half that holds when a cap stops the run before that
-    event fires, which is unmeasured on this host.
+    `agent_returned` AND ONLY WHEN THAT STOP DELIVERED; this is the half that holds when a
+    cap stops the run before that event fires, which is unmeasured on this host, and the
+    half that holds when the agent stopped with the work still unfinished.
 
     THE ISSUE ITSELF RIDES ALONG IN THE ROW, so `wf-widen` can name the agents a verdict
     is about without parsing them back out of the sentence it was given.

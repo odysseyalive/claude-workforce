@@ -19308,7 +19308,7 @@ if _tb_src.count('getattr(os, "O_NOFOLLOW", 0)') != 1 or "_open_nofollow" not in
 if "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)" not in _tb_src:
     _tb_sec.append("the temporary counter name is no longer created exclusively, so it "
                    "can be a link somebody put there first")
-if "counted, _ignored, spent = count_turns(tpath, 0," not in _tb_src:
+if "counted, _ignored, spent, writes = count_turns(tpath, 0," not in _tb_src:
     _tb_sec.append("the refusal no longer falls back to counting from the transcript — a "
                    "squatted directory would then cost the run its hand-back, which hands "
                    "a denial of service the outcome this hook exists to prevent")
@@ -20108,17 +20108,73 @@ if 'waiting = [a for a in agents if a.get("state") == "running"]' not in _il:
     _il_st.append("judge_issue holds on more than a RUNNING agent — a `handoff` agent has "
                   "STOPPED at its turn cap, and holding on it waits forever for a run the "
                   "harness already ended")
-if "def agent_handoff(payload, led):" not in _il or 'a["state"] = "handoff"' not in _il:
+if ("def agent_handoff(payload, led, writes=None):" not in _il
+        or 'a["state"] = "handoff"' not in _il):
     _il_st.append("nothing writes the `handoff` state through the ledger's own API, so the "
                   "state is declared and set by nobody again")
 # COUNTED, NOT `in`: the definition contains the call's own text, so a bare `in` passes on
 # a file where the function is defined and never called — which is exactly the shape a
 # later edit leaves behind. Two sites: the def, and the one call at the final threshold.
-if _tb_src.count("mark_handoff(payload)") != 2:
+if _tb_src.count("mark_handoff(payload, ") != 2:
     _il_st.append(f"wf-turn-budget names mark_handoff at "
-                  f"{_tb_src.count('mark_handoff(payload)')} sites, expected 2 — its own "
+                  f"{_tb_src.count('mark_handoff(payload, ')} sites, expected 2 — its own "
                   "def and the call at the final threshold. Without the call the session "
                   "is never told which agent to resume")
+# THE MARK SURVIVES THE STOP THAT FOLLOWS THE CUT. MEASURED 2026-10-13, end to end, in
+# session `68b82f98`: a `maxTurns: 10` IC was cut three times and `wf-widen`'s
+# `SubagentStop` overwrote the mark with `returned` every time, so the main `Stop` judged
+# "every agent back, items open" and printed a KICKBACK. The resume line this whole
+# mechanism exists for never appeared in that session at all — the run only finished
+# because the HARNESS's own cut notice prompted a resume, which is luck. Three literals:
+# the parameter that carries the only thing allowed to retire the mark, the guard that
+# reads it, and the caller that answers it.
+if "def agent_returned(payload, led, judgment, delivered=False):" not in _il:
+    _il_st.append("agent_returned takes no `delivered` argument, so every stop is a "
+                  "delivery and a cut agent's `handoff` is cleared by the stop the cut "
+                  "itself caused")
+if 'if a.get("state") != "handoff" or delivered:' not in _il:
+    _il_st.append("the stop overwrites a `handoff` state unconditionally — the measured "
+                  "defect of 2026-10-13, where the mark was written at the final "
+                  "threshold and gone again seconds later")
+if _il_w.count("report_delivered(payload)") != 2:
+    _il_st.append(f"wf-widen names report_delivered at "
+                  f"{_il_w.count('report_delivered(payload)')} sites, expected 2 — its own "
+                  "def and the one call at `SubagentStop`. Without the call the ledger is "
+                  "told nothing about whether the stop delivered, and `delivered=False` "
+                  "would keep every agent's mark forever")
+# AND THE OTHER END OF THE CYCLE. A resume fires no `SubagentStart`, so without this an
+# agent that is working again reads as `handoff` and the Stop in the middle of its second
+# round asks the session to resume what it already resumed.
+if ('if a.get("agent_id") == aid and a.get("state") == "handoff":' not in _il
+        or _tb_src.count("mark_running(payload)") != 2):
+    _il_st.append("nothing puts a RESUMED agent back to `running`: a `SendMessage` resume "
+                  "fires no SubagentStart, so the entry sits at `handoff` while the agent "
+                  "works and the next Stop asks for a resume that already happened")
+# THE STALL GUARD MEASURES THE AGENT'S OWN OUTPUT, NOT ONLY THE SESSION'S CHECKLIST. In
+# the same measured run the IC wrote eight files in its first round and eight more in its
+# second and was flagged `handoff_stalled` at the second cut — because the session had
+# recorded no checklist, so both marks carried the digest of the EMPTY set. An escalation
+# hands the issue to the user instead of finishing it, so it rests on two signals now.
+if "handoff_writes" not in _il or '"writes": writes' not in _tb_src:
+    _il_st.append("the hand-off records no write count, so progress is measured only by "
+                  "the session's own item statuses — which are empty on every issue whose "
+                  "checklist the session has not written yet")
+if ('writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)' not in _tb_src
+        or 'frozenset(("Write", "Edit", "MultiEdit", "NotebookEdit"))' not in _tb_src):
+    _il_st.append("nothing counts the files the agent wrote in the round it just spent — "
+                  "the count rides on the same guarded transcript read as the turn count, "
+                  "and without it the only progress signal is a checklist the session may "
+                  "never have written")
+if "if (measured and unmet_asks(iss) and not moved" not in _il:
+    _il_st.append("stalled is no longer gated on a MEASURED round with a non-empty unmet "
+                  "set and no new writes — an absent report alone is not an unchanged one, "
+                  "and two digests of sha256(\"\") say nothing about the agent")
+# THE CAP LINE READS WITHIN THE ALLOWANCE. The counter is cumulative across a resume, so
+# the record filed about a thrice-cut IC said "stopped at turn 23 of 10" — a number that
+# reads as a bug in the hook, in a performance record about a person.
+if "(round {rounds})" not in _il_w or "rounds = (turns + cap - 1) // cap" not in _il_w:
+    _il_st.append("the cap hit is reported against the cumulative count rather than the "
+                  "current allowance, so a resumed agent's record says turn 23 of 10")
 if "handoff_stalled" not in _il or "handoff_stalled" not in _il_w:
     _il_st.append("the loop guard is gone from the writer or the reader: a resumed agent "
                   "that hands off again with the same unmet set is resumed forever")
