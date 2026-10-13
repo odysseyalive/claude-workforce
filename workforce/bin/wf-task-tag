@@ -1163,7 +1163,9 @@ def judge_issue(iss):
       kickback  every agent is back and ITEMS THE SESSION ITSELF RECORDED ARE STILL OPEN.
       closed    every item done. A `handoff` agent does not block this: an agent that
                 stopped at a cap having finished the work has nothing left to be resumed
-                for, and `judge_ledger` flips it to `returned` as the issue closes.
+                for, and `judge_ledger` flips it to `returned` as the issue closes. AN
+                ISSUE WITH NO ITEMS AT ALL IS NOT CLOSED OVER A CUT AGENT (2026-10-13):
+                see the `handoff` row above.
       open      an issue with no recorded items and no agent is nothing to judge. It is the
                 shape a one-line message leaves behind, and a hook that kicked back on it
                 would fire on almost every turn.
@@ -1181,7 +1183,13 @@ def judge_issue(iss):
     items = issue_items(iss)
     undone = [i for i in items if not item_done(i)]
     cut = [a for a in agents if a.get("state") == "handoff"]
-    if cut and undone:
+    # AN ISSUE WITH NO ITEMS AT ALL AND A CUT AGENT IS NOT A FINISHED ISSUE, and that is
+    # the second half of the defect the 2026-10-13 run measured. The session had written
+    # no checklist when its IC was cut, so `undone` was empty, so this fell through to
+    # `closed` — and `judge_ledger` then retired the `handoff` mark as it closed. An issue
+    # closed on no recorded items is a completion nobody observed; the agent stopping at
+    # its cap is itself the evidence that work is left, which is what the mark MEANS.
+    if cut and (undone or not items):
         stalled = [a for a in cut if a.get("handoff_stalled")]
         who = ", ".join("%s (%s)" % (a["agent_id"], a.get("agent_type") or "?")
                         for a in (stalled or cut))
@@ -1190,6 +1198,9 @@ def judge_issue(iss):
             return "escalate", "%s stopped at its turn cap twice with the same unmet " \
                                "set — %d of %d items still open: %s" % (
                                    who, len(undone), len(items), asks)
+        if not items:
+            return "handoff", "%s stopped at its turn cap and this issue records no " \
+                              "items, so nothing here says its work is done" % who
         return "handoff", "%s stopped at its turn cap with %d of %d items still open: " \
                           "%s" % (who, len(undone), len(items), asks)
     if undone:

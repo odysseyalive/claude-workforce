@@ -9028,6 +9028,39 @@
       "i1  CLOSED  2 items done, 1 agents returned"
     ]
   },
+  "widen-handoff-no-items-still-resumes": {
+    "_why": "THE TRIAL'S ACTUAL LEDGER, which is the shape no earlier case had: the session was cut before it wrote any checklist, so the issue carries ZERO items and one `handoff` agent. Until 2026-10-13 that fell through to CLOSED -- `undone` is empty when there are no items -- and `judge_ledger` retired the mark as it closed, so the agent that stopped mid-work was recorded as finished and nobody was told to resume it. An issue closed on no recorded items is a completion nobody observed, and the cut itself is the evidence work is left. The verdict is HANDOFF and the action names the agent_id, exactly as it does when items are open. `CLOSED` is forbidden here for that reason.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"open\"",
+          "\"agent_id\": \"a9\", \"agent_type\": \"filer\", \"state\": \"handoff\""
+        ],
+        "not": [
+          "\"state\": \"closed\"",
+          "\"state\": \"returned\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "CLOSED",
+      "ESCALATE",
+      "successor",
+      "re-dispatch",
+      "spawn"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
+    "want": [
+      "i1  HANDOFF  a9 (filer) stopped at its turn cap and this issue records no items",
+      "RESUME a9 with SendMessage"
+    ]
+  },
   "widen-handoff-capped-stop-keeps-the-mark": {
     "_why": "THE STOP THAT FOLLOWS THE CUT DOES NOT UNDO IT, which is the defect a real end-to-end run measured on 2026-10-13 (session `68b82f98`). `a1` is `handoff` on its issue, its counter says 23 turns against a cap of 10, and the report its order named is not there -- so this stop delivered nothing, and the mark that tells the main `Stop` to RESUME it has to survive. It did not: `agent_returned` overwrote it on every one of three cuts in that run, the main Stop judged `every agent back, items open`, and the K8 resume line never appeared at all. The `PERF` line in the same breath is the cosmetic half: the counter is cumulative across a resume, so `turn 23 of 10` is turn 3 of the THIRD allowance and now says so. `handoff_stalled` must be absent -- this is one cut seen twice, by the hook and then by this stop, not two cuts.",
     "after": {
