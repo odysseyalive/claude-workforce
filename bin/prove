@@ -1526,6 +1526,18 @@ CASES = [
     # templates.md dropped from the heal set while wf-companion still copies WF-PRINCIPLES.
     ("change record: every block a producer copies is a heal region, and nothing reads principles.md",
      "bin/gen-changes", "del", '    "workforce/references/templates.md",\n'),
+    # ── a region the session start heals needs no audit (2026-10-12) ──
+    # The session-start side deleted: a checkpoint-only release names nothing and the
+    # reader cannot tell it from a release that still needs an audit.
+    ("change record: a region the session start heals needs no audit, from 1.77.0 on",
+     "bin/gen-changes", "del",
+     "        if at_start:\n            session.append(heal_label(path, at_start))\n"),
+    # The version gate deleted: every record back to 1.0.0 is restated in terms of a
+    # carrier that did not exist when it shipped.
+    ("change record: a region the session start heals needs no audit, from 1.77.0 on",
+     "bin/gen-changes", "del",
+     "    if vkey(ver) < vkey(SESSION_START_FROM):\n"
+     "        return bool(hits), list(AUDIT_BANNER) if hits else []\n"),
     ("wf-census publishes immutable spans per file, with line numbers",
      CEN, "del", "sacred_lines.append(lineno)"),
     ("wf-conform computes T2 coverage for a removal target",

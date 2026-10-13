@@ -14736,20 +14736,24 @@ check(
     "`YES` tells every user to run an audit that has nothing to heal",
 )
 
-# The other half: a change inside the block `wf-companion` copies still flags. The
-# marker comes from the producer, so the test follows the producer if the block is renamed.
+# The other half: a change inside the block `wf-companion` copies still flags, and the hit
+# NAMES that block. The marker comes from the producer, so the test follows the producer if
+# the block is renamed.
 _hc_lines = _hc_after.split("\n")
-_hc_cp = None
+_hc_cp = _hc_cp_name = None
 if _wc_mod is not None:
     _hc_at = next((i for i, l in enumerate(_hc_lines)
                    if l.startswith(_wc_mod.CHECKPOINT_MARKERS[0])), None)
     if _hc_at is not None and not _hc_lines[_hc_at + 1].startswith("<!--"):
         _hc_cp = "\n".join(_hc_lines[:_hc_at + 1] + [_hc_lines[_hc_at + 1] + " (edited)"]
                            + _hc_lines[_hc_at + 2:])
+    _hc_nm = re.match(r"<!-- ([A-Z][A-Z0-9-]*) START", _wc_mod.CHECKPOINT_MARKERS[0])
+    _hc_cp_name = _hc_nm.group(1) if _hc_nm else None
 check(
     "change record: a change inside the Canonical Dispatch block still flags an org heal",
-    _hc_cp is not None
-    and _hc_hits([_hc_org], {_hc_org: _hc_after}, {_hc_org: _hc_cp}) == [_hc_org],
+    _hc_cp is not None and _hc_cp_name is not None
+    and _hc_hits([_hc_org], {_hc_org: _hc_after},
+                 {_hc_org: _hc_cp}) == [(_hc_org, (_hc_cp_name,))],
     f"{_hc_err}an edit to the first line inside {_hc_org}'s CHECKPOINT block did not flag. "
     "Every generated `/org` carries that block, so `no` leaves existing orgs dispatching "
     "on a stale ladder with nothing telling the user to audit",
@@ -14764,11 +14768,71 @@ _hc_unp_b = _hc_unp_a.replace("\n", "\n(edited)\n", 1)
 check(
     "change record: unpaired markers, no markers or a missing side flag an org heal",
     len(_hc_unp) == len(_hc_lines) - 1
-    and _hc_hits([_hc_org], {_hc_org: _hc_unp_a}, {_hc_org: _hc_unp_b}) == [_hc_org]
-    and _hc_hits([_hc_org], {_hc_org: "a\n"}, {_hc_org: "b\n"}) == [_hc_org]
-    and _hc_hits([_hc_org], {}, {_hc_org: _hc_after}) == [_hc_org],
+    and _hc_hits([_hc_org], {_hc_org: _hc_unp_a}, {_hc_org: _hc_unp_b}) == [(_hc_org, None)]
+    and _hc_hits([_hc_org], {_hc_org: "a\n"}, {_hc_org: "b\n"}) == [(_hc_org, None)]
+    and _hc_hits([_hc_org], {}, {_hc_org: _hc_after}) == [(_hc_org, None)],
     f"{_hc_err}a regioned heal path whose blocks cannot be read was classified `no`. "
     "Unreadable is uncertain, and uncertain must flag",
+)
+
+# A REGION HEALED AT SESSION START IS NOT AN AUDIT (2026-10-12, 86c175e).
+# `wf-commitments`' session-start carrier now runs `wf-companion.refresh_drifted`, so a
+# DRIFTED machine-owned region is rewritten in every project at its next session start
+# with nobody running anything. A release whose only org-reaching change is such a region
+# must therefore read `no` and name what the session start repairs; `ORG-CHAIN`, which
+# `org embed` writes into every HANDBOOK and no carrier refreshes, must still read `YES`.
+# And the rule is gated on the release version: this record regenerates all 110 bodies
+# every run, so applying it to a release that shipped before the carrier existed would
+# restate history in terms of a mechanism that did not exist, which is the defect
+# `gen-changes`' first paragraph exists to prevent.
+_hc_ss = []
+try:
+    _hc_blocks = dict(_hc_mod.copied_regions(_hc_after) or []) if _hc_mod else {}
+
+    def _hc_edit_in(name):
+        """The fixture's org.md with one line added inside `name`'s block, or None."""
+        blk = _hc_blocks.get(name)
+        if not blk or "\n" not in blk:
+            return None
+        head, rest = blk.split("\n", 1)
+        return _hc_after.replace(blk, f"{head}\n(edited)\n{rest}", 1)
+
+    _hc_chain = _hc_edit_in("ORG-CHAIN")
+    if _hc_cp is None or _hc_chain is None:
+        _hc_ss.append("the fixture does not carry both copied blocks, so neither side of "
+                      "the split can be read")
+    else:
+        _hc_cp_hit = _hc_hits([_hc_org], {_hc_org: _hc_after}, {_hc_org: _hc_cp})
+        _hc_ch_hit = _hc_hits([_hc_org], {_hc_org: _hc_after}, {_hc_org: _hc_chain})
+        _hc_now, _hc_now_txt = _hc_mod.heal_banner(_hc_cp_hit, "1.77.0")
+        _hc_then, _hc_then_txt = _hc_mod.heal_banner(_hc_cp_hit, "1.76.0")
+        _hc_ch, _hc_ch_txt = _hc_mod.heal_banner(_hc_ch_hit, "1.77.0")
+        _hc_now_txt, _hc_then_txt = " ".join(_hc_now_txt), " ".join(_hc_then_txt)
+        _hc_ch_txt = " ".join(_hc_ch_txt)
+        if _hc_now:
+            _hc_ss.append("a checkpoint-only release still reads `Reaches an existing "
+                          "org: YES`, sending every user to an audit with nothing to heal")
+        if "next session start" not in _hc_now_txt or _hc_cp_name not in _hc_now_txt:
+            _hc_ss.append(f"the banner does not name the block a session start repairs: "
+                          f"{_hc_now_txt[:120]!r}")
+        if "`/workforce audit`" in _hc_now_txt:
+            _hc_ss.append("a checkpoint-only release still sends the reader to an audit")
+        if not _hc_ch or "ORG-CHAIN" not in _hc_ch_txt \
+                or "at the next `/workforce audit`" not in _hc_ch_txt:
+            _hc_ss.append(f"an ORG-CHAIN change does not read YES and name the audit: "
+                          f"{_hc_ch_txt[:120]!r}")
+        if not _hc_then or _hc_then_txt != " ".join(_hc_mod.AUDIT_BANNER):
+            _hc_ss.append(f"a release older than {_hc_mod.SESSION_START_FROM} does not "
+                          f"regenerate its original banner: {_hc_then_txt[:120]!r}")
+except Exception as _exc:                                # noqa: BLE001
+    _hc_ss.append(f"the split walk raised {_exc!r}")
+check(
+    "change record: a region the session start heals needs no audit, from 1.77.0 on",
+    not _hc_ss,
+    f"{_hc_err}" + "; ".join(_hc_ss) + ". `refresh_drifted` rewrites a drifted "
+    "machine-owned region in every project at its next session start, so `YES` for one of "
+    "those is an audit with nothing to do — and a banner that names nothing reads the same "
+    "for a stale dispatch ladder and a reworded sentence",
 )
 
 # The regions are only as right as the producer list. Every CORE companion `wf-companion`

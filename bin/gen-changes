@@ -33,9 +33,11 @@ DERIVED, NEVER AUTHORED. Both the bodies and the classifications come from git:
             from the change the way a hand-written summary does.
   heal      whether an existing org carries a COPY of something the release changed —
             a handbook contract, the chart format, the /org dispatch checkpoint, the
-            operating principles. If it does, updating the skill is not enough and
-            `audit` has real work; if it does not, the change is self-contained in
-            the skill tree and an org that never re-audits is still correct.
+            operating principles. The banner NAMES each copy that moved and splits it
+            by what repairs it: a machine-owned region is rewritten at the next session
+            start with nobody running anything (SESSION_START_REGIONS), while a handbook's
+            copy waits for `/workforce audit`. `Reaches an existing org: YES` means the
+            second kind exists; `no` means nothing is left for an audit to do.
 
 Regenerating from history rather than appending means the record cannot rot: it is a
 projection of the commits, and a maintainer who forgets to write an entry has not
@@ -114,6 +116,11 @@ def copied_regions(text):
 def heal_hits(paths, old_text, new_text):
     """The heal paths through which a change reaches an existing org, in HEAL_PATHS order.
 
+    [(path, regions)] — `regions` names the copied blocks that changed, and is None when
+    the WHOLE file counts: a heal path outside REGIONED, or a regioned one whose blocks
+    cannot be compared. None is the uncertain answer and the caller treats it as the
+    broadest one.
+
     `paths` is the set of files the range changed. `old_text(path)` and `new_text(path)`
     return the file at the range's two ends, or None when it does not exist there.
     """
@@ -121,6 +128,7 @@ def heal_hits(paths, old_text, new_text):
     for h in HEAL_PATHS:
         if h not in paths:
             continue
+        regions = None
         if h in REGIONED:
             before, after = old_text(h), new_text(h)
             if before == after:
@@ -129,8 +137,101 @@ def heal_hits(paths, old_text, new_text):
             rb = copied_regions(after) if after is not None else None
             if ra and rb and ra == rb:
                 continue
-        hits.append(h)
+            # WHICH BLOCKS MOVED, once something has. A block on one side only counts as
+            # changed. Everything this cannot answer — a side that does not exist, markers
+            # that do not pair, a reorder that changed no block's text — falls through to
+            # None, which flags the whole file exactly as it did before regions were named.
+            if ra and rb:
+                a, b = dict(ra), dict(rb)
+                regions = tuple(n for n in dict.fromkeys([n for n, _ in rb]
+                                                         + [n for n, _ in ra])
+                                if a.get(n) != b.get(n)) or None
+        hits.append((h, regions))
     return hits
+
+# THE REGIONS A SESSION START HEALS BY ITSELF, WHICH NEED NO AUDIT. Since 86c175e
+# (2026-10-12) the session-start carrier in `wf-commitments` runs
+# `wf-companion.refresh_drifted`, which rewrites every machine-owned region whose bytes
+# differ from the installed release — in every project, at its next session start, with
+# nobody running anything. A release whose only org-reaching change is such a region
+# therefore reaches existing orgs on its own, and `Reaches an existing org: YES` would
+# send every user to an audit with nothing left for it to heal. The user, 2026-10-12:
+# "I don't have to run an audit after this update, correct?"
+#
+# ONLY WHERE THIS GENERATOR CAN SEE THE REGION. `refresh_drifted` also refreshes
+# `WF-PRINCIPLES` in `templates.md` and `WF-LEDGER-DOCTRINE` in `personnel-templates.md`.
+# Neither path is in REGIONED, because agents copy those files outside the markers too, so
+# a change to one is whole-file here and this generator cannot tell which half moved. They
+# stay audit-side under the rule REGIONED already states: a false "no" leaves an org stale
+# with nothing to say so, a false "yes" costs one audit. `ORG-CHAIN` is audit-side for a
+# different and permanent reason — `org embed` writes it into every HANDBOOK, and no
+# carrier refreshes a handbook.
+SESSION_START_REGIONS = {
+    "workforce/references/procedures/org.md": ("ORG-DISPATCH-CHECKPOINT",),
+}
+# A RECORD OF AN OLDER RELEASE IS NOT RESTATED BY A LATER MECHANISM. This file regenerates
+# every body every run, so an unconditional rule would describe 110 past releases in terms
+# of a carrier that did not exist when they shipped — and for those releases a changed
+# region really did wait for an audit. 1.77.0 is the release carrying 86c175e; every record
+# before it keeps the text it has, down to the byte.
+SESSION_START_FROM = "1.77.0"
+# The audit half of the banner, and the whole of it before SESSION_START_FROM. One literal,
+# because those older records are regenerated from it and must not move.
+AUDIT_BANNER = ("**An org built before this release carries a stale copy of "
+                "something this release changed.** Updating the skill is not "
+                "enough — run `/workforce audit` so the heal passes rewrite it.", "")
+
+
+def heal_label(path, regions):
+    """One heal hit as the banner names it: the path, and the blocks when they are known."""
+    return f"`{path}`" + (f" ({', '.join(regions)})" if regions else "")
+
+
+def heal_split(hits):
+    """(session, audit): the hits a session start repairs, and the ones an audit does.
+
+    Banner labels, in HEAL_PATHS order. A file with a changed block on each side appears in
+    both lists, each naming only its own blocks.
+
+    THE VERSION GATE IS NOT REPEATED HERE. `heal_banner` returns the older releases' own
+    text before it ever asks for a split, so a second copy of the SESSION_START_FROM test
+    in this function would be a rule stated twice that only one caller can reach.
+    """
+    session, audit = [], []
+    for path, regions in hits:
+        auto = SESSION_START_REGIONS.get(path, ())
+        at_start = [r for r in regions or () if r in auto]
+        at_audit = [r for r in regions or () if r not in auto]
+        if at_start:
+            session.append(heal_label(path, at_start))
+        if at_audit or not regions:
+            audit.append(heal_label(path, at_audit))
+    return session, audit
+
+
+def heal_banner(hits, ver):
+    """(needs_audit, banner lines) for one release.
+
+    `needs_audit` IS the `Reaches an existing org:` field: YES only when something is still
+    waiting for `/workforce audit`. The banner says WHAT is stale, because "a stale copy of
+    something" alone reads the same for a broken dispatch ladder and a reworded sentence.
+    """
+    if vkey(ver) < vkey(SESSION_START_FROM):
+        return bool(hits), list(AUDIT_BANNER) if hits else []
+    session, audit = heal_split(hits)
+    lines = []
+    if audit:
+        lines += list(AUDIT_BANNER)
+    elif session:
+        lines += ["**An org built before this release carries a stale copy of something "
+                  "this release changed, and nothing has to be run to repair it.**", ""]
+    if session:
+        lines += ["Reaches existing orgs at their next session start, no audit: "
+                  + ", ".join(session) + ".", ""]
+    if audit:
+        lines += ["Reaches existing handbooks at the next `/workforce audit`: "
+                  + ", ".join(audit) + ".", ""]
+    return bool(audit), lines
 
 # Surface labels, in the order they are reported. First match wins per path.
 SURFACES = (
@@ -258,7 +359,8 @@ def main():
         date = git("log", "-1", "--format=%ad", "--date=short", bump).strip()
         surf = surfaces_for(paths)
         old_rev = prev or f"{bump}~1"
-        heal = bool(heal_hits(paths, lambda p: blob(old_rev, p), lambda p: blob(bump, p)))
+        heal, banner = heal_banner(
+            heal_hits(paths, lambda p: blob(old_rev, p), lambda p: blob(bump, p)), ver)
         # THE BUMP COMMIT IS THE WORST SUBJECT IN THE RANGE, AND SINCE `wrap` IT IS
         # ALWAYS THE LAST ONE. `wrap` ends every session with "Roll the session into
         # one release (vX.Y.Z)" followed by a record regeneration, so taking the tip's
@@ -288,11 +390,7 @@ def main():
                  f"*Released {date}. {len(commits)} commit(s), {len(paths)} file(s) "
                  f"changed. Surface: {', '.join(surf)}. "
                  f"Reaches an existing org: {'YES' if heal else 'no'}.*", ""]
-        if heal:
-            parts += ["**An org built before this release carries a stale copy of "
-                      "something this release changed.** Updating the skill is not "
-                      "enough — run `/workforce audit` so the heal passes rewrite it.",
-                      ""]
+        parts += banner
         if not prev:
             parts += ["*This is the first numbered release. Everything before it "
                       "predates version numbering and is in git history, not here — "
@@ -323,18 +421,15 @@ def main():
         ver, paths = pending
         date = git("log", "-1", "--format=%ad", "--date=short").strip()
         surf = surfaces_for(paths)
-        heal = bool(heal_hits(paths, lambda p: blob("HEAD", p), worktree))
+        heal, banner = heal_banner(
+            heal_hits(paths, lambda p: blob("HEAD", p), worktree), ver)
         subj = "(pending — message lands on the next regeneration)"
         rows.append((ver, date, surf, heal, subj, 0, len(paths)))
         parts = [f"# {ver}", "",
                  f"*PENDING as of {date}. {len(paths)} file(s) changed. "
                  f"Surface: {', '.join(surf)}. "
                  f"Reaches an existing org: {'YES' if heal else 'no'}.*", ""]
-        if heal:
-            parts += ["**An org built before this release carries a stale copy of "
-                      "something this release changed.** Updating the skill is not "
-                      "enough — run `/workforce audit` so the heal passes rewrite it.",
-                      ""]
+        parts += banner
         parts += ["*This release is being committed as this file is written, so its "
                   "commit message does not exist yet. The classification above comes "
                   "from the diff itself and is final; the prose arrives when "
