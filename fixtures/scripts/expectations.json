@@ -7469,7 +7469,7 @@
     "stdin_raw": "not json at all"
   },
   "turn-budget-between-thresholds-quiet": {
-    "_why": "THE SILENCE BETWEEN THE TWO INJECTIONS. 35 of 40 is past the 80% boundary and short of `maxTurns - 2`, so the warn has already been spent and the final is not yet due. Without this row the suite could not tell a correct second threshold from one that fires the moment the first has.",
+    "_why": "THE SILENCE BETWEEN THE TWO INJECTIONS, AT THE TURN JUST BELOW THE SECOND. 36 of 40 is past the 80% boundary and one turn short of `maxTurns - 3`, so the warn has already been spent and the final is not yet due. Without this row the suite could not tell a correct second threshold from one that fires the moment the first has; at the adjacent turn it also catches a threshold that slipped a turn EARLY, which `turn-budget-final-returns-now` on its own cannot see.",
     "after": {
       "tmp/wf-turn-budget/s1/a1/fired-final": {
         "absent": true
@@ -7488,7 +7488,7 @@
     "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
   },
   "turn-budget-eighty-percent-warns": {
-    "_why": "32 OF 40 IS THE 80% BOUNDARY, and this is the whole point of the hook: a cut-off that arrives unannounced delivers nothing to read back (REPORT.md 5), and an agent cannot count its own turns. The injected text must name all three artefacts the successor needs -- an OUTPUT.md with every exit criterion MET or UNMET, a HANDOFF.md continuation brief in the section shape `org.md` rung 12b verifies, and the `HANDOFF` verdict that makes rung 12b fire. `fired-warn` is the once-only marker.",
+    "_why": "32 OF 40 IS THE 80% BOUNDARY, and this is the whole point of the hook: a cut-off that arrives unannounced delivers nothing to read back (REPORT.md 5), and an agent cannot count its own turns. The injected text must name all three artefacts the successor needs -- an OUTPUT.md with every exit criterion MET or UNMET, a HANDOFF.md continuation brief in the section shape `org.md` rung 12b verifies, and the `HANDOFF` verdict that makes rung 12b fire. IT MUST ALSO SAY WHAT RUNG 12b ACTUALLY DOES WITH THAT VERDICT: resume this same agent with `SendMessage` and a fresh turn allowance, context intact, spawning a successor only on exhausted context. Until e06d730 the rung spawned a successor and this text said so; an agent told it will be replaced writes a brief for a stranger instead of a checkpoint for itself, and `RESUME YOU` is what keeps the two from drifting apart again. `fired-warn` is the once-only marker.",
     "after": {
       "tmp/wf-turn-budget/s1/a1/fired-final": {
         "absent": true
@@ -7515,11 +7515,12 @@
       "OUTPUT.md",
       "HANDOFF.md",
       "MET or UNMET",
-      "7. What went wrong"
+      "7. What went wrong",
+      "RESUME YOU"
     ]
   },
   "turn-budget-final-returns-now": {
-    "_why": "`maxTurns - 2` = 38 OF 40, AND THE NUMBER IS CHOSEN TO LEAVE ROOM TO OBEY IT. The second injection says return now with what exists, and an instruction read on turn 39 has turns 39 and 40 to write a file and hand back; one that waited until turn 39 had been taken would leave a single turn for both. Shorter than the 80% text on purpose -- an agent two turns from the cap cannot spend one reading a procedure.",
+    "_why": "`maxTurns - 3` = 37 OF 40, AND THE NUMBER IS WHAT MAKES THE INSTRUCTION OBEYABLE. It was `maxTurns - 2`, and the end-to-end run of commit d782174 measured the cost of that turn: a `maxTurns: 20` IC took the final injection on turn 18, spent 19 on OUTPUT.md and 20 on HANDOFF.md, and the cap arrived before it could reply -- both files written and the HANDOFF verdict never delivered, which is the silence the hook exists to prevent. So the text asks for BOTH files in ONE turn via parallel `Write` calls and the reply on the next, and the threshold leaves three: one to write, one of slack for a retry, one to reply. The wants below pin that wording, because a text that goes back to one file per turn re-creates the measured defect at a threshold that still looks right.",
     "after": {
       "tmp/wf-turn-budget/s1/a1/fired-final": {
         "want": []
@@ -7537,9 +7538,15 @@
     "want": [
       "\"additionalContext\"",
       "TURN BUDGET",
-      "38 of 40",
+      "37 of 40",
       "RETURN NOW",
-      "HANDOFF"
+      "Three turns left",
+      "BOTH FILES IN ONE TURN",
+      "in parallel",
+      "OUTPUT.md",
+      "HANDOFF.md",
+      "7. What went wrong",
+      "THEN REPLY `HANDOFF"
     ]
   },
   "turn-budget-hostile-agent-type": {
@@ -7660,7 +7667,7 @@
     "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"data-analyst\"}"
   },
   "turn-budget-unreadable-transcript-counts-calls": {
-    "_why": "NO TRANSCRIPT ON DISK, SO IT COUNTS CALLS, WHICH ERRS TOWARD AN EARLY HANDOFF. There is no transcript file in this tree at all. Calls >= turns always, so a call count crosses the boundary no later than the true turn count -- the conservative direction, because an early written hand-back costs one order and a silent cut-off costs the whole run. The stored count is 7, this call makes 8, and 8 is 80% of 10.",
+    "_why": "NO TRANSCRIPT ON DISK, SO IT COUNTS CALLS, WHICH ERRS TOWARD AN EARLY HANDOFF. There is no transcript file in this tree at all. Calls >= turns always, so a call count crosses the boundary no later than the true turn count -- the conservative direction, because an early written hand-back costs one order and a silent cut-off costs the whole run. The stored count is 7, this call makes 8, and 8 is past both boundaries of a cap of 10. UNDER `maxTurns - 3` A SMALL CAP TAKES THE FINAL TEXT, NOT THE 80% ONE: 10 puts the final at 7 and the warn at 8, so the final is due first and the stronger one speaks, spending the warn unspoken. That is why the wants name only what both texts carry. It costs the run nothing, because the final text carries the whole instruction -- both files, their seven sections, and the verdict.",
     "env": {
       "TMPDIR": "${TREE}/tmp"
     },

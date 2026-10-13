@@ -76,9 +76,15 @@ import sys
 # budget still unspent, which is enough turns to write an OUTPUT.md and a continuation
 # brief and still hand back. For the measured IC cap of 40 that is turn 32.
 #
-# FINAL is `maxTurns - 2`, and the 2 is the room to obey it. An instruction read on turn
-# 39 of 40 has turns 39 and 40 — one to write the file, one to return. Fire it a turn
-# later and there is one turn for both, which is the silent cut-off wearing a warning.
+# FINAL is `maxTurns - 3`, and the 3 is the room to obey it. IT WAS `- 2`, AND THE
+# END-TO-END RUN OF COMMIT d782174 MEASURED WHY THAT IS ONE TOO FEW: a `maxTurns: 20` IC
+# took the final injection on turn 18, spent turn 19 writing `OUTPUT.md` and turn 20
+# writing `HANDOFF.md`, and the cap arrived before it could reply — so both files existed
+# on disk and the `HANDOFF` verdict never reached the manager, which is the silence this
+# hook exists to prevent, one layer in. A written file the manager was never told about is
+# not a hand-back. So the budget is three turns: ONE to write both files with parallel
+# `Write` calls, which FINAL_TEXT now asks for by name, one of slack for a write that has
+# to be retried, and one for the REPLY, which is the only part the manager receives.
 #
 # EXPRESSED AS A FRACTION OF THE CAP, NOT AS A NUMBER OF TURNS, because the cap is read
 # from the handbook and differs per employee. `(n * 4 + 4) // 5` is ceil(0.8n) without
@@ -88,7 +94,7 @@ def warn_at(max_turns):
 
 
 def final_at(max_turns):
-    return max_turns - 2
+    return max_turns - 3
 
 
 # ── the continuation brief's shape ───────────────────────────────────────────
@@ -126,15 +132,28 @@ OTHERWISE, START NO NEW WORK and do these three things now, in this order:
 {sections}
 3. Return `HANDOFF <path to your OUTPUT.md>` as your verdict.
 
-Your manager reads `HANDOFF` as an instruction to spawn a fresh employee of your role
-from that brief (`org.md` rung 12b). You are forbidden to continue yourself, so a brief
-you do not write is work that simply stops."""
+Your manager reads `HANDOFF` as an instruction to RESUME YOU — `SendMessage`, continue
+from that brief, with a fresh turn allowance and the context you have already paid for
+still in place (`org.md` rung 12b). A turn cap is a checkpoint, not an ending, and a
+fresh employee of your role is spawned only if you report your context exhausted. What
+you cannot do is give yourself more turns, so a brief you do not write is work that
+simply stops."""
 
 FINAL_TEXT = """TURN BUDGET — turn {turns} of {cap}. RETURN NOW, with whatever exists.
 
-Two turns left. Write nothing new and verify nothing more. Write what you have into
-`OUTPUT.md` with each exit criterion MET or UNMET, and return `HANDOFF <that path>`.
-A partial account handed back beats a complete one the limit cuts off."""
+Three turns left. Write nothing new and verify nothing more.
+
+BOTH FILES IN ONE TURN. Send two `Write` calls in a SINGLE message, in parallel — one
+file per turn is how this run ends a sentence short of handing anything back:
+
+* `OUTPUT.md`, at the path your handbook names, each exit criterion MET or UNMET.
+* `HANDOFF.md`, in THE SAME DIRECTORY as that `OUTPUT.md` — not at the root of the
+  project — with these seven sections, all filled:
+{sections}
+
+THEN REPLY `HANDOFF <path to your OUTPUT.md>` and nothing else. That reply is the only
+part your manager receives: files you wrote and never named are files nobody reads. A
+partial account replied beats a complete one the limit cuts off."""
 
 # WHAT A DELIVERED INJECTION LOOKS LIKE IN THE TRANSCRIPT, which is how the once-only rule
 # survives with no counter directory. DERIVED FROM THE TEXTS rather than restated beside
@@ -210,9 +229,13 @@ def read_cap(root, agent_type):
                 cap = int(m.group(1))
             except ValueError:
                 continue
-            # A cap of 2 or less has no room between the two thresholds and nothing
-            # useful to say; a negative one is a typo. Left alone rather than clamped.
-            if cap > 2:
+            # A cap of 3 or less puts `cap - 3` at or before turn 0, so the final
+            # injection would fire on the very first call and there is nothing useful to
+            # say to such a run; a negative one is a typo. The bound moved with the
+            # threshold — it was `> 2` when the threshold was `cap - 2`, and it is the
+            # same statement: the boundary has to land at least one turn into the run.
+            # Left alone rather than clamped.
+            if cap > 3:
                 return cap
     return None
 
@@ -500,13 +523,17 @@ def main():
         """True for the one call that gets to say this. Marker file, or the transcript."""
         return claim(path, marker) if path else mark not in spent
 
-    # BOTH DUE AT ONCE MEANS THE STRONGER ONE SPEAKS. For a small cap the two thresholds
-    # coincide (`maxTurns: 10` puts both at 8), and emitting two paragraphs on one call
+    # BOTH DUE AT ONCE MEANS THE STRONGER ONE SPEAKS, and under `cap - 3` the final one is
+    # due FIRST for every cap below 15 (`maxTurns: 10` puts the final at 7 and the 80%
+    # warn at 8). That is handled rather than special-cased: the final branch is tested
+    # first and spends the warn unspoken, and the final text carries the whole instruction
+    # — both files, their shape, and the verdict — so an agent that only ever sees this one
+    # is told everything the warn would have told it. Emitting two paragraphs on one call
     # would spend the budget it is trying to protect.
     if turns >= final_at(cap):
         once("fired-warn", WARN_MARK)              # spend the quieter one unspoken
         if once("fired-final", FINAL_MARK):
-            emit(FINAL_TEXT.format(turns=turns, cap=cap))
+            emit(FINAL_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
     elif turns >= warn_at(cap) and once("fired-warn", WARN_MARK):
         emit(WARN_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
     return 0

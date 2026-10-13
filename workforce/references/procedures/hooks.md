@@ -48,7 +48,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. It also runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project. |
 | `wf-org-sync` | `PostToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | **keeps an org chart that already EXISTS current with the files on disk, so nobody has to type `org index` to make a new agent dispatchable.** Appends an ADOPTED `## Roster` row for an agent in `.claude/agents/**` the chart does not list (`org.md` step 1a), marks a charted row whose file is gone `GHOST` (`org.md` step 4), and rewrites one marker-delimited `## Skills` list from `.claude/skills/*/SKILL.md`. It is **not an index**: it computes no tier, department, manager, fan-out or stamp, and it never touches the `Generated:` line — a separate `Synced:` line records this pass, and it is written only beside a real change, so a run with nothing to do writes nothing and a second run is byte-for-byte identical. `Bash` is in the matcher because a `cp`, a `mv` or a `git pull` adds an agent exactly as a `Write` does. Never creates a chart (`bin/sync`'s rule — never materialize an org nobody built), and that absent-chart `lstat` is also what makes it cheap enough to run on every call. § The org sync below |
 | `wf-org-sync` | `SessionStart` | *(none)* | the same sync for everything that happened while nobody was looking — another session, a checkout, a sibling clone. A `PostToolUse`-only registration can only see writes made in front of it. |
-| `wf-turn-budget` | `PostToolUse` | `*` | **tells a capped employee it is near its turn limit, once, while it still has turns to write with.** MEASURED in odyssey-alive session `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both build orders, both had already finished and verified their main work, and both returned **no report at all** — the run ends mid-sentence and the manager gets nothing to read. At 80% of the agent's `maxTurns` it injects one instruction: start no new work, write `OUTPUT.md` with every exit criterion MET or UNMET, write the seven-section continuation brief at `HANDOFF.md`, return `HANDOFF <path>` — which is the verdict `org.md` rung 12b acts on. A second, shorter injection at `maxTurns − 2` says return now with what exists. Each fires at most once, claimed with `O_CREAT\|O_EXCL` because parallel calls in one turn run this hook concurrently. It counts **TURNS, not calls** — assistant messages carrying a `tool_use`, read from the subagent's own transcript at `<session>/subagents/agent-<agent_id>.jsonl` from a stored byte offset — because parallel calls share a turn and two measured report orders ran 42 and 44 calls inside a 40-turn cap and both finished. Silent for the main thread (no `agent_id`), for an agent hook's own agent (`agent_id`, no `agent_type`), for an agent with no handbook, and for one with no `maxTurns` (every Lead). The counter is scratch under `$TMPDIR`, never in the project. § The turn budget below |
+| `wf-turn-budget` | `PostToolUse` | `*` | **tells a capped employee it is near its turn limit, once, while it still has turns to write with.** MEASURED in odyssey-alive session `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both build orders, both had already finished and verified their main work, and both returned **no report at all** — the run ends mid-sentence and the manager gets nothing to read. At 80% of the agent's `maxTurns` it injects one instruction: start no new work, write `OUTPUT.md` with every exit criterion MET or UNMET, write the seven-section continuation brief at `HANDOFF.md`, return `HANDOFF <path>` — which is the verdict `org.md` rung 12b acts on. A second injection at `maxTurns − 3` says return now with what exists, writing both files in ONE turn as parallel `Write` calls and replying with the verdict on the next — measured in commit `d782174`'s end-to-end run, at `maxTurns − 2` the agent spent both remaining turns writing a file each and the verdict never reached the manager. Each fires at most once, claimed with `O_CREAT\|O_EXCL` because parallel calls in one turn run this hook concurrently. It counts **TURNS, not calls** — assistant messages carrying a `tool_use`, read from the subagent's own transcript at `<session>/subagents/agent-<agent_id>.jsonl` from a stored byte offset — because parallel calls share a turn and two measured report orders ran 42 and 44 calls inside a 40-turn cap and both finished. Silent for the main thread (no `agent_id`), for an agent hook's own agent (`agent_id`, no `agent_type`), for an agent with no handbook, and for one with no `maxTurns` (every Lead). The counter is scratch under `$TMPDIR`, never in the project. § The turn budget below |
 
 **The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
@@ -592,11 +592,23 @@ not one, and one holding three `tool_use` blocks is still one.
 | Threshold | For `maxTurns: 40` | What it injects |
 |---|---|---|
 | 80% of `maxTurns` | turn 32 | start no new work; write `OUTPUT.md` with every exit criterion MET or UNMET and its evidence; write the seven-section continuation brief at `HANDOFF.md` beside it; return `HANDOFF <OUTPUT.md path>`. If the work is already complete, finish normally. |
-| `maxTurns − 2` | turn 38 | return now with what exists. |
+| `maxTurns − 3` | turn 37 | return now with what exists: BOTH files in ONE turn, as two parallel `Write` calls, then reply `HANDOFF <OUTPUT.md path>` on the next. |
 
-**`maxTurns − 2` rather than `maxTurns − 1`, because the 2 is the room to obey it.** An
-instruction read on turn 39 of 40 has turns 39 and 40 — one to write the file, one to hand back.
-Fire it a turn later and there is one turn for both, which is a silent cut-off wearing a warning.
+**`maxTurns − 3` rather than `maxTurns − 2`, and the third turn was bought with a measured
+failure.** The end-to-end run of commit `d782174` gave a `maxTurns: 20` IC an order too long to
+finish: it took the final injection on turn 18, spent turn 19 writing `OUTPUT.md` and turn 20
+writing `HANDOFF.md`, and the cap arrived before it could reply. Both files were on disk and the
+`HANDOFF` verdict never reached the manager — the same silence this hook exists to prevent, one
+layer in, because a file nobody was told about is not a hand-back. Three turns is one to write both
+files together, one of slack for a write that has to be retried, and one for the reply, which is the
+only part a manager receives. The text asks for the single-turn write by name; the threshold is what
+makes obeying it possible, and neither half works without the other.
+
+**Below `maxTurns: 15` the final threshold is due before the 80% one** (a cap of 10 puts the final
+at 7 and the warn at 8). The final branch is tested first and spends the warn unspoken, and the
+final text carries the whole instruction — both files, the brief's seven sections, and the verdict —
+so a small-cap employee that only ever sees this one is told everything. A cap of 3 or less gets no
+boundary at all: `cap − 3` would land on or before turn 0.
 
 **Each fires at most once, claimed with `O_CREAT|O_EXCL`.** `PostToolUse` fires on every call, so a
 boundary that re-announced itself would repeat the same paragraph eight times between turn 32 and
@@ -642,6 +654,12 @@ this hook's text names them. Before 2026-10-12 rung 12b verified "sections 3–7
 in no file on disk — `wf-handoff`, the producer, was retired in the simplification release, so the
 verdict had a consumer and nothing that could satisfy it. `bin/check` requires the seven section
 lines to appear in both the script and `org.md`.
+
+**What rung 12b does with the verdict is RESUME that same agent** — `SendMessage`, continue from the
+brief, context intact and a fresh turn allowance — and spawn a successor only when the agent reports
+its context exhausted (`e06d730`). The injected text says so, because an agent told it is about to
+be replaced writes a brief for a stranger rather than a checkpoint for itself, and a capped agent
+cannot know which of the two is coming unless this text tells it.
 
 ## The commitment ledger
 

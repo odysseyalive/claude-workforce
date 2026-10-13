@@ -19053,7 +19053,7 @@ if "if not bare(agent_id) or not bare(agent_type):" not in _tb_src:
 # DERIVED FROM THE CAP, NEVER A NUMBER. The cap differs per employee and is read from the
 # handbook; a literal 32 here would be a second statement of a constant (Core Principle
 # 9a) and would stop meaning 80% the moment any cap changed.
-if "(max_turns * 4 + 4) // 5" not in _tb_src or "return max_turns - 2" not in _tb_src:
+if "(max_turns * 4 + 4) // 5" not in _tb_src or "return max_turns - 3" not in _tb_src:
     _tb_problems.append("a threshold is no longer derived from maxTurns — the cap is read "
                         "per employee, so a fixed turn number stops being 80% of anything")
 # ONCE, AND THE CLAIM IS ATOMIC. Parallel calls in one turn run this hook concurrently.
@@ -19183,10 +19183,13 @@ check(
 
 
 # RUN, NOT READ, AND AT A CAP NO FIXTURE USES. Every `turn-budget-*` fixture pins
-# `maxTurns: 40` or `10`, so a hook that hard-coded 32 and 38 would pass all thirteen.
+# `maxTurns: 40` or `10`, so a hook that hard-coded 32 and 37 would pass all thirteen.
 # This drives a `maxTurns: 80` handbook — the producer cap the sizing work proposes — and
-# requires the boundary to land at 64 and 78, which is only true if it is a fraction of
-# the cap. Four short runs; the whole block is well under a second.
+# requires the boundary to land at 64 and 77, which is only true if it is a fraction of
+# the cap and `cap - 3`. TURN 76 IS THE OTHER SIDE OF THE FINAL BOUNDARY and is why there
+# are four runs rather than three: 77 firing proves `cap - 2` is gone only together with
+# 76 staying quiet, which is what rules out `cap - 4` and anything looser. Four short
+# runs; the whole block is well under a second.
 def _turn_budget_scales():
     import tempfile
     tool = os.path.join(ROOT, "workforce/bin/wf-turn-budget")
@@ -19200,7 +19203,7 @@ def _turn_budget_scales():
         with open(os.path.join(d, ".claude/agents/eng-coder.md"), "w") as fh:
             fh.write("---\nname: eng-coder\ntools: Read, Edit, Write\n"
                      "disallowedTools: Agent\nmaxTurns: 80\n---\n\n# Coder\n")
-        for turns in (63, 64, 78):
+        for turns in (63, 64, 76, 77):
             # A fresh session id per run, so each one starts with no claim marker.
             sid = "s%d" % turns
             tdir = os.path.join(d, sid, "subagents")
@@ -19229,14 +19232,18 @@ if "additionalContext" in _tbs[63][1]:
 if "64 of 80" not in _tbs[64][1]:
     _tbs_problems.append(f"turn 64 of 80 did not announce the 80% boundary: "
                          f"{_tbs[64][1].strip()[:160]!r}")
-if "RETURN NOW" not in _tbs[78][1]:
-    _tbs_problems.append(f"turn 78 of 80 did not say to return now: "
-                         f"{_tbs[78][1].strip()[:160]!r}")
+if "RETURN NOW" in _tbs[76][1]:
+    _tbs_problems.append("turn 76 of 80 said to return now: the final boundary is "
+                         "`cap - 3`, so 76 is still inside the budget and only a looser "
+                         "threshold fires there")
+if "77 of 80" not in _tbs[77][1] or "RETURN NOW" not in _tbs[77][1]:
+    _tbs_problems.append(f"turn 77 of 80 did not say to return now: "
+                         f"{_tbs[77][1].strip()[:160]!r}")
 check(
     "turn budget: the thresholds scale with the employee's own cap",
     not _tbs_problems,
     "; ".join(_tbs_problems) + ". Every fixture pins maxTurns 40 or 10, so a boundary "
-    "hard-coded at 32 and 38 passes all thirteen of them and then stops a producer IC "
+    "hard-coded at 32 and 37 passes all thirteen of them and then stops a producer IC "
     "half-way through its budget",
 )
 
