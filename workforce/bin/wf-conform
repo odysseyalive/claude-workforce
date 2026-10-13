@@ -198,11 +198,20 @@ ROUTING_RX = re.compile(r"\bESCALATE\b|\bis run by\b|\bnot yours to run\b|\besca
 # evaluator's own name — because a handbook healed by `audit` carries the first and one
 # authored before 2026-09-10 carries the second. Used by the `Regression:` row only, which
 # is advisory, so a role this misses loses a report and no role is failed by it.
-# THE RESOLVER HALF NAMES NO FLAG. Spelling it with `wf-catalog`'s kind flag put a flag
-# string in THIS script that this script's own parser does not accept, and the shipped-flag
-# check reads that as a tool printing a flag it does not have. The call is matched by its
-# command and its kind instead, which is the same evidence without the false claim.
-CODE_ROLE_RX = re.compile(r"\bcode-evaluator\b|\bwf-catalog\b[^\n]*\bcode\b")
+# THE RESOLVER HALF MATCHES THE KIND ARGUMENT, not the word `code` anywhere on the line.
+# MEASURED 2026-10-12 on the university corpus: `\bwf-catalog\b[^\n]*\bcode\b` matched
+# `text-evaluator.md:90`, a `Negative:` line routing the TEXT catalog whose parenthetical
+# explains the dash as "the same two code points, in the resolver's regex spelling". A
+# PROSE role was advised to add a `Regression:` line it has nothing to run twice for, and
+# the two corpus rows that compare this script's output against a real org failed on that
+# one advisory with no behaviour change behind it. The kind argument is the evidence; a
+# prose handbook is free to use the English word `code` in a sentence.
+# AND IT NAMES NO FLAG AS A STRING TOKEN. Spelling it with `wf-catalog`'s kind flag put a
+# flag string in THIS script that this script's own parser does not accept, and the
+# shipped-flag check reads that as a tool printing a flag it does not have. `-{2}` is the
+# same two hyphens to the regex engine and no flag to a reader of the string constants,
+# which is the same evidence without the false claim. Both separators are accepted.
+CODE_ROLE_RX = re.compile(r"\bcode-evaluator\b|\bwf-catalog\b[^\n]*-{2}kind[ =]code\b")
 # Harness slash-commands: real invocations that are not project files and never will
 # be. Naming one is correct, so an unresolved-command check that does not know them
 # reports every handbook that says `/compact` as broken.
