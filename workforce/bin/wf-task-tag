@@ -506,7 +506,18 @@ def state_component(payload):
 
 def tag_path(payload):
     """Where the tag waits for `Stop`. Keyed by session AND agent, so two sessions never
-    cross and neither do two concurrent judgments inside one session."""
+    cross and neither do two concurrent judgments inside one session.
+
+    NOTHING HERE IS OPENED WITH A PLAIN `open()` — every reader goes through
+    `read_json_nofollow` and every writer through `write_json_atomic`, for the reason the
+    issue ledger uses them (see `write_json_atomic`): the LAST fallback below is `/tmp`,
+    which is world-writable, and this name is predictable from a session id other accounts
+    on the machine can see. A link planted at it would aim the hook's write at any file the
+    user can write and hand the hook's read a file it was never given (CWE-59). The same
+    rule covers `wf-asks.<sid>.json` beside it, `wf-widen`'s flag and closeout, and
+    `wf-commitments`' read of this file: one pattern, `wf-turn-budget`'s (3c7431c), never a
+    second design.
+    """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = state_component(payload)
     return os.path.join(d, f"wf-task-tag.{sid}.json")
@@ -531,13 +542,10 @@ def open_agent_tag(payload):
     """
     if not agent_component(payload):
         return
-    try:
-        with open(tag_path(payload), "w", encoding="utf-8") as fh:
-            json.dump({"hits": [], "prompt": "", "senses": [], "asks": None,
+    write_json_atomic(tag_path(payload),
+                      {"hits": [], "prompt": "", "senses": [], "asks": None,
                        "asks_why": "", "checklist": None,
-                       "agent": str(payload.get("agent_type") or "")}, fh)
-    except OSError:
-        pass
+                       "agent": str(payload.get("agent_type") or "")})
 
 
 # WHAT AN ITEM IS, defined beside the list it belongs to. `wf-widen` counts these toward the
@@ -702,11 +710,30 @@ def issues_dir(payload, create=False):
     the project we're good."* A project that commits its `.claude` keeps committing
     everything else in it; an ignore rule one level up would silently un-commit a tree
     somebody chose to ship.
+
+    A LINKED DIRECTORY IS REFUSED OUTRIGHT, which is the half `O_NOFOLLOW` on the files
+    cannot reach: `os.makedirs(d, exist_ok=True)` succeeds when `d` is a symlink to a
+    directory, and every file below it is then created inside the link's TARGET under a
+    name that is not a link and that no flag can object to. So the directory itself is
+    checked with `os.path.islink`, for `issues/` and for the `.claude/workforce` holding
+    it. `.claude` ITSELF IS NOT CHECKED, deliberately: a dotfiles install that symlinks
+    `.claude` into a managed tree is an ordinary setup, and refusing it would take the
+    ledger away from a project that did nothing wrong.
     """
     root = project_root(payload)
     if not root:
         return None
-    d = os.path.join(root, ".claude", "workforce", ISSUES)
+    wf = os.path.join(root, ".claude", "workforce")
+    d = os.path.join(wf, ISSUES)
+    # sec-eval: this is a check-then-use (CWE-367). A directory swapped for a link in the
+    # window between this test and the write still wins; closing that window means holding
+    # an `O_DIRECTORY | O_NOFOLLOW` handle and threading `dir_fd` through every path this
+    # module joins, which is a redesign of the ledger's addressing rather than a guard.
+    # Ceiling accepted: this refuses the PLANTED link, which is the reachable case — winning
+    # the race needs write access to `.claude/workforce`, and whoever has that can plant the
+    # link in advance instead. Upgrade path: `dir_fd` on every open under `issues/`.
+    if os.path.islink(d) or os.path.islink(wf):
+        return None
     if not create:
         return d if os.path.isdir(d) else None
     try:
@@ -1019,11 +1046,7 @@ def previous_checklist(payload):
     """The checklist record the last tag carried, or None. The record is this hook's, kept in
     the tag file, because the checklist file is the session's to rewrite and cannot be trusted
     to hold the user's prompt or whether a `Stop` has ended the turn it belongs to."""
-    try:
-        with open(tag_path(payload), encoding="utf-8") as fh:
-            tag = json.load(fh)
-    except (OSError, ValueError):
-        return None
+    tag = read_json_nofollow(tag_path(payload))
     rec = tag.get("checklist") if isinstance(tag, dict) else None
     return rec if isinstance(rec, dict) else None
 
@@ -1075,10 +1098,7 @@ def start_checklist(payload, prev=None):
     # Injected text opens no list of its own: it is not the user's ask.
     if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
         return "", None
-    try:
-        with open(p, "w", encoding="utf-8") as fh:
-            json.dump({"prompt": prompt[:2000], "items": []}, fh)
-    except OSError:
+    if not write_json_atomic(p, {"prompt": prompt[:2000], "items": []}):
         return "", None
     # `issue` PAIRS THE LIST WITH THE ISSUE IT BELONGS TO, and it is what the next
     # message's absorb reads. Without it the items would have no issue to land on.
@@ -1171,14 +1191,11 @@ def main():
         # jury correctly refuses a case with no ask. A fresh, explicitly-empty tag fixes
         # the staleness just as well (it IS this turn's) and keeps the ask on disk for
         # the blind sample in `wf-widen` (§ THE BLIND SAMPLE).
-        try:
-            with open(tag_path(payload), "w", encoding="utf-8") as fh:
-                _n, _how = count_asks(payload.get("prompt") or "")
-                json.dump({"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
+        _n, _how = count_asks(payload.get("prompt") or "")
+        write_json_atomic(tag_path(payload),
+                          {"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
                            "senses": [], "asks": _n, "asks_why": _how,
-                           "checklist": checklist_record}, fh)
-        except OSError:
-            pass
+                           "checklist": checklist_record})
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
@@ -1186,9 +1203,9 @@ def main():
         }}))
         return 0
 
-    try:
-        with open(tag_path(payload), "w", encoding="utf-8") as fh:
-            json.dump({"hits": hits,
+    # Never fatal: the injection below still lands, and the Stop half degrades quietly.
+    write_json_atomic(tag_path(payload),
+                      {"hits": hits,
                        # THE ASK ITSELF, carried forward because `Stop` never gets it.
                        # The Stop payload has no `prompt` field, so the judge was
                        # comparing evidence to conclusion with NO IDEA what was asked —
@@ -1206,9 +1223,7 @@ def main():
                        # THE CHECKLIST RECORD: the user's prompt and whether a `Stop` has
                        # ended its turn. Kept here, in a file this hook writes, and never in
                        # the checklist file the session edits.
-                       "checklist": checklist_record}, fh)
-    except OSError:
-        pass        # the injection below still lands; the Stop half degrades quietly
+                       "checklist": checklist_record})
 
     # STATED AS FACTS ABOUT THE ASK, NEVER AS AN INSTRUCTION. The hooks reference is
     # explicit that text framed as an out-of-band command trips the prompt-injection

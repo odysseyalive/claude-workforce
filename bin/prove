@@ -300,6 +300,49 @@ CASES = [
      TAG, "delall",
      'waiting = [a for a in agents if a.get("state") in ("running", "handoff")]'),
 
+    # ── THE PER-TURN STATE BESIDE IT (CWE-59, security review 2026-10-12) ───────
+    # THE FORBIDDEN FORMS ARE PROVED BY APPENDING THEM, for the reason the os.getcwd() case
+    # above gives: an absence rule passes on a file nobody ever reopened the door in, so the
+    # only mutation that can fire it is adding the door. Each appended function is valid
+    # Python that nothing calls, so the module still imports and the named assertion is the
+    # one that fires.
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     TAG, "append", '\ndef _plain_tag_write(payload):\n'
+                    '    with open(tag_path(payload), "w", encoding="utf-8") as fh:\n'
+                    '        fh.write("{}")\n'),
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     TAG, "append", '\ndef _plain_checklist_write(payload):\n'
+                    '    with open(checklist_path(payload), "w", encoding="utf-8") as fh:\n'
+                    '        fh.write("{}")\n'),
+    # COUNTED, NOT `in`: three events write the tag and a fourth site is a door the fixtures
+    # do not walk through, so the count is what refuses it.
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     TAG, "append", '\ndef _fourth_tag_write(payload):\n'
+                    '    return write_json_atomic(tag_path(payload), {})\n'),
+    # THE LINKED DIRECTORY. Deleting the first half of the `or` leaves valid Python and the
+    # `.claude/workforce` half in place, which is exactly the hole: `issues/` itself is then
+    # followed and every file lands in the link's target.
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     TAG, "delall", "os.path.islink(d) or "),
+    # THE GUARDED READ. `tag = read_json_nofollow` without its argument is a valid name
+    # binding, so the module still imports and the assertion is what notices.
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     TAG, "delall", "(tag_path(payload))"),
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     WDN, "append", '\ndef _plain_tag_read(payload):\n'
+                    '    with open(tag_file(payload), encoding="utf-8") as fh:\n'
+                    '        return fh.read()\n'),
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     WDN, "append", '\ndef _sixth_widen_write(p):\n'
+                    '    return TT.write_json_atomic(p, {})\n'),
+    # THE CLOSEOUT RECORD IS A LIST, so it takes the shared guarded open rather than the
+    # dict-only reader. Dropping the flag leaves a one-argument call — valid Python, and an
+    # open that follows whatever is planted at the name.
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     WDN, "delall", ", os.O_RDONLY"),
+    ("tag: no per-turn state is written or read through a name another account can plant",
+     "workforce/bin/wf-commitments", "delall", "TT.read_json_nofollow("),
+
     # ── THE TURN BOUNDARY (wf-turn-budget, 2026-10-12) ──────────────────────────
     # Four assertions, and every literal each one pins gets a case. The two about the
     # thresholds are the ones that decide whether the hook is a feature or noise, and the

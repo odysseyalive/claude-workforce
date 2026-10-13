@@ -7869,6 +7869,104 @@
       "issue i1"
     ]
   },
+  "tasktag-tag-write-refuses-a-planted-link": {
+    "_why": "THE TAG IS THE LEDGER'S PROBLEM ONE DIRECTORY OVER (CWE-59, security review 2026-10-12). Its path falls back to `/tmp` whenever the harness names no `scratchpad_dir`, which is world-writable, and `wf-task-tag.<session>.json` is derived from a session id rather than from a secret -- so the name is plantable by any other account on the machine. A link sits at the tag's own name aiming at `victim.json`, and the hook writes this turn's tag. THE WRITE GOES THROUGH `write_json_atomic`, the same helper the ledger uses: the temporary name is created `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMED over `wf-task-tag.s1.json`, and rename acts on the NAME, so the planted link is replaced and its target is never opened. `victim.json` byte-unchanged is the proof of the refusal; the real ask landing in the tag is the proof the refusal did not also break the feature, which is the half a bare `absent` assertion cannot see.",
+    "after": {
+      "victim.json": {
+        "want": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ]
+      },
+      "wf-task-tag.s1.json": {
+        "not": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ],
+        "want": [
+          "\"prompt\": \"Please fix the skul-dev deploy failure"
+        ]
+      }
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "wf-task-tag.s1.json": "victim.json"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "Asks checklist for this message"
+    ]
+  },
+  "tasktag-issues-dir-link-takes-no-write": {
+    "_why": "`O_NOFOLLOW` ON THE FILE CANNOT SEE A LINKED DIRECTORY, and that is the half this tree holds. `.claude/workforce/issues` is a symlink to `elsewhere/`, and `os.makedirs(d, exist_ok=True)` SUCCEEDS on a symlink to a directory -- every file the hook then creates below it is created inside the link's target under a name that is not itself a link, so no flag on the open can object. The ledger, the per-project index and the hook's own `.gitignore` would all land in a directory nobody named. `issues_dir` therefore refuses outright with `os.path.islink`, for `issues/` and for the `.claude/workforce` holding it, and returns None -- which every caller already treats as `record nothing`. The three `absent` rows are the write that did not happen; `exit 0` with the ask still tagged is the hook degrading quietly rather than failing the turn, which is what a hook on `UserPromptSubmit` owes the user.",
+    "after": {
+      "elsewhere/.gitignore": {
+        "absent": true
+      },
+      "elsewhere/index.json": {
+        "absent": true
+      },
+      "elsewhere/s1.json": {
+        "absent": true
+      },
+      "elsewhere/victim.json": {
+        "want": [
+          "DO NOT WRITE INTO A LINKED DIRECTORY."
+        ]
+      }
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        ".claude/workforce/issues": "../../elsewhere"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "Asks checklist for this message"
+    ]
+  },
+  "widen-tag-refuses-a-planted-link": {
+    "_why": "THE READ SIDE, AT THE EVENT THAT ONLY READS. Same tree as `widen-subagent-with-no-slot-is-not-given-the-session-ask`, with a SYMLINK where the agent's slot would be: `wf-task-tag.nosession.a1.json` aims at `victim.json`, which is itself shaped like a slot file so that following the link would succeed rather than merely fail differently. Through the link this stop would find a slot, resolve the agent's ask onto it, and WRITE IT BACK through the same link -- clobbering a file the hook was never given. `TT.read_json_nofollow` refuses the link instead, so the stop reads as an agent this installation never saw start and is judged on its reply alone (`not scored`), and the session's own tag beside it is still not borrowed as the agent's order (`history claim` forbidden, as in the sibling case). `victim.json` byte-unchanged is the write half of the same refusal.",
+    "after": {
+      "victim.json": {
+        "want": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "wf-task-tag.nosession.a1.json": "victim.json"
+      }
+    },
+    "not": [
+      "Traceback",
+      "history claim",
+      "existence claim",
+      "NOT OPENED"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"Nine hooks are wired into the settings file.\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "not scored"
+    ]
+  },
   "issues-third-message-keeps-both-issues": {
     "_why": "THE DEFECT THE LEDGER REPLACES, measured in this project's own session of 2026-10-12: the skul-dev fix and the turn-limit work were open at the same time and each new message erased the other's items. The user, 2026-10-12: \"you may actually be dealing with multiple issues at the same time, and you might have different sets of agents working on those different issues.\" This tree holds both issues with two agents each and a live checklist belonging to i2, and a THIRD message arrives. Three things must hold at once: i1 keeps the items it was given turns ago, i2's live checklist is ABSORBED onto i2 before the per-turn file is wiped (which is what makes the wipe safe rather than lossy), and i3 is opened beside them instead of replacing them. `add the named fixture` is the absorbed item: it existed only in the checklist file this message removes, so finding it on i2 afterwards is the whole proof.",
     "after": {

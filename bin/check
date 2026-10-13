@@ -19669,6 +19669,76 @@ check(
     "capped agent is never judged as a failure in the meantime",
 )
 
+# FIVE. THE PER-TURN STATE BESIDE THE LEDGER GETS THE SAME REFUSAL (CWE-59, security review
+# 2026-10-12). The ledger lives in a repository; the tag, the asks checklist, the widen flag
+# and the closeout record live in `scratchpad_dir`, `$TMPDIR`, or — the LAST fallback, taken
+# whenever the harness names neither — `/tmp`, which is world-writable and shared with every
+# other account on the machine. The names are `wf-task-tag.<sid>.json` and its siblings,
+# derived from a session id, so they are predictable rather than secret. A link planted at
+# one of them aimed the hook's write at any file the user could write and handed its read a
+# file it was never given: the user's own prompt, written somewhere nobody asked for.
+#
+# THE FORBIDDEN FORMS ARE PINNED AS WELL AS THE GUARDED ONES, because this class comes back
+# as a NEW call site rather than as an edit to an old one — one more `open(tag_path(...))`
+# added by a later change is a reopened door, and a positive-only pin passes with it there.
+# Three fixtures prove the behaviour (`tasktag-tag-write-refuses-a-planted-link`,
+# `widen-tag-refuses-a-planted-link`, `tasktag-issues-dir-link-takes-no-write`); this pins
+# that no second, unguarded door exists beside the ones they walk through.
+_il_cm = read("workforce/bin/wf-commitments")
+_tag_lnk = []
+for _src, _name, _form in (
+        (_il, "wf-task-tag", "open(tag_path(payload)"),
+        (_il, "wf-task-tag", "open(checklist_path(payload)"),
+        (_il_w, "wf-widen", "open(tag_file(payload)"),
+        (_il_w, "wf-widen", "open(widen_flag(payload)"),
+        (_il_w, "wf-widen", "open(closeout_path(payload)"),
+        (_il_cm, "wf-commitments", 'open(os.path.join(d, f"wf-task-tag.')):
+    # `with open(` and `= open(` only: `_open_nofollow(` and `os.fdopen(` both contain the
+    # name and are the guarded forms this rule exists to require.
+    if f"with {_form}" in _src or f"= {_form}" in _src:
+        _tag_lnk.append(f"{_name} opens {_form[5:]} with a plain open(), which follows a "
+                        "link planted at that name")
+if _il.count("write_json_atomic(tag_path(payload)") != 3:
+    _tag_lnk.append(f"the tag is written atomically at "
+                    f"{_il.count('write_json_atomic(tag_path(payload)')} sites, expected 3 "
+                    "— the slot `SubagentStart` opens, the untagged turn's empty tag, and "
+                    "the tagged turn's")
+if "read_json_nofollow(tag_path(payload))" not in _il:
+    _tag_lnk.append("previous_checklist does not read the tag through the guarded reader, "
+                    "so last turn's checklist record is taken from whatever the name points "
+                    "at")
+if 'write_json_atomic(p, {"prompt": prompt[:2000], "items": []})' not in _il:
+    _tag_lnk.append("the asks checklist is not written atomically, and it sits in the same "
+                    "directory under an equally predictable name")
+if _il_w.count("TT.write_json_atomic(") != 5:
+    _tag_lnk.append(f"wf-widen writes per-turn state atomically at "
+                    f"{_il_w.count('TT.write_json_atomic(')} sites, expected 5 — the flag, "
+                    "the agent's resolved ask, the closeout record, the ended mark, and the "
+                    "checklist hand-off")
+if _il_w.count("TT.read_json_nofollow(") != 4:
+    _tag_lnk.append(f"wf-widen reads per-turn state through the guarded reader at "
+                    f"{_il_w.count('TT.read_json_nofollow(')} sites, expected 4 — the tag, "
+                    "the asks checklist, the ended mark's tag, and the flag it joins")
+if "TT._open_nofollow(closeout_path(payload), os.O_RDONLY)" not in _il_w:
+    _tag_lnk.append("the closeout record is read with a plain open; it holds a LIST, so it "
+                    "takes the shared guarded open rather than the dict-only reader")
+if 'TT.read_json_nofollow(os.path.join(d, f"wf-task-tag.{sid}.json"))' not in _il_cm:
+    _tag_lnk.append("wf-commitments reads the tag unguarded — and it PRINTS what it reads "
+                    "there to the user as the turn's ask count")
+if "if os.path.islink(d) or os.path.islink(wf):" not in _il:
+    _tag_lnk.append("issues_dir does not refuse a linked directory; `os.makedirs(d, "
+                    "exist_ok=True)` succeeds on a symlink to a directory and every file "
+                    "below it is then created inside the link's target, where no "
+                    "`O_NOFOLLOW` on the file can object")
+check(
+    "tag: no per-turn state is written or read through a name another account can plant",
+    not _tag_lnk,
+    "; ".join(_tag_lnk) + ". The tag, the asks checklist, the widen flag and the closeout "
+    "record fall back to /tmp when the harness names no scratchpad, under names derived "
+    "from a session id. A planted symlink there is an arbitrary-file write aimed by "
+    "whoever planted it, and an arbitrary-file read handed to the hook (CWE-59)",
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report
