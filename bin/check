@@ -19665,28 +19665,107 @@ check(
     and "def ensure_ignored" in _rh_cm
     # APPEND, NEVER REWRITE — a project's own rules in that file survive, and the rule is
     # added once however many turns state a commitment.
-    and 'open(p, "a", encoding="utf-8")' in _rh_cm
-    and 'ln.lstrip("/") == IGNORE_RULE' in _rh_cm,
+    and "os.O_WRONLY | os.O_APPEND | os.O_CREAT" in _rh_cm
+    and 'ln.lstrip("/") == IGNORE_RULE' in _rh_cm
+    # AND THE DIRECTORY IS REFUSED BY NAME. `.claude/workforce` being a link means every
+    # path under it belongs to a tree this project did not name, and the rule's own open
+    # only guards its last component.
+    and "if os.path.islink(os.path.dirname(ledger)):" in _rh_cm,
     "the commitments hook must write a `.gitignore` rule for commitments.json as it writes "
-    "the ledger, by appending. A widened rule takes `.claude/workforce/` out of the "
-    "projects that commit it; a rule written by an audit arrives after the file is already "
-    "committed, which is how both measured projects got there",
+    "the ledger, by appending, and never through a planted name. A widened rule takes "
+    "`.claude/workforce/` out of the projects that commit it; a rule written by an audit "
+    "arrives after the file is already committed, which is how both measured projects got "
+    "there",
 )
 
-# IT NAMES THE COMMAND AND STOPS. Untracking belongs in a commit the project's author
-# makes, so the hook runs no git command that writes — asserted on the argv, because a
-# comment promising it is not a constraint.
+# CWE-59, AND THE CALL SITES ARE COUNTED RATHER THAN MERELY PRESENT. Every file this hook
+# opens sits at a predictable path in somebody's repository and is opened unattended on
+# every turn, so one of them growing a plain `open()` is one unguarded door into the same
+# directory — which is how the read and the write drift apart. `wf-task-tag` counts its
+# four for the same reason. `commitments-gitignore-link-unchanged` proves the behaviour;
+# this proves there is no second door. MEASURED: `os.path.islink(p)` then `open(p, "a")`
+# resolves the name twice, and a link planted between the two calls is followed.
+_rh_lnk = []
+if 'flags | getattr(os, "O_NOFOLLOW", 0)' not in _rh_cm:
+    _rh_lnk.append("no O_NOFOLLOW helper in wf-commitments")
+if _rh_cm.count("_open_nofollow(") != 7:
+    _rh_lnk.append(f"_open_nofollow names {_rh_cm.count('_open_nofollow(')} sites, expected "
+                   "7 — its own def, the region stamp, the git index, the ignore rule's "
+                   "read and append, and the ledger's own read and write")
+check(
+    "ledger hygiene: nothing beside the ledger is opened through a name somebody planted",
+    not _rh_lnk,
+    "; ".join(_rh_lnk) + ". The ledger, its ignore rule and the region stamp all live at "
+    "predictable paths in a shared checkout, and this hook opens them with nobody watching "
+    "on every turn: a link planted at one of those names aims the write at whatever it "
+    "points to and the read at a file the project never gave",
+)
+
+# IT NAMES THE COMMAND AND RUNS NONE. Untracking belongs in a commit the project's author
+# makes, so the hook runs no git command that writes — and since 2026-10-12 it runs no
+# command AT ALL, which is a security property rather than a saving. Asking `git ls-files`
+# meant running git inside a directory whose own `.git/config` git then reads, and config
+# keys name executables git runs for it: MEASURED on git 2.55.0, a repository whose LOCAL
+# config set `core.fsmonitor` to a command had that command EXECUTED by
+# `git ls-files --error-unmatch -- <path>`. This hook opens every project on the machine
+# with nobody watching, so that was an arbitrary command on session start. Both halves are
+# asserted on the argv and the imports, because a comment promising it is not a constraint.
 _rh_git = re.findall(r'\[\s*"git",\s*"([a-z-]+)"', _rh_cm)
+_rh_exec = [_f for _f in ("import subprocess", "subprocess.run(", "subprocess.Popen(",
+                          "os.system(", "os.popen(", "os.execv", "os.spawn")
+            if _f in _rh_cm]
+
+# RESOURCE EXHAUSTION IN A PARSER THAT READS SOMEBODY ELSE'S REPOSITORY (A10:2025), and
+# the reason this half is a RUN rather than a literal. The version-4 varint grows its
+# accumulator seven bits per continuation byte while each shift costs the whole integer, so
+# an unbounded read of a `\x80` run is quadratic. MEASURED 2026-10-12 against the unbounded
+# version: 65 536 continuation bytes took 1.70 s and 262 144 took 28.1 s — minutes of CPU
+# at session start, in a loop whose input is whatever `.git/index` holds. 64 KiB is used
+# here and not the full read cap so that A REGRESSION FAILS IN UNDER A SECOND instead of
+# looking like a hang, which is the state hardest to diagnose.
+_rh_dos = []
+if "for _ in range(10):" not in _rh_cm:
+    _rh_dos.append("the version-4 varint is not bounded to the ten bytes a 64-bit value "
+                   "needs, so a run of continuation bytes is quadratic")
+try:
+    import time as _rh_time
+    import importlib.machinery as _im4
+    import importlib.util as _iu4
+    sys.dont_write_bytecode = True
+    _sp4 = _iu4.spec_from_loader("_wf_cm", _im4.SourceFileLoader(
+        "_wf_cm", "workforce/bin/wf-commitments"))
+    _cm_mod = _iu4.module_from_spec(_sp4)
+    _sp4.loader.exec_module(_cm_mod)
+    _rh_crafted = (b"DIRC" + (4).to_bytes(4, "big") + (0xFFFFFFFF).to_bytes(4, "big")
+                   + b"\x80" * (1 << 16))
+    _rh_t0 = _rh_time.perf_counter()
+    _rh_ans = _cm_mod._index_tracks(_rh_crafted, b".claude/workforce/commitments.json")
+    _rh_el = _rh_time.perf_counter() - _rh_t0
+    if _rh_ans is not None:
+        _rh_dos.append(f"a crafted index answered {_rh_ans!r}, where UNKNOWN is the only "
+                       "honest answer about bytes that do not parse")
+    if _rh_el > 0.5:
+        _rh_dos.append(f"took {_rh_el:.2f}s to refuse 64 KiB of continuation bytes")
+except Exception as _exc:                                # noqa: BLE001
+    _rh_dos.append(f"the index-parser run raised {_exc!r}")
 check(
     "ledger hygiene: a tracked ledger is named for the user to untrack, never staged",
     "LEDGER TRACKED" in _rh_cm and "git rm --cached" in _rh_cm
-    and "_untracked_ledger(root)" in _rh_cm and _rh_git == ["ls-files"]
-    # THE GATE: one read of `.git/index`, the shape `_heal_git_hooks` uses on `.git/config`.
-    and 'LEDGER_REL.encode("utf-8") not in idx' in _rh_cm,
-    f"wf-commitments runs git {_rh_git!r}. A SessionStart line must name the one-time "
-    "`git rm --cached` and nothing else: a hook that stages or commits in somebody else's "
-    "repository writes history they did not ask for, and one that asks git on every "
-    "session start pays a subprocess in every healthy project",
+    and "_untracked_ledger(root)" in _rh_cm and _rh_git == [] and _rh_exec == []
+    # THE ANSWER IS PARSED, NOT ASKED: one read of `.git/index`, the shape
+    # `_heal_git_hooks` uses on `.git/config`, and the entry walk that reads it.
+    and 'if len(idx) < 12 or idx[:4] != b"DIRC":' in _rh_cm
+    and "_index_tracks(idx, LEDGER_REL" in _rh_cm
+    # A VERSION THIS CANNOT READ IS UNKNOWN, never parsed as the nearest one it knows —
+    # and an unknown answer prints nothing at all.
+    and "if version not in (2, 3, 4):" in _rh_cm
+    and not _rh_dos,
+    "; ".join(_rh_dos) + f". wf-commitments runs git {_rh_git!r} and carries {_rh_exec!r}. "
+    "A SessionStart line "
+    "must name the one-time `git rm --cached` and nothing else: a hook that stages or "
+    "commits in somebody else's repository writes history they did not ask for, and one "
+    "that runs git inside a repository somebody else prepared runs whatever that "
+    "repository's own config told git to run",
 )
 
 
