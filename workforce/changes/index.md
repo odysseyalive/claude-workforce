@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.77.4 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.4: a cut agent is resumed, never respawned, and an issue's items can close |
 | 1.77.3 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.3: an agent that stops on its own after a resume is returned, not re-marked as cut |
 | 1.77.2 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.2: a cut agent stays marked for resume, and every round gets its final notice |
 | 1.77.1 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.1: an agent stopped at its turn limit still owns its running jobs |
