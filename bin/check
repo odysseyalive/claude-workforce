@@ -19895,6 +19895,24 @@ if "RESUME {who} with SendMessage" not in _il_w:
 if "handoff_action(payload, iss, verdict)" not in _il_w:
     _il_st.append("the action line is not rendered, so the verdict reaches the user as a "
                   "status with no instruction in it")
+# THE ESCALATION READS A FILE AND QUOTES AN AGENT, and both halves are attack surface
+# (security review of 6b49140). Two fixtures walk through them —
+# `widen-handoff-linked-run-dir-is-not-read` and `widen-handoff-brief-is-quoted-not-obeyed`
+# — and what they cannot say is why each control is the one that works.
+if ("if not base.startswith(root + os.sep):" not in _il_w
+        or "p = os.path.realpath(os.path.join(base, run, employee" not in _il_w):
+    _il_st.append("the HANDOFF lookup does not resolve its path and contain it under the "
+                  "work tree — `work/`, the run directory and the employee directory can "
+                  "EACH be a link, and `os.path.isfile` follows all three, so a leaf-only "
+                  "link test reads whatever the outermost one points at")
+if "_INERT_RX.sub" not in _il_w or "QUOTED AS DATA" not in _il_w:
+    _il_st.append("section 1 is not carried as framed, stripped data — it is text an AGENT "
+                  "wrote, and an unstripped escape sequence in it can close its own "
+                  "quotation and continue as if the hook were speaking")
+if 'decided["systemMessage"] = (prior + "\\n\\n" if prior else "") + _quoted' not in _il_w:
+    _il_st.append("the quoted brief no longer goes to the user's channel alone — on a "
+                  "BLOCKED stop the verdict line lands in `reason`, which is the model's "
+                  "context, and a stuck agent's own words have no business there")
 check(
     "issues: an agent cut at its turn cap is marked, and the Stop asks for it to be resumed",
     not _il_st,
