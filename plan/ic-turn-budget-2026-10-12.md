@@ -226,6 +226,46 @@ it fires on any running task. In a subagent it seems to fire every time. That is
 - K4. Measure false fires against the 1,269 subagent transcripts already used at `wf-widen:755–760`, before shipping,
   against the same 1.5% budget.
 
+  **DONE 2026-10-12.** The corpus is the same place and the same selection rule — every `agent-*.jsonl` under
+  `~/.claude/projects/*/<session>/subagents/` — and it has shrunk with the host's transcript retention: **996
+  transcripts today, 1,277 recorded `SubagentStop` firings** against 1,269/1,395 when the close-out was measured.
+  Every stop is the hook's own `hook_system_message` attachment, so the replay runs at the instants the hook really
+  ran; the main-`Stop` half serves the transcript TRUNCATED at that attachment, because `confirmed_reply` refuses a
+  reply the file does not hold as the end of a turn (without the truncation 832 of 843 held stops returned `reply not
+  matched` and measured nothing). The replay reads; it writes nowhere outside its own sandbox. The corpus is LIVE —
+  this session's own agents were writing into it while it ran — so the stop counts move by a handful between runs and
+  each row below carries the denominator of its own run.
+
+  | path | fires / stops | rate | wrong |
+  |---|---|---|---|
+  | K3 `SubagentStop`, the order's report — as first written | 496 / 1,272 | 39.1% | **488** |
+  | K3, narrowed and asked once (shipped) | 6 / 1,277 | 0.47% | **0** |
+  | K2 held stops, promise trigger — before the hold was widened | 9 / 846 | 1.06% | **9** |
+  | K2 held stops, promise trigger (shipped) | 0 / 852 | 0.00% | **0** |
+  | K2 held stops, the claim scan | 6 / 852 | 0.70% | 0 — in class for the detector whose own budget is 1.5% |
+  | K2 held stops, the close-out | 3 shells / 852 | 0.35% | 0 — one shell is this measurement's own, one is a sibling coder's in the live session, one is historical |
+  | K8 main `Stop`, the issue ledger | 0 / 1,521 | 0.00% | 0, and **vacuous**: see below |
+
+  The 488 wrong K3 fires were four path-or-vocabulary shapes, none of them a missing report: a bare `OUTPUT.md` in
+  prose resolved at the project root (210), a SIBLING's report the order quoted to be read (41), a path given
+  relative to the run dir (11), a complete criterion → evidence table that does not use the upper-case `MET` token
+  (154), and `IN-PROGRESS` inside a quoted order or a sentence saying no row is open (5). The nine wrong K2 fires
+  were all a turn holding for work it had dispatched, in words `WAITING` did not carry — the first wrong blocks this
+  project has measured from removing the whole-decision exemption, because until then none of those stops was judged
+  at all. Both rules are narrowed, every shape has a fixture that fails on the old code, and the records sit in
+  `wf-widen`'s own comment blocks beside the rules they bind.
+
+  **K8 cannot be measured against history and its 0 is not evidence.** The input it reads — `<project>/.claude/
+  workforce/issues/<session>.json` — does not exist in any project on this machine, in or out of the corpus (checked:
+  the only copies are fixture trees), because the ledger shipped today and nothing has been synced. It also never
+  returns a `decision`, so it cannot block: its kickback is a line joined to whatever `widen` already decided. The
+  blocking-hook bar does not bind on it; the first real reading comes after the operator syncs.
+
+  **What the replay cannot see:** `order_report` stats the file as it is TODAY, so a stop that happened before the
+  agent's first write to that path reads a report the stop could not have seen. 59 of the 1,272 are that shape — an
+  intermediate hand-back, 33 agents — which is why the ask is now recorded once per artifact. Without that record one
+  of those agents is asked eleven times for one file.
+
 **Added after oa-work's history** (`/home/francis/lab/odyssey-alive/.claude/workforce/work/turnlimit-analysis-20261012/HISTORY.md`,
 384 lines, sourced, 7 items marked UNSOURCED): **45 cut-offs in 269 capped-IC dispatches (16%), none of which
 delivered a report.** `engineering-site` was cut on 14 of 24 dispatches. 11 of the 43 cut agents were on daily lookup

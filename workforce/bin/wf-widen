@@ -466,6 +466,24 @@ TAIL = 400
 # TWO FACTS, NOT ONE PHRASE, for each half. "waiting on" appears in plenty of replies that
 # then genuinely stop mid-work, and notifications open a large share of turns in an
 # agent-driven run, so neither the words nor the notification alone can buy silence.
+#
+# AND THE PHRASINGS ARE MEASURED, which is the K4 half of this. Replaying every stop this
+# machine recorded, 846 of them carried the exemption's own line (`a background task is
+# still running`), so on every one of those the second fact HELD. 9 blocked on the promise
+# trigger, 1.06%, and all 9 were a turn holding for work it had dispatched — in words this
+# pattern did not have: *"an independent reader is checking its references now. I'll fix
+# whatever it finds"*, *"Six re-checks are running. I'll report each result"*, *"its helper
+# is still reviewing the draft"*, *"the correspondent is now re-sweeping Gmail"*, *"I'll
+# write the walkthrough when the survey comes back"*, *"I'll fix the catalog after the last
+# three runs"*. Every one of those is the hold this section exists for, and every one was a
+# WRONG block — the first measured since K2 removed the whole-decision exemption, because
+# until then none of these stops was judged at all.
+#
+# WIDENING THIS CANNOT REACH A TURN THAT IS NOT HOLDING. `declared_hold` requires the second
+# fact — a task really running, or a completion notification that opened the turn — so a
+# reply carrying any phrase below with nothing in flight is judged exactly as before
+# (`widen-dispatched-words-alone-still-block` is that reply with neither fact). That is what
+# makes the progress-verb forms safe to add here and nowhere else.
 WAITING = re.compile(
     r"\b(?:holding|hold)\b[^.\n]{0,40}\b(?:for|until|on)\b"
     r"|\bwaiting (?:on|for)\b"
@@ -473,7 +491,20 @@ WAITING = re.compile(
     r"\b(?:agents?|batch|background|tasks?|run|runs|gate|gates)\b"
     r"|\bstill (?:running|in flight|working)\b"
     r"|\b(?:let|letting) (?:it|them|those|the \w+) finish\b"
-    r"|\bcontinuing to wait\b", re.I)
+    r"|\bcontinuing to wait\b"
+    # the dispatched work, named as in progress
+    r"|\b(?:is|are|'s|'re) (?:now |currently )?(?:still )?"
+    r"(?:running|checking|reviewing|re-?checking|re-?sweeping|sweeping|gathering"
+    r"|verifying|in progress|under way|underway)\b"
+    r"|\bstill (?:reviewing|checking|verifying|gathering|going)\b"
+    # the promise's own condition: it lands when the dispatched thing comes back
+    r"|\b(?:when|once|after|as|until)\b[^.\n]{0,40}"
+    r"\b(?:comes? back|passes|lands|stops?|finishes|returns?|reports? back)\b"
+    # … or the awaited thing is named and its verb elided — "after the last three runs",
+    # the ninth of the nine measured wrong blocks and the only one the clause above misses
+    r"|\b(?:when|once|after|until)\b[^.\n]{0,40}"
+    r"\b(?:runs?|agents?|batch(?:es)?|tasks?|reviews?|checks?|gates?|sweeps?|surveys?)\b",
+    re.I)
 
 
 def just_finished(payload):
@@ -630,7 +661,21 @@ def _row_text(d):
     `from=\\"x\\"` and every pattern here would have to carry the escaping too.
     """
     if d.get("type") == "attachment":
-        return (d.get("attachment") or {}).get("prompt") or ""
+        # AN ATTACHMENT'S `prompt` IS NOT ALWAYS A STRING, and that is measured rather than
+        # defensive: one `queued_command` row in 2,630 on this machine carries a CONTENT
+        # BLOCK LIST, because the user pasted an image with the command. Returned raw it
+        # reached `.lstrip()` in `closeout_facts` and `wf-widen` exited 1 printing nothing —
+        # for that stop and for every later stop in that session, since each one re-reads
+        # the whole transcript. Found 2026-10-12 replaying every Stop on this machine, in
+        # the path K2 newly reaches: the `background_tasks` exemption used to return above
+        # the close-out, so 1,879 stops never walked a row at all. The list shape is read
+        # with the same `_block_text` the `user` branch below uses.
+        pr = (d.get("attachment") or {}).get("prompt")
+        if isinstance(pr, str):
+            return pr
+        if isinstance(pr, list):
+            return "\n".join(_block_text(b) for b in pr if isinstance(b, dict))
+        return ""
     # A `queue-operation` row is how the host records a notification it queued for the
     # SESSION rather than for an agent, and it is the only place a shell started by a
     # finished agent is ever closed. MEASURED over 277 real sessions: without this row
@@ -991,27 +1036,122 @@ def closeout_subagent(payload):
 # unresolved placeholder, not a file that is missing — and it must sit inside the project
 # the hook fired for, because a path read out of model-written text is not a licence to
 # stat anything on the machine.
+#
+# MEASURED 2026-10-12 (K4), over the same corpus the close-out below was measured on: every
+# `agent-*.jsonl` under `~/.claude/projects/*/<session>/subagents/`, replayed through this
+# gate with the project root the harness would have given it. 996 transcripts and 1,277
+# recorded `SubagentStop` firings on the run below; the corpus is live, so the baseline run
+# an hour earlier saw 1,272 of them. Each stop is the hook's OWN attachment row, so the
+# replay runs where the hook really ran rather than at the end of a file.
+#
+#   as first written   496 of 1,272 stops fired, 39.1%. 488 were WRONG, in four shapes, and
+#                      every shape is a path-or-vocabulary read rather than a missing
+#                      report: 210 on `<root>/OUTPUT.md` invented from the artifact's bare
+#                      NAME in prose, 41 on a SIBLING's report the order quoted for this
+#                      agent to read, 11 on a run-dir-relative path resolved at the project
+#                      root, 154 on a COMPLETE criterion → evidence table that does not use
+#                      the upper-case `MET` token, 5 on `IN-PROGRESS` inside a quoted order
+#                      or a sentence saying no row is open. (The shapes overlap; the four
+#                      narrowings below are what each one needed.)
+#   as it now stands   6 of 1,277 stops fire, 0.47%, against the 1.5% budget that retired
+#                      this distribution's last speech guard. ALL SIX HAND-READ FROM THE
+#                      TRANSCRIPT and all six correct: 3 agents stopped with nothing at the
+#                      path their order named (one had its dispatcher's directory sitting
+#                      empty beside its own spawn file), and 3 left a report whose every
+#                      status cell still read `IN-PROGRESS` while the reply said the next
+#                      step out loud.
+#
+# WHAT THE REPLAY CANNOT SEE, stated because it is the one bound on that rate: the file is
+# stat'd as it is TODAY, so a stop that happened BEFORE the agent's first write to that path
+# reads a report the stop could not have seen. 59 of the 1,272 are that — an intermediate
+# hand-back, 33 agents, the report written later in the same run. They are fires the rule
+# means to make, and the "asked once" record in `order_expectation` is what keeps them from
+# being made repeatedly: without it one of those agents is asked eleven times for one file.
+#
+# THE MISSES ARE THE PRICE AND THEY ARE NAMED. An order that spells the artifact only as a
+# bare `OUTPUT.md`, or as a path outside `workforce/work/`, or that reaches a stop carrying
+# no `agent_type`, is no longer asked for a report at all. That is the deliberate direction:
+# a miss costs a line in a ledger and a wrong block costs an agent its hand-back, and this
+# project's rule is that a BLOCKING hook ships with zero KNOWN wrong fires.
 OUTPUT_IN_ORDER_RX = re.compile(r"""[^\s`'"()\[\],;]*OUTPUT\.md""")
 # `<` `>` `$` `{` `}` `*` `?` — a placeholder or a glob, never a resolved path.
 OUTPUT_PLACEHOLDER = set("<>${}*?")
+# THE ARTIFACT'S OWN DIRECTORY SHAPE, `org.md` clause 6: `.claude/workforce/work/<run-id>/
+# <employee>/OUTPUT.md`. MEASURED 2026-10-12 over 1,272 subagent stops: without this
+# segment, a path an order gave relative to the RUN DIRECTORY — `content-lead/OUTPUT.md`,
+# which is how a Lead writes a sibling's deliverable into its own order — resolves against
+# the project root to `<root>/content-lead/OUTPUT.md`, a phantom nothing will ever write.
+# 11 of those stops blocked on one.
+OUTPUT_WORK_SEG = "workforce" + os.sep + "work" + os.sep
 # The report is read only far enough to see its criterion table. A criterion table that
 # needs more than this to reach its first mark is not the artifact being asked for.
 OUTPUT_READ_BYTES = 65536
-# THE MARK, AS THE TEMPLATE SPELLS IT. `handbook-templates.md` § Reporting: a criterion →
-# evidence table, "`UNMET` stated, never omitted", and an unfinished row written
-# `IN-PROGRESS` — "an absent row is silence, and silence reads as a pass".
-OUTPUT_MARKED_RX = re.compile(r"\b(?:UN)?MET\b")
-OUTPUT_UNFINISHED_RX = re.compile(r"IN-PROGRESS")
+# THE MARK, AND THE SECOND HALF OF IT IS MEASURED. `handbook-templates.md` § Reporting asks
+# for a criterion → evidence table with "`UNMET` stated, never omitted", so `MET`/`UNMET`
+# was the whole test until 2026-10-12. Replayed over every report on this machine it kicked
+# back 154 COMPLETE reports — a criterion → evidence table whose status column reads `PASS`
+# or `DONE`, an `## Exit Criteria` heading, a `## Verdict` line — because the one thing they
+# do not carry is that upper-case token. Every one of those was a wrong fire. The mark is
+# therefore any of the four shapes a real report states its criteria in, which still leaves
+# the branch firing on what it was written for: a stub that states none of them.
+OUTPUT_MARKED_RX = re.compile(
+    r"\b(?:UN)?MET\b"                                        # the template's own token
+    r"|^[#*\s>]*exit criteri"                                # an exit-criteria heading
+    r"|criterion[^|\n]{0,24}(?:\||→|->|to)[^|\n]{0,24}evidence"
+    r"|\|[^|\n]{0,24}criterion[^|\n]{0,24}\|"                # a criterion column
+    r"|^[#*\s>]*verdict\b", re.I | re.M)                     # a verdict line
+# AN OPEN ROW IS A STATUS CELL, NOT THE TOKEN ANYWHERE. `IN-PROGRESS` read loose matched the
+# QUOTED ORDER ("never leave an `IN-PROGRESS` stub" — a guardrail several handbooks state,
+# echoed back by every report that quotes its order verbatim), the sentence that says the
+# opposite ("no `IN-PROGRESS` rows remain"), and a row about ANOTHER agent's report. MEASURED
+# 2026-10-12: 5 of 8 `unfinished` fires were one of those three, and all five are gone when
+# the token has to open a table cell.
+OUTPUT_UNFINISHED_RX = re.compile(r"\|\s*[(*`\[]*IN-PROGRESS")
+# THE MARKS ARE ASKED OF AN ORDER THAT ASKED FOR THEM. A controlled expectation is only the
+# org's to enforce where the org set it: an order that names a path and asks for findings —
+# a code-evaluator review, an independent evaluation — is answered by the findings being
+# there. MEASURED: one complete 14k review report was kicked back for carrying no criterion
+# table its order never asked for.
+OUTPUT_CRITERIA_ASKED_RX = re.compile(r"exit criteri|criterion|\bUNMET\b", re.I)
 
 
-def order_output(payload, ask):
-    """Absolute path of the `OUTPUT.md` this agent's order named, or None for an order
-    that named none. See the block above for why a missing one is the gate."""
+def order_output(payload, ask, marks=True):
+    """Absolute path of the `OUTPUT.md` THIS agent's order named for it, or None.
+
+    THREE THINGS MAKE A CANDIDATE THIS AGENT'S ARTIFACT, and all three are measured. Over
+    1,272 real subagent stops the first-match-wins read below fired on 496 of them (39%),
+    and 488 were a path nobody had named for the stopping agent:
+
+      a directory component   `OUTPUT.md` bare is the artifact's NAME in prose — "write
+                              your OUTPUT.md incrementally", which the templates ask for —
+                              and resolving it against the project root invents
+                              `<root>/OUTPUT.md`. 210 fires, every one wrong.
+      this agent's own name    the parent directory must be the stopping agent. An order
+                              routinely QUOTES a sibling's report for the agent to read
+                              (`…/<run>/engineering-site/OUTPUT.md`), and taking the first
+                              one in the text blocks this agent because another agent's
+                              report is missing. 41 fires, every one wrong.
+      the work-dir segment     see `OUTPUT_WORK_SEG`.
+
+    AND OF SEVERAL CANDIDATES NAMING THIS AGENT, THE ONE THAT IS THERE WINS. An order can
+    name the same artifact twice, once absolute and once project-relative; a stop is not
+    owed a report it has already written at a path its own order gave. 46 of the 1,272
+    measured stops name two, so the tie-break is reachable rather than theoretical — and
+    `marks` is passed in rather than defaulted here BECAUSE of those: on 3 of them the
+    order asks for no criteria, and a tie-break reading a stricter rule than the caller
+    walks past the file the agent wrote and reports the other path absent.
+    """
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
     if not isinstance(root, str) or not root.strip():
         # NO `os.getcwd()` FALLBACK, which is `wf-commitments.path`'s rule: both sources
         # above are supplied BY THE HARNESS and name the project this hook fired for,
         # while `getcwd()` names wherever the process happens to be.
+        return None
+    # NO `agent_type`, NO GATE. The employee's name is what tells this agent's artifact from
+    # a sibling's, and a stop that does not carry one (a `type: "agent"` hook's reader) is
+    # judged on its reply alone, exactly as `own_tag` treats a stop with no slot.
+    who = payload.get("agent_type")
+    if not isinstance(who, str) or not who.strip():
         return None
     # `realpath`, NOT `normpath`. The containment test below is the only thing standing
     # between a path read out of model-written text and a stat of whatever it names, and
@@ -1020,15 +1160,25 @@ def order_output(payload, ask):
     # outside the project anyway. Both sides are resolved, because a project reached
     # through a link (a worktree, a `/tmp` that is one) would otherwise never match.
     root = os.path.realpath(root)
+    found = []
     for cand in OUTPUT_IN_ORDER_RX.findall(ask or ""):
         cand = cand.lstrip("*_([:>")
         if not cand or set(cand) & OUTPUT_PLACEHOLDER:
             continue
+        parent = os.path.dirname(cand)
+        if not parent or os.path.basename(parent) != who:
+            continue
+        if OUTPUT_WORK_SEG not in cand:
+            continue
         path = os.path.realpath(cand if os.path.isabs(cand)
                                 else os.path.join(root, cand))
-        if path != root and path.startswith(root + os.sep):
+        if path == root or not path.startswith(root + os.sep):
+            continue
+        found.append(path)
+    for path in found:
+        if order_report(path, marks) == "ok":
             return path
-    return None
+    return found[0] if found else None
 
 
 def in_project(payload, path):
@@ -1047,7 +1197,7 @@ def in_project(payload, path):
         return path
 
 
-def order_report(path):
+def order_report(path, marks=True):
     """What is at `path`: "ok", "unmarked", "unfinished" or "absent".
 
     READ THROUGH `_open_nofollow`, the sibling's guarded open, so a link planted at a
@@ -1055,6 +1205,10 @@ def order_report(path):
     name this hook cannot open without following something is reported "absent", which
     is the safe direction: the kickback asks for a report, and a report nobody can read
     is not one.
+
+    `marks=False` FOR AN ORDER THAT ASKED FOR NONE, and then the file being there is the
+    whole answer. See `OUTPUT_CRITERIA_ASKED_RX`: the gate enforces the expectation the
+    order set, never one it did not.
     """
     try:
         fd = TT._open_nofollow(path, os.O_RDONLY)
@@ -1065,6 +1219,8 @@ def order_report(path):
             body = fh.read(OUTPUT_READ_BYTES)
     except OSError:
         return "absent"
+    if not marks:
+        return "ok"
     if OUTPUT_UNFINISHED_RX.search(body):
         return "unfinished"
     return "ok" if OUTPUT_MARKED_RX.search(body) else "unmarked"
@@ -1338,15 +1494,28 @@ def order_expectation(payload):
 
     THE LOOP BOUND IS THE ONE ALREADY THERE. `widen` returns before this on
     `stop_hook_active`, so the continuation this block causes cannot reach it, exactly as
-    the close-out above relies on. Nothing is remembered between stops: an agent kicked
-    back once and resumed later is asked again only if the report is still missing, which
-    is the answer the kickback asked for.
+    the close-out above relies on.
+
+    AND IT IS ASKED ONCE PER ARTIFACT, in the close-out's own record, which is measured
+    rather than tidy. The text has always said "This is asked once" and nothing enforced
+    it: an agent hands back several times on one order — holding for a build, resumed by
+    its parent — and the report is written on the LAST of those turns. MEASURED 2026-10-12
+    over 1,272 recorded stops: 59 of them were an intermediate hand-back whose report did
+    not exist yet and was written later in the same run, across 33 agents, and ONE agent
+    would have been asked eleven times for the same file. That is the shape the close-out
+    beside this one already refuses — "a guard that repeats an answered question is the
+    7.0% false-positive rate that retired this distribution's last speech guard, reached
+    by repetition instead of by a bad detector".
     """
     ask = spawn_prompt(payload)
-    path = order_output(payload, ask)
+    # ONE READING OF THE ORDER, HANDED TO BOTH. `order_output`'s tie-break asks the same
+    # question this does, and a tie-break holding the file to a stricter rule than the
+    # caller walks past the report the agent wrote.
+    marks = bool(OUTPUT_CRITERIA_ASKED_RX.search(ask or ""))
+    path = order_output(payload, ask, marks)
     if not path:
         return None
-    state = order_report(path)
+    state = order_report(path, marks)
     if state == "ok":
         return None
     capped = at_cap(payload)
@@ -1356,6 +1525,15 @@ def order_expectation(payload):
         # The measured defect is the stop that left NOTHING.
         return cap_perf(payload, path, ask, capped) if state == "absent" else None
     owed = in_project(payload, path)
+    # ASKED ONCE, in the record the close-out above writes and reads. The key is the
+    # ARTIFACT, not the agent: two agents on one order each owe their own file, and one
+    # agent handing back four times on one order is owed one question. It is keyed by the
+    # path AS THE PROJECT NAMES IT, which is the spelling the block's own text uses — an
+    # absolute key would make the record unreadable to anyone who moved the checkout, and
+    # the record is per session, so the project it belongs to is never in doubt.
+    if ("r:" + owed) in closeout_reported(payload):
+        return None
+    closeout_record(payload, {"r:" + owed})
     if state == "absent":
         said = f"There is no report at {owed}, which your work order named."
     elif state == "unfinished":
