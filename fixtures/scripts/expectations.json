@@ -4665,6 +4665,38 @@
       "not scored"
     ]
   },
+  "widen-hold-on-dispatched-work-is-not-a-stop": {
+    "_why": "K4 ON THE K2 CHANGE, and the first wrong block measured since the whole-decision exemption was removed. Replaying every Stop this machine recorded, 846 carried the exemption's own line - so a task really was running on each - and 9 of them (1.06%) blocked on the promise trigger while the turn was holding for work it had dispatched. This is one of the nine, byte for byte: the reader is out, the promise is what happens when it comes back, and the phrasing is one `WAITING` did not have. The second fact is in the payload, as it always was.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The blueprint is written and an independent reader is checking its references now. I'll fix whatever it finds, then send you the final plan.\", \"background_tasks\": [{\"id\": \"x\", \"status\": \"running\"}]}",
+    "want": [
+      "not scored"
+    ],
+    "not": [
+      "not judged",
+      "stopped mid-work"
+    ]
+  },
+  "widen-dispatched-words-alone-still-block": {
+    "_why": "THE NEGATIVE THAT KEEPS THE WIDENED HOLD FROM BECOMING A PHRASE ANY TURN CAN WRITE, exactly as `widen-waiting-words-alone-still-block` does for the older half. Byte for byte the reply of the row above with NOTHING in flight: no `background_tasks`, no notification tag on disk. Two facts make a hold; one makes a stop that announced work and ended. It must still block, or the K4 fix retires the trigger it was narrowing.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The blueprint is written and an independent reader is checking its references now. I'll fix whatever it finds, then send you the final plan.\"}",
+    "want": [
+      "stopped mid-work",
+      "CONTINUING"
+    ],
+    "not": [
+      "not judged"
+    ]
+  },
   "widen-waiting-words-alone-still-block": {
     "_why": "THE NEGATIVE THAT KEEPS THE FIX FROM WIDENING INTO SILENCE. Byte for byte the reply of widen-between-batches-is-silent, with no task running and no notification tag on disk: nothing is pending, nobody was asked anything, and the turn ended on \"Continuing.\" That is the measured stop defect - 10 of 106 turns - and it must still be blocked, or a guard is retired by a phrase any turn can write.",
     "exit": 0,
@@ -4725,6 +4757,20 @@
     ],
     "not": [
       "not judged"
+    ]
+  },
+  "widen-subagent-two-named-paths-take-the-one-written": {
+    "_why": "FOUND BY THE CODE REVIEW OF THE K4 FIX, and measured: 46 of 1,272 stops name this agent's artifact TWICE - a resumed order quoting the earlier half's path alongside this half's - and on 3 of them the order asks for no criteria. With the tie-break reading a stricter rule than its caller, it walks past the file the agent wrote (no criterion table, because none was asked for) and reports the OTHER path absent. One reading of the order is handed to both.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"platform-lead\", \"last_assistant_message\": \"All four items are wired. Handing back.\"}",
+    "not": [
+      "no report",
+      "\"decision\": \"block\"",
+      "work/r1/platform-lead"
     ]
   },
   "widen-subagent-report-is-asked-once-per-artifact": {

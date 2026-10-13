@@ -466,6 +466,24 @@ TAIL = 400
 # TWO FACTS, NOT ONE PHRASE, for each half. "waiting on" appears in plenty of replies that
 # then genuinely stop mid-work, and notifications open a large share of turns in an
 # agent-driven run, so neither the words nor the notification alone can buy silence.
+#
+# AND THE PHRASINGS ARE MEASURED, which is the K4 half of this. Replaying every stop this
+# machine recorded, 846 of them carried the exemption's own line (`a background task is
+# still running`), so on every one of those the second fact HELD. 9 blocked on the promise
+# trigger, 1.06%, and all 9 were a turn holding for work it had dispatched — in words this
+# pattern did not have: *"an independent reader is checking its references now. I'll fix
+# whatever it finds"*, *"Six re-checks are running. I'll report each result"*, *"its helper
+# is still reviewing the draft"*, *"the correspondent is now re-sweeping Gmail"*, *"I'll
+# write the walkthrough when the survey comes back"*, *"I'll fix the catalog after the last
+# three runs"*. Every one of those is the hold this section exists for, and every one was a
+# WRONG block — the first measured since K2 removed the whole-decision exemption, because
+# until then none of these stops was judged at all.
+#
+# WIDENING THIS CANNOT REACH A TURN THAT IS NOT HOLDING. `declared_hold` requires the second
+# fact — a task really running, or a completion notification that opened the turn — so a
+# reply carrying any phrase below with nothing in flight is judged exactly as before
+# (`widen-dispatched-words-alone-still-block` is that reply with neither fact). That is what
+# makes the progress-verb forms safe to add here and nowhere else.
 WAITING = re.compile(
     r"\b(?:holding|hold)\b[^.\n]{0,40}\b(?:for|until|on)\b"
     r"|\bwaiting (?:on|for)\b"
@@ -473,7 +491,20 @@ WAITING = re.compile(
     r"\b(?:agents?|batch|background|tasks?|run|runs|gate|gates)\b"
     r"|\bstill (?:running|in flight|working)\b"
     r"|\b(?:let|letting) (?:it|them|those|the \w+) finish\b"
-    r"|\bcontinuing to wait\b", re.I)
+    r"|\bcontinuing to wait\b"
+    # the dispatched work, named as in progress
+    r"|\b(?:is|are|'s|'re) (?:now |currently )?(?:still )?"
+    r"(?:running|checking|reviewing|re-?checking|re-?sweeping|sweeping|gathering"
+    r"|verifying|in progress|under way|underway)\b"
+    r"|\bstill (?:reviewing|checking|verifying|gathering|going)\b"
+    # the promise's own condition: it lands when the dispatched thing comes back
+    r"|\b(?:when|once|after|as|until)\b[^.\n]{0,40}"
+    r"\b(?:comes? back|passes|lands|stops?|finishes|returns?|reports? back)\b"
+    # … or the awaited thing is named and its verb elided — "after the last three runs",
+    # the ninth of the nine measured wrong blocks and the only one the clause above misses
+    r"|\b(?:when|once|after|until)\b[^.\n]{0,40}"
+    r"\b(?:runs?|agents?|batch(?:es)?|tasks?|reviews?|checks?|gates?|sweeps?|surveys?)\b",
+    re.I)
 
 
 def just_finished(payload):
@@ -1006,11 +1037,14 @@ def closeout_subagent(payload):
 # the hook fired for, because a path read out of model-written text is not a licence to
 # stat anything on the machine.
 #
-# MEASURED 2026-10-12 (K4), over the same corpus the close-out below was measured on: 991
-# real subagent transcripts on this machine and 1,272 recorded `SubagentStop` firings, each
-# replayed through this gate with the project root the harness would have given it.
+# MEASURED 2026-10-12 (K4), over the same corpus the close-out below was measured on: every
+# `agent-*.jsonl` under `~/.claude/projects/*/<session>/subagents/`, replayed through this
+# gate with the project root the harness would have given it. 996 transcripts and 1,277
+# recorded `SubagentStop` firings on the run below; the corpus is live, so the baseline run
+# an hour earlier saw 1,272 of them. Each stop is the hook's OWN attachment row, so the
+# replay runs where the hook really ran rather than at the end of a file.
 #
-#   as first written   496 stops fired, 39.1%. 488 of them were WRONG, in four shapes, and
+#   as first written   496 of 1,272 stops fired, 39.1%. 488 were WRONG, in four shapes, and
 #                      every shape is a path-or-vocabulary read rather than a missing
 #                      report: 210 on `<root>/OUTPUT.md` invented from the artifact's bare
 #                      NAME in prose, 41 on a SIBLING's report the order quoted for this
@@ -1019,8 +1053,8 @@ def closeout_subagent(payload):
 #                      the upper-case `MET` token, 5 on `IN-PROGRESS` inside a quoted order
 #                      or a sentence saying no row is open. (The shapes overlap; the four
 #                      narrowings below are what each one needed.)
-#   as it now stands   6 stops fire, 0.47%, against the 1.5% budget that retired this
-#                      distribution's last speech guard. ALL SIX HAND-READ FROM THE
+#   as it now stands   6 of 1,277 stops fire, 0.47%, against the 1.5% budget that retired
+#                      this distribution's last speech guard. ALL SIX HAND-READ FROM THE
 #                      TRANSCRIPT and all six correct: 3 agents stopped with nothing at the
 #                      path their order named (one had its dispatcher's directory sitting
 #                      empty beside its own spawn file), and 3 left a report whose every
@@ -1081,7 +1115,7 @@ OUTPUT_UNFINISHED_RX = re.compile(r"\|\s*[(*`\[]*IN-PROGRESS")
 OUTPUT_CRITERIA_ASKED_RX = re.compile(r"exit criteri|criterion|\bUNMET\b", re.I)
 
 
-def order_output(payload, ask):
+def order_output(payload, ask, marks=True):
     """Absolute path of the `OUTPUT.md` THIS agent's order named for it, or None.
 
     THREE THINGS MAKE A CANDIDATE THIS AGENT'S ARTIFACT, and all three are measured. Over
@@ -1101,7 +1135,11 @@ def order_output(payload, ask):
 
     AND OF SEVERAL CANDIDATES NAMING THIS AGENT, THE ONE THAT IS THERE WINS. An order can
     name the same artifact twice, once absolute and once project-relative; a stop is not
-    owed a report it has already written at a path its own order gave.
+    owed a report it has already written at a path its own order gave. 46 of the 1,272
+    measured stops name two, so the tie-break is reachable rather than theoretical — and
+    `marks` is passed in rather than defaulted here BECAUSE of those: on 3 of them the
+    order asks for no criteria, and a tie-break reading a stricter rule than the caller
+    walks past the file the agent wrote and reports the other path absent.
     """
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
     if not isinstance(root, str) or not root.strip():
@@ -1138,7 +1176,7 @@ def order_output(payload, ask):
             continue
         found.append(path)
     for path in found:
-        if order_report(path) == "ok":
+        if order_report(path, marks) == "ok":
             return path
     return found[0] if found else None
 
@@ -1470,10 +1508,14 @@ def order_expectation(payload):
     by repetition instead of by a bad detector".
     """
     ask = spawn_prompt(payload)
-    path = order_output(payload, ask)
+    # ONE READING OF THE ORDER, HANDED TO BOTH. `order_output`'s tie-break asks the same
+    # question this does, and a tie-break holding the file to a stricter rule than the
+    # caller walks past the report the agent wrote.
+    marks = bool(OUTPUT_CRITERIA_ASKED_RX.search(ask or ""))
+    path = order_output(payload, ask, marks)
     if not path:
         return None
-    state = order_report(path, bool(OUTPUT_CRITERIA_ASKED_RX.search(ask or "")))
+    state = order_report(path, marks)
     if state == "ok":
         return None
     capped = at_cap(payload)
