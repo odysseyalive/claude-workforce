@@ -1314,6 +1314,14 @@ def at_cap(payload):
     record about a person. 23 of a cap of 10 is turn 3 of the third allowance, and that
     is what it now says.
 
+    AND IT IS `wf-turn-budget.turn_round` THAT SAYS IT, not arithmetic of this file's own.
+    This file used to divide by the cap and that hook used to multiply by it, and both
+    assumed a round ENDS on an exact multiple of the cap — which the harness does not
+    guarantee and did not do: measured 2026-10-13, a cap-10 IC was cut on turn 8 of round
+    1, so the two models disagreed about which allowance turn 15 was in and the one that
+    schedules the notices put round 2's final threshold past the cut. Two numbers derived
+    from one function cannot disagree; two derivations of the same number did.
+
     THE COUNT IS `wf-turn-budget`'s OWN AND IS NOT RECOUNTED HERE. That hook already
     counts this agent's turns on every one of its tool calls and stores them beside the
     cap it read from the handbook (`read_cap`, `read_state`), so the number exists by the
@@ -1350,17 +1358,18 @@ def at_cap(payload):
         bases.append(os.path.join(scratch, "wf-turn-budget"))
     import tempfile
     bases.append(os.path.join(tempfile.gettempdir(), "wf-turn-budget"))
-    turns = 0
+    # THE COUNTER THAT COUNTED MOST IS THE ONE READ, whole. The round anchor only means
+    # anything beside the count it was recorded with, so the two locations are compared on
+    # the count and the winner's state is taken intact rather than its keys picked apart.
+    turns, state = 0, {}
     for base in bases:
-        turns = max(turns, counter_turns(base, session, agent_id))
+        found = counter_state(base, session, agent_id)
+        if TB.counted(found, "turns") > turns:
+            turns, state = TB.counted(found, "turns"), found
     if turns < cap:
         return None
-    # CEILING DIVISION, 1-BASED. `turns >= cap > 0` here, so the allowance this count lands
-    # in is `ceil(turns / cap)` and the turn inside it is never 0 and never past the cap.
-    # Derived from the two numbers rather than read from the counter: the counter stores one
-    # cumulative total, and a second stored number would be a second thing to keep in step.
-    rounds = (turns + cap - 1) // cap
-    return turns - (rounds - 1) * cap, cap, rounds
+    in_round, rounds, _start = TB.turn_round(state, cap)
+    return in_round, cap, rounds
 
 
 def _ours(path, want):
@@ -1384,8 +1393,8 @@ def _ours(path, want):
     return getuid is None or st.st_uid == getuid()
 
 
-def counter_turns(base, session, agent_id):
-    """`wf-turn-budget`'s recorded turn count for this agent, or 0 when it is not OURS.
+def counter_state(base, session, agent_id):
+    """`wf-turn-budget`'s stored counters for this agent, or `{}` when they are not OURS.
 
     THE COUNTER CAN SIT IN A SHARED DIRECTORY, which makes this a trust question rather
     than a parse. `wf-turn-budget` prefers the session's private scratchpad but falls back
@@ -1399,29 +1408,31 @@ def counter_turns(base, session, agent_id):
     at the name and `fstat` then asks what was actually opened, which is the pair that
     cannot be raced.
 
-    0 IS THE SAFE ANSWER for every refusal, because `at_cap` compares it against the cap:
-    an unverifiable counter means no cap hit, which costs an unfiled record and never
-    files a wrong one.
+    AN EMPTY MAP IS THE SAFE ANSWER for every refusal, because every number taken off it
+    goes through `wf-turn-budget.counted`, where a missing key is 0 — and `at_cap` compares
+    the turn count against the cap, so an unverifiable counter means no cap hit, which
+    costs an unfiled record and never files a wrong one. The keys are NOT validated here:
+    the hook that writes them validates on the way in and on the way out, and `counted` is
+    the one reader both files share, so a second idea of what a count is cannot grow here.
     """
     d = os.path.join(base, session, agent_id)
     if not all(_ours(p, stat.S_ISDIR)
                for p in (base, os.path.join(base, session), d)):
-        return 0
+        return {}
     try:
         fd = TT._open_nofollow(os.path.join(d, "count.json"), os.O_RDONLY)
     except OSError:
-        return 0
+        return {}
     try:
         with os.fdopen(fd, encoding="utf-8") as fh:
             st = os.fstat(fh.fileno())
             getuid = getattr(os, "getuid", None)
             if not stat.S_ISREG(st.st_mode) or (getuid and st.st_uid != getuid()):
-                return 0
+                return {}
             state = json.load(fh)
     except (OSError, ValueError):
-        return 0
-    turns = state.get("turns") if isinstance(state, dict) else None
-    return turns if isinstance(turns, int) and turns >= 0 else 0
+        return {}
+    return state if isinstance(state, dict) else {}
 
 
 PERF_STORE_PARTS = (".claude", "workforce", "personnel")

@@ -5097,6 +5097,34 @@
       }
     }
   },
+  "widen-cap-hit-round-agrees-with-the-budget": {
+    "_why": "THE TWO HOOKS READ ONE ROUND MODEL, which is the half no single-script row could show. The counter here is the trial's: 15 turns against a cap of 10, with the first round recorded as having ended on turn 8. `wf-turn-budget` fires its final notice at that same turn 15 and calls it `7 of 10` (`turn-budget-resumed-round-is-anchored-to-the-cut`), and this record says `turn 7 of 10 (round 2)` -- the same two numbers, out of `turn_round`, because this file now asks that function instead of dividing by the cap itself. The ceiling division it replaced read turn 5 of round 2 from the same counter, so the performance record and the instruction the agent was given disagreed about which turn it was cut on, and the schedule that owns the thresholds was the one that was wrong. `turn 5 of 10` is the negative that pins it.",
+    "after": {
+      ".claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md": {
+        "want": [
+          "**Attribution:** **ENVIRONMENT**",
+          "turn 7 of its cap of 10",
+          "allowance 2"
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "\"decision\": \"block\"",
+      "turn 5 of 10",
+      "turn 15 of 10",
+      "Traceback"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"last_assistant_message\": \"PASS | the install section is rewritten.\"}",
+    "want": [
+      "stopped at turn 7 of 10 (round 2)",
+      "PERF filed at .claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md"
+    ]
+  },
   "widen-subagent-under-cap-files-no-perf": {
     "_why": "THE MUTATION CHECK ON THE ROW ABOVE, and the one number that separates them: the same tree with the counter at 4 of 10. An agent that stopped with turns left was not cut off - it chose to stop - so there is no ENVIRONMENT condition to record and a performance record filed against it would be a wrong record about a person. It still owes its report, so it is kicked back instead, and the personnel store is never created.",
     "exit": 0,
@@ -8343,6 +8371,105 @@
     "want": [
       "\"additionalContext\"",
       "37 of 40",
+      "RETURN NOW"
+    ]
+  },
+  "turn-budget-resumed-round-is-anchored-to-the-cut": {
+    "_why": "THE TRIAL'S OWN SHAPE, AND THE DEFECT IS THAT THE RESUMED AGENT WAS TOLD NOTHING. MEASURED 2026-10-13, session `68b82f98`, cap 10: the harness cut the agent on TURN 8 of round 1, not on turn 10. The schedule it replaced multiplied the cap -- round 1's final threshold plus one cap -- so round 2's notice was booked for turn 17, the second cut came first, and the agent wrote no continuation brief at all. This transcript is that run: 8 turns, the hook's own notice arriving back as a `hook_additional_context` attachment, the resume prompt, and 7 turns more. The round is anchored to the PROMPT ROW at turn 8, so the final notice lands on turn 15 -- `round_start + cap - 3` -- and the agent is told while it still has three turns to write in. `round_start: 8` in the counter is the half that proves WHERE the anchor came from: the injection row carries text and no `tool_result`, so a reader that did not exclude the hook's own words would have anchored at turn 7 and fired at 14.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"handoff\""
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 15",
+          "\"round\": 1",
+          "\"round_start\": 8"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-final-1": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "15 of 10",
+      "17 of 10"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "7 of 10",
+      "RETURN NOW"
+    ]
+  },
+  "turn-budget-anchored-round-is-quiet-before-its-threshold": {
+    "_why": "THE MUTATION CHECK ON THE ROW ABOVE, one turn short of the threshold. Same cut at turn 8 and same resume, with 6 turns in the second allowance instead of 7: turn 14 is turn 6 of round 2, the notice is not due, and a hook that fired on every call after a resume -- or that re-anchored the round on the WRONG row -- announces the boundary here. The counter is the assertion that cannot be satisfied by silence: `round` 1 and `round_start` 8 say the resume was observed and the anchor recorded, so the quiet is the schedule's and not a failure to read the transcript at all.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 14",
+          "\"round\": 1",
+          "\"round_start\": 8"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-final-1": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW",
+      "TURN BUDGET"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
+  },
+  "turn-budget-exact-cut-keeps-the-whole-second-allowance": {
+    "_why": "NOTHING REGRESSES FOR THE ROUND THAT DID END ON THE CAP. A `maxTurns: 80` producer was cut with the counter reading exactly 80, was resumed, and runs on: the anchored schedule puts its second final notice at 80 + 77 = TURN 157, which is the same turn the cap-multiple arithmetic booked, and the text reads `77 of 80` as it did before. That is the whole point of anchoring rather than re-basing: when the harness's count and ours agree, the two models agree too, and the change is only visible on the rounds that ended early. At a cap of 80 the drift is also where the measured silence costs most -- 45 cut-offs in 269 capped-IC dispatches -- so this row runs at the producer cap rather than the 10 the trial used.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"handoff\""
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 157",
+          "\"round\": 1",
+          "\"round_start\": 80"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-final-1": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "157 of 80",
+      "64 of 80"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "77 of 80",
       "RETURN NOW"
     ]
   },

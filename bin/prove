@@ -575,7 +575,58 @@ CASES = [
     ("turn budget: nothing is written or read through a name another account can plant",
      TBG, "del", "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)"),
     ("turn budget: nothing is written or read through a name another account can plant",
-     TBG, "del", "counted, _ignored, spent, writes = count_turns(tpath, 0,"),
+     TBG, "del", "tail = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))"),
+    # ── EVERY ROUND'S BOUNDARY, ANCHORED TO WHERE THE LAST ONE ENDED (2026-10-13) ──
+    # THE ASSERTION IS TEXTUAL, so a mutation that also breaks the file still proves it:
+    # `bin/check` READS both hooks here rather than executing them, and the PROVEN test is
+    # made before the BAD-CASE one. What the broken-file cases cannot do is say anything
+    # about behaviour, which is why the four conformance-named rows below exist as well and
+    # every one of them leaves valid Python.
+    #
+    # COUNTED, NOT `in`: a SECOND definition of `turn_round` silently wins for every caller
+    # and leaves the name every reader imports, so the case APPENDS one that answers "turn
+    # 0 of allowance 1" forever — which is also the shape under which no notice ever fires.
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "append",
+     "\ndef turn_round(state, cap):\n    return 0, 1, 0\n"),
+    # THE TWO RETIRED MODELS ARE PROVED BY APPENDING THEM, for the reason the os.getcwd()
+    # case above gives: an absence rule passes on a file nobody ever wrote the form into.
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "append",
+     "\n_OLD_ROUND = lambda turns, cap: (turns - final_at(cap)) // cap\n"),
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     WDN, "append", "\n_OLD_CEIL = lambda turns, cap: (turns + cap - 1) // cap\n"),
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "del", "if in_round >= final_at(cap):"),
+    ("turn budget: every round is anchored to where the last one ended, by one shared "
+     "function",
+     TBG, "del", "os.path.commonprefix([WARN_MARK, FINAL_MARK])"),
+    # AND THE SAME MECHANISM AS BEHAVIOUR. The conformance suite is a `bin/check`
+    # assertion, so the three `turn-budget-*` round fixtures and `widen-cap-hit-round-
+    # agrees-with-the-budget` fire by name. Each of these four leaves a file that runs and
+    # does the wrong thing, which is the only residue that proves anything.
+    #
+    # THE ROUND THAT NEVER ADVANCES is the measured silence itself: the anchor still moves,
+    # but the claim marker keeps round 0's name, so the resumed agent's notice is spent
+    # forever and the trial's shape goes quiet again at turn 15.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     TBG, "del", 'state["round"] += tail["rounds"]'),
+    # THE ANCHOR ITSELF. `round` still counts the resumes, so round 2's threshold is read
+    # from 0 and lands a whole cap late — the cap-multiple schedule by another route.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     TBG, "del", 'state["round_start"] = state["turns"] + tail["round_start"]'),
+    # THE WORK ORDER READ AS A RESUME. Without the turn-0 refusal a re-read from the top of
+    # the transcript books the order itself as an allowance, and every round after it is
+    # off by one — which the counter in all three round fixtures states by number.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     TBG, "del", " or not (offset or turns)"),
+    # AND THE READER AT THE OTHER END, whose record is the one a person is judged by.
+    ("scripts: the script-conformance suite passes, every case it selects",
+     WDN, "del", "in_round, rounds, _start = TB.turn_round(state, cap)"),
     # THE BRIEF'S SHAPE, pinned in BOTH files: the hook injects the section lines and
     # org.md rung 12b verifies them, so a case per side.
     ("turn budget: the continuation brief has one shape, named by its producer and its "

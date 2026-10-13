@@ -97,6 +97,80 @@ def final_at(max_turns):
     return max_turns - 3
 
 
+# ── which allowance a cumulative count lands in ──────────────────────────────
+# ONE DEFINITION, READ BY BOTH HOOKS, BECAUSE THE TWO IT REPLACES DISAGREED. This file
+# scheduled round k's thresholds at `final_at(cap) + k * cap`, and `wf-widen` reported the
+# round as `ceil(turns / cap)`. Both assume a round ENDS on an exact multiple of the cap.
+# MEASURED 2026-10-13, session `68b82f98`, cap 10: the harness cut the agent on TURN 8 of
+# round 1, not on turn 10. Round 2's final threshold was therefore scheduled for turn 17,
+# the second cut arrived first, and THE RESUMED AGENT GOT NO FINAL NOTICE AND WROTE NO
+# BRIEF — the silence this hook exists to remove, one round in. Our count and the
+# harness's disagree whenever a turn is not a tool call, so with a cap of 80 the same
+# drift opens on every resume.
+#
+# SO A ROUND IS ANCHORED TO WHERE THE PREVIOUS ONE ACTUALLY ENDED, which is a fact the
+# agent's own transcript already records: a `SendMessage` resume appends a new PROMPT row
+# to it, and the turn count standing at that row is where the next allowance begins
+# (`count_turns`). `round_start` is that number, stored beside the count in `count.json`.
+# Round k's thresholds are then `round_start + warn_at(cap)` and `round_start +
+# final_at(cap)`, so the final notice lands three turns before the limit in EVERY round
+# rather than only the first.
+#
+# THE CAP-MULTIPLE MODEL SURVIVES AS THE BACKSTOP, and it is what makes the anchor safe to
+# ship against state written without it. `round_start` is 0 for a run that was never cut,
+# and round 1 then behaves exactly as it did; it is also 0 in a counter the previous
+# release wrote. When the count has outrun a whole allowance from the anchor, the anchor is
+# missing or stale, so the ceiling division answers instead — the number the last release
+# printed, for the state it left behind. The direction of the error stays the one this hook
+# already chose: an early boundary costs one extra written hand-back, a late one costs the
+# run.
+def counted(state, key):
+    """One stored counter off `count.json`, validated WHERE IT IS READ.
+
+    The counter sits in scratch another account on the host can reach, so a string, a
+    float or a negative on any key reads as 0 rather than raising inside a hook — and
+    `wf-widen` reads the same file for itself, so the validator is shared rather than
+    stated twice with two ideas of what a count is.
+    """
+    v = state.get(key) if isinstance(state, dict) else None
+    return v if isinstance(v, int) and v >= 0 else 0
+
+
+def turn_round(state, cap):
+    """`(turn within this allowance, which allowance, the count the allowance started at)`.
+
+    1-BASED ON BOTH NUMBERS. Allowance 1 is the first one, and the turn inside it is never
+    0 after the first call of a round and never past the cap. `wf-widen` prints both in the
+    performance record it files, and this hook keys its claim markers on `allowance - 1`,
+    so round 0 keeps the marker name it had before any round was counted.
+    """
+    turns, start, rounds = (counted(state, "turns"), counted(state, "round_start"),
+                            counted(state, "round"))
+    if not isinstance(cap, int) or cap < 1:
+        return turns, 1, 0
+    if start > turns:
+        start = 0        # state that cannot be true is discarded, as `read_state` does
+    spent = turns - start
+    if spent > cap:
+        extra = (spent + cap - 1) // cap - 1
+        rounds += extra
+        spent -= extra * cap
+        start = turns - spent
+    return spent, rounds + 1, start
+
+
+def keyed(marker, round_):
+    """The claim name for one round of `marker`.
+
+    ROUND 0 KEEPS THE BARE NAME, so a marker file written before rounds were counted is
+    still read by the release that counts them. One definition because three places build
+    this name — the claim, the walk back over the claims, and the test for whether the
+    current round's notice has already gone out — and a fourth spelling of it is how a
+    resumed agent ends up claiming a marker nobody looks for.
+    """
+    return marker if round_ <= 0 else "%s-%d" % (marker, round_)
+
+
 # ── the continuation brief's shape ───────────────────────────────────────────
 # THESE SEVEN HEADINGS ARE A CONTRACT WITH `org.md` RUNG 12b, which is the consumer that
 # reads the brief and RESUMES THE SAME AGENT from it (e06d730; a fresh agent of the role
@@ -162,6 +236,25 @@ partial account replied beats a complete one the limit cuts off."""
 # wording is improved, and the symptom would be the paragraph repeating on every call.
 WARN_MARK = WARN_TEXT.split("{turns}")[0]
 FINAL_MARK = FINAL_TEXT.split("{turns}")[0]
+
+# AND WHAT EITHER OF THEM LOOKS LIKE ON A ROW THAT IS NOT A TURN. A delivered injection
+# arrives in the agent's own transcript as a `hook_additional_context` attachment, so the
+# row that carries it is neither a turn nor the new prompt that starts a round — it is the
+# signal that the round it was sent in is ending. DERIVED FROM THE TWO TEXTS, like the
+# marks above: a third copy of the opening line is the one that drifts the first time the
+# wording improves.
+#
+# ASCII ONLY, AND THAT IS NOT TIDINESS. The common prefix ends in an em dash, and a
+# transcript writer that escapes non-ASCII spells it `\\u2014`, so a needle carrying the
+# character itself would match nothing on that host. Everything up to it matches either
+# spelling.
+#
+# AND IT IS NEVER ALLOWED TO BE EMPTY. `b"" in raw` is true of every row, which would read
+# every round as ending; a prefix the two texts no longer share would produce exactly that.
+# The final notice's own head is the fallback, because that is the injection this exclusion
+# exists for.
+BUDGET_MARK = (os.path.commonprefix([WARN_MARK, FINAL_MARK])
+               or FINAL_MARK).encode("ascii", "ignore").rstrip()
 
 
 # `agent_type` ARRIVES IN A PAYLOAD AND BECOMES A PATH, so it is validated as a bare
@@ -282,12 +375,31 @@ def agent_transcript(payload, session_id, agent_id):
 WRITE_TOOLS = frozenset(("Write", "Edit", "MultiEdit", "NotebookEdit"))
 
 
-def count_turns(path, offset, needles=()):
-    """(turns, new offset, needles seen, writes) — or (None, offset, {}, 0).
+def count_turns(path, offset, needles=(), pending=False):
+    """What the tail of this agent's transcript says, as a dict:
+
+      turns        turns in the rows just read, or None when nothing could be read
+      off          the offset to resume from
+      seen         how many times each of `needles` appeared
+      writes       `WRITE_TOOLS` calls in those rows
+      rounds       ROUND BOUNDARIES in those rows — new allowances this agent was granted
+      round_start  the turn count standing at the last of them, within this read
 
     A TURN IS AN ASSISTANT MESSAGE CARRYING A `tool_use`. An assistant row holding only
     `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
     is the whole reason this counts rows instead of calls.
+
+    A ROUND BOUNDARY IS A PROMPT ROW THAT FOLLOWS A DELIVERED NOTICE, and both halves of
+    that are load-bearing. A `SendMessage` resume appends a user row carrying TEXT, where
+    every ordinary user row in a subagent's transcript carries a `tool_result`; that row is
+    where the harness's new turn allowance begins, and it is the only thing on this host
+    that marks the end of the previous one. `pending` is the second half: a prompt row is
+    read as a boundary ONLY when the final notice for the current round has already gone
+    out. Nothing else on a transcript can then move the anchor mid-round, and a row of an
+    unforeseen shape costs at worst the cap-multiple backstop (`turn_round`) rather than a
+    notice postponed into silence. The cost is the same reason: the extra parse is reached
+    only after a notice has been delivered, which is once per round, so an ordinary call of
+    an ordinary capped agent pays one `in` test for it.
 
     ONLY WHOLE LINES ARE CONSUMED. The host batches transcript appends on a 100 ms timer,
     so the tail can be a half-written line; the offset advances to the last newline and
@@ -315,37 +427,78 @@ def count_turns(path, offset, needles=()):
     # agent components are), so the name is reachable by anything that can set `cwd` or
     # that path. `read_cap` takes the same guard, and it is the one `wf-turn-ledger`'s
     # `_read_lines` has carried since it shipped.
+    unread = {"turns": None, "off": offset, "seen": {}, "writes": 0,
+              "rounds": 0, "round_start": 0}
     if not path or not os.path.isfile(path):
-        return None, offset, {}, 0
+        return unread
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
             chunk = fh.read()
     except (OSError, ValueError):
-        return None, offset, {}, 0
+        return unread
     seen = dict((n, chunk.count(n.encode("utf-8"))) for n in needles)
     cut = chunk.rfind(b"\n")
     if cut < 0:
-        return 0, offset, seen, 0
-    turns = writes = 0
+        return dict(unread, turns=0, seen=seen)
+    turns = writes = rounds = start = 0
     for raw in chunk[:cut + 1].splitlines():
-        if b'"tool_use"' not in raw:          # cheap reject before any parse
+        if b'"tool_use"' in raw:              # cheap reject before any parse
+            try:
+                row = json.loads(raw.decode("utf-8", "replace"))
+            except ValueError:
+                continue
+            if row.get("type") != "assistant":
+                continue
+            content = (row.get("message") or {}).get("content")
+            if not isinstance(content, list):
+                continue
+            calls = [b for b in content
+                     if isinstance(b, dict) and b.get("type") == "tool_use"]
+            if calls:
+                turns += 1
+                writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
+            continue
+        if BUDGET_MARK in raw:
+            # THIS HOOK'S OWN INJECTION, arriving back as an attachment. Not a turn, not a
+            # prompt, and the one thing on the transcript that says the round is ending —
+            # which is what the no-state path has to read it for: there is no marker file
+            # there to ask.
+            pending = True
+            continue
+        # A PROMPT ROW IS A USER ROW WITH NO `tool_result` IN IT, tested on the raw bytes
+        # so an ordinary call parses nothing extra. The byte test is deliberately the
+        # whole of the `tool_result` refusal: a resume message that quotes the words
+        # `tool_result` is read as one of them and the backstop answers, where a parse
+        # that looked past it could read a tool result as a new allowance.
+        if not pending or b'"tool_result"' in raw or b'"user"' not in raw:
             continue
         try:
             row = json.loads(raw.decode("utf-8", "replace"))
         except ValueError:
             continue
-        if row.get("type") != "assistant":
+        if row.get("type") != "user":
             continue
         content = (row.get("message") or {}).get("content")
-        if not isinstance(content, list):
+        if isinstance(content, str):
+            text = content.strip()
+        elif isinstance(content, list):
+            text = "".join(str(b.get("text") or "") for b in content
+                           if isinstance(b, dict) and b.get("type") == "text").strip()
+        else:
             continue
-        calls = [b for b in content
-                 if isinstance(b, dict) and b.get("type") == "tool_use"]
-        if calls:
-            turns += 1
-            writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
-    return turns, offset + cut + 1, seen, writes
+        if not text or not (offset or turns):
+            # THE FIRST PROMPT OF A TRANSCRIPT IS THE ORDER, NOT A RESUME, and a round
+            # cannot start on turn 0 because round 1 already did. The test is reached when
+            # a notice is pending and the read starts at the top of the file — the state a
+            # discarded or squatted counter leaves — and without it that re-read books the
+            # work order itself as a new allowance and every later round is off by one.
+            continue
+        rounds += 1
+        start = turns
+        pending = False
+    return {"turns": turns, "off": offset + cut + 1, "seen": seen, "writes": writes,
+            "rounds": rounds, "round_start": start}
 
 
 # ── the counter directory, which lives in a place other people can write ─────
@@ -425,8 +578,19 @@ def _open_nofollow(path, flags, mode=0o600):
     return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
 
 
+# WHAT THE COUNTER HOLDS, DECLARED ONCE AND IN ORDER. The reader, the writer and
+# `wf-widen`'s own read of the same file all key on this set, so a key added here reaches
+# every one of them — where three literal lists would have left the newest key written by
+# one and read by none. A KEY THAT ARRIVES ON STATE THAT NEVER HELD IT READS AS 0, which
+# is the honest answer and the compatible one: `writes` was added on 2026-10-13 and
+# `round`/`round_start` the day after, and a counter written before either says nothing was
+# counted, so nothing is claimed and the first write after the upgrade stores the real
+# number. For `round_start` that zero IS round 1, which is the behaviour that shipped.
+STATE_KEYS = ("off", "turns", "calls", "writes", "round", "round_start")
+
+
 def read_state(path):
-    """The stored offset and counts — `(off, turns, calls, writes)` — or zeros.
+    """The stored counters, as a dict of `STATE_KEYS` — zeros for anything unreadable.
     Unparsable state is DISCARDED.
 
     The transcript is the source of truth and this file is a cache, so throwing it away
@@ -437,7 +601,7 @@ def read_state(path):
     through — the read would otherwise be an arbitrary-file read aimed by whoever got to
     the name first.
     """
-    zero = (0, 0, 0, 0)
+    zero = dict.fromkeys(STATE_KEYS, 0)
     try:
         fd = _open_nofollow(os.path.join(path, "count.json"), os.O_RDONLY)
     except OSError:
@@ -447,20 +611,10 @@ def read_state(path):
             d = json.load(fh)
     except (OSError, ValueError):
         return zero
-    if not isinstance(d, dict):
-        return zero
-    out = []
-    # `writes` ARRIVES ON STATE THAT NEVER HELD IT. A counter written before 2026-10-13
-    # has three keys, and a missing one reads as 0 — which is the honest answer: nothing
-    # was counted, so no progress is claimed, and the first mark after the upgrade stores
-    # the real number.
-    for key in ("off", "turns", "calls", "writes"):
-        v = d.get(key)
-        out.append(v if isinstance(v, int) and v >= 0 else 0)
-    return out[0], out[1], out[2], out[3]
+    return dict((k, counted(d, k)) for k in STATE_KEYS)
 
 
-def write_state(path, off, turns, calls, writes):
+def write_state(path, state):
     """Replace the counter atomically, and never through a link.
 
     THE TEMPORARY NAME IS CREATED `O_CREAT | O_EXCL | O_NOFOLLOW`, so it cannot be a
@@ -468,6 +622,10 @@ def write_state(path, off, turns, calls, writes):
     then renames over `count.json`: rename acts on the NAME, so a symlink sitting at that
     name is replaced rather than written through. Those two together are why no file
     outside this directory can be reached by writing here.
+
+    EXACTLY `STATE_KEYS` ARE WRITTEN, validated on the way out as well as on the way in.
+    The file is read by two hooks and by anybody's `cat`; a key that only one release ever
+    wrote is a key the other reads as 0 and cannot tell from absent.
     """
     tmp = os.path.join(path, "count.json.%d" % os.getpid())
     try:
@@ -476,8 +634,7 @@ def write_state(path, off, turns, calls, writes):
         return
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump({"off": off, "turns": turns, "calls": calls,
-                       "writes": writes}, fh)
+            json.dump(dict((k, counted(state, k)) for k in STATE_KEYS), fh)
         os.replace(tmp, os.path.join(path, "count.json"))
     except OSError:
         try:
@@ -598,14 +755,15 @@ def last_claim(path, marker, rounds):
     call.
 
     KEYED TO THE CUT RATHER THAN TO THE ROUND, and that is measured. In session `68b82f98`
-    a `maxTurns: 10` IC was cut at turn 8 and resumed at turn 9, and `(turns - final_at) //
-    cap` reads 0 for both — one round by the arithmetic, two allowances in fact. A resume
-    claim keyed by round number would therefore have been spent by the cut itself for
-    small caps. The marker that the cut actually claimed is the one thing that cannot
-    disagree with how many times this agent has been told to hand off.
+    a `maxTurns: 10` IC was cut at turn 8 and resumed at turn 9, and the cap-multiple
+    arithmetic that scheduled the rounds read the same round for both — one round by that
+    arithmetic, two allowances in fact. A resume claim keyed by round number would
+    therefore have been spent by the cut itself for small caps. The marker that the cut
+    actually claimed is the one thing that cannot disagree with how many times this agent
+    has been told to hand off.
     """
     for k in range(rounds, -1, -1):
-        name = marker if k == 0 else "%s-%d" % (marker, k)
+        name = keyed(marker, k)
         if os.path.exists(os.path.join(path, name)):
             return name
     return ""
@@ -647,30 +805,54 @@ def main():
     path = state_dir(payload, session_id, agent_id)
 
     if path:
-        off, turns, calls, writes = read_state(path)
-        calls += 1
-        counted, new_off, _, wrote = count_turns(tpath, off)
-        if counted is None:
+        state = read_state(path)
+        # HAS THIS ROUND'S NOTICE ALREADY GONE OUT? `count_turns` needs the answer before
+        # it reads, because that is what licenses it to read a prompt row in the tail as
+        # the start of a new allowance. One `os.path.exists` on the ordinary call of an
+        # agent that has never been cut, which is almost every call.
+        pending = os.path.exists(os.path.join(
+            path, keyed("fired-final", turn_round(state, cap)[1] - 1)))
+        state["calls"] += 1
+        tail = count_turns(tpath, state["off"], pending=pending)
+        if tail["turns"] is None:
             # THE FALLBACK ERRS TOWARD AN EARLY HANDOFF. Calls >= turns always, so a call
             # count crosses the boundary no later than the true turn count would. An early
             # written hand-back costs one extra order; a silent cut-off costs the run.
-            turns, new_off = calls, off
+            state["turns"] = state["calls"]
         else:
-            turns += counted
-            writes += wrote
-        write_state(path, new_off, turns, calls, writes)
-        spent = set()
+            if tail["rounds"]:
+                # THE NEW ALLOWANCE STARTS WHERE THE PROMPT ROW STOOD, which is the turn
+                # count as of the previous call plus whatever this read counted before it.
+                state["round"] += tail["rounds"]
+                state["round_start"] = state["turns"] + tail["round_start"]
+            state["turns"] += tail["turns"]
+            state["writes"] += tail["writes"]
+            state["off"] = tail["off"]
+        write_state(path, state)
+        spent = {}
     else:
         # NO DIRECTORY COULD BE VERIFIED, SO THERE IS NO STATE AND THE RUN STILL GETS ITS
         # BOUNDARY. The count is taken from the whole transcript rather than a tail, and
         # the once-only rule is answered by the transcript too: a delivered injection is
         # recorded there as a `hook_additional_context` attachment (measured 2026-10-12),
-        # so what was already said can be read back. No transcript AND no state leaves
-        # nothing to count, and a number nothing measured is not worth stopping a run on.
-        counted, _ignored, spent, writes = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
-        if counted is None:
+        # so what was already said can be read back. The rounds come off the same read,
+        # which is why `pending` defaults to False here: the whole run is in front of it,
+        # injections included, so it can see for itself which prompt row ended a round. No
+        # transcript AND no state leaves nothing to count, and a number nothing measured is
+        # not worth stopping a run on.
+        tail = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
+        if tail["turns"] is None:
             return 0
-        turns = counted
+        spent = tail["seen"]
+        state = {"turns": tail["turns"], "writes": tail["writes"],
+                 "round": tail["rounds"], "round_start": tail["round_start"]}
+    writes = state["writes"]
+    # THE ROUND, ANCHORED TO WHERE THE LAST ONE ENDED. One function answers it for this
+    # hook and for `wf-widen`'s record of the same stop, so the schedule and the line that
+    # reports it cannot drift apart again — which they had, and the cost was a resumed
+    # agent that reached its second cap in silence.
+    in_round, allowance, _start = turn_round(state, cap)
+    round_ = allowance - 1
 
     def once(marker, mark, round_=0):
         """True for the one call that gets to say this, ONCE PER ROUND.
@@ -684,7 +866,7 @@ def main():
         today's name, so a claim written before this change is still read.
         """
         if path:
-            return claim(path, marker if round_ == 0 else "%s-%d" % (marker, round_))
+            return claim(path, keyed(marker, round_))
         return spent.get(mark, 0) <= round_
 
     # BOTH DUE AT ONCE MEANS THE STRONGER ONE SPEAKS, and under `cap - 3` the final one is
@@ -694,33 +876,32 @@ def main():
     # — both files, their shape, and the verdict — so an agent that only ever sees this one
     # is told everything the warn would have told it. Emitting two paragraphs on one call
     # would spend the budget it is trying to protect.
-    # THE ROUND, AND THE ONE ASSUMPTION IN IT. A resume grants a fresh allowance of the
-    # same size (measured 2026-10-12: a coder cut at 80 ran on to 129), and the count is
-    # cumulative across the resume, so round k's final threshold is `final_at(cap) + k *
-    # cap`. The assumption decides only WHEN the second notice lands: late still produces
-    # the mark, and early costs one extra written hand-back, which is the direction this
-    # hook already errs in on purpose.
-    round_ = (turns - final_at(cap)) // cap
+    # BOTH THRESHOLDS ARE READ INSIDE THE ALLOWANCE, which is the whole of the fix: the
+    # turn compared against them is `turns - round_start`, so round 2 of a cap of 10 fires
+    # its final notice at the anchor plus 7 whatever the anchor is — turn 15 for a round
+    # that ended at 8, and turn 157 for one that ended on the nose at 80.
     cut_now = False
-    if turns >= final_at(cap):
-        once("fired-warn", WARN_MARK)              # spend the quieter one unspoken
+    if in_round >= final_at(cap):
+        once("fired-warn", WARN_MARK, round_)      # spend the quieter one unspoken
         if once("fired-final", FINAL_MARK, round_):
             # THE MARK BEFORE THE TEXT. The injection is what the agent acts on, and the
             # mark is what the session acts on; if only one of them can land, the one that
             # survives a crash in the other is the one the user is waiting on.
             cut_now = True
             mark_handoff(payload, writes)
-            emit(FINAL_TEXT.format(turns=turns - round_ * cap, cap=cap,
-                                   sections=BRIEF_SECTIONS))
-    elif turns >= warn_at(cap) and once("fired-warn", WARN_MARK):
-        emit(WARN_TEXT.format(turns=turns, cap=cap, sections=BRIEF_SECTIONS))
+            emit(FINAL_TEXT.format(turns=in_round, cap=cap, sections=BRIEF_SECTIONS))
+    elif in_round >= warn_at(cap) and once("fired-warn", WARN_MARK, round_):
+        emit(WARN_TEXT.format(turns=in_round, cap=cap, sections=BRIEF_SECTIONS))
     # AND THE OTHER END: THIS CALL IS A CUT AGENT WORKING AGAIN. Not on the call that just
     # told it to hand off, which would flip the mark it had this moment written. No state
     # directory means no claim and no flip: the transcript records an injection but not a
     # resume, so such an agent keeps its `handoff` mark until it delivers — one resume asked
     # for twice, which is the recoverable direction against a hold that never ends.
     if path and not cut_now:
-        cut = last_claim(path, "fired-final", max(round_, 0))
+        # NO `max()` ON THE BOUND: `turn_round` returns a 1-based allowance, so the round
+        # index it yields is never negative — where the arithmetic it replaced could read
+        # -1 for an agent under its first threshold.
+        cut = last_claim(path, "fired-final", round_)
         if cut and claim(path, RESUME_MARK + cut):
             mark_running(payload)
     return 0

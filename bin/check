@@ -19308,7 +19308,7 @@ if _tb_src.count('getattr(os, "O_NOFOLLOW", 0)') != 1 or "_open_nofollow" not in
 if "fd = _open_nofollow(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)" not in _tb_src:
     _tb_sec.append("the temporary counter name is no longer created exclusively, so it "
                    "can be a link somebody put there first")
-if "counted, _ignored, spent, writes = count_turns(tpath, 0," not in _tb_src:
+if "tail = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))" not in _tb_src:
     _tb_sec.append("the refusal no longer falls back to counting from the transcript — a "
                    "squatted directory would then cost the run its hand-back, which hands "
                    "a denial of service the outcome this hook exists to prevent")
@@ -20155,7 +20155,9 @@ if ('if a.get("agent_id") == aid and a.get("state") == "handoff":' not in _il
 # second and was flagged `handoff_stalled` at the second cut — because the session had
 # recorded no checklist, so both marks carried the digest of the EMPTY set. An escalation
 # hands the issue to the user instead of finishing it, so it rests on two signals now.
-if "handoff_writes" not in _il or '"writes": writes' not in _tb_src:
+if ("handoff_writes" not in _il
+        or 'STATE_KEYS = ("off", "turns", "calls", "writes", "round", "round_start")'
+        not in _tb_src):
     _il_st.append("the hand-off records no write count, so progress is measured only by "
                   "the session's own item statuses — which are empty on every issue whose "
                   "checklist the session has not written yet")
@@ -20176,7 +20178,8 @@ if "if (measured and unmet_asks(iss) and not moved" not in _il:
 # THE CAP LINE READS WITHIN THE ALLOWANCE. The counter is cumulative across a resume, so
 # the record filed about a thrice-cut IC said "stopped at turn 23 of 10" — a number that
 # reads as a bug in the hook, in a performance record about a person.
-if "(round {rounds})" not in _il_w or "rounds = (turns + cap - 1) // cap" not in _il_w:
+if ("(round {rounds})" not in _il_w
+        or "in_round, rounds, _start = TB.turn_round(state, cap)" not in _il_w):
     _il_st.append("the cap hit is reported against the cumulative count rather than the "
                   "current allowance, so a resumed agent's record says turn 23 of 10")
 if "handoff_stalled" not in _il or "handoff_stalled" not in _il_w:
@@ -20214,6 +20217,62 @@ check(
     "it has already paid for (measured 2026-10-12 — a coder cut at 80 tool uses finished at "
     "129), and starting over with a fresh one is the behaviour the user measured as never "
     "finishing",
+)
+
+# FOUR (b). EVERY ROUND GETS ITS BOUNDARY, NOT ONLY THE FIRST (2026-10-13).
+#
+# MEASURED in the same session, cap 10: the harness cut the agent on TURN 8 of round 1, not
+# on turn 10. The schedule multiplied the cap — round k's final threshold was
+# `final_at(cap) + k * cap` — so round 2's notice was booked for turn 17, the second cut
+# landed before it, and the resumed agent wrote no continuation brief at all. `wf-widen`
+# carried the OTHER model, `ceil(turns / cap)`, so the record it filed and the instruction
+# the agent was given disagreed about which turn it was cut on. Our count and the harness's
+# differ whenever a turn is not a tool call, so at the producer cap of 80 the same drift
+# opens on every resume.
+#
+# Three fixtures replay the measured shapes — `turn-budget-resumed-round-is-anchored-to-the-
+# cut` (the trial: cut at 8, notice at 15), `turn-budget-anchored-round-is-quiet-before-its-
+# threshold` (one turn short, silent) and `turn-budget-exact-cut-keeps-the-whole-second-
+# allowance` (cap 80, anchor 80, notice at 157) — plus `widen-cap-hit-round-agrees-with-the-
+# budget` for the two hooks reading one model. What a fixture cannot see is that there is
+# only ONE function, that the thresholds are read inside the allowance, and that the hook's
+# own injection is never mistaken for the prompt that opens the next round.
+_ar = []
+# COUNTED, NOT `in`, because the failure this guards runs both ways: the function deleted,
+# and a SECOND definition of it added — where the later one silently wins for every caller
+# and `wf-widen` goes on reading the name it always did.
+if _tb_src.count("def turn_round(") != 1:
+    _ar.append(f"wf-turn-budget defines turn_round at "
+               f"{_tb_src.count('def turn_round(')} sites, expected 1 — it is the one "
+               "definition of which allowance a cumulative count lands in, and `wf-widen` "
+               "reads it from there rather than deriving a second answer of its own")
+if "(turns - final_at(cap)) // cap" in _tb_src:
+    _ar.append("the cap-multiple schedule is back in the hook — it assumes every round "
+               "ends on an exact multiple of the cap, and the measured cut came on turn 8 "
+               "of 10")
+if "(turns + cap - 1) // cap" in _il_w:
+    _ar.append("wf-widen divides by the cap again, which is the second model: two "
+               "derivations of one number are what disagreed about round 2")
+if "if in_round >= final_at(cap):" not in _tb_src:
+    _ar.append("the final threshold is no longer read INSIDE the allowance, so a resumed "
+               "agent is measured against its cumulative count and hears nothing until a "
+               "turn it has already been cut at")
+if 'state["round_start"] = state["turns"] + tail["round_start"]' not in _tb_src:
+    _ar.append("nothing records where the round started, so the anchor every threshold is "
+               "measured from stays 0 and round 2 is scheduled as round 1 plus one cap")
+if ("if BUDGET_MARK in raw:" not in _tb_src
+        or "os.path.commonprefix([WARN_MARK, FINAL_MARK])" not in _tb_src):
+    _ar.append("the hook's own injection is no longer excluded from the prompt rows — it "
+               "comes back in the agent's transcript as a `hook_additional_context` "
+               "attachment carrying text, so it would anchor the next round at the notice "
+               "instead of at the cut, three turns early")
+check(
+    "turn budget: every round is anchored to where the last one ended, by one shared "
+    "function",
+    not _ar,
+    "; ".join(_ar) + ". The final notice has to land three turns before the limit in EVERY "
+    "round — a resumed agent that reaches its cap in silence is the defect this hook was "
+    "written for, one round further in",
 )
 
 # FIVE. THE PER-TURN STATE BESIDE THE LEDGER GETS THE SAME REFUSAL (CWE-59, security review
