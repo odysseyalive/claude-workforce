@@ -20222,13 +20222,29 @@ if _il.count("def resume_action(") != 1:
                   f"{_il.count('def resume_action(')} sites, expected 1 — it is the one "
                   "definition of the action a cut agent's hand-off asks for, and a second "
                   "one hands the Stop and the spawn deny different instructions again")
-for _rdr, _rnm, _rcall in ((_il_w, "wf-widen's Stop kickback", "TT.resume_action(who)"),
+for _rdr, _rnm, _rcall in ((_il_w, "wf-widen's Stop kickback", "TT.resume_action(ids)"),
                            (_tb_src, "wf-turn-budget's spawn deny",
-                            "tt.resume_action(held[0])")):
+                            "tt.resume_action(held)")):
     if _rcall not in _rdr:
         _il_st.append(f"{_rnm} does not read resume_action from wf-task-tag, so it spells "
                       "the resume out again — and the copy that is edited next is the "
                       "only one the session hears on that event")
+# AND IT TAKES THE LIST, SO THE VALIDATOR CANNOT BE LEFT OUT. These ids come off a JSON
+# file in the repository and the sentences built from them land in
+# `permissionDecisionReason` and the stop's `systemMessage` — model context and the user's
+# channel. 421a89c validated the DENY and left the `Stop` quoting whatever the ledger
+# said; `widen-handoff-a-planted-agent-id-is-never-quoted` measures that door. A formatter
+# handed finished text is a formatter whose caller can forget to validate, so the naming
+# and the refusal are one function.
+if ("def name_agents(" not in _il or "if bare_name(a)" not in _il
+        or "if not bare_name(aid):" not in _il):
+    _il_st.append("the agent ids are named without being validated — `bare_name` is not "
+                  "applied inside the naming, so a planted `agent_id` is read out loud "
+                  "verbatim in the kickback the model and the user both see")
+if 'if a.get("state") == "handoff" and TT.bare_name(a.get("agent_id"))' not in _il_w:
+    _il_st.append("wf-widen's hand-off list is not filtered to agents it can name, so the "
+                  "escalation, the quote frame and the id subscript each take whatever "
+                  "the ledger file holds")
 if "handoff_action(payload, iss, verdict)" not in _il_w:
     _il_st.append("the action line is not rendered, so the verdict reaches the user as a "
                   "status with no instruction in it")

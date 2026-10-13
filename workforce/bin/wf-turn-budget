@@ -931,6 +931,12 @@ def guard_spawn(payload):
     # is held, and the same module owns the sentence this deny ends on (`resume_action`).
     # Asking for it in a second `_ledger_read` would re-execute the sibling and re-read the
     # ledger to format a string.
+    #
+    # THE `bare` FILTER STAYS HERE EVEN THOUGH `resume_action` NOW VALIDATES TOO, because
+    # the two refusals answer different questions. This one is CONTROL FLOW: a held agent
+    # nobody can name leaves `held` empty, and an empty `held` allows the spawn rather than
+    # denying it in terms the model cannot act on (`spawn-guard-a-planted-agent-id-is-
+    # never-quoted`). The one in `name_agents` only decides what is quoted.
     got = _ledger_read(payload, lambda mod, led: (
         mod, [a for a in (mod.held_by(led, want) or []) if bare(a)]))
     tt, held = got if got else (None, [])
@@ -941,7 +947,7 @@ def guard_spawn(payload):
         "permissionDecision": "deny",
         "permissionDecisionReason": DENY_TEXT.format(
             who=", ".join(held), atype=want,
-            action=tt.resume_action(held[0]))}}) + "\n")
+            action=tt.resume_action(held))}}) + "\n")
     return 0
 
 

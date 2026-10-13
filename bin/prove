@@ -375,6 +375,21 @@ CASES = [
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
      TBG, "delall", "tt.resume_action"),
+    # AND THE VALIDATOR INSIDE THE NAMING. Each mutation leaves the join running and the
+    # id quoted, which IS the defect: `", ".join(a for a in ids)` and a loop with no
+    # `continue` both parse and both read a planted `agent_id` out loud.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", " if bare_name(a)"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "delall", "        if not bare_name(aid):\n            continue\n"),
+    # THE WIDEN SIDE'S OWN FILTER, deleted as the CONDITION rather than the `if` header —
+    # `[a for a in TT.issue_agents(iss)]` parses, and every entry comes through.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall",
+     '\n           if a.get("state") == "handoff" and TT.bare_name(a.get("agent_id"))'),
     # THE MARK SURVIVING ITS OWN CUT (2026-10-13). NO CASE HERE DELETES A `def` LINE OR AN
     # `if` HEADER, and both halves of that are the constraint `bin/check` imposes by
     # EXECUTING wf-task-tag: a deleted `def` orphans its body at module level and a deleted

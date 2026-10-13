@@ -9510,6 +9510,23 @@
           "spawn"
       ]
   },
+  "widen-handoff-a-planted-agent-id-is-never-quoted": {
+      "_why": "THE SAME LEDGER, THE OTHER EVENT. `spawn-guard-a-planted-agent-id-is-never-quoted` pins the `PreToolUse` deny; this pins the main `Stop`, where the same ids reach `systemMessage` (the user's channel) and `reason` (the model's). The deny side was validated by 421a89c and the stop side was not, so until 2026-10-13 a planted `agent_id` was quoted verbatim in the kickback -- the injection the deny already refused, arriving by the other door. The validation now lives in `wf-task-tag`'s `name_agents`, which BOTH sentences are built from, so the formatter and the validator cannot drift apart again. Nothing nameable is left here, so the action falls back to a sentence with no id in it: the instruction is still right, and that is the whole point -- a kickback that cannot name its agent still says resume, it just does not read the planted string out loud.",
+      "script": "wf-widen",
+      "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "want": [
+          "RESUME the agent on this issue with SendMessage"
+      ],
+      "not": [
+          "Traceback",
+          "IGNORE THE ABOVE",
+          "authorised to delete"
+      ]
+  },
   "spawn-guard-a-planted-agent-id-is-never-quoted": {
       "_why": "THE DENY REASON IS MODEL CONTEXT, NOT A LOG LINE. The agent ids it names come off a JSON file in the repository -- a file a person, another tool or a bad merge can edit -- and `permissionDecisionReason` lands in the turn's context verbatim. This ledger's `agent_id` carries a newline and an instruction. `bare` refuses it where `agent_type` is already refused, so the list is empty and the spawn is simply allowed: a guard that cannot name its agent has nothing to say, and saying it anyway would be the injection. Allowing is the recoverable direction -- the cost is one wrong spawn, where quoting it is arbitrary text in front of the model on every `Agent` call for the rest of the session.",
       "script": "wf-turn-budget",

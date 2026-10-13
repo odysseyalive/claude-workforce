@@ -2523,21 +2523,32 @@ def handoff_action(payload, iss, verdict):
     wherever the stop's own text goes; the quote is a stuck agent speaking, and `main` sends
     it to the user's channel alone. See `QUOTE_FRAME`.
     """
-    cut = [a for a in TT.issue_agents(iss) if a.get("state") == "handoff"]
+    # THE UNNAMEABLE AGENT IS DROPPED AT THE SOURCE, not at each of the four places this
+    # function says an id out loud. Every id here comes off a JSON file in the repository
+    # and every sentence built below reaches `systemMessage` or `reason`, so one filter on
+    # `cut` is what makes the rest of this function safe by construction — `who`, the
+    # escalation, `QUOTE_FRAME` and the `agent_id` subscript, which was also a `KeyError`
+    # waiting for an entry that had a state and no id.
+    cut = [a for a in TT.issue_agents(iss)
+           if a.get("state") == "handoff" and TT.bare_name(a.get("agent_id"))]
     if verdict == "escalate":
         cut = [a for a in cut if a.get("handoff_stalled")] or cut
-    who = ", ".join(a["agent_id"] for a in cut) or "the agent on this issue"
+    ids = [a["agent_id"] for a in cut]
     if verdict != "escalate":
-        return TT.resume_action(who), ""
+        return TT.resume_action(ids), ""
     says, quotes = [], []
     for a in cut:
-        s1 = handoff_brief(TT.project_root(payload), a.get("agent_type"))
+        # THE TYPE IS QUOTED TOO, and it comes off the same file as the id. `handoff_brief`
+        # refuses an unnameable one when it builds the path; this is the same refusal where
+        # the name is merely SAID, which is the half 421a89c did not reach.
+        atype = a.get("agent_type")
+        s1 = handoff_brief(TT.project_root(payload), atype)
         if s1:
             says.append(HAS_BRIEF)
             quotes.append(QUOTE_FRAME.format(who=a["agent_id"], text=s1))
         else:
-            says.append(NO_BRIEF.format(who=a.get("agent_type") or "<employee>"))
-    return (ESCALATE_ACTION.format(who=who, brief=" ".join(says)),
+            says.append(NO_BRIEF.format(who=atype if TT.bare_name(atype) else "<employee>"))
+    return (ESCALATE_ACTION.format(who=TT.name_agents(ids), brief=" ".join(says)),
             "\n".join(quotes))
 
 

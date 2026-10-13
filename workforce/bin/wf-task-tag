@@ -1137,17 +1137,56 @@ def held_by(led, agent_type):
 # THE WORDS ARE CHOSEN, NOT ARRANGED: "successor", "re-dispatch" and "spawn" are absent on
 # purpose, because the measured failure (session `bb8a3e53`) was a hand-off read as a
 # brief for a fresh run.
-def resume_action(who):
-    """The one action a cut agent's issue takes, addressed to `who`.
+def name_agents(ids):
+    """The ids safe to say out loud, as one string — or a phrase naming none of them.
 
-    `who` is already-validated agent-id text — `bare_name` at the deny, the ledger's own
-    linked ids at the stop. This formats; it never checks, because a caller that has not
-    validated an id has a worse problem than this sentence.
+    THE VALIDATION LIVES WITH THE NAMING, which is the whole reason this is a function
+    and not a `", ".join` at each call site. These ids come off a JSON file in the
+    repository — a file a person, another tool or a bad merge can edit — and the
+    sentences built from them land in `permissionDecisionReason` and in the stop's
+    `systemMessage`: the model's context and the user's channel. A caller that joins
+    first and validates second is a caller that can forget the second half, and one did:
+    421a89c validated the deny and left the `Stop` quoting whatever the ledger said
+    (fixture `widen-handoff-a-planted-agent-id-is-never-quoted`).
+
+    AN UNNAMEABLE ID IS DROPPED, NOT ESCAPED. `bare_name` is an allowlist, so there is no
+    argument about which spellings a stripper misses. With nothing nameable left the
+    sentence still reads correctly and simply names no one — the instruction is the
+    valuable part, and reading the planted string out loud is the injection.
+    """
+    return ", ".join(a for a in ids if bare_name(a)) or "the agent on this issue"
+
+
+def name_labelled(agents, key, unknown="?"):
+    """`name_agents` for the STATUS lines, which say `id (type)` or `id (state)`.
+
+    The same refusal, applied to BOTH halves: an agent nobody can name is dropped, and a
+    qualifier nobody can name is replaced by `unknown` rather than printed. The status
+    line travels with the action line into the same `systemMessage`, so validating one
+    and not the other would leave the door open by exactly one string.
+    """
+    out = []
+    for a in agents:
+        aid = a.get("agent_id")
+        if not bare_name(aid):
+            continue
+        tag = a.get(key)
+        out.append("%s (%s)" % (aid, tag if bare_name(tag) else unknown))
+    return ", ".join(out) or "the agent on this issue"
+
+
+def resume_action(ids):
+    """The one action a cut agent's issue takes, naming the ids it can name.
+
+    IT TAKES THE LIST, NOT FINISHED TEXT, so no caller can hand this formatter an id
+    nobody validated: `name_agents` is applied here, inside the one definition both
+    hooks read. `wf-turn-budget` keeps a `bare` filter of its own as well, because there
+    it decides WHETHER to deny at all rather than merely what to quote.
     """
     return ("→ RESUME {who} with SendMessage: tell it to continue from its own "
             "HANDOFF.md, at the exit criteria still UNMET. Its context is already "
             "loaded and a resume gives it a fresh turn allowance (org.md rung 12b). "
-            "Do not start this work over with anyone else.").format(who=who)
+            "Do not start this work over with anyone else.").format(who=name_agents(ids))
 
 
 def unmet_asks(iss):
@@ -1275,7 +1314,7 @@ def judge_issue(iss):
     if waiting:
         return "hold", "%d of %d agents still out: %s" % (
             len(waiting), len(agents),
-            ", ".join("%s (%s)" % (a["agent_id"], a.get("state")) for a in waiting))
+            name_labelled(waiting, "state"))
     items = issue_items(iss)
     undone = [i for i in items if not item_done(i)]
     cut = [a for a in agents if a.get("state") == "handoff"]
@@ -1287,8 +1326,7 @@ def judge_issue(iss):
     # its cap is itself the evidence that work is left, which is what the mark MEANS.
     if cut and (undone or not items):
         stalled = [a for a in cut if a.get("handoff_stalled")]
-        who = ", ".join("%s (%s)" % (a["agent_id"], a.get("agent_type") or "?")
-                        for a in (stalled or cut))
+        who = name_labelled(stalled or cut, "agent_type")
         asks = "; ".join(i["ask"][:80] for i in undone)
         if stalled:
             return "escalate", "%s stopped at its turn cap twice with the same unmet " \
