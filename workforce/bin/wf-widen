@@ -966,6 +966,308 @@ def closeout_subagent(payload):
     }
 
 
+# ── THE REPORT THE ORDER ASKED FOR, CHECKED WHERE THE STOP IS SEEN ───────────────
+# THIS IS A CONTROLLED EXPECTATION, WHICH IS WHY IT CAN BE CHECKED AT ALL. Everything
+# else this hook judges is read out of prose; this one was SET by the org in the work
+# order itself — rung 12b's brief shape and `handbook-templates.md` § Reporting both name
+# one artifact, `.claude/workforce/work/<run-id>/<name>/OUTPUT.md`, and the dispatcher
+# writes the resolved path into the order (`org.md` clause 6: "plus the artifact path
+# under `.claude/workforce/work/<run-id>/`"). So the order states the path, the stop can
+# read the path out of the order (`spawn_prompt`), and the file is either there or it is
+# not. No judgement, no detector, no rate.
+#
+# MEASURED, and it is the defect this exists for: 45 cut-offs in 269 capped-IC dispatches
+# on a sibling project (16%), NONE of which delivered a report
+# (`turnlimit-analysis-20261012/HISTORY.md`). `handbook-templates.md` already answers it in
+# prose — "Write the OUTPUT.md incrementally, never only at the end", added 2026-09-25 —
+# and the weekly rate did not move: W40 was 16 of 66 AFTER that clause shipped. A rule with
+# a reader and no producer is a rule that is not in force.
+#
+# ZERO FALSE FIRES IS THE BAR, so the gate is the ORDER rather than the agent. An order
+# that names no concrete OUTPUT.md is not an org work order and is never kicked back: a
+# one-shot subagent, a `type: "agent"` hook's reader, a teammate asked a question. The
+# path must also RESOLVE — a template still carrying `<run-id>`, `${…}` or a glob is an
+# unresolved placeholder, not a file that is missing — and it must sit inside the project
+# the hook fired for, because a path read out of model-written text is not a licence to
+# stat anything on the machine.
+OUTPUT_IN_ORDER_RX = re.compile(r"""[^\s`'"()\[\],;]*OUTPUT\.md""")
+# `<` `>` `$` `{` `}` `*` `?` — a placeholder or a glob, never a resolved path.
+OUTPUT_PLACEHOLDER = set("<>${}*?")
+# The report is read only far enough to see its criterion table. A criterion table that
+# needs more than this to reach its first mark is not the artifact being asked for.
+OUTPUT_READ_BYTES = 65536
+# THE MARK, AS THE TEMPLATE SPELLS IT. `handbook-templates.md` § Reporting: a criterion →
+# evidence table, "`UNMET` stated, never omitted", and an unfinished row written
+# `IN-PROGRESS` — "an absent row is silence, and silence reads as a pass".
+OUTPUT_MARKED_RX = re.compile(r"\b(?:UN)?MET\b")
+OUTPUT_UNFINISHED_RX = re.compile(r"IN-PROGRESS")
+
+
+def order_output(payload, ask):
+    """Absolute path of the `OUTPUT.md` this agent's order named, or None for an order
+    that named none. See the block above for why a missing one is the gate."""
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    if not isinstance(root, str) or not root.strip():
+        # NO `os.getcwd()` FALLBACK, which is `wf-commitments.path`'s rule: both sources
+        # above are supplied BY THE HARNESS and name the project this hook fired for,
+        # while `getcwd()` names wherever the process happens to be.
+        return None
+    root = os.path.abspath(root)
+    for cand in OUTPUT_IN_ORDER_RX.findall(ask or ""):
+        cand = cand.lstrip("*_([:>")
+        if not cand or set(cand) & OUTPUT_PLACEHOLDER:
+            continue
+        path = os.path.normpath(cand if os.path.isabs(cand)
+                                else os.path.join(root, cand))
+        if path != root and path.startswith(root + os.sep):
+            return path
+    return None
+
+
+def in_project(payload, path):
+    """`path` as the PROJECT names it, which is how every line below says it.
+
+    The resolved path is absolute because that is the only way to stat it; a block whose
+    reason reads `/tmp/x/y/.claude/workforce/work/…` is the same path spelled in the one
+    form neither the agent nor the record's reader uses.
+    """
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    try:
+        return os.path.relpath(path, os.path.abspath(root))
+    except ValueError:                       # different drives on Windows
+        return path
+
+
+def order_report(path):
+    """What is at `path`: "ok", "unmarked", "unfinished" or "absent".
+
+    READ THROUGH `_open_nofollow`, the sibling's guarded open, so a link planted at a
+    predictable path inside a checkout cannot aim this read somewhere else (CWE-59). A
+    name this hook cannot open without following something is reported "absent", which
+    is the safe direction: the kickback asks for a report, and a report nobody can read
+    is not one.
+    """
+    try:
+        fd = TT._open_nofollow(path, os.O_RDONLY)
+    except OSError:
+        return "absent"
+    try:
+        with os.fdopen(fd, encoding="utf-8", errors="replace") as fh:
+            body = fh.read(OUTPUT_READ_BYTES)
+    except OSError:
+        return "absent"
+    if OUTPUT_UNFINISHED_RX.search(body):
+        return "unfinished"
+    return "ok" if OUTPUT_MARKED_RX.search(body) else "unmarked"
+
+
+_TB = []
+
+
+def _turn_budget():
+    """`wf-turn-budget`'s definitions, loaded at most once per process and only where they
+    are needed — the cap half below, on a `SubagentStop` that already has a report to
+    account for. The two siblings at the head of this file are read on every event; this
+    one would be 548 lines parsed on every Stop to answer a question most Stops never ask.
+    `wf-commitments` loads `wf-settings-apply` the same way and for the same reason."""
+    if not _TB:
+        _TB.append(_sibling("wf-turn-budget"))
+    return _TB[0]
+
+
+def at_cap(payload):
+    """`(turns, cap)` when this agent stopped AT its turn cap, else None.
+
+    THE COUNT IS `wf-turn-budget`'s OWN AND IS NOT RECOUNTED HERE. That hook already
+    counts this agent's turns on every one of its tool calls and stores them beside the
+    cap it read from the handbook (`read_cap`, `read_state`), so the number exists by the
+    time the agent stops. A second counter in this file would be a second thing to keep
+    in step with the harness's own idea of a turn, and the copy that drifts is the one
+    that files a performance record against an agent that stopped early.
+
+    BOTH COUNTER LOCATIONS ARE TRIED, and that is measured rather than defensive:
+    `PostToolUse` carries no `scratchpad_dir` on 2.1.296 (platform.md fact 22b), so the
+    counter the writer actually used is the temp-dir one, while THIS event does carry the
+    key. Reading only the preferred location would find an empty counter at every real
+    stop. Nothing is created: the writer owns that directory, and a reader that makes
+    directories in `/tmp` on every subagent stop litters the host it runs on.
+
+    `>= cap`, NEVER `cap - 1`. A record filed against an agent that returned on its own
+    is a wrong record about a person, and a missed one costs a line in a ledger.
+    """
+    TB = _turn_budget()
+    agent_type = payload.get("agent_type")
+    agent_id = payload.get("agent_id")
+    if not TB.bare(agent_type) or not TB.bare(agent_id):
+        return None
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    if not isinstance(root, str) or not os.path.isdir(root):
+        return None
+    cap = TB.read_cap(root, agent_type)
+    if cap is None:
+        return None
+    session = payload.get("session_id")
+    session = session if TB.bare(session) else "no-session"
+    bases = []
+    scratch = payload.get("scratchpad_dir")
+    if isinstance(scratch, str) and scratch:
+        bases.append(os.path.join(scratch, "wf-turn-budget"))
+    import tempfile
+    bases.append(os.path.join(tempfile.gettempdir(), "wf-turn-budget"))
+    turns = 0
+    for base in bases:
+        turns = max(turns, TB.read_state(os.path.join(base, session, agent_id))[1])
+    return (turns, cap) if turns >= cap else None
+
+
+PERF_STORE = os.path.join(".claude", "workforce", "personnel")
+PERF_SLUG_RX = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def cap_perf(payload, path, ask, capped):
+    """File the `PERF` a cap hit owes, and say so. Never a block.
+
+    `ledger.md:42` — "`maxTurns` or a cap hit → **PERF**, attribution ENVIRONMENT, yes" —
+    has required this since 2026-07-29, and the project filed 0 against 45 cuts, because
+    the rule had a reader and no producer. This is the producer. The shape is
+    `personnel-templates.md` § PERF, filled from what the stop knows and from nothing it
+    had to judge; `wf-ledger` is the reader, as it is for every other record in that store.
+
+    NOT A BLOCK, and that is the attribution restated as behaviour. The agent is out of
+    turns: a kickback here asks for a turn the harness has already refused, which is a
+    block that can never be satisfied. ENVIRONMENT means the record is filed against the
+    condition, so nothing is asked of the agent at all.
+
+    `O_CREAT | O_EXCL | O_NOFOLLOW` IS THE WHOLE ONCE-ONLY MECHANISM. One record per
+    capped ORDER: the name carries the run-id out of the artifact path, so a second stop
+    of the same agent on the same order adds nothing, two concurrent stops cannot both
+    write, a link planted at the name is refused rather than written through, and the
+    ledger's append-only invariant is kept by never reopening a record that exists.
+    """
+    turns, cap = capped
+    agent = payload.get("agent_type") or "unknown"
+    run = PERF_SLUG_RX.sub("-", os.path.basename(os.path.dirname(
+        os.path.dirname(path))))[:64] or "unknown-run"
+    rel = os.path.join(PERF_STORE, f"PERF-{run}-{agent}-turn-cap.md")
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    full = os.path.join(root, rel)
+    owed = in_project(payload, path)
+    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} with no report "
+            f"at {owed}. PERF filed at {rel}")
+    try:
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        fd = TT._open_nofollow(full, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except OSError:
+        # Already filed for this order, or a store that cannot be written. Either way the
+        # record is not this stop's to add to, and the line still says what happened.
+        return {"systemMessage": note}
+    handbook = os.path.join(".claude", "agents", f"{agent}.md")
+    try:
+        with open(os.path.join(root, handbook), "rb") as fh:
+            sha = hashlib.sha256(fh.read()).hexdigest()[:12]
+    except OSError:
+        sha = "unread"
+    quoted = "\n".join("> " + ln for ln in (ask or "").strip().splitlines()[:12]) \
+        or "> (the order was not recorded)"
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(f"""# PERF-{run}-{agent}-turn-cap
+
+**Status:** open
+**Employee:** {agent}
+**Handbook:** `{handbook}` @ sha {sha}
+**Section implicated:** § Reporting "Write your deliverable to \
+`.claude/workforce/work/<run-id>/<name>/OUTPUT.md`"
+**Attribution:** **ENVIRONMENT**
+
+## What Was Expected
+A report at `{owed}`, carrying the `REQUEST (verbatim):` block, a criterion → evidence
+table with every exit criterion marked MET or UNMET, and an `## Exceptions` list.
+
+## What Was Produced
+Nothing at that path. The agent stopped at turn {turns} of its cap of {cap}, so the run
+ended without the artifact and the work it did is not recoverable from the file.
+
+## The Instruction That Produced It
+{quoted}
+
+## Why That Instruction Permitted This Outcome
+The reporting contract names the artifact and asks for it incrementally, but nothing in
+the text makes the first write happen before the work does, and nothing in it bounds the
+work to the turns the cap allows. A run can therefore follow every instruction it was
+given and still be cut before the report exists — which is what happened here.
+
+## Attribution Determination
+- [ ] The text permits the observed outcome                        → DOCUMENT
+- [ ] The text forbids it and it happened anyway                   → EXECUTOR
+- [x] A tool/API/host/quota condition outside the text             → ENVIRONMENT
+
+## Amendment
+- AMD: (none yet) · filed mechanically by `wf-widen` on `SubagentStop`, per
+  `procedures/ledger.md` § Capture — "`maxTurns` or a cap hit → PERF, attribution
+  ENVIRONMENT, yes".
+""")
+    except OSError:
+        pass
+    return {"systemMessage": note}
+
+
+def order_expectation(payload):
+    """The stopping agent's report against the expectation its own order set, or None.
+
+    ONE GATE FOR BOTH HALVES, and it is the order's artifact path. A stop whose order
+    named no `OUTPUT.md` returns here having been asked nothing; a stop that has its
+    report returns having answered. What is left is a stop that owes a report and did not
+    leave one, which is either a run with turns to spare — kicked back ONCE to write it —
+    or a run that hit its cap, which is a `PERF` and no kickback.
+
+    THE LOOP BOUND IS THE ONE ALREADY THERE. `widen` returns before this on
+    `stop_hook_active`, so the continuation this block causes cannot reach it, exactly as
+    the close-out above relies on. Nothing is remembered between stops: an agent kicked
+    back once and resumed later is asked again only if the report is still missing, which
+    is the answer the kickback asked for.
+    """
+    ask = spawn_prompt(payload)
+    path = order_output(payload, ask)
+    if not path:
+        return None
+    state = order_report(path)
+    if state == "ok":
+        return None
+    capped = at_cap(payload)
+    if capped:
+        # A PARTIAL REPORT AT THE CAP IS STILL A REPORT, so it gets no record and no
+        # block: the rows that closed are on disk and whoever reads them can see which.
+        # The measured defect is the stop that left NOTHING.
+        return cap_perf(payload, path, ask, capped) if state == "absent" else None
+    owed = in_project(payload, path)
+    if state == "absent":
+        said = f"There is no report at {owed}, which your work order named."
+    elif state == "unfinished":
+        said = (f"The report at {owed} still carries an `IN-PROGRESS` row, so at least "
+                f"one exit criterion has no verdict.")
+    else:
+        said = (f"The report at {owed} marks no exit criterion MET or UNMET, so nothing "
+                f"in it says which of them closed.")
+    return {
+        "decision": "block",
+        "reason": (
+            f"{said}\n\n"
+            "Your order's reporting contract is one artifact: the `REQUEST (verbatim):` "
+            "block quoted unchanged, a criterion → evidence table with EVERY exit "
+            "criterion marked MET or UNMET — `UNMET` stated rather than omitted, "
+            "because an absent row reads as a pass — and an `## Exceptions` list, "
+            "`(none)` when there is nothing.\n\n"
+            "Write it now, then hand back. MEASURED on a sibling project: 45 of 269 "
+            "capped dispatches ended with no report at all, and from the outside a run "
+            "that finished and wrote nothing is indistinguishable from one still "
+            "working. Only what is in the file survives this stop.\n\n"
+            "This is asked once."),
+        "systemMessage": f"WIDEN  no report — {os.path.basename(os.path.dirname(path))} "
+                         f"stopped with {state} {os.path.basename(path)}",
+    }
+
+
 SENSE_COUNT = {
     "sight": lambda c: c[1] and len(c[1]),      # distinct sources read
     "hearing": lambda c: c[3],                  # web, spawned readers, skills
@@ -1198,6 +1500,15 @@ def widen(payload):
         left_open = closeout_subagent(payload)
         if left_open:
             return left_open
+
+        # THE ORDER'S OWN REPORT, ABOVE EVERY JUDGEMENT BELOW. See § THE REPORT THE ORDER
+        # ASKED FOR: it is a controlled expectation the org SET in the work order, so it is
+        # a fact about a path rather than a reading of prose, and a fact that can be
+        # checked for free is checked before anything is judged or spawned. It also decides
+        # the cap half: an agent cut at its cap is not widened, it is recorded.
+        owed = order_expectation(payload)
+        if owed:
+            return owed
 
     # NOTHING IS GATED ON A BACKGROUND TASK ANY MORE. The whole-decision exemption that
     # stood here is removed on the user's rule of 2026-10-12, *"Agents and their work should
