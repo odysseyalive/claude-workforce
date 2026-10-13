@@ -265,7 +265,7 @@ CASES = [
      TBG, "del", "(max_turns * 4 + 4) // 5"),
     ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
      "payload the host actually sends",
-     TBG, "del", "return max_turns - 2"),
+     TBG, "del", "return max_turns - 3"),
     ("turn budget: the boundary is derived from the cap, claimed once, and keyed on the "
      "payload the host actually sends",
      TBG, "del", "fd = _open_nofollow(os.path.join(path, marker),"),
@@ -317,9 +317,14 @@ CASES = [
     ("kickback: the facts the background_tasks gate was removed on are measured and recorded",
      PL, "del", "first `isSidechain` `user` row"),
     # RUN, NOT READ: the thresholds must scale with the cap. Hard-coding the 40-turn
-    # numbers passes every fixture and then stops a producer IC half-way through.
+    # numbers passes every fixture and then stops a producer IC half-way through. A case
+    # per threshold, because the block asserts on four runs and one of them proven is one
+    # quarter of it: the second case is the FINAL half, and the turn-76 and turn-77 arms
+    # are the only place `cap - 3` is checked by running it.
     ("turn budget: the thresholds scale with the employee's own cap",
      TBG, "del", "return (max_turns * 4 + 4) // 5"),
+    ("turn budget: the thresholds scale with the employee's own cap",
+     TBG, "del", "return max_turns - 3"),
     # ── NOTHING IS LEFT RUNNING WHEN THE ORDER IS DONE (2026-09-24) ──────────────
     # One assertion over six files, so every file it reads gets a case: a check that
     # reads six surfaces and is proven against one is proven on one sixth of itself.
