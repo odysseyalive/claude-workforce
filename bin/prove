@@ -54,6 +54,9 @@ USAGE
     bin/prove                    every case (~30 min; the exact count prints at start)
     bin/prove <substring>        the cases whose CHECK NAME contains it
     bin/prove --since <ref>      the cases whose TARGET FILE changed since <ref>
+    bin/prove --cases-for <path> PRINTS the `<target>\tcheck name` rows that point at
+                                 <path> and runs nothing. What `bin/check --for` and
+                                 `wf-map --tests` ask, so neither keeps its own list
     bin/prove --self-test        under a second: the five verdicts this harness hands out,
                                  asserted against a miniature tree. bin/check runs it.
 
@@ -254,6 +257,38 @@ PWSH_CHECKS = {
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── THE CODE MAP (wf-map, records-code-map, 2026-10-12) ─────────────────────
+    # THE CONTAINMENT CASE OVERRIDES `inside` INSTEAD OF DELETING ITS GUARD. Deleting the
+    # `if real == rroot or …:` line orphans its `return real` and the file stops parsing,
+    # which is BAD-CASE: the fixtures would fail on a SyntaxError and the named assertion
+    # would never be the reason. Appending a second definition of `inside` at module end
+    # shadows the first in valid python, so the script runs and does exactly the wrong
+    # thing — a symlink out of the tree is followed — which is what the row asserts it
+    # never does.
+    ("map: wf-map outlines a file, ranks a topic, names what covers a file, and refuses a "
+     "path outside the root",
+     "workforce/bin/wf-map", "append",
+     "\n\ndef inside(root, path):\n    return os.path.realpath(path)\n"),
+    ("map: wf-map ships as an exec, its data skill is the gateway, and a handbook sends an "
+     "employee to it",
+     "workforce/skills/records-code-map/SKILL.md", "del",
+     "Degraded state may cause more work. It may never authorize a write."),
+    # `delall`, not `del`: the assertion reads whether the FILE still carries `--list`, and
+    # the literal appears in the usage text, the flag test and the usage error. Removing
+    # the first occurrence alone would leave the other two and report a vacuous pass. With
+    # all three gone `listing = "" in argv` is still valid python, so the suite still runs
+    # and the case measures the flag rather than a crash.
+    ("map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+     "rather than running anything out of the tree it maps",
+     "bin/script-conformance", "delall", "--list"),
+    # APPENDING THE LITERAL IS THE MUTATION, because the assertion is a NEGATIVE one:
+    # wf-map must carry no interpreter spawn at all. A comment carrying the name is
+    # enough to fire it, and that is deliberate — the assertion is deliberately blunt,
+    # since a reviewer cannot tell a safe spawn from the one that shipped the defect.
+    ("map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+     "rather than running anything out of the tree it maps",
+     "workforce/bin/wf-map", "append", "\n# sys.executable\n"),
+
     # ── THE ISSUE LEDGER (wf-task-tag, wf-widen, 2026-10-12) ────────────────────
     # EVERY MUTATION HERE KEEPS THE FILE IMPORTABLE, and that is not a nicety: `bin/check`
     # EXECUTES `wf-task-tag` as a module (its `classify` is run against real prompts), so a
@@ -3266,6 +3301,27 @@ def derived_cases(existing):
 
 DERIVED = derived_cases({c[0] for c in CASES})
 CASES = CASES + DERIVED
+
+# `--cases-for <path>…` — THE CASE LIST, ANSWERING WHICH ASSERTIONS NAME A FILE, and
+# nothing is run. `--since` already computes exactly this selection for its own run
+# (`c[1] in _changed`, below); `bin/check --for` and `wf-map --tests` need the answer
+# WITHOUT a thirty-minute suite behind it, and the only safe way to give it to them is
+# from this list rather than from a second one somebody keeps in step by hand.
+#
+# IT SITS ABOVE THE BASELINE DELIBERATELY. `failing_checks(ROOT)` below is a full
+# `bin/check` — 146 s measured 2026-10-12 — so a query placed after it would cost more
+# than the reads it saves, and `bin/check --for` would recurse into a second full run of
+# itself. Everything this handler needs (CASES, DERIVED) exists by this line.
+if "--cases-for" in sys.argv[1:]:
+    _i = sys.argv.index("--cases-for")
+    _want = {a for a in sys.argv[_i + 1:] if not a.startswith("-")}
+    if not _want:
+        print("usage: bin/prove --cases-for <repo-relative path> [<path>…]", file=sys.stderr)
+        sys.exit(2)
+    _want = {w.lstrip("./") for w in _want}
+    for _relpath, _name in sorted({(c[1], c[0]) for c in CASES if c[1] in _want}):
+        print(f"{_relpath}\t{_name}")
+    sys.exit(0)
 
 baseline = failing_checks(ROOT)
 if baseline:

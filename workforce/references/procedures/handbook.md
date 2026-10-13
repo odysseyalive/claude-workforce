@@ -258,6 +258,11 @@ A Sources entry naming `Skill(X)` means the `## Procedure` grants that invocatio
 includes `Skill`: Sources says WHERE the truth is and HOW to reach it; the Procedure exercises the
 reach. This is the identity+channel / exercised-step split, not two canonical texts.
 
+**Every employee that reads code gets the map line `handbook-templates.md` § Sources carries** —
+`wf-map --topic` before a search, `wf-map <file>` before a read, `wf-map --tests <file>` before a
+test run (`records-code-map`): four profiled coder orders spent 21-42% of their tool calls searching
+and reading, 30-43% running tests, and two ran out of turns.
+
 **A pure reviewer, adjudicator, or mechanism-only role reads no authoritative input of its own → write
 `## Sources` as `(none)`**, exactly as `## Directives` reads `(none bound)` when nothing is bound. A
 silent skip is not `(none)`: it is indistinguishable from a Sources authoring nobody performed, which
