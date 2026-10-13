@@ -278,9 +278,16 @@ CASES = [
     # the first occurrence alone would leave the other two and report a vacuous pass. With
     # all three gone `listing = "" in argv` is still valid python, so the suite still runs
     # and the case measures the flag rather than a crash.
-    ("map: one case list answers both coverage questions — `bin/check --for` and "
-     "`wf-map --tests` ask bin/prove",
+    ("map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+     "rather than running anything out of the tree it maps",
      "bin/script-conformance", "delall", "--list"),
+    # APPENDING THE LITERAL IS THE MUTATION, because the assertion is a NEGATIVE one:
+    # wf-map must carry no interpreter spawn at all. A comment carrying the name is
+    # enough to fire it, and that is deliberate — the assertion is deliberately blunt,
+    # since a reviewer cannot tell a safe spawn from the one that shipped the defect.
+    ("map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+     "rather than running anything out of the tree it maps",
+     "workforce/bin/wf-map", "append", "\n# sys.executable\n"),
 
     # ── THE ISSUE LEDGER (wf-task-tag, wf-widen, 2026-10-12) ────────────────────
     # EVERY MUTATION HERE KEEPS THE FILE IMPORTABLE, and that is not a nicety: `bin/check`

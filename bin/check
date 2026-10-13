@@ -19944,9 +19944,22 @@ try:
                       f"{len(_cf_rows)} row(s) for two files the suite covers")
 except (OSError, subprocess.SubprocessError) as _exc:
     _cf_st.append(f"`bin/prove --cases-for` would not run ({_exc})")
+_wfm_src = read("workforce/bin/wf-map")
+if "sys.executable" in _wfm_src:
+    _cf_st.append("wf-map spawns an interpreter. It must never execute anything it found "
+                  "in the tree it maps: the first version ran the mapped root's bin/prove "
+                  "behind a docstring match, and a docstring is text anybody can copy, so "
+                  "in a hostile checkout that gate ran the checkout's code")
+if "COVERAGE_COMMANDS" not in _wfm_src:
+    _cf_st.append("wf-map no longer prints the coverage commands, so `--tests` has no "
+                  "answer to give where it may not run one")
+if 'GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]' not in _wfm_src:
+    _cf_st.append("wf-map's vcs calls are no longer hardened against repository-local "
+                  "config, which can name an executable in a tree this script did not write")
+_cf_st += _sc_cases("map-tests-never-runs-project-prove")
 check(
-    "map: one case list answers both coverage questions — `bin/check --for` and "
-    "`wf-map --tests` ask bin/prove",
+    "map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+    "rather than running anything out of the tree it maps",
     not _cf_st,
     "; ".join(_cf_st),
 )

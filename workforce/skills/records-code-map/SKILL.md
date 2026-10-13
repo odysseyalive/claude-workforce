@@ -26,7 +26,7 @@ Three views, each a stream of text rows on stdout. No file on disk, in any of th
 |---|---|---|
 | outline | `wf-map <file> [<file>…]` | `<line:int>  <kind>  <name>  <first doc or comment line>`, where `kind` is `§` (section), `def`, `class` or `fn`. Preceded by a header: path, language (`python` \| `shell` \| `markdown` \| `generic`), line count, def count, section count |
 | topic | `wf-map --topic <words…>` | a per-file block: `<path>  ·  <hits:int> hit(s) · <words matched:int>/<words asked:int>`, then up to 3 `<line:int>  <text>` rows. Ranked by words matched, then hits, then path |
-| coverage | `wf-map --tests <file>` | three counted groups — `bin/check assertions`, `conformance fixtures`, `handbook checks` — each row `· <name>`, a handbook row carrying `<handbook>:<line>  Check\|Regression\|Negative: <command>` |
+| coverage | `wf-map --tests <file>` | three groups — the coverage COMMANDS present in this tree (`$ <command>    # <what it answers>`, for the caller to run; nothing is executed), the conformance cases naming the file read out of `expectations.json`, and the handbook rows `<handbook>:<line>  Check\|Regression\|Negative: <command>` |
 
 Options: `--root DIR` (default `$CLAUDE_PROJECT_DIR`, else the working directory),
 `--limit N` (outline rows, default 200; files shown per topic, max 12).
@@ -46,7 +46,8 @@ nothing, which is the state `## Degradation` answers.
 |---|---|
 | No row is ever written to disk — the map exists only on stdout | `mechanical` |
 | Every target resolves inside `--root`; a symlink leaving the tree is refused by name, before it is opened | `mechanical` |
-| No file being mapped is executed, imported or loaded — the outline comes from reading text | `mechanical` |
+| Nothing in the mapped tree is executed, imported or loaded — not the file being mapped, and not a suite living there. A docstring match is not identity, so coverage commands are printed rather than run | `mechanical` |
+| Every vcs call overrides `core.fsmonitor` and `core.hooksPath` on the command line, because repository-local config can name an executable | `mechanical` |
 | At most 4 MiB is read per file, and a truncated outline says `TRUNCATED` in its header | `mechanical` |
 | `--tests` reuses the project's own selectors and keeps no coverage list of its own | `mechanical` |
 | A line number is the line in the file as it is on disk right now | `contextual` — true only of an unedited file; re-run after an edit |
@@ -91,9 +92,9 @@ An empty instance is the only instance:
 
 | Script | Implements | Load-bearing | Negative test |
 |---|---|---|---|
-| `workforce/bin/wf-map` | the three views above, the root containment rule and the read cap | yes — an employee with no map searches by hand, which is the 21-42% of tool calls this exists to remove | `map-escape-symlink`: a symlink out of the tree is handed to it → exits 2, names the path, reads nothing. Run 2026-10-12 |
-| `bin/prove --cases-for` (maintainer-only) | answers which assertions name a file, from the one case list | yes — without it `--tests` and `bin/check --for` would each keep a list that drifts | `map-tests-handbook-check`: a project with no `bin/prove` falls through to handbook `Check:` lines rather than reporting no coverage. Run 2026-10-12 |
-| `bin/script-conformance --list` (maintainer-only) | answers which fixtures a change to a file can reach | no — its absence costs the fixture column, not correctness | the `map-` rows of the conformance suite, which select through it. Run 2026-10-12 |
+| `workforce/bin/wf-map` | the three views above, the root containment rule, the read cap, and the refusal to execute anything in the mapped tree | yes — an employee with no map searches by hand, which is the 21-42% of tool calls this exists to remove | `map-escape-symlink`: a symlink out of the tree is handed to it → exits 2, names the path, reads nothing. Run 2026-10-12 |
+| `bin/prove --cases-for` (maintainer-only) | answers which assertions name a file, from the one case list. `bin/check --for` asks it; `wf-map` only PRINTS the command | yes — without it `bin/check --for` would keep a list that drifts from the cases | `map-tests-never-runs-project-prove`: a project whose `bin/prove` carries the copied docstring and writes a marker if run → the marker is absent and the command is printed. Run 2026-10-12 |
+| `bin/script-conformance --list` (maintainer-only) | answers which fixtures a change to a file can reach, transitively | no — its absence costs the transitive fixture list, not correctness | `map-tests-handbook-check`: a project with neither suite falls through to handbook `Check:` lines rather than reporting no coverage. Run 2026-10-12 |
 
 A maintainer reports; it never repairs. `wf-map` writes nothing anywhere, which is the
 strongest form of that rule available to a script.

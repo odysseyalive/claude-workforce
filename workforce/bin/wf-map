@@ -23,20 +23,31 @@ over the text — MEASURED on this repository's own `bin/check` at 19,841 lines:
 0.08 s. Under the one-second budget by an order of magnitude, so there is no cache to
 justify.
 
-IT REUSES THE SELECTORS THAT ALREADY EXIST; IT NEVER KEEPS A SECOND LIST. `--tests` in
-this repository asks `bin/prove --cases-for` which assertions name a file, and
-`bin/script-conformance --touching --list` which fixtures a change to it can reach.
-Both already decide that for their own runs. A second list of "what covers what" would
-be the stale index this script exists to avoid, one directory over.
+IT NAMES THE SELECTORS THAT ALREADY EXIST AND NEVER KEEPS A SECOND LIST, and it does
+not RUN them. `--tests` prints `bin/prove --cases-for <file>`, `bin/check --for <file>`
+and `bin/script-conformance --list --touching <file>` for the caller to run
+deliberately, beside what a text read can be sure of on its own. Those three decide
+coverage for their own runs, so no copy of their answer is kept here — a second list of
+"what covers what" is the stale index this script exists to avoid, one directory over.
 
 WHAT IT REFUSES TO DO, because it reads whatever path it is handed:
 
   * **It never leaves the root.** Every target is resolved with `realpath` and must
     still be inside the resolved root, so a symlink pointing out of the tree is
     REFUSED by name rather than followed. The containment test happens before the open.
-  * **It never executes a file it maps.** Outlines come from reading text and matching
-    regexes — never from `import`, never from a loader. A file under review may be
-    hostile, and a mapper that imported it would run it.
+  * **It never executes ANYTHING it finds in the tree** — not the file it maps, and not
+    a suite that happens to live there. Outlines come from reading text and matching
+    regexes, never from `import` and never from a loader; coverage commands are
+    PRINTED. The first version ran `bin/prove` out of the mapped root, gated on a
+    docstring match, and a docstring is text anybody can copy: in a hostile checkout
+    that gate would have run the checkout's code. There is no identity check an
+    installed copy can make that tells a stranger's `bin/prove` from this project's, so
+    the capability is gone rather than guarded.
+  * **Every `git` call is hardened against repository-local configuration**, which can
+    name an executable: `core.fsmonitor` and `core.hooksPath` are overridden on the
+    command line, `GIT_OPTIONAL_LOCKS=0` keeps a read from writing, and both calls are
+    argument lists with timeouts. A `git grep` in a repository somebody else wrote must
+    not be a way to start their program.
   * **It caps what it reads** at CAP bytes per file, and says so when it truncates. A
     multi-gigabyte generated file must not become this process's memory footprint.
   * **No `shell=True`, ever.** The two tools it calls are invoked as argument lists,
@@ -53,9 +64,9 @@ TWO BOUNDED DECISIONS, DECLARED SO NEITHER IS RE-LITIGATED:
     script. Upgrade to opening each component with O_NOFOLLOW if it ever runs as
     another user.
 
-    sec-eval: a repo-relative path beginning with `-` is DROPPED by the two selectors
-    this calls rather than read as a flag, because both ignore arguments starting with
-    `-`. Upgrade to a `--` separator if either tool's parsing changes.
+    sec-eval: a repo-relative path beginning with `-` is printed inside a suggested
+    command rather than passed anywhere, so the caller reads it before any shell does.
+    Upgrade to a `--` separator in the printed form if a path like that ever appears.
 
 Exit codes
     0  mapped
@@ -69,6 +80,7 @@ Usage
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -81,6 +93,19 @@ WIDTH = 108                    # a printed line is truncated to this, so output 
 DEFAULT_LIMIT = 200            # outline rows before the deepest are dropped
 TOOL_TIMEOUT = 120
 WALK_BUDGET = 20000            # files the no-git fallback reads before it says it stopped
+
+# EVERY VCS CALL IS HARDENED, because repository-local configuration can name an
+# EXECUTABLE and this script runs in trees it did not write. `core.fsmonitor` and
+# `core.hooksPath` are the two that start a program; both are overridden on the command
+# line, where no in-repo config can win. `GIT_OPTIONAL_LOCKS=0` keeps a read-only query
+# from writing to the index, and `GIT_TERMINAL_PROMPT=0` keeps it from ever asking for a
+# credential. Same class the commitments hook is fixing (O7).
+GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
+
+
+def git_env():
+    """The environment every vcs call gets: no optional writes, no prompts."""
+    return dict(os.environ, GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
              "corpus", ".mypy_cache", ".pytest_cache", ".next", "target", "vendor"}
@@ -100,13 +125,22 @@ GENERIC_DEF = re.compile(
     r"([A-Za-z_$][\w$:.-]*)")
 DOCSTRING = re.compile(r'^\s*(?:[rubf]{0,2})("""|\'\'\')\s*(.*?)\s*(?:"""|\'\'\')?\s*$')
 
-# The first bytes that identify a tool as THIS project's own. `--tests` calls two
-# scripts out of the root it was pointed at, and a root is often somebody else's
-# repository; a name match is not identity, so the docstring is the credential.
-SIGILS = {
-    "bin/prove": "Prove each new bin/check assertion by breaking its target",
-    "bin/script-conformance": "run the four SHIPPED scripts against fixtures",
-}
+# THE SUITES `--tests` NAMES, and it names them as COMMANDS FOR THE CALLER TO RUN. It
+# does not run them. The first version did, gated on a docstring match that was supposed
+# to prove the script was this project's own — and a docstring is text anybody can copy,
+# so `wf-map --tests` inside a hostile checkout would have run that checkout's code
+# (found in security review of fabecb3, before this reached anyone). No identity check
+# available to an installed copy can tell a stranger's `bin/prove` from ours, so the
+# class is removed rather than guarded: nothing in the mapped tree is ever executed.
+COVERAGE_COMMANDS = (
+    ("bin/prove", "bin/prove --cases-for {rel}",
+     "the bin/check assertions whose case names this file"),
+    ("bin/check", "bin/check --for {rel}",
+     "run only those assertions"),
+    ("bin/script-conformance", "bin/script-conformance --list --touching {rel}",
+     "the conformance fixtures a change to this file can reach"),
+)
+EXPECTATIONS = "fixtures/scripts/expectations.json"
 
 
 def clip(text, width=WIDTH):
@@ -295,9 +329,9 @@ def git_root(root):
     try:
         # PYTHON 3.6 IS THE FLOOR — RHEL 8 ships it (DEF-Q-001) — so never
         # `capture_output=` or `text=`: both arrived in 3.7 and a 3.7 call crashes there.
-        r = subprocess.run(["git", "-C", root, "rev-parse", "--is-inside-work-tree"],
+        r = subprocess.run(GIT + ["-C", root, "rev-parse", "--is-inside-work-tree"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           universal_newlines=True, timeout=30)
+                           universal_newlines=True, timeout=30, env=git_env())
     except (OSError, subprocess.SubprocessError):
         return None
     return root if r.returncode == 0 and r.stdout.strip() == "true" else None
@@ -314,10 +348,10 @@ def topic_git(root, words):
     for w in words:
         try:
             r = subprocess.run(
-                ["git", "-C", root, "grep", "-n", "-I", "-i", "--untracked",
-                 "--no-color", "-F", "-e", w],
+                GIT + ["-C", root, "grep", "-n", "-I", "-i", "--untracked",
+                       "--no-color", "-F", "-e", w],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                universal_newlines=True, timeout=TOOL_TIMEOUT)
+                universal_newlines=True, timeout=TOOL_TIMEOUT, env=git_env())
         except (OSError, subprocess.SubprocessError):
             return None
         if r.returncode not in (0, 1):
@@ -404,29 +438,42 @@ def print_topic(root, words, limit):
     print()
 
 
-def own_tool(root, rel):
-    """The absolute path of this project's own `rel`, or None.
-
-    IDENTITY, NOT NAME. `--tests` runs two scripts out of the root it was handed, and
-    that root is usually somebody else's repository. A file called `bin/prove` there is
-    a stranger's program; its first bytes have to say it is ours before it is run.
-    """
+def have(root, rel):
+    """True when `rel` is a regular file inside `root` — read as a FACT, never run."""
     p = os.path.join(root, rel)
-    if os.path.islink(p) or not os.path.isfile(p) or not inside(root, p):
-        return None
+    return not os.path.islink(p) and os.path.isfile(p) and bool(inside(root, p))
+
+
+def fixture_cases(root, rel):
+    """Conformance cases naming `rel`, read STATICALLY out of `expectations.json`.
+
+    JSON IS DATA; A SCRIPT IS NOT. `bin/script-conformance --list --touching` computes
+    this more precisely — it follows one script loading another — but computing it means
+    running a program out of the mapped tree, which is the thing this script does not
+    do. So the rows here are the ones a text read can be sure of (a case whose `script`
+    is this file, or whose own fixture directory is this path), and the command that
+    computes the full set is PRINTED for the caller to run deliberately.
+    """
+    p = os.path.join(root, EXPECTATIONS)
+    if not have(root, EXPECTATIONS):
+        return []
     text, _ = read_capped(p)
-    return p if text and SIGILS[rel] in text[:4096] else None
-
-
-def run_tool(root, path, args):
-    """`(rc, stdout)` — argument list, timeout, no shell, never the target file."""
+    if not text:
+        return []
     try:
-        r = subprocess.run([sys.executable, path] + list(args), cwd=root,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           universal_newlines=True, timeout=TOOL_TIMEOUT)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return 1, f"would not run ({exc})"
-    return r.returncode, r.stdout
+        rows = json.loads(text)
+    except ValueError:
+        return []
+    if not isinstance(rows, dict):
+        return []
+    base = os.path.basename(rel)
+    out = []
+    for name, spec in sorted(rows.items()):
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("script") == base or rel.startswith(f"fixtures/scripts/{name}/"):
+            out.append(name)
+    return out
 
 
 def handbook_checks(root, rel):
@@ -463,36 +510,27 @@ def handbook_checks(root, rel):
 
 
 def print_tests(root, rel, target):
-    """What covers `rel` — this repository's suites first, handbooks otherwise."""
+    """What covers `rel`: the commands that answer it, the fixtures a text read is sure
+    of, and the handbook checks that name it. NOTHING HERE IS EXECUTED."""
     print(f"tests covering {rel}\n")
-    prove = own_tool(root, "bin/prove")
-    if prove:
-        rc, out = run_tool(root, prove, ["--cases-for", rel])
-        names = sorted({l.split("\t")[-1].strip() for l in out.splitlines() if l.strip()})
-        print(f"  bin/check assertions · {len(names)}"
-              + ("" if rc == 0 else f" (bin/prove exited {rc})"))
-        for n in names[:20]:
-            print("    · " + clip(n, WIDTH - 8))
-        if len(names) > 20:
-            print(f"    … {len(names) - 20} more")
-        if names:
-            print(f"    run: bin/check --for {rel}")
-            print(f"    prove: bin/prove --since HEAD")
-        else:
-            print("    no assertion names this file — writing one is part of the change")
-    sc = own_tool(root, "bin/script-conformance")
-    if sc:
-        rc, out = run_tool(root, sc, ["--touching", rel, "--list"])
-        cases = sorted({l.strip() for l in out.splitlines() if l.strip()})
-        print(f"\n  conformance fixtures · {len(cases)}")
+    cmds = [(c.format(rel=rel), why) for tool, c, why in COVERAGE_COMMANDS
+            if have(root, tool)]
+    if cmds:
+        print(f"  suites in this tree · {len(cmds)} command(s) — RUN THESE YOURSELF; "
+              f"wf-map never executes a script it found in the tree")
+        for c, why in cmds:
+            print("    $ " + clip(f"{c}    # {why}", WIDTH - 8))
+    cases = fixture_cases(root, rel)
+    if cases:
+        print(f"\n  conformance fixtures naming it · {len(cases)} "
+              f"(read from {EXPECTATIONS}; the --touching command above computes the "
+              f"transitive set)")
         for c in cases[:20]:
             print("    · " + clip(c, WIDTH - 8))
         if len(cases) > 20:
             print(f"    … {len(cases) - 20} more")
-        if cases:
-            print(f"    run: bin/script-conformance --touching {rel}")
     rows = handbook_checks(root, rel)
-    if rows or not (prove or sc):
+    if rows or not cmds:
         print(f"\n  handbook checks · {len(rows)}")
         for hb, n, kind, cmd in rows[:20]:
             print("    · " + clip(f"{hb}:{n}  {kind}: {cmd}", WIDTH - 8))
