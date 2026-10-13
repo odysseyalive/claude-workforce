@@ -1190,8 +1190,8 @@ def counter_turns(base, session, agent_id):
     return turns if isinstance(turns, int) and turns >= 0 else 0
 
 
-PERF_STORE = os.path.join(".claude", "workforce", "personnel")
 PERF_STORE_PARTS = (".claude", "workforce", "personnel")
+PERF_STORE = os.path.join(*PERF_STORE_PARTS)
 PERF_SLUG_RX = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -1203,24 +1203,23 @@ def perf_store(root):
     `wf-task-tag`'s `issues_dir` closed on 2026-10-12 (849eb74) and the same one here:
     `os.makedirs(…, exist_ok=True)` SUCCEEDS on a symlink that points at a directory, and
     the record's own name is then not a link, so no flag on the open can object. A link
-    planted at `.claude/workforce` or at `personnel` would land a performance record in a
-    directory nobody named. Every level is `lstat`ed before anything is created, and a
-    link anywhere refuses the write outright — one unrecorded cap hit, said out loud in
-    the stop line, against a write outside the project.
+    planted at `personnel` or at the `.claude/workforce` holding it would land a
+    performance record in a directory nobody named. Refusing costs one unrecorded cap
+    hit, said out loud in the stop line.
+
+    `.claude` ITSELF IS NOT CHECKED, and that is the sibling's rule rather than an
+    oversight: a dotfiles install that symlinks `.claude` into a managed tree is an
+    ordinary setup, and refusing it would take the record away from a project that did
+    nothing wrong.
     """
-    path = root
-    for part in PERF_STORE_PARTS:
-        path = os.path.join(path, part)
-        try:
-            if stat.S_ISLNK(os.lstat(path).st_mode):
-                return ""
-        except OSError:
-            pass                    # not there yet, and `makedirs` below creates it
+    d = os.path.join(root, *PERF_STORE_PARTS)
+    if os.path.islink(d) or os.path.islink(os.path.dirname(d)):
+        return ""
     try:
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(d, exist_ok=True)
     except OSError:
         return ""
-    return path
+    return d
 
 
 def cap_perf(payload, path, ask, capped):
@@ -1251,16 +1250,21 @@ def cap_perf(payload, path, ask, capped):
     agent = PERF_SLUG_RX.sub("-", str(payload.get("agent_type") or ""))[:64] or "unknown"
     run = PERF_SLUG_RX.sub("-", os.path.basename(os.path.dirname(
         os.path.dirname(path))))[:64] or "unknown-run"
-    rel = os.path.join(PERF_STORE, f"PERF-{run}-{agent}-turn-cap.md")
+    name = f"PERF-{run}-{agent}-turn-cap.md"
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
-    owed = in_project(payload, path)
-    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} with no report "
-            f"at {owed}. PERF filed at {rel}")
     store = perf_store(root)
+    owed = in_project(payload, path)
+    # THE LINE SAYS WHICH OF THE TWO HAPPENED. A stop that reports a record it could not
+    # write is worse than one that reports nothing: the next reader goes looking for a
+    # file that is not there and concludes the cap hit was never seen.
+    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} with no report "
+            f"at {owed}. "
+            + (f"PERF filed at {os.path.join(PERF_STORE, name)}" if store
+               else f"no PERF written to {PERF_STORE} — a link is on the way to it"))
     if not store:
-        return {"systemMessage": note.replace("PERF filed at", "no PERF written to")}
+        return {"systemMessage": note}
     try:
-        fd = TT._open_nofollow(os.path.join(store, os.path.basename(rel)),
+        fd = TT._open_nofollow(os.path.join(store, name),
                                os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except OSError:
         # Already filed for this order, or a store that cannot be written. Either way the
