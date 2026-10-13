@@ -58,10 +58,56 @@ FAILS = []
 WARNS = []
 SKIPS = []
 PASSES = 0
+FILTERED = 0
+
+# `bin/check --for <path>…` — THE ASSERTIONS THAT COVER A FILE, and nothing else
+# reported. MEASURED 2026-10-12: one full run of this file took 146 s, and four profiled
+# coder orders spent 30-43% of their tool calls running tests. A coder that changed one
+# script read 600 passing rows to find the three that watch it.
+#
+# THE COVERING SET IS NOT DECIDED HERE. `bin/prove` already knows which assertion names
+# which file — every case carries its target — so this asks it (`--cases-for`, which runs
+# nothing) rather than keeping a second mapping that would drift from the first silently.
+# No prove, no narrowing: the run refuses rather than guessing a subset.
+#
+# WHAT IT NARROWS IS THE REPORT AND THE EXIT STATUS, said plainly because the difference
+# is measurable. This file is a flat script: every assertion is executed as the module
+# runs, so `--for` cannot skip the work of a row it does not report. It skips the two
+# NESTED SUITES nothing selected needs — the ~45 s script-conformance run and the ~43 s
+# corpus pair — and reports only the covering rows. Making the rest of the run fast is
+# K13's job, not this flag's.
+ONLY = None
+if "--for" in sys.argv:
+    _fi = sys.argv.index("--for")
+    FOR_PATHS = [p.lstrip("./") for p in sys.argv[_fi + 1:] if not p.startswith("-")]
+    if not FOR_PATHS:
+        print("usage: bin/check --for <repo-relative path> [<path>…]", file=sys.stderr)
+        sys.exit(2)
+    if not os.path.isfile(os.path.join(ROOT, "bin", "prove")):
+        print("bin/check --for: bin/prove is missing, so the covering set cannot be "
+              "resolved. Run bin/check with no arguments.", file=sys.stderr)
+        sys.exit(2)
+    try:
+        _fr = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "prove"),
+                              "--cases-for", *FOR_PATHS],
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             universal_newlines=True, timeout=300)
+    except (OSError, subprocess.SubprocessError) as _exc:
+        print(f"bin/check --for: could not ask bin/prove ({_exc})", file=sys.stderr)
+        sys.exit(2)
+    if _fr.returncode != 0:
+        print(f"bin/check --for: bin/prove exited {_fr.returncode}: "
+              f"{_fr.stdout.strip()[-300:]}", file=sys.stderr)
+        sys.exit(2)
+    ONLY = frozenset(l.split("\t")[-1].strip()
+                     for l in _fr.stdout.splitlines() if l.strip())
 
 
 def check(name, ok, detail=""):
-    global PASSES
+    global PASSES, FILTERED
+    if ONLY is not None and name not in ONLY:
+        FILTERED += 1
+        return
     if ok:
         PASSES += 1
     else:
@@ -97,6 +143,13 @@ def skip(name, why):
     repository rather than a defect in the distribution. `bin/prove` can therefore
     run. Every skip prints its own line, with its precondition.
     """
+    global FILTERED
+    # A skip carries a CHECK NAME, so `--for` narrows it exactly as it narrows a check:
+    # a precondition for a property this run was not asked about is noise, and noise is
+    # what the flag exists to remove.
+    if ONLY is not None and name not in ONLY:
+        FILTERED += 1
+        return
     SKIPS.append((name, why))
 
 
@@ -3911,7 +3964,10 @@ check(
 # plain bin/check, so the full suite runs once before any case, and a mutation to a
 # shipped script or a fixture still runs every case that script can alter.
 _sc_mut = os.environ.get("WF_PROVE_MUTATION", "")
-if _sc_mut and not (_sc_mut == "bin/script-conformance"
+if ONLY is not None and (
+        "scripts: the script-conformance suite passes, every case it selects" not in ONLY):
+    pass          # `--for` did not select this row, so its ~45 s subprocess is not run
+elif _sc_mut and not (_sc_mut == "bin/script-conformance"
                     or _sc_mut.startswith(("fixtures/scripts/", "workforce/bin/"))):
     skip("scripts: the script-conformance suite passes, every case it selects",
          f"bin/prove child mutating {_sc_mut}, which no conformance case executes; "
@@ -18543,7 +18599,11 @@ check(
 # snapshot it prints one SKIPPED line and exits 0, which is what keeps a fresh clone and every
 # other developer green. `bin/prove` excludes `corpus/` from its per-case copies, so this costs
 # nothing inside the prove suite.
-if not _corpus_snaps:
+if ONLY is not None and (
+        "corpus: the display-mode scripts say the same thing on a real org, whatever "
+        "the session" not in ONLY):
+    pass          # `--for` did not select this row, so its ~43 s pair of runs is not made
+elif not _corpus_snaps:
     skip("corpus: the display-mode scripts say the same thing on a real org, whatever the session",
          "no snapshots in corpus/ on this machine, so nothing was run. This is the expected "
          "state on a fresh clone: a snapshot holds a real project's own words and is never "
@@ -19889,11 +19949,186 @@ check(
     "capped agent is never judged as a failure in the meantime",
 )
 
+# FIVE. THE PER-TURN STATE BESIDE THE LEDGER GETS THE SAME REFUSAL (CWE-59, security review
+# 2026-10-12). The ledger lives in a repository; the tag, the asks checklist, the widen flag
+# and the closeout record live in `scratchpad_dir`, `$TMPDIR`, or — the LAST fallback, taken
+# whenever the harness names neither — `/tmp`, which is world-writable and shared with every
+# other account on the machine. The names are `wf-task-tag.<sid>.json` and its siblings,
+# derived from a session id, so they are predictable rather than secret. A link planted at
+# one of them aimed the hook's write at any file the user could write and handed its read a
+# file it was never given: the user's own prompt, written somewhere nobody asked for.
+#
+# THE FORBIDDEN FORMS ARE PINNED AS WELL AS THE GUARDED ONES, because this class comes back
+# as a NEW call site rather than as an edit to an old one — one more `open(tag_path(...))`
+# added by a later change is a reopened door, and a positive-only pin passes with it there.
+# Three fixtures prove the behaviour (`tasktag-tag-write-refuses-a-planted-link`,
+# `widen-tag-refuses-a-planted-link`, `tasktag-issues-dir-link-takes-no-write`); this pins
+# that no second, unguarded door exists beside the ones they walk through.
+_il_cm = read("workforce/bin/wf-commitments")
+_tag_lnk = []
+for _src, _name, _form in (
+        (_il, "wf-task-tag", "open(tag_path(payload)"),
+        (_il, "wf-task-tag", "open(checklist_path(payload)"),
+        (_il_w, "wf-widen", "open(tag_file(payload)"),
+        (_il_w, "wf-widen", "open(widen_flag(payload)"),
+        (_il_w, "wf-widen", "open(closeout_path(payload)"),
+        (_il_cm, "wf-commitments", 'open(os.path.join(d, f"wf-task-tag.')):
+    # `with open(` and `= open(` only: `_open_nofollow(` and `os.fdopen(` both contain the
+    # name and are the guarded forms this rule exists to require.
+    if f"with {_form}" in _src or f"= {_form}" in _src:
+        _tag_lnk.append(f"{_name} opens {_form[5:]} with a plain open(), which follows a "
+                        "link planted at that name")
+if _il.count("write_json_atomic(tag_path(payload)") != 3:
+    _tag_lnk.append(f"the tag is written atomically at "
+                    f"{_il.count('write_json_atomic(tag_path(payload)')} sites, expected 3 "
+                    "— the slot `SubagentStart` opens, the untagged turn's empty tag, and "
+                    "the tagged turn's")
+if "read_json_nofollow(tag_path(payload))" not in _il:
+    _tag_lnk.append("previous_checklist does not read the tag through the guarded reader, "
+                    "so last turn's checklist record is taken from whatever the name points "
+                    "at")
+if 'write_json_atomic(p, {"prompt": prompt[:2000], "items": []})' not in _il:
+    _tag_lnk.append("the asks checklist is not written atomically, and it sits in the same "
+                    "directory under an equally predictable name")
+if _il_w.count("TT.write_json_atomic(") != 5:
+    _tag_lnk.append(f"wf-widen writes per-turn state atomically at "
+                    f"{_il_w.count('TT.write_json_atomic(')} sites, expected 5 — the flag, "
+                    "the agent's resolved ask, the closeout record, the ended mark, and the "
+                    "checklist hand-off")
+if _il_w.count("TT.read_json_nofollow(") != 4:
+    _tag_lnk.append(f"wf-widen reads per-turn state through the guarded reader at "
+                    f"{_il_w.count('TT.read_json_nofollow(')} sites, expected 4 — the tag, "
+                    "the asks checklist, the ended mark's tag, and the flag it joins")
+if "TT._open_nofollow(closeout_path(payload), os.O_RDONLY)" not in _il_w:
+    _tag_lnk.append("the closeout record is read with a plain open; it holds a LIST, so it "
+                    "takes the shared guarded open rather than the dict-only reader")
+if 'TT.read_json_nofollow(os.path.join(d, f"wf-task-tag.{sid}.json"))' not in _il_cm:
+    _tag_lnk.append("wf-commitments reads the tag unguarded — and it PRINTS what it reads "
+                    "there to the user as the turn's ask count")
+if "if os.path.islink(d) or os.path.islink(wf):" not in _il:
+    _tag_lnk.append("issues_dir does not refuse a linked directory; `os.makedirs(d, "
+                    "exist_ok=True)` succeeds on a symlink to a directory and every file "
+                    "below it is then created inside the link's target, where no "
+                    "`O_NOFOLLOW` on the file can object")
+check(
+    "tag: no per-turn state is written or read through a name another account can plant",
+    not _tag_lnk,
+    "; ".join(_tag_lnk) + ". The tag, the asks checklist, the widen flag and the closeout "
+    "record fall back to /tmp when the harness names no scratchpad, under names derived "
+    "from a session id. A planted symlink there is an arbitrary-file write aimed by "
+    "whoever planted it, and an arbitrary-file read handed to the hook (CWE-59)",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE CODE MAP (K12, 2026-10-12). The user: *"if the bin check is taking a long time and
+# the coder is running out of turns trying to find data, it seems to me that both of
+# these would be helped by some kind of an index system to help direct where in the code
+# to go for specific things."* Measured from four coder transcripts the same day:
+# 21-42% of their tool calls were searching and reading, 30-43% were running tests, and
+# two ran out of turns. `wf-map` answers both from the files, on every call, storing
+# nothing — a stored index drifts in silence, which is the defect the `lab` roster
+# measured (12 of ~30 projects gone from disk, 10 present and unlisted).
+# ─────────────────────────────────────────────────────────────────────────────
+_map_st = []
+if "exec workforce/bin/wf-map" not in read("manifest.txt"):
+    _map_st.append("wf-map is not declared `exec` in manifest.txt, so no install ships it")
+if "sibling workforce/skills/records-code-map/SKILL.md" not in read("manifest.txt"):
+    _map_st.append("the records-code-map data skill is not declared `sibling`, so the map "
+                   "has no gateway on a host and data-skills.md's own rule — no removal may "
+                   "leave a live dataset with no invocable path to it — is broken on day one")
+_rcm = read("workforce/skills/records-code-map/SKILL.md")
+for _sec in ("## Schema", "## Invariants", "## Degradation", "## Owner", "## Git policy",
+             "## Seed", "## Maintainers"):
+    if _sec not in _rcm:
+        _map_st.append(f"records-code-map/SKILL.md has no {_sec} — a data skill that lacks "
+                       "any required section is a verify finding (data-skills.md)")
+if "Degraded state may cause more work. It may never authorize a write." not in _rcm:
+    _map_st.append("records-code-map/SKILL.md drops the universal invariant every data "
+                   "skill carries")
+if "wf-map --topic" not in read("workforce/references/handbook-templates.md"):
+    _map_st.append("the IC template's `## Sources` no longer tells an employee to map "
+                   "before it searches, so the map ships and nobody is sent to it")
+if "wf-map" not in read("workforce/references/procedures/handbook.md"):
+    _map_st.append("no procedure names wf-map, so it is a shipped script nothing invokes — "
+                   "the dormancy the four inherited hooks were deleted for")
+check(
+    "map: wf-map ships as an exec, its data skill is the gateway, and a handbook sends an "
+    "employee to it",
+    not _map_st,
+    "; ".join(_map_st),
+)
+# BEHAVIOURAL, through the fixtures, because every claim above is about text. The six
+# rows are the three views plus the two guarantees that cost the most if they rot: a
+# topic query must not surface a .gitignored file, and a symlink out of the tree is
+# refused rather than followed.
+check(
+    "map: wf-map outlines a file, ranks a topic, names what covers a file, and refuses a "
+    "path outside the root",
+    not _sc_cases("map-outline-python", "map-outline-markdown", "map-topic-walk-ranks",
+                  "map-topic-git-skips-ignored", "map-tests-handbook-check",
+                  "map-escape-symlink"),
+    "a shipped map is doing something its fixtures say it must not. Run "
+    "`bin/script-conformance map-` to see every case",
+)
+# THE SELECTION HAS ONE SOURCE, AND IT ANSWERS. `--for` above and `wf-map --tests` both
+# ask `bin/prove --cases-for` which assertions name a file; a second mapping would drift
+# from prove's cases silently, which is the whole failure mode this feature was built
+# against. Run rather than read: the flag could exist and return nothing.
+_cf_st = []
+if "--cases-for" not in read("bin/prove"):
+    _cf_st.append("bin/prove no longer answers --cases-for, so `bin/check --for` and "
+                  "`wf-map --tests` have no case list to ask")
+if "--list" not in read("bin/script-conformance"):
+    _cf_st.append("bin/script-conformance no longer lists a --touching selection without "
+                  "running it, so wf-map --tests cannot name the fixtures that cover a file")
+try:
+    _cf = subprocess.run([sys.executable, os.path.join(ROOT, "bin", "prove"), "--cases-for",
+                          "workforce/bin/wf-conform", "workforce/references/evaluators.md"],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         universal_newlines=True, timeout=300)
+    _cf_rows = [l for l in _cf.stdout.splitlines() if "\t" in l]
+    if _cf.returncode != 0 or not _cf_rows:
+        _cf_st.append(f"`bin/prove --cases-for` exited {_cf.returncode} with "
+                      f"{len(_cf_rows)} row(s) for two files the suite covers")
+except (OSError, subprocess.SubprocessError) as _exc:
+    _cf_st.append(f"`bin/prove --cases-for` would not run ({_exc})")
+_wfm_src = read("workforce/bin/wf-map")
+if "sys.executable" in _wfm_src:
+    _cf_st.append("wf-map spawns an interpreter. It must never execute anything it found "
+                  "in the tree it maps: the first version ran the mapped root's bin/prove "
+                  "behind a docstring match, and a docstring is text anybody can copy, so "
+                  "in a hostile checkout that gate ran the checkout's code")
+if "COVERAGE_COMMANDS" not in _wfm_src:
+    _cf_st.append("wf-map no longer prints the coverage commands, so `--tests` has no "
+                  "answer to give where it may not run one")
+if 'GIT = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]' not in _wfm_src:
+    _cf_st.append("wf-map's vcs calls are no longer hardened against repository-local "
+                  "config, which can name an executable in a tree this script did not write")
+_cf_st += _sc_cases("map-tests-never-runs-project-prove")
+check(
+    "map: `bin/check --for` asks bin/prove, and wf-map PRINTS the coverage commands "
+    "rather than running anything out of the tree it maps",
+    not _cf_st,
+    "; ".join(_cf_st),
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"claude-workforce conformance — {len(declared)} shipped files\n")
+# WHAT A NARROWED RUN MEASURED, printed BEFORE the verdict and never folded into it.
+# A subset that reports like a full run is how a green line comes to mean less than it
+# says (`bin/prove`'s own filter header makes the same point), so the covering set, the
+# paths it was resolved from, and the number of rows this run did not report all print.
+if ONLY is not None:
+    print(f"--for {' '.join(FOR_PATHS)} — {len(ONLY)} covering assertion(s) from "
+          f"bin/prove's case list, {FILTERED} row(s) NOT reported. This is a SUBSET: "
+          f"run bin/check with no arguments before a commit.\n")
+    if not ONLY:
+        print("no assertion in bin/prove's case list names those paths — nothing was "
+              "measured, which is not a pass. Write one with the change.\n")
 if FAILS:
     print(f"FAIL ({len(FAILS)}):")
     for name, detail in FAILS:
@@ -19917,4 +20152,7 @@ if SKIPS:
 
 print(f"{PASSES} passed, {len(FAILS)} failed, {len(SKIPS)} skipped, "
       f"{len(WARNS)} warnings")
-sys.exit(1 if FAILS else 0)
+# A NARROWED RUN THAT COVERED NOTHING EXITS NONZERO. `--for` on a file no assertion
+# names would otherwise print `0 passed, 0 failed` and exit 0 — the vacuous green this
+# repository's whole gate design exists to refuse.
+sys.exit(1 if FAILS or (ONLY is not None and not ONLY) else 0)

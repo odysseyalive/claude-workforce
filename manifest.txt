@@ -99,6 +99,13 @@ exec workforce/bin/wf-live
 exec workforce/bin/wf-catalog
 exec workforce/bin/wf-code-eval
 exec workforce/bin/wf-upstream
+# wf-map answers "where in the code" and "what covers this file" from the files
+# themselves, on every call, storing nothing. Measured from four coder transcripts
+# (2026-10-12): 21-42% of their tool calls were searching and reading, 30-43% were
+# running tests, and two ran out of turns. Its gateway is the `records-code-map` sibling
+# skill below; `procedures/org.md` is where an employee is told to call it before it
+# searches.
+exec workforce/bin/wf-map
 
 # ── Hooks ─────────────────────────────────────────────────────────────────────
 # Registered to a harness event by `/workforce hooks --execute`, which is the
@@ -321,6 +328,23 @@ sibling workforce/skills/blueprint/SKILL.md
 sibling workforce/skills/shared-artifact/SKILL.md
 sibling workforce/skills/shared-artifact/references/house-style.md
 sibling workforce/skills/shared-artifact/references/template.html
+
+# ── records-code-map — the DATA SKILL fronting the generated code map ─────────
+#
+# Same install mechanism as the siblings above, and a third contract: a data skill holds
+# a dataset — its schema, its invariants and its degradation behaviour — rather than
+# grading an artifact or authoring one (`data-skills.md`). Its dataset is the output of
+# `exec workforce/bin/wf-map`, which is GENERATED ON EVERY CALL AND NEVER STORED, so it
+# is the one data skill whose `## Git policy` has no ignore rule to name and whose
+# `## Seed` is the absence of a file.
+#
+# It ships as a sibling for the reason every skill does: a skill is discoverable at
+# `<skills-root>/<name>/SKILL.md` and nowhere else, so shipping it is what lets `update`
+# alone carry it to every project. It carries NO `references/` corpus and NO
+# `<kind>-ref-version` drift anchor, and it is registered in neither `wf-catalog` nor
+# `wf-conform`: there is no catalog to drift. Reading it as an evaluator would make those
+# tools look half-wired when they are correctly wired.
+sibling workforce/skills/records-code-map/SKILL.md
 
 # ── Procedures ────────────────────────────────────────────────────────────────
 workforce/references/procedures/audit.md

@@ -156,50 +156,46 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
 
     Never fatal: a widen that cannot write its hand-off still blocks with a reason.
     """
-    try:
-        with open(widen_flag(payload), "w", encoding="utf-8") as fh:
-            json.dump({
-                "sampled": sampled,
-                "ask": {"prompt": (_tag or {}).get("prompt") or "",
-                        "kinds": [h.get("kind") for h in ((_tag or {}).get("hits") or [])],
-                        # HOW MANY THINGS WERE ASKED, so a juror can ask whether each
-                        # one was ANSWERED. The COUNT is checked mechanically and for
-                        # free by `wf-commitments` on every multi-ask turn — "cheap
-                        # decides, expensive acts", and a subagent spent counting `##`
-                        # is the waste the user's second directive names. What only a
-                        # reader can judge is whether section 2 addressed ask 2, and
-                        # that question was unaskable while the flag carried the prompt
-                        # as one undifferentiated string.
-                        "asks": (_tag or {}).get("asks"),
-                        "asks_why": (_tag or {}).get("asks_why") or "",
-                        # THE DOCKET IS THE APPLICABLE SET, never a fallback to the
-                        # unopened one. On a SAMPLED turn nothing is unopened by
-                        # definition, so falling back handed the jury an EMPTY docket —
-                        # no juror seated — and it convicted anyway. A stale pre-patch
-                        # tag carries no `senses` key at all, so the fallback was the
-                        # only value there was.
-                        "senses": sorted(applicable)},
-                "evidence": {"channels": {k: v for k, v in rows},
-                             "reads": counts[0], "distinct": len(counts[1] or []),
-                             "enumerating": counts[2], "outside": counts[3],
-                             "ran": counts[4]},
-                "conclusion": (reply or "")[:4000],
-                # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
-                # APPLICABLE sense as unopened, which on a sampled turn is every sense
-                # the ask needed — including ones the turn opened 24 times.
-                #
-                # FOUND BY THE AUDITING AGENT, on its first real outing: it read
-                # `unopened: ["touch"]` beside `channels.touch: 24` and refused to
-                # judge, because the hand-off contradicted itself. That is the right
-                # refusal — an evaluator that guesses which half of an incoherent input
-                # to believe is worse than one that says the input is incoherent — and
-                # it is the independence directive paying for itself, since the session
-                # that wrote both fields saw no contradiction at all.
-                "unopened": sorted(unopened),
-                "why": [{"trigger": t, "sense": s, "reason": r} for t, s, r in why],
-            }, fh)
-    except OSError:
-        pass
+    TT.write_json_atomic(widen_flag(payload), {
+        "sampled": sampled,
+        "ask": {"prompt": (_tag or {}).get("prompt") or "",
+                "kinds": [h.get("kind") for h in ((_tag or {}).get("hits") or [])],
+                # HOW MANY THINGS WERE ASKED, so a juror can ask whether each
+                # one was ANSWERED. The COUNT is checked mechanically and for
+                # free by `wf-commitments` on every multi-ask turn — "cheap
+                # decides, expensive acts", and a subagent spent counting `##`
+                # is the waste the user's second directive names. What only a
+                # reader can judge is whether section 2 addressed ask 2, and
+                # that question was unaskable while the flag carried the prompt
+                # as one undifferentiated string.
+                "asks": (_tag or {}).get("asks"),
+                "asks_why": (_tag or {}).get("asks_why") or "",
+                # THE DOCKET IS THE APPLICABLE SET, never a fallback to the
+                # unopened one. On a SAMPLED turn nothing is unopened by
+                # definition, so falling back handed the jury an EMPTY docket —
+                # no juror seated — and it convicted anyway. A stale pre-patch
+                # tag carries no `senses` key at all, so the fallback was the
+                # only value there was.
+                "senses": sorted(applicable)},
+        "evidence": {"channels": {k: v for k, v in rows},
+                     "reads": counts[0], "distinct": len(counts[1] or []),
+                     "enumerating": counts[2], "outside": counts[3],
+                     "ran": counts[4]},
+        "conclusion": (reply or "")[:4000],
+        # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
+        # APPLICABLE sense as unopened, which on a sampled turn is every sense
+        # the ask needed — including ones the turn opened 24 times.
+        #
+        # FOUND BY THE AUDITING AGENT, on its first real outing: it read
+        # `unopened: ["touch"]` beside `channels.touch: 24` and refused to
+        # judge, because the hand-off contradicted itself. That is the right
+        # refusal — an evaluator that guesses which half of an incoherent input
+        # to believe is worse than one that says the input is incoherent — and
+        # it is the independence directive paying for itself, since the session
+        # that wrote both fields saw no contradiction at all.
+        "unopened": sorted(unopened),
+        "why": [{"trigger": t, "sense": s, "reason": r} for t, s, r in why],
+    })
 
 
 def task_tag(payload):
@@ -216,13 +212,10 @@ def task_tag(payload):
     were made, so the reply scan was silent and correct to be silent — while the ASK was
     plainly a `history` question, whose sense is hearing.
     """
-    try:
-        with open(tag_file(payload), encoding="utf-8") as fh:
-            tag = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    # A tag that is not an object is no tag: every reader calls `.get` on it.
-    return tag if isinstance(tag, dict) else None
+    # A tag that is not an object is no tag: every reader calls `.get` on it, and
+    # `read_json_nofollow` already answers None for one — and for a planted link at the
+    # name, which is the sibling's rule (`tag_path`) and not a second design.
+    return TT.read_json_nofollow(tag_file(payload))
 
 
 def tag_file(payload):
@@ -328,11 +321,7 @@ def resolve_agent_ask(payload):
                 # re-read it with; the list is the main session's artifact. Stated rather
                 # than left absent, so `checklist()` reads a decision instead of a gap.
                 "checklist": None})
-    try:
-        with open(tag_file(payload), "w", encoding="utf-8") as fh:
-            json.dump(tag, fh)
-    except OSError:
-        pass
+    TT.write_json_atomic(tag_file(payload), tag)
     return tag
 
 
@@ -787,21 +776,33 @@ def closeout_path(payload):
 
 def closeout_reported(payload):
     """What this session has already been told about. An unreadable record is an empty one:
-    the cost of forgetting is one repeated report, and the cost of failing here is none."""
+    the cost of forgetting is one repeated report, and the cost of failing here is none.
+
+    THIS RECORD IS A LIST, not an object, so the read is the sibling's `_open_nofollow`
+    rather than its `read_json_nofollow` — that reader answers None for anything that is
+    not a dict, and changing what is written here to suit it would change a file already
+    on disk in every live session. The guarded OPEN is the shared part, and it is the part
+    that matters: the name sits in `/tmp` when the harness names no scratchpad, so a link
+    planted at it would hand this hook a file it was never given (CWE-59)."""
     try:
-        with open(closeout_path(payload), encoding="utf-8") as fh:
+        fd = TT._open_nofollow(closeout_path(payload), os.O_RDONLY)
+    except OSError:
+        return set()
+    try:
+        with os.fdopen(fd, encoding="utf-8") as fh:
             return set(json.load(fh))
     except (OSError, ValueError, TypeError):
         return set()
 
 
 def closeout_record(payload, add):
-    """Add to the record. Never fatal — a block that cannot be remembered still blocks."""
-    try:
-        with open(closeout_path(payload), "w", encoding="utf-8") as fh:
-            json.dump(sorted(closeout_reported(payload) | set(add)), fh)
-    except OSError:
-        pass
+    """Add to the record. Never fatal — a block that cannot be remembered still blocks.
+
+    A LIST IS FINE HERE: `write_json_atomic` serializes whatever it is given and the
+    rename is what refuses the planted link, so nothing about this shape needs the
+    object the sibling's reader insists on."""
+    TT.write_json_atomic(closeout_path(payload),
+                         sorted(closeout_reported(payload) | set(add)))
 
 
 def closeout(payload):
@@ -1470,6 +1471,10 @@ def checklist(payload):
     the session's alone and every agent read the main turn's file. The FILE NAME is spelled
     out here as it always was: `wf-live` pairs a hand-off's writer with its reader by that
     literal, and a reader that resolves the name through a helper reads as no reader at all.
+    THE VERB IS ALSO WHAT `wf-live` READS, and since 2026-10-12 the read here is
+    `TT.read_json_nofollow` rather than `open()` — so `read_json_nofollow` is in that
+    registry's `READ_VERBS` beside `open(`, or this function stops counting as the reader of
+    a file it reads and the orphan-hand-off check goes quiet instead of green.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = TT.state_component(payload)
@@ -1477,11 +1482,9 @@ def checklist(payload):
     record = (task_tag(payload) or {}).get("checklist")
     if not isinstance(record, dict):
         return None, None
-    try:
-        with open(p, encoding="utf-8") as fh:
-            cl = json.load(fh)
-    except (OSError, ValueError):
-        cl = {}
+    # Through the sibling's guarded reader, never a plain `open()`: the list sits beside
+    # the tag, under a name as predictable as the tag's (`wf-task-tag.tag_path`).
+    cl = TT.read_json_nofollow(p) or {}
     return cl, record
 
 
@@ -1493,14 +1496,14 @@ def mark_ended(payload):
     tag, because the session rewrites the checklist file and would drop it.
     """
     path = tag_file(payload)
+    tag = TT.read_json_nofollow(path)
+    # A tag that is absent, unparsable, a planted link, or carries no checklist record
+    # leaves nothing to mark. `TypeError` is the None and the non-object cases together.
     try:
-        with open(path, encoding="utf-8") as fh:
-            tag = json.load(fh)
         tag["checklist"]["ended"] = True
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(tag, fh)
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
+    except (KeyError, TypeError):
+        return
+    TT.write_json_atomic(path, tag)
 
 
 def hand_checklist_to_jury(payload, record, items):
@@ -1508,11 +1511,7 @@ def hand_checklist_to_jury(payload, record, items):
     blended reply is judged by a reader that did not write it. Joins this turn's flag when
     `widen` raised one, and raises one when it did not."""
     flag = widen_flag(payload)
-    try:
-        with open(flag, encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, ValueError):
-        data = None
+    data = TT.read_json_nofollow(flag)
     if not isinstance(data, dict):
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
                 "conclusion": (TL.confirmed_reply(payload)[0] or "")[:4000],
@@ -1532,11 +1531,7 @@ def hand_checklist_to_jury(payload, record, items):
     # read from it is the session choosing the question its reply is checked against.
     prompt = record.get("prompt")
     ask["prompt"] = (prompt if isinstance(prompt, str) else "") or ask.get("prompt") or ""
-    try:
-        with open(flag, "w", encoding="utf-8") as fh:
-            json.dump(data, fh)
-    except OSError:
-        pass
+    TT.write_json_atomic(flag, data)
 
 
 def with_checklist(payload):

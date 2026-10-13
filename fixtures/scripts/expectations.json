@@ -1,4 +1,95 @@
 {
+  "map-outline-python": {
+    "_why": "THE OUTLINE, ON THE LANGUAGE MOST OF THIS PROJECT IS WRITTEN IN. Every row an employee reads is asserted here: the header's language and counts, a SECTION declared by a comment banner (the house style in bin/check, and the thing a def regex alone cannot see), a def and a class with their first docstring line, a nested method at its own depth, and a def whose summary is the comment ABOVE it. The negatives are the point of the outline: no body line and no import is ever printed, because a map that reproduces the file saves nobody a read.",
+    "script": "wf-map",
+    "args": ["sample.py"],
+    "exit": 0,
+    "want": [
+      "sample.py  ·  python · 25 lines · 4 def(s) · 1 section(s)",
+      "4  § GREETINGS, the section this banner declares",
+      "9  def greet Say hello to NAME, once.",
+      "14  class Counter Counts the things nobody else counts.",
+      "bump Add N and return the running total.",
+      "24  def farewell a plain comment above a def is read as its first line"
+    ],
+    "not": ["Traceback", "return f\"hello", "self.total += n"]
+  },
+  "map-outline-markdown": {
+    "_why": "MARKDOWN IS CODE HERE. Half this distribution's shipped surfaces are references an agent reads, so the map has to answer `where in this file` for them too: every heading with its line number, its depth, and the first real sentence under it. The html comment under `## Installing a widget` is an enforcement marker in this project's own references and must never be mistaken for that sentence -- it was, in the first version.",
+    "script": "wf-map",
+    "args": ["guide.md"],
+    "exit": 0,
+    "want": [
+      "guide.md  ·  markdown · 16 lines · 0 def(s) · 4 section(s)",
+      "1  § Widget guide What a widget is, in one sentence nobody has to re-derive.",
+      "5  § Installing a widget Run the installer and answer two questions.",
+      "§ The slot a widget lands in It lands beside the others",
+      "14  § Removing a widget The removal is reported, never silent."
+    ],
+    "not": ["Traceback", "an html comment is never the summary line"]
+  },
+  "map-topic-walk-ranks": {
+    "_why": "THE TOPIC QUERY WITH NO GIT, which is the harness's own condition (the tree is copied to a temp directory) and a user's condition in any directory that is not a repository. Two assertions: the fallback walk runs and SAYS it walked, and the RANK is by how many of the query's words a file carries -- the file matching both sorts above the file matching one. A file matching neither is absent, so `unrelated.md` is the negative. One matching LINE is one hit however many words it holds, which an earlier version got wrong by printing the same line twice.",
+    "script": "wf-map",
+    "args": ["--topic", "widget", "slot"],
+    "exit": 0,
+    "want": [
+      "topic: widget slot  ·  2 file(s) matched (walk, 2 word(s))",
+      "widget.md  ·  2 hit(s) · 2/2 word(s)",
+      "mentions-one-word.md  ·  1 hit(s) · 1/2 word(s)",
+      "The widget registry holds one widget per slot"
+    ],
+    "not": ["Traceback", "unrelated.md"]
+  },
+  "map-topic-git-skips-ignored": {
+    "_why": "IN A REPOSITORY IT ASKS GIT, AND THAT IS WHAT KEEPS AN IGNORED FILE OUT OF THE REPORT. `git grep --untracked` searches what is tracked and what is new, and NOT what .gitignore excludes -- so a project's secrets, caches and vendored trees cannot be surfaced by a topic query even though the script can read them. The walk fallback has its own skip list; this case proves the git path, which is the one that runs in every real checkout.",
+    "script": "wf-map",
+    "args": ["--topic", "widget"],
+    "exit": 0,
+    "git": {"init": true, "commit": true},
+    "want": [
+      "(git grep, 1 word(s))",
+      "tracked.md  ·  1 hit(s) · 1/1 word(s)",
+      "The widget lives here, tracked and committed."
+    ],
+    "not": ["Traceback", "ignored/secret.md", "inside an ignored directory"]
+  },
+  "map-tests-never-runs-project-prove": {
+    "_why": "THE EXECUTION CLASS, FAILING FIRST. The first version of `--tests` RAN the mapped tree's bin/prove, gated on a docstring match -- and a docstring is text anybody can copy, so wf-map inside a hostile checkout would have run that checkout's code (security review of fabecb3, before it reached anyone). This tree's bin/prove carries the copied docstring verbatim and writes `ran-prove.marker` if it is ever executed. The marker must not exist afterwards, and the coverage command must be PRINTED for the caller instead -- there is no identity check an installed copy can make, so the capability is gone rather than guarded.",
+    "script": "wf-map",
+    "args": ["--tests", "src/widget.py"],
+    "exit": 0,
+    "want": [
+      "suites in this tree · 1 command(s) — RUN THESE YOURSELF",
+      "bin/prove --cases-for src/widget.py",
+      "handbook checks · 1",
+      "Check: `pytest tests/test_widget.py -k build`"
+    ],
+    "not": ["Traceback", "hostile bin/prove ran", "ran-prove.marker"],
+    "after": {"ran-prove.marker": {"absent": true}}
+  },
+  "map-tests-handbook-check": {
+    "_why": "THE PROJECT PATH OF `--tests`, and the common one: a staffed project has no bin/prove and no conformance suite, so the test map is the employees' own runnable proofs. `handbook-templates.md` Verification is the shape -- `Check:` targeted, `Regression:` the full suite -- and only the lines that NAME the file or its directory are reported, which is why the bare `Regression: pytest` line here must be absent from the output. A fixture with no bin/prove also proves the identity gate: a project's own scripts are not run to answer this.",
+    "script": "wf-map",
+    "args": ["--tests", "src/widget.py"],
+    "exit": 0,
+    "want": [
+      "tests covering src/widget.py",
+      "handbook checks · 2",
+      ".claude/agents/widget-coder.md:9 Check: `pytest tests/test_widget.py -k build`",
+      "Negative: `pytest tests/test_widget_rejects.py`"
+    ],
+    "not": ["Traceback", "bin/check assertions", "Regression: `pytest` "]
+  },
+  "map-escape-symlink": {
+    "_why": "THE SECURITY FLOOR, FAILING FIRST. This script is handed arbitrary paths out of a work order, so a symlink pointing out of the tree must be REFUSED by name rather than followed: `escape.py` resolves to a path above the root and the run exits 2 having read nothing. The link is created at run time because a dangling or escaping link cannot be committed. `kept.py` is beside it and is never read either -- the refusal is per path, and a run that mapped nothing exits 2 rather than reporting an empty map as a map.",
+    "script": "wf-map",
+    "args": ["escape.py"],
+    "exit": 2,
+    "git": {"init": true, "links": {"escape.py": "../escape.py"}},
+    "want": ["resolves outside the root", "escape.py"],
+    "not": ["Traceback", "def kept", "· python ·"]
+  },
   "commitments-heals-git-hook": {
     "_why": "THE CARRIER FOR THE GIT HALF. The SessionStart registration every default install already has reaches a stranded repository with no audit, no typed command and no settings write -- the 2026-09-07 directive, the next use of workforce heals it. This tree has NO settings file at all, which is the point: the settings half's own gate ends on the first read here, so a git half placed behind it would never fire. The hook still exits 0 and still speaks JSON.",
     "script": "wf-commitments",
@@ -8041,6 +8132,104 @@
     "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
     "want": [
       "issue i1"
+    ]
+  },
+  "tasktag-tag-write-refuses-a-planted-link": {
+    "_why": "THE TAG IS THE LEDGER'S PROBLEM ONE DIRECTORY OVER (CWE-59, security review 2026-10-12). Its path falls back to `/tmp` whenever the harness names no `scratchpad_dir`, which is world-writable, and `wf-task-tag.<session>.json` is derived from a session id rather than from a secret -- so the name is plantable by any other account on the machine. A link sits at the tag's own name aiming at `victim.json`, and the hook writes this turn's tag. THE WRITE GOES THROUGH `write_json_atomic`, the same helper the ledger uses: the temporary name is created `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMED over `wf-task-tag.s1.json`, and rename acts on the NAME, so the planted link is replaced and its target is never opened. `victim.json` byte-unchanged is the proof of the refusal; the real ask landing in the tag is the proof the refusal did not also break the feature, which is the half a bare `absent` assertion cannot see.",
+    "after": {
+      "victim.json": {
+        "want": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ]
+      },
+      "wf-task-tag.s1.json": {
+        "not": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ],
+        "want": [
+          "\"prompt\": \"Please fix the skul-dev deploy failure"
+        ]
+      }
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "wf-task-tag.s1.json": "victim.json"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "Asks checklist for this message"
+    ]
+  },
+  "tasktag-issues-dir-link-takes-no-write": {
+    "_why": "`O_NOFOLLOW` ON THE FILE CANNOT SEE A LINKED DIRECTORY, and that is the half this tree holds. `.claude/workforce/issues` is a symlink to `elsewhere/`, and `os.makedirs(d, exist_ok=True)` SUCCEEDS on a symlink to a directory -- every file the hook then creates below it is created inside the link's target under a name that is not itself a link, so no flag on the open can object. The ledger, the per-project index and the hook's own `.gitignore` would all land in a directory nobody named. `issues_dir` therefore refuses outright with `os.path.islink`, for `issues/` and for the `.claude/workforce` holding it, and returns None -- which every caller already treats as `record nothing`. The three `absent` rows are the write that did not happen; `exit 0` with the ask still tagged is the hook degrading quietly rather than failing the turn, which is what a hook on `UserPromptSubmit` owes the user.",
+    "after": {
+      "elsewhere/.gitignore": {
+        "absent": true
+      },
+      "elsewhere/index.json": {
+        "absent": true
+      },
+      "elsewhere/s1.json": {
+        "absent": true
+      },
+      "elsewhere/victim.json": {
+        "want": [
+          "DO NOT WRITE INTO A LINKED DIRECTORY."
+        ]
+      }
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        ".claude/workforce/issues": "../../elsewhere"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "Asks checklist for this message"
+    ]
+  },
+  "widen-tag-refuses-a-planted-link": {
+    "_why": "THE READ SIDE, AT THE EVENT THAT ONLY READS. Same tree as `widen-subagent-with-no-slot-is-not-given-the-session-ask`, with a SYMLINK where the agent's slot would be: `wf-task-tag.nosession.a1.json` aims at `victim.json`, which is itself shaped like a slot file so that following the link would succeed rather than merely fail differently. Through the link this stop would find a slot, resolve the agent's ask onto it, and WRITE IT BACK through the same link -- clobbering a file the hook was never given. `TT.read_json_nofollow` refuses the link instead, so the stop reads as an agent this installation never saw start and is judged on its reply alone (`not scored`), and the session's own tag beside it is still not borrowed as the agent's order (`history claim` forbidden, as in the sibling case). `victim.json` byte-unchanged is the write half of the same refusal.",
+    "after": {
+      "victim.json": {
+        "want": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        "wf-task-tag.nosession.a1.json": "victim.json"
+      }
+    },
+    "not": [
+      "Traceback",
+      "history claim",
+      "existence claim",
+      "NOT OPENED"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"Nine hooks are wired into the settings file.\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}",
+    "want": [
+      "not scored"
     ]
   },
   "issues-third-message-keeps-both-issues": {
