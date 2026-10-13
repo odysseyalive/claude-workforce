@@ -1122,8 +1122,15 @@ def agent_handoff(payload, led, writes=None):
         for a in issue_agents(iss):
             if a.get("agent_id") == aid:
                 digest = unmet_digest(iss)
-                measured = writes is not None
-                moved = measured and writes > (a.get("handoff_writes") or 0)
+                measured = isinstance(writes, int) and writes >= 0
+                # THE STORED COUNT IS VALIDATED WHERE IT IS READ, which is this file's rule
+                # for everything that comes off the ledger: the file lives in a repository
+                # and a string or null on this key would make the comparison below raise
+                # inside the hook's own try/except — and a mark that silently does not get
+                # written is the whole silence this mechanism exists to remove.
+                prev = a.get("handoff_writes")
+                prev = prev if isinstance(prev, int) and prev >= 0 else 0
+                moved = measured and writes > prev
                 if (measured and unmet_asks(iss) and not moved
                         and a.get("handoff_digest") == digest):
                     a["handoff_stalled"] = True
