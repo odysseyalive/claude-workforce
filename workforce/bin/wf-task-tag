@@ -1518,6 +1518,21 @@ def judge_ledger(payload, led):
 # this machine, 275 are under eight words.
 CHECKLIST_MIN_WORDS = 12
 
+# THE TWO SENTENCES WITH TWO READERS, EACH WRITTEN ONCE. A turn that opens no asks of its
+# own still names the same file and the same carried rows (`carry_only_checklist`), so both
+# sentences are now said in two places — and a second COPY of either one in this file is the
+# copy that drifts, as well as the thing that would make `bin/check`'s grep for the carried
+# words vacuous: breaking one copy would no longer break the pin.
+CHECKLIST_HEAD = ("Asks checklist for this message: %s. It holds "
+                  "{\"prompt\", \"items\", \"carried\"}")
+# THE CARRIED LIST IS ONE SENTENCE HOWEVER LONG IT IS: the rows live in the file, so the
+# prompt pays for the pointer and not for the items.
+CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's earlier "
+                "issues, each naming its own issue id. Mark one \"done\", \"answered\" or "
+                "\"dropped\" when this turn finishes or withdraws it and leave the rest as "
+                "they are; only a carried row's status is read back, onto the issue it "
+                "names, and that issue closes once its items are all finished.")
+
 
 def checklist_path(payload):
     """Where this turn's asks checklist lives. Keyed exactly like the tag, so a concurrent
@@ -1542,6 +1557,9 @@ def start_checklist(payload, prev=None):
 
     Last turn's file is removed first, so a short reply never inherits a list of asks it was
     never given.
+
+    A MESSAGE THAT OPENS NO LIST OF ITS OWN STILL CARRIES this session's earlier open items,
+    through `carry_only_checklist`, and gets no file at all when there are none.
     """
     prompt = payload.get("prompt") or ""
     p = checklist_path(payload)
@@ -1593,9 +1611,11 @@ def start_checklist(payload, prev=None):
         os.remove(p)
     except OSError:
         pass
-    # Injected text opens no list of its own: it is not the user's ask.
+    # Injected text opens no list of its own: it is not the user's ask. IT STILL CARRIES,
+    # when this session has earlier open items — see `carry_only_checklist`, which is where
+    # the measured hand-back case is written down.
     if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
-        return "", None
+        return carry_only_checklist(p, carried)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
                                  "carried": carried}):
         return "", None
@@ -1604,8 +1624,8 @@ def start_checklist(payload, prev=None):
     record = {"prompt": prompt[:2000], "ended": False, "issue": issue_id}
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
-    return (f"Asks checklist for this message: {p}. It holds "
-            "{\"prompt\", \"items\", \"carried\"} and its \"items\" start empty. Each separate "
+    return (CHECKLIST_HEAD % p
+            + " and its \"items\" start empty. Each separate "
             "ask is one item, {\"ask\": <in the user's words>, "
             "\"status\": \"open\"}, written before the work starts; statuses are updated as the "
             "work goes, and an ask found along the way is added. A finished ask is \"done\", or "
@@ -1617,15 +1637,46 @@ def start_checklist(payload, prev=None):
                "which keeps them after this turn ends and keeps every earlier open issue "
                "beside them; an agent spawned now is linked to that issue and its result is "
                "recorded there." if issue_id else "")
-            # THE CARRIED LIST IS NAMED ONLY WHEN THERE IS ONE, and the sentence is one
-            # sentence however long the list is: the rows live in the file, so the prompt
-            # pays for the pointer and not for the items.
-            + (f" \"carried\" holds {len(carried)} still-open item(s) from this session's "
-               "earlier issues, each naming its own issue id. Mark one \"done\", "
-               "\"answered\" or \"dropped\" when this turn finishes or withdraws it and "
-               "leave the rest as they are; only a carried row's status is read back, onto "
-               "the issue it names, and that issue closes once its items are all finished."
-               if carried else "")), record
+            # THE CARRIED LIST IS NAMED ONLY WHEN THERE IS ONE.
+            + (" " + CARRIED_LINE % len(carried) if carried else "")), record
+
+
+def carry_only_checklist(p, carried):
+    """The file and the line a message that opens no asks of its own still gets, when this
+    session has earlier issues with open items. `("", None)` when it has none.
+
+    THE TURN A DISPATCHED ITEM IS FINISHED ON IS AN INJECTED TURN, which is the half of the
+    carry 1.77.4 could not reach. MEASURED 2026-10-13 in odyssey-alive's session `629732ff`:
+    turn 1 was the user's ask, the session wrote its one item, dispatched a background agent
+    and replied "handed off", and the `Stop` ended that turn with the item correctly open.
+    TURN 2 WAS THE HAND-BACK — "Another Claude session sent a message", which `INJECTED`
+    matches — so it opened no checklist, was handed no carried rows, and the file had just
+    been removed: the session's own `sed` to mark the item done answered "No such file or
+    directory". The `Stop` then found no record, absorbed nothing, and printed `i1 KICKBACK
+    1 of 1 items unaddressed` about work that was finished. An issue whose work completes
+    asynchronously could never close, because the only turn that could close it is this one.
+
+    SO THE ROWS RIDE ON IT TOO, and nothing else about the turn changes. `"items"` stays
+    empty and the line asks for no ask-splitting, because the message made no asks. The
+    record is marked `carry_only`, which is what keeps `wf-widen` from handing the widening
+    jury a checklist for this turn: an injected hand-back is not the user's ask and must not
+    be graded as one. AND IT NAMES NO ISSUE, deliberately — the next message's `absorb_items`
+    would otherwise copy this empty `items` list over that issue's real items.
+
+    A TURN WITH NO CARRIED ROWS IS UNCHANGED: no file, no line, no record. A short reply to a
+    session holding nothing open is the common case, and it stays free.
+    """
+    if not carried:
+        return "", None
+    # THE PROMPT FIELD IS EMPTY RATHER THAN THE INJECTED TEXT. The field exists for the
+    # user's ask, this message is not one, and the record's prompt is what `wf-widen` would
+    # put in front of a juror — so harness text has no reason to be in either copy.
+    if not write_json_atomic(p, {"prompt": "", "items": [], "carried": carried}):
+        return "", None
+    return (CHECKLIST_HEAD % p
+            + " and its \"items\" stay empty, because this message makes no asks of its "
+            "own. " + CARRIED_LINE % len(carried),
+            {"prompt": "", "ended": False, "issue": None, "carry_only": True})
 
 
 # ─────────────────────────────────────────────────────────────────────────────────

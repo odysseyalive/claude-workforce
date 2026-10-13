@@ -2378,6 +2378,17 @@ def with_checklist(payload):
         return
     items = TT.checklist_items(cl)
     mark_ended(payload)
+    # A CARRY-ONLY LIST IS NOT A TURN'S ASK, so the jury is never handed it. `wf-task-tag`
+    # writes one on a message that opened no checklist of its own — a hand-back, a task
+    # notification arriving after a Stop, a reply too short to open a list — purely so this
+    # session's earlier issues can be finished on the turn their work actually lands
+    # (`TT.carry_only_checklist`, measured 2026-10-13 in session `629732ff`). Grading an
+    # injected hand-back against "the message" would seat a juror on text the user never
+    # wrote. THE MARK ABOVE STILL HAPPENS: the turn did end, and `ended` is what stops the
+    # next notification from reusing this list. The carried statuses are read back in
+    # `ledger_verdict`, one step earlier, which is the whole point of the file.
+    if record.get("carry_only"):
+        return
     asks = (own_tag(payload) or {}).get("asks")
     if len(items) >= 2 or (isinstance(asks, int) and asks >= 2):
         hand_checklist_to_jury(payload, record, items)

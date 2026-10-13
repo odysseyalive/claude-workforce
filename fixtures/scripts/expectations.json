@@ -9564,6 +9564,91 @@
       "i7  CLOSED"
     ]
   },
+  "issues-handback-turn-carries-the-open-item": {
+    "_why": "THE TURN A DISPATCHED ITEM IS FINISHED ON IS AN INJECTED TURN, which is the half of the carry 1.77.4 could not reach. This tree is odyssey-alive's session `629732ff` at the head of its second turn, 2026-10-13: turn 1 was the user's `/org` calendar ask, the session wrote its one item, dispatched `business-correspondent` and replied \"handed off\", and the Stop ended that turn with the item correctly open -- so i1 holds no items yet and the finished turn's list is still on disk. TURN 2 IS THE HAND-BACK, which `INJECTED` matches on \"Another Claude session sent a message\". It opened no checklist, was handed no carried rows, and the file had just been removed: the session's own `sed` to mark the item done answered \"No such file or directory\", the Stop found no record, and `i1 KICKBACK 1 of 1 items unaddressed` printed about work that was finished. Here the hand-back absorbs the item onto i1 and carries it straight back, and the line it is given asks for no ask-splitting -- the message made no asks. The hand-back's own text is asserted ABSENT from the file, because harness text has no business in a field that exists for the user's ask.",
+    "after": {
+      "wf-asks.s1.json": {
+        "not": [
+          "[Subagent hand-back]"
+        ],
+        "want": [
+          "\"items\": []",
+          "\"carried\": [{\"issue\": \"i1\", \"ask\": \"add the following to my calendar: E-School, Kingdom Hall, 24340 NW Meek Road, Hillsboro. January 16 2027. 8AM to 5PM\", \"status\": \"open\"}]"
+        ]
+      },
+      "wf-task-tag.s1.json": {
+        "want": [
+          "\"carry_only\": true",
+          "\"issue\": null"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "Each separate ask is one item"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Another Claude session sent a message:\\n<agent-message from=\\\"a6141809c0a65003e\\\">\\n[Subagent hand-back] The calendar event is written and the invitation is drafted. The text below is the final report of a subagent this session delegated to.\\n</agent-message>\"}",
+    "want": [
+      "still-open item(s) from this session's earlier issues",
+      "stay empty, because this message makes no asks of its own"
+    ]
+  },
+  "issues-short-reply-with-nothing-open-gets-no-list": {
+    "_why": "NOTHING OPEN, NOTHING WRITTEN, which is the half of the carry-only rule that keeps a short reply free. \"yes it's done\" is under `CHECKLIST_MIN_WORDS` and opens no asks of its own, and this session's one issue is CLOSED while still carrying an item -- so what the gate reads is the OPEN set and not the shape of the message. No checklist file, no context line and a `null` record on the tag: three spellings of the same refusal, because a file written here would be a chore on every short reply in every session that ever closed an issue.",
+    "after": {
+      "wf-asks.s1.json": {
+        "absent": true
+      },
+      "wf-task-tag.s1.json": {
+        "want": [
+          "\"checklist\": null"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "Asks checklist for this message"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"yes it's done\"}",
+    "want": []
+  },
+  "issues-carry-only-stop-closes-the-issue-and-seats-no-juror": {
+    "_why": "THE STOP THAT ENDS THE HAND-BACK TURN, and the two things it owes the session. The carried row for i1 is marked `done` -- what `629732ff` tried to write and could not, because the file was gone -- so this Stop absorbs the status onto the issue the row NAMES and closes i1 in the same breath, where before the kickback repeated on every Stop for the rest of the session. AND THE WIDENING JURY IS SEATED ON NOTHING: the tag's record is `carry_only`, so no checklist is handed over and no flag is raised, because an injected hand-back is not the user's ask and must not be graded as one. The tag counts 2 asks on purpose -- that is the condition that WOULD hand a list to the juror -- so the absent flag is the guard answering and not the hand-off failing to qualify. `ended` is still marked: the turn did end, and that is what stops the next notification from reusing this list.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"ask\": \"add the following to my calendar: E-School, Kingdom Hall, 24340 NW Meek Road, Hillsboro. January 16 2027. 8AM to 5PM\", \"status\": \"done\"",
+          "\"state\": \"closed\""
+        ]
+      },
+      "wf-task-tag.s1.json": {
+        "want": [
+          "\"ended\": true"
+        ]
+      },
+      "wf-widen-flag.s1.json": {
+        "absent": true
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The event is on the calendar for 16 January 2027 and the invitation is drafted.\"}",
+    "want": [
+      "ISSUES  1 open issue(s) judged",
+      "i1  CLOSED"
+    ]
+  },
   "spawn-guard-cut-agent-of-the-same-role-is-denied": {
       "_why": "THE WRONG ACTION, REFUSED WHERE IT IS TAKEN. Trial e2e3 (session `bb8a3e53`, 2026-10-13): a cap-10 filer was cut, and in the SAME main turn the session spawned a second filer with the `Agent` tool and then a third. Both cut agents stayed `handoff` in the ledger for the rest of the session and neither was ever resumed. The K8 kickback that names the resume is on the main `Stop`, and that session never stopped between the three dispatches, so the one line that would have corrected it had no event to fire on. This is the same session shape and the same tool call, and the answer is a DENY that names the agent_id to message instead. The spawn is from the MAIN thread, which is what `agent_id` being absent means (platform.md fact 22a).",
       "script": "wf-turn-budget",

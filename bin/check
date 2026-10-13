@@ -15541,6 +15541,24 @@ check(
 )
 
 
+def _cl_stale(d):
+    """Whether the checklist on disk is still LAST turn's list.
+
+    THE FILE BEING THERE STOPPED BEING THE QUESTION on 2026-10-13. A turn that opens no
+    checklist of its own now gets a CARRY-ONLY file whenever this session has earlier open
+    items (`wf-task-tag.carry_only_checklist`), so existence no longer tells a kept list from
+    a fresh one. What must never survive the turn is the CONTENT — the items and the prompt
+    the last turn was given, which is exactly what the notification kept in 98f76fe — and a
+    carry-only list has neither: its `items` are empty and its `prompt` is "".
+    """
+    try:
+        with open(os.path.join(d, "wf-asks.c1.json")) as fh:
+            cl = json.load(fh)
+    except (OSError, ValueError):
+        return False
+    return bool(cl.get("items")) or bool(cl.get("prompt"))
+
+
 def _cl_handed(d):
     """Whether the flag hands the jury a checklist. Removes the flag, so the next Stop starts clean."""
     path = os.path.join(d, "wf-widen-flag.c1.json")
@@ -15564,7 +15582,7 @@ def _cl_once():
         res["first"] = _cl_handed(d)
         # The turn ended. A background task's notification now opens a NEW turn.
         _cl_hook(d, "wf-task-tag", {"prompt": "<task-notification> " + _CL_W20})
-        res["kept"] = os.path.exists(os.path.join(d, "wf-asks.c1.json"))
+        res["stale"] = _cl_stale(d)
         _cl_stop(d)
         res["after_notice"] = _cl_handed(d)
     with tempfile.TemporaryDirectory() as d:
@@ -15588,11 +15606,11 @@ def _cl_once():
 _cl_once_r = _cl_once()
 check(
     "asks checklist: handed over once, so a later turn never gets a list whose turn has ended",
-    _cl_once_r == {"first": True, "kept": False, "after_notice": False, "again": False,
+    _cl_once_r == {"first": True, "stale": False, "after_notice": False, "again": False,
                    "mid_turn": True},
     f"{_cl_once_r}. A list handed over at one Stop was handed over again when a notification "
-    "opened the next turn, because the notification kept the file; a notification mid-turn "
-    "must still keep it (98f76fe)",
+    "opened the next turn, because the notification kept the file's items; a notification "
+    "mid-turn must still keep them (98f76fe)",
 )
 
 
@@ -15606,8 +15624,7 @@ def _cl_lookalike():
                                                      {"ask": "earlier two", "status": "open"}]})
             _cl_hook(d, "wf-task-tag", {"prompt": lead + _CL_W20})
             _cl_stop(d)
-            stale = (os.path.exists(os.path.join(d, "wf-asks.c1.json"))
-                     or _cl_flag_prompt(d).startswith("earlier"))
+            stale = _cl_stale(d) or _cl_flag_prompt(d).startswith("earlier")
             res.append((lead.strip(), stale))
     return res
 
@@ -20651,6 +20668,145 @@ check(
     "; ".join(_il_cf) + ". An issue that cannot be finished after the turn that opened it is "
     "an issue that is never finished: six were reported open on every Stop of odyssey-alive's "
     "session 37f162e1 with the list only growing, and the session had no path to say so",
+)
+
+
+# EIGHT. THE TURN ON WHICH DISPATCHED WORK FINISHES IS A TURN THAT OPENS NO CHECKLIST
+# (2026-10-13). The user, on the `oa-work` session: *"the job looks like it's done, but the
+# ISSUES item doesn't appear to be updating. Maybe it is in the backend, but definately isn't
+# on the screen."* MEASURED in odyssey-alive's session `629732ff`, whose ledger held one issue:
+#
+#   turn 1   the `/org` calendar ask. The session wrote its one item, dispatched
+#            `business-correspondent`, replied "handed off", and the Stop ended the turn with
+#            the item open — correct, because the work had not landed yet.
+#   turn 2   THE HAND-BACK ITSELF, which arrives as a user message beginning "Another Claude
+#            session sent a message" and so matches `INJECTED`. `start_checklist` absorbed the
+#            outgoing list, REMOVED the file, and returned before writing a new one: no file,
+#            no line, no record. The session's own `sed` to mark the item done answered "No
+#            such file or directory", the Stop found no record to absorb, and `i1  KICKBACK
+#            1 of 1 items unaddressed` printed about work that was finished.
+#
+# SO THE CARRY HAD TO REACH THE INJECTED AND THE SHORT TURNS. 1.77.4's reached only a turn
+# that opened a checklist of its own, and the hand-back is exactly the turn on which
+# asynchronous work finishes — so an issue whose agent reports after its turn ended could
+# never close, and neither could one finished by a reply as short as "yes it's done".
+#
+# THE WHOLE SEQUENCE IS RUN, both hooks, five events, because no `fixtures/scripts` case can:
+# that harness runs ONE invocation per case and this defect only exists across a Stop. The
+# three fixtures named below hold the single states the sequence passes through.
+def _il_handback():
+    import tempfile
+    _org = ("/org please add the following to my calendar: E-School,  Kingdom Hall, "
+            "24340 NW Meek Road, Hillsboro. January 16 2027. 8AM to 5PM")
+    _ask = ("add the following to my calendar: E-School, Kingdom Hall, 24340 NW Meek Road, "
+            "Hillsboro. January 16 2027. 8AM to 5PM")
+    _hb = ("Another Claude session sent a message:\n"
+           "<agent-message from=\"a6141809c0a65003e\">\n"
+           "[Subagent hand-back] The event is on the calendar.\n</agent-message>")
+    bad = []
+
+    def _env(d):
+        # THE LEDGER'S PROJECT IS NAMED, NEVER INHERITED. `project_root` reads
+        # CLAUDE_PROJECT_DIR first, so a `bin/check` run inside a hooked session would
+        # otherwise write these issues into THIS repository's own ledger.
+        return {"WF_BLIND_SAMPLE": "0", "CLAUDE_PROJECT_DIR": d}
+
+    def _issue(d):
+        try:
+            with open(os.path.join(d, ".claude/workforce/issues/c1.json")) as fh:
+                return json.load(fh)["issues"][0]
+        except (OSError, ValueError, KeyError, IndexError, TypeError):
+            return {}
+
+    def _list(d):
+        try:
+            with open(os.path.join(d, "wf-asks.c1.json")) as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return None
+
+    def _turn_one(d):
+        """The ask, the item the session writes, and the Stop that ends that turn."""
+        _cl_hook(d, "wf-task-tag", {"prompt": _org}, _env(d))
+        _cl_put(d, "wf-asks.c1.json",
+                {"prompt": _org, "items": [{"ask": _ask, "status": "open"}], "carried": []})
+        _cl_stop(d, _env(d))
+        _cl_handed(d)
+
+    def _hand_back(d, where):
+        """The hand-back turn, with the carried row marked done as the session marks it."""
+        _rc, out = _cl_hook(d, "wf-task-tag", {"prompt": _hb}, _env(d))
+        line = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+        cl = _list(d)
+        if cl is None:
+            bad.append("%s: the hand-back turn gets no checklist file, so the item the "
+                       "agent just finished cannot be marked on the turn it finished" % where)
+            return line
+        if [(r.get("issue"), r.get("ask"), r.get("status"))
+                for r in cl.get("carried") or []] != [("i1", _ask, "open")]:
+            bad.append("%s: the hand-back turn carries %r rather than i1's one open item"
+                       % (where, cl.get("carried")))
+            return line
+        if cl.get("items") != []:
+            bad.append("%s: the carry-only list opens items of its own: %r"
+                       % (where, cl.get("items")))
+        cl["carried"][0]["status"] = "done"
+        _cl_put(d, "wf-asks.c1.json", cl)
+        return line
+
+    with tempfile.TemporaryDirectory() as d:
+        _turn_one(d)
+        line = _hand_back(d, "the measured sequence")
+        if "wf-asks.c1.json" not in line or "still-open item(s)" not in line:
+            bad.append("the hand-back turn is told neither the file nor the rows: %r"
+                       % line[-200:])
+        if "Each separate ask is one item" in line:
+            bad.append("the carry-only line asks the turn to split asks it never got")
+        _rc, out = _cl_stop(d, _env(d))
+        said = (out.get("systemMessage") or "") + (out.get("reason") or "")
+        if "i1  CLOSED" not in said:
+            bad.append("the Stop that ends the hand-back turn does not close i1: %r" % said)
+        if _issue(d).get("items") != [{"ask": _ask, "status": "done"}]:
+            bad.append("the finished item does not land on i1: %r" % _issue(d).get("items"))
+        # THE JURY IS NOT SEATED ON TEXT THE USER NEVER WROTE. The tag's record is
+        # `carry_only`, so this Stop hands over no checklist and raises no flag.
+        if _cl_handed(d):
+            bad.append("the widening agent is handed a checklist for an injected hand-back")
+
+    # NO STOP FIRED, which is the other way a turn can end: the next message's absorb is the
+    # half that holds then, and it reads the same rows back.
+    with tempfile.TemporaryDirectory() as d:
+        _turn_one(d)
+        _hand_back(d, "no Stop fired")
+        _cl_hook(d, "wf-task-tag", {"prompt": _org + " (and confirm the invitation went)"},
+                 _env(d))
+        if _issue(d).get("items") != [{"ask": _ask, "status": "done"}]:
+            bad.append("with no Stop between them, the next message does not read the "
+                       "carried status back: %r" % _issue(d).get("items"))
+
+    # AND A TURN WITH NOTHING OPEN IS UNCHANGED: no ledger, no carried rows, no file.
+    with tempfile.TemporaryDirectory() as d:
+        _cl_hook(d, "wf-task-tag", {"prompt": _hb}, _env(d))
+        if _list(d) is not None:
+            bad.append("an injected turn with nothing open still writes a checklist file")
+    return bad
+
+
+_il_hb = _il_handback()
+if "carry_only" not in _il_w:
+    _il_hb.append("wf-widen does not read the carry-only mark, so the widening jury is "
+                  "seated on a hand-back the user never wrote")
+_il_hb += _sc_cases("issues-handback-turn-carries-the-open-item",
+                    "issues-carry-only-stop-closes-the-issue-and-seats-no-juror",
+                    "issues-short-reply-with-nothing-open-gets-no-list")
+check(
+    "issues: the turn a dispatched item finishes on carries it, and the jury is not seated "
+    "on that turn",
+    not _il_hb,
+    "; ".join(_il_hb) + ". A hand-back is an INJECTED message, so the turn that receives it "
+    "opened no checklist: odyssey-alive's `629732ff` marked its one item done on that turn "
+    "and the write went to a file the hook had just removed, so every Stop afterwards "
+    "printed `i1  KICKBACK  1 of 1 items unaddressed` about finished work",
 )
 
 
