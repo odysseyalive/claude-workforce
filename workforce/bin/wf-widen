@@ -2388,12 +2388,12 @@ def with_checklist(payload):
 # `SendMessage` kept its whole context and gave it a fresh turn allowance — a coder cut at
 # 80 tool uses finished at 129 — while a fresh agent of the same role starts the work over
 # and spends the context again. `org.md` rung 12b already says RESUME (e06d730); nothing
-# made the session do it. These two sentences are what the kickback says, and the words
-# "successor", "re-dispatch" and "spawn" are deliberately absent from both.
-RESUME_ACTION = ("→ RESUME {who} with SendMessage: tell it to continue from its own "
-                 "HANDOFF.md, at the exit criteria still UNMET. Its context is already "
-                 "loaded and a resume gives it a fresh turn allowance (org.md rung 12b). "
-                 "Do not start this work over with anyone else.")
+# made the session do it.
+#
+# THE SENTENCE ITSELF IS `TT.resume_action`, not a constant here. `wf-turn-budget`'s
+# `PreToolUse` deny says the same thing to the same session in the turn the wrong spawn is
+# attempted, and the two copies had already drifted when this was made one definition
+# (2026-10-13). The ESCALATION's wording below has one speaker and stays here.
 ESCALATE_ACTION = ("→ DECIDE THIS ONE YOURSELF: {who} stopped at its cap twice with the "
                    "same work open, so resuming it again is not progress. {brief}")
 NO_BRIEF = ("No readable HANDOFF.md under .claude/workforce/work/<run-id>/{who}/, so "
@@ -2528,7 +2528,7 @@ def handoff_action(payload, iss, verdict):
         cut = [a for a in cut if a.get("handoff_stalled")] or cut
     who = ", ".join(a["agent_id"] for a in cut) or "the agent on this issue"
     if verdict != "escalate":
-        return RESUME_ACTION.format(who=who), ""
+        return TT.resume_action(who), ""
     says, quotes = [], []
     for a in cut:
         s1 = handoff_brief(TT.project_root(payload), a.get("agent_type"))

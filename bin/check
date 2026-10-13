@@ -20207,9 +20207,28 @@ if ("(round {rounds})" not in _il_w
 if "handoff_stalled" not in _il or "handoff_stalled" not in _il_w:
     _il_st.append("the loop guard is gone from the writer or the reader: a resumed agent "
                   "that hands off again with the same unmet set is resumed forever")
-if "RESUME {who} with SendMessage" not in _il_w:
+# THE ONE ACTION, SAID ONCE AND READ TWICE. `wf-widen` says it at the main `Stop` and
+# `wf-turn-budget` says it in the `PreToolUse` deny, and until 2026-10-13 each spelled the
+# sentence out in its own file — already drifted when they were merged: the deny had
+# dropped the kept-context clause and moved the rung inline. So the literal is pinned at
+# its ONE definition in `wf-task-tag`, COUNTED for the reason `turn_round` is counted (a
+# second `def` silently wins for every caller and leaves the name both readers import),
+# and each reader is pinned at its call.
+if "RESUME {who} with SendMessage" not in _il:
     _il_st.append("the kickback no longer names a resume as its one action — a fresh agent "
                   "of the same role starts the work over, which is the measured defect")
+if _il.count("def resume_action(") != 1:
+    _il_st.append(f"wf-task-tag defines resume_action at "
+                  f"{_il.count('def resume_action(')} sites, expected 1 — it is the one "
+                  "definition of the action a cut agent's hand-off asks for, and a second "
+                  "one hands the Stop and the spawn deny different instructions again")
+for _rdr, _rnm, _rcall in ((_il_w, "wf-widen's Stop kickback", "TT.resume_action(who)"),
+                           (_tb_src, "wf-turn-budget's spawn deny",
+                            "tt.resume_action(held[0])")):
+    if _rcall not in _rdr:
+        _il_st.append(f"{_rnm} does not read resume_action from wf-task-tag, so it spells "
+                      "the resume out again — and the copy that is edited next is the "
+                      "only one the session hears on that event")
 if "handoff_action(payload, iss, verdict)" not in _il_w:
     _il_st.append("the action line is not rendered, so the verdict reaches the user as a "
                   "status with no instruction in it")

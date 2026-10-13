@@ -1124,6 +1124,32 @@ def held_by(led, agent_type):
     return held
 
 
+# ── and the one action both of this mechanism's hooks name ──────────────────
+# ONE SENTENCE, TWO HOOKS. `wf-widen` says it to the session at the main `Stop`; the
+# `PreToolUse` deny in `wf-turn-budget` says it in the turn the wrong spawn is attempted.
+# Until 2026-10-13 each hook spelled it out in its own file, and the two had already
+# drifted: the deny argued the rung inline and dropped the kept-context clause, the stop
+# carried the clause and put the rung at the end. One mechanism, two differently-argued
+# versions of its single action — and an edit to either leaves the other saying the old
+# thing. It lives here because this is the module both hooks already load, and because the
+# ledger this sentence is about is this module's.
+#
+# THE WORDS ARE CHOSEN, NOT ARRANGED: "successor", "re-dispatch" and "spawn" are absent on
+# purpose, because the measured failure (session `bb8a3e53`) was a hand-off read as a
+# brief for a fresh run.
+def resume_action(who):
+    """The one action a cut agent's issue takes, addressed to `who`.
+
+    `who` is already-validated agent-id text — `bare_name` at the deny, the ledger's own
+    linked ids at the stop. This formats; it never checks, because a caller that has not
+    validated an id has a worse problem than this sentence.
+    """
+    return ("→ RESUME {who} with SendMessage: tell it to continue from its own "
+            "HANDOFF.md, at the exit criteria still UNMET. Its context is already "
+            "loaded and a resume gives it a fresh turn allowance (org.md rung 12b). "
+            "Do not start this work over with anyone else.").format(who=who)
+
+
 def unmet_asks(iss):
     """ONE issue's UNMET set — the asks the session itself has not marked done."""
     return [i["ask"] for i in issue_items(iss) if not item_done(i)]

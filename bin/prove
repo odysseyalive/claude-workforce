@@ -353,9 +353,28 @@ CASES = [
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
      TBG, "delall", "            mark_handoff(payload, writes)"),
+    # THE ONE ACTION: its single definition in `wf-task-tag`, and each hook that reads it.
+    # The literal lives inside a string, so deleting it leaves wf-task-tag importable —
+    # which this case needs, because `bin/check` EXECUTES that file.
     ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
      "resumed",
-     WDN, "delall", "RESUME {who} with SendMessage"),
+     TAG, "delall", "RESUME {who} with SendMessage"),
+    # COUNTED, NOT `in`, for the reason the `turn_round` case gives: a SECOND `def` wins
+    # silently for every caller and leaves the name both hooks import. The appended one
+    # answers with nothing at all, which is the deny and the kickback with no action in
+    # them.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TAG, "append", '\ndef resume_action(who):\n    return ""\n'),
+    # THE READERS, as NAMES rather than whole statements, exactly as the `TB.fold_tail`
+    # cases above: `return (who), ""` and `action=(held[0])` both parse, so each hook runs
+    # and says the wrong thing rather than failing to load.
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     WDN, "delall", "TT.resume_action"),
+    ("issues: an agent cut at its turn cap is marked, and the Stop asks for it to be "
+     "resumed",
+     TBG, "delall", "tt.resume_action"),
     # THE MARK SURVIVING ITS OWN CUT (2026-10-13). NO CASE HERE DELETES A `def` LINE OR AN
     # `if` HEADER, and both halves of that are the constraint `bin/check` imposes by
     # EXECUTING wf-task-tag: a deleted `def` orphans its body at module level and a deleted

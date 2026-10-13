@@ -887,15 +887,18 @@ def mark_running(payload):
 # issue closing, `agent_resumed` retiring the mark at the resumed agent's next tool call,
 # the mark ageing out of `held_by`'s window, and a spawn of any OTHER role, which is never
 # touched. A project with no ledger reads `[]` and is never guarded at all.
+#
+# `{action}` IS NOT SPELLED OUT HERE. It is `wf-task-tag`'s `resume_action`, which
+# `wf-widen` reads for the same sentence at the main `Stop` — one mechanism saying one
+# thing on two events. Each file used to carry its own wording and the two had already
+# drifted by the time they were made one definition (2026-10-13).
 DENY_TEXT = """A cut agent of this role is still holding this work, so a fresh one would start it over.
 
 {who} ({atype}) hit its turn cap in this session and is marked `handoff` on this
-session's issue ledger. Its context is already loaded, and a `SendMessage` resume gives it
-a fresh turn allowance — measured 2026-10-12: a coder cut at 80 tool calls finished at 129.
+session's issue ledger — measured 2026-10-12: a coder cut at 80 tool calls was resumed
+rather than replaced, and finished at 129.
 
-→ RESUME {first} with SendMessage: tell it to continue from its own HANDOFF.md, at the
-  exit criteria still UNMET (`org.md` rung 12b). Do not start this work over with anyone
-  else.
+{action}
 
 `HANDOFF` from an employee is a request to resume THAT agent. It is never a brief for a
 replacement. Spawn a fresh {atype} only after the resumed agent reports its context
@@ -923,15 +926,22 @@ def guard_spawn(payload):
     # hook's output is a `permissionDecisionReason` — model context, not a log line. An
     # unvalidated string from that file would be arbitrary text injected into the turn.
     # `bare` is the same refusal `agent_type` takes two lines up.
-    held = [a for a in (_ledger_read(payload, lambda mod, led: mod.held_by(led, want))
-                        or []) if bare(a)]
+    #
+    # THE MODULE COMES BACK WITH THE IDS, one load for both halves: the ledger answers who
+    # is held, and the same module owns the sentence this deny ends on (`resume_action`).
+    # Asking for it in a second `_ledger_read` would re-execute the sibling and re-read the
+    # ledger to format a string.
+    got = _ledger_read(payload, lambda mod, led: (
+        mod, [a for a in (mod.held_by(led, want) or []) if bare(a)]))
+    tt, held = got if got else (None, [])
     if not held:
         return 0
     sys.stdout.write(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
         "permissionDecisionReason": DENY_TEXT.format(
-            who=", ".join(held), first=held[0], atype=want)}}) + "\n")
+            who=", ".join(held), atype=want,
+            action=tt.resume_action(held[0]))}}) + "\n")
     return 0
 
 
