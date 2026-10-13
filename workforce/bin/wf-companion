@@ -877,6 +877,85 @@ def migrate_write(root, wf, entry, path, new_body, t2):
     return True, f"{detail}; {kept} other user span(s) byte-identical"
 
 
+def write_and_prove(root, wf, entry, path, new_body, materialize=False):
+    """Write one companion's new body and prove the result. (ok, state_read_back).
+
+    MATERIALIZING CREATES THE DIRECTORY; REFRESHING NEVER DOES. A refresh whose parent is
+    missing is a target that moved under the run, and `makedirs` would turn that into a
+    confident write to a path nobody named.
+
+    WRITE THROUGH A SYMLINK, NEVER OVER IT, AND NEVER OUT OF THE PROJECT. `write` renames
+    a temp file over the link's TARGET, so the link survives (SKILL.md Atomic-or-Absent
+    rule 3), and it refuses a target that resolves outside the root: a Core skill
+    symlinked into a shared tree is another project's file, and this run was not pointed
+    at that project.
+
+    READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify its own output
+    has not finished (`checksums.md` rule 2). A MATERIALIZED companion must read back
+    CURRENT or name a precondition (UNMANAGED, NO-REGION); what this read-back must
+    establish is that the FILE IS THERE AND PARSES — anything stricter would fail every
+    successful creation, which is the always-fails-so-nobody-reads-it defect this script
+    already carries a scar from.
+
+    ONE DEFINITION, TWO CALLERS: `main`'s `--execute` report and `refresh_drifted`, which
+    the session-start heal carrier runs. An audit's refresh and a session start's must
+    write and prove identically, or the two paths drift and the cheaper one wins by
+    being the one that actually runs. The OSError from the write itself is NOT caught
+    here: each caller reports it in its own voice.
+    """
+    write(root, path, new_body, makedirs=materialize)
+    if raw_bytes(path) != new_body.encode("utf-8"):
+        raise OSError(0, "read back different bytes from the ones written")
+    back_state = evaluate(root, wf, entry)[0]
+    ok = (back_state == "CURRENT"
+          or (materialize and back_state in ("UNMANAGED", "NO-REGION")))
+    if ok and materialize:
+        fm_ok, why = frontmatter_ok(load(path)[0] or "")
+        if not fm_ok:
+            ok, back_state = False, f"unloadable frontmatter ({why})"
+    return ok, back_state
+
+
+def refresh_drifted(root, wf=None):
+    """Refresh every machine-owned region whose bytes differ from shipped source.
+    ([(name, detail)], [failure lines]) — it creates nothing and writes nothing else.
+
+    THE REFRESH HALF OF `--execute` WITHOUT ITS REPORT, so the session-start heal carrier
+    in `wf-commitments` can run this decision instead of a second copy of it. `/org`'s
+    dispatch rungs are a byte-canonical region (`procedures/org.md` § step 5) and
+    `--execute` was their only producer, run by `audit` Step 4 alone — so a rung a release
+    changed reached no project until somebody audited it. The user, 2026-10-12: "I don't
+    have to run an audit after this update, correct?"
+
+    DRIFTED ONLY, and that is the narrowing that makes it safe to run unattended. An
+    ABSENT companion is materialized by the audit and never here: a session start is not
+    the place to create a skill a project has never had, and `--execute`'s own read-back
+    accepts an UNMANAGED result for a creation, which is a judgement that belongs with a
+    report somebody is reading. UNMANAGED, NO-REGION, INCOMPLETE, MIGRATE, SUPPLEMENT and
+    UNDECODABLE are all left exactly as they are. The region rules are `evaluate`'s,
+    unchanged: a customized Core skill is never overwritten (`audit-setup.md` Step 0.3
+    state 3), a lone marker is reported and skipped, and nothing outside the marker pair
+    is touched.
+    """
+    wf = wf or wf_source_root()
+    refreshed, failures = [], []
+    for entry in CORE:
+        state, detail, path, new_body, _t2 = evaluate(root, wf, entry)
+        if state != "DRIFTED" or new_body is None:
+            continue
+        try:
+            ok, back_state = write_and_prove(root, wf, entry, path, new_body)
+        except OSError as exc:
+            failures.append(f"{entry['name']}: not written, the file keeps its bytes "
+                            f"({exc.strerror})")
+            continue
+        if ok:
+            refreshed.append((entry["name"], detail))
+        else:
+            failures.append(f"{entry['name']}: refreshed and read back {back_state}")
+    return refreshed, failures
+
+
 def evaluate(root, wf, entry):
     """One row: (state, detail, installed_path, new_body_or_None, t2_blocks).
 
@@ -1235,34 +1314,12 @@ def main():
                 print(f"  ~ {name:22s} {state:9s} {detail} — would {verb}")
                 continue
             try:
-                # MATERIALIZING CREATES THE DIRECTORY; REFRESHING NEVER DOES. A refresh
-                # whose parent is missing is a target that moved under the run, and
-                # `makedirs` would turn that into a confident write to a path nobody
-                # named.
-                #
-                # WRITE THROUGH A SYMLINK, NEVER OVER IT, AND NEVER OUT OF THE PROJECT.
-                # `write` renames a temp file over the link's TARGET, so the link survives
-                # (SKILL.md Atomic-or-Absent rule 3), and it refuses a target that resolves
-                # outside the root: a Core skill symlinked into a shared tree is another
-                # project's file, and this run was not pointed at that project.
-                write(root, path, new_body, makedirs=(state == "ABSENT"))
-                if raw_bytes(path) != new_body.encode("utf-8"):
-                    raise OSError(0, "read back different bytes from the ones written")
-                # READ BACK WITH THIS SCRIPT'S OWN READER. A generator that cannot verify
-                # its own output has not finished (`checksums.md` rule 2).
-                #
-                # A MATERIALIZED companion must read back CURRENT or name a precondition
-                # (UNMANAGED, NO-REGION); what this read-back must establish is that the
-                # FILE IS THERE AND PARSES — anything stricter would fail every successful
-                # creation, which is the always-fails-so-nobody-reads-it defect this script
-                # already carries a scar from.
-                back_state = evaluate(root, wf, entry)[0]
-                ok = (back_state == "CURRENT" or
-                      (verb == "materialize" and back_state in ("UNMANAGED", "NO-REGION")))
-                if ok and verb == "materialize":
-                    fm_ok, why = frontmatter_ok(load(path)[0] or "")
-                    if not fm_ok:
-                        ok, back_state = False, f"unloadable frontmatter ({why})"
+                # THE WRITE, THE SYMLINK RULE AND THE READ-BACK ARE `write_and_prove`'s,
+                # shared with `refresh_drifted` so that what an audit refreshes and what a
+                # session start refreshes cannot come apart. Its docstring carries the
+                # reasoning for each of the three.
+                ok, back_state = write_and_prove(root, wf, entry, path, new_body,
+                                                 materialize=(state == "ABSENT"))
                 if not ok:
                     failed = True
                     unrefreshed += 1

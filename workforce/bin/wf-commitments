@@ -75,6 +75,25 @@ SERIES = re.compile(r"\b(?:then|and then|after that|followed by)\b\s+([^.\n]{4,8
 
 MAX_OPEN = 40           # a ledger nobody can read is a ledger nobody reads
 
+# THE LEDGER'S PATH AS GIT SPELLS IT — forward slashes at every depth, on every host,
+# because that is what an index entry and a `.gitignore` rule both hold. The filesystem
+# path is this split by `/` and rejoined by `os.path.join`, never the other way round.
+LEDGER_REL = ".claude/workforce/commitments.json"
+# `commitments.json` AND NOTHING ELSE. User, 2026-10-12: "some projects actually do ship
+# their Claude directory with the repository ... as long as the index is in the Claude
+# directory on the project we're good." So the rule may never widen to `.claude/` or to
+# `.claude/workforce/`: everything else in there stays the project's to commit, and the
+# one file this hook writes is the one file that holds the operator's own sentences.
+IGNORE_RULE = "commitments.json"
+IGNORE_NOTE = (
+    "# Written by the workforce commitments hook. This ledger records what a turn in this\n"
+    "# project SAID it would do next — the operator's own sentences, not the project's\n"
+    "# source — and a checked-in copy conflicts with the next `git pull` the moment two\n"
+    "# machines both record a turn. The rule covers this one file on purpose: everything\n"
+    "# else in this directory is still yours to commit.\n")
+# Where `_heal_regions` records the state it last refreshed against. See its docstring.
+REGION_STAMP_REL = ".claude/workforce/.regions-refreshed"
+
 
 def project_root(payload):
     """The project this hook fired for, as the harness names it, or None. See `path`."""
@@ -83,9 +102,10 @@ def project_root(payload):
 
 
 def heal_settings(root):
-    """Remove what a retirement left behind in this project: the retired workforce hook
-    ROWS, and the retired pin guard's GIT hook. Returns the line(s) to show the user, or
-    "" when there was nothing to do.
+    """Everything this project needs put right before its first request, in one carrier:
+    the retired workforce hook ROWS, the retired pin guard's GIT hook, the machine-owned
+    REGIONS a release moved on, and the one-time untracking of a committed ledger.
+    Returns the line(s) to show the user, or "" when there was nothing to do.
 
     WHY IT RIDES THIS HOOK. `SessionStart` fires once per session in every project, and
     this registration is already live on every machine that has the default set, so the
@@ -121,7 +141,10 @@ def heal_settings(root):
     to 89-98 ms; measured after the fix against HEAD, 21 runs each: 37 ms with no workforce
     row, 38 ms with live rows only, 79 ms on the one session that heals). The git half's
     gate is the same shape: one read of `.git/config`, and `hooksPath` absent from its text
-    ends it with nothing imported and no subprocess run. NEVER RAISES: nothing here may
+    ends it with nothing imported and no subprocess run. The two halves added 2026-10-12
+    hold to the same rule and each states its own gate: `_heal_regions` compares one
+    stamp against two directory listings, `_untracked_ledger` reads one git index.
+    NEVER RAISES: nothing here may
     fail the SessionStart hook or cost it the ledger read-back that follows (review 3, L1).
     """
     progress = {"wrote": []}
@@ -129,7 +152,9 @@ def heal_settings(root):
         if not root:
             return ""
         said = [x for x in (_heal_settings(root, progress),
-                            _heal_git_hooks(root, progress)) if x]
+                            _heal_git_hooks(root, progress),
+                            _heal_regions(root, progress),
+                            _untracked_ledger(root)) if x]
         return "\n".join(said)
     except Exception as exc:                             # noqa: BLE001 — see docstring
         # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
@@ -266,6 +291,250 @@ def _heal_git_hooks(root, progress):
     for f in res.get("failures") or []:
         lines.append(f"GIT HOOK NOT HEALED  {f}. Run /workforce verify.")
     return "\n".join(lines)
+
+
+_WSC = []
+
+
+def _wsc():
+    """wf-companion, imported at most once per process — and only behind the stamp gate."""
+    if not _WSC:
+        _WSC.append(_sibling("wf-companion"))
+    return _WSC[0]
+
+
+def _stat_rows(d, names=None):
+    """`(name, size, mtime_ns)` for each file in `d`, sorted; None when `d` cannot be
+    listed. `names` restricts it to one file name per subdirectory instead.
+
+    No file is READ here. The question is only whether either side of the refresh has
+    moved since the last one, and a listing answers that for the price of the directory
+    entries.
+    """
+    rows = []
+    try:
+        with os.scandir(d) as it:
+            for e in sorted(it, key=lambda x: x.name):
+                if names is None:
+                    if e.is_file(follow_symlinks=False):
+                        st = e.stat(follow_symlinks=False)
+                        rows.append((e.name, st.st_size, st.st_mtime_ns))
+                    continue
+                for n in names:
+                    try:
+                        st = os.stat(os.path.join(d, e.name, n))
+                    except OSError:
+                        continue
+                    rows.append((f"{e.name}/{n}", st.st_size, st.st_mtime_ns))
+    except OSError:
+        return None
+    return rows
+
+
+def _region_digest(root, wf):
+    """The state `_heal_regions` last refreshed against, as one short line, or None when
+    either side cannot be listed and no claim can be made.
+
+    BOTH SIDES ARE IN IT. The SHIPPED side is every file in `references/` and
+    `references/procedures/`, which is a superset of the three that carry a canonical span
+    — naming only those three would restate `wf-companion`'s own CORE list here, and a
+    second copy of that list is what drifts. The cost of the superset is that an unrelated
+    reference file moving opens the gate once, and the refresh it opens reports CURRENT
+    and writes the stamp again. The INSTALLED side is each `.claude/skills/*/SKILL.md`, so
+    a hand-edit to a companion's region is seen too, not only a release.
+    """
+    import hashlib
+    parts = []
+    for d in (os.path.join(wf, "references"),
+              os.path.join(wf, "references", "procedures")):
+        rows = _stat_rows(d)
+        if rows is None:
+            return None
+        parts.append(repr(rows))
+    rows = _stat_rows(os.path.join(root, ".claude", "skills"), names=("SKILL.md",))
+    if rows is None:
+        return None
+    parts.append(repr(rows))
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _heal_regions(root, progress):
+    """Refresh this project's machine-owned REGIONS to shipped source, at session start.
+
+    THE DEFECT. A project's `/org` dispatch rungs are a byte-canonical region copied into
+    its own SKILL.md (`procedures/org.md` § step 5), and the only producer that refreshes
+    one is `wf-companion --execute`, which only `audit` Step 4 runs. New hooks reach a
+    project on `update` through `--wire-defaults`; a changed rung reached nobody until
+    somebody audited. So a release could ship a dispatch rule and every existing org kept
+    dispatching on the old ladder, silently. The user, 2026-10-12: "I don't have to run an
+    audit after this update, correct?" — and until this, the honest answer was that they
+    did.
+
+    THE DECISION IS `wf-companion`'s, NOT A SECOND ONE. `refresh_drifted` is the refresh
+    half of `--execute` with the same `evaluate`, the same write and the same read-back, so
+    only a DRIFTED region is replaced, only between its markers, and a customized Core
+    skill is never overwritten (`audit-setup.md` Step 0.3 state 3). What this function
+    decides is whether to ask at all.
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO, which is the gate's whole design: two directory
+    listings and one small read, with nothing imported. `.claude/workforce/.regions-refreshed`
+    holds the digest of what either side could change (`_region_digest`); equal means
+    nothing has moved since the last refresh and it ends there. The settings half's own
+    measurement is the standard it is held to — 37 ms with nothing to do against 79 ms on
+    the one session that heals (`heal_settings`, review 3, L8).
+
+    A PROJECT WITH NO COMPANIONS IS NOT ONE TO BUILD THEM IN. No `.claude/skills` means no
+    region to refresh and no stamp written: materializing an absent companion is `audit`
+    Step 4's job, with a report somebody is reading, and `refresh_drifted` leaves ABSENT
+    alone for the same reason.
+    """
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if not os.path.isdir(os.path.join(root, ".claude", "skills")):
+        return ""
+    want = _region_digest(root, wf)
+    stamp = os.path.join(root, *REGION_STAMP_REL.split("/"))
+    if want is not None:
+        try:
+            with open(stamp, encoding="utf-8") as fh:
+                if fh.read().strip() == want:
+                    return ""
+        except OSError:
+            pass
+    refreshed, failures = _wsc().refresh_drifted(root, wf)
+    progress["wrote"] += [f".claude/skills/{n}/SKILL.md" for n, _d in refreshed]
+    lines = []
+    if refreshed:
+        lines.append("REFRESHED  this project's machine-owned region(s) now match the "
+                     "installed release: "
+                     + "; ".join(f"{n} ({d})" for n, d in refreshed) + ". Only the span "
+                     "between the markers was replaced; everything around it is "
+                     "byte-for-byte as it was. A restart loads the new text.")
+    for f in failures:
+        lines.append(f"REGION NOT REFRESHED  {f}. Run /workforce audit.")
+    # THE STAMP IS WRITTEN ONLY WHEN THE ANSWER WOULD BE THE SAME NEXT TIME. A failure
+    # leaves it alone, so the next session start tries again instead of recording a
+    # refresh that did not happen. It is NOT written when the digest could not be taken,
+    # for the same reason.
+    # IT GOES THROUGH THE PRODUCER'S OWN WRITER, which is already imported on this path:
+    # `write` refuses a target that resolves outside the project and renames over a
+    # link's target rather than over the link (SKILL.md Atomic-or-Absent rule 3). A plain
+    # `open(stamp, "w")` would follow a symlink somebody left in `.claude/workforce/` and
+    # put these bytes wherever it pointed, in a hook that runs unattended at session start.
+    if want is not None and not failures:
+        try:
+            os.makedirs(os.path.dirname(stamp), exist_ok=True)
+            _wsc().write(root, stamp, want + "\n")
+        except (OSError, ValueError):
+            pass
+    return "\n".join(lines)
+
+
+def _untracked_ledger(root):
+    """The one-time `git rm --cached` line for a project whose ledger git already tracks,
+    or "".
+
+    MEASURED 2026-10-12: `.claude/workforce/commitments.json` is tracked in nsayka-wawa
+    and in odyssey-alive (`git ls-files`), and on 2026-10-10 a local edit to the copy on
+    nsayka-wawa's live server would have made `git pull --ff-only` conflict. The ignore
+    rule `ensure_ignored` writes stops a project tracking it from now on and does nothing
+    for one that already does: git keeps tracking a file it already knows, whatever
+    `.gitignore` says.
+
+    IT SAYS THE COMMAND AND STOPS. Untracking belongs in a commit the project's author
+    makes, with their message, in their own staging area — so this hook never runs
+    `git rm`, never stages and never commits. It also clears itself: once the command has
+    been run, `git ls-files` stops answering and the line stops appearing.
+
+    ONE READ IS THE WHOLE GATE for the projects with nothing to say, which is nearly all
+    of them — the same shape `_heal_git_hooks` uses on `.git/config`. The ledger's own
+    path bytes absent from `.git/index` means it cannot be an entry, and that ends it with
+    no subprocess run. The bytes being PRESENT proves nothing (in this repository every
+    `fixtures/scripts/*/.claude/workforce/` path carries them as a substring), so the
+    answer itself is always `git ls-files`, which is authoritative. An index written in
+    VERSION 4 prefix-compresses its paths, so the gate cannot read it and asks git
+    instead; a `.git` that is a FILE — a linked worktree, a submodule — keeps its index
+    where only git can name it, and does the same.
+
+    IT ASKS GIT HERE RATHER THAN THROUGH `wf-settings-apply._tracked`, deliberately: that
+    helper always shells out, and reaching it would import the classifier on every session
+    start in every git project — the 37-to-89 ms regression `heal_settings` records. Its
+    own docstring states the rule this follows: "Every caller now decides what an
+    unanswerable question means for it." For a NAG LINE the answer is silence, because a
+    line printed on a question nobody could answer is one every reader learns to skip.
+    """
+    if not os.path.lexists(os.path.join(root, *LEDGER_REL.split("/"))):
+        return ""
+    dot = os.path.join(root, ".git")
+    if os.path.isdir(dot):
+        try:
+            with open(os.path.join(dot, "index"), "rb") as fh:
+                idx = fh.read()
+        except OSError:
+            return ""
+        if (idx[:4] == b"DIRC" and int.from_bytes(idx[4:8], "big") < 4
+                and LEDGER_REL.encode("utf-8") not in idx):
+            return ""
+    elif not os.path.isfile(dot):
+        return ""
+    import subprocess
+    try:
+        p = subprocess.run(["git", "ls-files", "--error-unmatch", "--", LEDGER_REL],
+                           cwd=root, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if p.returncode or not p.stdout.strip():
+        return ""
+    return (f"LEDGER TRACKED  git is tracking {LEDGER_REL}, which records what turns in "
+            f"this project said they would do. It is written on every turn that states "
+            f"one, so a tracked copy conflicts with the next `git pull` as soon as two "
+            f"machines both record a turn. One command, once, in a commit of your own: "
+            f"`git rm --cached {LEDGER_REL}`. The ignore rule beside it is already "
+            f"written; this hook stages nothing and commits nothing.")
+
+
+def ensure_ignored(ledger):
+    """Make `.claude/workforce/.gitignore` cover `commitments.json`, that file alone.
+
+    IT RIDES THE WRITE, and that is the point: the ledger is created by a hook that runs
+    long before anybody types a workforce command, so an audit-authored rule would arrive
+    after the file was already committed — which is exactly what happened in the two
+    projects `_untracked_ledger` names.
+
+    APPEND, NEVER REWRITE. A project's own rules in that file are kept byte-for-byte, the
+    rule is added once, and a file that already covers the ledger — `commitments.json`,
+    `/commitments.json`, or a `*` with no negation under it — is left exactly as it is.
+
+    NOTHING IS STAGED. Writing a file is this hook's business; `git add` in somebody
+    else's repository is not (K7).
+
+    SILENT ON FAILURE. A read-only `.claude/workforce/` is a project that has told us
+    something, and the ledger write above it has already dealt with the same OSError.
+
+    NEVER THROUGH A SYMLINK. An append follows one, so a link left in `.claude/workforce/`
+    would put this note and this rule wherever it pointed — a file outside the project,
+    written by a hook that runs on every turn with nobody watching. A `.gitignore` that is
+    a link is not ours to append to, and the ledger's own writer refuses the same shape
+    one directory up (`wf-ledger.atomic_write`, containment).
+    """
+    p = os.path.join(os.path.dirname(ledger), ".gitignore")
+    if os.path.islink(p):
+        return
+    try:
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            body = fh.read()
+    except OSError:
+        body = None
+    lines = [ln.strip() for ln in (body or "").splitlines()]
+    if any(ln.lstrip("/") == IGNORE_RULE for ln in lines) or (
+            "*" in lines and not any(ln.startswith("!") for ln in lines)):
+        return
+    try:
+        with open(p, "a", encoding="utf-8") as fh:
+            fh.write(("" if not body or body.endswith("\n") else "\n")
+                     + ("\n" if body else "") + IGNORE_NOTE + IGNORE_RULE + "\n")
+    except OSError:
+        return
 
 
 def path(payload):
@@ -458,6 +727,9 @@ def main():
             json.dump(book, fh, indent=2)
     except OSError:
         return 0
+    # THE IGNORE RULE RIDES THE WRITE, never a session start: the file exists from this
+    # moment on, and the rule has to be there before the project's next `git add -A`.
+    ensure_ignored(p)
     msg = (f"COMMITMENTS  {len(fresh)} stated this turn · "
            f"{len(book['open'])} open in this project")
     if asks_line:

@@ -2764,6 +2764,35 @@ CASES = [
      AUD, "del", "`wf-settings-apply --root <project> --heal`"),
     ("pin guard: the records that retired it name the heal that removes it",
      "workforce/references/procedures/verify.md", "delall", "heal_git_hooks"),
+    # ── the session-start region refresh and the ledger's ignore rule (2026-10-12) ───
+    # THE CARRIER. The SessionStart call is the only thing that reaches a project nobody
+    # audits, which is the whole of K9; nothing else in either file names it.
+    ("session heal: the region refresh is wf-companion's own decision, carried by SessionStart",
+     "workforce/bin/wf-commitments", "del", "_wsc().refresh_drifted(root, wf)"),
+    # THE PRODUCER'S HALF. Deleting the entry point leaves the carrier calling nothing.
+    ("session heal: the region refresh is wf-companion's own decision, carried by SessionStart",
+     "workforce/bin/wf-companion", "del", "def refresh_drifted"),
+    # ONE WRITE-AND-PROVE, TWO CALLERS. Deleting the definition is deleting the shared
+    # proof; both callers then need their own, which is how the two paths come apart.
+    ("session heal: the audit and the session start share one write-and-prove",
+     "workforce/bin/wf-companion", "del", "def write_and_prove"),
+    # THE CHEAP GATE. Without the stamp comparison every session start in every project
+    # imports wf-companion and evaluates every Core region — 238 ms against 0.5 ms,
+    # measured 2026-10-12.
+    ("session heal: the region refresh costs a stamp comparison when there is nothing to do",
+     "workforce/bin/wf-commitments", "del", "if fh.read().strip() == want:"),
+    # THE STAMP IS WRITTEN, not only read. Without the write the gate never closes and the
+    # mtime case's second pass has nothing to show it was skipped.
+    ("session heal: a current region is left byte-for-byte, mtime included, and stamped",
+     "workforce/bin/wf-commitments", "del", '_wsc().write(root, stamp, want + "\\n")'),
+    # THE RULE RIDES THE WRITE. Deleting the call leaves a ledger with no rule beside it,
+    # which is the state both measured projects were committed in.
+    ("ledger hygiene: the ignore rule rides the write and covers that one file",
+     "workforce/bin/wf-commitments", "del", "ensure_ignored(p)"),
+    # THE INDEX GATE. Without it every session start in every git project shells out to
+    # `git ls-files`, the cost the one read exists to avoid.
+    ("ledger hygiene: a tracked ledger is named for the user to untrack, never staged",
+     "workforce/bin/wf-commitments", "del", 'LEDGER_REL.encode("utf-8") not in idx'),
 ]
 
 

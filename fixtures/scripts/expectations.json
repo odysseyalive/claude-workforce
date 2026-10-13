@@ -1380,6 +1380,119 @@
       "current 0 · refreshed 0 · materialized 2 · appended 0 · unrefreshed 1 · absent 0"
     ]
   },
+  "commitments-region-refreshed": {
+    "_why": "K9, 2026-10-12. The user asked \"I don't have to run an audit after this update, correct?\" and until this the answer was that they did: a project's /org dispatch rungs are a byte-canonical region copied into its own SKILL.md, and the only producer was `wf-companion --execute`, which only audit Step 4 runs. So a rung a release changed reached nobody who did not audit. The SessionStart carrier now refreshes it, through wf-companion's own refresh_drifted -- the same evaluate, the same write, the same read-back -- so only the span between the markers moves. The preamble above it and the trailer below it are asserted byte-for-byte, because a heal that 'won' by rewriting the file would take a project's own text with it. The stamp is written so the next session start costs two directory listings and no import.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "REFRESHED",
+      "rungs installed vs",
+      "Only the span between the markers was replaced"
+    ],
+    "not": [
+      "Traceback",
+      "NOT REFRESHED",
+      "INTERRUPTED"
+    ],
+    "after": {
+      ".claude/skills/org/SKILL.md": {
+        "want": [
+          "Hand-written preamble this project owns. A session start must not touch this line.",
+          "Hand-written trailer this project also owns. It is below the END marker and stays there.",
+          "<!-- ORG-DISPATCH-CHECKPOINT END -->"
+        ],
+        "not": [
+          "A second stale rung",
+          "deliberately behind shipped source"
+        ]
+      },
+      ".claude/workforce/.regions-refreshed": {
+        "want": []
+      }
+    }
+  },
+  "commitments-ignore-rule": {
+    "_why": "K7, 2026-10-12. The ledger is git-tracked in nsayka-wawa and odyssey-alive, and on 2026-10-10 a local edit to the copy on nsayka-wawa's live server would have made `git pull --ff-only` conflict. The rule that stops it rides the WRITE, because the ledger is created by a hook that runs long before anybody types a workforce command -- an audit-authored rule arrives after the file has been committed, which is how both of those projects got there. It covers commitments.json and nothing else: the user, 2026-10-12, \"some projects actually do ship their Claude directory with the repository\", so the rest of .claude/workforce/ stays theirs to commit. The hand-written rule above it is asserted byte-for-byte and the ledger's own rule exactly once, because an appender that runs on every turn is one duplicated line away from a file nobody can read.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"last_assistant_message\": \"Next, I will wire the ignore rule and then run the suite.\"}",
+    "exit": 0,
+    "want": [
+      "COMMITMENTS",
+      "stated this turn"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/.gitignore": {
+        "want": [
+          "# This project's own rule, written by hand. It must survive byte-for-byte.",
+          "scratch/",
+          "Written by the workforce commitments hook"
+        ],
+        "once": [
+          "commitments.json"
+        ],
+        "not": [
+          ".claude/",
+          "\nworkforce/",
+          "\n*\n"
+        ]
+      },
+      ".claude/workforce/commitments.json": {
+        "want": [
+          "wire the ignore rule"
+        ]
+      }
+    }
+  },
+  "commitments-ledger-tracked": {
+    "_why": "K7's other half. An ignore rule does nothing for a file git already tracks, and this is the shape measured in two projects on 2026-10-12: the ledger committed, no rule, because there was none to stop it. Untracking is one command, it belongs in a commit the project's author makes with their own message, and A HOOK DOES NOT STAGE OR COMMIT IN SOMEBODY ELSE'S REPOSITORY -- so the session start names the command and stops. The absent .gitignore is the assertion that it stopped: the rule rides the ledger WRITE and a SessionStart writes nothing into the repository at all.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "git": {
+      "init": true,
+      "commit": true
+    },
+    "want": [
+      "LEDGER TRACKED",
+      "git rm --cached .claude/workforce/commitments.json",
+      "this hook stages nothing and commits nothing",
+      "1 thing(s) a previous turn in this project said it would"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/.gitignore": {
+        "absent": true
+      },
+      ".claude/workforce/commitments.json": {
+        "want": [
+          "wire the tag into wf-widen"
+        ]
+      }
+    }
+  },
+  "commitments-ledger-untracked": {
+    "_why": "The clean half, and the one that keeps the gate honest. Same ledger, same kind of repository, never committed: the path's bytes are not in .git/index, so the check ends there with no `git ls-files` run and nothing said. A line that appears in a healthy project is a line every reader learns to skip, which is the whole value of the one above. The read-back line is asserted to prove the hook did its ordinary job here rather than bailing out early.",
+    "script": "wf-commitments",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "git": {
+      "init": true
+    },
+    "want": [
+      "1 thing(s) a previous turn in this project said it would"
+    ],
+    "not": [
+      "LEDGER TRACKED",
+      "git rm --cached",
+      "Traceback"
+    ]
+  },
   "commitments-records-a-list": {
     "_why": "THE MEASURED CASE, verbatim in shape. A goal was set, the next turn answered with this list, every item shipped, all four suites went green, the goal cleared - and the work was half done, because the list omitted the acting half. The ledger cannot make a list complete; it stops an incomplete one from evaporating.",
     "exit": 0,
