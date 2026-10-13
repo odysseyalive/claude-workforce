@@ -241,6 +241,8 @@ ASTY = "workforce/bin/wf-artifact-style"
 ASTYS = "workforce/skills/shared-artifact/references/house-style.md"
 ASTYT = "workforce/skills/shared-artifact/references/template.html"
 TBG = "workforce/bin/wf-turn-budget"
+TAG = "workforce/bin/wf-task-tag"
+WDN = "workforce/bin/wf-widen"
 
 # The bin/check assertions that run install.ps1 under PowerShell and are skipped without it.
 PWSH_CHECKS = {
@@ -252,6 +254,52 @@ PWSH_CHECKS = {
 #   "del"    -> remove the literal
 #   "append" -> append the literal
 CASES = [
+    # ── THE ISSUE LEDGER (wf-task-tag, wf-widen, 2026-10-12) ────────────────────
+    # EVERY MUTATION HERE KEEPS THE FILE IMPORTABLE, and that is not a nicety: `bin/check`
+    # EXECUTES `wf-task-tag` as a module (its `classify` is run against real prompts), so a
+    # deletion that left a SyntaxError would fail the import assertion instead of the named
+    # one and every case below would come back BAD-CASE having proved nothing. So each
+    # literal is a WHOLE statement whose removal leaves valid Python, and each appended one
+    # is valid Python too. That constraint is why `IGNORE_RULE` and `AGENT_STATES` are
+    # module constants rather than values spelled at their use site.
+    #
+    # THE FORBIDDEN FORM IS PROVED BY APPENDING IT, not by deleting anything: the rule is
+    # that the project root is never guessed, and an absence rule passes on a file nothing
+    # was ever written to. `project_root`'s docstring names `os.getcwd()` twice to explain
+    # why the fallback is absent, which is exactly why the assertion pins the two CODE
+    # shapes and this case appends one of them.
+    ("issues: the ledger's project is the one the harness named, never os.getcwd()",
+     TAG, "append", '\n_LEDGER_ROOT_FALLBACK = os.getcwd()\n'),
+    ("issues: the hook writes its own ignore rule, over issues/ alone",
+     TAG, "delall", 'IGNORE_RULE = "*\\n"'),
+    ("issues: the hook writes its own ignore rule, over issues/ alone",
+     TAG, "delall", 'ignore = os.path.join(d, ".gitignore")'),
+    ("issues: the hook writes its own ignore rule, over issues/ alone",
+     TAG, "delall", 'ISSUES = "issues"'),
+    # THE RENAME IS THE WHOLE SYMLINK DEFENCE ON THE WRITE SIDE. Without it the temporary
+    # file is simply left behind and nothing replaces the planted link, so the next read
+    # goes through it.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     TAG, "delall", "os.replace(tmp, path)"),
+    # COUNTED, NOT `in`: the assertion requires EXACTLY FOUR `_open_nofollow` sites, so a
+    # fifth, unguarded door into the same directory fails it. A bare `in` would survive one.
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     TAG, "append",
+     '\ndef _fifth_door(p):\n    return _open_nofollow(p, os.O_RDONLY)\n'),
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     WDN, "delall", "TT.judge_ledger(payload, led)"),
+    ("issues: nothing in the ledger is written or read through a name another account can "
+     "plant",
+     WDN, "delall", "TT.agent_returned(payload, led"),
+    ("issues: the agent state K8 will set is declared and already held on",
+     TAG, "delall", 'AGENT_STATES = ("running", "returned", "handoff")'),
+    ("issues: the agent state K8 will set is declared and already held on",
+     TAG, "delall",
+     'waiting = [a for a in agents if a.get("state") in ("running", "handoff")]'),
+
     # ── THE TURN BOUNDARY (wf-turn-budget, 2026-10-12) ──────────────────────────
     # Four assertions, and every literal each one pins gets a case. The two about the
     # thresholds are the ones that decide whether the hook is a feature or noise, and the

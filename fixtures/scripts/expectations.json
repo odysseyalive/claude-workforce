@@ -7804,5 +7804,230 @@
       "32 of 40",
       "HANDOFF"
     ]
+  },
+  "issues-ignore-rule-covers-issues-only": {
+    "_why": "THE HOOK WRITES ITS OWN IGNORE RULE, and an audit never has to. The ledger holds the user's prompts, which do not belong in a repository, and a rule only an audit adds reaches no project until somebody re-audits it -- the measured precedent is the commitments ledger, git-TRACKED in nsayka-wawa and odyssey-alive, where a local edit on a live server would have made a `git pull --ff-only` conflict on 2026-10-10. THE RULE COVERS `issues/` ONLY, which is the half this case exists to pin: the user, 2026-10-12, \"some projects actually do ship their Claude directory with the repository\", so a rule at `.claude/` or `.claude/workforce/` would silently un-commit a tree somebody chose to ship. Both of those paths are asserted ABSENT, because an over-broad ignore rule passes every test that only looks for the rule.",
+    "after": {
+      ".claude/.gitignore": {
+        "absent": true
+      },
+      ".claude/workforce/.gitignore": {
+        "absent": true
+      },
+      ".claude/workforce/issues/.gitignore": {
+        "want": [
+          "*"
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i1\"",
+          "\"state\": \"open\""
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "issue i1"
+    ]
+  },
+  "issues-ledger-refuses-a-planted-link": {
+    "_why": "THE LEDGER LIVES IN A REPOSITORY, so its path is predictable and its directory is shared -- which is exactly the condition a planted symlink needs (CWE-59). A link is planted at the ledger's own name, `issues/s1.json`, aiming at `victim.json`. BOTH HALVES OF THE REFUSAL ARE ASSERTED. The READ is `O_NOFOLLOW`, so the hook does not read the victim's bytes in as this session's issues -- `DO NOT WRITE OR READ THROUGH THE LINK.` is forbidden in the ledger it writes. The WRITE creates its temporary name `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMES over `s1.json`: rename acts on the name, so the link is replaced and its target is never opened, which `victim.json` unchanged is the proof of. A real issue in its place is the proof the refusal did not also break the feature. The pattern is `wf-turn-budget`'s (3c7431c), deliberately not a second design.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ],
+        "want": [
+          "\"id\": \"i1\""
+        ]
+      },
+      "victim.json": {
+        "want": [
+          "DO NOT WRITE OR READ THROUGH THE LINK."
+        ]
+      }
+    },
+    "exit": 0,
+    "git": {
+      "init": true,
+      "links": {
+        ".claude/workforce/issues/s1.json": "../../../victim.json"
+      }
+    },
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Please fix the skul-dev deploy failure and tell me why the migration step keeps erroring out on the production server\"}",
+    "want": [
+      "issue i1"
+    ]
+  },
+  "issues-third-message-keeps-both-issues": {
+    "_why": "THE DEFECT THE LEDGER REPLACES, measured in this project's own session of 2026-10-12: the skul-dev fix and the turn-limit work were open at the same time and each new message erased the other's items. The user, 2026-10-12: \"you may actually be dealing with multiple issues at the same time, and you might have different sets of agents working on those different issues.\" This tree holds both issues with two agents each and a live checklist belonging to i2, and a THIRD message arrives. Three things must hold at once: i1 keeps the items it was given turns ago, i2's live checklist is ABSORBED onto i2 before the per-turn file is wiped (which is what makes the wipe safe rather than lossy), and i3 is opened beside them instead of replacing them. `add the named fixture` is the absorbed item: it existed only in the checklist file this message removes, so finding it on i2 afterwards is the whole proof.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "want": [
+          "\"i1\"",
+          "\"i2\"",
+          "\"i3\""
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i1\"",
+          "\"ask\": \"explain the migration error\", \"status\": \"done\"",
+          "\"id\": \"i2\"",
+          "\"ask\": \"add the named fixture\", \"status\": \"open\"",
+          "\"ask\": \"ship the turn boundary\", \"status\": \"done\"",
+          "\"id\": \"i3\""
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Third thing, and it is separate from both of those: the issue ledger itself needs to keep every open issue when a new message arrives\"}",
+    "want": [
+      "issue i3"
+    ]
+  },
+  "issues-handback-lands-on-its-own-issue": {
+    "_why": "NO CROSS-TALK, and this is the case that pins it. Two issues are open with two agents each, and a3 -- i2's agent -- hands back while a2, a3's and a4's siblings are still out. The issue is found BY `agent_id`, never by which issue is newest, because with interleaved hand-backs \"the current issue\" is the wrong answer for every stop but the luckiest. So a3 goes `returned` on i2 and NOTHING on i1 moves: a2 is still `running` on i1 and a4 is still `running` on i2, both asserted, because a verdict that marked the wrong agent would otherwise pass a test that only looked at a3.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "{\"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\", \"state\": \"returned\"",
+          "{\"agent_id\": \"a2\", \"agent_type\": \"business-analyst\", \"state\": \"running\"",
+          "{\"agent_id\": \"a4\", \"agent_type\": \"engineering-coder\", \"state\": \"running\"",
+          "\"ask\": \"fix the deploy\", \"status\": \"open\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "{\"agent_id\": \"a4\", \"agent_type\": \"engineering-coder\", \"state\": \"returned\""
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"The boundary is shipped and the fixture passes.\", \"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\"}",
+    "want": []
+  },
+  "issues-running-agent-is-a-hold": {
+    "_why": "A HOLD IS A HOLD, which is the user's rule of 2026-10-12: \"Agents and their work should not interrupt the widened technology.\" An issue whose agents are still out is in flight, so it is reported as a hold and never kicked back -- kicking it back would be judging an agent that has not spoken yet. Both open issues are held here, each naming which of its agents is still out, and `KICKBACK` is forbidden in the output. A `handoff` agent holds for the same reason; K8 is the order that resumes one.",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK",
+      "CLOSED"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both batches are still running.\"}",
+    "want": [
+      "ISSUES",
+      "i1  HOLD",
+      "i2  HOLD",
+      "agents still out",
+      "a2 (running)"
+    ]
+  },
+  "issues-all-returned-with-open-items-is-kicked-back": {
+    "_why": "THE OTHER HALF OF THE SAME JUDGMENT, and the only new verdict that can reach the user as a kickback. Every agent on i2 is back and an item the SESSION ITSELF wrote is still open, so the issue is not finished and the Stop says which item. The evidence is deliberately never inferred -- only an item the session recorded and did not mark done counts -- because this project's rule is that a blocking surface ships with no known wrong fire. i1 is `CLOSED` in the same run, which is what proves the two verdicts are decided per issue and not for the session as a whole.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i1\", \"prompt\": \"fix the skul-dev deploy failure\", \"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "i2  HOLD"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
+    "want": [
+      "ISSUES",
+      "i2  KICKBACK",
+      "items unaddressed",
+      "ship the turn boundary",
+      "i1  CLOSED"
+    ]
+  },
+  "issues-done-and-returned-closes": {
+    "_why": "THE CLOSING CONDITION, stated by the user on 2026-10-12 and pinned here: an issue closes when all its items are done AND all its agents have returned. Either half alone is not enough, and the two sibling cases hold each half open. The `state` on disk is asserted as well as the line, because a verdict that was reported and not recorded would judge the same issue again on the next Stop forever.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "not": [
+          "\"id\": \"i1\""
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "HOLD",
+      "KICKBACK"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The deploy is fixed and both agents are back.\"}",
+    "want": [
+      "ISSUES",
+      "i1  CLOSED",
+      "agents returned"
+    ]
+  },
+  "issues-stop-with-no-agent-id-is-not-keyable": {
+    "_why": "A STOP WITH NO `agent_id` IS NOT KEYABLE, and the rule is the negative fixture `widen-subagent-with-no-slot-is-not-given-the-session-ask` applied to the ledger: `agent_id` is the ONLY field that tells an agent apart from the session that spawned it (platform.md fact 22b), so without one there is no name to record a hand-back under and a guessed one would attach this agent's result to another agent's work. NOTHING IS WRITTEN AT ALL, which `index.json` absent proves: it does not exist in the tree, so the hook creating it would be the hook having decided which agent this was. a3 is forbidden to have gone `returned`, since it is the entry a newest-issue guess would have reached first.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "absent": true
+      },
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "{\"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\", \"state\": \"returned\""
+        ],
+        "want": [
+          "{\"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\", \"state\": \"running\"",
+          "{\"agent_id\": \"a4\", \"agent_type\": \"engineering-coder\", \"state\": \"running\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"The boundary is shipped and the fixture passes.\"}",
+    "want": []
   }
 }

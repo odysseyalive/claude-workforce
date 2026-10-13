@@ -1583,6 +1583,63 @@ def with_checklist(payload):
         hand_checklist_to_jury(payload, record, items)
 
 
+def ledger_verdict(payload, decided):
+    """The issue ledger's half of this stop (K2c). Returns a line for the user, or "".
+
+    TWO EVENTS, TWO JOBS, and they are the two ends of one agent's life:
+
+      `SubagentStop`   the stopping agent is marked `returned` ON ITS OWN ISSUE and its
+                       judgment — whatever this hook just decided about its hand-back — is
+                       recorded there. The issue is found BY `agent_id`, never by which
+                       issue is newest, which is what keeps two issues' interleaved
+                       hand-backs from crossing. A stop with no `agent_id` is NOT KEYABLE:
+                       `agent_returned` records nothing rather than guessing a name, and
+                       the negative fixture `widen-subagent-with-no-slot-is-not-given-the-
+                       session-ask` pins that a stop with no slot is never given the
+                       session's own state.
+
+      main `Stop`      every OPEN issue is judged, not just this message's, because an
+                       agent dispatched three messages ago hands back after that turn
+                       ended. A hold is a hold, a finished issue is closed, and an issue
+                       whose agents are all back with items the session itself left open is
+                       kicked back. `judge_issue` carries which is which and why.
+
+    IT NEVER BLOCKS AND IT NEVER COSTS `widen` ITS DECISION. The verdict is a line, joined
+    to whatever `widen` already decided by `main`. The kickback this ledger can ask for
+    rests on an item the SESSION wrote and did not mark done, so there is no inference in
+    it; a new blocking surface resting on an inference is what this project's rule about a
+    zero-known-wrong-fire gate forbids.
+    """
+    if payload.get("stop_hook_active"):
+        return ""
+    led = TT.load_ledger(payload)
+    if payload.get("hook_event_name") == "SubagentStop":
+        # THE JUDGMENT IS WHAT THIS HOOK JUST SAID about the hand-back: its block reason
+        # when it blocked, and "returned" when it had nothing to say. Recorded on the issue
+        # so the main `Stop` judges the issue against what its agents actually delivered.
+        judgment = "returned"
+        if isinstance(decided, dict):
+            judgment = (decided.get("reason") or decided.get("systemMessage")
+                        or "returned")
+        if TT.agent_returned(payload, led, judgment):
+            TT.save_ledger(payload, led)
+        return ""
+    rows = TT.judge_ledger(payload, led)
+    if not rows:
+        return ""
+    TT.save_ledger(payload, led)
+    out = []
+    for iid, verdict, why, ask in rows:
+        # An issue with nothing recorded against it is not reported. It is the shape a
+        # one-line message leaves behind, and naming it on every Stop would be noise.
+        if verdict == "open":
+            continue
+        out.append(f"  {iid}  {verdict.upper()}  {why}  [{ask}]")
+    if not out:
+        return ""
+    return f"ISSUES  {len(out)} open issue(s) judged\n" + "\n".join(out)
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -1590,6 +1647,21 @@ def main():
     except json.JSONDecodeError:
         return 0
     decided = widen(payload)
+    # THE LEDGER MUST NEVER COST WIDEN ITS DECISION either, for the reason stated below the
+    # checklist hand-off: its input is a file in somebody's repository, and a crash here
+    # used to mean this hook exited 1 and printed nothing at all.
+    try:
+        _issues = ledger_verdict(payload, decided)
+    except Exception:
+        _issues = ""
+    if _issues:
+        if isinstance(decided, dict):
+            # Joined to the decision rather than replacing it: a blocked Stop still has to
+            # say what it blocked on, and the issue list is context for the same reader.
+            key = "reason" if "reason" in decided else "systemMessage"
+            decided[key] = (decided.get(key) or "") + "\n\n" + _issues
+        else:
+            decided = {"systemMessage": _issues}
     # THE HAND-OFF MUST NEVER COST WIDEN ITS DECISION. Its input is a file the session writes.
     # The types are validated where they are read; this is the backstop for whatever that
     # misses, because a crash here used to exit 1 and print nothing.
