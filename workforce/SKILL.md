@@ -874,6 +874,9 @@ defects, three carried through three or more audits — and the queue's own clos
 person noticing the paragraph and opening a session by hand", which `deferred.md` names as a rule with a
 reader and no producer. This is the reader.*
 
+**A `dev` session also runs `bin/loop due`** right after the inbox. When it prints DUE, start a review
+cycle with `bin/loop mine --cycle` (`plan/review-loop-2026-10-14.md`).
+
 **No install is created in this repo, and no test runs against the live one.** `bin/sync` refreshes
 `.claude/skills/workforce` only if it is already there and never materializes it; `--personal`
 refreshes `~/.claude/skills/workforce` alone. When a test needs a real install, `bin/dev-sandbox

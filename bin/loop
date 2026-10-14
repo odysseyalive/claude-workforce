@@ -1,0 +1,708 @@
+#!/usr/bin/env python3
+"""loop — the review loop: workforce evaluating itself from real use. MAINTAINER-ONLY; not shipped.
+
+    bin/loop mine [--since YYYY-MM-DD] [--project SUBSTR] [--cycle]   per-session outcome signals
+    bin/loop due                                                      DUE / NOT DUE, one line
+
+    Every subcommand takes `--state DIR` (default `${XDG_STATE_HOME:-~/.local/state}/workforce-loop`)
+    and `--projects DIR` (default `${CLAUDE_CONFIG_DIR:-~/.claude}/projects`).
+
+WHAT IT IS FOR. The user, 2026-10-14: "see if we could put something together that would help
+with recursive improvement that we can run periodically and do an evaluation that can, you know,
+as the model capabilities grow, this feature would get better and better." The design is
+`plan/review-loop-2026-10-14.md`. This file is parts 1 (`mine`) and 6 (`due`); categorize, bank,
+replay, score, propose and gate are later subcommands of THIS script, each added as one more
+entry in `COMMANDS` at the bottom.
+
+NOT SHIPPED, AND IT WRITES NOTHING IN THE REPO OR IN ANY PROJECT. It reads every transcript on
+this machine, finance and tax sessions included, so it is not in `manifest.txt` and everything it
+writes lands in the state directory (created 0700, files 0600). Every input is opened read-only.
+
+`mine` — INPUTS
+    <projects>/<dir>/<session>.jsonl                 the session's own transcript
+    <projects>/<dir>/<session>/subagents/**/*.jsonl  its subagents, counted AGAINST that session
+    <cwd>/.claude/workforce/issues/<session>.json    the issue ledger `wf-task-tag` keeps; `cwd`
+                                                     is read from the transcript, never guessed
+    Transcripts are streamed line by line, and a line is only JSON-parsed when its raw bytes say
+    it is a user, assistant, title or Stop-hook system-message record.
+
+    --since  keeps a session whose newest file (main or subagent) was modified on or after that
+             local date, and then counts the WHOLE session, not just the part after the date.
+    --project  substring of the transcript directory name (`-home-you-lab-thing`).
+
+`mine` — SIGNALS PER SESSION. Outcomes are what the score reads; activity is diagnostic only.
+    issues           from the ledger: opened (folded continuations, `merged`, excluded), closed,
+                     and how each close was evidenced (see LEDGER below). An issue not closed is
+                     judged by `wf-task-tag`'s own `judge_issue`: `left_open` is one with items,
+                     agents or a tracked message still unfinished; `left_unjudged` is its `open`
+                     verdict (nothing recorded against it), which is not counted as friction.
+    reopened         an issue id an ISSUES block reported CLOSED that a LATER block in the same
+                     session reported with any other verdict. The ledger cannot say this.
+    kickbacks        ISSUES lines with verdict KICKBACK (raw lines, and distinct issue ids).
+    stop_blocks      user records starting "Stop hook feedback:", i.e. a Stop hook blocked.
+    hook_not_met     those whose text says "condition was not met" (a prompt/agent Stop hook).
+    corrections      HEURISTIC. A human turn that follows an assistant reply and whose first
+                     400 characters match one phrase in `CORRECTION_PHRASES`. Uncalibrated.
+    interrupts       "[Request interrupted by user" records in the main transcript.
+    turn_limit_hits  a background agent's task-notification whose summary says "stopped at its
+                     N-turn limit", or a foreground Agent/Task tool_result that opens "NOTE: this
+                     agent stopped at its N-turn limit". Text quoted inside a Bash result does
+                     not count; the result must belong to an Agent/Task tool_use.
+    tool_errors      tool_result blocks with is_error true, main and subagents.
+    tokens           per API message id (a streamed reply is split over several records that
+                     repeat one usage): input + cache_creation + cache_read + output.
+    tokens_per_closed_issue  tokens / closed issues, None when nothing closed.
+    models           message.model of every assistant record ("<synthetic>" skipped).
+
+LEDGER — WHAT IT CAN AND CANNOT SAY. An issue is a snapshot: id, prompt, `state`, items with a
+status, agents. It carries no timestamps and no history, and nothing in `wf-task-tag` moves a
+closed issue back to open, so the ledger alone can never show a reopen. A close is split by what
+evidenced it: `done` (session items, at least one with a completion status), `withdrawn` (every
+item dropped/withdrawn/superseded/...), `agents` (no items; every agent returned), `fallback` (no
+session items; the hook's own copy of the message was marked done or superseded). Only `done` is
+the session claiming the ask was met; none of them is the user saying so.
+
+FRICTION SCORE — UNCALIBRATED until the user confirms the ranking matches what actually hurt.
+
+    friction = 3*corrections + 2*interrupts + 3*hook_not_met + 2*kickback_issues
+             + 3*turn_limit_hits + 2*issues_left_open + 3*issues_reopened + 0.25*tool_errors
+
+    Raw counts, not rates, so a long bad session outranks a short bad one. Sessions with no human
+    turn, and TEST sessions (`test: true` in sessions.jsonl: cwd under `/tmp/claude-*` or an
+    `sdk-*` entrypoint), are mined and totalled but never ranked.
+
+`mine` — OUTPUT: `<state>/mine/<UTC timestamp>/sessions.jsonl` (one row per session) and
+`summary.json`, plus a plain-text summary on stdout. `--cycle` also writes
+`<state>/cycles/<UTC timestamp>.json` (date, session count, session ids, model ids); it refuses
+`--project`, because a cycle is the whole machine.
+
+`due` — DUE when there is no cycle record, when 30 or more days have passed since the last one,
+when 50 or more sessions exist that it did not mine, or when a model id appears in a transcript
+modified since it that is not among the ids it recorded. It never re-mines: it reads directory
+listings, mtimes, and the last 256 KB of at most 20 recently modified transcripts. One line out,
+exit 0 either way.
+"""
+
+import argparse
+import collections
+import datetime
+import glob
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _wf_task_tag():
+    """`wf-task-tag`'s ledger readers, imported rather than restated, so the definition of a done
+    item cannot drift between the hook that writes the ledger and the loop that reads it."""
+    sys.dont_write_bytecode = True  # never drop a __pycache__ into the shipped directory
+    path = os.path.join(ROOT, "workforce", "bin", "wf-task-tag")
+    loader = importlib.machinery.SourceFileLoader("_wf_task_tag", path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+TT = _wf_task_tag()
+
+# The second half of `DONE_STATUSES`: an ask taken back rather than met. `wf-task-tag` treats both
+# halves alike (either lets an issue close); the loop splits them, because a withdrawn ask is not
+# evidence the work was done.
+WITHDRAWN = frozenset(("dropped", "withdrawn", "cancelled", "canceled", "n/a", "not needed",
+                       "superseded"))
+
+# THE CORRECTION HEURISTIC. Matched case-insensitively against the first 400 characters of a human
+# turn that follows an assistant reply. Each entry is one way people push back; nothing else counts.
+# A small explicit list, so a false fire can be traced to the phrase that made it.
+CORRECTION_PHRASES = [
+    r"^(no|nope|nah)\b(?![ ,.!]+(problem|worries|rush|need|thanks))",
+    r"\bthat'?s not\b", r"\bthat is not\b", r"\bnot what i\b",
+    r"\byou (didn'?t|did not|haven'?t|have not|missed|forgot|skipped|ignored)\b",
+    r"\b(i said|i asked|i told you|as i said)\b",
+    r"\bi (meant|wasn'?t (talking|asking))\b",
+    r"\bwhy (did|didn'?t|would) you\b",
+    r"\bstill (not|doesn'?t|isn'?t|broken|failing|wrong|the same)\b",
+    r"\b(doesn'?t|does not|didn'?t|did not|isn'?t|is not) work",
+    r"\b(that'?s|that is|it'?s|this is|you'?re|you are) (wrong|incorrect)\b",
+    r"\b(stop doing|don'?t do that|try again|revert that|undo that)\b",
+]
+_CORRECTION = [re.compile(p, re.I) for p in CORRECTION_PHRASES]
+
+# A user record that is not the person typing. Older transcripts carry no `origin`, so these
+# prefixes are how a hook, command echo, notification or resume is told apart from a human turn.
+MACHINE_PREFIXES = ("<", "[", "Stop hook feedback", "This session is being continued",
+                    "Base directory for this skill", "Another Claude session", "Caveat:")
+
+FRICTION_WEIGHTS = {"corrections": 3, "interrupts": 2, "hook_not_met": 3, "kickback_issues": 2,
+                    "turn_limit_hits": 3, "issues_left_open": 2, "issues_reopened": 3,
+                    "tool_errors": 0.25}
+
+DUE_DAYS, DUE_SESSIONS, DUE_TAIL_FILES, DUE_TAIL_BYTES = 30, 50, 20, 256 * 1024
+LEDGER_MAX_BYTES = 8 * 1024 * 1024
+
+_WANTED = re.compile(rb'"type": ?"(user|assistant|ai-title|custom-title)"|hook_system_message')
+_ISSUE_LINE = re.compile(r"^\s+(i\d+)\s+([A-Z][A-Z_-]+)\b", re.M)
+_TURN_LIMIT_NOTE = re.compile(r"NOTE: this agent stopped at its (\d+)-turn limit")
+_TURN_LIMIT_SUMMARY = re.compile(r"<summary>Agent \"(.*?)\" stopped at its (\d+)-turn limit")
+_ASSISTANT = re.compile(rb'"type": ?"assistant"')
+
+
+# ---------------------------------------------------------------- paths and private writes
+
+def default_state():
+    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(base, "workforce-loop")
+
+
+def default_projects():
+    base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    return os.path.join(base, "projects")
+
+
+def private_dir(path):
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    return path
+
+
+def write_private(path, text):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def utc_stamp(epoch):
+    return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def project_root(cwd):
+    """A worktree agent's cwd is `<project>/.claude/worktrees/<name>`; its work is the project's."""
+    return cwd.split("/.claude/worktrees/")[0] if cwd else cwd
+
+
+# ---------------------------------------------------------------- discovery
+
+def discover(projects, since_epoch=None, project_sub=None):
+    """[(dir name, session id, main path, [subagent paths], newest mtime)] for every session."""
+    out = []
+    for d in sorted(os.listdir(projects)):
+        if project_sub and project_sub not in d:
+            continue
+        pdir = os.path.join(projects, d)
+        if not os.path.isdir(pdir):
+            continue
+        for main in sorted(glob.glob(os.path.join(glob.escape(pdir), "*.jsonl"))):
+            sid = os.path.basename(main)[:-len(".jsonl")]
+            subs = sorted(glob.glob(os.path.join(glob.escape(pdir), glob.escape(sid), "subagents",
+                                                 "**", "*.jsonl"), recursive=True))
+            newest = max(os.path.getmtime(p) for p in [main] + subs)
+            if since_epoch is not None and newest < since_epoch:
+                continue
+            out.append((d, sid, main, subs, newest))
+    return out
+
+
+# ---------------------------------------------------------------- one session
+
+def human_text(rec):
+    """The words a person typed in this user record, or None when it is not a human turn."""
+    if rec.get("isMeta"):
+        return None
+    origin = rec.get("origin")
+    kind = origin.get("kind") if isinstance(origin, dict) else None
+    if kind is not None and kind != "human":
+        return None
+    if kind is None and rec.get("promptSource") in ("sdk", "system"):
+        return None
+    content = (rec.get("message") or {}).get("content")
+    if isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result"
+                                         for b in content):
+        return None
+    content = record_text(rec)
+    if not content.strip():
+        return None
+    args = re.search(r"<command-args>(.*?)</command-args>", content, re.S)
+    if args:  # a slash command the user typed: the arguments are what they said
+        return args.group(1).strip()
+    if kind is None and content.lstrip().startswith(MACHINE_PREFIXES):
+        return None
+    return content.strip()
+
+
+def record_text(rec):
+    content = (rec.get("message") or {}).get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(b.get("text", "") for b in content
+                        if isinstance(b, dict) and b.get("type") == "text")
+    return ""
+
+
+def result_text(block):
+    c = block.get("content")
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return " ".join(b.get("text", "") for b in c if isinstance(b, dict))
+    return ""
+
+
+class Session:
+    def __init__(self, project_dir, sid):
+        self.project_dir, self.sid = project_dir, sid
+        self.cwd = self.entrypoint = self.title = None
+        self.title_custom = False
+        self.first_ts = self.last_ts = None
+        self.newest_model = (None, "")  # (model, timestamp)
+        self.models = collections.Counter()
+        self.usage = {}
+        self.c = collections.Counter()
+        self.correction_samples, self.turn_limit_samples = [], []
+        self.kickback_ids = set()
+        self.closed_seen, self.reopened = set(), set()
+        self.bad_lines = 0
+        self.bytes = 0
+
+    # Each transcript is read on its own so tool_use ids map to names within that file.
+    def read(self, path, is_sub):
+        tools = {}
+        replied = False
+        with open(path, "rb") as fh:
+            for raw in fh:
+                self.bytes += len(raw)
+                if not _WANTED.search(raw):
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except ValueError:
+                    self.bad_lines += 1
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                replied = self.record(rec, is_sub, tools, replied)
+
+    def record(self, rec, is_sub, tools, replied):
+        kind = rec.get("type")
+        ts = rec.get("timestamp") or ""
+        if not is_sub:
+            if self.cwd is None and rec.get("cwd"):
+                self.cwd = rec["cwd"]
+            if self.entrypoint is None and rec.get("entrypoint"):
+                self.entrypoint = rec["entrypoint"]
+            if ts:
+                self.first_ts = min(self.first_ts or ts, ts)
+                self.last_ts = max(self.last_ts or ts, ts)
+        if kind in ("ai-title", "custom-title") and not is_sub:
+            title = rec.get("customTitle") or rec.get("aiTitle")
+            if title and (kind == "custom-title" or not self.title_custom):
+                self.title, self.title_custom = title, kind == "custom-title"
+        elif kind == "assistant":
+            self.assistant(rec, ts, tools)
+            return True
+        elif kind == "user":
+            self.user(rec, is_sub, tools, replied, ts)
+        elif kind == "attachment":
+            att = rec.get("attachment") or {}
+            if att.get("type") == "hook_system_message" and not is_sub:
+                self.issues_block(att.get("content") or "")
+        return replied
+
+    def assistant(self, rec, ts, tools):
+        msg = rec.get("message") or {}
+        model = msg.get("model")
+        if model and model != "<synthetic>":
+            self.models[model] += 1
+            if ts >= self.newest_model[1]:
+                self.newest_model = (model, ts)
+        usage = msg.get("usage")
+        if isinstance(usage, dict):
+            self.usage[msg.get("id") or rec.get("requestId") or rec.get("uuid")] = usage
+        for b in msg.get("content") or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                tools[b.get("id")] = (b.get("name"), (b.get("input") or {}).get("description"))
+
+    def user(self, rec, is_sub, tools, replied, ts):
+        content = (rec.get("message") or {}).get("content")
+        if isinstance(content, list):
+            for b in content:
+                if not (isinstance(b, dict) and b.get("type") == "tool_result"):
+                    continue
+                if b.get("is_error"):
+                    self.c["tool_errors"] += 1
+                name, desc = tools.get(b.get("tool_use_id")) or (None, None)
+                if name in ("Agent", "Task"):
+                    m = _TURN_LIMIT_NOTE.search(result_text(b)[:400])
+                    if m:
+                        self.turn_limit(ts, str(desc or "foreground agent"), m.group(1))
+        text = record_text(rec)
+        origin = rec.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == "task-notification":
+            m = _TURN_LIMIT_SUMMARY.search(text)
+            if m:
+                self.turn_limit(ts, m.group(1), m.group(2))
+            return
+        if text.startswith("Stop hook feedback:"):
+            self.c["stop_blocks"] += 1
+            if "condition was not met" in text:
+                self.c["hook_not_met"] += 1
+            self.issues_block(text)
+            return
+        if is_sub:
+            return  # a subagent's "user" turns are its dispatcher, never the person
+        if text.startswith("[Request interrupted by user"):
+            self.c["interrupts"] += 1
+            return
+        said = human_text(rec)
+        if said is None:
+            return
+        self.c["human_turns"] += 1
+        if not replied:
+            return
+        head = said[:400]
+        for pat in _CORRECTION:
+            m = pat.search(head)
+            if m:
+                self.c["corrections"] += 1
+                if len(self.correction_samples) < 5:
+                    self.correction_samples.append(
+                        {"ts": ts, "phrase": m.group(0), "excerpt": " ".join(head.split())[:160]})
+                break
+
+    def turn_limit(self, ts, who, limit):
+        self.c["turn_limit_hits"] += 1
+        if len(self.turn_limit_samples) < 5:
+            self.turn_limit_samples.append({"ts": ts, "agent": who[:80], "limit": int(limit)})
+
+    def issues_block(self, text):
+        if "ISSUES" not in text:
+            return
+        for iid, verdict in _ISSUE_LINE.findall(text[text.find("ISSUES"):]):
+            if verdict == "KICKBACK":
+                self.c["kickback_lines"] += 1
+                self.kickback_ids.add(iid)
+            if verdict == "CLOSED":
+                self.closed_seen.add(iid)
+            elif iid in self.closed_seen:
+                self.reopened.add(iid)
+
+    # ------------------------------------------------------------ ledger
+
+    def ledger(self):
+        """Outcome counts from `<cwd>/.claude/workforce/issues/<session>.json`, or None."""
+        if not self.cwd:
+            return None
+        path = os.path.join(self.cwd, ".claude", "workforce", TT.ISSUES,
+                            "%s.json" % TT.session_component({"session_id": self.sid}))
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError:
+            return None
+        with os.fdopen(fd, "rb") as fh:
+            raw = fh.read(LEDGER_MAX_BYTES + 1)
+        try:
+            led = json.loads(raw) if len(raw) <= LEDGER_MAX_BYTES else None
+        except ValueError:
+            led = None
+        if not isinstance(led, dict) or not isinstance(led.get("issues"), list):
+            return {"path": path, "readable": False}
+        out = collections.Counter()
+        for iss in led["issues"]:
+            if not isinstance(iss, dict):
+                continue
+            if iss.get("merged"):
+                out["merged"] += 1
+                continue
+            out["opened"] += 1
+            # An issue not yet marked closed is judged as the next Stop would judge it. Its
+            # `open` verdict means nothing was recorded against it (no item, no agent): that is
+            # the shape a follow-up message leaves, not unfinished work, so it is counted apart.
+            verdict = "closed" if iss.get("state") == "closed" else TT.judge_issue(iss)[0]
+            if verdict != "closed":
+                out["open_" + verdict] += 1
+                out["left_unjudged" if verdict == "open" else "left_open"] += 1
+                continue
+            out["closed"] += 1
+            out["closed_" + close_evidence(iss)] += 1
+        return dict(out, path=path, readable=True)
+
+    # ------------------------------------------------------------ row
+
+    def is_test(self):
+        """A session run BY a test, not by the user at work: launched in a harness scratchpad
+        (`/tmp/claude-*`) or through the SDK (`sdk-*`). Mined and totalled, never ranked."""
+        return bool((self.cwd or "").startswith("/tmp/claude-")
+                    or (self.entrypoint or "").startswith("sdk-"))
+
+    def row(self):
+        tokens = collections.Counter()
+        for u in self.usage.values():
+            for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+                      "output_tokens"):
+                v = u.get(k)
+                if isinstance(v, int):
+                    tokens[k] += v
+        total = sum(tokens.values())
+        led = self.ledger()
+        closed = (led or {}).get("closed", 0)
+        sig = {k: self.c[k] for k in ("human_turns", "corrections", "interrupts", "stop_blocks",
+                                      "hook_not_met", "kickback_lines", "turn_limit_hits",
+                                      "tool_errors")}
+        sig["kickback_issues"] = len(self.kickback_ids)
+        sig["issues_reopened"] = len(self.reopened)
+        sig["issues_left_open"] = (led or {}).get("left_open", 0)
+        friction = sum(w * sig[k] for k, w in FRICTION_WEIGHTS.items())
+        return {
+            "session": self.sid, "project": project_root(self.cwd) or self.project_dir,
+            "project_dir": self.project_dir, "cwd": self.cwd, "title": self.title,
+            "entrypoint": self.entrypoint, "first_ts": self.first_ts, "last_ts": self.last_ts,
+            "subagents": self.c["subagent_files"], "signals": sig,
+            "reopened_ids": sorted(self.reopened), "kickback_ids": sorted(self.kickback_ids),
+            "ledger": led, "tokens": dict(tokens, total=total),
+            "tokens_per_closed_issue": round(total / closed) if closed else None,
+            "models": dict(self.models), "newest_model": list(self.newest_model),
+            "correction_samples": self.correction_samples,
+            "turn_limit_samples": self.turn_limit_samples,
+            "friction": round(friction, 2), "test": self.is_test(),
+            "ranked": sig["human_turns"] > 0 and not self.is_test(),
+            "bad_lines": self.bad_lines, "bytes": self.bytes,
+        }
+
+
+def close_evidence(iss):
+    """What evidenced a closed issue: done | withdrawn | agents | fallback | none."""
+    items = TT.session_items(iss)
+    if items:
+        words = {str(i.get("status") or "").strip().lower().rstrip(".") for i in items}
+        return "withdrawn" if words <= WITHDRAWN else "done"
+    if TT.issue_agents(iss):
+        return "agents"
+    if TT.issue_items(iss):
+        return "fallback"
+    return "none"
+
+
+def mine_session(project_dir, sid, main, subs):
+    s = Session(project_dir, sid)
+    s.read(main, False)
+    for p in subs:
+        s.c["subagent_files"] += 1
+        s.read(p, True)
+    return s.row()
+
+
+# ---------------------------------------------------------------- mine
+
+PROJECT_COLS = ("sessions", "human_turns", "issues_opened", "issues_closed", "corrections",
+                "interrupts", "hook_not_met", "kickback_issues", "turn_limit_hits", "tool_errors")
+
+
+def summarize(rows):
+    per = collections.OrderedDict()
+    for r in sorted(rows, key=lambda r: r["project"]):
+        t = per.setdefault(r["project"], collections.Counter())
+        sig, led = r["signals"], r["ledger"] or {}
+        t["sessions"] += 1
+        t["issues_opened"] += led.get("opened", 0)
+        t["issues_closed"] += led.get("closed", 0)
+        t["tokens"] += r["tokens"]["total"]
+        for k in PROJECT_COLS[1:]:
+            if k in sig:
+                t[k] += sig[k]
+    return per
+
+
+def cmd_mine(args):
+    t0 = time.time()
+    if args.cycle and args.project:
+        print("loop mine: --cycle refuses --project; a cycle covers the whole machine",
+              file=sys.stderr)
+        return 2
+    since = None
+    if args.since:
+        since = datetime.datetime.strptime(args.since, "%Y-%m-%d").timestamp()
+    sessions = discover(args.projects, since, args.project)
+    rows = [mine_session(d, sid, main, subs) for d, sid, main, subs, _ in sessions]
+    models = collections.Counter()
+    newest = (None, "")
+    for r in rows:
+        models.update(r["models"])
+        if r["newest_model"][0] and r["newest_model"][1] >= newest[1]:
+            newest = tuple(r["newest_model"])
+    ranked = sorted((r for r in rows if r["ranked"]), key=lambda r: -r["friction"])[:20]
+    per = summarize(rows)
+    now = time.time()
+    out = private_dir(os.path.join(private_dir(os.path.join(private_dir(args.state), "mine")),
+                                   utc_stamp(now)))
+    write_private(os.path.join(out, "sessions.jsonl"),
+                  "".join(json.dumps(r, sort_keys=True) + "\n" for r in rows))
+    summary = {
+        "mined_at": utc_stamp(now), "since": args.since, "project_filter": args.project,
+        "projects_dir": args.projects, "sessions": len(rows),
+        "subagent_files": sum(r["subagents"] for r in rows),
+        "bytes_read": sum(r["bytes"] for r in rows), "bad_lines": sum(r["bad_lines"] for r in rows),
+        "elapsed_s": round(time.time() - t0, 1), "models": dict(models.most_common()),
+        "newest_model": newest[0], "friction_weights": FRICTION_WEIGHTS,
+        "correction_phrases": CORRECTION_PHRASES,
+        "per_project": {p: dict(t) for p, t in per.items()},
+        "worst": [{"session": r["session"], "project": r["project"], "title": r["title"],
+                   "friction": r["friction"], "signals": r["signals"]} for r in ranked],
+    }
+    write_private(os.path.join(out, "summary.json"), json.dumps(summary, indent=1) + "\n")
+    if args.cycle:
+        cyc = private_dir(os.path.join(args.state, "cycles"))
+        write_private(os.path.join(cyc, utc_stamp(now) + ".json"), json.dumps({
+            "date": utc_stamp(now), "mined_at_epoch": now, "since": args.since,
+            "session_count": len(rows), "session_ids": sorted(r["session"] for r in rows),
+            "models": sorted(models), "newest_model": newest[0], "mine_dir": out,
+        }, indent=1) + "\n")
+    print_summary(summary, per, ranked, out, args.cycle)
+    return 0
+
+
+def print_summary(summary, per, ranked, out, cycle):
+    print("loop mine: %d sessions (%d subagent transcripts), %.0f MB read in %.1fs%s"
+          % (summary["sessions"], summary["subagent_files"], summary["bytes_read"] / 1e6,
+             summary["elapsed_s"], "  since %s" % summary["since"] if summary["since"] else ""))
+    print("\nPer project  (sess turns iss-open iss-closed corr intr not-met kickb turnlim toolerr  tokens)")
+    for p, t in sorted(per.items(), key=lambda kv: -kv[1]["sessions"]):
+        print("  %-52s %4d %5d %4d %4d %4d %4d %4d %4d %4d %5d %8.1fM"
+              % (p[-52:], *(t[k] for k in PROJECT_COLS), t["tokens"] / 1e6))
+    print("\nWorst %d by friction (UNCALIBRATED; formula in `bin/loop` docstring)" % len(ranked))
+    for i, r in enumerate(ranked, 1):
+        s = r["signals"]
+        print("  %2d. %6.2f  %s  %-28s corr %d intr %d not-met %d kickb %d turnlim %d open %d "
+              "reopen %d toolerr %d  %s"
+              % (i, r["friction"], r["session"][:8], os.path.basename(r["project"])[:28],
+                 s["corrections"], s["interrupts"], s["hook_not_met"], s["kickback_issues"],
+                 s["turn_limit_hits"], s["issues_left_open"], s["issues_reopened"],
+                 s["tool_errors"], (r["title"] or "")[:40]))
+    print("\nModels seen: %s" % ", ".join("%s (%d)" % kv for kv in summary["models"].items()))
+    print("Written: %s/{sessions.jsonl,summary.json}%s" % (out, "  + cycle record" if cycle else ""))
+
+
+# ---------------------------------------------------------------- due
+
+def tail_models(path):
+    """Model ids in the last DUE_TAIL_BYTES of a transcript, oldest first."""
+    try:
+        with open(path, "rb") as fh:
+            offset = max(0, os.path.getsize(path) - DUE_TAIL_BYTES)
+            fh.seek(offset)
+            data = fh.read()
+    except OSError:
+        return []
+    lines = data.split(b"\n")
+    if offset > 0:
+        lines = lines[1:]  # the read began mid-line; a read from 0 begins on a whole one
+    found = []
+    for line in lines:
+        if not _ASSISTANT.search(line):
+            continue
+        # PARSED, NEVER REGEX-SCANNED: an Agent tool_use input carries `"model": "sonnet"` too,
+        # and only `message.model` is the model that answered.
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict) or rec.get("type") != "assistant":
+            continue
+        msg = rec.get("message")
+        model = msg.get("model") if isinstance(msg, dict) else None
+        if isinstance(model, str) and model != "<synthetic>":
+            found.append(model)
+    return found
+
+
+def cmd_due(args):
+    cycles = sorted(glob.glob(os.path.join(glob.escape(args.state), "cycles", "*.json")))
+    if not cycles:
+        print("DUE: no cycle recorded yet in %s" % os.path.join(args.state, "cycles"))
+        return 0
+    try:
+        with open(cycles[-1], encoding="utf-8") as fh:
+            cyc = json.load(fh)
+    except (OSError, ValueError):
+        cyc = None
+    if not isinstance(cyc, dict):
+        print("DUE: last cycle record unreadable (%s)" % cycles[-1])
+        return 0
+    at = float(cyc.get("mined_at_epoch") or 0)
+    known_ids = set(cyc.get("session_ids") or [])
+    known_models = set(cyc.get("models") or [])
+    days = (time.time() - at) / 86400
+    fresh, new = [], 0
+    for path in glob.glob(os.path.join(glob.escape(args.projects), "*", "*.jsonl")) + \
+            glob.glob(os.path.join(glob.escape(args.projects), "*", "*", "subagents", "**",
+                                   "*.jsonl"), recursive=True):
+        m = os.path.getmtime(path)
+        if m <= at:
+            continue
+        fresh.append((m, path))
+        if "/subagents/" not in path and os.path.basename(path)[:-6] not in known_ids:
+            new += 1
+    seen = {}  # insertion-ordered set: newest file first
+    for _, path in sorted(fresh, reverse=True)[:DUE_TAIL_FILES]:
+        seen.update(dict.fromkeys(reversed(tail_models(path))))
+    unseen = [m for m in seen if m not in known_models]
+    reasons = []
+    if days >= DUE_DAYS:
+        reasons.append("%.0f days since the last cycle (%s)" % (days, cyc.get("date")))
+    if new >= DUE_SESSIONS:
+        reasons.append("%d new sessions since it" % new)
+    if unseen:
+        reasons.append("model id %s not seen at the last cycle (it recorded %s)"
+                       % (", ".join(unseen), ", ".join(sorted(known_models)) or "none"))
+    if reasons:
+        print("DUE: " + "; ".join(reasons))
+    else:
+        print("NOT DUE: %.0f of %d days since the last cycle (%s), %d of %d new sessions, "
+              "no new model id (recent: %s)" % (days, DUE_DAYS, cyc.get("date"), new,
+                                                DUE_SESSIONS, ", ".join(seen) or "none"))
+    return 0
+
+
+# ---------------------------------------------------------------- dispatcher
+
+def add_mine(p):
+    p.add_argument("--since", metavar="YYYY-MM-DD",
+                   help="only sessions with a file modified on or after this local date")
+    p.add_argument("--project", metavar="SUBSTR",
+                   help="only transcript directories whose name contains SUBSTR")
+    p.add_argument("--cycle", action="store_true", help="also write the cycle record `due` reads")
+
+
+# One entry per stage: name -> (help, argument adder, runner). A later stage is one more row.
+COMMANDS = {
+    "mine": ("per-session outcome signals from every transcript and issue ledger", add_mine,
+             cmd_mine),
+    "due": ("print DUE or NOT DUE for a new review cycle, with the reason", lambda p: None,
+            cmd_due),
+}
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = ap.add_subparsers(dest="cmd")
+    for name, (helptext, add_args, run) in COMMANDS.items():
+        p = sub.add_parser(name, help=helptext)
+        p.add_argument("--state", default=default_state(),
+                       help="state directory (default: %(default)s)")
+        p.add_argument("--projects", default=default_projects(),
+                       help="transcript root (default: %(default)s)")
+        add_args(p)
+        p.set_defaults(run=run)
+    args = ap.parse_args()
+    if not args.cmd:
+        ap.print_help()
+        return 2
+    return args.run(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
